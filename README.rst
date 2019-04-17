@@ -1,4 +1,4 @@
-.. image:: https://raw.githubusercontent.com/empymod/emg3d-logo/master/logo-emg3d-edited.png
+.. image:: https://raw.githubusercontent.com/empymod/emg3d-logo/master/logo-emg3d-cut.png
    :target: https://github.com/empymod/emg3d
    :alt: emg3d logo
    
