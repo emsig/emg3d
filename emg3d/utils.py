@@ -1,0 +1,1531 @@
+"""
+
+:mod:`utils` -- Utilities
+=========================
+
+Utility functions for the multigrid solver.
+
+"""
+# Copyright 2018-2019 The emg3d Developers.
+#
+# This file is part of emg3d.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License.  You may obtain a copy
+# of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+
+import os
+import sys
+import time
+import numba
+import scipy
+import shelve
+import textwrap
+import platform
+import numpy as np
+import multiprocessing
+from scipy import optimize
+from timeit import default_timer
+from contextlib import contextmanager
+from datetime import datetime, timedelta
+
+import emg3d  # emg3d for Versions
+
+# Optional modules
+try:
+    import IPython
+except ImportError:
+    IPython = False
+try:
+    import matplotlib
+except ImportError:
+    matplotlib = False
+try:
+    import numexpr
+except ImportError:
+    numexpr = False
+try:
+    import mkl
+except ImportError:
+    mkl = False
+
+# Get mkl info from numexpr or mkl, if available
+if mkl:
+    mklinfo = mkl.get_version_string()
+elif numexpr:
+    mklinfo = numexpr.get_vml_version()
+else:
+    mklinfo = False
+
+
+__all__ = ['get_domain', 'get_stretched_h', 'get_hx', 'get_source_field',
+           'Model', 'Field', 'TensorMesh', 'Time', 'now', 'timeit', 'ctimeit',
+           'data_write', 'data_read', 'Versions']
+
+
+# CONSTANTS
+c = 299792458              # Speed of light m/s
+mu_0 = 4e-7*np.pi          # Magn. permeability of free space [H/m]
+epsilon_0 = 1./(mu_0*c*c)  # Elec. permittivity of free space [F/m]
+
+
+# HELPER FUNCTIONS TO CREATE MESH => These will probably move to discretize.
+def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
+               fact_min=0.2, fact_neg=5, fact_pos=None):
+    r"""Get domain extent and minimum cell width as a function of skin depth.
+
+    Returns the extent of the calculation domain and the minimum cell width as
+    a multiple of the skin depth, with possible user restrictions on minimum
+    calculation domain and range of possible minimum cell widths.
+
+    .. math::
+
+            \delta &= 503.3 \sqrt{\frac{\rho}{f}} , \\
+            x_\text{start} &= x_0-k_\text{neg}\delta , \\
+            x_\text{end} &= x_0+k_\text{pos}\delta , \\
+            h_\text{min} &= k_\text{min} \delta .
+
+    .. note::
+
+        This utility will probably move into discretize in the future.
+
+
+    Parameters
+    ----------
+
+    x0 : float
+        Center of the calculation domain. Normally the source location.
+        Default is 0.
+
+    freq : float
+        Frequency (Hz) to calculate the skin depth.
+        Default is 1 Hz.
+
+    rho : float, optional
+        Resistivity (Ohm m) to calculate skin depth.
+        Default is 0.3 Ohm m (sea water).
+
+    limits : None or list
+        [start, end] of model domain. This extent represents the minimum extent
+        of the domain. The domain is therefore only adjusted if it has to reach
+        outside of [start, end].
+        Default is None.
+
+    min_width : None, float, or list of two floats
+        Minimum cell width is calculated as a function of skin depth:
+        fact_min*sd. If ``min_width`` is a float, this is used. If a list of
+        two values [min, max] are provided, the are used to restrain min_width.
+        Default is None.
+
+    fact_min, fact_neg, fact_pos : floats
+        The skin depth is multiplied with these factors to estimate:
+
+            - Minimum cell width (``fact_min``, default 0.2)
+            - Domain-start (``fact_neg``, default 5), and
+            - Domain-end (``fact_pos``, defaults to ``fact_neg``).
+
+
+    Returns
+    -------
+
+    h_min : float
+        Minimum cell width.
+
+    domain : list
+        Start- and end-points of calculation domain.
+
+    """
+
+    # Set fact_pos to fact_neg if not provided
+    if fact_pos is None:
+        fact_pos = fact_neg
+
+    # Calculate the skin depth
+    skind = 503.3*np.sqrt(rho/freq)
+
+    # Estimate minimum cell width
+    h_min = fact_min*skind
+    if min_width is not None:  # Respect user input
+        if np.array(min_width).size == 1:
+            h_min = min_width
+        else:
+            h_min = np.clip(h_min, *min_width)
+
+    # Estimate calculation domain
+    domain = [x0-fact_neg*skind, x0+fact_pos*skind]
+    if limits is not None:  # Respect user input
+        domain = [min(limits[0], domain[0]), max(limits[1], domain[1])]
+
+    return h_min, domain
+
+
+def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
+    """Return cell widths for a stretched grid within the domain.
+
+    Returns ``nx`` cell widths within ``domain``, where the minimum cell width
+    is ``h_min``. The cells are not stretched within ``x0`` and ``x1``, and
+    outside uses a power-law stretching. The actual stretching factor and the
+    number of cells left and right of ``x0`` and ``x1`` are find in a
+    minimization process.
+
+    The domain is not completely respected. The starting point of the domain
+    is, but the endpoint of the domain might slightly shift (this is more
+    likely the case for small ``nx``, for big ``nx`` the shift should be
+    small). The new endpoint can be obtained with ``domain[0]+np.sum(hx)``. If
+    you want the domain to be respected absolutely, set ``resp_domain=True``.
+    However, be aware that this will introduce one stretch-factor which is
+    different from the other stretch factors, to accommodate the restriction.
+    This one-off factor is between the left- and right-side of ``x0``, or, if
+    ``x1`` is provided, just after ``x1``.
+
+    .. note::
+
+        This utility will probably move into discretize in the future.
+
+
+    Parameters
+    ----------
+
+    h_min : float
+        Minimum cell width.
+
+    domain : list
+        [start, end] of model domain.
+
+    nx : int
+        Number of cells.
+
+    x0 : float
+        Center of the grid. ``x0`` is restricted to ``domain``.
+        Default is 0.
+
+    x1 : float
+        If provided, then no stretching is applied between ``x0`` and ``x1``.
+        The non-stretched part starts at ``x0`` and stops at the first possible
+        location at or after ``x1``. ``x1`` is restricted to ``domain``.
+
+    resp_domain : bool
+        If False (default), then the domain-end might shift slightly to assure
+        that the same stretching factor is applied throughout. If set to True,
+        however, the domain is respected absolutely. This will introduce one
+        stretch-factor which is different from the other stretch factors, to
+        accommodate the restriction. This one-off factor is between the left-
+        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
+
+
+    Returns
+    -------
+    hx : ndarray
+        Cell widths of mesh.
+
+    """
+
+    # Cast to arrays
+    domain = np.array(domain, dtype=float)
+    x0 = np.array(x0, dtype=float)
+    x0 = np.clip(x0, *domain)  # Restrict to model domain
+    if x1 is not None:
+        x1 = np.array(x1, dtype=float)
+        x1 = np.clip(x1, *domain)  # Restrict to model domain
+
+    # If x1 is provided (a part is not stretched)
+    if x1 is not None:
+
+        # Store original values
+        xlim_orig = domain.copy()
+        nx_orig = int(nx)
+        x0_orig = x0.copy()
+
+        # Get number of non-stretched cells
+        n_nos = int(np.ceil((x1-x0)/h_min))-1
+        # Note that wee subtract one cell, because the standard scheme provides
+        # one h_min-cell.
+
+        # Reset x0, because the first h_min comes from normal scheme
+        x0 += h_min
+
+        # Reset xmax for normal scheme
+        domain[1] -= n_nos*h_min
+
+        # Reset nx for normal scheme
+        nx -= n_nos
+
+        # If there are not enough points reset to standard procedure
+        # This five is arbitrary. However, nx should be much bigger than five
+        # anyways, otherwise stretched grid doesn't make sense.
+        if nx <= 5:
+            print("Warning :: Not enough points for non-stretched part,"
+                  "ignoring therefore `x1`.")
+            domain = xlim_orig
+            nx = nx_orig
+            x0 = x0_orig
+            x1 = None
+
+    # Get stretching factor (a = 1+alpha).
+    if h_min == 0 or h_min > np.diff(domain)/nx:
+        # If h_min is bigger than the domain-extent divided by nx, no
+        # stretching is required at all.
+        alpha = 0
+    else:
+
+        # Wrap _get_dx into a minimization function to call with fsolve.
+        def find_alpha(alpha, h_min, args):
+            """Find alpha such that min(hx) = h_min."""
+            return min(get_hx(alpha, *args))/h_min-1
+
+        # Search for best alpha, must be at least 0
+        args = (domain, nx, x0)
+        alpha = max(0, optimize.fsolve(find_alpha, 0.02, (h_min, args)))
+
+    # With alpha get actual cell spacing with `resp_domain` to respect the
+    # users decision.
+    hx = get_hx(alpha, domain, nx, x0, resp_domain)
+
+    # Add the non-stretched center if x1 is provided
+    if x1 is not None:
+        hx = np.r_[hx[: np.argmin(hx)], np.ones(n_nos)*h_min,
+                   hx[np.argmin(hx):]]
+
+    return hx
+
+
+def get_hx(alpha, domain, nx, x0, resp_domain=True):
+    r"""Return cell widths for given input.
+
+    Find the number of cells left and right of ``x0``, ``nl`` and ``nr``
+    respectively, for the provided alpha. For this, we solve
+
+    .. math::   \frac{x_\text{max}-x_0}{x_0-x_\text{min}} =
+                \frac{a^{nr}-1}{a^{nl}-1}
+
+    where :math:`a = 1+\alpha`.
+
+    .. note::
+
+        This utility will probably move into discretize in the future.
+
+
+    Parameters
+    ----------
+
+    alpha : float
+        Stretching factor ``a`` is given by ``a=1+alpha``.
+
+    domain : list
+        [start, end] of model domain.
+
+    nx : int
+        Number of cells.
+
+    x0 : float
+        Center of the grid. ``x0`` is restricted to ``domain``.
+
+    resp_domain : bool
+        If False (default), then the domain-end might shift slightly to assure
+        that the same stretching factor is applied throughout. If set to True,
+        however, the domain is respected absolutely. This will introduce one
+        stretch-factor which is different from the other stretch factors, to
+        accommodate the restriction. This one-off factor is between the left-
+        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
+
+
+    Returns
+    -------
+    hx : ndarray
+        Cell widths of mesh.
+
+    """
+    if alpha <= 0.:  # If alpha <= 0: equal spacing (no stretching at all)
+        hx = np.ones(nx)*np.diff(domain)/nx
+
+    else:            # Get stretched hx
+        a = alpha+1
+
+        # Get hx depending if x0 is on the domain boundary or not.
+        if x0 == domain[0] or x0 == domain[1]:
+            # Get al a's
+            alr = np.diff(domain)*alpha/(a**nx-1)*a**np.arange(nx)
+            if x0 == domain[1]:
+                alr = alr[::-1]
+
+            # Calculate differences
+            hx = alr*np.diff(domain)/sum(alr)
+
+        else:
+            # Find number of elements left and right by solving:
+            #     (xmax-x0)/(x0-xmin) = a**nr-1/(a**nl-1)
+            nr = np.arange(2, nx+1)
+            er = (domain[1]-x0)/(x0-domain[0]) - (a**nr[::-1]-1)/(a**nr-1)
+            nl = np.argmin(abs(np.floor(er)))+1
+            nr = nx-nl
+
+            # Get all a's
+            al = a**np.arange(nl-1, -1, -1)
+            ar = a**np.arange(1, nr+1)
+
+            # Calculate differences
+            if resp_domain:
+                # This version honours domain[0] and domain[1], but to achieve
+                # this it introduces one stretch-factor which is different from
+                # all the others between al to ar.
+                hx = np.r_[al*(x0-domain[0])/sum(al),
+                           ar*(domain[1]-x0)/sum(ar)]
+            else:
+                # This version moves domain[1], but each stretch-factor is
+                # exactly the same.
+                fact = (x0-domain[0])/sum(al)  # Take distance from al.
+                hx = np.r_[al, ar]*fact
+
+                # Note: this hx is equivalent as providing the following h
+                # to TensorMesh:
+                # h = [(h_min, nl-1, -a), (h_min, n_nos+1), (h_min, nr, a)]
+
+    return hx
+
+
+def get_source_field(grid, src, freq, strength=0):
+    r"""Return the source field.
+
+    The source field is given in Equation 2 in [Muld06]_,
+
+    .. math::
+
+        \mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} .
+
+    Either finite length dipoles or infinitesimal small point dipoles can be
+    defined, whereas the return source field corresponds to a normalized (1 Am)
+    source distributed within the cell(s) it resides (can be changed with the
+    ``strength``-parameter).
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; a ``TensorMesh``-instance.
+
+    src : list of floats
+        Source coordinates (m). There are two formats:
+
+          - Finite length dipole: ``[x0, x1, y0, y1, z0, z1]``.
+          - Point dipole: ``[x, y, z, azimuth, dip]``.
+
+    freq : float
+        Source frequency (Hz).
+
+    strength : float, optional
+        Source strength (A):
+
+          - If 0, output is normalized to a source of 1 m length, and source
+            strength of 1 A.
+          - If != 0, output is returned for given source length and strength.
+
+        Default is 0.
+
+
+    Returns
+    -------
+    sfield : :func:`Field`-instance
+        Source field, normalized to 1 A m.
+
+    """
+    # Cast some parameters
+    src = np.array(src, dtype=float)
+    strength = float(strength)
+
+    # Ensure source is a point or a finite dipole
+    if len(src) not in [5, 6]:
+        print("* ERROR   :: Source is wrong defined. Must be either a point,\n"
+              "             [x, y, z, azimuth, dip], or a finite dipole,\n"
+              "             [x1, x2, y1, y2, z1, z2]. Provided source:\n"
+              f"             {src}.")
+        raise ValueError("Source error")
+    elif len(src) == 5:
+        finite = False  # Infinitesimal small dipole.
+    else:
+        finite = True   # Finite length dipole.
+
+        # Ensure finite length dipole is not a point dipole.
+        if np.allclose(np.linalg.norm(src[1::2]-src[::2]), 0):
+            print("* ERROR   :: Provided source is a point dipole, "
+                  "use the format [x, y, z, azimuth, dip] instead.")
+            raise ValueError("Source error")
+
+    # Ensure source is within grid
+    if finite:
+        ii = [0, 1, 2, 3, 4, 5]
+    else:
+        ii = [0, 0, 1, 1, 2, 2]
+
+    source_in = np.any(src[ii[0]] >= grid.vectorNx[0])
+    source_in *= np.any(src[ii[1]] <= grid.vectorNx[-1])
+    source_in *= np.any(src[ii[2]] >= grid.vectorNy[0])
+    source_in *= np.any(src[ii[3]] <= grid.vectorNy[-1])
+    source_in *= np.any(src[ii[4]] >= grid.vectorNz[0])
+    source_in *= np.any(src[ii[5]] <= grid.vectorNz[-1])
+
+    if not source_in:
+        print(f"* ERROR   :: Provided source outside grid: {src}.")
+        raise ValueError("Source error")
+
+    # Get source orientation (dxs, dys, dzs)
+    if not finite:  # Point dipole: convert azimuth/dip to weights.
+        h = np.cos(np.deg2rad(src[4]))
+        dys = np.sin(np.deg2rad(src[3]))*h
+        dxs = np.cos(np.deg2rad(src[3]))*h
+        dzs = np.sin(np.deg2rad(src[4]))
+        srcdir = np.array([dxs, dys, dzs])
+        src = src[:3]
+
+    else:           # Finite dipole: get length and normalize.
+        srcdir = np.diff(src.reshape(3, 2)).ravel()
+
+        # Normalize to one if strength is 0.
+        if strength == 0:
+            srcdir /= np.linalg.norm(srcdir)
+
+    # Set source strength.
+    if strength == 0:  # 1 A m
+        strength = srcdir
+    else:              # Multiply source length with source strength
+        strength *= srcdir
+
+    def set_source(grid, idir, finite):
+        """Set the source-field in idir."""
+
+        # Get edges or cells, depending on which direction (idir)
+        if idir == 0:
+            xx = grid.vectorCCx
+            nx = grid.nCx
+        else:
+            xx = grid.vectorNx
+            nx = grid.nNx
+        if idir == 1:
+            yy = grid.vectorCCy
+            ny = grid.nCy
+        else:
+            yy = grid.vectorNy
+            ny = grid.nNy
+        if idir == 2:
+            zz = grid.vectorCCz
+            nz = grid.nCz
+        else:
+            zz = grid.vectorNz
+            nz = grid.nNz
+
+        # Initiate source field in idir;
+        # (nx, ny, nz) corresponds to vnEx/vnEy/vnEz
+        s = np.zeros((nx, ny, nz))
+
+        # Return source-field depending if point or finite dipole.
+        if finite:
+            return finite_source(xx, yy, zz, src, s, idir, grid)
+        else:
+            return point_source(xx, yy, zz, src, s)
+
+    def point_source(xx, yy, zz, src, s):
+        """Set point dipole source."""
+        nx, ny, nz = s.shape
+
+        # Get indices of cells in which source resides.
+        ix = max(0, np.where(src[0] < np.r_[xx, np.infty])[0][0]-1)
+        iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
+        iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
+
+        # Indices and field strength in x-direction
+        if ix == nx-1:
+            rx = 1.0
+            ex = 1.0
+            ix1 = ix
+        else:
+            ix1 = ix+1
+            rx = (src[0]-xx[ix])/(xx[ix1]-xx[ix])
+            ex = 1.0-rx
+
+        # Indices and field strength in y-direction
+        if iy == ny-1:
+            ry = 1.0
+            ey = 1.0
+            iy1 = iy
+        else:
+            iy1 = iy+1
+            ry = (src[1]-yy[iy])/(yy[iy1]-yy[iy])
+            ey = 1.0-ry
+
+        # Indices and field strength in z-direction
+        if iz == nz-1:
+            rz = 1.0
+            ez = 1.0
+            iz1 = iz
+        else:
+            iz1 = iz+1
+            rz = (src[2]-zz[iz])/(zz[iz1]-zz[iz])
+            ez = 1.0-rz
+
+        s[ix, iy, iz] = ex*ey*ez
+        s[ix1, iy, iz] = rx*ey*ez
+        s[ix, iy1, iz] = ex*ry*ez
+        s[ix1, iy1, iz] = rx*ry*ez
+        s[ix, iy, iz1] = ex*ey*rz
+        s[ix1, iy, iz1] = rx*ey*rz
+        s[ix, iy1, iz1] = ex*ry*rz
+        s[ix1, iy1, iz1] = rx*ry*rz
+
+        # Return point dipole source.
+        return s
+
+    def finite_source(xx, yy, zz, src, s, idir, grid):
+        """Set finite dipole source.
+
+        Using adjoint interpolation method, probably not the most efficient
+        implementation.
+        """
+        nx, ny, nz = s.shape
+
+        # Source lengths in x-, y-, and z-directions.
+        d_xyz = src[1::2]-src[::2]
+
+        # Inverse source lengths.
+        id_xyz = d_xyz.copy()
+        id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
+
+        # Cell fractions.
+        a1 = (grid.vectorNx-src[0])*id_xyz[0]
+        a2 = (grid.vectorNy-src[2])*id_xyz[1]
+        a3 = (grid.vectorNz-src[4])*id_xyz[2]
+
+        # Get range of indices of cells in which source resides.
+        def min_max_ind(vector, i):
+            """Return [min, max]-index of cells in which source resides."""
+            vmin = min(src[2*i:2*i+2])
+            vmax = max(src[2*i:2*i+2])
+            return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
+                    max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
+
+        rix = min_max_ind(grid.vectorNx, 0)
+        riy = min_max_ind(grid.vectorNy, 1)
+        riz = min_max_ind(grid.vectorNz, 2)
+
+        # Loop over these indices.
+        for iz in range(riz[0], riz[1]+1):
+            for iy in range(riy[0], riy[1]+1):
+                for ix in range(rix[0], rix[1]+1):
+
+                    # Determine centre of gravity of line segment in cell.
+                    aa = np.vstack([[a1[ix], a1[ix+1]], [a2[iy], a2[iy+1]],
+                                   [a3[iz], a3[iz+1]]])
+                    aa = np.sort(aa[d_xyz != 0, :], 1)
+                    al = max(0, aa[:, 0].max())  # Left and right
+                    ar = min(1, aa[:, 1].min())  # elements.
+
+                    # Characteristics of this cell.
+                    xmin = src[::2]+al*d_xyz
+                    xmax = src[::2]+ar*d_xyz
+                    x_c = (xmin+xmax)/2.0
+                    slen = np.linalg.norm(src[1::2]-src[::2])
+                    x_len = np.linalg.norm(xmax-xmin)/slen
+
+                    # Contribution to edge (coordinate idir)
+                    rx = (x_c[0]-grid.vectorNx[ix])/grid.hx[ix]
+                    ex = 1-rx
+                    ry = (x_c[1]-grid.vectorNy[iy])/grid.hy[iy]
+                    ey = 1-ry
+                    rz = (x_c[2]-grid.vectorNz[iz])/grid.hz[iz]
+                    ez = 1-rz
+
+                    # Add to field (only if segment inside cell).
+                    if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
+
+                        if idir == 0:
+                            s[ix, iy, iz] += ey*ez*x_len
+                            s[ix, iy+1, iz] += ry*ez*x_len
+                            s[ix, iy, iz+1] += ey*rz*x_len
+                            s[ix, iy+1, iz+1] += ry*rz*x_len
+                        if idir == 1:
+                            s[ix, iy, iz] += ex*ez*x_len
+                            s[ix+1, iy, iz] += rx*ez*x_len
+                            s[ix, iy, iz+1] += ex*rz*x_len
+                            s[ix+1, iy, iz+1] += rx*rz*x_len
+                        if idir == 2:
+                            s[ix, iy, iz] += ex*ey*x_len
+                            s[ix+1, iy, iz] += rx*ey*x_len
+                            s[ix, iy+1, iz] += ex*ry*x_len
+                            s[ix+1, iy+1, iz] += rx*ry*x_len
+
+        # Return finite length dipole source.
+        return s
+
+    # Get the source field in x-, y-, and z-direction
+    sx = strength[0]*set_source(grid, 0, finite)
+    sy = strength[1]*set_source(grid, 1, finite)
+    sz = strength[2]*set_source(grid, 2, finite)
+
+    # Multiply by j omega mu and return field instance
+    iomegamu = 2j*np.pi*freq*mu_0
+    return iomegamu*Field(sx, sy, sz)
+
+
+class TensorMesh:
+    """Rudimentary mesh for multigrid calculation.
+
+    The tensor-mesh :class:`discretize.TensorMesh` is a powerful tool,
+    including sophisticated mesh-generation possibilities in 1D, 2D, and 3D,
+    plotting routines, and much more. However, in the multigrid solver we have
+    to generate a mesh at each level, many times over and over again, and we
+    only need a very limited set of attributes. This tensor-mesh class provides
+    all required attributes. All attributes here are the same as their
+    counterparts in :class:`discretize.TensorMesh` (both in name and value).
+
+    .. warning::
+        This is a slimmed-down version of :class:`discretize.TensorMesh`, meant
+        principally for internal use by the multigrid modeller. It is highly
+        recommended to use :class:`discretize.TensorMesh` to create the input
+        meshes instead of this class. There are no input-checks carried out
+        here, and there is only one accepted input format for ``h`` and ``x0``.
+
+
+    Parameters
+    ----------
+    h : list of three ndarrays
+        Cell widths in [x, y, z] directions.
+
+    x0 : ndarray of dimension (3, )
+        Origin (x, y, z).
+
+    """
+
+    def __init__(self, h, x0):
+        """Initialize the mesh."""
+        self.x0 = x0
+
+        # Width of cells.
+        self.hx = h[0]
+        self.hy = h[1]
+        self.hz = h[2]
+
+        # Cell related properties.
+        self.nCx = int(self.hx.size)
+        self.nCy = int(self.hy.size)
+        self.nCz = int(self.hz.size)
+        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
+        self.nC = int(self.vnC.prod())
+        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
+        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
+        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
+
+        # Node related properties.
+        self.nNx = self.nCx + 1
+        self.nNy = self.nCy + 1
+        self.nNz = self.nCz + 1
+        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
+        self.nN = int(self.vnN.prod())
+        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
+        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
+        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
+
+        # Edge related properties.
+        self.gridEx = self._get_tensor(
+                self.vectorCCx, self.vectorNy, self.vectorNz)
+        self.gridEy = self._get_tensor(
+                self.vectorNx, self.vectorCCy, self.vectorNz)
+        self.gridEz = self._get_tensor(
+                self.vectorNx, self.vectorNy, self.vectorCCz)
+        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
+        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
+        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
+        self.nEx = int(self.vnEx.prod())
+        self.nEy = int(self.vnEy.prod())
+        self.nEz = int(self.vnEz.prod())
+        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
+        self.nE = int(self.vnE.sum())
+
+    @property
+    def vol(self):
+        """Construct cell volumes of the 3D model as 1D array."""
+        xy = np.outer(self.hx, self.hy).flatten(order='F')
+        return np.outer(xy, self.hz).flatten(order='F')
+
+    @staticmethod
+    def _get_tensor(x1, x2, x3):
+        """For CCx, CCy, and CCz."""
+        Z, Y, X = np.broadcast_arrays(x3, x2[:, None], x1[:, None, None])
+        out = np.r_[X.flatten('F'), Y.flatten('F'), Z.flatten('F')]
+        return out.reshape(-1, 3, order='F')
+
+
+# MODEL AND FIELD CLASSES
+class Model:
+    r"""Create a resistivity model.
+
+    For now, the model grid equals the calculation grid. However, this should
+    change in the future, and functions to go from one to the other and back
+    have to be implemented.
+
+    Relative electric permeability :math:`\varepsilon_r` and relative
+    magnetic permittivity :math:`\mu_r` are both fixed at 1.
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Grid on which to apply model.
+
+    res_x, res_y, res_z : float or ndarray; default to 1.
+        Resistivity in x-, y-, and z-directions. If ndarray, the must have
+        length of grid.nC.
+
+    freq : float
+        Frequency.
+
+    """
+
+    # Constants
+    c = 299792458              # Speed of light m/s
+    mu_0 = 4e-7*np.pi          # Magn. permeability of free space [H/m]
+    epsilon_0 = 1./(mu_0*c*c)  # Elec. permittivity of free space [F/m]
+
+    def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=1.):
+        """Initiate a new resistivity model."""
+
+        # Initiate resistivity, eta, and mu_r
+        if res_y is None and res_z is None:   # Isotropic.
+            self.case = 0
+            self.__res = np.empty(grid.nC, dtype=float)
+            self.__eta = np.empty(grid.nC, dtype=complex)
+        elif res_y is None or res_z is None:  # VTI or HTI.
+            if res_z is None:
+                self.case = 1
+            else:
+                self.case = 2
+            self.__res = np.empty(2*grid.nC, dtype=float)
+            self.__eta = np.empty(2*grid.nC, dtype=complex)
+        else:                                 # Tri-axial anisotropy.
+            self.case = 3
+            self.__res = np.empty(3*grid.nC, dtype=float)
+            self.__eta = np.empty(3*grid.nC, dtype=complex)
+
+        # Set x-directed resistivity
+        if isinstance(res_x, (float, int)):
+            self.__res[:grid.nC] = res_x*np.ones(grid.nC)
+        else:
+            if res_x.shape[0] != grid.nC:
+                print("* ERROR   :: Provided input res_x has shape "
+                      f"{res_x.shape}; but shape {grid.nC} is required.")
+                raise ValueError("Wrong Shape")
+            self.__res[:grid.nC] = res_x
+
+        # Set y-directed resistivity
+        if res_y is None:
+            pass
+        elif isinstance(res_y, (float, int)):
+            self.__res[grid.nC:2*grid.nC] = res_y*np.ones(grid.nC)
+        else:
+            if res_y.shape[0] != grid.nC:
+                print("* ERROR   :: Provided input res_y has shape "
+                      f"{res_y.shape}; but shape {grid.nC} is required.")
+                raise ValueError("Wrong Shape")
+            self.__res[grid.nC:2*grid.nC] = res_y
+
+        # Set z-directed resistivity
+        if res_z is None:
+            pass
+        elif isinstance(res_z, (float, int)):
+            if res_y is None:
+                self.__res[grid.nC:] = res_z*np.ones(grid.nC)
+            else:
+                self.__res[2*grid.nC:] = res_z*np.ones(grid.nC)
+        else:
+            if res_z.shape[0] != grid.nC:
+                print("* ERROR   :: Provided input res_z has shape "
+                      f"{res_z.shape}; but shape {grid.nC} is required.")
+                raise ValueError("Wrong Shape")
+            if res_y is None:
+                self.__res[grid.nC:] = res_z
+            else:
+                self.__res[2*grid.nC:] = res_z
+
+        # Store frequency
+        self.freq = freq
+
+        # Store required info from grid
+        self.nC = grid.nC
+        self.vnC = grid.vnC
+        self.vol = grid.vol
+
+        # Update eta with given resistivities
+        self.update_eta
+
+    @property
+    def iomega(self):
+        r"""Return :math:`i \omega = 2i \pi f`."""
+        return 2j*np.pi*self.freq
+
+    # RESISTIVITIES
+    @property
+    def res(self):
+        r"""Resistivity vector [res_x, res_y, res_z] (:math:`\rho`)."""
+        return self.__res
+
+    @res.setter
+    def res(self, res):
+        r"""Update resistivity vector [res_x, res_y, res_z] (:math:`\rho`)."""
+        self.__res = res.ravel('F')
+        self.update_eta
+
+    @property
+    def res_x(self):
+        r"""Resistivity in x-direction (:math:`\rho_x`)."""
+        return self.__res[:self.nC].reshape(self.vnC, order='F')
+
+    @res_x.setter
+    def res_x(self, res):
+        r"""Update resistivity in x-direction (:math:`\rho_x`)."""
+        self.__res[:self.nC] = res.ravel('F')
+        self.update_eta
+
+    @property
+    def res_y(self):
+        r"""Resistivity in y-direction (:math:`\rho_y`)."""
+        if self.case in [1, 3]:  # HTI or tri-axial.
+            return self.__res[self.nC:2*self.nC].reshape(self.vnC, order='F')
+        else:                    # Return res_x.
+            return self.res_x
+
+    @res_y.setter
+    def res_y(self, res):
+        r"""Update resistivity in y-direction (:math:`\rho_y`)."""
+        if self.case in [1, 3]:  # HTI or tri-axial.
+            self.__res[self.nC:2*self.nC] = res.ravel('F')
+        else:
+            print("Cannot set res_y, as it was initialized as res_x.")
+            raise ValueError
+        self.update_eta
+
+    @property
+    def res_z(self):
+        r"""Resistivity in z-direction (:math:`\rho_z`)."""
+        if self.case == 2:    # VTI.
+            return self.__res[self.nC:].reshape(self.vnC, order='F')
+        elif self.case == 3:  # Tri-axial.
+            return self.__res[2*self.nC:].reshape(self.vnC, order='F')
+        else:                 # Return res_x.
+            return self.res_x
+
+    @res_z.setter
+    def res_z(self, res):
+        r"""Update resistivity in z-direction (:math:`\rho_z`)."""
+        if self.case == 2:  # VTI.
+            self.__res[self.nC:] = res.ravel('F')
+        elif self.case == 3:  # Tri-axial.
+            self.__res[2*self.nC:] = res.ravel('F')
+        else:
+            print("Cannot set res_z, as it was initialized as res_x.")
+            raise ValueError
+        self.update_eta
+
+    # ETA's
+    @property
+    def eta(self):
+        r"""Complete eta vector [eta_x, eta_y, eta_z] (:math:`\eta`).
+
+        The parameter :math:`\eta` is given by
+
+        .. math::
+
+            \eta = V \mathrm{i} \omega \mu_0
+                   (\sigma-\mathrm{i}\omega\varepsilon_0\varepsilon_r) ;
+
+        where, currently, :math:`\varepsilon_r = 1`. V is the cell
+        volume.
+        """
+        return self.__eta
+
+    @eta.setter
+    def eta(self, eta):
+        r"""Update complete eta vector [eta_x, eta_y, eta_z] (:math:`\eta`)."""
+        self.__eta = eta.ravel('F')
+
+    @property
+    def eta_x(self):
+        r"""eta in x-direction (:math:`\eta_x`)."""
+        return self.__eta[:self.nC].reshape(self.vnC, order='F')
+
+    @eta_x.setter
+    def eta_x(self, eta):
+        r"""Update eta in x-direction (:math:`\eta_x`)."""
+        self.__eta[:self.nC] = eta.ravel('F')
+
+    @property
+    def eta_y(self):
+        r"""eta in x-direction (:math:`\eta_y`)."""
+        if self.case in [1, 3]:  # HTI or tri-axial.
+            return self.__eta[self.nC:2*self.nC].reshape(self.vnC, order='F')
+        else:                    # Return eta_x.
+            return self.eta_x
+
+    @eta_y.setter
+    def eta_y(self, eta):
+        r"""Update eta in y-direction (:math:`\eta_y`)."""
+        if self.case in [1, 3]:  # HTI or tri-axial.
+            self.__eta[self.nC:2*self.nC] = eta.ravel('F')
+        else:
+            print("Cannot set eta_y, as res_y was initialized as res_x.")
+            raise ValueError
+
+    @property
+    def eta_z(self):
+        r"""eta in x-direction (:math:`\eta_z`)."""
+        if self.case == 2:    # VTI.
+            return self.__eta[self.nC:].reshape(self.vnC, order='F')
+        elif self.case == 3:  # Tri-axial.
+            return self.__eta[2*self.nC:].reshape(self.vnC, order='F')
+        else:                 # Return res_x.
+            return self.eta_x
+
+    @eta_z.setter
+    def eta_z(self, eta):
+        r"""Update eta in z-direction (:math:`\eta_z`)."""
+        if self.case == 2:  # VTI.
+            self.__eta[self.nC:] = eta.ravel('F')
+        elif self.case == 3:  # Tri-axial.
+            self.__eta[2*self.nC:] = eta.ravel('F')
+        else:
+            print("Cannot set eta_z, as res_z was initialized as res_x.")
+            raise ValueError
+
+    @property
+    def update_eta(self):
+        r"""Update eta vector [eta_x, eta_y, eta_z] (:math:`\eta`)."""
+        eta = self.iomega*self.mu_0*(1./self.__res-self.iomega*self.epsilon_0)
+        if self.case == 3:
+            self.__eta = eta*np.r_[self.vol, self.vol, self.vol]
+        elif self.case in [1, 2]:
+            self.__eta = eta*np.r_[self.vol, self.vol]
+        else:
+            self.__eta = eta*self.vol
+
+    # MU_R's
+    @property
+    def v_mu_r(self):
+        r"""Volume divided by relative magnetic permittivity.
+
+        Relative magnetic permittivity is currently fixed to 1.
+        """
+        return self.vol.reshape(self.vnC, order='F')
+
+
+class Field(np.ndarray):
+    """Create a Field instance with x-, y-, and z-views of the field.
+
+    A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
+    z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
+    default array contains the whole field, which can be the electric field,
+    the source field, or the residual field, in a 1D array. A ``Field``
+    instance has additionally the property ``ensure_pec`` which, if called,
+    ensures Perfect Electric Conductor (PEC) boundary condition.
+
+    A ``Field`` can be initiated in three ways:
+
+    1. ``Field(grid)``:
+    Calling it with a ``TensorMesh``-instance returns a ``Field``-instance of
+    correct dimensions initiated with complex zeroes.
+
+    2. ``Field(grid, field)``:
+    Calling it with a ``TensorMesh``-instance and an ``ndarray`` returns a
+    ``Field``-instance of the provided ``ndarray``.
+
+    3. ``Field(fx, fy, fz)``:
+    Calling it with three ``ndarray``'s which represent the field in x-, y-,
+    and z-direction returns a ``Field``-instance with these views.
+
+    Sort-order is 'F'.
+
+    """
+
+    def __new__(cls, grid, field=None, fz=None):
+        """Initiate a new Field-instance."""
+
+        # Collect field
+        if field is None and fz is None:  # Empty Field with dimension grid.nE.
+            new = np.zeros(grid.nE, dtype=complex)
+        elif field is not None and fz is None:  # grid and field provided
+            new = field
+        else:                                   # fx, fy, fz provided
+            new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
+
+        # Store the field as object
+        obj = np.asarray(new).view(cls)
+
+        # Store relevant numbers for the views.
+        if field is not None and fz is not None:  # Deduce from arrays
+            obj.nEx = grid.size
+            obj.nEy = field.size
+            obj.nEz = fz.size
+            obj.vnEx = grid.shape
+            obj.vnEy = field.shape
+            obj.vnEz = fz.shape
+        else:                                     # If grid is provided
+            for attr in ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']:
+                setattr(obj, attr, getattr(grid, attr))
+
+        return obj
+
+    def __array_finalize__(self, obj):
+        """Ensure relevant numbers are stored no matter how created."""
+        self.nEx = getattr(obj, 'nEx', None)
+        self.nEy = getattr(obj, 'nEy', None)
+        self.nEz = getattr(obj, 'nEz', None)
+        self.vnEx = getattr(obj, 'vnEx', None)
+        self.vnEy = getattr(obj, 'vnEy', None)
+        self.vnEz = getattr(obj, 'vnEz', None)
+
+    @property
+    def field(self):
+        """Entire field, 1D [fx, fy, fz]."""
+        return self.view()
+
+    @field.setter
+    def field(self, field):
+        """Update field, 1D [fx, fy, fz]."""
+        self.view()[:] = field
+
+    @property
+    def fx(self):
+        """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
+        return self.view()[:self.nEx].reshape(self.vnEx, order='F')
+
+    @fx.setter
+    def fx(self, fx):
+        """Update field in x-direction."""
+        self.view()[:self.nEx] = fx.ravel('F')
+
+    @property
+    def fy(self):
+        """View of the field in the y-direction (nNx, nCy, nNz)."""
+        return self.view()[self.nEx:-self.nEz].reshape(self.vnEy, order='F')
+
+    @fy.setter
+    def fy(self, fy):
+        """Update field in y-direction."""
+        self.view()[self.nEx:-self.nEz] = fy.ravel('F')
+
+    @property
+    def fz(self):
+        """View of the field in the z-direction (nNx, nNy, nCz)."""
+        return self.view()[-self.nEz:].reshape(self.vnEz, order='F')
+
+    @fz.setter
+    def fz(self, fz):
+        """Update electric field in z-direction."""
+        self.view()[-self.nEz:] = fz.ravel('F')
+
+    @property
+    def ensure_pec(self):
+        """Set Perfect Electric Conductor (PEC) boundary condition."""
+        # Apply PEC to fx
+        self.fx[:, 0, :] = 0.+0.j
+        self.fx[:, -1, :] = 0.+0.j
+        self.fx[:, :, 0] = 0.+0.j
+        self.fx[:, :, -1] = 0.+0.j
+
+        # Apply PEC to fy
+        self.fy[0, :, :] = 0.+0.j
+        self.fy[-1, :, :] = 0.+0.j
+        self.fy[:, :, 0] = 0.+0.j
+        self.fy[:, :, -1] = 0.+0.j
+
+        # Apply PEC to fz
+        self.fz[0, :, :] = 0.+0.j
+        self.fz[-1, :, :] = 0.+0.j
+        self.fz[:, 0, :] = 0.+0.j
+        self.fz[:, -1, :] = 0.+0.j
+
+
+# FUNCTIONS RELATED TO TIMING
+class Time:
+    """Class for timing (now; runtime)."""
+
+    def __init__(self):
+        """Initialize time zero (t0) with current time stamp."""
+        self.__t0 = default_timer()
+
+    @property
+    def t0(self):
+        """Return time zero of this class instance."""
+        return self.__t0
+
+    @property
+    def now(self):
+        """Return string of current time."""
+        return(now())
+
+    @property
+    def runtime(self):
+        """Return string of runtime since time zero."""
+        return timeit(self.__t0)
+
+
+def now():
+    """Return current time in the format hh:mm:ss as a string.
+
+
+    Returns
+    -------
+    time : str
+        Current time in the format 'hh:mm:ss'.
+
+
+    Examples
+    --------
+    >>> import emg3d
+    >>> emg3d.utils.now()
+    '08:25:13'
+
+    """
+    return datetime.now().strftime("%H:%M:%S")
+
+
+def timeit(t0=None):
+    r"""Measure runtime.
+
+    Time is rounded to full seconds if the total time is greater than 10 s.
+
+
+    Parameters
+    ----------
+    t0 : default-timer-instance; optional
+        The input is the output from an initial timeit-run.
+
+
+    Returns
+    -------
+    time : `default_timer`-instance or string.
+
+        - Returns the current ``default_timer``-instance if no input ``t0`` is
+          provided.
+        - Returns a string with the time passed between ``t0`` and now if
+          ``t0`` is provided.
+
+
+    Examples
+    --------
+    >>> import emg3d
+    >>> import time
+    >>> t0 = emg3d.utils.timeit()
+    >>> time.sleep(10)
+    >>> emg3d.utils.timeit(t0)
+    '0:00:10'
+
+    See Also
+    --------
+    ctimeit : Context manager for timeit.
+
+    """
+    if t0:
+        t1 = default_timer() - t0
+        if t1 < 10:  # Below 10 s, print full output.
+            return str(timedelta(seconds=t1))
+        else:  # After 10 s round to full seconds.
+            return str(timedelta(seconds=np.round(t1)))
+    else:
+        return default_timer()
+
+
+@contextmanager
+def ctimeit(before='', after=''):
+    """Print time used by commands run within the context manager.
+
+    Parameters
+    ----------
+    before, after : str, optional
+        String printed before and after timeit.
+
+    Examples
+    --------
+    >>> import emg3d
+    >>> import time
+    >>> with emg3d.utils.ctimeit("The command sleep(10) took ", " long!"):
+    >>>     time.sleep(10)
+    The command sleep(10) took 0:00:10 long!
+
+    See Also
+    --------
+    timeit : Plain timeit without context manager.
+
+    """
+    t0 = timeit()
+    yield
+    print(f"{before}{timeit(t0)}{after}")
+
+
+# FUNCTIONS RELATED TO DATA MANAGEMENT
+def data_write(fname, keys, values, path='data'):
+    """Write all values with their corresponding key to file path/fname.
+
+    ``data_write`` and ``data_read`` are probably better suited as ``tofile``
+    and ``fromfile`` instances in their specific classes.
+
+
+    Parameters
+    ----------
+    fname : str
+        File name.
+
+    keys : str or list of str
+        Name(s) of the values to store in file.
+
+    values : anything
+        Values to store with keys in file.
+
+    path : str, optional
+        Absolute or relative path where to store. Default is 'data'.
+
+    """
+    # Get absolute path, create if it doesn't exist
+    path = os.path.abspath(path)
+    os.makedirs(path, exist_ok=True)
+
+    # Shelve it
+    with shelve.open(path+'/'+fname) as db:
+        if not isinstance(keys, (list, tuple)):  # single parameter
+            db[keys] = values
+        else:                                    # lists/tuples of parameters
+            for i, key in enumerate(keys):
+                db[key] = values[i]
+
+
+def data_read(fname, keys=None, path='data'):
+    """Read and return keys from file path/fname.
+
+    ``data_write`` and ``data_read`` are probably better suited as ``tofile``
+    and ``fromfile`` instances in their specific classes.
+
+
+    Parameters
+    ----------
+    fname : str
+        File name.
+
+    keys : str, list of str, or None; optional
+        Name(s) of the values to get from file. If None, returns everything as
+        a dict. Default is None.
+
+    path : str, optional
+        Absolute or relative path where to store. Default is 'data'.
+
+
+    Returns
+    -------
+    out : values or dict
+        Requested value(s) or dict containing everything if keys=None.
+
+    """
+    # Get absolute path
+    path = os.path.abspath(path)
+
+    # Get it from shelve
+    with shelve.open(path+'/'+fname) as db:
+        if keys is None:                           # None
+            out = dict()
+            for key, item in db.items():
+                out[key] = item
+            return out
+
+        elif not isinstance(keys, (list, tuple)):  # single parameter
+            return db[keys]
+
+        else:                                      # lists/tuples of parameters
+            out = []
+            for key in keys:
+                out.append(db[key])
+            return out
+
+
+# OTHER
+class Versions:
+    r"""Print date, time, and version information.
+
+    Print date, time, and package version information in any environment
+    (Jupyter notebook, IPython console, Python console, QT console), either as
+    html-table (notebook) or as plain text (anywhere).
+
+    Always shown are the OS, number of CPU(s), ``numpy``, ``scipy``,
+    ``emg3d``, ``numba``, ``sys.version``, and time/date.
+
+    Additionally shown are, if they can be imported, ``IPython`` and
+    ``matplotlib``. It also shows MKL information, if available.
+
+    All modules provided in ``add_pckg`` are also shown. They have to be
+    imported before ``versions`` is called.
+
+    This script was heavily inspired by:
+
+        - ipynbtools.py from qutip https://github.com/qutip
+        - watermark.py from https://github.com/rasbt/watermark
+
+
+    Parameters
+    ----------
+    add_pckg : packages, optional
+        Package or list of packages to add to output information (must be
+        imported beforehand).
+
+    ncol : int, optional
+        Number of package-columns in html table; only has effect if
+        ``mode='HTML'`` or ``mode='html'``. Defaults to 3.
+
+
+    Examples
+    --------
+    >>> import pytest
+    >>> import dateutil
+    >>> from emg3d import Versions
+    >>> Versions()                            # Default values
+    >>> Versions(pytest)                      # Provide additional package
+    >>> Versions([pytest, dateutil], ncol=5)  # Set nr of columns
+
+    """
+
+    def __init__(self, add_pckg=None, ncol=4):
+        """Initiate and add packages and number of columns to self."""
+        self.add_pckg = self._get_packages(add_pckg)
+        self.ncol = int(ncol)
+
+    def __repr__(self):
+        r"""Plain-text version information."""
+
+        # Width for text-version
+        n = 54
+        text = '\n' + n*'-' + '\n'
+
+        # Date and time info as title
+        text += time.strftime('  %a %b %d %H:%M:%S %Y %Z\n\n')
+
+        # OS and CPUs
+        text += '{:>15}'.format(platform.system())+' : OS\n'
+        text += '{:>15}'.format(multiprocessing.cpu_count())+' : CPU(s)\n'
+
+        # Loop over packages
+        for pckg in self.add_pckg:
+            text += '{:>15} : {}\n'.format(pckg.__version__, pckg.__name__)
+
+        # sys.version
+        text += '\n'
+        for txt in textwrap.wrap(sys.version, n-4):
+            text += '  '+txt+'\n'
+
+        # mkl version
+        if mklinfo:
+            text += '\n'
+            for txt in textwrap.wrap(mklinfo, n-4):
+                text += '  '+txt+'\n'
+
+        # Finish
+        text += n*'-'
+
+        return text
+
+    def _repr_html_(self):
+        """HTML-rendered version information."""
+
+        # Define html-styles
+        border = "border: 2px solid #fff;'"
+
+        def colspan(html, txt, ncol, nrow):
+            r"""Print txt in a row spanning whole table."""
+            html += "  <tr>\n"
+            html += "     <td style='text-align: center; "
+            if nrow == 0:
+                html += "font-weight: bold; font-size: 1.2em; "
+            elif nrow % 2 == 0:
+                html += "background-color: #ddd;"
+            html += border + " colspan='"
+            html += str(2*ncol)+"'>%s</td>\n" % txt
+            html += "  </tr>\n"
+            return html
+
+        def cols(html, version, name, ncol, i):
+            r"""Print package information in two cells."""
+
+            # Check if we have to start a new row
+            if i > 0 and i % ncol == 0:
+                html += "  </tr>\n"
+                html += "  <tr>\n"
+
+            html += "    <td style='text-align: right; background-color: #ccc;"
+            html += " " + border + ">%s</td>\n" % version
+
+            html += "    <td style='text-align: left; "
+            html += border + ">%s</td>\n" % name
+
+            return html, i+1
+
+        # Start html-table
+        html = "<table style='border: 3px solid #ddd;'>\n"
+
+        # Date and time info as title
+        html = colspan(html, time.strftime('%a %b %d %H:%M:%S %Y %Z'),
+                       self.ncol, 0)
+
+        # OS and CPUs
+        html += "  <tr>\n"
+        html, i = cols(html, platform.system(), 'OS', self.ncol, 0)
+        html, i = cols(html, multiprocessing.cpu_count(), 'CPU(s)',
+                       self.ncol, i)
+
+        # Loop over packages
+        for pckg in self.add_pckg:
+            html, i = cols(html, pckg.__version__, pckg.__name__, self.ncol, i)
+        # Fill up the row
+        while i % self.ncol != 0:
+            html += "    <td style= " + border + "></td>\n"
+            html += "    <td style= " + border + "></td>\n"
+            i += 1
+        # Finish row
+        html += "  </tr>\n"
+
+        # sys.version
+        html = colspan(html, sys.version, self.ncol, 1)
+
+        # mkl version
+        if mklinfo:
+            html = colspan(html, mklinfo, self.ncol, 2)
+
+        # Finish table
+        html += "</table>"
+
+        return html
+
+    @staticmethod
+    def _get_packages(add_pckg):
+        r"""Create list of packages."""
+
+        # Mandatory packages
+        pckgs = [np, scipy, numba, emg3d]
+
+        # Optional packages
+        for module in [IPython, matplotlib]:
+            if module:
+                pckgs += [module]
+
+        # Cast and add add_pckg
+        if add_pckg is not None:
+
+            # Cast add_pckg
+            if isinstance(add_pckg, tuple):
+                add_pckg = list(add_pckg)
+
+            if not isinstance(add_pckg, list):
+                add_pckg = [add_pckg, ]
+
+            # Add add_pckg
+            pckgs += add_pckg
+
+        return pckgs

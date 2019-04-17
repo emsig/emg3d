@@ -1,0 +1,453 @@
+import re
+import time
+import pytest
+import numpy as np
+import scipy as sp
+from discretize import TensorMesh
+from numpy.testing import assert_allclose
+
+# Optional imports
+try:
+    import IPython
+except ImportError:
+    IPython = False
+
+from emg3d import utils
+
+
+def create_dummy(nx, ny, nz, imag=True):
+    """Return complex dummy arrays of shape nx*ny*nz.
+
+    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
+    imaginary part.
+
+    """
+    if imag:
+        out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
+    else:
+        out = np.arange(1, nx*ny*nz+1)
+    return out.reshape(nx, ny, nz)
+
+
+# HELPER FUNCTIONS TO CREATE MESH
+def test_get_domain():
+    # Test default values (and therefore skindepth etc)
+    h1, d1 = utils.get_domain()
+    assert_allclose(h1, 55.133753)
+    assert_allclose(d1, [-1378.343816, 1378.343816])
+
+    # Ensure fact_min/fact_neg/fact_pos
+    h2, d2 = utils.get_domain(fact_min=1, fact_neg=10, fact_pos=20)
+    assert h2 == 5*h1
+    assert 2*d1[0] == d2[0]
+    assert -2*d2[0] == d2[1]
+
+    # Check limits and min_width
+    h3, d3 = utils.get_domain(limits=[-10000, 10000], min_width=[1, 10])
+    assert h3 == 10
+    assert np.sum(d3) == 0
+
+    h4, d4 = utils.get_domain(limits=[-10000, 10000], min_width=5.5)
+    assert h4 == 5.5
+    assert np.sum(d4) == 0
+
+
+def test_get_stretched_h(capsys):
+    # Test min_space bigger (11) then required (10)
+    h1 = utils.get_stretched_h(11, [0, 100], nx=10)
+    assert_allclose(np.ones(10)*10, h1)
+
+    # Test with range, wont end at 100
+    h2 = utils.get_stretched_h(10, [-100, 100], nx=10, x0=20, x1=60)
+    assert_allclose(np.ones(4)*10, h2[5:9])
+    assert -100+np.sum(h2) != 100
+
+    # Now ensure 100
+    h3 = utils.get_stretched_h(10, [-100, 100], nx=10, x0=20, x1=60,
+                               resp_domain=True)
+    assert -100+np.sum(h3) == 100
+
+    out, _ = capsys.readouterr()  # Empty capsys
+    _ = utils.get_stretched_h(10, [-100, 100], nx=5, x0=20, x1=60)
+    out, _ = capsys.readouterr()
+    assert "Warning :: Not enough points for non-stretched part" in out
+
+
+def test_get_hx():
+    # Test alpha <= 0
+    hx1 = utils.get_hx(-.5, [0, 10], 5, 3.33)
+    assert_allclose(np.ones(5)*2, hx1)
+
+    # Test x0 on domain
+    hx2a = utils.get_hx(0.1, [0, 10], 5, 0)
+    assert_allclose(np.ones(4)*1.1, hx2a[1:]/hx2a[:-1])
+    hx2b = utils.get_hx(0.1, [0, 10], 5, 10)
+    assert_allclose(np.ones(4)/1.1, hx2b[1:]/hx2b[:-1])
+    assert np.sum(hx2b) == 10.0
+
+    # Test resp_domain
+    hx3 = utils.get_hx(0.1, [0, 10], 3, 8, False)
+    assert np.sum(hx3) != 10.0
+
+
+def test_get_source_field(capsys):
+    src = [100, 200, 300, 27, 31]
+    grid = TensorMesh([[(200, 4)], [(400, 4)], [(800, 4)]])
+    grid.x0 -= src[:3]
+    freq = 1.2458
+    sfield = utils.get_source_field(grid, src, freq)
+    iomegamu = 2j*np.pi*freq*4e-7*np.pi
+
+    # Check zeros
+    assert 0 == np.sum(np.r_[sfield.fx[:, 2:, :].ravel(),
+                             sfield.fy[:, 2:, :].ravel(),
+                             sfield.fz[:, 2:, :].ravel()])
+
+    # Check source cells
+    h = np.cos(np.deg2rad(src[4]))
+    y = np.sin(np.deg2rad(src[3]))*h
+    x = np.cos(np.deg2rad(src[3]))*h
+    z = np.sin(np.deg2rad(src[4]))
+    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/iomegamu).real, 1)
+    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/iomegamu).real, 1)
+    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/iomegamu).real, 1)
+
+    # Put source on final node, should still work.
+    src = [grid.vectorNx[-1], grid.vectorNy[-1], grid.vectorNz[-1],
+           src[3], src[4]]
+    sfield = utils.get_source_field(grid, src, freq)
+    tot_field = np.linalg.norm(
+            [np.sum(sfield.fx), np.sum(sfield.fy), np.sum(sfield.fz)])
+    assert_allclose(tot_field/np.abs(np.sum(iomegamu)), 1.0)
+
+    out, _ = capsys.readouterr()  # Empty capsys
+
+    # Provide wrong source definition. Ensure it fails.
+    with pytest.raises(ValueError):
+        sfield = utils.get_source_field(grid, [0, 0, 0], 1)
+    out, _ = capsys.readouterr()
+    assert "ERROR   :: Source is wrong defined. Must be" in out
+
+    # Put source way out. Ensure it fails.
+    with pytest.raises(ValueError):
+        src = [1e10, 1e10, 1e10, 0, 0]
+        sfield = utils.get_source_field(grid, src, 1)
+    out, _ = capsys.readouterr()
+    assert "ERROR   :: Provided source outside grid" in out
+
+    # Put finite dipole of zero length. Ensure it fails.
+    with pytest.raises(ValueError):
+        src = [0, 0, 100, 100, -200, -200]
+        sfield = utils.get_source_field(grid, src, 1)
+    out, _ = capsys.readouterr()
+    assert "* ERROR   :: Provided source is a point dipole" in out
+
+    # === Point dipole to finite dipole comparisons ===
+    def get_xyz(d_src):
+        """Return dimensions corresponding to azimuth and dip."""
+        h = np.cos(np.deg2rad(d_src[4]))
+        dys = np.sin(np.deg2rad(d_src[3]))*h
+        dxs = np.cos(np.deg2rad(d_src[3]))*h
+        dzs = np.sin(np.deg2rad(d_src[4]))
+        return [dxs, dys, dzs]
+
+    def get_f_src(d_src, slen=1.0):
+        """Return d_src and f_src for d_src input."""
+        xyz = get_xyz(d_src)
+        f_src = [d_src[0]-xyz[0]*slen/2, d_src[0]+xyz[0]*slen/2,
+                 d_src[1]-xyz[1]*slen/2, d_src[1]+xyz[1]*slen/2,
+                 d_src[2]-xyz[2]*slen/2, d_src[2]+xyz[2]*slen/2]
+        return d_src, f_src
+
+    # 1a. Source within one cell, normalized.
+    grid = TensorMesh([[(500, 3)], [(500, 3)], [(500, 3)]], 'CCC')
+    d_src, f_src = get_f_src([0, 0., 0., 23, 15])
+    dsf = utils.get_source_field(grid, d_src, 1)
+    fsf = utils.get_source_field(grid, f_src, 1)
+    assert_allclose(fsf, dsf)
+
+    # 1b. Source within one cell, source strength = pi.
+    grid = TensorMesh([[(500, 3)], [(500, 3)], [(500, 3)]], 'CCC')
+    d_src, f_src = get_f_src([0, 0., 0., 32, 53])
+    dsf = utils.get_source_field(grid, d_src, 3.3, np.pi)
+    fsf = utils.get_source_field(grid, f_src, 3.3, np.pi)
+    assert_allclose(fsf, dsf)
+
+    # 1c. Source over various cells, normalized.
+    grid = TensorMesh([[(200, 8)], [(200, 8)], [(200, 8)]], 'CCC')
+    d_src, f_src = get_f_src([0, 0., 0., 40, 20], 300.0)
+    dsf = utils.get_source_field(grid, d_src, 10.0, 0)
+    fsf = utils.get_source_field(grid, f_src, 10.0, 0)
+    assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+    assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+    assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+    # 1d. Source over various cells, source strength = pi.
+    grid = TensorMesh([[(200, 8)], [(200, 8)], [(200, 8)]], 'CCC')
+    slen = 300
+    strength = np.pi
+    d_src, f_src = get_f_src([0, 0., 0., 20, 30], slen)
+    dsf = utils.get_source_field(grid, d_src, 1.3, slen*strength)
+    fsf = utils.get_source_field(grid, f_src, 1.3, strength)
+    assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+    assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+    assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+    # 1e. Source over various stretched cells, source strength = pi.
+    grid = TensorMesh(
+            [[(200, 8, 1.1)], [(200, 8, 1.2)], [(200, 8, 1.3)]], 'CCC')
+    slen = 333
+    strength = np.pi
+    d_src, f_src = get_f_src([0, 0., 0., 50, 33], slen)
+    dsf = utils.get_source_field(grid, d_src, 0.7, slen*strength)
+    fsf = utils.get_source_field(grid, f_src, 0.7, strength)
+    assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+    assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+    assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+
+def test_TensorMesh():
+
+    # Create an advanced grid with discretize.
+    grid = TensorMesh(
+            [[(10, 10, -1.1), (10, 20, 1), (10, 10, 1.1)],
+             [(33, 20, 1), (33, 10, 1.5)],
+             [20]],
+            x0='CN0')
+
+    # Use this grid instance to create emg3d equivalent.
+    emg3dgrid = utils.TensorMesh(grid.h, grid.x0)
+
+    # List of all attributes in emg3d-grid.
+    all_attr = [
+        'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx',
+        'vectorCCy', 'vectorCCz', 'gridEx', 'gridEy', 'gridEz', 'nEx', 'nEy',
+        'nEz', 'nCx', 'nCy', 'nCz', 'vnC', 'nNx', 'nNy', 'nNz', 'vnN', 'vnEx',
+        'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'nE', 'vol'
+    ]
+
+    # Ensure they are the same.
+    for attr in all_attr:
+        assert_allclose(getattr(grid, attr), getattr(emg3dgrid, attr))
+
+
+# MODEL AND FIELD CLASSES
+def test_model():
+    # Mainly regression tests
+
+    # Create some dummy data
+    grid = TensorMesh([[(2, 2)], [(3, 4)], [(0.5, 2)]])
+
+    res_x = create_dummy(*grid.vnC, False)
+    res_y = res_x/2.0
+    res_z = res_x*1.4
+
+    # Using defaults
+    model1 = utils.Model(grid)
+    assert model1.mu_0 == sp.constants.mu_0            # Check constants
+    assert model1.epsilon_0 == sp.constants.epsilon_0  # Check constants
+    assert_allclose(model1.res_x, model1.res_y)
+    assert_allclose(model1.nC, grid.nC)
+    assert_allclose(model1.vnC, grid.vnC)
+    assert_allclose(model1.vol, grid.vol)
+
+    # Using ints
+    model2 = utils.Model(grid, 2., 3., 4.)
+    assert_allclose(model2.res_x*1.5, model2.res_y)
+    assert_allclose(model2.res_x*2, model2.res_z)
+
+    # Check wrong shape
+    with pytest.raises(ValueError):
+        utils.Model(grid, res_x)
+    with pytest.raises(ValueError):
+        utils.Model(grid, res_y=res_y)
+    with pytest.raises(ValueError):
+        utils.Model(grid, res_z=res_z)
+
+    # Check with all inputs
+    model3 = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
+                         res_z.ravel('F'), freq=1.234)
+    assert_allclose(model3.res_x, model3.res_y*2)
+    assert_allclose(model3.res_x.shape, grid.vnC)
+    assert_allclose(model3.res_x, model3.res_z/1.4)
+    assert_allclose(model3.res, np.r_[res_x.ravel('F'), res_y.ravel('F'),
+                                      res_z.ravel('F')])
+    assert model3.iomega == 2j*np.pi*model3.freq
+
+    # Check setters
+    model3.res_x = np.ones(grid.vnC)*2.0
+    model3.res_y = np.ones(grid.vnC)*3.0
+    model3.res_z = np.ones(grid.vnC)*4.0
+    assert_allclose(model2.res, model3.res)
+    model3.res = np.ones(grid.nC*3)
+    assert_allclose(model1.res, model3.res[:grid.nC])
+
+    # Check eta
+    assert_allclose(model3.eta, np.r_[model3.eta_x.ravel('F'),
+                                      model3.eta_y.ravel('F'),
+                                      model3.eta_z.ravel('F')])
+
+    eta = model3.iomega*model3.mu_0
+    eta *= (1./model3.res-model3.iomega*model3.epsilon_0)
+    eta *= np.r_[model3.vol, model3.vol, model3.vol]
+    assert_allclose(model3.eta, eta)
+    model3.eta_x = np.ones(grid.vnC)
+    model3.eta_y = np.ones(grid.vnC)
+    model3.eta_z = np.ones(grid.vnC)
+    assert_allclose(model3.res_x, model3.eta_x)
+    assert_allclose(model3.res_y, model3.eta_y)
+    assert_allclose(model3.res_z, model3.eta_z)
+    model3.eta = 3*np.ones(grid.nC*3)
+    assert_allclose(3*model3.res, model3.eta)
+
+
+def test_field():
+    # Create some dummy data
+    grid = TensorMesh([[(.5, 8)], [(1, 4)], [(2, 8)]])
+
+    ex = create_dummy(*grid.vnEx)
+    ey = create_dummy(*grid.vnEy)
+    ez = create_dummy(*grid.vnEz)
+
+    # Test the views
+    ee = utils.Field(ex, ey, ez)
+    assert_allclose(ee, np.r_[ex.ravel('F'), ey.ravel('F'), ez.ravel('F')])
+    assert_allclose(ee.fx, ex)
+    assert_allclose(ee.fy, ey)
+    assert_allclose(ee.fz, ez)
+
+    # Test the other possibilities to initiate a Field-instance.
+    ee2 = utils.Field(grid, ee.field)
+    assert_allclose(ee.field, ee2.field)
+    assert_allclose(ee.fx, ee2.fx)
+
+    ee3 = utils.Field(grid)
+    assert ee.shape == ee3.shape
+
+    # Try setting values
+    ee3.field = ee.field
+    assert_allclose(ee.field, ee3.field)
+    ee3.fx = ee.fx
+    ee3.fy = ee.fy
+    ee3.fz = ee.fz
+    assert_allclose(ee.field, ee3.field)
+
+    # Check PEC
+    ee.ensure_pec
+    assert abs(np.sum(ee.fx[:, 0, :] + ee.fx[:, -1, :])) == 0
+    assert abs(np.sum(ee.fx[:, :, 0] + ee.fx[:, :, -1])) == 0
+    assert abs(np.sum(ee.fy[0, :, :] + ee.fy[-1, :, :])) == 0
+    assert abs(np.sum(ee.fy[:, :, 0] + ee.fy[:, :, -1])) == 0
+    assert abs(np.sum(ee.fz[0, :, :] + ee.fz[-1, :, :])) == 0
+    assert abs(np.sum(ee.fz[:, 0, :] + ee.fz[:, -1, :])) == 0
+
+
+# FUNCTIONS RELATED TO TIMING
+def test_Time():
+    t0 = utils.timeit()  # Create almost at the same time a
+    time = utils.Time()  # t0-stamp and a Time-instance.
+
+    assert_allclose(t0, time.t0)
+    assert time.now == utils.now()
+    assert time.runtime[:-3] == utils.timeit(time.t0)[:-3]
+
+
+def test_now():
+    out = utils.now()
+    assert re.match(r'[0-9][0-9]:[0-9][0-9]:[0-9][0-9]', out)
+
+
+def test_timeit():
+    t0 = utils.timeit()
+    out = utils.timeit(t0-1)
+    assert "0:00:01.00" in out
+    out = utils.timeit(t0-10)
+    assert "0:00:10" == out
+
+
+def test_ctimeit(capsys):
+    with utils.ctimeit("The command sleep(1) took ", " long!"):
+        time.sleep(1)
+    out, _ = capsys.readouterr()
+
+    assert "The command sleep(1) took " in out
+    assert " long!" in out
+    assert "0:00:01" in out
+
+
+# FUNCTIONS RELATED TO DATA MANAGEMENT
+def test_data_write_read(tmpdir):
+    # Create test data
+    grid = TensorMesh([[(100, 4)], [(100, 8)], [(100, 16)]])
+
+    e1 = create_dummy(*grid.vnEx)
+    e2 = create_dummy(*grid.vnEy)
+    e3 = create_dummy(*grid.vnEz)
+    ee = utils.Field(e1, e2, e3)
+
+    # Write and read data, single arguments
+    utils.data_write('testthis', 'ee', ee, tmpdir)
+    ee_out = utils.data_read('testthis', 'ee', tmpdir)
+
+    # Compare data
+    assert_allclose(ee, ee_out)
+
+    # Write and read data, multi arguments
+    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir)
+    grid_out, ee_out = utils.data_read('testthis', ('grid', 'ee'), tmpdir)
+
+    # Compare data
+    assert_allclose(ee, ee_out)
+    for attr in ['nCx', 'nCy', 'nCz']:
+        assert getattr(grid, attr) == getattr(grid_out, attr)
+
+    # Write and read data, None
+    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir)
+    out = utils.data_read('testthis', path=tmpdir)
+
+    # Compare data
+    assert_allclose(ee, ee_out)
+    for attr in ['nCx', 'nCy', 'nCz']:
+        assert getattr(grid, attr) == getattr(out['grid'], attr)
+
+
+# OTHER
+def test_versions(capsys):
+
+    # Check the default
+    print(utils.Versions())
+    out1, _ = capsys.readouterr()
+
+    # Check one of the standard packages
+    assert 'numpy' in out1
+
+    # Check with an additional package
+    print(utils.Versions(add_pckg=re))
+    out2, _ = capsys.readouterr()
+
+    # Check the provided package, with number
+    assert re.__version__ + ' : re' in out2
+
+    # Check the 'text'-version, providing a package as tuple
+    v1 = utils.Versions(add_pckg=(re, ))
+    print(v1.__repr__())
+    out3, _ = capsys.readouterr()
+
+    # They have to be the same, except time (run at slightly different times)
+    assert out2[75:] == out3[75:]
+
+    # Check 'HTML'/'html'-version, providing a package as a list
+    v2 = utils.Versions(add_pckg=[re])
+    print(v2._repr_html_())
+    out4, _ = capsys.readouterr()
+
+    assert 'numpy' in out4
+    assert 'td style=' in out4
+
+    # Check row of provided package, with number
+    teststr = "<td style='text-align: right; background-color: #ccc; "
+    teststr += "border: 2px solid #fff;'>"
+    teststr += re.__version__
+    teststr += "</td>\n    <td style='"
+    teststr += "text-align: left; border: 2px solid #fff;'>re</td>"
+    assert teststr in out4

@@ -1,5 +1,21 @@
-emg3d
-=====
+.. image:: https://raw.githubusercontent.com/empymod/emg3d-logo/master/logo-emg3d-cut.png
+   :target: https://empymod.github.io
+   :alt: emg3d logo
+   
+----
+
+.. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
+   :target: http://emg3d.readthedocs.io/en/latest
+   :alt: Documentation Status
+.. image:: https://travis-ci.org/empymod/emg3d.svg?branch=master
+   :target: https://travis-ci.org/empymod/emg3d
+   :alt: Travis-CI
+.. image:: https://coveralls.io/repos/github/empymod/emg3d/badge.svg?branch=master
+   :target: https://coveralls.io/github/empymod/emg3d?branch=master
+   :alt: Coveralls
+.. image:: https://img.shields.io/codacy/grade/a15b80f75cd64be3bca73da30f191a83/master.svg
+   :target: https://www.codacy.com/app/prisae/emg3d
+   :alt: Codacy
 
 .. sphinx-inclusion-marker
 
@@ -8,8 +24,8 @@ anisotropy. The matrix-free solver can be used as main solver or as
 preconditioner for one of the Krylov subspace methods implemented in
 :mod:`scipy.sparse.linalg`, and the governing equations are discretized on a
 staggered Yee grid. The code is written completely in Python using the
-``numpy``/``scipy``-stack, where the most time- and memory-consuming parts are
-sped up through jitted ``numba``-functions.
+NumPy/SciPy-stack, where the most time- and memory-consuming parts are sped up
+through jitted numba-functions.
 
 
 More information
@@ -17,10 +33,51 @@ More information
 For more information regarding installation, usage, contributing, roadmap, bug
 reports, and much more, see
 
-- **Website**: TODO,
-- **Documentation**: TODO,
+- **Website**: https://empymod.github.io,
+- **Documentation**: https://emg3d.readthedocs.io,
 - **Source Code**: https://github.com/empymod/emg3d,
-- **Examples**: TODO
+- **Examples**: https://github.com/empymod/emg3d-examples.
+
+
+Features
+========
+
+- Multigrid solver for 3D electromagnetic diffusion with regular grids.
+- Can be used together with the `SimPEG <https://simpeg.xyz>`_-framework.
+- Can be used as a standalone solver or as a pre-conditioner for various Krylov
+  subspace methods implemented in SciPy, e.g., BiCGSTAB
+  (:func:`scipy.sparse.linalg.bicgstab`) or CGS
+  (:func:`scipy.sparse.linalg.cgs`).
+- Tri-axial electrical anisotropy.
+- Semicoarsening and line relaxation.
+- Grid-size can be anything.
+
+
+Installation
+============
+
+You can install emg3d either via ``conda`` (preferred):
+
+.. code-block:: console
+
+   conda install -c prisae emg3d
+
+or via ``pip``:
+
+.. code-block:: console
+
+   pip install emg3d
+
+Required are Python version 3.7 or higher and the modules ``NumPy``, ``SciPy``,
+and ``numba``; ``discretize`` (from `SimPEG <https://simpeg.xyz>`_) is highly
+recommended.
+
+If you are new to Python we recommend using a Python distribution, which will
+ensure that all dependencies are met, specifically properly compiled versions
+of ``NumPy`` and ``SciPy``; we recommend using `Anaconda
+<https://www.anaconda.com/download>`_. If you install Anaconda you can simply
+start the *Anaconda Navigator*, add the channel ``prisae`` and ``emg3d`` will
+appear in the package list and can be installed with a click.
 
 
 Citation
@@ -39,6 +96,6 @@ See :doc:`credits` for the history of the code.
 License information
 ===================
 
-Copyright 2018-2019 Dieter Werthmüller; TU Delft.
+Copyright 2018-2019 The emg3d Developers.
 
 Licensed under the Apache License, Version 2.0, see the ``LICENSE``-file.
