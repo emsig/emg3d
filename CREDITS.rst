@@ -12,8 +12,8 @@ History and authors of the original code
 The core of `emg3d` is a complete rewrite of the multigrid code by Wim Mulder
 ([Muld06]_, [Muld07]_, [Muld08]_, [MuWS08]_), developed at Shell and at TU
 Delft. Various authors contributed to the original code, amongst others, Tom
-Jönsthövel ([JoOM06_]; improved solver for strongly stretched grids) and Marwan
-Wirianto ([WiMS10_], [WiMS11_]; computation of time-domain data). The original
+Jönsthövel ([JoOM06]_; improved solver for strongly stretched grids) and Marwan
+Wirianto ([WiMS10]_, [WiMS11]_; computation of time-domain data). The original
 code was written in Matlab, where the most time- and memory-consuming parts
 were sped up through mex-files (written in C).
 
