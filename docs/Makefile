@@ -1,5 +1,6 @@
 # Disable numba, so jitted functions are nicely documented.
 export NUMBA_DISABLE_JIT=1
+export NUMBA_CACHE_DIR=$(HOME)
 
 # Command line options.
 SPHINXOPTS    =
