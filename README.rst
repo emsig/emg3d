@@ -4,8 +4,8 @@
    
 ----
 
-.. image:: https://readthedocs.org/projects/empy3d/badge/?version=latest
-   :target: http://empy3d.readthedocs.io/en/latest
+.. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
+   :target: http://emg3d.readthedocs.io/en/latest
    :alt: Documentation Status
 
 .. sphinx-inclusion-marker
