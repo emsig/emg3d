@@ -4,6 +4,10 @@
    
 ----
 
+.. image:: https://readthedocs.org/projects/empy3d/badge/?version=latest
+   :target: http://empy3d.readthedocs.io/en/latest
+   :alt: Documentation Status
+
 .. sphinx-inclusion-marker
 
 A multigrid solver for 3D electromagnetic diffusion with tri-axial electrical
