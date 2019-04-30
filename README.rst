@@ -10,6 +10,9 @@
 .. image:: https://travis-ci.org/empymod/emg3d.svg?branch=master
    :target: https://travis-ci.org/empymod/emg3d
    :alt: Travis-CI
+.. image:: https://coveralls.io/repos/github/empymod/emg3d/badge.svg?branch=master
+   :target: https://coveralls.io/github/empymod/emg3d?branch=master
+   :alt: Coveralls
 
 .. sphinx-inclusion-marker
 
