@@ -29,8 +29,7 @@ reports, and much more, see
 Features
 ========
 
-- Multigrid solver for 3D electromagnetic diffusion with regular grids (using
-  :class:`discretize.TensorMesh`).
+- Multigrid solver for 3D electromagnetic diffusion with regular grids.
 - Tri-axial electrical anisotropy.
 - Can be used as a standalone solver or as a pre-conditioner for various Krylov
   subspace methods implemented in SciPy, e.g., BiCGSTAB
@@ -43,7 +42,7 @@ Features
 Installation
 ============
 
-You can install emg3d either via ``conda``:
+You can install emg3d either via ``conda`` (preferred):
 
 .. code-block:: console
 
@@ -55,10 +54,16 @@ or via ``pip``:
 
    pip install emg3d
 
-Required are Python version 3.7 or higher and the modules `NumPy`, `SciPy`,
-`numba`, and `discretize` (from SimPEG). Consult the installation notes in the
-`manual <https://emg3d.readthedocs.io/en/stable/usage.html#installation>`_ for
-more information regarding installation and requirements.
+Required are Python version 3.7 or higher and the modules ``NumPy``, ``SciPy``,
+and ``numba``; ``discretize`` (from `SimPEG <https://simpeg.xyz>`_) is highly
+recommended.
+
+If you are new to Python we recommend using a Python distribution, which will
+ensure that all dependencies are met, specifically properly compiled versions
+of ``NumPy`` and ``SciPy``; we recommend using `Anaconda
+<https://www.anaconda.com/download>`_. If you install Anaconda you can simply
+start the *Anaconda Navigator*, add the channel ``prisae`` and ``emg3d`` will
+appear in the package list and can be installed with a click.
 
 
 Citation

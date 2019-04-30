@@ -1,0 +1,12 @@
+# Directories
+__pycache__/
+
+# Sphinx
+_build/
+
+# Pytest and coverage related
+htmlcov
+.coverage
+.coverage.*
+.pytest_cache/
+tests/create_data/tmp/

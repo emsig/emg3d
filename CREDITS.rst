@@ -2,13 +2,13 @@ Credits
 #######
 
 This project was started by **Dieter Werthmüller**. Every contributor will be
-listed here and is considered to be part of *The emg3d Developers*:
+listed here and is considered to be part of «The emg3d Developers»:
 
 - `Dieter Werthmüller <https://github.com/prisae>`_
 
 
-History and authors of the original code
-----------------------------------------
+Historical credits
+------------------
 
 The core of *emg3d* is a complete rewrite and redesign of the multigrid code by
 **Wim A. Mulder** ([Muld06]_, [Muld07]_, [Muld08]_, [MuWS08]_), developed at
@@ -18,14 +18,13 @@ stretched grids), **Marwan Wirianto** ([WiMS10]_, [WiMS11]_; computation of
 time-domain data), and **Evert C. Slob** ([SlHM10]_; analytical solutions). The
 original code was written in Matlab, where the most time- and memory-consuming
 parts were sped up through mex-files (written in C). It included multigrid with
-or without BiCGSTAB, VTI resistivity, semi coarsening, and linerelaxation; the
+or without BiCGSTAB, VTI resistivity, semicoarsening, and line relaxation; the
 number of cells had to be powers of two, and coarsening was done only until the
-first dimension was at two cells. As such it corresponds more or less to *emg3d
-v0.3.0* (with VTI instead of tri-axial resistivity).
+first dimension was at two cells. As such it corresponded roughly to *emg3d
+v0.3.0*.
 
 See the :doc:`references` in the manual for the full citations and a more
 extensive list.
-
 
 .. note::
 
