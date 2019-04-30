@@ -1,7 +1,4 @@
-import os
-import sys
 import time
-sys.path.append(os.path.pardir)
 from emg3d import __version__
 
 # ==== 1. Extensions  ====
