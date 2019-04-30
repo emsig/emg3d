@@ -95,3 +95,8 @@ License information
 Copyright 2018-2019 The emg3d Developers.
 
 Licensed under the Apache License, Version 2.0, see the ``LICENSE``-file.
+
+
+.. image:: https://api.codacy.com/project/badge/Grade/49917bd004574859865d25cd81adda16
+   :alt: Codacy Badge
+   :target: https://app.codacy.com/app/prisae/emg3d?utm_source=github.com&utm_medium=referral&utm_content=empymod/emg3d&utm_campaign=Badge_Grade_Dashboard
