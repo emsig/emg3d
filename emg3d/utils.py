@@ -582,8 +582,6 @@ def get_source_field(grid, src, freq, strength=0):
         Using adjoint interpolation method, probably not the most efficient
         implementation.
         """
-        nx, ny, nz = s.shape
-
         # Source lengths in x-, y-, and z-directions.
         d_xyz = src[1::2]-src[::2]
 

@@ -314,7 +314,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
     amat = np.zeros(36, dtype=np.complex128)
 
     # Smoothing steps
-    for it in range(nu):
+    for _ in range(nu):
 
         # Direction of Gauss-Seidel ordering; 0=forward, 1=backward
         iback = 1-iback
@@ -602,7 +602,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
     amat = np.zeros(6*nr, dtype=np.complex128)
 
     # Smoothing steps
-    for it in range(nu):
+    for _ in range(nu):
 
         # Direction of Gauss-Seidel ordering; 0=forward, 1=backward
         iback = 1-iback
@@ -876,7 +876,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
     amat = np.zeros(6*nr, dtype=np.complex128)
 
     # Smoothing steps
-    for it in range(nu):
+    for _ in range(nu):
 
         # Direction of Gauss-Seidel ordering; 0=forward, 1=backward
         iback = 1-iback
@@ -1150,7 +1150,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
     amat = np.zeros(6*nr, dtype=np.complex128)
 
     # Smoothing steps
-    for it in range(nu):
+    for _ in range(nu):
 
         # Direction of Gauss-Seidel ordering; 0=forward, 1=backward
         iback = 1-iback
