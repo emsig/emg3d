@@ -68,14 +68,10 @@ Making a release
     2. Now to the conda-build part::
 
            conda skeleton pypi emg3d
-           conda build --python 3.5 emg3d
-           conda build --python 3.6 emg3d
            conda build --python 3.7 emg3d
 
     3. Convert for all platforms::
 
-           conda convert --platform all /opt/miniconda/miniconda/conda-bld/linux-64/emg3d-[version]-py35_0.tar.bz2
-           conda convert --platform all /opt/miniconda/miniconda/conda-bld/linux-64/emg3d-[version]-py36_0.tar.bz2
            conda convert --platform all /opt/miniconda/miniconda/conda-bld/linux-64/emg3d-[version]-py37_0.tar.bz2
 
     4. Upload them::
