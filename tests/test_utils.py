@@ -251,10 +251,36 @@ def test_model():
     assert_allclose(model1.vnC, grid.vnC)
     assert_allclose(model1.vol, grid.vol)
 
+    # Assert you can not set res_y/eta_y nor res_z/eta_z if not provided from
+    # the start.
+    with pytest.raises(ValueError):
+        model1.res_y = 2*model1.res_x
+    with pytest.raises(ValueError):
+        model1.eta_y = 2*model1.eta_x
+    with pytest.raises(ValueError):
+        model1.res_z = 2*model1.res_x
+    with pytest.raises(ValueError):
+        model1.eta_z = 2*model1.eta_x
+
     # Using ints
     model2 = utils.Model(grid, 2., 3., 4.)
     assert_allclose(model2.res_x*1.5, model2.res_y)
     assert_allclose(model2.res_x*2, model2.res_z)
+
+    # VTI: Setting res_x and res_z, not res_y
+    model2b = utils.Model(grid, 2., res_z=4.)
+    assert_allclose(model2b.res_x, model2b.res_y)
+    assert_allclose(model2b.eta_x, model2b.eta_y)
+    model2b.res_z = model2b.res_x
+    model2b.eta_z = model2b.eta_x
+    model2c = utils.Model(grid, 2., res_z=model2b.res_z.flatten('F'))
+    assert_allclose(model2c.res_x, model2c.res_z)
+    assert_allclose(model2c.eta_x, model2c.eta_z)
+
+    # HTI: Setting res_x and res_y, not res_z
+    model2d = utils.Model(grid, 2., 4.)
+    assert_allclose(model2d.res_x, model2d.res_z)
+    assert_allclose(model2d.eta_x, model2d.eta_z)
 
     # Check wrong shape
     with pytest.raises(ValueError):

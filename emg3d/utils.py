@@ -50,19 +50,13 @@ try:
 except ImportError:
     matplotlib = False
 try:
-    import numexpr
-except ImportError:
-    numexpr = False
-try:
     import mkl
 except ImportError:
     mkl = False
 
-# Get mkl info from numexpr or mkl, if available
+# Get mkl info, if available
 if mkl:
     mklinfo = mkl.get_version_string()
-elif numexpr:
-    mklinfo = numexpr.get_vml_version()
 else:
     mklinfo = False
 
