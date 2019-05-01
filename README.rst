@@ -4,25 +4,12 @@
    
 ----
 
-.. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
-   :target: http://emg3d.readthedocs.io/en/latest
-   :alt: Documentation Status
-.. image:: https://travis-ci.org/empymod/emg3d.svg?branch=master
-   :target: https://travis-ci.org/empymod/emg3d
-   :alt: Travis-CI
-.. image:: https://coveralls.io/repos/github/empymod/emg3d/badge.svg?branch=master
-   :target: https://coveralls.io/github/empymod/emg3d?branch=master
-   :alt: Coveralls
-.. image:: https://img.shields.io/codacy/grade/a15b80f75cd64be3bca73da30f191a83/master.svg
-   :target: https://www.codacy.com/app/prisae/emg3d
-   :alt: Codacy
-
 .. sphinx-inclusion-marker
 
 A multigrid solver for 3D electromagnetic diffusion with tri-axial electrical
 anisotropy. The matrix-free solver can be used as main solver or as
 preconditioner for one of the Krylov subspace methods implemented in
-:mod:`scipy.sparse.linalg`, and the governing equations are discretized on a
+`scipy.sparse.linalg`, and the governing equations are discretized on a
 staggered Yee grid. The code is written completely in Python using the
 NumPy/SciPy-stack, where the most time- and memory-consuming parts are sped up
 through jitted numba-functions.
@@ -46,8 +33,7 @@ Features
 - Can be used together with the `SimPEG <https://simpeg.xyz>`_-framework.
 - Can be used as a standalone solver or as a pre-conditioner for various Krylov
   subspace methods implemented in SciPy, e.g., BiCGSTAB
-  (:func:`scipy.sparse.linalg.bicgstab`) or CGS
-  (:func:`scipy.sparse.linalg.cgs`).
+  (`scipy.sparse.linalg.bicgstab`) or CGS (`scipy.sparse.linalg.cgs`).
 - Tri-axial electrical anisotropy.
 - Semicoarsening and line relaxation.
 - Grid-size can be anything.
@@ -92,7 +78,7 @@ will post here the details as soon as we have them.
 All releases have a Zenodo-DOI, provided on the `release-page
 <https://github.com/empymod/emg3d/releases>`_.
 
-See :doc:`credits` for the history of the code.
+See `CREDITS` for the history of the code.
 
 
 License information

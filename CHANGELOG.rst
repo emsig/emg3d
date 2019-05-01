@@ -2,11 +2,11 @@ Changelog
 #########
 
 
-*latest* : Flexible grid size
------------------------------
+v0.5.0 : Any grid size
+----------------------
 
-- **First open-source version**, including the Travis-RTD-Coveralls-Codacy
-  toolchain and Zenodo. No benchmarks yet.
+- First open-source version.
+- Include RTD, Travis, Coveralls, Codacy, and Zenodo. No benchmarks yet.
 - Accepts now *any* grid size (warns if a bad grid size for MG is provided).
 - Coarsens now to the lowest level of each dimension, not only to the coarsest
   level of the smallest dimension.
