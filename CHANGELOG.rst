@@ -5,6 +5,8 @@ Changelog
 v0.5.0 : Any grid size
 ----------------------
 
+**2019-05-01**
+
 - First open-source version.
 - Include RTD, Travis, Coveralls, Codacy, and Zenodo. No benchmarks yet.
 - Accepts now *any* grid size (warns if a bad grid size for MG is provided).
