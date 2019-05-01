@@ -72,6 +72,21 @@ def test_solver(capsys):
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['bicresult'], efield)
 
+    # Same as previous, without BiCGSTAB, but some print checking.
+    efield = solver.solver(grid, model, sfield, verb=3)
+    out, _ = capsys.readouterr()
+    assert ' emg3d START ::' in out
+    assert ' [hh:mm:ss] ' in out
+    assert ' CONVERGED' in out
+    assert ' MG cycles ' in out
+    assert ' Final l2-norm ' in out
+    assert ' emg3d END :: ' in out
+
+    # Max it
+    _ = solver.solver(grid, model, sfield, verb=2, maxit=1)
+    out, _ = capsys.readouterr()
+    assert ' MAX. ITERATION REACHED' in out
+
     # BiCGSTAB with lower verbosity, print checking.
     _ = solver.solver(grid, model, sfield, verb=2, maxit=1, sslsolver=True)
     out, _ = capsys.readouterr()
@@ -90,6 +105,11 @@ def test_solver(capsys):
     assert outarray is None
     assert "Provided efield already good enough!" in out
 
+    # Check stagnation by providing zero source field
+    _ = solver.solver(grid, model, sfield*0)
+    out, _ = capsys.readouterr()
+    assert "STAGNATED" in out
+
     # 2. Regression test for heterogeneous case.
     dat = REGRES['reg_2'][()]
     grid = dat['grid']
@@ -102,6 +122,22 @@ def test_solver(capsys):
 
     assert_allclose(dat['result'], efield.field)
 
+    # Check the QC plot if it is too long.
+    # Coincidently, this one also diverges if nu_pre=0!
+    # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
+    mesh = TensorMesh([2**9, 2, 2], x0='CCC')
+    sfield = utils.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
+    model = utils.Model(mesh)
+    _ = solver.solver(mesh, model, sfield, verb=3, nu_pre=0)
+    out, _ = capsys.readouterr()
+    assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
+    assert "DIVERGED" in out
+
+
+def multigrid():
+    pass
+    # No test at the moment. Add one!
+
 
 def test_smoothing():
     # 1. The only thing to test here is that smoothing returns the same as
@@ -110,45 +146,67 @@ def test_smoothing():
 
     nu = 2
 
-    # Create a grid
+    points = [[(100, 2)],
+              [(10, 27, -1.1), (10, 10), (10, 27, 1.1)],
+              [(50, 4, 1.2)]]
+
     src = [0, -10, -10, 43, 13]
-    grid = TensorMesh(
-        [[(100, 2)],
-         [(10, 27, -1.1), (10, 10), (10, 27, 1.1)],
-         [(50, 4, 1.2)]],
-        x0=src[:3])
 
-    # Create some resistivity model
-    x = np.arange(1, grid.nCx+1)*2
-    y = 1/np.arange(1, grid.nCy+1)
-    z = np.arange(1, grid.nCz+1)[::-1]/10
-    res_x = np.outer(np.outer(x, y), z).ravel()
-    freq = 0.319
-    model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x, freq=freq)
+    # Loop and move the 2-cell dimension (100, 2) from x to y to z.
+    for xyz in range(3):
 
-    # Create a source field
-    sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
+        # Create a grid
+        grid = TensorMesh(
+            [points[xyz % 3],
+             points[(xyz+1) % 3],
+             points[(xyz+2) % 3]],
+            x0=src[:3])
 
-    # Run two iterations to get an e-field
-    field = solver.solver(grid, model, sfield, maxit=2, verb=1)
+        # Create some resistivity model
+        x = np.arange(1, grid.nCx+1)*2
+        y = 1/np.arange(1, grid.nCy+1)
+        z = np.arange(1, grid.nCz+1)[::-1]/10
+        res_x = np.outer(np.outer(x, y), z).ravel()
+        freq = 0.319
+        model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x, freq=freq)
 
-    # Collect Gauss-Seidel input (same for all routines)
-    inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz, nu)
+        # Create a source field
+        sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
 
-    func = ['', '_x', '_y', '_z']
-    for ldir in range(4):
-        # Get it directly from njitted
-        efield = utils.Field(grid, field)
-        getattr(njitted, 'gauss_seidel'+func[ldir])(
-                efield.fx, efield.fy, efield.fz, *inp)
+        # Run two iterations to get an e-field
+        field = solver.solver(grid, model, sfield, maxit=2, verb=1)
 
-        # Use solver.smoothing
-        ofield = utils.Field(grid, field)
-        solver.smoothing(grid, model, sfield, ofield, nu, ldir)
+        # Collect Gauss-Seidel input (same for all routines)
+        inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
+               model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz, nu)
 
-        # Compare
-        assert_allclose(efield, ofield)
+        func = ['', '_x', '_y', '_z']
+        for ldir in range(8):
+            # Get it directly from njitted
+            efield = utils.Field(grid, field)
+            if ldir < 4:
+                getattr(njitted, 'gauss_seidel'+func[ldir])(
+                        efield.fx, efield.fy, efield.fz, *inp)
+            elif ldir == 4:
+                njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+                njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+            elif ldir == 5:
+                njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+                njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+            elif ldir == 6:
+                njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+                njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+            elif ldir == 7:
+                njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+                njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+                njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+
+            # Use solver.smoothing
+            ofield = utils.Field(grid, field)
+            solver.smoothing(grid, model, sfield, ofield, nu, ldir)
+
+            # Compare
+            assert_allclose(efield, ofield)
 
 
 def test_restriction():

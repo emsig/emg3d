@@ -50,19 +50,13 @@ try:
 except ImportError:
     matplotlib = False
 try:
-    import numexpr
-except ImportError:
-    numexpr = False
-try:
     import mkl
 except ImportError:
     mkl = False
 
-# Get mkl info from numexpr or mkl, if available
+# Get mkl info, if available
 if mkl:
     mklinfo = mkl.get_version_string()
-elif numexpr:
-    mklinfo = numexpr.get_vml_version()
 else:
     mklinfo = False
 
@@ -588,8 +582,6 @@ def get_source_field(grid, src, freq, strength=0):
         Using adjoint interpolation method, probably not the most efficient
         implementation.
         """
-        nx, ny, nz = s.shape
-
         # Source lengths in x-, y-, and z-directions.
         d_xyz = src[1::2]-src[::2]
 

@@ -51,6 +51,8 @@ Features
 - Tri-axial electrical anisotropy.
 - Semicoarsening and line relaxation.
 - Grid-size can be anything.
+- As a multigrid method it scales with the number of unknowns *N* and has
+  therefore optimal complexity *O(N)*.
 
 
 Installation
