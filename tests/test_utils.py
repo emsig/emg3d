@@ -15,6 +15,12 @@ except ImportError:
 from emg3d import utils
 
 
+def get_h(ncore, npad, width, factor):
+    """Get cell widths for TensorMesh."""
+    pad = ((np.ones(npad)*np.abs(factor))**(np.arange(npad)+1))*width
+    return np.r_[pad[::-1], np.ones(ncore)*width, pad]
+
+
 def create_dummy(nx, ny, nz, imag=True):
     """Return complex dummy arrays of shape nx*ny*nz.
 
@@ -223,7 +229,7 @@ def test_TensorMesh():
         'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx',
         'vectorCCy', 'vectorCCz', 'gridEx', 'gridEy', 'gridEz', 'nEx', 'nEy',
         'nEz', 'nCx', 'nCy', 'nCz', 'vnC', 'nNx', 'nNy', 'nNz', 'vnN', 'vnEx',
-        'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'nE', 'vol'
+        'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'nE', 'vol', 'x0'
     ]
 
     # Ensure they are the same.

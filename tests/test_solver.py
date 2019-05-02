@@ -6,6 +6,8 @@ from numpy.testing import assert_allclose
 
 from emg3d import solver, utils, njitted
 
+# from .test_utils import get_h
+
 # Data generated with create_data/regression.py
 REGRES = np.load(join(dirname(__file__), 'data/regression.npz'),
                  allow_pickle=True)
@@ -28,7 +30,7 @@ def test_solver(capsys):
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res'][()]
 
-    grid = TensorMesh(**dat['input_grid'])
+    grid = utils.TensorMesh(**dat['input_grid'])
     model = utils.Model(**dat['input_model'])
     sfield = utils.get_source_field(**dat['input_source'])
 
@@ -125,7 +127,9 @@ def test_solver(capsys):
     # Check the QC plot if it is too long.
     # Coincidently, this one also diverges if nu_pre=0!
     # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
-    mesh = TensorMesh([2**9, 2, 2], x0='CCC')
+    mesh = utils.TensorMesh(
+            [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
+            x0=np.array([-0.5, -1, -1]))
     sfield = utils.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
     model = utils.Model(mesh)
     _ = solver.solver(mesh, model, sfield, verb=3, nu_pre=0)
