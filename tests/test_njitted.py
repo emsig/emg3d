@@ -6,13 +6,43 @@ from . import alternatives
 from emg3d import solver, njitted, utils
 
 
+def get_h(h):
+    """Get cell widths for TensorMesh.
+
+    This is a simplified version of discretize.utils.meshutils.meshTensor,
+    just for testing purposes here.
+    """
+
+    if not isinstance(h, list):
+        h = [h]
+
+    h_array = np.array([])
+    for v in h:
+        if len(v) == 2:
+            h_array = np.r_[h_array, np.ones(int(v[1]))*float(v[0])]
+        elif len(v) == 3:
+            start = float(v[0])
+            num = int(v[1])
+            factor = float(v[2])
+            out = ((np.ones(num)*np.abs(factor))**(np.arange(num)+1))*start
+            if factor < 0:
+                out = out[::-1]
+            h_array = np.r_[h_array, out]
+
+    return h_array
+
+
 def test_amat_x():
 
     # 1. Compare to alternative amat_x
 
     # Create a grid
     src = [200, 300, -50., 5, 60]
-    grid = TensorMesh([[(100, 16, 1.2)], [(800, 8)], [(500, 4)]], 'CCC')
+    hx = get_h([(100, 16, 1.2)])
+    hy = get_h([(800, 8)])
+    hz = get_h([(500, 4)])
+    grid = utils.TensorMesh(
+            [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
     # Create some resistivity model
     x = np.arange(1, grid.nCx+1)*2
@@ -171,11 +201,11 @@ def test_restrict():
     h = np.array([1, 1, 1, 1])
 
     # Fine and coarse grid.
-    fgrid = TensorMesh([h, h, h], x0='CCC')
-    cgrid = TensorMesh([np.diff(fgrid.vectorNx[::2]),
-                        np.diff(fgrid.vectorNy[::2]),
-                        np.diff(fgrid.vectorNz[::2])],
-                       x0='CCC')
+    fgrid = utils.TensorMesh([h, h, h], x0=np.array([-2, -2, -2]))
+    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]),
+                              np.diff(fgrid.vectorNy[::2]),
+                              np.diff(fgrid.vectorNz[::2])],
+                             fgrid.x0)
 
     # Regular grid, so all weights (wx, wy, wz) are the same...
     w = njitted.restrict_weights(
