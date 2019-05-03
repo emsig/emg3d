@@ -1,10 +1,11 @@
 import pytest
 import numpy as np
-from discretize import TensorMesh
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
 from emg3d import solver, utils, njitted
+
+from .test_utils import get_h
 
 # Data generated with create_data/regression.py
 REGRES = np.load(join(dirname(__file__), 'data/regression.npz'),
@@ -28,7 +29,7 @@ def test_solver(capsys):
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res'][()]
 
-    grid = TensorMesh(**dat['input_grid'])
+    grid = utils.TensorMesh(**dat['input_grid'])
     model = utils.Model(**dat['input_model'])
     sfield = utils.get_source_field(**dat['input_source'])
 
@@ -125,7 +126,9 @@ def test_solver(capsys):
     # Check the QC plot if it is too long.
     # Coincidently, this one also diverges if nu_pre=0!
     # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
-    mesh = TensorMesh([2**9, 2, 2], x0='CCC')
+    mesh = utils.TensorMesh(
+            [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
+            x0=np.array([-0.5, -1, -1]))
     sfield = utils.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
     model = utils.Model(mesh)
     _ = solver.solver(mesh, model, sfield, verb=3, nu_pre=0)
@@ -146,21 +149,20 @@ def test_smoothing():
 
     nu = 2
 
-    points = [[(100, 2)],
-              [(10, 27, -1.1), (10, 10), (10, 27, 1.1)],
-              [(50, 4, 1.2)]]
-
+    widths = [np.ones(2)*100, get_h(10, 27, 10, 1.1), get_h(2, 1, 50, 1.2)]
+    x0 = [-w.sum()/2 for w in widths]
     src = [0, -10, -10, 43, 13]
 
     # Loop and move the 2-cell dimension (100, 2) from x to y to z.
     for xyz in range(3):
 
         # Create a grid
-        grid = TensorMesh(
-            [points[xyz % 3],
-             points[(xyz+1) % 3],
-             points[(xyz+2) % 3]],
-            x0=src[:3])
+        grid = utils.TensorMesh(
+            [widths[xyz % 3],
+             widths[(xyz+1) % 3],
+             widths[(xyz+2) % 3]],
+            x0=np.array([x0[xyz % 3], x0[(xyz+1) % 3], x0[(xyz+2) % 3]])
+        )
 
         # Create some resistivity model
         x = np.arange(1, grid.nCx+1)*2
@@ -213,7 +215,8 @@ def test_restriction():
 
     # Simple test with restriction followed by prolongation.
     src = [0, 0, 0, 0, 45]
-    grid = TensorMesh([[(100, 4)], [(100, 4)], [(100, 4)]])
+    grid = utils.TensorMesh(
+            [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100], x0=np.zeros(3))
 
     # Create dummy model and fields, parameters don't matter.
     model = utils.Model(grid, 1, 1, 1, 1)
@@ -260,12 +263,9 @@ def test_residual():
     # sfield-amat_x. Basically a copy of the function itself.
 
     # Create a grid
-    src = [-10, 30, 0., 45, 45]
-    grid = TensorMesh(
-        [[(33.3, 2, -1.2), (10, 4), (33.3, 2, 1.2)],
-         [(200, 16)],
-         [(25, 2)]],
-        x0=src[:3])
+    src = [90, 1600, 25., 45, 45]
+    grid = utils.TensorMesh(
+        [get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25], x0=np.zeros(3))
 
     # Create some resistivity model
     x = np.arange(1, grid.nCx+1)*2

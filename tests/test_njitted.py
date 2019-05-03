@@ -1,8 +1,8 @@
 import numpy as np
-from discretize import TensorMesh
 from numpy.testing import assert_allclose
 
 from . import alternatives
+from .test_utils import get_h
 from emg3d import solver, njitted, utils
 
 
@@ -12,7 +12,11 @@ def test_amat_x():
 
     # Create a grid
     src = [200, 300, -50., 5, 60]
-    grid = TensorMesh([[(100, 16, 1.2)], [(800, 8)], [(500, 4)]], 'CCC')
+    hx = get_h(8, 4, 100, 1.2)
+    hy = np.ones(8)*800
+    hz = np.ones(4)*500
+    grid = utils.TensorMesh(
+            [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
     # Create some resistivity model
     x = np.arange(1, grid.nCx+1)*2
@@ -86,12 +90,11 @@ def test_gauss_seidel():
         nz = [4, 4, 1][ldir-1]
 
         # Get this grid.
-        grid = TensorMesh(
-            [[(80, nx, -1.1), (80, nx, 1.1)],
-             [(100, ny, -1.3), (100, ny, 1.3)],
-             [(200, nz, -1.2), (200, nz, 1.2)]],
-            x0='CCC'
-        )
+        hx = get_h(0, nx, 80, 1.1)
+        hy = get_h(0, ny, 100, 1.3)
+        hz = get_h(0, nz, 200, 1.2)
+        grid = utils.TensorMesh(
+            [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
         # Initialize model with some resistivities.
         res_x = np.arange(grid.nC)+1
@@ -171,11 +174,11 @@ def test_restrict():
     h = np.array([1, 1, 1, 1])
 
     # Fine and coarse grid.
-    fgrid = TensorMesh([h, h, h], x0='CCC')
-    cgrid = TensorMesh([np.diff(fgrid.vectorNx[::2]),
-                        np.diff(fgrid.vectorNy[::2]),
-                        np.diff(fgrid.vectorNz[::2])],
-                       x0='CCC')
+    fgrid = utils.TensorMesh([h, h, h], x0=np.array([-2, -2, -2]))
+    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]),
+                              np.diff(fgrid.vectorNy[::2]),
+                              np.diff(fgrid.vectorNz[::2])],
+                             fgrid.x0)
 
     # Regular grid, so all weights (wx, wy, wz) are the same...
     w = njitted.restrict_weights(
@@ -232,16 +235,16 @@ def test_restrict_weights():
     # 2. Test with stretched grid and compare with alternative formulation
 
     # Create a highly stretched, non-centered grid
-    grid = TensorMesh(
-        [[(200, 2, -1.8), (200, 2), (200, 2, 1.8)],
-         [(800, 8, -1.2), (800, 8, 1.2)],
-         [(400, 4, -1.4), (400, 4, 1.4)]])
-    grid.x0 -= [100000, -3000, 100]
+    hx = get_h(2, 2, 200, 1.8)
+    hy = get_h(0, 8, 800, 1.2)
+    hz = get_h(0, 4, 400, 1.4)
+    grid = utils.TensorMesh(
+            [hx, hy, hz], np.array([-100000, 3000, 100]))
 
     # Create coarse grid thereof
     ch = [np.diff(grid.vectorNx[::2]), np.diff(grid.vectorNy[::2]),
           np.diff(grid.vectorNz[::2])]
-    cgrid = TensorMesh(ch, x0=grid.x0)
+    cgrid = utils.TensorMesh(ch, x0=grid.x0)
 
     # Calculate the weights in a numpy-way, instead of numba-way
     wl, w0, wr = alternatives.alt_restrict_weights(

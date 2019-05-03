@@ -15,7 +15,7 @@ hx = utils.get_stretched_h(hx_min, xdomain, nx, 0)
 hy = utils.get_stretched_h(hy_min, ydomain, nx, 0)
 hz = utils.get_stretched_h(hz_min, zdomain, nx, 250)
 input_grid = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
-grid = TensorMesh(**input_grid)
+grid = utils.TensorMesh(**input_grid)
 freq = 1.
 
 input_model = {
@@ -74,7 +74,7 @@ hz_min, zdomain = utils.get_domain(x0=250, freq=.1)
 hx = utils.get_stretched_h(hx_min, xdomain, 8, 0)
 hy = utils.get_stretched_h(hy_min, ydomain, 4, 0)
 hz = utils.get_stretched_h(hz_min, zdomain, 16, 250)
-grid = TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
+grid = utils.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
 
 
 # Initialize model
@@ -124,4 +124,27 @@ reg_2 = {
     'result': efield.field
 }
 
-np.savez_compressed('../data/regression.npz', res=out, reg_2=reg_2)
+# # # # # # # # # # 3. TensorMesh check # # # # # # # # # #
+# Create an advanced grid with discretize.
+
+grid = TensorMesh(
+        [[(10, 10, -1.1), (10, 20, 1), (10, 10, 1.1)],
+         [(33, 20, 1), (33, 10, 1.5)],
+         [20]],
+        x0='CN0')
+
+# List of all attributes in emg3d-grid.
+all_attr = [
+    'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx',
+    'vectorCCy', 'vectorCCz', 'gridEx', 'gridEy', 'gridEz', 'nEx', 'nEy',
+    'nEz', 'nCx', 'nCy', 'nCz', 'vnC', 'nNx', 'nNy', 'nNz', 'vnN', 'vnEx',
+    'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'nE', 'vol', 'x0'
+]
+
+mesh = {'attr': all_attr}
+
+for attr in all_attr:
+    mesh[attr] = getattr(grid, attr)
+
+
+np.savez_compressed('../data/regression.npz', res=out, reg_2=reg_2, grid=mesh)
