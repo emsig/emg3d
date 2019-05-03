@@ -15,7 +15,7 @@ hx = utils.get_stretched_h(hx_min, xdomain, nx, 0)
 hy = utils.get_stretched_h(hy_min, ydomain, nx, 0)
 hz = utils.get_stretched_h(hz_min, zdomain, nx, 250)
 input_grid = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
-grid = TensorMesh(**input_grid)
+grid = utils.TensorMesh(**input_grid)
 freq = 1.
 
 input_model = {
@@ -74,7 +74,7 @@ hz_min, zdomain = utils.get_domain(x0=250, freq=.1)
 hx = utils.get_stretched_h(hx_min, xdomain, 8, 0)
 hy = utils.get_stretched_h(hy_min, ydomain, 4, 0)
 hz = utils.get_stretched_h(hz_min, zdomain, 16, 250)
-grid = TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
+grid = utils.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
 
 
 # Initialize model
@@ -124,4 +124,12 @@ reg_2 = {
     'result': efield.field
 }
 
-np.savez_compressed('../data/regression.npz', res=out, reg_2=reg_2)
+# # # # # # # # # # 3. TensorMesh check # # # # # # # # # #
+# Create an advanced grid with discretize.
+grid = TensorMesh(
+        [[(10, 10, -1.1), (10, 20, 1), (10, 10, 1.1)],
+         [(33, 20, 1), (33, 10, 1.5)],
+         [20]],
+        x0='CN0')
+
+np.savez_compressed('../data/regression.npz', res=out, reg_2=reg_2, grid=grid)

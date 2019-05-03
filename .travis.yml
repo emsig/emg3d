@@ -4,9 +4,9 @@ language: python
 matrix:
   include:
     - python: 3.6  # => 3.7
-      env: PYTHON=3.7 PCKGS="mkl mkl-service numba" CHAN="defaults"
-    - python: 3.6  # => 3.7 with conda-forge; IPython, no JIT
-      env: PYTHON=3.7 PCKGS="numba IPython" NUMBA_DISABLE_JIT=1 CHAN="conda-forge"
+      env: PYTHON=3.7 PCKGS="mkl mkl-service numba" CHAN="defaults" INST=""
+    - python: 3.6  # => 3.7 with conda-forge; IPython, discretize, no JIT
+      env: PYTHON=3.7 PCKGS="numba IPython" NUMBA_DISABLE_JIT=1 CHAN="conda-forge" INST="discretize"
 
 install:
   - sudo apt-get update
@@ -24,7 +24,7 @@ install:
   # Install and activate environment, install packages
   - conda create -q -n test-environment -c $CHAN python=$PYTHON numpy scipy pytest pytest-cov $PCKGS
   - source activate test-environment
-  - pip install coveralls pytest-flake8 discretize
+  - pip install coveralls pytest-flake8 $INST
   - python setup.py install
 
 

@@ -2,9 +2,8 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from . import alternatives
-from emg3d import solver, njitted, utils
-
 from .test_utils import get_h
+from emg3d import solver, njitted, utils
 
 
 def test_amat_x():

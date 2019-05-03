@@ -3,7 +3,7 @@ import time
 import pytest
 import numpy as np
 import scipy as sp
-from discretize import TensorMesh
+from os.path import join, dirname
 from numpy.testing import assert_allclose
 
 # Optional imports
@@ -13,6 +13,10 @@ except ImportError:
     IPython = False
 
 from emg3d import utils
+
+# Data generated with create_data/regression.py
+REGRES = np.load(join(dirname(__file__), 'data/regression.npz'),
+                 allow_pickle=True)
 
 
 def get_h(ncore, npad, width, factor):
@@ -98,8 +102,8 @@ def test_get_hx():
 
 def test_get_source_field(capsys):
     src = [100, 200, 300, 27, 31]
-    grid = TensorMesh([[(200, 4)], [(400, 4)], [(800, 4)]])
-    grid.x0 -= src[:3]
+    h = np.ones(4)
+    grid = utils.TensorMesh([h*200, h*400, h*800], -np.array(src[:3]))
     freq = 1.2458
     sfield = utils.get_source_field(grid, src, freq)
     iomegamu = 2j*np.pi*freq*4e-7*np.pi
@@ -166,47 +170,50 @@ def test_get_source_field(capsys):
         return d_src, f_src
 
     # 1a. Source within one cell, normalized.
-    grid = TensorMesh([[(500, 3)], [(500, 3)], [(500, 3)]], 'CCC')
+    h = np.ones(3)*500
+    grid1 = utils.TensorMesh([h, h, h], np.array([-750, -750, -750]))
     d_src, f_src = get_f_src([0, 0., 0., 23, 15])
-    dsf = utils.get_source_field(grid, d_src, 1)
-    fsf = utils.get_source_field(grid, f_src, 1)
+    dsf = utils.get_source_field(grid1, d_src, 1)
+    fsf = utils.get_source_field(grid1, f_src, 1)
     assert_allclose(fsf, dsf)
 
     # 1b. Source within one cell, source strength = pi.
-    grid = TensorMesh([[(500, 3)], [(500, 3)], [(500, 3)]], 'CCC')
     d_src, f_src = get_f_src([0, 0., 0., 32, 53])
-    dsf = utils.get_source_field(grid, d_src, 3.3, np.pi)
-    fsf = utils.get_source_field(grid, f_src, 3.3, np.pi)
+    dsf = utils.get_source_field(grid1, d_src, 3.3, np.pi)
+    fsf = utils.get_source_field(grid1, f_src, 3.3, np.pi)
     assert_allclose(fsf, dsf)
 
     # 1c. Source over various cells, normalized.
-    grid = TensorMesh([[(200, 8)], [(200, 8)], [(200, 8)]], 'CCC')
+    h = np.ones(8)*200
+    grid2 = utils.TensorMesh([h, h, h], np.array([-800, -800, -800]))
     d_src, f_src = get_f_src([0, 0., 0., 40, 20], 300.0)
-    dsf = utils.get_source_field(grid, d_src, 10.0, 0)
-    fsf = utils.get_source_field(grid, f_src, 10.0, 0)
+    dsf = utils.get_source_field(grid2, d_src, 10.0, 0)
+    fsf = utils.get_source_field(grid2, f_src, 10.0, 0)
     assert_allclose(fsf.fx.sum(), dsf.fx.sum())
     assert_allclose(fsf.fy.sum(), dsf.fy.sum())
     assert_allclose(fsf.fz.sum(), dsf.fz.sum())
 
     # 1d. Source over various cells, source strength = pi.
-    grid = TensorMesh([[(200, 8)], [(200, 8)], [(200, 8)]], 'CCC')
     slen = 300
     strength = np.pi
     d_src, f_src = get_f_src([0, 0., 0., 20, 30], slen)
-    dsf = utils.get_source_field(grid, d_src, 1.3, slen*strength)
-    fsf = utils.get_source_field(grid, f_src, 1.3, strength)
+    dsf = utils.get_source_field(grid2, d_src, 1.3, slen*strength)
+    fsf = utils.get_source_field(grid2, f_src, 1.3, strength)
     assert_allclose(fsf.fx.sum(), dsf.fx.sum())
     assert_allclose(fsf.fy.sum(), dsf.fy.sum())
     assert_allclose(fsf.fz.sum(), dsf.fz.sum())
 
     # 1e. Source over various stretched cells, source strength = pi.
-    grid = TensorMesh(
-            [[(200, 8, 1.1)], [(200, 8, 1.2)], [(200, 8, 1.3)]], 'CCC')
+    h1 = get_h(4, 2, 200, 1.1)
+    h2 = get_h(4, 2, 200, 1.2)
+    h3 = get_h(4, 2, 200, 1.2)
+    x0 = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
+    grid3 = utils.TensorMesh([h1, h2, h3], x0)
     slen = 333
     strength = np.pi
     d_src, f_src = get_f_src([0, 0., 0., 50, 33], slen)
-    dsf = utils.get_source_field(grid, d_src, 0.7, slen*strength)
-    fsf = utils.get_source_field(grid, f_src, 0.7, strength)
+    dsf = utils.get_source_field(grid3, d_src, 0.7, slen*strength)
+    fsf = utils.get_source_field(grid3, f_src, 0.7, strength)
     assert_allclose(fsf.fx.sum(), dsf.fx.sum())
     assert_allclose(fsf.fy.sum(), dsf.fy.sum())
     assert_allclose(fsf.fz.sum(), dsf.fz.sum())
@@ -214,12 +221,8 @@ def test_get_source_field(capsys):
 
 def test_TensorMesh():
 
-    # Create an advanced grid with discretize.
-    grid = TensorMesh(
-            [[(10, 10, -1.1), (10, 20, 1), (10, 10, 1.1)],
-             [(33, 20, 1), (33, 10, 1.5)],
-             [20]],
-            x0='CN0')
+    # Load mesh created with discretize.TensorMesh.
+    grid = REGRES['grid'][()]
 
     # Use this grid instance to create emg3d equivalent.
     emg3dgrid = utils.TensorMesh(grid.h, grid.x0)
@@ -242,7 +245,9 @@ def test_model():
     # Mainly regression tests
 
     # Create some dummy data
-    grid = TensorMesh([[(2, 2)], [(3, 4)], [(0.5, 2)]])
+    grid = utils.TensorMesh(
+            [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+            np.zeros(3))
 
     res_x = create_dummy(*grid.vnC, False)
     res_y = res_x/2.0
@@ -335,7 +340,9 @@ def test_model():
 
 def test_field():
     # Create some dummy data
-    grid = TensorMesh([[(.5, 8)], [(1, 4)], [(2, 8)]])
+    grid = utils.TensorMesh(
+            [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
+            np.zeros(3))
 
     ex = create_dummy(*grid.vnEx)
     ey = create_dummy(*grid.vnEy)
@@ -410,7 +417,9 @@ def test_ctimeit(capsys):
 # FUNCTIONS RELATED TO DATA MANAGEMENT
 def test_data_write_read(tmpdir):
     # Create test data
-    grid = TensorMesh([[(100, 4)], [(100, 8)], [(100, 16)]])
+    grid = utils.TensorMesh(
+            [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
+            np.zeros(3))
 
     e1 = create_dummy(*grid.vnEx)
     e2 = create_dummy(*grid.vnEy)
