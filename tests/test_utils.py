@@ -2,7 +2,6 @@ import re
 import time
 import pytest
 import numpy as np
-import scipy as sp
 from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose
