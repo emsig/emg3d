@@ -126,10 +126,25 @@ reg_2 = {
 
 # # # # # # # # # # 3. TensorMesh check # # # # # # # # # #
 # Create an advanced grid with discretize.
+
 grid = TensorMesh(
         [[(10, 10, -1.1), (10, 20, 1), (10, 10, 1.1)],
          [(33, 20, 1), (33, 10, 1.5)],
          [20]],
         x0='CN0')
 
-np.savez_compressed('../data/regression.npz', res=out, reg_2=reg_2, grid=grid)
+# List of all attributes in emg3d-grid.
+all_attr = [
+    'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx',
+    'vectorCCy', 'vectorCCz', 'gridEx', 'gridEy', 'gridEz', 'nEx', 'nEy',
+    'nEz', 'nCx', 'nCy', 'nCz', 'vnC', 'nNx', 'nNy', 'nNz', 'vnN', 'vnEx',
+    'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'nE', 'vol', 'x0'
+]
+
+mesh = {'attr': all_attr}
+
+for attr in all_attr:
+    mesh[attr] = getattr(grid, attr)
+
+
+np.savez_compressed('../data/regression.npz', res=out, reg_2=reg_2, grid=mesh)

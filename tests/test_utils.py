@@ -3,6 +3,7 @@ import time
 import pytest
 import numpy as np
 import scipy as sp
+from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
@@ -225,19 +226,12 @@ def test_TensorMesh():
     grid = REGRES['grid'][()]
 
     # Use this grid instance to create emg3d equivalent.
-    emg3dgrid = utils.TensorMesh(grid.h, grid.x0)
-
-    # List of all attributes in emg3d-grid.
-    all_attr = [
-        'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx',
-        'vectorCCy', 'vectorCCz', 'gridEx', 'gridEy', 'gridEz', 'nEx', 'nEy',
-        'nEz', 'nCx', 'nCy', 'nCz', 'vnC', 'nNx', 'nNy', 'nNz', 'vnN', 'vnEx',
-        'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'nE', 'vol', 'x0'
-    ]
+    emg3dgrid = utils.TensorMesh(
+            [grid['hx'], grid['hy'], grid['hz']], grid['x0'])
 
     # Ensure they are the same.
-    for attr in all_attr:
-        assert_allclose(getattr(grid, attr), getattr(emg3dgrid, attr))
+    for attr in grid['attr']:
+        assert_allclose(grid[attr], getattr(emg3dgrid, attr))
 
 
 # MODEL AND FIELD CLASSES
@@ -255,8 +249,8 @@ def test_model():
 
     # Using defaults
     model1 = utils.Model(grid)
-    assert model1.mu_0 == sp.constants.mu_0            # Check constants
-    assert model1.epsilon_0 == sp.constants.epsilon_0  # Check constants
+    assert model1.mu_0 == constants.mu_0            # Check constants
+    assert model1.epsilon_0 == constants.epsilon_0  # Check constants
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
