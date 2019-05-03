@@ -16,6 +16,9 @@
 .. image:: https://img.shields.io/codacy/grade/a15b80f75cd64be3bca73da30f191a83/master.svg
    :target: https://www.codacy.com/app/prisae/emg3d
    :alt: Codacy
+.. image:: https://img.shields.io/badge/benchmark-asv-blue.svg?style=flat
+   :target: https://empymod.github.io/emg3d-asv
+   :alt: Airspeed Velocity
 .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.2656374.svg
    :target: https://doi.org/10.5281/zenodo.2656374
    :alt: Zenodo DOI
