@@ -1600,7 +1600,7 @@ def solve(amat, bvec):
 
 # Restriction
 @nb.njit(**_numba_setting)
-def restrict(crx, cry, crz, rx, ry, rz, wx, wz, wy, rdir):
+def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
     r"""Restriction of residual from fine to coarse grid.
 
     Corresponds to Equation 8 in [Muld06]_. The equation for the x-direction,
@@ -1631,9 +1631,9 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wz, wy, rdir):
     rx, ry, rz : ndarray
         Fine grid {x,y,z}-directed residual.
 
-    wx, wz, wy: tuple
+    wx, wy, wz: tuple
         Tuples containing the weights (wl, w0, wr) as returned from
-        :func:`restrict_weights` for the z- and y-directions.
+        :func:`restrict_weights` for the x-, y-, and z-directions.
 
     rdir : int
         Direction of semicoarsening; 0 for no semicoarsening.

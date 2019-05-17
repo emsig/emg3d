@@ -984,7 +984,7 @@ def restriction(grid, model, sfield, residual, rdir):
     # Calculate the source terms (Equation 8 in [Muld06]_).
     csfield = utils.Field(cgrid)  # Create empty coarse source field instance.
     njitted.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
-                     residual.fy, residual.fz, wx, wz, wy, rdir)
+                     residual.fy, residual.fz, wx, wy, wz, rdir)
 
     # Ensure PEC and initiate empty e-field.
     csfield.ensure_pec
