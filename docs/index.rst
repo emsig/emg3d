@@ -15,8 +15,8 @@ Version: |version| ~ Date: |today|
    :caption: User Manual
 
    usage
-   theory
    mgwhat
+   theory
    references
    changelog
    credits

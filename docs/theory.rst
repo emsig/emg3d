@@ -487,6 +487,11 @@ The *Residual Correction* is given by
 The Multigrid Method
 --------------------
 
+.. note::
+
+    If you have never heard of multigrid methods before you might want to read
+    through the :doc:`mgwhat`-section.
+
 Multigrid is a numerical technique for solving large, often sparse, systems of
 equations, using several grids at the same time. An elementary introduction can
 be found in [BrHM00]_. The motivation for this approach follows from the
