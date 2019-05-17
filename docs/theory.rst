@@ -595,6 +595,8 @@ accelerated by a Krylov method. Alternatively, multigrid might be viewed as a
 preconditioner for a Krylov method.
 
 
+.. _Gauss-Seidel:
+
 Gauss-Seidel
 ````````````
 
