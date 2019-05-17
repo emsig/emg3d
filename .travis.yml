@@ -1,11 +1,14 @@
-# http://conda.pydata.org/docs/travis.html
+dist: xenial  # Required for Python >= 3.7
+
 language: python
 
 matrix:
   include:
-    - python: 3.6  # => 3.7
+    - name: "Channel `defaults`; jitted"
+      python: 3.7
       env: PYTHON=3.7 PCKGS="mkl mkl-service numba" CHAN="defaults" INST=""
-    - python: 3.6  # => 3.7 with conda-forge; IPython, discretize, no JIT
+    - name: "Channel `conda-forge`; not jitted"
+      python: 3.7
       env: PYTHON=3.7 PCKGS="numba IPython" NUMBA_DISABLE_JIT=1 CHAN="conda-forge" INST="discretize"
 
 install:
