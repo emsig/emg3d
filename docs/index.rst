@@ -16,6 +16,7 @@ Version: |version| ~ Date: |today|
 
    usage
    theory
+   mgwhat
    references
    changelog
    credits
