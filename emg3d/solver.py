@@ -24,6 +24,7 @@ are in the :mod:`emg3d.njitted` as numba-jitted functions.
 # the License.
 
 
+import itertools
 import numpy as np
 from itertools import cycle
 import scipy.interpolate as si
@@ -1049,13 +1050,16 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
     z_pts = grid.gridEz[:grid.nNx*grid.nNy, :2]
 
     # Interpolate ex in y-z-slices.
+    out = reg_grid_int_init(cgrid.vectorNy, cgrid.vectorNz, x_pts)
     for ixc in range(cgrid.nCx):
 
         # Bilinear interpolation in the y-z plane
-        fn = si.RegularGridInterpolator(
-                (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
-                bounds_error=False, fill_value=None)
-        hh = fn(x_pts).reshape(grid.vnEx[1:], order='F')
+        # fn = si.RegularGridInterpolator(
+        #         (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
+        #         bounds_error=False, fill_value=None)
+        # hh = fn(x_pts).reshape(grid.vnEx[1:], order='F')
+        hh = reg_grid_int(cefield.fx[ixc, :, :], *out)
+        hh = hh.reshape(grid.vnEx[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
         if rdir not in [1, 5, 6]:
@@ -1392,3 +1396,55 @@ class MGParameters:
                   "             direction. Provided shape: "
                   f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
             raise ValueError('nCx/nCy/nCz')
+
+
+##################################
+def reg_grid_int_init(x, y, xi):
+    """Linear interpolation on a regular grid in 2D."""
+    grid = (x, y)
+    xirt = xi.reshape(-1, xi.shape[-1]).T
+
+    # find relevant edges between which xi are situated
+    indices = []
+
+    # compute distance to lower edge in unity units
+    norm_distances = []
+
+    # iterate through dimensions
+    for x, grid in zip(xirt, grid):
+        i = np.searchsorted(grid, x) - 1
+        i[i < 0] = 0
+        i[i > grid.size - 2] = grid.size - 2
+        indices.append(i)
+        norm_distances.append((x - grid[i]) / (grid[i + 1] - grid[i]))
+
+    indices = indices
+    norm_distances = norm_distances
+
+    return indices, norm_distances, xi.shape
+
+
+def reg_grid_int(values, indices, norm_distances, xi_shape):
+    """
+    Interpolation at coordinates
+
+    Parameters
+    ----------
+    xi : ndarray of shape (..., 2)
+        The coordinates to sample the gridded data at
+
+    """
+    # slice for broadcasting over trailing dimensions in values
+    vslice = (slice(None),)
+
+    # find relevant result
+    # each i and i+1 represents a edge
+    edges = itertools.product(*[[i, i + 1] for i in indices])
+    result = 0.
+    for edge_indices in edges:
+        weight = 1.
+        for ei, i, yi in zip(edge_indices, indices, norm_distances):
+            weight *= np.where(ei == i, 1 - yi, yi)
+        result += np.asarray(values[edge_indices]) * weight[vslice]
+
+    return result.reshape(xi_shape[:-1] + values.shape[2:])
