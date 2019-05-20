@@ -12,6 +12,10 @@ References
 .. [ClWe01] Clemens, M., and T. Weiland, 2001, Discrete electromagnetism with
    the finite integration technique: PIER, 32, 65--87; DOI:
    `10.2528/PIER00080103 <https://doi.org/10.2528/PIER00080103>`_.
+.. [Fedo64] Fedorenko, R. P., 1964, The speed of convergence of one iterative
+   process: USSR Computational Mathematics and Mathematical Physics, 4,
+   227--235; DOI `10.1016/0041-5553(64)90253-8
+   <https://doi.org/10.1016/0041-5553(64)90253-8>`_.
 .. [JoOM06] Jönsthövel, T. B., C. W. Oosterlee, and W. A. Mulder, 2006,
    Improving multigrid for 3-D electro-magnetic diffusion on stretched grids:
    European Conference on Computational Fluid Dynamics; UUID:
@@ -32,6 +36,9 @@ References
    diffusion with multigrid: Computing and Visualization in Science, 11,
    29--138; DOI: `10.1007/s00791-007-0064-y
    <https://doi.org/10.1007/s00791-007-0064-y>`_.
+.. [Muld11] Mulder, W. A., 2011, *in* Numerical Methods, Multigrid: Springer
+   Netherlands, 895--900; DOI `10.1007/978-90-481-8702-7_153
+   <https://doi.org/10.1007/978-90-481-8702-7_153>`_.
 .. [MuWS08] Mulder, W. A., M. Wirianto, and E. C. Slob, 2008, Time-domain
    modeling of electromagnetic diffusion with a frequency-domain code:
    Geophysics, 73, F1--F8; DOI: `10.1190/1.2799093

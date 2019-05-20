@@ -4,10 +4,11 @@ Multi-what?
 If you have never heard of the multigrid method before you might ask yourself
 "*multi-what?*" The following is an intent to describe the multigrid method
 without the maths; just some keywords and some figures. **It is a heavily
-simplified intro, using a 2D grid for simplicity.** Have a look at the
-:doc:`theory`-section for more details.
+simplified intro, using a 2D grid for simplicity.** A good, four-page intro
+with some maths is given by [Muld11]_. Have a look at the :doc:`theory`-section
+for more details.
 
-The multigrid method
+The multigrid method ([Fedo64]_)
 
 - is an iterative solver;
 - scales almost linearly (CPU & RAM);
@@ -41,10 +42,11 @@ typically 2 times (one forward, one backward). This is why it is called
 **smoother**, as it only smoothes the error, it does not solve it. The
 implemented method for this is the :ref:`Gauss-Seidel` method.
 
-Iterative solver which work in this matrix-free manner are typically very fast
-at solving for the local problem, hence the *high frequency* error, but very
-slow at solving the global problem, hence *low frequency* error. High and low
-frequency errors are meant relatively to cell-size here.
+Iterative solver which work in this matrix-free manner are typically **very
+fast at solving for the local problem**, hence at reducing the **high frequency
+error**, but **very slow at solving the global problem**, hence at reducing the
+**low frequency error**. High and low frequency errors are meant relatively to
+cell-size here.
 
 
 Moving between different grids
