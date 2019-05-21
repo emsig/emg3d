@@ -1020,56 +1020,55 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
 
     """
 
-    # Calculate required points of finer grid.
-    x_points = grid.gridEx[::grid.nCx, 1:]
-    y_points = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
-    y_points = y_points[:, :grid.nNx, :].reshape(-1, 2)
-    z_points = grid.gridEz[:grid.nNx*grid.nNy, :2]
+    # 0. Calculate required points of finer grid.
+    yz_points = grid.gridEx[::grid.nCx, 1:]
+    xz_points = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
+    xz_points = xz_points[:, :grid.nNx, :].reshape(-1, 2)
+    xy_points = grid.gridEz[:grid.nNx*grid.nNy, :2]
 
-    # Interpolate ex in y-z-slices.
-    rgi_inp = njitted.prolong_init((cgrid.vectorNy, cgrid.vectorNz), x_points)
-    for ixc in range(cgrid.nCx):
+    # 1. Interpolate ex in y-z-slices.
+    efieldx = njitted.prolon_fx(
+            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points)
 
-        # Bilinear interpolation in the y-z plane
-        hh = njitted.prolong(cefield.fx[ixc, :, :], *rgi_inp)
-        hh = hh.reshape(grid.vnEx[1:], order='F')
+    # Change sorting from C- to F-order (not yet possible in numba).
+    efieldx = efieldx.reshape((-1, *grid.vnEx[1:]), order='F')
 
-        # Piecewise constant interpolation in x-direction
-        if rdir not in [1, 5, 6]:
-            efield.fx[2*ixc, :, :] += hh
-            efield.fx[2*ixc+1, :, :] += hh
-        else:
-            efield.fx[ixc, :, :] += hh
+    # Piecewise constant interpolation in x-direction
+    if rdir not in [1, 5, 6]:
+        efield.fx[::2, :, :] += efieldx
+        efield.fx[1::2, :, :] += efieldx
+    else:
+        efield.fx += efieldx
 
-    # Interpolate ey in x-z-slices.
-    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNz), y_points)
+    # 2. Interpolate ey in x-z-slices.
+    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNz), xz_points)
     for iyc in range(cgrid.nCy):
 
         # Bilinear interpolation in the x-z plane
-        hh = njitted.prolong(cefield.fy[:, iyc, :], *rgi_inp)
-        hh = hh.reshape(grid.vnEy[::2], order='F')
+        efieldy = njitted.prolong(cefield.fy[:, iyc, :], *rgi_inp)
+        efieldy = efieldy.reshape(grid.vnEy[::2], order='F')
 
         # Piecewise constant interpolation in y-direction
         if rdir not in [2, 4, 6]:
-            efield.fy[:, 2*iyc, :] += hh
-            efield.fy[:, 2*iyc+1, :] += hh
+            efield.fy[:, 2*iyc, :] += efieldy
+            efield.fy[:, 2*iyc+1, :] += efieldy
         else:
-            efield.fy[:, iyc, :] += hh
+            efield.fy[:, iyc, :] += efieldy
 
-    # Interpolate ez in x-y-slices.
-    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNy), z_points)
+    # 3. Interpolate ez in x-y-slices.
+    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNy), xy_points)
     for izc in range(cgrid.nCz):
 
         # Bilinear interpolation in the x-y plane
-        hh = njitted.prolong(cefield.fz[:, :, izc], *rgi_inp)
-        hh = hh.reshape(grid.vnEz[:-1], order='F')
+        efieldz = njitted.prolong(cefield.fz[:, :, izc], *rgi_inp)
+        efieldz = efieldz.reshape(grid.vnEz[:-1], order='F')
 
         # Piecewise constant interpolation in z-direction
         if rdir not in [3, 4, 5]:
-            efield.fz[:, :, 2*izc] += hh
-            efield.fz[:, :, 2*izc+1] += hh
+            efield.fz[:, :, 2*izc] += efieldz
+            efield.fz[:, :, 2*izc+1] += efieldz
         else:
-            efield.fz[:, :, izc] += hh
+            efield.fz[:, :, izc] += efieldz
 
     # Ensure PEC boundaries
     efield.ensure_pec

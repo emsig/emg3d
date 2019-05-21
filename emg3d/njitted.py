@@ -2137,3 +2137,45 @@ def prolong_init(xy, xi):
         norm_distances[:, i] = normd
 
     return indices, norm_distances
+
+
+@nb.njit(**_numba_setting)
+def prolon_fx(vectorNy, vectorNz, cefieldx, yz_points):
+    """Bilinear interpolation in the y-z plane.
+
+    Prolongate the x-directed e-field by looping over each x-slice,
+    interpolating the y-z-plane.
+
+
+    Parameters
+    ----------
+    vectorNy, vectorNz : ndarray
+        Cell edges of the coarse grid in y- and z-directions.
+
+    cefieldx : ndarray
+        Coarse grid electric x-directed field.
+
+    yz_points : ndarray
+        2D array containing the (y, z)-coordinates to interpolate.
+
+
+    Returns
+    -------
+    efieldx : ndarray
+        Fine grid electric x-directed field.
+
+    """
+    # Number of x-slices.
+    nCx = cefieldx.shape[0]
+
+    # Pre-allocate interpolated field.
+    efieldx = np.zeros((nCx, yz_points.shape[0]), dtype=np.complex128)
+
+    # Initialize interpolation.
+    rgi_inp = prolong_init((vectorNy, vectorNz), yz_points)
+
+    # Bilinear interpolation for each y-z-plane/x-slice.
+    for ixc in range(nCx):
+        efieldx[ixc, :] = prolong(cefieldx[ixc, :, :], *rgi_inp)
+
+    return efieldx
