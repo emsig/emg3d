@@ -2022,3 +2022,117 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
         wr[i] *= cvectorCC[i]-vectorCC[2*i]
 
     return wl, w0, wr
+
+
+# Prolongation
+@nb.njit(**_numba_setting)
+def prolong(cefield, indices, norm_distances):
+    """Interpolating coarse grid e-field to fine grid.
+
+    This is a custom version of
+    :class:`scipy.interpolate.RegularGridInterpolator`; see those docs for more
+    information.
+
+    The customization makes the following assumption and adjustments:
+
+    - Only supports 2D;
+    - ``bounds_error=False``;
+    - ``fill_value=None``;
+    - changes in order to jitt it;
+    - re-arrangement so only the necessary things have to be done inside the
+      loop in :func:`emg3d.solver.prolongation`.
+
+
+    Parameters
+    ----------
+    cefield : Field
+        Coarse grid electric field; ``emg3d.utils.Field`` instance.
+
+    indices, norm_distances : lists of two 1D ndarrays
+        Output of :func:`prolong_init`.
+
+    Returns
+    -------
+    field : ndarray
+        Coarse grid electric field interpolated at fine grid locations.
+
+    Notes
+    -----
+    We set ``bounds_error=False`` and ``fill_value=None`` in
+    :class:`scipy.interpolate.RegularGridInterpolator` to extrapolate fine grid
+    points which are outside the coarse grid. The fine grid points are,
+    theoretically, never outside the coarse grid points. However, the
+    restriction mesh is created with the distances between points. This can
+    lead to fine grid points slightly outside coarse grid points (in the orders
+    of 1e-10 m) with very big distances (grids of roughly over 1e6 m). So
+    basically nothing, but it would still cause an error in the interpolation.
+
+    """
+    # Number of new points.
+    ni = indices[:, 0].size
+
+    # Find relevant fine grid field; each i and i+1 represents an edge.
+    field = np.zeros(ni, dtype=np.complex128)
+    for i in range(4):
+        weight = np.ones(ni)
+        edge_indices = (indices[:, 0] + i // 2, indices[:, 1] + i % 2)
+
+        # Calculate the weights.
+        for ii in range(2):
+            ei = edge_indices[ii]
+            ind = indices[:, ii]
+            yi = norm_distances[:, ii]
+
+            weight *= np.where(ei == ind, 1 - yi, yi)
+
+        # Add the current contribution.
+        for iii in range(ni):
+            ei0, ei1 = edge_indices[0][iii], edge_indices[1][iii]
+            field[iii] += np.asarray(cefield[ei0, ei1]) * weight[iii]
+
+    return field
+
+
+@nb.njit(**_numba_setting)
+def prolong_init(xy, xi):
+    """Initialization for `prolong`.
+
+    See :func:`prolong` for details.
+
+    Parameters
+    ----------
+    xy : tuple of two 1D arrays (x, y)
+        x and y are the grid points in x and y.
+
+    xi : ndarray of shape (..., 2)
+        The coordinates to sample the gridded data at.
+
+    Returns
+    -------
+    indices : list of two 1D ndarrays
+        Indices for interpolation from xy to xi.
+
+    norm_distances : list of two 1D ndarrays
+        Normalized distances for interpolation from xy to xi.
+
+    """
+
+    # Find relevant edges between which xi are situated.
+    indices = np.zeros(xi.shape, dtype=np.int16)
+
+    # Compute distance to lower edge in unity units.
+    norm_distances = np.zeros(xi.shape)
+
+    # Iterate through x, y.
+    for i in range(2):
+
+        ind = np.searchsorted(xy[i], xi[:, i]) - 1
+        ind[ind < 0] = 0
+        ind[ind > xy[i].size - 2] = xy[i].size - 2
+
+        indices[:, i] = ind
+
+        normd = ((xi[:, i] - xy[i][ind]) / (xy[i][ind + 1] - xy[i][ind]))
+        norm_distances[:, i] = normd
+
+    return indices, norm_distances

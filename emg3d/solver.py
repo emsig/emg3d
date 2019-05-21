@@ -24,10 +24,8 @@ are in the :mod:`emg3d.njitted` as numba-jitted functions.
 # the License.
 
 
-import itertools
 import numpy as np
 from itertools import cycle
-import scipy.interpolate as si
 import scipy.sparse.linalg as ssl
 from dataclasses import dataclass
 
@@ -1020,45 +1018,20 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
     rdir : int
         Direction of semicoarsening (0, 1, 2, or 3).
 
-    Notes
-    -----
-    We set ``bounds_error=False`` and ``fill_value=None`` in
-    :class:`scipy.interpolate.RegularGridInterpolator` to extrapolate fine grid
-    points which are outside the coarse grid. The fine grid points are,
-    theoretically, never outside the coarse grid points. However, the
-    restriction mesh is created with the distances between points. This can
-    lead to fine grid points slightly outside coarse grid points (in the orders
-    of 1e-10 m) with very big distances (grids of roughly over 1e6 m). So
-    basically nothing, but it would still cause an error in the interpolation.
-
     """
 
     # Calculate required points of finer grid.
-    #
-    # We get it from the mesh itself. It is the same as:
-    # x1, x2 = np.meshgrid(grid.vectorNy, grid.vectorNz)
-    # x_pts = np.vstack((x1.ravel(), x2.ravel())).T
-    # y1, y2 = np.meshgrid(grid.vectorNx, grid.vectorNz)
-    # y_pts = np.vstack((y1.ravel(), y2.ravel())).T
-    # z1, z2 = np.meshgrid(grid.vectorNx, grid.vectorNy)
-    # z_pts = np.vstack((z1.ravel(), z2.ravel())).T
-    #
-    # This could be stored in a table for each level for a potential speed-up.
-    x_pts = grid.gridEx[::grid.nCx, 1:]
-    y_pts = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
-    y_pts = y_pts[:, :grid.nNx, :].reshape(-1, 2)
-    z_pts = grid.gridEz[:grid.nNx*grid.nNy, :2]
+    x_points = grid.gridEx[::grid.nCx, 1:]
+    y_points = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
+    y_points = y_points[:, :grid.nNx, :].reshape(-1, 2)
+    z_points = grid.gridEz[:grid.nNx*grid.nNy, :2]
 
     # Interpolate ex in y-z-slices.
-    out = reg_grid_int_init(cgrid.vectorNy, cgrid.vectorNz, x_pts)
+    rgi_inp = njitted.prolong_init((cgrid.vectorNy, cgrid.vectorNz), x_points)
     for ixc in range(cgrid.nCx):
 
         # Bilinear interpolation in the y-z plane
-        # fn = si.RegularGridInterpolator(
-        #         (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
-        #         bounds_error=False, fill_value=None)
-        # hh = fn(x_pts).reshape(grid.vnEx[1:], order='F')
-        hh = reg_grid_int(cefield.fx[ixc, :, :], *out)
+        hh = njitted.prolong(cefield.fx[ixc, :, :], *rgi_inp)
         hh = hh.reshape(grid.vnEx[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
@@ -1069,13 +1042,12 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
             efield.fx[ixc, :, :] += hh
 
     # Interpolate ey in x-z-slices.
+    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNz), y_points)
     for iyc in range(cgrid.nCy):
 
         # Bilinear interpolation in the x-z plane
-        fn = si.RegularGridInterpolator(
-                (cgrid.vectorNx, cgrid.vectorNz), cefield.fy[:, iyc, :],
-                bounds_error=False, fill_value=None)
-        hh = fn(y_pts).reshape(grid.vnEy[::2], order='F')
+        hh = njitted.prolong(cefield.fy[:, iyc, :], *rgi_inp)
+        hh = hh.reshape(grid.vnEy[::2], order='F')
 
         # Piecewise constant interpolation in y-direction
         if rdir not in [2, 4, 6]:
@@ -1085,13 +1057,12 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
             efield.fy[:, iyc, :] += hh
 
     # Interpolate ez in x-y-slices.
+    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNy), z_points)
     for izc in range(cgrid.nCz):
 
         # Bilinear interpolation in the x-y plane
-        fn = si.RegularGridInterpolator(
-                (cgrid.vectorNx, cgrid.vectorNy), cefield.fz[:, :, izc],
-                bounds_error=False, fill_value=None)
-        hh = fn(z_pts).reshape(grid.vnEz[:-1], order='F')
+        hh = njitted.prolong(cefield.fz[:, :, izc], *rgi_inp)
+        hh = hh.reshape(grid.vnEz[:-1], order='F')
 
         # Piecewise constant interpolation in z-direction
         if rdir not in [3, 4, 5]:
@@ -1396,55 +1367,3 @@ class MGParameters:
                   "             direction. Provided shape: "
                   f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
             raise ValueError('nCx/nCy/nCz')
-
-
-##################################
-def reg_grid_int_init(x, y, xi):
-    """Linear interpolation on a regular grid in 2D."""
-    grid = (x, y)
-    xirt = xi.reshape(-1, xi.shape[-1]).T
-
-    # find relevant edges between which xi are situated
-    indices = []
-
-    # compute distance to lower edge in unity units
-    norm_distances = []
-
-    # iterate through dimensions
-    for x, grid in zip(xirt, grid):
-        i = np.searchsorted(grid, x) - 1
-        i[i < 0] = 0
-        i[i > grid.size - 2] = grid.size - 2
-        indices.append(i)
-        norm_distances.append((x - grid[i]) / (grid[i + 1] - grid[i]))
-
-    indices = indices
-    norm_distances = norm_distances
-
-    return indices, norm_distances, xi.shape
-
-
-def reg_grid_int(values, indices, norm_distances, xi_shape):
-    """
-    Interpolation at coordinates
-
-    Parameters
-    ----------
-    xi : ndarray of shape (..., 2)
-        The coordinates to sample the gridded data at
-
-    """
-    # slice for broadcasting over trailing dimensions in values
-    vslice = (slice(None),)
-
-    # find relevant result
-    # each i and i+1 represents a edge
-    edges = itertools.product(*[[i, i + 1] for i in indices])
-    result = 0.
-    for edge_indices in edges:
-        weight = 1.
-        for ei, i, yi in zip(edge_indices, indices, norm_distances):
-            weight *= np.where(ei == i, 1 - yi, yi)
-        result += np.asarray(values[edge_indices]) * weight[vslice]
-
-    return result.reshape(xi_shape[:-1] + values.shape[2:])
