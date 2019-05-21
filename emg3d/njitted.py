@@ -2040,7 +2040,8 @@ def prolong(cefield, indices, norm_distances):
     - ``fill_value=None``;
     - changes in order to jitt it;
     - re-arrangement so only the necessary things have to be done inside the
-      loop in :func:`emg3d.solver.prolongation`.
+      loop in :func:`emg3d.solver.prolongation`;
+    - No sanity checks are carried out; the input must be as expected.
 
 
     Parameters
