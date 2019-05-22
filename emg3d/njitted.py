@@ -2179,3 +2179,87 @@ def prolon_fx(vectorNy, vectorNz, cefieldx, yz_points):
         efieldx[ixc, :] = prolong(cefieldx[ixc, :, :], *rgi_inp)
 
     return efieldx
+
+
+@nb.njit(**_numba_setting)
+def prolon_fy(vectorNx, vectorNz, cefieldy, xz_points):
+    """Bilinear interpolation in the x-z plane.
+
+    Prolongate the y-directed e-field by looping over each y-slice,
+    interpolating the x-z-plane.
+
+
+    Parameters
+    ----------
+    vectorNx, vectorNz : ndarray
+        Cell edges of the coarse grid in x- and z-directions.
+
+    cefieldy : ndarray
+        Coarse grid electric y-directed field.
+
+    xz_points : ndarray
+        2D array containing the (x, z)-coordinates to interpolate.
+
+
+    Returns
+    -------
+    efieldy : ndarray
+        Fine grid electric y-directed field.
+
+    """
+    # Number of y-slices.
+    nCy = cefieldy.shape[1]
+
+    # Pre-allocate interpolated field.
+    efieldy = np.zeros((nCy, xz_points.shape[0]), dtype=np.complex128)
+
+    # Initialize interpolation.
+    rgi_inp = prolong_init((vectorNx, vectorNz), xz_points)
+
+    # Bilinear interpolation for each x-z-plane/y-slice.
+    for iyc in range(nCy):
+        efieldy[iyc, :] = prolong(cefieldy[:, iyc, :], *rgi_inp)
+
+    return efieldy
+
+
+@nb.njit(**_numba_setting)
+def prolon_fz(vectorNx, vectorNy, cefieldz, xy_points):
+    """Bilinear interpolation in the x-y plane.
+
+    Prolongate the z-directed e-field by looping over each z-slice,
+    interpolating the x-y-plane.
+
+
+    Parameters
+    ----------
+    vectorNx, vectorNy : ndarray
+        Cell edges of the coarse grid in x- and y-directions.
+
+    cefieldz : ndarray
+        Coarse grid electric z-directed field.
+
+    xy_points : ndarray
+        2D array containing the (x, y)-coordinates to interpolate.
+
+
+    Returns
+    -------
+    efieldz : ndarray
+        Fine grid electric z-directed field.
+
+    """
+    # Number of z-slices.
+    nCz = cefieldz.shape[2]
+
+    # Pre-allocate interpolated field.
+    efieldz = np.zeros((nCz, xy_points.shape[0]), dtype=np.complex128)
+
+    # Initialize interpolation.
+    rgi_inp = prolong_init((vectorNx, vectorNy), xy_points)
+
+    # Bilinear interpolation for each x-y-plane/z-slice.
+    for izc in range(nCz):
+        efieldz[izc, :] = prolong(cefieldz[:, :, izc], *rgi_inp)
+
+    return efieldz

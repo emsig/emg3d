@@ -1030,7 +1030,8 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
     efieldx = njitted.prolon_fx(
             cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points)
 
-    # Change sorting from C- to F-order (not yet possible in numba).
+    # Change sorting from C- to F-order.
+    # (Not yet possible in numba; move everything njitted once possible).
     efieldx = efieldx.reshape((-1, *grid.vnEx[1:]), order='F')
 
     # Piecewise constant interpolation in x-direction
@@ -1041,34 +1042,36 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
         efield.fx += efieldx
 
     # 2. Interpolate ey in x-z-slices.
-    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNz), xz_points)
-    for iyc in range(cgrid.nCy):
+    efieldy = njitted.prolon_fy(
+            cgrid.vectorNx, cgrid.vectorNz, cefield.fy, xz_points)
 
-        # Bilinear interpolation in the x-z plane
-        efieldy = njitted.prolong(cefield.fy[:, iyc, :], *rgi_inp)
-        efieldy = efieldy.reshape(grid.vnEy[::2], order='F')
+    # Change sorting from C- to F-order.
+    # (Not yet possible in numba; move everything njitted once possible).
+    efieldy = efieldy.reshape((-1, *grid.vnEy[::2]), order='F')
+    efieldy = np.swapaxes(efieldy, 0, 1)
 
-        # Piecewise constant interpolation in y-direction
-        if rdir not in [2, 4, 6]:
-            efield.fy[:, 2*iyc, :] += efieldy
-            efield.fy[:, 2*iyc+1, :] += efieldy
-        else:
-            efield.fy[:, iyc, :] += efieldy
+    # Piecewise constant interpolation in y-direction
+    if rdir not in [2, 4, 6]:
+        efield.fy[:, ::2, :] += efieldy
+        efield.fy[:, 1::2, :] += efieldy
+    else:
+        efield.fy += efieldy
 
     # 3. Interpolate ez in x-y-slices.
-    rgi_inp = njitted.prolong_init((cgrid.vectorNx, cgrid.vectorNy), xy_points)
-    for izc in range(cgrid.nCz):
+    efieldz = njitted.prolon_fz(
+            cgrid.vectorNx, cgrid.vectorNy, cefield.fz, xy_points)
 
-        # Bilinear interpolation in the x-y plane
-        efieldz = njitted.prolong(cefield.fz[:, :, izc], *rgi_inp)
-        efieldz = efieldz.reshape(grid.vnEz[:-1], order='F')
+    # Change sorting from C- to F-order.
+    # (Not yet possible in numba; move everything njitted once possible).
+    efieldz = efieldz.reshape((-1, *grid.vnEz[:-1]), order='F')
+    efieldz = np.moveaxis(efieldz, 0, 2)
 
-        # Piecewise constant interpolation in z-direction
-        if rdir not in [3, 4, 5]:
-            efield.fz[:, :, 2*izc] += efieldz
-            efield.fz[:, :, 2*izc+1] += efieldz
-        else:
-            efield.fz[:, :, izc] += efieldz
+    # Piecewise constant interpolation in z-direction
+    if rdir not in [3, 4, 5]:
+        efield.fz[:, :, ::2] += efieldz
+        efield.fz[:, :, 1::2] += efieldz
+    else:
+        efield.fz += efieldz
 
     # Ensure PEC boundaries
     efield.ensure_pec
