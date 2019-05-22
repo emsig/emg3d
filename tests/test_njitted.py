@@ -333,31 +333,31 @@ def test_prolong():
     cefield.fx = 1j*np.arange(cefield.fx.size)/10
 
     # Required interpolation points.
-    x_points = grid.gridEx[::grid.nCx, 1:]
+    yz_points = grid.gridEx[::grid.nCx, 1:]
 
     # Calculate SciPy alternative:
     for ixc in range(cgrid.nCx):
         fn = si.RegularGridInterpolator(
                 (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
                 bounds_error=False, fill_value=None)
-        hh = fn(x_points)
-        hh = fn(x_points).reshape(grid.vnEx[1:], order='F')
+        hh = fn(yz_points)
+        hh = fn(yz_points).reshape(grid.vnEx[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
         efield1.fx[2*ixc, :, :] += hh
         efield1.fx[2*ixc+1, :, :] += hh
 
     # Calculate emg3d-version:
-    rgi_inp = njitted.prolong_init((cgrid.vectorNy, cgrid.vectorNz), x_points)
-    for ixc in range(cgrid.nCx):
+    efieldx = njitted.prolon_fx(
+            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points)
 
-        # Bilinear interpolation in the y-z plane
-        hh = njitted.prolong(cefield.fx[ixc, :, :], *rgi_inp)
-        hh = hh.reshape(grid.vnEx[1:], order='F')
+    # Change sorting from C- to F-order.
+    # (Not yet possible in numba; move everything njitted once possible).
+    efieldx = efieldx.reshape((-1, *grid.vnEx[1:]), order='F')
 
-        # Piecewise constant interpolation in x-direction
-        efield2.fx[2*ixc, :, :] += hh
-        efield2.fx[2*ixc+1, :, :] += hh
+    # Piecewise constant interpolation in x-direction
+    efield2.fx[::2, :, :] += efieldx
+    efield2.fx[1::2, :, :] += efieldx
 
     # Compare
     np.allclose(efield1, efield2)
