@@ -2026,72 +2026,53 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
 # Prolongation
 @nb.njit(**_numba_setting)
-def prolong(cefield, indices, norm_distances):
-    """Interpolating coarse grid e-field to fine grid.
+def prolong_field(vectorN1, vectorN2, cefield, points, nC):
+    """Bilinear interpolation in 2D planes.
 
-    This is a custom version of
-    :class:`scipy.interpolate.RegularGridInterpolator`; see those docs for more
-    information.
-
-    The customization makes the following assumption and adjustments:
-
-    - Only supports 2D;
-    - ``bounds_error=False``;
-    - ``fill_value=None``;
-    - changes in order to jitt it;
-    - re-arrangement so only the necessary things have to be done inside the
-      loop in :func:`emg3d.solver.prolongation`;
-    - No sanity checks are carried out; the input must be as expected.
+    Prolongate the e-field normal to the plane by looping over each slice,
+    interpolating within the plane.
 
 
     Parameters
     ----------
-    cefield : Field
-        Coarse grid electric field; ``emg3d.utils.Field`` instance.
+    vectorN1, vectorN2 : ndarray
+        Cell edges of the coarse grid in the two plane-directions.
 
-    indices, norm_distances : lists of two 1D ndarrays
-        Output of :func:`prolong_init`.
+    cefield : ndarray
+        Coarse grid electric field directed normal to plane.
+
+    points : ndarray
+        2D array containing the plane-coordinates to interpolate.
+
+    nC : int
+        Number of coarse grid cells in the direction of the e-field. Must be
+        one of cefield.shape, otherwise a zero field is returned.
+
 
     Returns
     -------
-    field : ndarray
-        Coarse grid electric field interpolated at fine grid locations.
-
-    Notes
-    -----
-    We set ``bounds_error=False`` and ``fill_value=None`` in
-    :class:`scipy.interpolate.RegularGridInterpolator` to extrapolate fine grid
-    points which are outside the coarse grid. The fine grid points are,
-    theoretically, never outside the coarse grid points. However, the
-    restriction mesh is created with the distances between points. This can
-    lead to fine grid points slightly outside coarse grid points (in the orders
-    of 1e-10 m) with very big distances (grids of roughly over 1e6 m). So
-    basically nothing, but it would still cause an error in the interpolation.
+    efield : ndarray
+        Fine grid electric field normal to plane.
 
     """
-    # Number of new points.
-    ni = indices[:, 0].size
+    # Pre-allocate interpolated field.
+    efield = np.zeros((nC, points.shape[0]), dtype=np.complex128)
 
-    # Find relevant fine grid field; each i and i+1 represents an edge.
-    field = np.zeros(ni, dtype=np.complex128)
-    for i in range(4):
-        weight = np.ones(ni)
-        edge_indices = (indices[:, 0] + i // 2, indices[:, 1] + i % 2)
+    # Initialize interpolation.
+    rgi_inp = prolong_init((vectorN1, vectorN2), points)
 
-        # Calculate the weights.
-        for ii in range(2):
-            ei = edge_indices[ii]
-            ind = indices[:, ii]
-            yi = norm_distances[:, ii]
+    # Bilinear interpolation for each plane/slice.
+    if nC == cefield.shape[0]:   # x-directed.
+        for ic in range(nC):
+            prolong(efield[ic, :], cefield[ic, :, :], *rgi_inp)
+    elif nC == cefield.shape[1]:  # y-directed.
+        for ic in range(nC):
+            prolong(efield[ic, :], cefield[:, ic, :], *rgi_inp)
+    elif nC == cefield.shape[2]:  # z-directed.
+        for ic in range(nC):
+            prolong(efield[ic, :], cefield[:, :, ic], *rgi_inp)
 
-            weight *= np.where(ei == ind, 1 - yi, yi)
-
-        # Add the current contribution.
-        for iii in range(ni):
-            ei0, ei1 = edge_indices[0][iii], edge_indices[1][iii]
-            field[iii] += np.asarray(cefield[ei0, ei1]) * weight[iii]
-
-    return field
+    return efield
 
 
 @nb.njit(**_numba_setting)
@@ -2140,126 +2121,63 @@ def prolong_init(xy, xi):
 
 
 @nb.njit(**_numba_setting)
-def prolon_fx(vectorNy, vectorNz, cefieldx, yz_points):
-    """Bilinear interpolation in the y-z plane.
+def prolong(efield, cefield, indices, norm_distances):
+    """Interpolating coarse grid e-field to fine grid.
 
-    Prolongate the x-directed e-field by looping over each x-slice,
-    interpolating the y-z-plane.
+    This is a custom version of
+    :class:`scipy.interpolate.RegularGridInterpolator`; see those docs for more
+    information.
 
+    The customization makes the following assumption and adjustments:
 
-    Parameters
-    ----------
-    vectorNy, vectorNz : ndarray
-        Cell edges of the coarse grid in y- and z-directions.
-
-    cefieldx : ndarray
-        Coarse grid electric x-directed field.
-
-    yz_points : ndarray
-        2D array containing the (y, z)-coordinates to interpolate.
-
-
-    Returns
-    -------
-    efieldx : ndarray
-        Fine grid electric x-directed field.
-
-    """
-    # Number of x-slices.
-    nCx = cefieldx.shape[0]
-
-    # Pre-allocate interpolated field.
-    efieldx = np.zeros((nCx, yz_points.shape[0]), dtype=np.complex128)
-
-    # Initialize interpolation.
-    rgi_inp = prolong_init((vectorNy, vectorNz), yz_points)
-
-    # Bilinear interpolation for each y-z-plane/x-slice.
-    for ixc in range(nCx):
-        efieldx[ixc, :] = prolong(cefieldx[ixc, :, :], *rgi_inp)
-
-    return efieldx
-
-
-@nb.njit(**_numba_setting)
-def prolon_fy(vectorNx, vectorNz, cefieldy, xz_points):
-    """Bilinear interpolation in the x-z plane.
-
-    Prolongate the y-directed e-field by looping over each y-slice,
-    interpolating the x-z-plane.
+    - Only supports 2D;
+    - ``bounds_error=False``;
+    - ``fill_value=None``;
+    - changes in order to jitt it;
+    - re-arrangement so only the necessary things have to be done inside the
+      loop in :func:`emg3d.solver.prolongation`;
+    - No sanity checks are carried out; the input must be as expected.
+    - Interpolated field is directly put into the provided efield.
 
 
     Parameters
     ----------
-    vectorNx, vectorNz : ndarray
-        Cell edges of the coarse grid in x- and z-directions.
+    efield, cefield : ndarray
+        Fine and coarse grid electric fields.
 
-    cefieldy : ndarray
-        Coarse grid electric y-directed field.
-
-    xz_points : ndarray
-        2D array containing the (x, z)-coordinates to interpolate.
+    indices, norm_distances : lists of two 1D ndarrays
+        Output of :func:`prolong_init`.
 
 
-    Returns
-    -------
-    efieldy : ndarray
-        Fine grid electric y-directed field.
-
-    """
-    # Number of y-slices.
-    nCy = cefieldy.shape[1]
-
-    # Pre-allocate interpolated field.
-    efieldy = np.zeros((nCy, xz_points.shape[0]), dtype=np.complex128)
-
-    # Initialize interpolation.
-    rgi_inp = prolong_init((vectorNx, vectorNz), xz_points)
-
-    # Bilinear interpolation for each x-z-plane/y-slice.
-    for iyc in range(nCy):
-        efieldy[iyc, :] = prolong(cefieldy[:, iyc, :], *rgi_inp)
-
-    return efieldy
-
-
-@nb.njit(**_numba_setting)
-def prolon_fz(vectorNx, vectorNy, cefieldz, xy_points):
-    """Bilinear interpolation in the x-y plane.
-
-    Prolongate the z-directed e-field by looping over each z-slice,
-    interpolating the x-y-plane.
-
-
-    Parameters
-    ----------
-    vectorNx, vectorNy : ndarray
-        Cell edges of the coarse grid in x- and y-directions.
-
-    cefieldz : ndarray
-        Coarse grid electric z-directed field.
-
-    xy_points : ndarray
-        2D array containing the (x, y)-coordinates to interpolate.
-
-
-    Returns
-    -------
-    efieldz : ndarray
-        Fine grid electric z-directed field.
+    Notes
+    -----
+    We set ``bounds_error=False`` and ``fill_value=None`` in
+    :class:`scipy.interpolate.RegularGridInterpolator` to extrapolate fine grid
+    points which are outside the coarse grid. The fine grid points are,
+    theoretically, never outside the coarse grid points. However, the
+    restriction mesh is created with the distances between points. This can
+    lead to fine grid points slightly outside coarse grid points (in the orders
+    of 1e-10 m) with very big distances (grids of roughly over 1e6 m). So
+    basically nothing, but it would still cause an error in the interpolation.
 
     """
-    # Number of z-slices.
-    nCz = cefieldz.shape[2]
+    # Number of new points.
+    ni = indices[:, 0].size
 
-    # Pre-allocate interpolated field.
-    efieldz = np.zeros((nCz, xy_points.shape[0]), dtype=np.complex128)
+    # Find relevant fine grid field; each i and i+1 represents an edge.
+    for i in range(4):
+        weight = np.ones(ni)
+        edge_indices = (indices[:, 0] + i // 2, indices[:, 1] + i % 2)
 
-    # Initialize interpolation.
-    rgi_inp = prolong_init((vectorNx, vectorNy), xy_points)
+        # Calculate the weights.
+        for ii in range(2):
+            ei = edge_indices[ii]
+            ind = indices[:, ii]
+            yi = norm_distances[:, ii]
 
-    # Bilinear interpolation for each x-y-plane/z-slice.
-    for izc in range(nCz):
-        efieldz[izc, :] = prolong(cefieldz[:, :, izc], *rgi_inp)
+            weight *= np.where(ei == ind, 1 - yi, yi)
 
-    return efieldz
+        # Add the current contribution.
+        for iii in range(ni):
+            ei0, ei1 = edge_indices[0][iii], edge_indices[1][iii]
+            efield[iii] += np.asarray(cefield[ei0, ei1]) * weight[iii]

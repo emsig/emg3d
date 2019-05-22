@@ -340,16 +340,16 @@ def test_prolong():
         fn = si.RegularGridInterpolator(
                 (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
                 bounds_error=False, fill_value=None)
-        hh = fn(yz_points)
-        hh = fn(yz_points).reshape(grid.vnEx[1:], order='F')
+        efieldx = fn(yz_points)
+        efieldx = fn(yz_points).reshape(grid.vnEx[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
-        efield1.fx[2*ixc, :, :] += hh
-        efield1.fx[2*ixc+1, :, :] += hh
+        efield1.fx[2*ixc, :, :] += efieldx
+        efield1.fx[2*ixc+1, :, :] += efieldx
 
     # Calculate emg3d-version:
-    efieldx = njitted.prolon_fx(
-            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points)
+    efieldx = njitted.prolong_field(
+            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points, cgrid.nCx)
 
     # Change sorting from C- to F-order.
     # (Not yet possible in numba; move everything njitted once possible).

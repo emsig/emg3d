@@ -1026,47 +1026,36 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
     xz_points = xz_points[:, :grid.nNx, :].reshape(-1, 2)
     xy_points = grid.gridEz[:grid.nNx*grid.nNy, :2]
 
-    # 1. Interpolate ex in y-z-slices.
-    efieldx = njitted.prolon_fx(
-            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points)
+    # 1. Bilinear interpolate of fields within planes.
+    efieldx = njitted.prolong_field(
+            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points, cgrid.nCx)
+    efieldy = njitted.prolong_field(
+            cgrid.vectorNx, cgrid.vectorNz, cefield.fy, xz_points, cgrid.nCy)
+    efieldz = njitted.prolong_field(
+            cgrid.vectorNx, cgrid.vectorNy, cefield.fz, xy_points, cgrid.nCz)
 
-    # Change sorting from C- to F-order.
-    # (Not yet possible in numba; move everything njitted once possible).
+    # 2. Change sorting from C- to F-order.
+    # (Not yet possible in numba; move everything to njitted once possible).
     efieldx = efieldx.reshape((-1, *grid.vnEx[1:]), order='F')
+    efieldy = efieldy.reshape((-1, *grid.vnEy[::2]), order='F')
+    efieldy = np.swapaxes(efieldy, 0, 1)
+    efieldz = efieldz.reshape((-1, *grid.vnEz[:-1]), order='F')
+    efieldz = np.moveaxis(efieldz, 0, 2)
 
-    # Piecewise constant interpolation in x-direction
+    # 3. Piecewise constant interpolation in direction of field
+    # x-field.
     if rdir not in [1, 5, 6]:
         efield.fx[::2, :, :] += efieldx
         efield.fx[1::2, :, :] += efieldx
     else:
         efield.fx += efieldx
-
-    # 2. Interpolate ey in x-z-slices.
-    efieldy = njitted.prolon_fy(
-            cgrid.vectorNx, cgrid.vectorNz, cefield.fy, xz_points)
-
-    # Change sorting from C- to F-order.
-    # (Not yet possible in numba; move everything njitted once possible).
-    efieldy = efieldy.reshape((-1, *grid.vnEy[::2]), order='F')
-    efieldy = np.swapaxes(efieldy, 0, 1)
-
-    # Piecewise constant interpolation in y-direction
+    # y-field.
     if rdir not in [2, 4, 6]:
         efield.fy[:, ::2, :] += efieldy
         efield.fy[:, 1::2, :] += efieldy
     else:
         efield.fy += efieldy
-
-    # 3. Interpolate ez in x-y-slices.
-    efieldz = njitted.prolon_fz(
-            cgrid.vectorNx, cgrid.vectorNy, cefield.fz, xy_points)
-
-    # Change sorting from C- to F-order.
-    # (Not yet possible in numba; move everything njitted once possible).
-    efieldz = efieldz.reshape((-1, *grid.vnEz[:-1]), order='F')
-    efieldz = np.moveaxis(efieldz, 0, 2)
-
-    # Piecewise constant interpolation in z-direction
+    # z-field.
     if rdir not in [3, 4, 5]:
         efield.fz[:, :, ::2] += efieldz
         efield.fz[:, :, 1::2] += efieldz
