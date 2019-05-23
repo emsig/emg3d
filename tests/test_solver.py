@@ -191,29 +191,29 @@ def test_smoothing():
                model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz, nu)
 
         func = ['', '_x', '_y', '_z']
-        for ldir in range(8):
+        for lr_dir in range(8):
             # Get it directly from njitted
             efield = utils.Field(grid, field)
-            if ldir < 4:
-                getattr(njitted, 'gauss_seidel'+func[ldir])(
+            if lr_dir < 4:
+                getattr(njitted, 'gauss_seidel'+func[lr_dir])(
                         efield.fx, efield.fy, efield.fz, *inp)
-            elif ldir == 4:
+            elif lr_dir == 4:
                 njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
                 njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
-            elif ldir == 5:
+            elif lr_dir == 5:
                 njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
                 njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
-            elif ldir == 6:
+            elif lr_dir == 6:
                 njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
                 njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
-            elif ldir == 7:
+            elif lr_dir == 7:
                 njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
                 njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
                 njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
             # Use solver.smoothing
             ofield = utils.Field(grid, field)
-            solver.smoothing(grid, model, sfield, ofield, nu, ldir)
+            solver.smoothing(grid, model, sfield, ofield, nu, lr_dir)
 
             # Compare
             assert_allclose(efield, ofield)
@@ -237,7 +237,7 @@ def test_restriction():
 
     # Restrict it
     cgrid, cmodel, csfield, cefield = solver.restriction(
-            grid, model, sfield, rr, rdir=0)
+            grid, model, sfield, rr, sc_dir=0)
 
     assert_allclose(csfield.fx[:, 1:-1, 1], np.array([[196.+0.j], [596.+0.j]]))
     assert_allclose(csfield.fy[1:-1, :, 1], np.array([[356.+0.j, 436.+0.j]]))
@@ -254,7 +254,7 @@ def test_restriction():
     cefield += np.pi
 
     # Prolong it
-    solver.prolongation(grid, efield, cgrid, cefield, rdir=0)
+    solver.prolongation(grid, efield, cgrid, cefield, sc_dir=0)
 
     assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
     assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)

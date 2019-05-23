@@ -1600,7 +1600,7 @@ def solve(amat, bvec):
 
 # Restriction
 @nb.njit(**_numba_setting)
-def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
+def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     r"""Restriction of residual from fine to coarse grid.
 
     Corresponds to Equation 8 in [Muld06]_. The equation for the x-direction,
@@ -1635,7 +1635,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
         Tuples containing the weights (wl, w0, wr) as returned from
         :func:`restrict_weights` for the x-, y-, and z-directions.
 
-    rdir : int
+    sc_dir : int
         Direction of semicoarsening; 0 for no semicoarsening.
 
     """
@@ -1650,7 +1650,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
     wyl, wy0, wyr = wy
     wzl, wz0, wzr = wz
 
-    if rdir == 0:  # Standard
+    if sc_dir == 0:  # Standard
 
         # Loop over coarse z-edges.
         for ciz in range(cnNz):
@@ -1739,7 +1739,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
                         wyr[ciy]*(rz[ixp, iyp, ::2] + rz[ixp, iyp, 1::2])
                 )
 
-    elif rdir == 1:  # Restrict in y- and z-directions
+    elif sc_dir == 1:  # Restrict in y- and z-directions
 
         # Loop over coarse z-edges.
         for ciz in range(cnNz):
@@ -1788,7 +1788,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
             crz[:, ciy, :] += wyl[ciy]*(rz[:, iym, ::2] + rz[:, iym, 1::2])
             crz[:, ciy, :] += wyr[ciy]*(rz[:, iyp, ::2] + rz[:, iyp, 1::2])
 
-    elif rdir == 2:  # Restrict in x- and z-directions
+    elif sc_dir == 2:  # Restrict in x- and z-directions
 
         # Loop over coarse z-edges.
         for ciz in range(cnNz):
@@ -1837,7 +1837,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
             crz[cix, :, :] += wxl[cix]*(rz[ixm, :, ::2] + rz[ixm, :, 1::2])
             crz[cix, :, :] += wxr[cix]*(rz[ixp, :, ::2] + rz[ixp, :, 1::2])
 
-    elif rdir == 3:  # Restrict in x- and y-directions
+    elif sc_dir == 3:  # Restrict in x- and y-directions
 
         # Loop over coarse y-edges.
         for ciy in range(cnNy):
@@ -1886,7 +1886,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
             cry[cix, :, :] += wxl[cix]*(ry[ixm, ::2, :] + ry[ixm, 1::2, :])
             cry[cix, :, :] += wxr[cix]*(ry[ixp, ::2, :] + ry[ixp, 1::2, :])
 
-    elif rdir == 4:  # Restrict in x-direction
+    elif sc_dir == 4:  # Restrict in x-direction
 
         # Sum the terms for x-field.
         crx = rx[::2, :, :] + rx[1::2, :, :]
@@ -1907,7 +1907,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
             crz[cix, :, :] += wxl[cix]*rz[ixm, :, :]
             crz[cix, :, :] += wxr[cix]*rz[ixp, :, :]
 
-    elif rdir == 5:  # Restrict in y-direction
+    elif sc_dir == 5:  # Restrict in y-direction
 
         # Sum the terms for y-field.
         cry = ry[:, ::2, :] + ry[:, 1::2, :]
@@ -1928,7 +1928,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, rdir):
             crz[:, ciy, :] += wyl[ciy]*rz[:, iym, :]
             crz[:, ciy, :] += wyr[ciy]*rz[:, iyp, :]
 
-    elif rdir == 6:  # Restrict in z-direction
+    elif sc_dir == 6:  # Restrict in z-direction
 
         # Sum the terms for z-field.
         crz = rz[:, :, ::2] + rz[:, :, 1::2]

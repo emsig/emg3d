@@ -81,13 +81,14 @@ def test_gauss_seidel():
     freq = 0.9
     nu = 2  # One back-and-forth
 
-    for ldir in range(1, 4):
+    for lr_dir in range(1, 4):
 
         # `gauss_seidel`/`_x/y/z` loop over z, then y, then x. Together with
-        # `ldir`, we have to keep the dimension at 2 in order that they agree.
-        nx = [4, 1, 1][ldir-1]
-        ny = [4, 1, 1][ldir-1]
-        nz = [4, 4, 1][ldir-1]
+        # `lr_dir`, we have to keep the dimension at 2 in order that they
+        # agree.
+        nx = [4, 1, 1][lr_dir-1]
+        ny = [4, 1, 1][lr_dir-1]
+        nz = [4, 4, 1][lr_dir-1]
 
         # Get this grid.
         hx = get_h(0, nx, 80, 1.1)
@@ -117,11 +118,11 @@ def test_gauss_seidel():
         njitted.gauss_seidel_x(cfield.fx, cfield.fy, cfield.fz, *inp)
 
         # Get result from `gauss_seidel_x/y/z`.
-        if ldir == 1:
+        if lr_dir == 1:
             njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
-        elif ldir == 2:
+        elif lr_dir == 2:
             njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
-        elif ldir == 3:
+        elif lr_dir == 3:
             njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
         # Check the resulting field.

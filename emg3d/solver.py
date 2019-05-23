@@ -404,9 +404,9 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     # Initiate iteration count.
     it = 0
 
-    # Get cycmax (depends on cycle and on level [as a fct of rdir]).
+    # Get cycmax (depends on cycle and on level [as a fct of sc_dir]).
     # This defines the V, W, and F-cycle scheme.
-    if level == var.clevel[var.rdir]:
+    if level == var.clevel[var.sc_dir]:
         cycmax = 1
     elif new_cycmax == 0 or var.cycle != 'F':
         cycmax = var.cycmax
@@ -447,7 +447,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
         # Smooth and re-calculate error.
-        smoothing(grid, model, sfield, efield, var.nu_init, var.ldir)
+        smoothing(grid, model, sfield, efield, var.nu_init, var.lr_dir)
         l2_last = np.linalg.norm(residual(grid, model, sfield, efield))
 
         # Print initial smoothing info if verbose.
@@ -461,13 +461,13 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         # Store previous error for comparisons.
         l2_prev = l2_last
 
-        if level == var.clevel[var.rdir]:  # (A) Coarsest grid, solve system.
-            # Note that coarsest grid depends on semicoarsening (rdir). If
+        if level == var.clevel[var.sc_dir]:  # (A) Coarsest grid, solve system.
+            # Note that coarsest grid depends on semicoarsening (sc_dir). If
             # semicoarsening is carried out along the biggest dimension it
             # reduces the number of coarsening levels.
 
             # Gauss-Seidel on the coarsest grid.
-            smoothing(grid, model, sfield, efield, var.nu_coarse, var.ldir)
+            smoothing(grid, model, sfield, efield, var.nu_coarse, var.lr_dir)
 
             # Print coarsest grid smoothing info if verbose.
             if var.verb > 3:
@@ -480,7 +480,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
             # (B.1) Pre-smoothing (nu_pre).
             if var.nu_pre > 0:
-                smoothing(grid, model, sfield, efield, var.nu_pre, var.ldir)
+                smoothing(grid, model, sfield, efield, var.nu_pre, var.lr_dir)
 
             # Get current residual.
             res = residual(grid, model, sfield, efield)
@@ -491,41 +491,19 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 print_gs_info(it, level, cycmax, grid, l2_last,
                               f"pre-smoothing")
 
-            # Find out in which direction we want to half the number of cells.
-            # This depends on an (optional) direction of semicoarsening, and
-            # if the number of cells in a direction can still be halved.
-            xrdir = grid.nCx % 2 != 0 or grid.nCx < 3 or var.rdir == 1
-            yrdir = grid.nCy % 2 != 0 or grid.nCy < 3 or var.rdir == 2
-            zrdir = grid.nCz % 2 != 0 or grid.nCz < 3 or var.rdir == 3
-
-            # Set current rdir depending on the above outcome.
-            if xrdir:
-                if yrdir:
-                    rdir = 6  # Only coarsen in z-direction.
-                elif zrdir:
-                    rdir = 5  # Only coarsen in y-direction.
-                else:
-                    rdir = 1  # Coarsen in y- and z-directions.
-            elif yrdir:
-                if zrdir:
-                    rdir = 4  # Only coarsen in x-direction.
-                else:
-                    rdir = 2  # Coarsen in x- and z-directions.
-            elif zrdir:
-                rdir = 3  # Coarsen in x- and y-directions.
-            else:
-                rdir = 0  # Coarsen in all directions.
+            # Get sc_dir for this grid.
+            sc_dir = current_sc_dir(var.sc_dir, grid)
 
             # (B.2) Restrict grid, model, and fields from fine to coarse grid.
             cgrid, cmodel, csfield, cefield = restriction(
-                    grid, model, sfield, res, rdir)
+                    grid, model, sfield, res, sc_dir)
 
             # (B.3) Recursive call for coarse-grid correction.
             multigrid(cgrid, cmodel, csfield, cefield, var, level=level+1,
                       new_cycmax=cycmax-cyc)
 
             # (B.4) Add coarse field residual to fine grid field.
-            prolongation(grid, efield, cgrid, cefield, rdir)
+            prolongation(grid, efield, cgrid, cefield, sc_dir)
 
             # Append current prolongation level for QC if verbose.
             if var.verb > 2 and var._first_cycle:
@@ -533,7 +511,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
             # (B.5) Post-smoothing (nu_post).
             if var.nu_post > 0:
-                smoothing(grid, model, sfield, efield, var.nu_post, var.ldir)
+                smoothing(grid, model, sfield, efield, var.nu_post, var.lr_dir)
 
             # Get current error (l2-norm).
             l2_last = np.linalg.norm(residual(grid, model, sfield, efield))
@@ -559,9 +537,9 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
             # Adjust semicoarsening and line relaxation if they cycle.
             if var.rcycle:
-                var.rdir = next(var.rcycle)
+                var.sc_dir = next(var.rcycle)
             if var.lcycle:
-                var.ldir = next(var.lcycle)
+                var.lr_dir = next(var.lcycle)
 
             # Check if any termination criteria is fulfilled.
             if terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
@@ -692,7 +670,7 @@ def krylov(grid, model, sfield, efield, var):
 
 
 # MULTIGRID SUB-ROUTINES
-def smoothing(grid, model, sfield, efield, nu, ldir):
+def smoothing(grid, model, sfield, efield, nu, lr_dir):
     """Reducing high-frequency error by smoothing.
 
     Solves the linear equation system :math:`A x = b` iteratively using the
@@ -727,7 +705,7 @@ def smoothing(grid, model, sfield, efield, nu, ldir):
         reversed. E.g., ``nu=2`` is one symmetric Gauss-Seidel iteration, with
         a forward and a backward step.
 
-    ldir : int
+    lr_dir : int
         Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
 
     """
@@ -737,52 +715,23 @@ def smoothing(grid, model, sfield, efield, nu, ldir):
            model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz, nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
-
-    if grid.nCx == 2:  # Check x-direction.
-        if ldir == 1:
-            ldir = 0
-        elif ldir == 5:
-            ldir = 3
-        elif ldir == 6:
-            ldir = 2
-        elif ldir == 7:
-            ldir = 4
-
-    if grid.nCy == 2:  # Check y-direction.
-        if ldir == 2:
-            ldir = 0
-        elif ldir == 4:
-            ldir = 3
-        elif ldir == 6:
-            ldir = 1
-        elif ldir == 7:
-            ldir = 5
-
-    if grid.nCz == 2:  # Check z-direction.
-        if ldir == 3:
-            ldir = 0
-        elif ldir == 4:
-            ldir = 2
-        elif ldir == 5:
-            ldir = 1
-        elif ldir == 7:
-            ldir = 6
+    lr_dir = current_lr_dir(lr_dir, grid)
 
     # Calculate and store fields (in-place)
-    if ldir == 0:             # Standard MG
+    if lr_dir == 0:             # Standard MG
         njitted.gauss_seidel(efield.fx, efield.fy, efield.fz, *inp)
 
-    if ldir in [1, 5, 6, 7]:  # Line relaxation in x-direction
+    if lr_dir in [1, 5, 6, 7]:  # Line relaxation in x-direction
         njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
 
-    if ldir in [2, 4, 6, 7]:  # Line relaxation in y-direction
+    if lr_dir in [2, 4, 6, 7]:  # Line relaxation in y-direction
         njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
 
-    if ldir in [3, 4, 5, 7]:  # Line relaxation in z-direction
+    if lr_dir in [3, 4, 5, 7]:  # Line relaxation in z-direction
         njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
 
-def restriction(grid, model, sfield, residual, rdir):
+def restriction(grid, model, sfield, residual, sc_dir):
     """Downsampling of grid, model, and fields to a coarser grid.
 
     The restriction of the residual is used as source term for the coarse grid.
@@ -807,7 +756,7 @@ def restriction(grid, model, sfield, residual, rdir):
     sfield : Field
         Fine source field; ``emg3d.utils.Field`` instances.
 
-    rdir : int
+    sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
 
 
@@ -833,11 +782,11 @@ def restriction(grid, model, sfield, residual, rdir):
 
     # We take every second element for the direction(s) of coarsening.
     rx, ry, rz = 2, 2, 2
-    if rdir in [1, 5, 6]:  # No coarsening in x-direction.
+    if sc_dir in [1, 5, 6]:  # No coarsening in x-direction.
         rx = 1
-    if rdir in [2, 4, 6]:  # No coarsening in y-direction.
+    if sc_dir in [2, 4, 6]:  # No coarsening in y-direction.
         ry = 1
-    if rdir in [3, 4, 5]:  # No coarsening in z-direction.
+    if sc_dir in [3, 4, 5]:  # No coarsening in z-direction.
         rz = 1
 
     # Calculate distances of coarse grid.
@@ -850,22 +799,22 @@ def restriction(grid, model, sfield, residual, rdir):
     cgrid = utils.TensorMesh(ch, grid.x0)
 
     # 2. RESTRICT MODEL
-    def restr(param, rdir):
+    def restr(param, sc_dir):
         """Restrict model parameters."""
-        if rdir == 1:    # Only sum the four cells in y-z-plane
+        if sc_dir == 1:    # Only sum the four cells in y-z-plane
             out = param[:, :-1:2, :-1:2] + param[:, 1::2, :-1:2]
             out += param[:, :-1:2, 1::2] + param[:, 1::2, 1::2]
-        elif rdir == 2:  # Only sum the four cells in x-z-plane
+        elif sc_dir == 2:  # Only sum the four cells in x-z-plane
             out = param[:-1:2, :, :-1:2] + param[1::2, :, :-1:2]
             out += param[:-1:2, :, 1::2] + param[1::2, :, 1::2]
-        elif rdir == 3:  # Only sum the four cells in x-y-plane
+        elif sc_dir == 3:  # Only sum the four cells in x-y-plane
             out = param[:-1:2, :-1:2, :] + param[1::2, :-1:2, :]
             out += param[:-1:2, 1::2, :] + param[1::2, 1::2, :]
-        elif rdir == 4:  # Only sum the two cells in x-direction
+        elif sc_dir == 4:  # Only sum the two cells in x-direction
             out = param[:-1:2, :, :] + param[1::2, :, :]
-        elif rdir == 5:  # Only sum the two cells y-direction
+        elif sc_dir == 5:  # Only sum the two cells y-direction
             out = param[:, :-1:2, :] + param[:, 1::2, :]
-        elif rdir == 6:  # Only sum the two cells z-direction
+        elif sc_dir == 6:  # Only sum the two cells z-direction
             out = param[:, :, :-1:2] + param[:, :, 1::2]
         else:            # Standard: Sum all 8 cells.
             out = param[:-1:2, :-1:2, :-1:2] + param[1::2, :-1:2, :-1:2]
@@ -892,11 +841,11 @@ def restriction(grid, model, sfield, residual, rdir):
     # Note: Coarsening is done with eta, not with res. The reason is that eta
     #       includes the volume, while res doesn't. This is very important in
     #       the coarsening step.
-    cmodel.eta_x = restr(model.eta_x, rdir)
+    cmodel.eta_x = restr(model.eta_x, sc_dir)
     if res_y is not None:
-        cmodel.eta_y = restr(model.eta_y, rdir)
+        cmodel.eta_y = restr(model.eta_y, sc_dir)
     if res_z is not None:
-        cmodel.eta_z = restr(model.eta_z, rdir)
+        cmodel.eta_z = restr(model.eta_z, sc_dir)
 
     # 3. RESTRICT FIELDS
 
@@ -904,7 +853,7 @@ def restriction(grid, model, sfield, residual, rdir):
     # The corresponding weights are not actually used in the case of
     # semicoarsening. We still have to provide arrays of the correct format
     # though, otherwise numba will complain in the jitted functions.
-    if rdir not in [1, 5, 6]:
+    if sc_dir not in [1, 5, 6]:
         wx = njitted.restrict_weights(
                 grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
                 cgrid.vectorCCx, cgrid.hx)
@@ -913,7 +862,7 @@ def restriction(grid, model, sfield, residual, rdir):
         wx0 = np.ones(grid.nNx, dtype=float)
         wx = (wxlr, wx0, wxlr)
 
-    if rdir not in [2, 4, 6]:
+    if sc_dir not in [2, 4, 6]:
         wy = njitted.restrict_weights(
                 grid.vectorNy, grid.vectorCCy, grid.hy, cgrid.vectorNy,
                 cgrid.vectorCCy, cgrid.hy)
@@ -922,7 +871,7 @@ def restriction(grid, model, sfield, residual, rdir):
         wy0 = np.ones(grid.nNy, dtype=float)
         wy = (wylr, wy0, wylr)
 
-    if rdir not in [3, 4, 5]:
+    if sc_dir not in [3, 4, 5]:
         wz = njitted.restrict_weights(
                 grid.vectorNz, grid.vectorCCz, grid.hz, cgrid.vectorNz,
                 cgrid.vectorCCz, cgrid.hz)
@@ -934,7 +883,7 @@ def restriction(grid, model, sfield, residual, rdir):
     # Calculate the source terms (Equation 8 in [Muld06]_).
     csfield = utils.Field(cgrid)  # Create empty coarse source field instance.
     njitted.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
-                     residual.fy, residual.fz, wx, wy, wz, rdir)
+                     residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Ensure PEC and initiate empty e-field.
     csfield.ensure_pec
@@ -943,7 +892,7 @@ def restriction(grid, model, sfield, residual, rdir):
     return cgrid, cmodel, csfield, cefield
 
 
-def prolongation(grid, efield, cgrid, cefield, rdir):
+def prolongation(grid, efield, cgrid, cefield, sc_dir):
     """Interpolating the electric field from coarse grid to fine grid.
 
     The prolongation from a coarser to a finer grid is the inverse process of
@@ -966,7 +915,7 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
     efield, cefield : Fields
         Fine and coarse grid electric fields; ``emg3d.utils.Field`` instances.
 
-    rdir : int
+    sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
 
     Notes
@@ -998,7 +947,7 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
         hh = fn(x_pts).reshape(grid.vnEx[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
-        if rdir not in [1, 5, 6]:
+        if sc_dir not in [1, 5, 6]:
             efield.fx[2*ixc, :, :] += hh
             efield.fx[2*ixc+1, :, :] += hh
         else:
@@ -1014,7 +963,7 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
         hh = fn(y_pts).reshape(grid.vnEy[::2], order='F')
 
         # Piecewise constant interpolation in y-direction
-        if rdir not in [2, 4, 6]:
+        if sc_dir not in [2, 4, 6]:
             efield.fy[:, 2*iyc, :] += hh
             efield.fy[:, 2*iyc+1, :] += hh
         else:
@@ -1030,7 +979,7 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
         hh = fn(z_pts).reshape(grid.vnEz[:-1], order='F')
 
         # Piecewise constant interpolation in z-direction
-        if rdir not in [3, 4, 5]:
+        if sc_dir not in [3, 4, 5]:
             efield.fz[:, :, 2*izc] += hh
             efield.fz[:, :, 2*izc+1] += hh
         else:
@@ -1152,7 +1101,7 @@ class MGParameters:
             rcycle = np.array([int(x) for x in str(abs(self.semicoarsening))])
             self.rcycle = cycle(rcycle)
 
-            # Ensure numbers are within 0 <= rdir <= 3
+            # Ensure numbers are within 0 <= sc_dir <= 3
             if np.any(rcycle < 0) or np.any(rcycle > 3):
                 print("* ERROR   :: `semicoarsening` must be one of  "
                       f"(False, True, 0, 1, 2, 3).\n"
@@ -1163,13 +1112,13 @@ class MGParameters:
 
         # Get first (or only) direction.
         if self.rcycle:
-            self.rdir = next(self.rcycle)
+            self.sc_dir = next(self.rcycle)
         else:
-            self.rdir = rcycle[0]
+            self.sc_dir = rcycle[0]
 
         # Set semicoarsening to True/False; print statement
-        self.semicoarsening = self.rdir != 0
-        self.__prdir = f"{self.semicoarsening} {rcycle}"
+        self.semicoarsening = self.sc_dir != 0
+        self.__p_sc_dir = f"{self.semicoarsening} {rcycle}"
 
         # 2. linerelaxation
         if self.linerelaxation is True:            # If True, cycle [1, 2, 3].
@@ -1182,7 +1131,7 @@ class MGParameters:
             lcycle = np.array([int(x) for x in str(abs(self.linerelaxation))])
             self.lcycle = cycle(lcycle)
 
-            # Ensure numbers are within 0 <= ldir <= 7
+            # Ensure numbers are within 0 <= lr_dir <= 7
             if np.any(lcycle < 0) or np.any(lcycle > 7):
                 print("* ERROR   :: `linerelaxation` must be one of  "
                       f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
@@ -1193,13 +1142,13 @@ class MGParameters:
 
         # Get first (only) direction
         if self.lcycle:
-            self.ldir = next(self.lcycle)
+            self.lr_dir = next(self.lcycle)
         else:
-            self.ldir = lcycle[0]
+            self.lr_dir = lcycle[0]
 
         # Set linerelaxation to True/False; print statement
-        self.linerelaxation = self.ldir != 0
-        self.__pldir = f"{self.linerelaxation} {lcycle}"
+        self.linerelaxation = self.lr_dir != 0
+        self.__p_lr_dir = f"{self.linerelaxation} {lcycle}"
 
         # 3. sslsolver and cycle
         solvers = ['bicgstab', 'cgs', 'gmres', 'lgmres', 'gcrotmk']
@@ -1247,9 +1196,9 @@ class MGParameters:
         outstring = (
             f"   MG-cycle       : {self.cycle!r:17}"
             f"   sslsolver : {self.sslsolver!r}\n"
-            f"   semicoarsening : {self.__prdir:17}"
+            f"   semicoarsening : {self.__p_sc_dir:17}"
             f"   tol       : {self.tol}\n"
-            f"   linerelaxation : {self.__pldir:17}"
+            f"   linerelaxation : {self.__p_lr_dir:17}"
             f"   maxit     : {self.__maxit}\n"
             f"   nu_{{i,1,c,2}}   : {self.nu_init}, {self.nu_pre}"
             f", {self.nu_coarse}, {self.nu_post}       "
@@ -1294,10 +1243,10 @@ class MGParameters:
 
         # Set overall clevel and store.
         self.clevel = np.array(
-            [max(clevel[0], clevel[1], clevel[2]),  # Max-level if rdir=0
-             max(clevel[1], clevel[2]),             # Max-level if rdir=1
-             max(clevel[0], clevel[2]),             # Max-level if rdir=2
-             max(clevel[0], clevel[1])]             # Max-level if rdir=3
+            [max(clevel[0], clevel[1], clevel[2]),  # Max-level if sc_dir=0
+             max(clevel[1], clevel[2]),             # Max-level if sc_dir=1
+             max(clevel[0], clevel[2]),             # Max-level if sc_dir=2
+             max(clevel[0], clevel[1])]             # Max-level if sc_dir=3
         )
 
         # Store coarsest nr of cells on coarsest grid and dimension for the
@@ -1356,6 +1305,115 @@ class MGParameters:
 
 
 # SMALL MG HELPER ROUTINES
+def current_sc_dir(sc_dir, grid):
+    """Return current direction(s) for semicoarsening.
+
+    Semicoarsening is defined in ``self.sc_dir``. Here ``self.sc_dir`` is
+    checked with which directions can actually still be halved, and
+    depending on that, an adjusted ``sc_dir`` is returned for this
+    particular grid.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    sc_dir : int
+        Direction of semicoarsening.
+
+    Returns
+    -------
+    c_sc_dir : int
+        Current direction of semicoarsening.
+
+    """
+    # Find out in which direction we want to half the number of cells.
+    # This depends on an (optional) direction of semicoarsening, and
+    # if the number of cells in a direction can still be halved.
+    xsc_dir = grid.nCx % 2 != 0 or grid.nCx < 3 or sc_dir == 1
+    ysc_dir = grid.nCy % 2 != 0 or grid.nCy < 3 or sc_dir == 2
+    zsc_dir = grid.nCz % 2 != 0 or grid.nCz < 3 or sc_dir == 3
+
+    # Set current sc_dir depending on the above outcome.
+    if xsc_dir:
+        if ysc_dir:
+            c_sc_dir = 6  # Only coarsen in z-direction.
+        elif zsc_dir:
+            c_sc_dir = 5  # Only coarsen in y-direction.
+        else:
+            c_sc_dir = 1  # Coarsen in y- and z-directions.
+    elif ysc_dir:
+        if zsc_dir:
+            c_sc_dir = 4  # Only coarsen in x-direction.
+        else:
+            c_sc_dir = 2  # Coarsen in x- and z-directions.
+    elif zsc_dir:
+        c_sc_dir = 3  # Coarsen in x- and y-directions.
+    else:
+        c_sc_dir = 0  # Coarsen in all directions.
+
+    return c_sc_dir
+
+
+def current_lr_dir(lr_dir, grid):
+    """Return current direction(s) for line relaxation.
+
+    Line relaxation is defined in ``self.lr_dir``. Here ``self.lr_dir`` is
+    checked with the dimension of the grid, to avoid line relaxation in a
+    direction where there are only two cells.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    lr_dir : int
+        Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
+
+
+    Returns
+    -------
+    lr_dir : int
+        Current direction of line relaxation.
+
+    """
+    lr_dir = np.copy(lr_dir)
+
+    if grid.nCx == 2:  # Check x-direction.
+        if lr_dir == 1:
+            lr_dir = 0
+        elif lr_dir == 5:
+            lr_dir = 3
+        elif lr_dir == 6:
+            lr_dir = 2
+        elif lr_dir == 7:
+            lr_dir = 4
+
+    if grid.nCy == 2:  # Check y-direction.
+        if lr_dir == 2:
+            lr_dir = 0
+        elif lr_dir == 4:
+            lr_dir = 3
+        elif lr_dir == 6:
+            lr_dir = 1
+        elif lr_dir == 7:
+            lr_dir = 5
+
+    if grid.nCz == 2:  # Check z-direction.
+        if lr_dir == 3:
+            lr_dir = 0
+        elif lr_dir == 4:
+            lr_dir = 2
+        elif lr_dir == 5:
+            lr_dir = 1
+        elif lr_dir == 7:
+            lr_dir = 6
+
+    return lr_dir
+
+
 def print_cycle_info(var, l2_last, l2_prev, l2_init):
     """Print cycle info to log.
 
@@ -1412,13 +1470,13 @@ def print_cycle_info(var, l2_last, l2_prev, l2_init):
     if var.sslsolver:  # For multigrid as preconditioner.
         info += f"   [{var.time.now}] {l2_last:.3e} "
         info += f"after {20*' '} {var.it:2} {var.cycle}-cycles; "
-        info += f"  {var.ldir} {var.rdir}"
+        info += f"  {var.lr_dir} {var.sc_dir}"
 
     else:              # For multigrid as solver.
         info += f"   [{var.time.now}] {l2_last:.3e} "
         info += f"after {var.it:2} {var.cycle}-cycles; "
         info += f"[{l2_last/l2_init:.3e}, {l2_last/l2_prev:.3e}]"
-        info += f" {var.ldir} {var.rdir}"
+        info += f" {var.lr_dir} {var.sc_dir}"
 
     if var.verb > 3:
         info += "\n"

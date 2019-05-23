@@ -9,6 +9,8 @@ Changelog
 - Add *Multi-what?*-page to documentation.
 - Refactoring.
 - Removed ``discretize`` as hard dependency.
+- Rename ``rdir`` and ``ldir`` to the more descriptive ``sc_dir`` and
+  ``lr_dir``.
 
 v0.5.0 : Accept any grid size
 -----------------------------
