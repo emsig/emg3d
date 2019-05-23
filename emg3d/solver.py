@@ -34,8 +34,8 @@ from . import utils
 from . import njitted
 
 __all__ = ['solver', 'multigrid', 'smoothing', 'restriction', 'prolongation',
-           'residual', 'krylov', 'MGParameters', 'print_cycle_info',
-           'terminate']
+           'residual', 'krylov', 'MGParameters', 'current_sc_dir',
+           'current_lr_dir', 'print_cycle_info', 'terminate']
 
 
 # MAIN USER-FACING FUNCTION
@@ -1505,6 +1505,7 @@ def terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
 
 
     Returns
+    -------
     finished : bool
         Boolean indicating if multigrid is finished.
 
