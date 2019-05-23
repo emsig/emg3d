@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import scipy.interpolate as si
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
@@ -389,3 +390,66 @@ def test_mgparameters():
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=(1, 2, 3), verb=1)
+
+
+def test_RegularGridProlongator():
+
+    def prolon_scipy(grid, cgrid, efield, cefield, x_points):
+        """Calculate SciPy alternative."""
+        for ixc in range(cgrid.nCx):
+            # Bilinear interpolation in the y-z plane
+            fn = si.RegularGridInterpolator(
+                    (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
+                    bounds_error=False, fill_value=None)
+            hh = fn(x_points).reshape(grid.vnEx[1:], order='F')
+
+            # Piecewise constant interpolation in x-direction
+            efield[2*ixc, :, :] += hh
+            efield[2*ixc+1, :, :] += hh
+
+        return efield
+
+    def prolon_emg3d(grid, cgrid, efield, cefield, x_points):
+        """Calculate emg3d alternative."""
+        fn = solver.RegularGridProlongator(
+                cgrid.vectorNy, cgrid.vectorNz, x_points)
+
+        for ixc in range(cgrid.nCx):
+            # Bilinear interpolation in the y-z plane
+            hh = fn(cefield.fx[ixc, :, :]).reshape(grid.vnEx[1:], order='F')
+
+            # Piecewise constant interpolation in x-direction
+            efield[2*ixc, :, :] += hh
+            efield[2*ixc+1, :, :] += hh
+
+        return efield
+
+    # Create fine grid.
+    nx = 2**7
+    hx = 50*np.ones(nx)
+    hx = np.array([4, 1.1, 2, 3])
+    hy = np.array([2, 0.1, 20, np.pi])
+    hz = np.array([1, 2, 5, 1])
+    grid = utils.TensorMesh([hx, hy, hz], x0=np.array([0, 0, 0]))
+
+    # Create coarse grid.
+    chx = np.diff(grid.vectorNx[::2])
+    cgrid = utils.TensorMesh([chx, chx, chx], x0=np.array([0, 0, 0]))
+
+    # Create empty fine grid fields.
+    efield1 = utils.Field(grid)
+    efield2 = utils.Field(grid)
+
+    # Create coarse grid field with some values.
+    cefield = utils.Field(cgrid)
+    cefield.fx = np.arange(cefield.fx.size)
+    cefield.fx = 1j*np.arange(cefield.fx.size)/10
+
+    # Required interpolation points.
+    x_points = grid.gridEx[::grid.nCx, 1:]
+
+    # Compare
+    out1 = prolon_scipy(grid, cgrid, efield1.fx, cefield, x_points)
+    out2 = prolon_emg3d(grid, cgrid, efield2.fx, cefield, x_points)
+
+    assert_allclose(out1, out2)

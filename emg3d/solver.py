@@ -24,9 +24,8 @@ are in the :mod:`emg3d.njitted` as numba-jitted functions.
 # the License.
 
 
+import itertools
 import numpy as np
-from itertools import cycle
-import scipy.interpolate as si
 import scipy.sparse.linalg as ssl
 from dataclasses import dataclass
 
@@ -35,7 +34,8 @@ from . import njitted
 
 __all__ = ['solver', 'multigrid', 'smoothing', 'restriction', 'prolongation',
            'residual', 'krylov', 'MGParameters', 'current_sc_dir',
-           'current_lr_dir', 'print_cycle_info', 'terminate']
+           'current_lr_dir', 'print_cycle_info', 'terminate',
+           'RegularGridProlongator']
 
 
 # MAIN USER-FACING FUNCTION
@@ -918,33 +918,19 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
 
-    Notes
-    -----
-    We set ``bounds_error=False`` and ``fill_value=None`` in
-    :class:`scipy.interpolate.RegularGridInterpolator` to extrapolate fine grid
-    points which are outside the coarse grid. The fine grid points are,
-    theoretically, never outside the coarse grid points. However, the
-    restriction mesh is created with the distances between points. This can
-    lead to fine grid points slightly outside coarse grid points (in the orders
-    of 1e-10 m) with very big distances (grids of roughly over 1e6 m). So
-    basically nothing, but it would still cause an error in the interpolation.
-
     """
 
     # Calculate required points of finer grid.
-    x_pts = grid.gridEx[::grid.nCx, 1:]
-    y_pts = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
-    y_pts = y_pts[:, :grid.nNx, :].reshape(-1, 2)
-    z_pts = grid.gridEz[:grid.nNx*grid.nNy, :2]
+    yz_points = grid.gridEx[::grid.nCx, 1:]
+    xz_points = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
+    xz_points = xz_points[:, :grid.nNx, :].reshape(-1, 2)
+    xy_points = grid.gridEz[:grid.nNx*grid.nNy, :2]
 
     # Interpolate ex in y-z-slices.
+    fn = RegularGridProlongator(cgrid.vectorNy, cgrid.vectorNz, yz_points)
     for ixc in range(cgrid.nCx):
-
         # Bilinear interpolation in the y-z plane
-        fn = si.RegularGridInterpolator(
-                (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
-                bounds_error=False, fill_value=None)
-        hh = fn(x_pts).reshape(grid.vnEx[1:], order='F')
+        hh = fn(cefield.fx[ixc, :, :]).reshape(grid.vnEx[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
         if sc_dir not in [1, 5, 6]:
@@ -954,13 +940,11 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
             efield.fx[ixc, :, :] += hh
 
     # Interpolate ey in x-z-slices.
+    fn = RegularGridProlongator(cgrid.vectorNx, cgrid.vectorNz, xz_points)
     for iyc in range(cgrid.nCy):
 
         # Bilinear interpolation in the x-z plane
-        fn = si.RegularGridInterpolator(
-                (cgrid.vectorNx, cgrid.vectorNz), cefield.fy[:, iyc, :],
-                bounds_error=False, fill_value=None)
-        hh = fn(y_pts).reshape(grid.vnEy[::2], order='F')
+        hh = fn(cefield.fy[:, iyc, :]).reshape(grid.vnEy[::2], order='F')
 
         # Piecewise constant interpolation in y-direction
         if sc_dir not in [2, 4, 6]:
@@ -970,13 +954,11 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
             efield.fy[:, iyc, :] += hh
 
     # Interpolate ez in x-y-slices.
+    fn = RegularGridProlongator(cgrid.vectorNx, cgrid.vectorNy, xy_points)
     for izc in range(cgrid.nCz):
 
         # Bilinear interpolation in the x-y plane
-        fn = si.RegularGridInterpolator(
-                (cgrid.vectorNx, cgrid.vectorNy), cefield.fz[:, :, izc],
-                bounds_error=False, fill_value=None)
-        hh = fn(z_pts).reshape(grid.vnEz[:-1], order='F')
+        hh = fn(cefield.fz[:, :, izc]).reshape(grid.vnEz[:-1], order='F')
 
         # Piecewise constant interpolation in z-direction
         if sc_dir not in [3, 4, 5]:
@@ -1093,13 +1075,13 @@ class MGParameters:
         # 1. semicoarsening
         if self.semicoarsening is True:            # If True, cycle [1, 2, 3].
             rcycle = np.array([1, 2, 3])
-            self.rcycle = cycle(rcycle)
+            self.rcycle = itertools.cycle(rcycle)
         elif self.semicoarsening in np.arange(4):  # If 0-4, use this.
             rcycle = np.array([int(self.semicoarsening)])
             self.rcycle = False
         else:                                      # Else, use numbers.
             rcycle = np.array([int(x) for x in str(abs(self.semicoarsening))])
-            self.rcycle = cycle(rcycle)
+            self.rcycle = itertools.cycle(rcycle)
 
             # Ensure numbers are within 0 <= sc_dir <= 3
             if np.any(rcycle < 0) or np.any(rcycle > 3):
@@ -1123,13 +1105,13 @@ class MGParameters:
         # 2. linerelaxation
         if self.linerelaxation is True:            # If True, cycle [1, 2, 3].
             lcycle = np.array([4, 5, 6])
-            self.lcycle = cycle(lcycle)
+            self.lcycle = itertools.cycle(lcycle)
         elif self.linerelaxation in np.arange(8):  # If 0-7, use this.
             lcycle = np.array([int(self.linerelaxation)])
             self.lcycle = False
         else:                                      # Else, use numbers.
             lcycle = np.array([int(x) for x in str(abs(self.linerelaxation))])
-            self.lcycle = cycle(lcycle)
+            self.lcycle = itertools.cycle(lcycle)
 
             # Ensure numbers are within 0 <= lr_dir <= 7
             if np.any(lcycle < 0) or np.any(lcycle > 7):
@@ -1304,7 +1286,7 @@ class MGParameters:
             print(info, **kwargs)
 
 
-# SMALL MG HELPER ROUTINES
+# MG HELPER ROUTINES
 def current_sc_dir(sc_dir, grid):
     """Return current direction(s) for semicoarsening.
 
@@ -1546,3 +1528,105 @@ def terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
         var.cprint(info, 1, end="")
 
     return finished
+
+
+class RegularGridProlongator:
+    """Prolongate field from coarse to fine grid.
+
+    This is a heavily modified and adapted version of
+    :class:`scipy.interpolate.RegularGridInterpolator`.
+
+    The main difference (besides the pre-sets) is that this version allows to
+    initiate an instance with the coarse and fine grids. This initialize will
+    calculate the required weights, and it has therefore only to be done once.
+
+    After this, interpolating values from the coarse to the fine grid can be
+    carried out much faster.
+
+    Simplifications in comparison to
+    :class:`scipy.interpolate.RegularGridInterpolator`:
+
+    - No sanity checks what-so-ever.
+    - Only 2D data;
+    - ``method='linear'``;
+    - ``bounds_error=False``;
+    - ``fill_value=None``.
+
+    It results in a speed-up factor of about 2, independent of grid size, for
+    this particular case. The prolongation is the second-most expensive part of
+    multigrid after the smoothing. Trying to improve this further might
+    therefore be useful.
+
+    Parameters
+    ----------
+    x, y : ndarray
+        The x/y-coordinates defining the coarse grid.
+
+    cxy : ndarray of shape (..., 2)
+        The ([[x], [y]]).T-coordinates defining the fine grid.
+
+    """
+
+    def __init__(self, x, y, cxy):
+        self.grid = tuple([np.asarray(p) for p in (x, y)])
+        self.size = cxy.shape[0]
+        self.weight, self.edges = self._get_weights(cxy)
+
+    def __call__(self, values):
+        """Return values of coarse grid on fine grid locations.
+
+        Parameters
+        ----------
+        values : ndarray
+            Values corresponding to x/y-coordinates.
+
+        Returns
+        -------
+        result : ndarray
+            Values corresponding to cxy-coordinates.
+
+        """
+        # Initiate result.
+        result = 0.
+
+        # Create a copy of the edges-iterator.
+        self.edges, edges_copy = itertools.tee(self.edges)
+
+        # Find relevant values.
+        for n, edge_indices in enumerate(edges_copy):
+            result += np.asarray(values[edge_indices]) * self.weight[n, :]
+
+        return result
+
+    def _get_weights(self, xi):
+        """Calculate weights for xi-coordinates."""
+
+        # Find relevant edges between which xi are situated.
+        indices = []
+
+        # Compute distance to lower edge in unity units.
+        norm_distances = []
+
+        # Iterate through dimensions.
+        for x, grid in zip(xi.T, self.grid):
+            i = np.searchsorted(grid, x) - 1
+            i[i < 0] = 0
+            i[i > grid.size - 2] = grid.size - 2
+            indices.append(i)
+            norm_distances.append((x - grid[i]) / (grid[i + 1] - grid[i]))
+
+        # Find relevant values; each i and i+1 represents a edge.
+        edges = itertools.product(*[[i, i + 1] for i in indices])
+
+        # Create a copy of the edges-iterator.
+        edges, edges_copy = itertools.tee(edges)
+
+        # Calculate weights.
+        weight = np.ones((4, self.size))
+        for n, edge_indices in enumerate(edges_copy):
+            partial_weight = 1.
+            for ei, i, yi in zip(edge_indices, indices, norm_distances):
+                partial_weight *= np.where(ei == i, 1 - yi, yi)
+            weight[n, :] = partial_weight
+
+        return weight, edges
