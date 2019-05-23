@@ -34,7 +34,7 @@ from . import utils
 from . import njitted
 
 __all__ = ['solver', 'multigrid', 'smoothing', 'restriction', 'prolongation',
-           'residual', 'MGParameters']
+           'residual', 'krylov', 'MGParameters']
 
 
 def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
@@ -300,154 +300,57 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     )
 
     # Print all parameters if verbose.
-    if var.verb > 1:
-        print(f"\n:: emg3d START :: {var.time.now} ::\n")
-        print(var)
+    var.cprint(f"\n:: emg3d START :: {var.time.now} ::\n", 1)
+    var.cprint(var, 1)
 
     # Get efield
-    do_run = True     # Flag whether or not to run the solver.
-    do_return = True  # Flag whether or not to return the field.
     if efield is None:
         # If not provided, initiate an empty one.
         efield = utils.Field(grid)
+
+        # Set flag to return the field.
+        do_return = True
     else:
         # If provided, take the conjugate (see return statement).
         efield.field = efield.field.conjugate()
 
-        # Don't return the field, just inplace.
+        # Set flag to NOT return the field.
         do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = np.linalg.norm(residual(grid, model, sfield, efield))
         if var.l2 < var.tol*np.linalg.norm(sfield):
-            do_run = False
+            info = f"   > Provided efield already good enough!"
+            var.cprint(info+f":: emg3d END ::\n", 1)
+            return
 
-    # Switch if multigrid or ssl-solver is main solver.
-    if do_run and var.sslsolver:  # `ssl-solver` is main solver.
-
-        # Print header of iteration log.
-        if var.verb > 2:
-            prnt = f"   [hh:mm:ss]     {'error':<15}{'solver':<20} "
-            if var.cycle:
-                prnt += f"{'MG':<11} l s"
-            print(prnt+f"\n")
-
-        # Define matrix operation A x as LinearOperator.
-        def amatvec(efield):
-            """Compute A x for solver; residual is b-Ax = src-amatvec."""
-
-            # Cast current efield to Field instance.
-            efield = utils.Field(grid, efield)
-
-            # Calculate A x.
-            rfield = utils.Field(grid)
-            njitted.amat_x(
-                    rfield.fx, rfield.fy, rfield.fz,
-                    efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                    model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz)
-
-            # Return Field instance.
-            return rfield
-
-        # Initiate LinearOperator A x.
-        A = ssl.LinearOperator(
-                shape=(grid.nE, grid.nE), dtype=complex, matvec=amatvec)
-
-        # Define MG pre-conditioner as LinearOperator, if `var.cycle`.
-        def mg_matvec(sfield):
-            """Use multigrid as pre-conditioner."""
-
-            # Cast current fields to Field instances.
-            sfield = utils.Field(grid, sfield)
-            efield = utils.Field(grid)
-
-            # Solve for these fields.
-            multigrid(grid, model, sfield, efield, var)
-
-            # Set first_cycle off to reduce verbosity after first cycle.
-            var._first_cycle = False
-
-            return efield
-
-        # Initiate LinearOperator M.
-        M = None
+    # Print header for iteration log.
+    header = f"   [hh:mm:ss]     {'error':<15}"
+    if var.sslsolver:
+        header += f"{'solver':<20} "
         if var.cycle:
-            M = ssl.LinearOperator(
-                    shape=(grid.nE, grid.nE), dtype=complex, matvec=mg_matvec)
+            header += f"{'MG':<11} l s"
+    else:
+        header += f"{'l2:[last/init, last/prev]':>32} l s\n"
+    var.cprint(header+"\n", 2)
 
-        # Define callback to keep track of sslsolver-iterations.
-        def callback(x):
-            """Solver iteration count and error (l2-norm)."""
-            # Update iteration count.
-            var._ssl_it += 1
-
-            # Calculate and print l2-norm (only if verbose).
-            if var.verb > 2:
-
-                # 'gmres' returns the error, not the solution, in the callback.
-                if var.sslsolver == 'gmres':
-                    var.l2 = x
-                else:
-                    res = residual(grid, model, sfield, utils.Field(grid, x))
-                    var.l2 = np.linalg.norm(res)
-
-                print(f"   [{var.time.now}] {var.l2:.3e} "
-                      f"after {var._ssl_it:2} {var.sslsolver}-cycles")
-
-                # For those solvers who run an iteration before the first
-                # preconditioner run ['lgmres', 'gcrotmk'].
-                if var._ssl_it == 1 and var.it == 0 and var.cycle is not None:
-                    print()
-
-        # Solve the system with sslsolver.
-        efield, i = getattr(ssl, var.sslsolver)(
-                A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
-                atol=1e-30, M=M, callback=callback)
-
-        # Cast result to Field instance.
-        efield = utils.Field(grid, efield)
-
-        # Calculate final l2-norm, if not done in the callback.
-        if var.verb < 3:
-            var.l2 = np.linalg.norm(
-                    residual(grid, model, sfield, utils.Field(grid, efield)))
-
-        # Convergence-checks for sslsolver.
-        if i < 0:
-            print(f"\n* ERROR   :: Error in {var.sslsolver}.")
-        elif verb > 1:
-            if i > 0:
-                print("\n   > MAX. ITERATION REACHED, NOT CONVERGED")
-            else:
-                print("\n   > CONVERGED")
-
-    elif do_run:  # Multigrid is main solver.
-
-        # Print header of iteration log.
-        if var.verb > 2:
-            print(f"   [hh:mm:ss]     {'error':<15}"
-                  f"{'l2:[last/init, last/prev]':>32} l s\n")
-
-        # Solve the system with multigrid.
+    # Solve the system with...
+    if var.sslsolver:  # ... sslsolver.
+        krylov(grid, model, sfield, efield, var)
+    else:              # ... multigrid.
         multigrid(grid, model, sfield, efield, var)
 
     # Print runtime information.
-    if verb > 1:
-
-        # Multigrid and solver steps.
-        if not do_run:
-            print(f"   > Provided efield already good enough!")
-        elif var.sslsolver:
-            print(f"   > Solver steps   : {var._ssl_it}")
-            if var.cycle:
-                print(f"   > MG prec. steps : {var.it}")
-        else:
-            print(f"   > MG cycles      : {var.it}")
-
-        # Final error and runtime.
-        print(f"   > Final l2-norm  : {var.l2:.3e}\n")
-        print(f":: emg3d END :: {var.time.now} :: "
-              f"runtime = {var.time.runtime}\n")
+    if var.sslsolver:  # sslsolver-specific info.
+        info = f"   > Solver steps   : {var._ssl_it}\n"
+        if var.cycle:
+            info += f"   > MG prec. steps : {var.it}\n"
+    else:              # multigrid-specific info.
+        info = f"   > MG cycles      : {var.it}\n"
+    info += f"   > Final l2-norm  : {var.l2:.3e}\n\n"  # Final error.
+    info += f":: emg3d END :: {var.time.now} :: \n"    # END and time.
+    info += f"runtime = {var.time.runtime}\n"          # Total runtime.
+    var.cprint(info, 1)
 
     # To use the same Fourier-transform convention as empymod and commonly
     # used in CSEM, we return the conjugate.
@@ -481,6 +384,9 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
     sfield, efield : Field
         Source and electric fields; ``emg3d.utils.Field`` instances.
+
+    var : `MGParameters`-instance
+        As returned by :func:`multigrid`.
 
     **kwargs : Recursion parameters.
         Do not use; only used internally by recursion; ``level`` (current
@@ -1139,6 +1045,123 @@ def residual(grid, model, sfield, efield):
     return sfield-rfield
 
 
+def krylov(grid, model, sfield, efield, var):
+    """Krylov Subspace iterative solver for 3D CSEM data.
+
+    Using a Krylov subspace iterative solver (defined in `var.sslsolver`)
+    implemented in SciPy with or without multigrid as a pre-conditioner
+    ([Muld06]_).
+
+    - The electric field is stored in-place in ``efield``.
+    - The current error (l2-norm) is stored in ``var.l2``.
+
+    This function is called by :func:`solver`.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    model : Model
+        Model; ``emg3d.utils.Model`` instance.
+
+    sfield, efield : Field
+        Source and electric fields; ``emg3d.utils.Field`` instances.
+
+    var : `MGParameters`-instance
+        As returned by :func:`multigrid`.
+
+    """
+
+    # Define matrix operation A x as LinearOperator.
+    def amatvec(efield):
+        """Compute A x for solver; residual is b-Ax = src-amatvec."""
+
+        # Cast current efield to Field instance.
+        efield = utils.Field(grid, efield)
+
+        # Calculate A x.
+        rfield = utils.Field(grid)
+        njitted.amat_x(
+                rfield.fx, rfield.fy, rfield.fz,
+                efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
+                model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz)
+
+        # Return Field instance.
+        return rfield
+
+    # Initiate LinearOperator A x.
+    A = ssl.LinearOperator(
+            shape=(grid.nE, grid.nE), dtype=complex, matvec=amatvec)
+
+    # Define MG pre-conditioner as LinearOperator, if `var.cycle`.
+    def mg_matvec(sfield):
+        """Use multigrid as pre-conditioner."""
+
+        # Cast current fields to Field instances.
+        sfield = utils.Field(grid, sfield)
+        efield = utils.Field(grid)
+
+        # Solve for these fields.
+        multigrid(grid, model, sfield, efield, var)
+
+        # Set first_cycle off to reduce verbosity after first cycle.
+        var._first_cycle = False
+
+        return efield
+
+    # Initiate LinearOperator M.
+    M = None
+    if var.cycle:
+        M = ssl.LinearOperator(
+                shape=(grid.nE, grid.nE), dtype=complex, matvec=mg_matvec)
+
+    # Define callback to keep track of sslsolver-iterations.
+    def callback(x):
+        """Solver iteration count and error (l2-norm)."""
+        # Update iteration count.
+        var._ssl_it += 1
+
+        # Calculate and print l2-norm (only if verbose).
+        if var.verb > 2:
+
+            # 'gmres' returns the error, not the solution, in the callback.
+            if var.sslsolver == 'gmres':
+                var.l2 = x
+            else:
+                res = residual(grid, model, sfield, utils.Field(grid, x))
+                var.l2 = np.linalg.norm(res)
+
+            log = f"   [{var.time.now}] {var.l2:.3e} "
+            log += f"after {var._ssl_it:2} {var.sslsolver}-cycles"
+
+            # For those solvers who run an iteration before the first
+            # preconditioner run ['lgmres', 'gcrotmk'].
+            if var._ssl_it == 1 and var.it == 0 and var.cycle is not None:
+                log += "\n"
+
+            var.cprint(log, 2)
+
+    # Solve the system with sslsolver.
+    efield.field, i = getattr(ssl, var.sslsolver)(
+            A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
+            atol=1e-30, M=M, callback=callback)
+
+    # Calculate final l2-norm, if not done in the callback.
+    if var.verb < 3:
+        var.l2 = np.linalg.norm(
+                residual(grid, model, sfield, utils.Field(grid, efield)))
+
+    # Convergence-checks for sslsolver.
+    if i < 0:
+        var.cprint(f"\n* ERROR   :: Error in {var.sslsolver}.", -1)
+    elif i > 0:
+        var.cprint("\n   > MAX. ITERATION REACHED, NOT CONVERGED", 1)
+    else:
+        var.cprint("\n   > CONVERGED", 1)
+
+
 @dataclass
 class MGParameters:
     """Collect multigrid solver settings.
@@ -1382,3 +1405,23 @@ class MGParameters:
                   "             direction. Provided shape: "
                   f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
             raise ValueError('nCx/nCy/nCz')
+
+    def cprint(self, info, level, **kwargs):
+        """Conditional printing.
+
+        Prints `info` if `self.verb` > `level`.
+
+        Parameters
+        ----------
+        info : str
+            String to be printed.
+
+        level : int
+            Verbosity of info.
+
+        kwargs : optional
+            Arguments passed to `print`.
+
+        """
+        if self.verb > level:
+            print(info, **kwargs)

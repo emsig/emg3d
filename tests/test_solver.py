@@ -23,9 +23,8 @@ def create_dummy(nx, ny, nz):
     return out.reshape(nx, ny, nz)
 
 
-def test_solver(capsys):
-
-    # 1. Regression test for homogeneous halfspace.
+def test_solver_homogeneous(capsys):
+    # Regression test for homogeneous halfspace.
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res'][()]
 
@@ -111,7 +110,9 @@ def test_solver(capsys):
     out, _ = capsys.readouterr()
     assert "STAGNATED" in out
 
-    # 2. Regression test for heterogeneous case.
+
+def test_solver_heterogeneous(capsys):
+    # Regression test for heterogeneous case.
     dat = REGRES['reg_2'][()]
     grid = dat['grid']
     model = dat['model']
@@ -293,6 +294,31 @@ def test_residual():
 
     # Compare
     assert_allclose(out, sfield-rfield)
+
+
+def test_krylov(capsys):
+
+    # Everything should be tested just fine in `test_solver`.
+    # Just check here for bicgstab-error.
+
+    # Load any case.
+    dat = REGRES['res'][()]
+    grid = utils.TensorMesh(**dat['input_grid'])
+    model = utils.Model(**dat['input_model'])
+    sfield = utils.get_source_field(**dat['input_source'])
+    efield = utils.Field(grid)  # Initiate e-field.
+
+    # Get var-instance
+    var = solver.MGParameters(
+            cycle=None, sslsolver=True, semicoarsening=False,
+            linerelaxation=False, vnC=grid.vnC, verb=3,
+            maxit=-1,  # Set stupid input to make bicgstab fail.
+    )
+
+    # Call krylov and ensure it fails properly.
+    solver.krylov(grid, model, sfield, efield, var)
+    out, _ = capsys.readouterr()
+    assert '* ERROR   :: Error in bicgstab.' in out
 
 
 def test_mgparameters():

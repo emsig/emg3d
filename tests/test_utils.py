@@ -152,6 +152,8 @@ def test_get_source_field(capsys):
     out, _ = capsys.readouterr()
     assert "* ERROR   :: Provided source is a point dipole" in out
 
+
+def test_get_source_field_point_vs_finite(capsys):
     # === Point dipole to finite dipole comparisons ===
     def get_xyz(d_src):
         """Return dimensions corresponding to azimuth and dip."""
@@ -220,7 +222,6 @@ def test_get_source_field(capsys):
 
 
 def test_TensorMesh():
-
     # Load mesh created with discretize.TensorMesh.
     grid = REGRES['grid'][()]
 
