@@ -26,6 +26,7 @@ are in the :mod:`emg3d.njitted` as numba-jitted functions.
 
 import numpy as np
 from itertools import cycle
+import scipy.interpolate as si
 import scipy.sparse.linalg as ssl
 from dataclasses import dataclass
 
@@ -1018,49 +1019,72 @@ def prolongation(grid, efield, cgrid, cefield, rdir):
     rdir : int
         Direction of semicoarsening (0, 1, 2, or 3).
 
+    Notes
+    -----
+    We set ``bounds_error=False`` and ``fill_value=None`` in
+    :class:`scipy.interpolate.RegularGridInterpolator` to extrapolate fine grid
+    points which are outside the coarse grid. The fine grid points are,
+    theoretically, never outside the coarse grid points. However, the
+    restriction mesh is created with the distances between points. This can
+    lead to fine grid points slightly outside coarse grid points (in the orders
+    of 1e-10 m) with very big distances (grids of roughly over 1e6 m). So
+    basically nothing, but it would still cause an error in the interpolation.
+
     """
 
-    # 0. Calculate required points of finer grid.
-    yz_points = grid.gridEx[::grid.nCx, 1:]
-    xz_points = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
-    xz_points = xz_points[:, :grid.nNx, :].reshape(-1, 2)
-    xy_points = grid.gridEz[:grid.nNx*grid.nNy, :2]
+    # Calculate required points of finer grid.
+    x_pts = grid.gridEx[::grid.nCx, 1:]
+    y_pts = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
+    y_pts = y_pts[:, :grid.nNx, :].reshape(-1, 2)
+    z_pts = grid.gridEz[:grid.nNx*grid.nNy, :2]
 
-    # 1. Bilinear interpolate of fields within planes.
-    efieldx = njitted.prolong_field(
-            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points, cgrid.nCx)
-    efieldy = njitted.prolong_field(
-            cgrid.vectorNx, cgrid.vectorNz, cefield.fy, xz_points, cgrid.nCy)
-    efieldz = njitted.prolong_field(
-            cgrid.vectorNx, cgrid.vectorNy, cefield.fz, xy_points, cgrid.nCz)
+    # Interpolate ex in y-z-slices.
+    for ixc in range(cgrid.nCx):
 
-    # 2. Change sorting from C- to F-order.
-    # (Not yet possible in numba; move everything to njitted once possible).
-    efieldx = efieldx.reshape((-1, *grid.vnEx[1:]), order='F')
-    efieldy = efieldy.reshape((-1, *grid.vnEy[::2]), order='F')
-    efieldy = np.swapaxes(efieldy, 0, 1)
-    efieldz = efieldz.reshape((-1, *grid.vnEz[:-1]), order='F')
-    efieldz = np.moveaxis(efieldz, 0, 2)
+        # Bilinear interpolation in the y-z plane
+        fn = si.RegularGridInterpolator(
+                (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
+                bounds_error=False, fill_value=None)
+        hh = fn(x_pts).reshape(grid.vnEx[1:], order='F')
 
-    # 3. Piecewise constant interpolation in direction of field
-    # x-field.
-    if rdir not in [1, 5, 6]:
-        efield.fx[::2, :, :] += efieldx
-        efield.fx[1::2, :, :] += efieldx
-    else:
-        efield.fx += efieldx
-    # y-field.
-    if rdir not in [2, 4, 6]:
-        efield.fy[:, ::2, :] += efieldy
-        efield.fy[:, 1::2, :] += efieldy
-    else:
-        efield.fy += efieldy
-    # z-field.
-    if rdir not in [3, 4, 5]:
-        efield.fz[:, :, ::2] += efieldz
-        efield.fz[:, :, 1::2] += efieldz
-    else:
-        efield.fz += efieldz
+        # Piecewise constant interpolation in x-direction
+        if rdir not in [1, 5, 6]:
+            efield.fx[2*ixc, :, :] += hh
+            efield.fx[2*ixc+1, :, :] += hh
+        else:
+            efield.fx[ixc, :, :] += hh
+
+    # Interpolate ey in x-z-slices.
+    for iyc in range(cgrid.nCy):
+
+        # Bilinear interpolation in the x-z plane
+        fn = si.RegularGridInterpolator(
+                (cgrid.vectorNx, cgrid.vectorNz), cefield.fy[:, iyc, :],
+                bounds_error=False, fill_value=None)
+        hh = fn(y_pts).reshape(grid.vnEy[::2], order='F')
+
+        # Piecewise constant interpolation in y-direction
+        if rdir not in [2, 4, 6]:
+            efield.fy[:, 2*iyc, :] += hh
+            efield.fy[:, 2*iyc+1, :] += hh
+        else:
+            efield.fy[:, iyc, :] += hh
+
+    # Interpolate ez in x-y-slices.
+    for izc in range(cgrid.nCz):
+
+        # Bilinear interpolation in the x-y plane
+        fn = si.RegularGridInterpolator(
+                (cgrid.vectorNx, cgrid.vectorNy), cefield.fz[:, :, izc],
+                bounds_error=False, fill_value=None)
+        hh = fn(z_pts).reshape(grid.vnEz[:-1], order='F')
+
+        # Piecewise constant interpolation in z-direction
+        if rdir not in [3, 4, 5]:
+            efield.fz[:, :, 2*izc] += hh
+            efield.fz[:, :, 2*izc+1] += hh
+        else:
+            efield.fz[:, :, izc] += hh
 
     # Ensure PEC boundaries
     efield.ensure_pec
