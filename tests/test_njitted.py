@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.interpolate as si
 from numpy.testing import assert_allclose
 
 from . import alternatives
@@ -309,55 +308,3 @@ def test_blocks_to_amat():
     # Check it
     assert_allclose(amat_res, amat)
     assert_allclose(bvec_res, bvec)
-
-
-def test_prolong():
-    # Nr of cells of fine grid.
-    nx = 2**5
-
-    # Create fine grid.
-    hx = 50*np.ones(nx)
-    grid = utils.TensorMesh([hx, hx, hx], x0=np.array([0, 0, 0]))
-
-    # Create coarse grid.
-    chx = np.diff(grid.vectorNx[::2])
-    cgrid = utils.TensorMesh([chx, chx, chx], x0=np.array([0, 0, 0]))
-
-    # Create empty fine grid fields.
-    efield1 = utils.Field(grid)
-    efield2 = utils.Field(grid)
-
-    # Create coarse grid field with some values.
-    cefield = utils.Field(cgrid)
-    cefield.fx = np.arange(cefield.fx.size)
-    cefield.fx = 1j*np.arange(cefield.fx.size)/10
-
-    # Required interpolation points.
-    yz_points = grid.gridEx[::grid.nCx, 1:]
-
-    # Calculate SciPy alternative:
-    for ixc in range(cgrid.nCx):
-        fn = si.RegularGridInterpolator(
-                (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
-                bounds_error=False, fill_value=None)
-        efieldx = fn(yz_points)
-        efieldx = fn(yz_points).reshape(grid.vnEx[1:], order='F')
-
-        # Piecewise constant interpolation in x-direction
-        efield1.fx[2*ixc, :, :] += efieldx
-        efield1.fx[2*ixc+1, :, :] += efieldx
-
-    # Calculate emg3d-version:
-    efieldx = njitted.prolong_field(
-            cgrid.vectorNy, cgrid.vectorNz, cefield.fx, yz_points, cgrid.nCx)
-
-    # Change sorting from C- to F-order.
-    # (Not yet possible in numba; move everything njitted once possible).
-    efieldx = efieldx.reshape((-1, *grid.vnEx[1:]), order='F')
-
-    # Piecewise constant interpolation in x-direction
-    efield2.fx[::2, :, :] += efieldx
-    efield2.fx[1::2, :, :] += efieldx
-
-    # Compare
-    np.allclose(efield1, efield2)
