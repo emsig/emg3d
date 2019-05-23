@@ -314,15 +314,15 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         # If provided, take the conjugate (see return statement).
         efield.field = efield.field.conjugate()
 
-        # Set flag to NOT return the field.
-        do_return = False
-
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = np.linalg.norm(residual(grid, model, sfield, efield))
         if var.l2 < var.tol*np.linalg.norm(sfield):
             info = f"   > Provided efield already good enough!"
             var.cprint(info+f":: emg3d END ::\n", 1)
             return
+
+        # Set flag to NOT return the field.
+        do_return = False
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]     {'error':<15}"

@@ -124,6 +124,13 @@ def test_solver_heterogeneous(capsys):
 
     assert_allclose(dat['result'], efield.field)
 
+    # Check with provided e-field; 2x2 iter should yield the same as 4 iter.
+    efield2 = solver.solver(grid, model, sfield, maxit=4)
+    efield3 = solver.solver(grid, model, sfield, maxit=2)
+    solver.solver(grid, model, sfield, efield3, maxit=2)
+
+    assert_allclose(efield2, efield3)
+
     # Check the QC plot if it is too long.
     # Coincidently, this one also diverges if nu_pre=0!
     # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction

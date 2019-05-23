@@ -2,6 +2,14 @@ Changelog
 #########
 
 
+*latest*
+--------
+
+- Submission to JOSS.
+- Add *Multi-what?*-page to documentation.
+- Refactoring.
+- Removed ``discretize`` as hard dependency.
+
 v0.5.0 : Accept any grid size
 -----------------------------
 
