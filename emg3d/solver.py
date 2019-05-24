@@ -33,9 +33,7 @@ from . import utils
 from . import njitted
 
 __all__ = ['solver', 'multigrid', 'smoothing', 'restriction', 'prolongation',
-           'residual', 'krylov', 'MGParameters', 'current_sc_dir',
-           'current_lr_dir', 'print_cycle_info', 'terminate',
-           'RegularGridProlongator']
+           'residual', 'krylov', 'MGParameters', 'RegularGridProlongator']
 
 
 # MAIN USER-FACING FUNCTION
@@ -477,7 +475,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 res, l2_last = residual(grid, model, sfield, efield)
 
             # Get sc_dir for this grid.
-            sc_dir = current_sc_dir(var.sc_dir, grid)
+            sc_dir = _current_sc_dir(var.sc_dir, grid)
 
             # (B.2) Restrict grid, model, and fields from fine to coarse grid.
             cgrid, cmodel, csfield, cefield = restriction(
@@ -519,7 +517,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         else:          # Original grid reached, check termination criteria.
 
             # Print end-of-cycle info.
-            print_cycle_info(var, l2_last, l2_prev, l2_init)
+            _print_cycle_info(var, l2_last, l2_prev, l2_init)
 
             # Adjust semicoarsening and line relaxation if they cycle.
             if var.sc_cycle:
@@ -528,7 +526,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 var.lr_dir = next(var.lr_cycle)
 
             # Check if any termination criteria is fulfilled.
-            if terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+            if _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
                 break
 
             # Set first_cycle to False, to reduce verbosity from now on.
@@ -708,7 +706,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
            model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz, nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
-    lr_dir = current_lr_dir(lr_dir, grid)
+    lr_dir = _current_lr_dir(lr_dir, grid)
 
     # Calculate and store fields (in-place)
     if lr_dir == 0:             # Standard MG
@@ -787,38 +785,14 @@ def restriction(grid, model, sfield, residual, sc_dir):
         rz = 1
 
     # Calculate distances of coarse grid.
-    ch = [grid.hx, grid.hy, grid.hz]
-    ch[0] = np.diff(grid.vectorNx[::rx])
-    ch[1] = np.diff(grid.vectorNy[::ry])
-    ch[2] = np.diff(grid.vectorNz[::rz])
+    ch = [np.diff(grid.vectorNx[::rx]),
+          np.diff(grid.vectorNy[::ry]),
+          np.diff(grid.vectorNz[::rz])]
 
     # Create new ``TensorMesh``-instance for coarse grid
     cgrid = utils.TensorMesh(ch, grid.x0)
 
     # 2. RESTRICT MODEL
-    def restr(param, sc_dir):
-        """Restrict model parameters."""
-        if sc_dir == 1:    # Only sum the four cells in y-z-plane
-            out = param[:, :-1:2, :-1:2] + param[:, 1::2, :-1:2]
-            out += param[:, :-1:2, 1::2] + param[:, 1::2, 1::2]
-        elif sc_dir == 2:  # Only sum the four cells in x-z-plane
-            out = param[:-1:2, :, :-1:2] + param[1::2, :, :-1:2]
-            out += param[:-1:2, :, 1::2] + param[1::2, :, 1::2]
-        elif sc_dir == 3:  # Only sum the four cells in x-y-plane
-            out = param[:-1:2, :-1:2, :] + param[1::2, :-1:2, :]
-            out += param[:-1:2, 1::2, :] + param[1::2, 1::2, :]
-        elif sc_dir == 4:  # Only sum the two cells in x-direction
-            out = param[:-1:2, :, :] + param[1::2, :, :]
-        elif sc_dir == 5:  # Only sum the two cells y-direction
-            out = param[:, :-1:2, :] + param[:, 1::2, :]
-        elif sc_dir == 6:  # Only sum the two cells z-direction
-            out = param[:, :, :-1:2] + param[:, :, 1::2]
-        else:            # Standard: Sum all 8 cells.
-            out = param[:-1:2, :-1:2, :-1:2] + param[1::2, :-1:2, :-1:2]
-            out += param[:-1:2, :-1:2, 1::2] + param[1::2, :-1:2, 1::2]
-            out += param[:-1:2, 1::2, :-1:2] + param[1::2, 1::2, :-1:2]
-            out += param[:-1:2, 1::2, 1::2] + param[1::2, 1::2, 1::2]
-        return out
 
     # Check what type of anisotropy for dummy-resistivity.
     if model.case in [0, 2]:  # Isotropic or VTI.
@@ -838,44 +812,16 @@ def restriction(grid, model, sfield, residual, sc_dir):
     # Note: Coarsening is done with eta, not with res. The reason is that eta
     #       includes the volume, while res doesn't. This is very important in
     #       the coarsening step.
-    cmodel.eta_x = restr(model.eta_x, sc_dir)
+    cmodel.eta_x = _restrict_model_parameters(model.eta_x, sc_dir)
     if res_y is not None:
-        cmodel.eta_y = restr(model.eta_y, sc_dir)
+        cmodel.eta_y = _restrict_model_parameters(model.eta_y, sc_dir)
     if res_z is not None:
-        cmodel.eta_z = restr(model.eta_z, sc_dir)
+        cmodel.eta_z = _restrict_model_parameters(model.eta_z, sc_dir)
 
     # 3. RESTRICT FIELDS
 
     # Get the weights (Equation 9 of [Muld06]_).
-    # The corresponding weights are not actually used in the case of
-    # semicoarsening. We still have to provide arrays of the correct format
-    # though, otherwise numba will complain in the jitted functions.
-    if sc_dir not in [1, 5, 6]:
-        wx = njitted.restrict_weights(
-                grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
-                cgrid.vectorCCx, cgrid.hx)
-    else:
-        wxlr = np.zeros(grid.nNx, dtype=float)
-        wx0 = np.ones(grid.nNx, dtype=float)
-        wx = (wxlr, wx0, wxlr)
-
-    if sc_dir not in [2, 4, 6]:
-        wy = njitted.restrict_weights(
-                grid.vectorNy, grid.vectorCCy, grid.hy, cgrid.vectorNy,
-                cgrid.vectorCCy, cgrid.hy)
-    else:
-        wylr = np.zeros(grid.nNy, dtype=float)
-        wy0 = np.ones(grid.nNy, dtype=float)
-        wy = (wylr, wy0, wylr)
-
-    if sc_dir not in [3, 4, 5]:
-        wz = njitted.restrict_weights(
-                grid.vectorNz, grid.vectorCCz, grid.hz, cgrid.vectorNz,
-                cgrid.vectorCCz, cgrid.hz)
-    else:
-        wzlr = np.zeros(grid.nNz, dtype=float)
-        wz0 = np.ones(grid.nNz, dtype=float)
-        wz = (wzlr, wz0, wzlr)
+    wx, wy, wz = _get_restriction_weights(grid, cgrid, sc_dir)
 
     # Calculate the source terms (Equation 8 in [Muld06]_).
     csfield = utils.Field(cgrid)  # Create empty coarse source field instance.
@@ -1026,7 +972,7 @@ def residual(grid, model, sfield, efield):
     return res, norm
 
 
-# VAR-DATACLASS
+# VARIABLE DATACLASS
 @dataclass
 class MGParameters:
     """Collect multigrid solver settings.
@@ -1078,106 +1024,14 @@ class MGParameters:
 
         self.time = utils.Time()         # Timer
 
-        # 1. semicoarsening
-        if self.semicoarsening is True:            # If True, cycle [1, 2, 3].
-            sc_cycle = np.array([1, 2, 3])
-            self.sc_cycle = itertools.cycle(sc_cycle)
-        elif self.semicoarsening in np.arange(4):  # If 0-4, use this.
-            sc_cycle = np.array([int(self.semicoarsening)])
-            self.sc_cycle = False
-        else:                                      # Else, use numbers.
-            sc_cycle = np.array([int(x) for x in
-                                 str(abs(self.semicoarsening))])
-            self.sc_cycle = itertools.cycle(sc_cycle)
+        # 1. Set everything related to semicoarsening and line relaxation.
+        self._semicoarsening()
+        self._linerelaxation()
 
-            # Ensure numbers are within 0 <= sc_dir <= 3
-            if np.any(sc_cycle < 0) or np.any(sc_cycle > 3):
-                print("* ERROR   :: `semicoarsening` must be one of  "
-                      f"(False, True, 0, 1, 2, 3).\n"
-                      f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle, "
-                      f"e.g. 1213.\n{'Provided:':>23} "
-                      f"semicoarsening={self.semicoarsening}.")
-                raise ValueError('semicoarsening')
+        # 2. Set everything to used solver and MG-cycle.
+        self._solver_and_cycle()
 
-        # Get first (or only) direction.
-        if self.sc_cycle:
-            self.sc_dir = next(self.sc_cycle)
-        else:
-            self.sc_dir = sc_cycle[0]
-
-        # Set semicoarsening to True/False; print statement
-        self.semicoarsening = self.sc_dir != 0
-        self.__p_sc_dir = f"{self.semicoarsening} {sc_cycle}"
-
-        # 2. linerelaxation
-        if self.linerelaxation is True:            # If True, cycle [1, 2, 3].
-            lr_cycle = np.array([4, 5, 6])
-            self.lr_cycle = itertools.cycle(lr_cycle)
-        elif self.linerelaxation in np.arange(8):  # If 0-7, use this.
-            lr_cycle = np.array([int(self.linerelaxation)])
-            self.lr_cycle = False
-        else:                                      # Else, use numbers.
-            lr_cycle = np.array([int(x) for x in
-                                 str(abs(self.linerelaxation))])
-            self.lr_cycle = itertools.cycle(lr_cycle)
-
-            # Ensure numbers are within 0 <= lr_dir <= 7
-            if np.any(lr_cycle < 0) or np.any(lr_cycle > 7):
-                print("* ERROR   :: `linerelaxation` must be one of  "
-                      f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
-                      f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
-                      f"to cycle, e.g. 1213.\n{'Provided:':>23} "
-                      f"linerelaxation={self.linerelaxation}.")
-                raise ValueError('linerelaxation')
-
-        # Get first (only) direction
-        if self.lr_cycle:
-            self.lr_dir = next(self.lr_cycle)
-        else:
-            self.lr_dir = lr_cycle[0]
-
-        # Set linerelaxation to True/False; print statement
-        self.linerelaxation = self.lr_dir != 0
-        self.__p_lr_dir = f"{self.linerelaxation} {lr_cycle}"
-
-        # 3. sslsolver and cycle
-        solvers = ['bicgstab', 'cgs', 'gmres', 'lgmres', 'gcrotmk']
-        if self.sslsolver is True:
-            self.sslsolver = 'bicgstab'
-        elif self.sslsolver is not False and self.sslsolver not in solvers:
-            print(f"* ERROR   :: `sslsolver` must be True, False, or one of")
-            print(f"             {solvers}.")
-            print(f"             Provided: sslsolver={self.sslsolver!r}.")
-            raise ValueError('sslsolver!r')
-
-        if self.cycle not in ['F', 'V', 'W', None]:
-            print("* ERROR   :: `cycle` must be one of {'F', 'V', 'W', None}."
-                  f"\n             Provided: cycle={self.cycle}.")
-            raise ValueError('cycle')
-
-        # Add maximum MG cycles depending on cycle
-        if self.cycle in ['F', 'W']:
-            self.cycmax = 2
-        else:
-            self.cycmax = 1
-
-        # Ensure at least cycle or sslsolver is set
-        if not self.sslsolver and not self.cycle:
-            print("* ERROR   :: At least `cycle` or `sslsolver` is "
-                  "required.\n             Provided input: "
-                  f"cycle={self.cycle}; sslsolver={self.sslsolver}.")
-            raise ValueError('cycle/sslsolver')
-
-        # Store maxit in ssl_maxit and adjust maxit if sslsolver.
-        self.ssl_maxit = 0              # Maximum iteration
-        self.__maxit = f"{self.maxit}"  # For printing
-        if self.sslsolver:
-            self.ssl_maxit = self.maxit
-            if self.cycle is not None:  # Only if MG is used
-                self.maxit = max(len(sc_cycle), len(lr_cycle))
-                self.__maxit += f" ({self.maxit})"  # For printing
-
-        # 4. Check max coarsening level
+        # 3. Check max coarsening level
         self.max_level
 
     def __repr__(self):
@@ -1299,251 +1153,119 @@ class MGParameters:
         info += f"{grid.nCz:3}]: {norm:.3e} {text}"
         self.cprint(info, verbosity)
 
+    def _semicoarsening(self):
+        """Set everything related to semicoarsening."""
 
-# MG HELPER ROUTINES
-def current_sc_dir(sc_dir, grid):
-    """Return current direction(s) for semicoarsening.
+        # Check input.
+        if self.semicoarsening is True:            # If True, cycle [1, 2, 3].
+            sc_cycle = np.array([1, 2, 3])
+            self.sc_cycle = itertools.cycle(sc_cycle)
+        elif self.semicoarsening in np.arange(4):  # If 0-4, use this.
+            sc_cycle = np.array([int(self.semicoarsening)])
+            self.sc_cycle = False
+        else:                                      # Else, use numbers.
+            sc_cycle = np.array([int(x) for x in
+                                 str(abs(self.semicoarsening))])
+            self.sc_cycle = itertools.cycle(sc_cycle)
 
-    Semicoarsening is defined in ``self.sc_dir``. Here ``self.sc_dir`` is
-    checked with which directions can actually still be halved, and
-    depending on that, an adjusted ``sc_dir`` is returned for this
-    particular grid.
+            # Ensure numbers are within 0 <= sc_dir <= 3
+            if np.any(sc_cycle < 0) or np.any(sc_cycle > 3):
+                print("* ERROR   :: `semicoarsening` must be one of  "
+                      f"(False, True, 0, 1, 2, 3).\n"
+                      f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle, "
+                      f"e.g. 1213.\n{'Provided:':>23} "
+                      f"semicoarsening={self.semicoarsening}.")
+                raise ValueError('semicoarsening')
 
-
-    Parameters
-    ----------
-    grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
-
-    sc_dir : int
-        Direction of semicoarsening.
-
-    Returns
-    -------
-    c_sc_dir : int
-        Current direction of semicoarsening.
-
-    """
-    # Find out in which direction we want to half the number of cells.
-    # This depends on an (optional) direction of semicoarsening, and
-    # if the number of cells in a direction can still be halved.
-    xsc_dir = grid.nCx % 2 != 0 or grid.nCx < 3 or sc_dir == 1
-    ysc_dir = grid.nCy % 2 != 0 or grid.nCy < 3 or sc_dir == 2
-    zsc_dir = grid.nCz % 2 != 0 or grid.nCz < 3 or sc_dir == 3
-
-    # Set current sc_dir depending on the above outcome.
-    if xsc_dir:
-        if ysc_dir:
-            c_sc_dir = 6  # Only coarsen in z-direction.
-        elif zsc_dir:
-            c_sc_dir = 5  # Only coarsen in y-direction.
+        # Get first (or only) direction.
+        if self.sc_cycle:
+            self.sc_dir = next(self.sc_cycle)
         else:
-            c_sc_dir = 1  # Coarsen in y- and z-directions.
-    elif ysc_dir:
-        if zsc_dir:
-            c_sc_dir = 4  # Only coarsen in x-direction.
+            self.sc_dir = sc_cycle[0]
+
+        # Set semicoarsening to True/False; print statement
+        self.semicoarsening = self.sc_dir != 0
+        self.__p_sc_dir = f"{self.semicoarsening} {sc_cycle}"
+        self.__raw_sc_cycle = sc_cycle
+
+    def _linerelaxation(self):
+        """Set everything related to line relaxation."""
+
+        # Check input.
+        if self.linerelaxation is True:            # If True, cycle [1, 2, 3].
+            lr_cycle = np.array([4, 5, 6])
+            self.lr_cycle = itertools.cycle(lr_cycle)
+        elif self.linerelaxation in np.arange(8):  # If 0-7, use this.
+            lr_cycle = np.array([int(self.linerelaxation)])
+            self.lr_cycle = False
+        else:                                      # Else, use numbers.
+            lr_cycle = np.array([int(x) for x in
+                                 str(abs(self.linerelaxation))])
+            self.lr_cycle = itertools.cycle(lr_cycle)
+
+            # Ensure numbers are within 0 <= lr_dir <= 7
+            if np.any(lr_cycle < 0) or np.any(lr_cycle > 7):
+                print("* ERROR   :: `linerelaxation` must be one of  "
+                      f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
+                      f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
+                      f"to cycle, e.g. 1213.\n{'Provided:':>23} "
+                      f"linerelaxation={self.linerelaxation}.")
+                raise ValueError('linerelaxation')
+
+        # Get first (only) direction
+        if self.lr_cycle:
+            self.lr_dir = next(self.lr_cycle)
         else:
-            c_sc_dir = 2  # Coarsen in x- and z-directions.
-    elif zsc_dir:
-        c_sc_dir = 3  # Coarsen in x- and y-directions.
-    else:
-        c_sc_dir = 0  # Coarsen in all directions.
+            self.lr_dir = lr_cycle[0]
 
-    return c_sc_dir
+        # Set linerelaxation to True/False; print statement
+        self.linerelaxation = self.lr_dir != 0
+        self.__p_lr_dir = f"{self.linerelaxation} {lr_cycle}"
+        self.__raw_lr_cycle = lr_cycle
 
+    def _solver_and_cycle(self):
+        """Set everything related to solver and MG-cycle."""
 
-def current_lr_dir(lr_dir, grid):
-    """Return current direction(s) for line relaxation.
+        # sslsolver.
+        solvers = ['bicgstab', 'cgs', 'gmres', 'lgmres', 'gcrotmk']
+        if self.sslsolver is True:
+            self.sslsolver = 'bicgstab'
+        elif self.sslsolver is not False and self.sslsolver not in solvers:
+            print(f"* ERROR   :: `sslsolver` must be True, False, or one of")
+            print(f"             {solvers}.")
+            print(f"             Provided: sslsolver={self.sslsolver!r}.")
+            raise ValueError('sslsolver!r')
 
-    Line relaxation is defined in ``self.lr_dir``. Here ``self.lr_dir`` is
-    checked with the dimension of the grid, to avoid line relaxation in a
-    direction where there are only two cells.
+        if self.cycle not in ['F', 'V', 'W', None]:
+            print("* ERROR   :: `cycle` must be one of {'F', 'V', 'W', None}."
+                  f"\n             Provided: cycle={self.cycle}.")
+            raise ValueError('cycle')
 
-
-    Parameters
-    ----------
-    grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
-
-    lr_dir : int
-        Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
-
-
-    Returns
-    -------
-    lr_dir : int
-        Current direction of line relaxation.
-
-    """
-    lr_dir = np.copy(lr_dir)
-
-    if grid.nCx == 2:  # Check x-direction.
-        if lr_dir == 1:
-            lr_dir = 0
-        elif lr_dir == 5:
-            lr_dir = 3
-        elif lr_dir == 6:
-            lr_dir = 2
-        elif lr_dir == 7:
-            lr_dir = 4
-
-    if grid.nCy == 2:  # Check y-direction.
-        if lr_dir == 2:
-            lr_dir = 0
-        elif lr_dir == 4:
-            lr_dir = 3
-        elif lr_dir == 6:
-            lr_dir = 1
-        elif lr_dir == 7:
-            lr_dir = 5
-
-    if grid.nCz == 2:  # Check z-direction.
-        if lr_dir == 3:
-            lr_dir = 0
-        elif lr_dir == 4:
-            lr_dir = 2
-        elif lr_dir == 5:
-            lr_dir = 1
-        elif lr_dir == 7:
-            lr_dir = 6
-
-    return lr_dir
-
-
-def print_cycle_info(var, l2_last, l2_prev, l2_init):
-    """Print cycle info to log.
-
-    Parameters
-    ----------
-    var : `MGParameters`-instance
-        As returned by :func:`multigrid`.
-
-    l2_last, l2_prev, l2_init : float
-        Last, previous, and initial l2-norms.
-
-    """
-
-    # Start info string, return if not enough verbose.
-    if var.verb < 3:
-        return
-    elif var.verb > 3:
-        info = "\n"
-    else:
-        info = ""
-
-    # Add multigrid-cycle visual QC on first cycle.
-    if var._first_cycle:
-
-        # Cast levels into array, get maximum.
-        _lvl_all = np.array(var._level_all, dtype=int)
-        lvl_max = np.max(_lvl_all)
-
-        # Get levels, multiply by difference to get +/-.
-        lvl = (_lvl_all[1:] + _lvl_all[:-1])//2+1
-        lvl *= _lvl_all[1:] - _lvl_all[:-1]
-
-        # Create info string.
-        out = [f"       h_\n"]
-        slen = min(len(lvl), 70)
-        for cl in range(lvl_max):
-            out += f"   {2**(cl+1):4}h_ "
-            out += [" " if abs(lvl[v]) != cl+1 else "\\" if
-                    lvl[v] > 0 else "/" for v in range(slen)]
-            if cl < lvl_max-1:
-                out.append("\n")
-
-        # Add the cycle to inf.
-        info += "".join(out)
-        info += "\n\n"
-        if len(lvl) > 70:
-            info += "  (Cycle-QC restricted to first 70 steps of "
-            info += f"{len(lvl)} steps.)\n"
-
-        # Reset _level_all
-        var._level_all = [0, ]
-
-    # Add iteration log.
-    if var.sslsolver:  # For multigrid as preconditioner.
-        info += f"   [{var.time.now}] {l2_last:.3e} "
-        info += f"after {20*' '} {var.it:2} {var.cycle}-cycles; "
-        info += f"  {var.lr_dir} {var.sc_dir}"
-
-    else:              # For multigrid as solver.
-        info += f"   [{var.time.now}] {l2_last:.3e} "
-        info += f"after {var.it:2} {var.cycle}-cycles; "
-        info += f"[{l2_last/l2_init:.3e}, {l2_last/l2_prev:.3e}]"
-        info += f" {var.lr_dir} {var.sc_dir}"
-
-    if var.verb > 3:
-        info += "\n"
-
-    # Print the info.
-    var.cprint(info, 2)
-
-
-def terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
-    """Return multigrid termination flag.
-
-    Checks all termination criteria and returns True if at least one is
-    fulfilled.
-
-
-    Parameters
-    ----------
-    var : `MGParameters`-instance
-        As returned by :func:`multigrid`.
-
-    l2_last, l2_prev, l2_init, l2_refe : float
-        Last, previous, initial, and reference l2-norms.
-
-    it : int
-        Iteration number.
-
-
-    Returns
-    -------
-    finished : bool
-        Boolean indicating if multigrid is finished.
-
-    """
-
-    finished = False
-
-    if var.sslsolver:  # If multigrid as preconditioner, exit silently.
-        if it == var.maxit:
-            finished = True
-
-    else:
-        # Initialize info string.
-        info = ""
-
-        if var.verb < 4:
-            add = "\n"
+        # Add maximum MG cycles depending on cycle
+        if self.cycle in ['F', 'W']:
+            self.cycmax = 2
         else:
-            add = ""
+            self.cycmax = 1
 
-        if l2_last < var.tol*l2_refe:        # Converged.
-            info += add+"   > CONVERGED\n"
-            finished = True
+        # Ensure at least cycle or sslsolver is set
+        if not self.sslsolver and not self.cycle:
+            print("* ERROR   :: At least `cycle` or `sslsolver` is "
+                  "required.\n             Provided input: "
+                  f"cycle={self.cycle}; sslsolver={self.sslsolver}.")
+            raise ValueError('cycle/sslsolver')
 
-        elif l2_last > 10*l2_init:           # Diverged.
-            info += add+"   > DIVERGED\n"
-            finished = True
-
-        elif it > 2 and l2_last >= l2_prev:  # Stagnated.
-            info += add+"   > STAGNATED\n"
-            finished = True
-
-        elif it == var.maxit:                # Maximum iterations reached.
-            info += add+"   > MAX. ITERATION REACHED, NOT CONVERGED\n"
-            finished = True
-
-        # Print info.
-        var.cprint(info, 1, end="")
-
-    return finished
+        # Store maxit in ssl_maxit and adjust maxit if sslsolver.
+        self.ssl_maxit = 0              # Maximum iteration
+        self.__maxit = f"{self.maxit}"  # For printing
+        if self.sslsolver:
+            self.ssl_maxit = self.maxit
+            if self.cycle is not None:  # Only if MG is used
+                self.maxit = max(len(self.__raw_sc_cycle),
+                                 len(self.__raw_lr_cycle))
+                self.__maxit += f" ({self.maxit})"  # For printing
 
 
+# INTERPOLATION DATACLASS
 class RegularGridProlongator:
     """Prolongate field from coarse to fine grid.
 
@@ -1640,3 +1362,341 @@ class RegularGridProlongator:
         """Return a copy of the edges-iterator."""
         self.edges, edges = itertools.tee(self.edges)
         return edges
+
+
+# MG HELPER ROUTINES
+def _current_sc_dir(sc_dir, grid):
+    """Return current direction(s) for semicoarsening.
+
+    Semicoarsening is defined in ``self.sc_dir``. Here ``self.sc_dir`` is
+    checked with which directions can actually still be halved, and
+    depending on that, an adjusted ``sc_dir`` is returned for this
+    particular grid.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    sc_dir : int
+        Direction of semicoarsening.
+
+    Returns
+    -------
+    c_sc_dir : int
+        Current direction of semicoarsening.
+
+    """
+    # Find out in which direction we want to half the number of cells.
+    # This depends on an (optional) direction of semicoarsening, and
+    # if the number of cells in a direction can still be halved.
+    xsc_dir = grid.nCx % 2 != 0 or grid.nCx < 3 or sc_dir == 1
+    ysc_dir = grid.nCy % 2 != 0 or grid.nCy < 3 or sc_dir == 2
+    zsc_dir = grid.nCz % 2 != 0 or grid.nCz < 3 or sc_dir == 3
+
+    # Set current sc_dir depending on the above outcome.
+    if xsc_dir:
+        if ysc_dir:
+            c_sc_dir = 6  # Only coarsen in z-direction.
+        elif zsc_dir:
+            c_sc_dir = 5  # Only coarsen in y-direction.
+        else:
+            c_sc_dir = 1  # Coarsen in y- and z-directions.
+    elif ysc_dir:
+        if zsc_dir:
+            c_sc_dir = 4  # Only coarsen in x-direction.
+        else:
+            c_sc_dir = 2  # Coarsen in x- and z-directions.
+    elif zsc_dir:
+        c_sc_dir = 3  # Coarsen in x- and y-directions.
+    else:
+        c_sc_dir = 0  # Coarsen in all directions.
+
+    return c_sc_dir
+
+
+def _current_lr_dir(lr_dir, grid):
+    """Return current direction(s) for line relaxation.
+
+    Line relaxation is defined in ``self.lr_dir``. Here ``self.lr_dir`` is
+    checked with the dimension of the grid, to avoid line relaxation in a
+    direction where there are only two cells.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    lr_dir : int
+        Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
+
+
+    Returns
+    -------
+    lr_dir : int
+        Current direction of line relaxation.
+
+    """
+    lr_dir = np.copy(lr_dir)
+
+    if grid.nCx == 2:  # Check x-direction.
+        if lr_dir == 1:
+            lr_dir = 0
+        elif lr_dir == 5:
+            lr_dir = 3
+        elif lr_dir == 6:
+            lr_dir = 2
+        elif lr_dir == 7:
+            lr_dir = 4
+
+    if grid.nCy == 2:  # Check y-direction.
+        if lr_dir == 2:
+            lr_dir = 0
+        elif lr_dir == 4:
+            lr_dir = 3
+        elif lr_dir == 6:
+            lr_dir = 1
+        elif lr_dir == 7:
+            lr_dir = 5
+
+    if grid.nCz == 2:  # Check z-direction.
+        if lr_dir == 3:
+            lr_dir = 0
+        elif lr_dir == 4:
+            lr_dir = 2
+        elif lr_dir == 5:
+            lr_dir = 1
+        elif lr_dir == 7:
+            lr_dir = 6
+
+    return lr_dir
+
+
+def _print_cycle_info(var, l2_last, l2_prev, l2_init):
+    """Print cycle info to log.
+
+    Parameters
+    ----------
+    var : `MGParameters`-instance
+        As returned by :func:`multigrid`.
+
+    l2_last, l2_prev, l2_init : float
+        Last, previous, and initial l2-norms.
+
+    """
+
+    # Start info string, return if not enough verbose.
+    if var.verb < 3:
+        return
+    elif var.verb > 3:
+        info = "\n"
+    else:
+        info = ""
+
+    # Add multigrid-cycle visual QC on first cycle.
+    if var._first_cycle:
+
+        # Cast levels into array, get maximum.
+        _lvl_all = np.array(var._level_all, dtype=int)
+        lvl_max = np.max(_lvl_all)
+
+        # Get levels, multiply by difference to get +/-.
+        lvl = (_lvl_all[1:] + _lvl_all[:-1])//2+1
+        lvl *= _lvl_all[1:] - _lvl_all[:-1]
+
+        # Create info string.
+        out = [f"       h_\n"]
+        slen = min(len(lvl), 70)
+        for cl in range(lvl_max):
+            out += f"   {2**(cl+1):4}h_ "
+            out += [" " if abs(lvl[v]) != cl+1 else "\\" if
+                    lvl[v] > 0 else "/" for v in range(slen)]
+            if cl < lvl_max-1:
+                out.append("\n")
+
+        # Add the cycle to inf.
+        info += "".join(out)
+        info += "\n\n"
+        if len(lvl) > 70:
+            info += "  (Cycle-QC restricted to first 70 steps of "
+            info += f"{len(lvl)} steps.)\n"
+
+        # Reset _level_all
+        var._level_all = [0, ]
+
+    # Add iteration log.
+    if var.sslsolver:  # For multigrid as preconditioner.
+        info += f"   [{var.time.now}] {l2_last:.3e} "
+        info += f"after {20*' '} {var.it:2} {var.cycle}-cycles; "
+        info += f"  {var.lr_dir} {var.sc_dir}"
+
+    else:              # For multigrid as solver.
+        info += f"   [{var.time.now}] {l2_last:.3e} "
+        info += f"after {var.it:2} {var.cycle}-cycles; "
+        info += f"[{l2_last/l2_init:.3e}, {l2_last/l2_prev:.3e}]"
+        info += f" {var.lr_dir} {var.sc_dir}"
+
+    if var.verb > 3:
+        info += "\n"
+
+    # Print the info.
+    var.cprint(info, 2)
+
+
+def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+    """Return multigrid termination flag.
+
+    Checks all termination criteria and returns True if at least one is
+    fulfilled.
+
+
+    Parameters
+    ----------
+    var : `MGParameters`-instance
+        As returned by :func:`multigrid`.
+
+    l2_last, l2_prev, l2_init, l2_refe : float
+        Last, previous, initial, and reference l2-norms.
+
+    it : int
+        Iteration number.
+
+
+    Returns
+    -------
+    finished : bool
+        Boolean indicating if multigrid is finished.
+
+    """
+
+    finished = False
+
+    if var.sslsolver:  # If multigrid as preconditioner, exit silently.
+        if it == var.maxit:
+            finished = True
+
+    else:
+        # Initialize info string.
+        info = ""
+
+        if var.verb < 4:
+            add = "\n"
+        else:
+            add = ""
+
+        if l2_last < var.tol*l2_refe:        # Converged.
+            info += add+"   > CONVERGED\n"
+            finished = True
+
+        elif l2_last > 10*l2_init:           # Diverged.
+            info += add+"   > DIVERGED\n"
+            finished = True
+
+        elif it > 2 and l2_last >= l2_prev:  # Stagnated.
+            info += add+"   > STAGNATED\n"
+            finished = True
+
+        elif it == var.maxit:                # Maximum iterations reached.
+            info += add+"   > MAX. ITERATION REACHED, NOT CONVERGED\n"
+            finished = True
+
+        # Print info.
+        var.cprint(info, 1, end="")
+
+    return finished
+
+
+def _restrict_model_parameters(param, sc_dir):
+    """Restrict model parameters.
+
+    Parameters
+    ----------
+    param : ndarray
+        Model parameter to restrict.
+
+    sc_dir : int
+        Direction of semicoarsening.
+
+    Returns
+    -------
+    out : ndarray
+        Restricted model parameter.
+
+    """
+    if sc_dir == 1:    # Only sum the four cells in y-z-plane
+        out = param[:, :-1:2, :-1:2] + param[:, 1::2, :-1:2]
+        out += param[:, :-1:2, 1::2] + param[:, 1::2, 1::2]
+    elif sc_dir == 2:  # Only sum the four cells in x-z-plane
+        out = param[:-1:2, :, :-1:2] + param[1::2, :, :-1:2]
+        out += param[:-1:2, :, 1::2] + param[1::2, :, 1::2]
+    elif sc_dir == 3:  # Only sum the four cells in x-y-plane
+        out = param[:-1:2, :-1:2, :] + param[1::2, :-1:2, :]
+        out += param[:-1:2, 1::2, :] + param[1::2, 1::2, :]
+    elif sc_dir == 4:  # Only sum the two cells in x-direction
+        out = param[:-1:2, :, :] + param[1::2, :, :]
+    elif sc_dir == 5:  # Only sum the two cells y-direction
+        out = param[:, :-1:2, :] + param[:, 1::2, :]
+    elif sc_dir == 6:  # Only sum the two cells z-direction
+        out = param[:, :, :-1:2] + param[:, :, 1::2]
+    else:            # Standard: Sum all 8 cells.
+        out = param[:-1:2, :-1:2, :-1:2] + param[1::2, :-1:2, :-1:2]
+        out += param[:-1:2, :-1:2, 1::2] + param[1::2, :-1:2, 1::2]
+        out += param[:-1:2, 1::2, :-1:2] + param[1::2, 1::2, :-1:2]
+        out += param[:-1:2, 1::2, 1::2] + param[1::2, 1::2, 1::2]
+    return out
+
+
+def _get_restriction_weights(grid, cgrid, sc_dir):
+    """Return restriction weights.
+
+    Return the weights (Equation 9 of [Muld06]_). The corresponding weights are
+    not actually used in the case of semicoarsening. We still have to provide
+    arrays of the correct format though, otherwise numba will complain in the
+    jitted functions.
+
+
+    Parameters
+    ----------
+    grid, cgrid : TensorMesh
+        Fine and coarse grids; ``emg3d.utils.TensorMesh`` instances.
+
+    sc_dir : int
+        Direction of semicoarsening.
+
+
+    Returns
+    -------
+    wx, wy, wz : ndarray
+        Restriction weights.
+
+    """
+    if sc_dir not in [1, 5, 6]:
+        wx = njitted.restrict_weights(
+                grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
+                cgrid.vectorCCx, cgrid.hx)
+    else:
+        wxlr = np.zeros(grid.nNx, dtype=float)
+        wx0 = np.ones(grid.nNx, dtype=float)
+        wx = (wxlr, wx0, wxlr)
+
+    if sc_dir not in [2, 4, 6]:
+        wy = njitted.restrict_weights(
+                grid.vectorNy, grid.vectorCCy, grid.hy, cgrid.vectorNy,
+                cgrid.vectorCCy, cgrid.hy)
+    else:
+        wylr = np.zeros(grid.nNy, dtype=float)
+        wy0 = np.ones(grid.nNy, dtype=float)
+        wy = (wylr, wy0, wylr)
+
+    if sc_dir not in [3, 4, 5]:
+        wz = njitted.restrict_weights(
+                grid.vectorNz, grid.vectorCCz, grid.hz, cgrid.vectorNz,
+                cgrid.vectorCCz, cgrid.hz)
+    else:
+        wzlr = np.zeros(grid.nNz, dtype=float)
+        wz0 = np.ones(grid.nNz, dtype=float)
+        wz = (wzlr, wz0, wzlr)
+
+    return wx, wy, wz

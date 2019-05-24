@@ -5,6 +5,9 @@ Changelog
 *latest*
 --------
 
+- Replace :class:`scipy.interpolate.RegularGridInterpolator` with a custom
+  tailored version of it (`solver.RegularGridProlongator`); results in twice
+  as fast prolongation.
 - Submission to JOSS.
 - Add *Multi-what?*-page to documentation.
 - Some major refactoring, particularly in ``solver``.
