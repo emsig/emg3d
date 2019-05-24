@@ -333,7 +333,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         if var.cycle:
             header += f"{'MG':<11} l s"
     else:
-        header += f"{'l2:[last/init, last/prev]':>32} l s\n"
+        header += f"{'l2:[last/init, last/prev]':>32} l s"
     var.cprint(header+"\n", 2)
 
     # Solve the system with...
@@ -350,7 +350,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     else:              # multigrid-specific info.
         info = f"   > MG cycles      : {var.it}\n"
     info += f"   > Final l2-norm  : {var.l2:.3e}\n\n"  # Final error.
-    info += f":: emg3d END :: {var.time.now} :: \n"    # END and time.
+    info += f":: emg3d END :: {var.time.now} :: "      # END and time.
     info += f"runtime = {var.time.runtime}\n"          # Total runtime.
     var.cprint(info, 1)
 
@@ -1568,9 +1568,8 @@ class RegularGridProlongator:
     """
 
     def __init__(self, x, y, cxy):
-        self.grid = tuple([np.asarray(p) for p in (x, y)])
         self.size = cxy.shape[0]
-        self.weight, self.edges = self._get_weights(cxy)
+        self._set_edges_and_weights((x, y), cxy)
 
     def __call__(self, values):
         """Return values of coarse grid on fine grid locations.
@@ -1589,26 +1588,23 @@ class RegularGridProlongator:
         # Initiate result.
         result = 0.
 
-        # Create a copy of the edges-iterator.
-        self.edges, edges_copy = itertools.tee(self.edges)
-
         # Find relevant values.
-        for n, edge_indices in enumerate(edges_copy):
+        for n, edge_indices in enumerate(self._get_edges_copy()):
             result += np.asarray(values[edge_indices]) * self.weight[n, :]
 
         return result
 
-    def _get_weights(self, xi):
-        """Calculate weights for xi-coordinates."""
+    def _set_edges_and_weights(self, xy, cxy):
+        """Calculate weights to go from xy- to cxy-coordinates."""
 
-        # Find relevant edges between which xi are situated.
+        # Find relevant edges between which cxy are situated.
         indices = []
 
         # Compute distance to lower edge in unity units.
         norm_distances = []
 
         # Iterate through dimensions.
-        for x, grid in zip(xi.T, self.grid):
+        for x, grid in zip(cxy.T, xy):
             i = np.searchsorted(grid, x) - 1
             i[i < 0] = 0
             i[i > grid.size - 2] = grid.size - 2
@@ -1616,17 +1612,17 @@ class RegularGridProlongator:
             norm_distances.append((x - grid[i]) / (grid[i + 1] - grid[i]))
 
         # Find relevant values; each i and i+1 represents a edge.
-        edges = itertools.product(*[[i, i + 1] for i in indices])
-
-        # Create a copy of the edges-iterator.
-        edges, edges_copy = itertools.tee(edges)
+        self.edges = itertools.product(*[[i, i + 1] for i in indices])
 
         # Calculate weights.
-        weight = np.ones((4, self.size))
-        for n, edge_indices in enumerate(edges_copy):
+        self.weight = np.ones((4, self.size))
+        for n, edge_indices in enumerate(self._get_edges_copy()):
             partial_weight = 1.
             for ei, i, yi in zip(edge_indices, indices, norm_distances):
                 partial_weight *= np.where(ei == i, 1 - yi, yi)
-            weight[n, :] = partial_weight
+            self.weight[n, :] = partial_weight
 
-        return weight, edges
+    def _get_edges_copy(self):
+        """Return a copy of the edges-iterator."""
+        self.edges, edges = itertools.tee(self.edges)
+        return edges
