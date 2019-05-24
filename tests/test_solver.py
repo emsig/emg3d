@@ -120,17 +120,26 @@ def test_solver_heterogeneous(capsys):
     sfield = dat['sfield']
     sfield = utils.Field(grid, sfield)
     inp = dat['inp']
+    inp['verb'] = 1
 
     efield = solver.solver(grid, model, sfield, **inp)
 
     assert_allclose(dat['result'], efield.field)
 
     # Check with provided e-field; 2x2 iter should yield the same as 4 iter.
-    efield2 = solver.solver(grid, model, sfield, maxit=4)
-    efield3 = solver.solver(grid, model, sfield, maxit=2)
-    solver.solver(grid, model, sfield, efield3, maxit=2)
+    efield2 = solver.solver(grid, model, sfield, maxit=4, verb=1)
+    efield3 = solver.solver(grid, model, sfield, maxit=2, verb=1)
+    solver.solver(grid, model, sfield, efield3, maxit=2, verb=1)
 
     assert_allclose(efield2, efield3)
+
+    # One test without post-smoothing to check if it runs.
+    efield4 = solver.solver(
+            grid, model, sfield, maxit=20, nu_pre=0, nu_post=4, verb=3)
+    efield5 = solver.solver(
+            grid, model, sfield, maxit=20, nu_pre=4, nu_post=0, verb=3)
+    # They don't converge, and hence don't agree. Just a lazy test.
+    assert_allclose(efield4, efield5, atol=1e-8)
 
     # Check the QC plot if it is too long.
     # Coincidently, this one also diverges if nu_pre=0!
@@ -214,10 +223,14 @@ def test_smoothing():
 
             # Use solver.smoothing
             ofield = utils.Field(grid, field)
-            solver.smoothing(grid, model, sfield, ofield, nu, lr_dir)
+            res, l2norm = solver.smoothing(
+                    grid, model, sfield, ofield, nu, lr_dir)
+            res2, l2norm2 = solver.residual(grid, model, sfield, efield)
 
             # Compare
             assert_allclose(efield, ofield)
+            assert_allclose(res, res2)
+            assert l2norm == l2norm2
 
 
 def test_restriction():
@@ -298,10 +311,11 @@ def test_residual():
             grid.hx, grid.hy, grid.hz)
 
     # Calculate residual
-    out = solver.residual(grid, model, sfield, efield)
+    out, outnorm = solver.residual(grid, model, sfield, efield)
 
     # Compare
     assert_allclose(out, sfield-rfield)
+    assert outnorm == np.linalg.norm(out)
 
 
 def test_krylov(capsys):

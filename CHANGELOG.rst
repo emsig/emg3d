@@ -7,10 +7,10 @@ Changelog
 
 - Submission to JOSS.
 - Add *Multi-what?*-page to documentation.
-- Refactoring.
+- Some major refactoring, particularly in ``solver``.
 - Removed ``discretize`` as hard dependency.
-- Rename ``rdir`` and ``ldir`` to the more descriptive ``sc_dir`` and
-  ``lr_dir``.
+- Rename ``rdir`` and ``ldir`` (and related ``p*dir``; ``*cycle``) to the more
+  descriptive ``sc_dir`` and ``lr_dir``.
 
 v0.5.0 : Accept any grid size
 -----------------------------

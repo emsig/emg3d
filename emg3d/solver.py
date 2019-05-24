@@ -317,7 +317,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         efield.field = efield.field.conjugate()
 
         # If efield is provided, check if it is already sufficiently good.
-        var.l2 = np.linalg.norm(residual(grid, model, sfield, efield))
+        _, var.l2 = residual(grid, model, sfield, efield)
         if var.l2 < var.tol*np.linalg.norm(sfield):
             info = f"   > Provided efield already good enough!"
             var.cprint(info+f":: emg3d END ::\n", 1)
@@ -416,44 +416,31 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
     # Define various l2-norms.
     l2_refe = np.linalg.norm(sfield)  # Reference norm for tolerance.
-    l2_last = np.linalg.norm(residual(grid, model, sfield, efield))
+    _, l2_last = residual(grid, model, sfield, efield)  # Current residual.
     l2_init = l2_last
     l2_prev = l2_last
 
     # If verbose, we keep track on the levels during the first cycle, for QC.
     if var.verb > 2 and var._first_cycle:
 
-        # Initiate _level_all.
-        if level == 0:
-            var._level_all = []
-
         # Store current level.
         var._level_all.append(level)
 
-    # Print initial call info if verbose.
-    if var.verb > 3:
-
-        def print_gs_info(it, level, cycmax, grid, norm, text):
-            """Print info after Gauss-Seidel smoothing steps."""
-            print(f"     {it:2} {level} {cycmax} [{grid.nCx:3}, {grid.nCy:3}, "
-                  f"{grid.nCz:3}]: {norm:.3e} {text}")
-
-        # Print header of smoothing log.
-        if level == 0:
-            print("     it cycmax               error")
-            print("      level [  dimension  ]            info\n")
-            print_gs_info(it, level, cycmax, grid, l2_last, "initial error")
+    # Print initial call info.
+    if level == 0:
+        var.cprint("     it cycmax               error", 3)
+        var.cprint("      level [  dimension  ]            info\n", 3)
+        var.print_gs_info(it, level, cycmax, grid, l2_last, "initial error", 3)
 
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
         # Smooth and re-calculate error.
-        smoothing(grid, model, sfield, efield, var.nu_init, var.lr_dir)
-        l2_last = np.linalg.norm(residual(grid, model, sfield, efield))
+        res, l2_last = smoothing(
+                grid, model, sfield, efield, var.nu_init, var.lr_dir)
 
-        # Print initial smoothing info if verbose.
-        if var.verb > 3:
-            print_gs_info(it, level, cycmax, grid, l2_last,
-                          f"initial smoothing")
+        # Print initial smoothing info.
+        var.print_gs_info(
+                it, level, cycmax, grid, l2_last, f"initial smoothing", 3)
 
     # Start the actual (recursive) multigrid cycle.
     while level == 0 or (level > 0 and it < cycmax):
@@ -467,29 +454,27 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             # reduces the number of coarsening levels.
 
             # Gauss-Seidel on the coarsest grid.
-            smoothing(grid, model, sfield, efield, var.nu_coarse, var.lr_dir)
+            res, l2_last = smoothing(
+                    grid, model, sfield, efield, var.nu_coarse, var.lr_dir)
 
-            # Print coarsest grid smoothing info if verbose.
-            if var.verb > 3:
-                res = residual(grid, model, sfield, efield)
-                l2_last = np.linalg.norm(res)
-                print_gs_info(it, level, cycmax, grid, l2_last,
-                              f"coarsest level")
+            # Print coarsest grid smoothing info.
+            var.print_gs_info(it, level, cycmax, grid, l2_last,
+                              f"coarsest level", 3)
 
         else:                   # (B) Not yet on coarsest grid.
 
             # (B.1) Pre-smoothing (nu_pre).
             if var.nu_pre > 0:
-                smoothing(grid, model, sfield, efield, var.nu_pre, var.lr_dir)
+                res, l2_last = smoothing(
+                        grid, model, sfield, efield, var.nu_pre, var.lr_dir)
 
-            # Get current residual.
-            res = residual(grid, model, sfield, efield)
+                # Print pre-smoothing info.
+                var.print_gs_info(it, level, cycmax, grid, l2_last,
+                                  f"pre-smoothing", 3)
 
-            # Print pre-smoothing info if verbose.
-            if var.nu_pre > 0 and var.verb > 3:
-                l2_last = np.linalg.norm(res)
-                print_gs_info(it, level, cycmax, grid, l2_last,
-                              f"pre-smoothing")
+            else:
+                # Get current error (l2-norm).
+                res, l2_last = residual(grid, model, sfield, efield)
 
             # Get sc_dir for this grid.
             sc_dir = current_sc_dir(var.sc_dir, grid)
@@ -511,15 +496,16 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
             # (B.5) Post-smoothing (nu_post).
             if var.nu_post > 0:
-                smoothing(grid, model, sfield, efield, var.nu_post, var.lr_dir)
+                res, l2_last = smoothing(
+                        grid, model, sfield, efield, var.nu_post, var.lr_dir)
 
-            # Get current error (l2-norm).
-            l2_last = np.linalg.norm(residual(grid, model, sfield, efield))
+                # Print post-smoothing info.
+                var.print_gs_info(it, level, cycmax, grid, l2_last,
+                                  f"post-smoothing", 3)
 
-            # Print post-smoothing info if verbose.
-            if var.nu_post > 0 and var.verb > 3:
-                print_gs_info(it, level, cycmax, grid, l2_last,
-                              f"post-smoothing")
+            else:
+                # Get current error (l2-norm).
+                res, l2_last = residual(grid, model, sfield, efield)
 
         # Update iterator counts.
         it += 1         # Local iterator.
@@ -536,10 +522,10 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             print_cycle_info(var, l2_last, l2_prev, l2_init)
 
             # Adjust semicoarsening and line relaxation if they cycle.
-            if var.rcycle:
-                var.sc_dir = next(var.rcycle)
-            if var.lcycle:
-                var.lr_dir = next(var.lcycle)
+            if var.sc_cycle:
+                var.sc_dir = next(var.sc_cycle)
+            if var.lr_cycle:
+                var.lr_dir = next(var.lr_cycle)
 
             # Check if any termination criteria is fulfilled.
             if terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
@@ -637,8 +623,7 @@ def krylov(grid, model, sfield, efield, var):
             if var.sslsolver == 'gmres':
                 var.l2 = x
             else:
-                res = residual(grid, model, sfield, utils.Field(grid, x))
-                var.l2 = np.linalg.norm(res)
+                _, var.l2 = residual(grid, model, sfield, utils.Field(grid, x))
 
             log = f"   [{var.time.now}] {var.l2:.3e} "
             log += f"after {var._ssl_it:2} {var.sslsolver}-cycles"
@@ -657,8 +642,7 @@ def krylov(grid, model, sfield, efield, var):
 
     # Calculate final l2-norm, if not done in the callback.
     if var.verb < 3:
-        var.l2 = np.linalg.norm(
-                residual(grid, model, sfield, utils.Field(grid, efield)))
+        _, var.l2 = residual(grid, model, sfield, utils.Field(grid, efield))
 
     # Convergence-checks for sslsolver.
     if i < 0:
@@ -708,6 +692,15 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     lr_dir : int
         Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
 
+
+    Returns
+    -------
+    res : ndarray
+        Current residual.
+
+    l2_norm : float
+        l2-norm of the residual.
+
     """
 
     # Collect Gauss-Seidel input (same for all routines)
@@ -729,6 +722,10 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     if lr_dir in [3, 4, 5, 7]:  # Line relaxation in z-direction
         njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+
+    # Return the current residual and its l2-norm.
+    res, norm = residual(grid, model, sfield, efield)
+    return res, norm
 
 
 def restriction(grid, model, sfield, residual, sc_dir):
@@ -1009,6 +1006,9 @@ def residual(grid, model, sfield, efield):
     residual : Field
         The residual field; ``emg3d.utils.Field`` instance.
 
+    norm : float
+        The l2-norm of the residual
+
     """
     # Get residual without source-field
     rfield = utils.Field(grid)
@@ -1016,8 +1016,14 @@ def residual(grid, model, sfield, efield):
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
                    model.v_mu_r, grid.hx, grid.hy, grid.hz)
 
-    # Return the complete residual: source-field - residual-field
-    return sfield-rfield
+    # The complete residual: source-field - residual-field.
+    res = sfield-rfield
+
+    # Calculate its norm.
+    norm = np.linalg.norm(res)
+
+    # Return residual and its norm.
+    return res, norm
 
 
 # VAR-DATACLASS
@@ -1064,7 +1070,7 @@ class MGParameters:
         """Set and check some of the parameters."""
 
         # 0. Set some additional variables
-        self._level_all: list = None     # To keep track of the
+        self._level_all = list()         # To keep track of the
         self._first_cycle: bool = True   # levels for QC-figure.
         self.it = 0                      # To store MG cycle count
         self._ssl_it = 0                 # To store solver iteration count
@@ -1074,17 +1080,18 @@ class MGParameters:
 
         # 1. semicoarsening
         if self.semicoarsening is True:            # If True, cycle [1, 2, 3].
-            rcycle = np.array([1, 2, 3])
-            self.rcycle = itertools.cycle(rcycle)
+            sc_cycle = np.array([1, 2, 3])
+            self.sc_cycle = itertools.cycle(sc_cycle)
         elif self.semicoarsening in np.arange(4):  # If 0-4, use this.
-            rcycle = np.array([int(self.semicoarsening)])
-            self.rcycle = False
+            sc_cycle = np.array([int(self.semicoarsening)])
+            self.sc_cycle = False
         else:                                      # Else, use numbers.
-            rcycle = np.array([int(x) for x in str(abs(self.semicoarsening))])
-            self.rcycle = itertools.cycle(rcycle)
+            sc_cycle = np.array([int(x) for x in
+                                 str(abs(self.semicoarsening))])
+            self.sc_cycle = itertools.cycle(sc_cycle)
 
             # Ensure numbers are within 0 <= sc_dir <= 3
-            if np.any(rcycle < 0) or np.any(rcycle > 3):
+            if np.any(sc_cycle < 0) or np.any(sc_cycle > 3):
                 print("* ERROR   :: `semicoarsening` must be one of  "
                       f"(False, True, 0, 1, 2, 3).\n"
                       f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle, "
@@ -1093,28 +1100,29 @@ class MGParameters:
                 raise ValueError('semicoarsening')
 
         # Get first (or only) direction.
-        if self.rcycle:
-            self.sc_dir = next(self.rcycle)
+        if self.sc_cycle:
+            self.sc_dir = next(self.sc_cycle)
         else:
-            self.sc_dir = rcycle[0]
+            self.sc_dir = sc_cycle[0]
 
         # Set semicoarsening to True/False; print statement
         self.semicoarsening = self.sc_dir != 0
-        self.__p_sc_dir = f"{self.semicoarsening} {rcycle}"
+        self.__p_sc_dir = f"{self.semicoarsening} {sc_cycle}"
 
         # 2. linerelaxation
         if self.linerelaxation is True:            # If True, cycle [1, 2, 3].
-            lcycle = np.array([4, 5, 6])
-            self.lcycle = itertools.cycle(lcycle)
+            lr_cycle = np.array([4, 5, 6])
+            self.lr_cycle = itertools.cycle(lr_cycle)
         elif self.linerelaxation in np.arange(8):  # If 0-7, use this.
-            lcycle = np.array([int(self.linerelaxation)])
-            self.lcycle = False
+            lr_cycle = np.array([int(self.linerelaxation)])
+            self.lr_cycle = False
         else:                                      # Else, use numbers.
-            lcycle = np.array([int(x) for x in str(abs(self.linerelaxation))])
-            self.lcycle = itertools.cycle(lcycle)
+            lr_cycle = np.array([int(x) for x in
+                                 str(abs(self.linerelaxation))])
+            self.lr_cycle = itertools.cycle(lr_cycle)
 
             # Ensure numbers are within 0 <= lr_dir <= 7
-            if np.any(lcycle < 0) or np.any(lcycle > 7):
+            if np.any(lr_cycle < 0) or np.any(lr_cycle > 7):
                 print("* ERROR   :: `linerelaxation` must be one of  "
                       f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
                       f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
@@ -1123,14 +1131,14 @@ class MGParameters:
                 raise ValueError('linerelaxation')
 
         # Get first (only) direction
-        if self.lcycle:
-            self.lr_dir = next(self.lcycle)
+        if self.lr_cycle:
+            self.lr_dir = next(self.lr_cycle)
         else:
-            self.lr_dir = lcycle[0]
+            self.lr_dir = lr_cycle[0]
 
         # Set linerelaxation to True/False; print statement
         self.linerelaxation = self.lr_dir != 0
-        self.__p_lr_dir = f"{self.linerelaxation} {lcycle}"
+        self.__p_lr_dir = f"{self.linerelaxation} {lr_cycle}"
 
         # 3. sslsolver and cycle
         solvers = ['bicgstab', 'cgs', 'gmres', 'lgmres', 'gcrotmk']
@@ -1166,7 +1174,7 @@ class MGParameters:
         if self.sslsolver:
             self.ssl_maxit = self.maxit
             if self.cycle is not None:  # Only if MG is used
-                self.maxit = max(len(rcycle), len(lcycle))
+                self.maxit = max(len(sc_cycle), len(lr_cycle))
                 self.__maxit += f" ({self.maxit})"  # For printing
 
         # 4. Check max coarsening level
@@ -1265,25 +1273,31 @@ class MGParameters:
                   f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
             raise ValueError('nCx/nCy/nCz')
 
-    def cprint(self, info, level, **kwargs):
+    def cprint(self, info, verbosity, **kwargs):
         """Conditional printing.
 
-        Prints `info` if `self.verb` > `level`.
+        Prints `info` if `self.verb` > `verbosity`.
 
         Parameters
         ----------
         info : str
             String to be printed.
 
-        level : int
+        verbosity : int
             Verbosity of info.
 
         kwargs : optional
             Arguments passed to `print`.
 
         """
-        if self.verb > level:
+        if self.verb > verbosity:
             print(info, **kwargs)
+
+    def print_gs_info(self, it, level, cycmax, grid, norm, text, verbosity):
+        """Helper routine to print info after Gauss-Seidel smoothing steps."""
+        info = f"     {it:2} {level} {cycmax} [{grid.nCx:3}, {grid.nCy:3}, "
+        info += f"{grid.nCz:3}]: {norm:.3e} {text}"
+        self.cprint(info, verbosity)
 
 
 # MG HELPER ROUTINES
