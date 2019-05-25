@@ -41,7 +41,7 @@ def test_solver_homogeneous(capsys):
     assert ' [hh:mm:ss] ' in out
     assert ' MG cycles ' in out
     assert ' Final l2-norm ' in out
-    assert ' emg3d END :: ' in out
+    assert ' emg3d END   :: ' in out
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['Fresult'], efield)
@@ -68,7 +68,7 @@ def test_solver_homogeneous(capsys):
     assert ' Solver steps ' in out
     assert ' MG prec. steps ' in out
     assert ' Final l2-norm ' in out
-    assert ' emg3d END :: ' in out
+    assert ' emg3d END   :: ' in out
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['bicresult'], efield)
@@ -81,7 +81,7 @@ def test_solver_homogeneous(capsys):
     assert ' CONVERGED' in out
     assert ' MG cycles ' in out
     assert ' Final l2-norm ' in out
-    assert ' emg3d END :: ' in out
+    assert ' emg3d END   :: ' in out
 
     # Max it
     _ = solver.solver(grid, model, sfield, verb=2, maxit=1)
@@ -98,15 +98,19 @@ def test_solver_homogeneous(capsys):
     _ = solver.solver(grid, model, sfield, verb=3, maxit=1,
                       sslsolver='gcrotmk')
 
-    # Provide initial field, ensure there is no output
+    # Provide initial field.
     _, _ = capsys.readouterr()  # empty
-    outarray = solver.solver(grid, model, sfield, efield)
+    efield_copy = efield.copy()
+    outarray = solver.solver(grid, model, sfield, efield_copy)
     out, _ = capsys.readouterr()
 
+    # Ensure there is no output.
     assert outarray is None
-    assert "Provided efield already good enough!" in out
+    assert "NOTHING DONE (provided efield already good enough)" in out
+    # Ensure the field did not change.
+    assert_allclose(efield, efield_copy)
 
-    # Check stagnation by providing zero source field
+    # Check stagnation by providing zero source field.
     _ = solver.solver(grid, model, sfield*0)
     out, _ = capsys.readouterr()
     assert "STAGNATED" in out

@@ -299,7 +299,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             linerelaxation=linerelaxation, vnC=grid.vnC, verb=verb, **kwargs
     )
 
-    # Print all parameters if verbose.
+    # Start logging and print all parameters.
     var.cprint(f"\n:: emg3d START :: {var.time.now} ::\n", 1)
     var.cprint(var, 1)
 
@@ -311,18 +311,23 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         # Set flag to return the field.
         do_return = True
     else:
-        # If provided, take the conjugate (see return statement).
+        # If provided, take the conjugate
+        # (see explanation at the end of the solver.solver-routine).
         efield.field = efield.field.conjugate()
+
+        # Set flag to NOT return the field.
+        do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
         _, var.l2 = residual(grid, model, sfield, efield)
         if var.l2 < var.tol*np.linalg.norm(sfield):
-            info = f"   > Provided efield already good enough!"
-            var.cprint(info+f":: emg3d END ::\n", 1)
-            return
 
-        # Set flag to NOT return the field.
-        do_return = False
+            # Switch-off both sslsolver and multigrid.
+            var.sslsolver = None
+            var.cycle = None
+
+            # Start final info.
+            info = f"   > NOTHING DONE (provided efield already good enough)\n"
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]     {'error':<15}"
@@ -330,14 +335,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         header += f"{'solver':<20} "
         if var.cycle:
             header += f"{'MG':<11} l s"
-    else:
-        header += f"{'l2:[last/init, last/prev]':>32} l s"
-    var.cprint(header+"\n", 2)
+        var.cprint(header+"\n", 2)
+    elif var.cycle:
+        var.cprint(header+f"{'l2:[last/init, last/prev]':>32} l s\n", 2)
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
         krylov(grid, model, sfield, efield, var)
-    else:              # ... multigrid.
+    elif var.cycle:    # ... multigrid.
         multigrid(grid, model, sfield, efield, var)
 
     # Print runtime information.
@@ -345,10 +350,10 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         info = f"   > Solver steps   : {var._ssl_it}\n"
         if var.cycle:
             info += f"   > MG prec. steps : {var.it}\n"
-    else:              # multigrid-specific info.
+    elif var.cycle:    # multigrid-specific info.
         info = f"   > MG cycles      : {var.it}\n"
     info += f"   > Final l2-norm  : {var.l2:.3e}\n\n"  # Final error.
-    info += f":: emg3d END :: {var.time.now} :: "      # END and time.
+    info += f":: emg3d END   :: {var.time.now} :: "    # END and time.
     info += f"runtime = {var.time.runtime}\n"          # Total runtime.
     var.cprint(info, 1)
 
@@ -418,10 +423,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     l2_init = l2_last
     l2_prev = l2_last
 
-    # If verbose, we keep track on the levels during the first cycle, for QC.
-    if var.verb > 2 and var._first_cycle:
-
-        # Store current level.
+    # Keep track on the levels during the first cycle, for QC.
+    if var._first_cycle:
         var._level_all.append(level)
 
     # Print initial call info.
@@ -488,8 +491,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             # (B.4) Add coarse field residual to fine grid field.
             prolongation(grid, efield, cgrid, cefield, sc_dir)
 
-            # Append current prolongation level for QC if verbose.
-            if var.verb > 2 and var._first_cycle:
+            # Append current prolongation level for QC.
+            if var._first_cycle:
                 var._level_all.append(level)
 
             # (B.5) Post-smoothing (nu_post).
@@ -519,18 +522,15 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             # Print end-of-cycle info.
             _print_cycle_info(var, l2_last, l2_prev, l2_init)
 
+            # Check if any termination criteria is fulfilled.
+            if _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+                break
+
             # Adjust semicoarsening and line relaxation if they cycle.
             if var.sc_cycle:
                 var.sc_dir = next(var.sc_cycle)
             if var.lr_cycle:
                 var.lr_dir = next(var.lr_cycle)
-
-            # Check if any termination criteria is fulfilled.
-            if _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
-                break
-
-            # Set first_cycle to False, to reduce verbosity from now on.
-            var._first_cycle = False
 
     # Store final error (l2-norm).
     var.l2 = l2_last
@@ -596,9 +596,6 @@ def krylov(grid, model, sfield, efield, var):
 
         # Solve for these fields.
         multigrid(grid, model, sfield, efield, var)
-
-        # Set first_cycle off to reduce verbosity after first cycle.
-        var._first_cycle = False
 
         return efield
 
@@ -1016,13 +1013,13 @@ class MGParameters:
         """Set and check some of the parameters."""
 
         # 0. Set some additional variables
-        self._level_all = list()         # To keep track of the
-        self._first_cycle: bool = True   # levels for QC-figure.
-        self.it = 0                      # To store MG cycle count
-        self._ssl_it = 0                 # To store solver iteration count
-        self.l2 = 0                      # To store current error
+        self._level_all = list()   # To keep track of the levels for QC-figure.
+        self._first_cycle = True   # Flag if in first cycle for QC-figure.
+        self.it = 0                # To store MG cycle count
+        self._ssl_it = 0           # To store solver iteration count
+        self.l2 = 0                # To store current error
 
-        self.time = utils.Time()         # Timer
+        self.time = utils.Time()   # Timer
 
         # 1. Set everything related to semicoarsening and line relaxation.
         self._semicoarsening()
@@ -1489,6 +1486,8 @@ def _print_cycle_info(var, l2_last, l2_prev, l2_init):
 
     # Start info string, return if not enough verbose.
     if var.verb < 3:
+        # Set first_cycle to False, to stop logging.
+        var._first_cycle = False
         return
     elif var.verb > 3:
         info = "\n"
@@ -1523,8 +1522,8 @@ def _print_cycle_info(var, l2_last, l2_prev, l2_init):
             info += "  (Cycle-QC restricted to first 70 steps of "
             info += f"{len(lvl)} steps.)\n"
 
-        # Reset _level_all
-        var._level_all = [0, ]
+        # Set first_cycle to False, to reduce verbosity from now on.
+        var._first_cycle = False
 
     # Add iteration log.
     if var.sslsolver:  # For multigrid as preconditioner.
