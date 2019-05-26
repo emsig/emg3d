@@ -860,13 +860,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
     """
 
-    # Calculate required points of finer grid.
-    yz_points = grid.gridEx[::grid.nCx, 1:]
-    xz_points = grid.gridEy[:, ::2].reshape(grid.nNz, -1, 2)
-    xz_points = xz_points[:, :grid.nNx, :].reshape(-1, 2)
-    xy_points = grid.gridEz[:grid.nNx*grid.nNy, :2]
-
     # Interpolate ex in y-z-slices.
+    yz_points = _get_prolongation_coordinates(grid, 'y', 'z')
     fn = RegularGridProlongator(cgrid.vectorNy, cgrid.vectorNz, yz_points)
     for ixc in range(cgrid.nCx):
         # Bilinear interpolation in the y-z plane
@@ -880,6 +875,7 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
             efield.fx[ixc, :, :] += hh
 
     # Interpolate ey in x-z-slices.
+    xz_points = _get_prolongation_coordinates(grid, 'x', 'z')
     fn = RegularGridProlongator(cgrid.vectorNx, cgrid.vectorNz, xz_points)
     for iyc in range(cgrid.nCy):
 
@@ -894,6 +890,7 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
             efield.fy[:, iyc, :] += hh
 
     # Interpolate ez in x-y-slices.
+    xy_points = _get_prolongation_coordinates(grid, 'x', 'y')
     fn = RegularGridProlongator(cgrid.vectorNx, cgrid.vectorNy, xy_points)
     for izc in range(cgrid.nCz):
 
@@ -1699,3 +1696,10 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
         wz = (wzlr, wz0, wzlr)
 
     return wx, wy, wz
+
+
+def _get_prolongation_coordinates(grid, d1, d2):
+    """Calculate required coordinates of finer grid for prolongation."""
+    D2, D1 = np.broadcast_arrays(
+            getattr(grid, 'vectorN'+d2), getattr(grid, 'vectorN'+d1)[:, None])
+    return np.r_[D1.flatten('F'), D2.flatten('F')].reshape(-1, 2, order='F')

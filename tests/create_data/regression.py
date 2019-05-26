@@ -136,9 +136,9 @@ grid = TensorMesh(
 # List of all attributes in emg3d-grid.
 all_attr = [
     'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx',
-    'vectorCCy', 'vectorCCz', 'gridEx', 'gridEy', 'gridEz', 'nEx', 'nEy',
-    'nEz', 'nCx', 'nCy', 'nCz', 'vnC', 'nNx', 'nNy', 'nNz', 'vnN', 'vnEx',
-    'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'nE', 'vol', 'x0'
+    'vectorCCy', 'vectorCCz', 'nEx', 'nEy', 'nEz', 'nCx', 'nCy', 'nCz', 'vnC',
+    'nNx', 'nNy', 'nNz', 'vnN', 'vnEx', 'vnEy', 'vnEz', 'vnE', 'nC', 'nN',
+    'nE', 'vol', 'x0'
 ]
 
 mesh = {'attr': all_attr}

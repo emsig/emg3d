@@ -412,14 +412,14 @@ def test_mgparameters():
 
 def test_RegularGridProlongator():
 
-    def prolon_scipy(grid, cgrid, efield, cefield, x_points):
+    def prolon_scipy(grid, cgrid, efield, cefield, yz_points):
         """Calculate SciPy alternative."""
         for ixc in range(cgrid.nCx):
             # Bilinear interpolation in the y-z plane
             fn = si.RegularGridInterpolator(
                     (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
                     bounds_error=False, fill_value=None)
-            hh = fn(x_points).reshape(grid.vnEx[1:], order='F')
+            hh = fn(yz_points).reshape(grid.vnEx[1:], order='F')
 
             # Piecewise constant interpolation in x-direction
             efield[2*ixc, :, :] += hh
@@ -427,10 +427,10 @@ def test_RegularGridProlongator():
 
         return efield
 
-    def prolon_emg3d(grid, cgrid, efield, cefield, x_points):
+    def prolon_emg3d(grid, cgrid, efield, cefield, yz_points):
         """Calculate emg3d alternative."""
         fn = solver.RegularGridProlongator(
-                cgrid.vectorNy, cgrid.vectorNz, x_points)
+                cgrid.vectorNy, cgrid.vectorNz, yz_points)
 
         for ixc in range(cgrid.nCx):
             # Bilinear interpolation in the y-z plane
@@ -464,10 +464,10 @@ def test_RegularGridProlongator():
     cefield.fx = 1j*np.arange(cefield.fx.size)/10
 
     # Required interpolation points.
-    x_points = grid.gridEx[::grid.nCx, 1:]
+    yz_points = solver._get_prolongation_coordinates(grid, 'y', 'z')
 
     # Compare
-    out1 = prolon_scipy(grid, cgrid, efield1.fx, cefield, x_points)
-    out2 = prolon_emg3d(grid, cgrid, efield2.fx, cefield, x_points)
+    out1 = prolon_scipy(grid, cgrid, efield1.fx, cefield, yz_points)
+    out2 = prolon_emg3d(grid, cgrid, efield2.fx, cefield, yz_points)
 
     assert_allclose(out1, out2)

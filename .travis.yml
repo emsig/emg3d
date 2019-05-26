@@ -7,10 +7,10 @@ language: python
 # bookkeeping, so it prints the same version in the Travis info.
 matrix:
   include:
-    - python: 3.7  # => 3.7 with defaults; mkl
-      env: PYTHON=3.7 PCKGS="mkl mkl-service numba" CHAN="defaults" INST=""
     - python: 3.7  # => 3.7 with conda-forge; IPython, discretize, no JIT
       env: PYTHON=3.7 PCKGS="numba IPython" NUMBA_DISABLE_JIT=1 CHAN="conda-forge" INST="discretize"
+    - python: 3.7  # => 3.7 with defaults; mkl
+      env: PYTHON=3.7 PCKGS="mkl mkl-service numba" CHAN="defaults" INST=""
 
 install:
   - sudo apt-get update
