@@ -2,18 +2,23 @@ Changelog
 #########
 
 
-*latest*
---------
+*v0.6.0* : RegularGridInterpolator
+----------------------------------
+
+**2019-05-26**
 
 - Replace :class:`scipy.interpolate.RegularGridInterpolator` with a custom
   tailored version of it (`solver.RegularGridProlongator`); results in twice
   as fast prolongation.
+- Simplify the fine-grid calculation in ``prolongation`` without using
+  ``gridE*``; memory friendlier.
 - Submission to JOSS.
 - Add *Multi-what?*-page to documentation.
 - Some major refactoring, particularly in ``solver``.
 - Removed ``discretize`` as hard dependency.
 - Rename ``rdir`` and ``ldir`` (and related ``p*dir``; ``*cycle``) to the more
   descriptive ``sc_dir`` and ``lr_dir``.
+
 
 v0.5.0 : Accept any grid size
 -----------------------------

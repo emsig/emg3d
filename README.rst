@@ -4,25 +4,6 @@
    
 ----
 
-.. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
-   :target: http://emg3d.readthedocs.io/en/latest
-   :alt: Documentation Status
-.. image:: https://travis-ci.org/empymod/emg3d.svg?branch=master
-   :target: https://travis-ci.org/empymod/emg3d
-   :alt: Travis-CI
-.. image:: https://coveralls.io/repos/github/empymod/emg3d/badge.svg?branch=master
-   :target: https://coveralls.io/github/empymod/emg3d?branch=master
-   :alt: Coveralls
-.. image:: https://img.shields.io/codacy/grade/a15b80f75cd64be3bca73da30f191a83/master.svg
-   :target: https://www.codacy.com/app/prisae/emg3d
-   :alt: Codacy
-.. image:: https://img.shields.io/badge/benchmark-asv-blue.svg?style=flat
-   :target: https://empymod.github.io/emg3d-asv
-   :alt: Airspeed Velocity
-.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.2656374.svg
-   :target: https://doi.org/10.5281/zenodo.2656374
-   :alt: Zenodo DOI
-
 .. sphinx-inclusion-marker
 
 A multigrid solver for 3D electromagnetic diffusion with tri-axial electrical
