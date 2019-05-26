@@ -724,12 +724,6 @@ class TensorMesh:
         self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
 
         # Edge related properties.
-        self.gridEx = self._get_tensor(
-                self.vectorCCx, self.vectorNy, self.vectorNz)
-        self.gridEy = self._get_tensor(
-                self.vectorNx, self.vectorCCy, self.vectorNz)
-        self.gridEz = self._get_tensor(
-                self.vectorNx, self.vectorNy, self.vectorCCz)
         self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
         self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
         self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
@@ -745,9 +739,37 @@ class TensorMesh:
         xy = np.outer(self.hx, self.hy).flatten(order='F')
         return np.outer(xy, self.hz).flatten(order='F')
 
+    # More edge related properties. Memory intensive, only built if required.
+    @property
+    def gridEx(self):
+        """Edge staggered grid in the x direction."""
+        return self._get_grid_e_xyz('gridEx')
+
+    @property
+    def gridEy(self):
+        """Edge staggered grid in the y direction."""
+        return self._get_grid_e_xyz('gridEy')
+
+    @property
+    def gridEz(self):
+        """Edge staggered grid in the z direction."""
+        return self._get_grid_e_xyz('gridEz')
+
+    def _get_grid_e_xyz(self, key):
+        """Return `key`-attribute, where key in [gridEx, gridEy, gridEz]."""
+        if getattr(self, '_' + key, None) is None:
+            if key == 'gridEx':
+                inp = (self.vectorCCx, self.vectorNy, self.vectorNz)
+            elif key == 'gridEy':
+                inp = (self.vectorNx, self.vectorCCy, self.vectorNz)
+            elif key == 'gridEz':
+                inp = (self.vectorNx, self.vectorNy, self.vectorCCz)
+            setattr(self, '_' + key, self._get_tensor(*inp))
+        return getattr(self, '_' + key)
+
     @staticmethod
     def _get_tensor(x1, x2, x3):
-        """For CCx, CCy, and CCz."""
+        """Return tensorial grid as column vectors [X, Y, Z]."""
         Z, Y, X = np.broadcast_arrays(x3, x2[:, None], x1[:, None, None])
         out = np.r_[X.flatten('F'), Y.flatten('F'), Z.flatten('F')]
         return out.reshape(-1, 3, order='F')
