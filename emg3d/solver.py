@@ -957,13 +957,13 @@ def residual(grid, model, sfield, efield):
                    model.v_mu_r, grid.hx, grid.hy, grid.hz)
 
     # The complete residual: source-field - residual-field.
-    res = sfield-rfield
+    np.subtract(sfield, rfield, rfield)
 
     # Calculate its norm.
-    norm = np.linalg.norm(res)
+    norm = np.linalg.norm(rfield)
 
     # Return residual and its norm.
-    return res, norm
+    return rfield, norm
 
 
 # VARIABLE DATACLASS
