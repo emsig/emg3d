@@ -7,7 +7,7 @@ description = 'A multigrid solver for 3D electromagnetic diffusion.'
 
 setup(
     name='emg3d',
-    version='0.6.1',
+    version='0.6.2dev0',
     description=description,
     long_description=readme,
     author='The emg3d Developers',
