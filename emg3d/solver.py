@@ -313,7 +313,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     else:
         # If provided, take the conjugate
         # (see explanation at the end of the solver.solver-routine).
-        efield.field = efield.field.conjugate()
+        np.conjugate(efield, efield)
 
         # Set flag to NOT return the field.
         do_return = False
@@ -359,7 +359,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # To use the same Fourier-transform convention as empymod and commonly
     # used in CSEM, we return the conjugate.
-    efield.field = efield.field.conjugate()
+    np.conjugate(efield, efield)
 
     # If efield was not provided, return it.
     if do_return:
