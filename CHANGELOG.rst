@@ -1,8 +1,10 @@
 Changelog
 #########
 
-*latest*
---------
+*v0.6.1* : Memory
+-----------------
+
+**2019-05-28**
 
 Memory and speed improvements:
 - Only calculate residual and l2-norm when absolutely necessary.
