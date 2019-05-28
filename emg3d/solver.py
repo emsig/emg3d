@@ -164,7 +164,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 1: Print warnings.
         - 2: Print runtime and information about the method.
         - 3: Print additional information for each MG-cycle.
-        - 4: Print everything.
+        - 4: Print everything (slower due to additional l2-norm calculations).
 
     **kwargs : Optional solver options:
 
@@ -319,7 +319,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
-        _, var.l2 = residual(grid, model, sfield, efield)
+        var.l2 = residual(grid, model, sfield, efield, True)
         if var.l2 < var.tol*np.linalg.norm(sfield):
 
             # Switch-off both sslsolver and multigrid.
@@ -419,7 +419,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
     # Define various l2-norms.
     l2_refe = np.linalg.norm(sfield)  # Reference norm for tolerance.
-    _, l2_last = residual(grid, model, sfield, efield)  # Current residual.
+    l2_last = residual(grid, model, sfield, efield, True)  # Current residual.
     l2_init = l2_last
     l2_prev = l2_last
 
@@ -431,17 +431,18 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     if level == 0:
         var.cprint("     it cycmax               error", 3)
         var.cprint("      level [  dimension  ]            info\n", 3)
-        var.print_gs_info(it, level, cycmax, grid, l2_last, "initial error", 3)
+        if var.verb > 3:
+            _print_gs_info(it, level, cycmax, grid, l2_last, "initial error")
 
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
         # Smooth and re-calculate error.
-        res, l2_last = smoothing(
-                grid, model, sfield, efield, var.nu_init, var.lr_dir)
+        smoothing(grid, model, sfield, efield, var.nu_init, var.lr_dir)
 
         # Print initial smoothing info.
-        var.print_gs_info(
-                it, level, cycmax, grid, l2_last, f"initial smoothing", 3)
+        if var.verb > 3:
+            norm = residual(grid, model, sfield, efield, True)
+            _print_gs_info(it, level, cycmax, grid, norm, "initial smoothing")
 
     # Start the actual (recursive) multigrid cycle.
     while level == 0 or (level > 0 and it < cycmax):
@@ -455,32 +456,30 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             # reduces the number of coarsening levels.
 
             # Gauss-Seidel on the coarsest grid.
-            res, l2_last = smoothing(
-                    grid, model, sfield, efield, var.nu_coarse, var.lr_dir)
+            smoothing(grid, model, sfield, efield, var.nu_coarse, var.lr_dir)
 
             # Print coarsest grid smoothing info.
-            var.print_gs_info(it, level, cycmax, grid, l2_last,
-                              f"coarsest level", 3)
+            if var.verb > 3:
+                norm = residual(grid, model, sfield, efield, True)
+                _print_gs_info(it, level, cycmax, grid, norm, "coarsest level")
 
         else:                   # (B) Not yet on coarsest grid.
 
             # (B.1) Pre-smoothing (nu_pre).
             if var.nu_pre > 0:
-                res, l2_last = smoothing(
-                        grid, model, sfield, efield, var.nu_pre, var.lr_dir)
+                smoothing(grid, model, sfield, efield, var.nu_pre, var.lr_dir)
 
                 # Print pre-smoothing info.
-                var.print_gs_info(it, level, cycmax, grid, l2_last,
-                                  f"pre-smoothing", 3)
-
-            else:
-                # Get current error (l2-norm).
-                res, l2_last = residual(grid, model, sfield, efield)
+                if var.verb > 3:
+                    norm = residual(grid, model, sfield, efield, True)
+                    _print_gs_info(
+                            it, level, cycmax, grid, norm, "pre-smoothing")
 
             # Get sc_dir for this grid.
             sc_dir = _current_sc_dir(var.sc_dir, grid)
 
             # (B.2) Restrict grid, model, and fields from fine to coarse grid.
+            res = residual(grid, model, sfield, efield)  # Get residual.
             cgrid, cmodel, csfield, cefield = restriction(
                     grid, model, sfield, res, sc_dir)
 
@@ -497,16 +496,13 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
             # (B.5) Post-smoothing (nu_post).
             if var.nu_post > 0:
-                res, l2_last = smoothing(
-                        grid, model, sfield, efield, var.nu_post, var.lr_dir)
+                smoothing(grid, model, sfield, efield, var.nu_post, var.lr_dir)
 
                 # Print post-smoothing info.
-                var.print_gs_info(it, level, cycmax, grid, l2_last,
-                                  f"post-smoothing", 3)
-
-            else:
-                # Get current error (l2-norm).
-                res, l2_last = residual(grid, model, sfield, efield)
+                if var.verb > 3:
+                    norm = residual(grid, model, sfield, efield, True)
+                    _print_gs_info(
+                            it, level, cycmax, grid, norm, f"post-smoothing")
 
         # Update iterator counts.
         it += 1         # Local iterator.
@@ -518,6 +514,9 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             cyc += 1
 
         else:          # Original grid reached, check termination criteria.
+
+            # Get current error (l2-norm).
+            l2_last = residual(grid, model, sfield, efield, True)
 
             # Print end-of-cycle info.
             _print_cycle_info(var, l2_last, l2_prev, l2_init)
@@ -618,7 +617,8 @@ def krylov(grid, model, sfield, efield, var):
             if var.sslsolver == 'gmres':
                 var.l2 = x
             else:
-                _, var.l2 = residual(grid, model, sfield, utils.Field(grid, x))
+                var.l2 = residual(
+                        grid, model, sfield, utils.Field(grid, x), True)
 
             log = f"   [{var.time.now}] {var.l2:.3e} "
             log += f"after {var._ssl_it:2} {var.sslsolver}-cycles"
@@ -637,7 +637,7 @@ def krylov(grid, model, sfield, efield, var):
 
     # Calculate final l2-norm, if not done in the callback.
     if var.verb < 3:
-        _, var.l2 = residual(grid, model, sfield, utils.Field(grid, efield))
+        var.l2 = residual(grid, model, sfield, utils.Field(grid, efield), True)
 
     # Convergence-checks for sslsolver.
     if i < 0:
@@ -687,15 +687,6 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     lr_dir : int
         Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
 
-
-    Returns
-    -------
-    res : ndarray
-        Current residual.
-
-    l2_norm : float
-        l2-norm of the residual.
-
     """
 
     # Collect Gauss-Seidel input (same for all routines)
@@ -717,10 +708,6 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     if lr_dir in [3, 4, 5, 7]:  # Line relaxation in z-direction
         njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
-
-    # Return the current residual and its l2-norm.
-    res, norm = residual(grid, model, sfield, efield)
-    return res, norm
 
 
 def restriction(grid, model, sfield, residual, sc_dir):
@@ -908,7 +895,7 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     efield.ensure_pec
 
 
-def residual(grid, model, sfield, efield):
+def residual(grid, model, sfield, efield, norm=False):
     r"""Calculating the residual.
 
     Returns the complete residual as given in [Muld06]_, page 636, middle of
@@ -940,14 +927,18 @@ def residual(grid, model, sfield, efield):
     sfield, efield : Field
         Source and electric fields; ``emg3d.utils.Field`` instances.
 
+    norm : bool
+        If True, the l2-norm of the residual is returned, not the residual.
+
 
     Returns
     -------
     residual : Field
-        The residual field; ``emg3d.utils.Field`` instance.
+        Returned if ``norm=False``. The residual field; ``emg3d.utils.Field``
+        instance.
 
     norm : float
-        The l2-norm of the residual
+        Returned if ``norm=True``. The l2-norm of the residual
 
     """
     # Get residual without source-field
@@ -959,11 +950,10 @@ def residual(grid, model, sfield, efield):
     # The complete residual: source-field - residual-field.
     np.subtract(sfield, rfield, rfield)
 
-    # Calculate its norm.
-    norm = np.linalg.norm(rfield)
-
-    # Return residual and its norm.
-    return rfield, norm
+    if norm:  # Return its norm.
+        return np.linalg.norm(rfield)
+    else:     # Return residual.
+        return rfield
 
 
 # VARIABLE DATACLASS
@@ -1140,12 +1130,6 @@ class MGParameters:
         """
         if self.verb > verbosity:
             print(info, **kwargs)
-
-    def print_gs_info(self, it, level, cycmax, grid, norm, text, verbosity):
-        """Helper routine to print info after Gauss-Seidel smoothing steps."""
-        info = f"     {it:2} {level} {cycmax} [{grid.nCx:3}, {grid.nCy:3}, "
-        info += f"{grid.nCz:3}]: {norm:.3e} {text}"
-        self.cprint(info, verbosity)
 
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
@@ -1539,6 +1523,36 @@ def _print_cycle_info(var, l2_last, l2_prev, l2_init):
 
     # Print the info.
     var.cprint(info, 2)
+
+
+def _print_gs_info(it, level, cycmax, grid, norm, text):
+    """Print info to log after each Gauss-Seidel smoothing step.
+
+    Parameters
+    ----------
+    it : int
+        Iteration number.
+
+    level : int
+        Current coarsening level.
+
+    cycmax : int
+        Maximum MG cycles.
+
+    grid : TensorMesh
+        Current grid; ``emg3d.utils.TensorMesh`` instance.
+
+    norm : float
+        Current l2-norm.
+
+    text : str
+        Info about Gauss-Seidel step.
+
+    """
+
+    info = f"     {it:2} {level} {cycmax} [{grid.nCx:3}, {grid.nCy:3}, "
+    info += f"{grid.nCz:3}]: {norm:.3e} {text}"
+    print(info)
 
 
 def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):

@@ -124,7 +124,7 @@ def test_solver_heterogeneous(capsys):
     sfield = dat['sfield']
     sfield = utils.Field(grid, sfield)
     inp = dat['inp']
-    inp['verb'] = 1
+    inp['verb'] = 4
 
     efield = solver.solver(grid, model, sfield, **inp)
 
@@ -227,14 +227,10 @@ def test_smoothing():
 
             # Use solver.smoothing
             ofield = utils.Field(grid, field)
-            res, l2norm = solver.smoothing(
-                    grid, model, sfield, ofield, nu, lr_dir)
-            res2, l2norm2 = solver.residual(grid, model, sfield, efield)
+            solver.smoothing(grid, model, sfield, ofield, nu, lr_dir)
 
             # Compare
             assert_allclose(efield, ofield)
-            assert_allclose(res, res2)
-            assert l2norm == l2norm2
 
 
 def test_restriction():
@@ -315,7 +311,8 @@ def test_residual():
             grid.hx, grid.hy, grid.hz)
 
     # Calculate residual
-    out, outnorm = solver.residual(grid, model, sfield, efield)
+    out = solver.residual(grid, model, sfield, efield)
+    outnorm = solver.residual(grid, model, sfield, efield, True)
 
     # Compare
     assert_allclose(out, sfield-rfield)

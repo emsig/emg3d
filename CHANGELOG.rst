@@ -1,6 +1,14 @@
 Changelog
 #########
 
+*latest*
+--------
+
+Memory and speed improvements:
+- Only calculate residual and l2-norm when absolutely necessary.
+- Inplace calculations for ``np.conjugate`` in ``solver.solver`` and
+  ``np.subtract`` in ``solver.residual``.
+
 
 *v0.6.0* : RegularGridInterpolator
 ----------------------------------
