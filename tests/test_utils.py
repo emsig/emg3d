@@ -281,6 +281,8 @@ def test_model():
     model2c = utils.Model(grid, 2., res_z=model2b.res_z.flatten('F'))
     assert_allclose(model2c.res_x, model2c.res_z)
     assert_allclose(model2c.eta_x, model2c.eta_z)
+    assert_allclose(model2c.eta, model2c._return_eta(model2c.res))
+    assert_allclose(model2c.res, model2c._return_res(model2c.eta))
 
     # HTI: Setting res_x and res_y, not res_z
     model2d = utils.Model(grid, 2., 4.)
@@ -322,14 +324,15 @@ def test_model():
     eta *= (1./model3.res-model3.iomega*model3.epsilon_0)
     eta *= np.r_[model3.vol, model3.vol, model3.vol]
     assert_allclose(model3.eta, eta)
-    model3.eta_x = np.ones(grid.vnC)
-    model3.eta_y = np.ones(grid.vnC)
-    model3.eta_z = np.ones(grid.vnC)
-    assert_allclose(model3.res_x, model3.eta_x)
-    assert_allclose(model3.res_y, model3.eta_y)
-    assert_allclose(model3.res_z, model3.eta_z)
-    model3.eta = 3*np.ones(grid.nC*3)
-    assert_allclose(3*model3.res, model3.eta)
+    model3.eta_x = np.ones(grid.vnC)+1j*np.ones(grid.vnC)
+    model3.eta_y = np.ones(grid.vnC)+1j*np.ones(grid.vnC)
+    model3.eta_z = np.ones(grid.vnC)+1j*np.ones(grid.vnC)
+    res_x = model3._return_res(model3.eta_x)
+    res_y = model3._return_res(model3.eta_y)
+    res_z = model3._return_res(model3.eta_z)
+    assert_allclose(res_x, model3.res_x)
+    assert_allclose(res_y, model3.res_y)
+    assert_allclose(res_z, model3.res_z)
 
 
 def test_field():
