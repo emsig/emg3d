@@ -492,38 +492,31 @@ def get_source_field(grid, src, freq, strength=0):
     else:              # Multiply source length with source strength
         strength *= srcdir
 
-    def set_source(grid, idir, finite):
+    def set_source(grid, strength, finite):
         """Set the source-field in idir."""
 
-        # Get edges or cells, depending on which direction (idir)
-        if idir == 0:
-            xx = grid.vectorCCx
-            nx = grid.nCx
-        else:
-            xx = grid.vectorNx
-            nx = grid.nNx
-        if idir == 1:
-            yy = grid.vectorCCy
-            ny = grid.nCy
-        else:
-            yy = grid.vectorNy
-            ny = grid.nNy
-        if idir == 2:
-            zz = grid.vectorCCz
-            nz = grid.nCz
-        else:
-            zz = grid.vectorNz
-            nz = grid.nNz
-
-        # Initiate source field in idir;
-        # (nx, ny, nz) corresponds to vnEx/vnEy/vnEz
-        s = np.zeros((nx, ny, nz))
+        # Initiate zero source field.
+        sfield = Field(grid)
 
         # Return source-field depending if point or finite dipole.
+        vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
+        vec2 = (grid.vectorNx, grid.vectorCCy, grid.vectorNz)
+        vec3 = (grid.vectorNx, grid.vectorNy, grid.vectorCCz)
         if finite:
-            return finite_source(xx, yy, zz, src, s, idir, grid)
+            finite_source(*vec1, src, sfield.fx, 0, grid)
+            finite_source(*vec2, src, sfield.fy, 1, grid)
+            finite_source(*vec3, src, sfield.fz, 2, grid)
         else:
-            return point_source(xx, yy, zz, src, s)
+            point_source(*vec1, src, sfield.fx)
+            point_source(*vec2, src, sfield.fy)
+            point_source(*vec3, src, sfield.fz)
+
+        # Multiply by strength*i*omega*mu in per direction.
+        sfield.fx *= strength[0]*2j*np.pi*freq*mu_0
+        sfield.fy *= strength[1]*2j*np.pi*freq*mu_0
+        sfield.fz *= strength[2]*2j*np.pi*freq*mu_0
+
+        return sfield
 
     def point_source(xx, yy, zz, src, s):
         """Set point dipole source."""
@@ -572,9 +565,6 @@ def get_source_field(grid, src, freq, strength=0):
         s[ix1, iy, iz1] = rx*ey*rz
         s[ix, iy1, iz1] = ex*ry*rz
         s[ix1, iy1, iz1] = rx*ry*rz
-
-        # Return point dipole source.
-        return s
 
     def finite_source(xx, yy, zz, src, s, idir, grid):
         """Set finite dipole source.
@@ -652,17 +642,8 @@ def get_source_field(grid, src, freq, strength=0):
                             s[ix, iy+1, iz] += ex*ry*x_len
                             s[ix+1, iy+1, iz] += rx*ry*x_len
 
-        # Return finite length dipole source.
-        return s
-
-    # Get the source field in x-, y-, and z-direction
-    sx = strength[0]*set_source(grid, 0, finite)
-    sy = strength[1]*set_source(grid, 1, finite)
-    sz = strength[2]*set_source(grid, 2, finite)
-
-    # Multiply by j omega mu and return field instance
-    iomegamu = 2j*np.pi*freq*mu_0
-    return iomegamu*Field(sx, sy, sz)
+    # Return the source field.
+    return set_source(grid, strength, finite)
 
 
 class TensorMesh:

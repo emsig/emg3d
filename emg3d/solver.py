@@ -1719,4 +1719,4 @@ def _get_prolongation_coordinates(grid, d1, d2):
     """Calculate required coordinates of finer grid for prolongation."""
     D2, D1 = np.broadcast_arrays(
             getattr(grid, 'vectorN'+d2), getattr(grid, 'vectorN'+d1)[:, None])
-    return np.r_[D1.flatten('F'), D2.flatten('F')].reshape(-1, 2, order='F')
+    return np.r_[D1.ravel('F'), D2.ravel('F')].reshape(-1, 2, order='F')
