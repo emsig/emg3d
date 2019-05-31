@@ -1,6 +1,14 @@
 Changelog
 #########
 
+*latest*
+--------
+
+- Change loop-order from x-z-y to z-x-y in Gauss-Seidel smoothing with line
+  relaxation in y-direction. Hence reversed lexicographical order. This results
+  in a significant speed-up, as x is the fastest changing axis.
+
+
 *v0.6.1* : Memory
 -----------------
 

@@ -157,6 +157,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           cycle over these values, e.g., ``linerelaxation=1213`` will cycle
           over [1, 2, 1, 3].
 
+        Note: Smoothing is generally done in lexicographical order, except for
+        line relaxation in y direction; the reason is speed (memory access).
+
     verb : int; optional
         Level of verbosity (the higher the more verbose). Default is 2.
 

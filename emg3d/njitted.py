@@ -822,6 +822,11 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
     into the main matrix A and vector b, and subsequently solved with a
     non-standard Cholesky factorisation, :func:`solve`.
 
+    Note: The smoothing with linerelaxation in y-direction is carried out in
+    reversed lexicographical order, in order to improve speed (memory access).
+    All other smoothers (:func:`gauss_seidel`, :func:`gauss_seidel_x`, and
+    :func:`gauss_seidel_z`) use lexicographical order.
+
     Tangential components at the boundaries are assumed to be 0 (PEC
     boundaries).
 
@@ -882,29 +887,29 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
         iback = 1-iback
 
         # Loop over cells, keeping boundaries fixed; y-fastest, then z, x.
-        for ixh in range(1, nCx):
+        for izh in range(1, nCz):
 
             # Back-forth-switch
             if iback:
-                ix = nCx-ixh
+                iz = nCz-izh
             else:
-                ix = ixh
+                iz = izh
 
             # Minus/plus indices
-            ixm = ix-1
-            ixp = ix+1
+            izm = iz-1
+            izp = iz+1
 
-            for izh in range(1, nCz):
+            for ixh in range(1, nCx):
 
                 # Back-forth-switch
                 if iback:
-                    iz = nCz-izh
+                    ix = nCx-ixh
                 else:
-                    iz = izh
+                    ix = ixh
 
                 # Minus/plus indices
-                izm = iz-1
-                izp = iz+1
+                ixm = ix-1
+                ixp = ix+1
 
                 for iyh in range(1, nCy+1):
 
