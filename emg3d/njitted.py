@@ -34,7 +34,7 @@ _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 # LinearOperator to calculate A x
 @nb.njit(**_numba_setting)
 def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
-    r"""Residual without source term.
+    r"""Residual without or with source term.
 
     Calculate the residual as given in [Muld06]_ in middle of the right column
     on page 636, but without the source term:
@@ -60,39 +60,20 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
     It can therefore be used as ``matvec`` to create a ``LinearOperator``,
     which can be passed to a solver.
 
-    Subtracting this partial residual field from the source field yields the
-    total residual.
-
     It is assumed that ex, ey, and ez have PEC boundaries; otherwise the output
     will not have PEC boundaries.
 
-    The residuals are stored in ``rx``, ``ry``, and ``rz``.
-
-    .. todo::
-
-        The calculation is carried out matrix-free, element by element.
-        However, the fields and model parameters are currently provided as
-        matrices. Change this function to provide arrays instead of matrices,
-        and check if it speeds it up or not.
-
-        The mapping for the fields is given by::
-
-            ex[x, y, z] => efield[x + nCx*(y + nNy*z)];
-            ey[x, y, z] => efield[nEx + x + nNx*(y + nCy*z)];
-            ey[x, y, z] => efield[nEx + nEy + x + nNx*(y + nNy*z)].
-
-        Using ``@nb.jitclass`` for :class:`emg3d.utils.Field` and
-        :class:`discretize.TensorMesh` might be another solution, so it gets
-        the matrices as views from the arrays.
-
-        This also applies to :func:`gauss_seidel`, :func:`gauss_seidel_x`,
-        :func:`gauss_seidel_y`, and :func:`gauss_seidel_z`.
+    The residuals are subtracted in-place from ``rx``, ``ry``, and ``rz``.
+    That means that if ``rx``, ``ry``, and ``rz`` contain the source field,
+    they will contain the total residual afterwards; if they are empty fields,
+    they will contain the negative partial residual afterwards.
 
 
     Parameters
     ----------
     rx, ry, rz : ndarray
-        Residuals in x-, y-, and z-directions (pre-allocated empty arrays).
+        Source field or pre-allocated zero residual field in x-, y-, and
+        z-directions.
 
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
@@ -195,9 +176,9 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
                 # -V (i omega mu_0 sigma~ E - nabla x mu_r^-1 nabla x E)
                 # Subtracting this from the source terms will yield the
                 # residual.
-                rx[ix, iy, iz] = rrx - stx*ex[ix, iy, iz]
-                ry[ix, iy, iz] = rry - sty*ey[ix, iy, iz]
-                rz[ix, iy, iz] = rrz - stz*ez[ix, iy, iz]
+                rx[ix, iy, iz] -= rrx - stx*ex[ix, iy, iz]
+                ry[ix, iy, iz] -= rry - sty*ey[ix, iy, iz]
+                rz[ix, iy, iz] -= rrz - stz*ez[ix, iy, iz]
 
 
 # Gauss-Seidel method

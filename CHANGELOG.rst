@@ -4,9 +4,15 @@ Changelog
 *latest*
 --------
 
+Memory and speed improvements:
+
 - Change loop-order from x-z-y to z-x-y in Gauss-Seidel smoothing with line
   relaxation in y-direction. Hence reversed lexicographical order. This results
   in a significant speed-up, as x is the fastest changing axis.
+- Move total residual calculation from ``solver.residual`` into
+  ``njitted.amat_x``.
+- Remove resistivity from ``Model``, calculate it on the fly from ``eta``.
+- Simplifications to ``utils.get_source_field``.
 
 
 *v0.6.1* : Memory
@@ -15,6 +21,7 @@ Changelog
 **2019-05-28**
 
 Memory and speed improvements:
+
 - Only calculate residual and l2-norm when absolutely necessary.
 - Inplace calculations for ``np.conjugate`` in ``solver.solver`` and
   ``np.subtract`` in ``solver.residual``.

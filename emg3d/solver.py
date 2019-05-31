@@ -582,7 +582,7 @@ def krylov(grid, model, sfield, efield, var):
                 model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz)
 
         # Return Field instance.
-        return rfield
+        return -rfield
 
     # Initiate LinearOperator A x.
     A = ssl.LinearOperator(
@@ -944,14 +944,11 @@ def residual(grid, model, sfield, efield, norm=False):
         Returned if ``norm=True``. The l2-norm of the residual
 
     """
-    # Get residual without source-field
-    rfield = utils.Field(grid)
+    # Get residual.
+    rfield = sfield.copy()
     njitted.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
                    model.v_mu_r, grid.hx, grid.hy, grid.hz)
-
-    # The complete residual: source-field - residual-field.
-    np.subtract(sfield, rfield, rfield)
 
     if norm:  # Return its norm.
         return np.linalg.norm(rfield)

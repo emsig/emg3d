@@ -304,7 +304,7 @@ def test_residual():
     efield = solver.solver(grid, model, sfield, maxit=2, verb=1)
 
     # Use directly amat_x
-    rfield = utils.Field(grid)
+    rfield = sfield.copy()
     njitted.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
             model.eta_x, model.eta_y, model.eta_z, model.v_mu_r,
@@ -315,7 +315,7 @@ def test_residual():
     outnorm = solver.residual(grid, model, sfield, efield, True)
 
     # Compare
-    assert_allclose(out, sfield-rfield)
+    assert_allclose(out, rfield)
     assert outnorm == np.linalg.norm(out)
 
 
