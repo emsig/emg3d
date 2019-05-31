@@ -781,29 +781,23 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     # 2. RESTRICT MODEL
 
-    # Check what type of anisotropy for dummy-resistivity.
-    if model.case in [0, 2]:  # Isotropic or VTI.
-        res_y = None
-    else:                     # HTI or tri-axial.
-        res_y = 1.
-    if model.case in [0, 1]:  # Isotropic or HTI.
-        res_z = None
-    else:                     # VTI or tri-axial.
-        res_z = 1.
+    class Model:
+        """Dummy class to create coarse-grid model."""
+        def __init__(self, case):
+            """Initialize with case."""
+            self.case = case
 
-    # Create coarse-grid model with dummy resistivities
-    cmodel = utils.Model(cgrid, res_x=1., res_y=res_y, res_z=res_z,
-                         freq=model.freq)
-
-    # Fill-in current eta's.
-    # Note: Coarsening is done with eta, not with res. The reason is that eta
-    #       includes the volume, while res doesn't. This is very important in
-    #       the coarsening step.
+    cmodel = Model(model.case)
     cmodel.eta_x = _restrict_model_parameters(model.eta_x, sc_dir)
-    if res_y is not None:
+    if model.case in [1, 3]:  # HTI or tri-axial.
         cmodel.eta_y = _restrict_model_parameters(model.eta_y, sc_dir)
-    if res_z is not None:
+    else:
+        cmodel.eta_y = cmodel.eta_x
+    if model.case in [2, 3]:  # VTI or tri-axial.
         cmodel.eta_z = _restrict_model_parameters(model.eta_z, sc_dir)
+    else:
+        cmodel.eta_z = cmodel.eta_x
+    cmodel.v_mu_r = _restrict_model_parameters(model.v_mu_r, sc_dir)
 
     # 3. RESTRICT FIELDS
 
