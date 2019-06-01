@@ -296,11 +296,19 @@ def test_model():
     assert_allclose(model3.res_x, model3.res_z/1.4)
     assert model3.iomega == 2j*np.pi*model3.freq
 
-    # Check setters
+    # Check setters vnC
     tres = np.ones(grid.vnC)
     model3.res_x = tres*2.0
     model3.res_y = tres*3.0
     model3.res_z = tres*4.0
+    assert_allclose(tres*2., model3.res_x)
+    assert_allclose(tres*3., model3.res_y)
+    assert_allclose(tres*4., model3.res_z)
+    # Check setters nC
+    tres2 = np.ones(grid.nC)
+    model3.res_x = tres2*2.0
+    model3.res_y = tres2*3.0
+    model3.res_z = tres2*4.0
     assert_allclose(tres*2., model3.res_x)
     assert_allclose(tres*3., model3.res_y)
     assert_allclose(tres*4., model3.res_z)
