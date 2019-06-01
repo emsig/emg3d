@@ -714,14 +714,6 @@ class TensorMesh:
         self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
         self.nE = int(self.vnE.sum())
 
-    @property
-    def vol(self):
-        """Construct cell volumes of the 3D model as 1d array."""
-        if getattr(self, '_vol', None) is None:
-            xy = np.outer(self.hx, self.hy).flatten(order='F')
-            self._vol = np.outer(xy, self.hz).flatten(order='F')
-        return self._vol
-
 
 # MODEL AND FIELD CLASSES
 class Model:
@@ -762,61 +754,67 @@ class Model:
         # Store required info from grid
         self.nC = grid.nC
         self.vnC = grid.vnC
-        self.vol = grid.vol
 
-        # Initiate resistivity and mu_r
+        # Construct cell volumes of the 3D model as 1d array.
+        vol = np.outer(np.outer(grid.hx, grid.hy).ravel('F'), grid.hz)
+        self.__vol = vol.ravel('F').reshape(self.vnC, order='F')
+
+        # Get case
         if res_y is None and res_z is None:   # Isotropic.
             self.case = 0
-            self.__res = np.empty(grid.nC, dtype=float)
         elif res_y is None or res_z is None:  # VTI or HTI.
             if res_z is None:
                 self.case = 1
             else:
                 self.case = 2
-            self.__res = np.empty(2*grid.nC, dtype=float)
         else:                                 # Tri-axial anisotropy.
             self.case = 3
-            self.__res = np.empty(3*grid.nC, dtype=float)
 
         # Set x-directed resistivity
         if isinstance(res_x, (float, int)):
-            self.__res[:grid.nC] = res_x*np.ones(grid.nC)
+            self.__res_x = res_x*np.ones(self.vnC, order='F')
         else:
-            if res_x.shape[0] != grid.nC:
+            if res_x.size != self.nC:
                 print("* ERROR   :: Provided input res_x has shape "
-                      f"{res_x.shape}; but shape {grid.nC} is required.")
+                      f"{res_x.shape}; but shape {self.vnC} or {self.nC} is "
+                      f"required.")
                 raise ValueError("Wrong Shape")
-            self.__res[:grid.nC] = res_x
+            elif res_x.shape[0] == self.vnC[0]:
+                self.__res_x = res_x
+            else:
+                self.__res_x = res_x.reshape(self.vnC, order='F')
 
         # Set y-directed resistivity
         if res_y is None:
             pass
         elif isinstance(res_y, (float, int)):
-            self.__res[grid.nC:2*grid.nC] = res_y*np.ones(grid.nC)
+            self.__res_y = res_y*np.ones(self.vnC, order='F')
         else:
-            if res_y.shape[0] != grid.nC:
+            if res_y.size != self.nC:
                 print("* ERROR   :: Provided input res_y has shape "
-                      f"{res_y.shape}; but shape {grid.nC} is required.")
+                      f"{res_y.shape}; but shape {self.vnC} or {self.nC} is "
+                      f"required.")
                 raise ValueError("Wrong Shape")
-            self.__res[grid.nC:2*grid.nC] = res_y
+            elif res_y.shape[0] == self.vnC[0]:
+                self.__res_y = res_y
+            else:
+                self.__res_y = res_y.reshape(self.vnC, order='F')
 
         # Set z-directed resistivity
         if res_z is None:
             pass
         elif isinstance(res_z, (float, int)):
-            if res_y is None:
-                self.__res[grid.nC:] = res_z*np.ones(grid.nC)
-            else:
-                self.__res[2*grid.nC:] = res_z*np.ones(grid.nC)
+            self.__res_z = res_z*np.ones(self.vnC, order='F')
         else:
-            if res_z.shape[0] != grid.nC:
+            if res_z.size != self.nC:
                 print("* ERROR   :: Provided input res_z has shape "
-                      f"{res_z.shape}; but shape {grid.nC} is required.")
+                      f"{res_z.shape}; but shape {self.vnC} or {self.nC} is "
+                      f"required.")
                 raise ValueError("Wrong Shape")
-            if res_y is None:
-                self.__res[grid.nC:] = res_z
+            elif res_z.shape[0] == self.vnC[0]:
+                self.__res_z = res_z
             else:
-                self.__res[2*grid.nC:] = res_z
+                self.__res_z = res_z.reshape(self.vnC, order='F')
 
     @property
     def iomega(self):
@@ -825,38 +823,28 @@ class Model:
 
     # RESISTIVITIES
     @property
-    def res(self):
-        r"""Resistivity vector [res_x, res_y, res_z] (:math:`\rho`)."""
-        return self.__res
-
-    @res.setter
-    def res(self, res):
-        r"""Update resistivity vector [res_x, res_y, res_z] (:math:`\rho`)."""
-        self.__res = res.ravel('F')
-
-    @property
     def res_x(self):
         r"""Resistivity in x-direction (:math:`\rho_x`)."""
-        return self.__res[:self.nC].reshape(self.vnC, order='F')
+        return self.__res_x
 
     @res_x.setter
     def res_x(self, res):
         r"""Update resistivity in x-direction (:math:`\rho_x`)."""
-        self.__res[:self.nC] = res.ravel('F')
+        self.__res_x = res.reshape(self.vnC, order='F')
 
     @property
     def res_y(self):
         r"""Resistivity in y-direction (:math:`\rho_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self.__res[self.nC:2*self.nC].reshape(self.vnC, order='F')
+            return self.__res_y
         else:                    # Return res_x.
-            return self.res_x
+            return self.__res_x
 
     @res_y.setter
     def res_y(self, res):
         r"""Update resistivity in y-direction (:math:`\rho_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            self.__res[self.nC:2*self.nC] = res.ravel('F')
+            self.__res_y = res.reshape(self.vnC, order='F')
         else:
             print("Cannot set res_y, as it was initialized as res_x.")
             raise ValueError
@@ -864,20 +852,16 @@ class Model:
     @property
     def res_z(self):
         r"""Resistivity in z-direction (:math:`\rho_z`)."""
-        if self.case == 2:    # VTI.
-            return self.__res[self.nC:].reshape(self.vnC, order='F')
-        elif self.case == 3:  # Tri-axial.
-            return self.__res[2*self.nC:].reshape(self.vnC, order='F')
-        else:                 # Return res_x.
-            return self.res_x
+        if self.case in [2, 3]:  # VTI or tri-axial.
+            return self.__res_z
+        else:                    # Return res_x.
+            return self.__res_x
 
     @res_z.setter
     def res_z(self, res):
         r"""Update resistivity in z-direction (:math:`\rho_z`)."""
-        if self.case == 2:  # VTI.
-            self.__res[self.nC:] = res.ravel('F')
-        elif self.case == 3:  # Tri-axial.
-            self.__res[2*self.nC:] = res.ravel('F')
+        if self.case in [2, 3]:  # VTI or tri-axial.
+            self.__res_z = res.reshape(self.vnC, order='F')
         else:
             print("Cannot set res_z, as it was initialized as res_x.")
             raise ValueError
@@ -901,7 +885,7 @@ class Model:
     def get_eta(self, res):
         r"""Update eta vector [eta_x, eta_y, eta_z] (:math:`\eta`)."""
         eta = self.iomega*self.mu_0*(1./res - self.iomega*self.epsilon_0)
-        return eta*self.vol.reshape(self.vnC, order='F')
+        return eta*self.__vol
 
     # MU_R's
     @property
@@ -910,7 +894,7 @@ class Model:
 
         Relative magnetic permittivity is currently fixed to 1.
         """
-        return self.vol.reshape(self.vnC, order='F')
+        return self.__vol
 
 
 class Field(np.ndarray):

@@ -254,7 +254,6 @@ def test_model():
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
-    assert_allclose(model1.vol, grid.vol)
 
     # Assert you can not set res_y nor res_z if not provided from the start.
     with pytest.raises(ValueError):
@@ -283,11 +282,11 @@ def test_model():
 
     # Check wrong shape
     with pytest.raises(ValueError):
-        utils.Model(grid, res_x)
+        utils.Model(grid, np.arange(10))
     with pytest.raises(ValueError):
-        utils.Model(grid, res_y=res_y)
+        utils.Model(grid, res_y=np.ones((2, 5, 6)))
     with pytest.raises(ValueError):
-        utils.Model(grid, res_z=res_z)
+        utils.Model(grid, res_z=np.array([1, 3]))
 
     # Check with all inputs
     model3 = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
@@ -295,27 +294,26 @@ def test_model():
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert_allclose(model3.res, np.r_[res_x.ravel('F'), res_y.ravel('F'),
-                                      res_z.ravel('F')])
     assert model3.iomega == 2j*np.pi*model3.freq
 
     # Check setters
-    model3.res_x = np.ones(grid.vnC)*2.0
-    model3.res_y = np.ones(grid.vnC)*3.0
-    model3.res_z = np.ones(grid.vnC)*4.0
-    assert_allclose(model2.res, model3.res)
-    model3.res = np.ones(grid.nC*3)
-    assert_allclose(model1.res, model3.res[:grid.nC])
+    tres = np.ones(grid.vnC)
+    model3.res_x = tres*2.0
+    model3.res_y = tres*3.0
+    model3.res_z = tres*4.0
+    assert_allclose(tres*2., model3.res_x)
+    assert_allclose(tres*3., model3.res_y)
+    assert_allclose(tres*4., model3.res_z)
 
     # Check eta
     iommu = model3.iomega*model3.mu_0
     iomep = model3.iomega*model3.epsilon_0
-    eta_x = iommu*(1./model3.res_x.ravel('F') - iomep)*model3.vol
-    eta_y = iommu*(1./model3.res_y.ravel('F') - iomep)*model3.vol
-    eta_z = iommu*(1./model3.res_z.ravel('F') - iomep)*model3.vol
-    assert_allclose(model3.eta_x.ravel('F'), eta_x)
-    assert_allclose(model3.eta_y.ravel('F'), eta_y)
-    assert_allclose(model3.eta_z.ravel('F'), eta_z)
+    eta_x = iommu*(1./model3.res_x - iomep)*model3._Model__vol
+    eta_y = iommu*(1./model3.res_y - iomep)*model3._Model__vol
+    eta_z = iommu*(1./model3.res_z - iomep)*model3._Model__vol
+    assert_allclose(model3.eta_x, eta_x)
+    assert_allclose(model3.eta_y, eta_y)
+    assert_allclose(model3.eta_z, eta_z)
 
 
 def test_field():
