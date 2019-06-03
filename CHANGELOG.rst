@@ -1,10 +1,10 @@
 Changelog
 #########
 
-*latest*
---------
+*v0.6.2* : CPU & RAM
+--------------------
 
-Memory and speed improvements:
+Further speed and memory improvements:
 
 - Add *CPU & RAM*-page to documentation.
 - Change loop-order from x-z-y to z-x-y in Gauss-Seidel smoothing with line
@@ -14,9 +14,9 @@ Memory and speed improvements:
   ``njitted.amat_x``.
 - Simplifications in ``utils``:
 
-    - Simplify ``utils.get_source_field``.
-    - Simplify ``utils.Model``.
-    - Removed unused timing-stuff from early development.
+  - Simplify ``utils.get_source_field``.
+  - Simplify ``utils.Model``.
+  - Removed unused timing-stuff from early development.
 
 
 *v0.6.1* : Memory

@@ -7,13 +7,13 @@ description = 'A multigrid solver for 3D electromagnetic diffusion.'
 
 setup(
     name='emg3d',
-    version='0.6.2dev0',
+    version='0.6.2',
     description=description,
     long_description=readme,
     author='The emg3d Developers',
     author_email='dieter@werthmuller.org',
     url='https://empymod.github.io',
-    download_url='https://github.com/empymod/emg3d/tarball/v0.6.1',
+    download_url='https://github.com/empymod/emg3d/tarball/v0.6.2',
     license='Apache License V2.0',
     packages=['emg3d'],
     classifiers=[
