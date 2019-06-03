@@ -249,8 +249,8 @@ def test_model():
 
     # Using defaults
     model1 = utils.Model(grid)
-    assert model1.mu_0 == constants.mu_0            # Check constants
-    assert model1.epsilon_0 == constants.epsilon_0  # Check constants
+    assert utils.mu_0 == constants.mu_0            # Check constants
+    assert utils.epsilon_0 == constants.epsilon_0  # Check constants
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
@@ -271,7 +271,7 @@ def test_model():
     assert_allclose(model2b.res_x, model2b.res_y)
     assert_allclose(model2b.eta_x, model2b.eta_y)
     model2b.res_z = model2b.res_x
-    model2c = utils.Model(grid, 2., res_z=model2b.res_z.flatten('F'))
+    model2c = utils.Model(grid, 2., res_z=model2b.res_z.copy())
     assert_allclose(model2c.res_x, model2c.res_z)
     assert_allclose(model2c.eta_x, model2c.eta_z)
 
@@ -282,19 +282,25 @@ def test_model():
 
     # Check wrong shape
     with pytest.raises(ValueError):
-        utils.Model(grid, np.arange(10))
+        model1.res_x = model1.res_x.ravel('F')
+    with pytest.raises(ValueError):
+        utils.Model(grid, np.arange(1, 11))
     with pytest.raises(ValueError):
         utils.Model(grid, res_y=np.ones((2, 5, 6)))
     with pytest.raises(ValueError):
         utils.Model(grid, res_z=np.array([1, 3]))
 
     # Check with all inputs
-    model3 = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
-                         res_z.ravel('F'), freq=1.234)
+    model3 = utils.Model(grid, res_x, res_y, res_z, freq=1.234)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert model3.iomega == 2j*np.pi*model3.freq
+    # Check with all inputs
+    model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
+                          res_z.ravel('F'), freq=1.234)
+    assert_allclose(model3b.res_x, model3b.res_y*2)
+    assert_allclose(model3b.res_x.shape, grid.vnC)
+    assert_allclose(model3b.res_x, model3b.res_z/1.4)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
@@ -304,24 +310,24 @@ def test_model():
     assert_allclose(tres*2., model3.res_x)
     assert_allclose(tres*3., model3.res_y)
     assert_allclose(tres*4., model3.res_z)
-    # Check setters nC
-    tres2 = np.ones(grid.nC)
-    model3.res_x = tres2*2.0
-    model3.res_y = tres2*3.0
-    model3.res_z = tres2*4.0
-    assert_allclose(tres*2., model3.res_x)
-    assert_allclose(tres*3., model3.res_y)
-    assert_allclose(tres*4., model3.res_z)
 
     # Check eta
-    iommu = model3.iomega*model3.mu_0
-    iomep = model3.iomega*model3.epsilon_0
+    iommu = 2j*np.pi*model3.freq*utils.mu_0
+    iomep = 2j*np.pi*model3.freq*utils.epsilon_0
     eta_x = iommu*(1./model3.res_x - iomep)*model3._Model__vol
     eta_y = iommu*(1./model3.res_y - iomep)*model3._Model__vol
     eta_z = iommu*(1./model3.res_z - iomep)*model3._Model__vol
     assert_allclose(model3.eta_x, eta_x)
     assert_allclose(model3.eta_y, eta_y)
     assert_allclose(model3.eta_z, eta_z)
+
+    # Check volume / mu
+    vol = np.outer(np.outer(grid.hx, grid.hy).ravel('F'), grid.hz)
+    vol = vol.ravel('F').reshape(grid.vnC, order='F')
+    assert_allclose(vol, model3.v_mu_r)
+    grid.vol = vol
+    model4 = utils.Model(grid, 1, freq=1)
+    assert_allclose(model4.v_mu_r, vol)
 
 
 def test_field():
