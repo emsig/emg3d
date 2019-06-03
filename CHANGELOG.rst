@@ -11,8 +11,11 @@ Memory and speed improvements:
   in a significant speed-up, as x is the fastest changing axis.
 - Move total residual calculation from ``solver.residual`` into
   ``njitted.amat_x``.
-- Remove resistivity from ``Model``, calculate it on the fly from ``eta``.
-- Simplifications to ``utils.get_source_field``.
+- Simplifications in ``utils``:
+
+    - Simplify ``utils.get_source_field``.
+    - Simplify ``utils.Model``.
+    - Removed unused timing-stuff from early development.
 
 
 *v0.6.1* : Memory

@@ -35,7 +35,6 @@ import numpy as np
 import multiprocessing
 from scipy import optimize
 from timeit import default_timer
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 import emg3d  # emg3d for Versions
@@ -62,8 +61,8 @@ else:
 
 
 __all__ = ['get_domain', 'get_stretched_h', 'get_hx', 'get_source_field',
-           'Model', 'Field', 'TensorMesh', 'Time', 'now', 'timeit', 'ctimeit',
-           'data_write', 'data_read', 'Versions']
+           'Model', 'Field', 'TensorMesh', 'Time', 'data_write', 'data_read',
+           'Versions']
 
 
 # CONSTANTS
@@ -1018,7 +1017,7 @@ class Field(np.ndarray):
         self.fz[:, -1, :] = 0.+0.j
 
 
-# FUNCTIONS RELATED TO TIMING
+# TIMING FOR LOGS
 class Time:
     """Class for timing (now; runtime)."""
 
@@ -1034,105 +1033,13 @@ class Time:
     @property
     def now(self):
         """Return string of current time."""
-        return(now())
+        return datetime.now().strftime("%H:%M:%S")
 
     @property
     def runtime(self):
         """Return string of runtime since time zero."""
-        return timeit(self.__t0)
-
-
-def now():
-    """Return current time in the format hh:mm:ss as a string.
-
-
-    Returns
-    -------
-    time : str
-        Current time in the format 'hh:mm:ss'.
-
-
-    Examples
-    --------
-    >>> import emg3d
-    >>> emg3d.utils.now()
-    '08:25:13'
-
-    """
-    return datetime.now().strftime("%H:%M:%S")
-
-
-def timeit(t0=None):
-    r"""Measure runtime.
-
-    Time is rounded to full seconds if the total time is greater than 10 s.
-
-
-    Parameters
-    ----------
-    t0 : default-timer-instance; optional
-        The input is the output from an initial timeit-run.
-
-
-    Returns
-    -------
-    time : `default_timer`-instance or string.
-
-        - Returns the current ``default_timer``-instance if no input ``t0`` is
-          provided.
-        - Returns a string with the time passed between ``t0`` and now if
-          ``t0`` is provided.
-
-
-    Examples
-    --------
-    >>> import emg3d
-    >>> import time
-    >>> t0 = emg3d.utils.timeit()
-    >>> time.sleep(10)
-    >>> emg3d.utils.timeit(t0)
-    '0:00:10'
-
-    See Also
-    --------
-    ctimeit : Context manager for timeit.
-
-    """
-    if t0:
-        t1 = default_timer() - t0
-        if t1 < 10:  # Below 10 s, print full output.
-            return str(timedelta(seconds=t1))
-        else:  # After 10 s round to full seconds.
-            return str(timedelta(seconds=np.round(t1)))
-    else:
-        return default_timer()
-
-
-@contextmanager
-def ctimeit(before='', after=''):
-    """Print time used by commands run within the context manager.
-
-    Parameters
-    ----------
-    before, after : str, optional
-        String printed before and after timeit.
-
-    Examples
-    --------
-    >>> import emg3d
-    >>> import time
-    >>> with emg3d.utils.ctimeit("The command sleep(10) took ", " long!"):
-    >>>     time.sleep(10)
-    The command sleep(10) took 0:00:10 long!
-
-    See Also
-    --------
-    timeit : Plain timeit without context manager.
-
-    """
-    t0 = timeit()
-    yield
-    print(f"{before}{timeit(t0)}{after}")
+        t1 = default_timer() - self.__t0
+        return str(timedelta(seconds=np.round(t1)))
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT

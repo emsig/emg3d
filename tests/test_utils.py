@@ -1,8 +1,8 @@
 import re
-import time
 import pytest
 import numpy as np
 from scipy import constants
+from timeit import default_timer
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
@@ -375,35 +375,19 @@ def test_field():
 
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
-    t0 = utils.timeit()  # Create almost at the same time a
-    time = utils.Time()  # t0-stamp and a Time-instance.
+    t0 = default_timer()  # Create almost at the same time a
+    time = utils.Time()   # t0-stamp and a Time-instance.
 
+    # Ensure they are the same.
     assert_allclose(t0, time.t0)
-    assert time.now == utils.now()
-    assert time.runtime[:-3] == utils.timeit(time.t0)[:-3]
 
-
-def test_now():
-    out = utils.now()
+    # Ensure `now` is a string of numbers and :.
+    out = time.now
     assert re.match(r'[0-9][0-9]:[0-9][0-9]:[0-9][0-9]', out)
 
-
-def test_timeit():
-    t0 = utils.timeit()
-    out = utils.timeit(t0-1)
-    assert "0:00:01.00" in out
-    out = utils.timeit(t0-10)
-    assert "0:00:10" == out
-
-
-def test_ctimeit(capsys):
-    with utils.ctimeit("The command sleep(1) took ", " long!"):
-        time.sleep(1)
-    out, _ = capsys.readouterr()
-
-    assert "The command sleep(1) took " in out
-    assert " long!" in out
-    assert "0:00:01" in out
+    # This should have taken less then 1s.
+    out = time.runtime
+    assert "0:00:00" == out
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
