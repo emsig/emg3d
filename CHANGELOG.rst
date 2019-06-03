@@ -4,6 +4,8 @@ Changelog
 *v0.6.2* : CPU & RAM
 --------------------
 
+**2019-06-03**
+
 Further speed and memory improvements:
 
 - Add *CPU & RAM*-page to documentation.

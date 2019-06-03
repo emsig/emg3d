@@ -29,4 +29,4 @@ from .utils import Versions
 
 __all__ = ['solver', 'utils', 'Versions']
 
-__version__ = '0.6.2'
+__version__ = '0.6.3dev0'
