@@ -17,6 +17,7 @@ Version: |version| ~ Date: |today|
    usage
    mgwhat
    theory
+   cpu_and_ram
    references
    changelog
    credits
