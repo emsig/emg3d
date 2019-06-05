@@ -524,15 +524,15 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             # Print end-of-cycle info.
             _print_cycle_info(var, l2_last, l2_prev, l2_init)
 
-            # Check if any termination criteria is fulfilled.
-            if _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
-                break
-
             # Adjust semicoarsening and line relaxation if they cycle.
             if var.sc_cycle:
                 var.sc_dir = next(var.sc_cycle)
             if var.lr_cycle:
                 var.lr_dir = next(var.lr_cycle)
+
+            # Check if any termination criteria is fulfilled.
+            if _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+                break
 
     # Store final error (l2-norm).
     var.l2 = l2_last

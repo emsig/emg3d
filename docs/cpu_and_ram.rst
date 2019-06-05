@@ -23,7 +23,7 @@ An example output of that notebook is shown in :numref:`Figure %s <runtime>`.
    :name: runtime
 
    Runtime as a function of cell size, which shows nicely the linear scaling
-   of multigrid solvers.
+   of multigrid solvers (using a single thread).
 
 The costliest functions (for big models) are:
 

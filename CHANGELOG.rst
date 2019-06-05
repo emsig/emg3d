@@ -1,6 +1,14 @@
 Changelog
 #########
 
+*latest*
+--------
+
+- CPU-graph added on top of RAM-graph.
+- Small bugfix introduced in ebd2c9d5: ``sc_cycle`` and ``lr_cycle`` was not
+  updated any longer at the end of a cycle (only affected ``sslsolver=True``.
+
+
 *v0.6.2* : CPU & RAM
 --------------------
 
