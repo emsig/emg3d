@@ -9,6 +9,7 @@ Changelog
   solver currently; however, it would not be too difficult to include if there
   is a need.
 - CPU-graph added on top of RAM-graph.
+- Expand ``utils.Field`` to work with pickle/shelve.
 - Small bugfix introduced in ebd2c9d5: ``sc_cycle`` and ``lr_cycle`` was not
   updated any longer at the end of a cycle (only affected ``sslsolver=True``.
 

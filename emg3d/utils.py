@@ -957,19 +957,53 @@ class Field(np.ndarray):
             obj.vnEy = field.shape
             obj.vnEz = fz.shape
         else:                                     # If grid is provided
-            for attr in ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']:
+            attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+            for attr in attr_list:
                 setattr(obj, attr, getattr(grid, attr))
 
         return obj
 
     def __array_finalize__(self, obj):
         """Ensure relevant numbers are stored no matter how created."""
+        if obj is None:
+            return
+
         self.nEx = getattr(obj, 'nEx', None)
         self.nEy = getattr(obj, 'nEy', None)
         self.nEz = getattr(obj, 'nEz', None)
         self.vnEx = getattr(obj, 'vnEx', None)
         self.vnEy = getattr(obj, 'vnEy', None)
         self.vnEz = getattr(obj, 'vnEz', None)
+
+    def __reduce__(self):
+        """Customize __reduce__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Get the parent's __reduce__ tuple.
+        pickled_state = super(Field, self).__reduce__()
+
+        # Create our own tuple to pass to __setstate__.
+        new_state = pickled_state[2]
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        for attr in attr_list:
+            new_state += (getattr(self, attr),)
+
+        # Return tuple that replaces parent's __setstate__ tuple with our own.
+        return (pickled_state[0], pickled_state[1], new_state)
+
+    def __setstate__(self, state):
+        """Customize __setstate__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Set the necessary attributes (in reverse order).
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list.reverse()
+        for i, name in enumerate(attr_list):
+            i += 1  # We need it 1..#attr instead of 0..#attr-1.
+            setattr(self, name, state[-i])
+
+        # Call the parent's __setstate__ with the other tuple elements.
+        super(Field, self).__setstate__(state[0:-i])
 
     @property
     def field(self):
