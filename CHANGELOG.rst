@@ -4,6 +4,10 @@ Changelog
 *latest*
 --------
 
+- Re-implemented the possibility to define isotropic magnetic permeabilities in
+  ``utils.Model``. Magnetic permeability is not tri-axially included in the
+  solver currently; however, it would not be too difficult to include if there
+  is a need.
 - CPU-graph added on top of RAM-graph.
 - Small bugfix introduced in ebd2c9d5: ``sc_cycle`` and ``lr_cycle`` was not
   updated any longer at the end of a cycle (only affected ``sslsolver=True``.

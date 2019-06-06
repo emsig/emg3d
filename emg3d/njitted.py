@@ -242,19 +242,6 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
     ``ez``.
 
 
-    Warnings
-    --------
-    The code by [Muld06]_ has a check and a workaround for singular-matrix
-    elements. This is not implemented here. However, it should not be
-    necessary. Singular-matrix element would only occur if :math:`\eta=0`,
-    hence if :math:`\sigma=0` and :math:`\varepsilon_r=0`. Having at least the
-    conductivity of air (5e-15 S/m) and a non-zero relative electric
-    permittivity, this is not a problem :math:`(\eta = \mathrm{i}\omega\mu_0
-    [\sigma - \mathrm{i} \omega \varepsilon_0 \varepsilon_r])`. The relative
-    electric permittivity is currently fixed to one anyway,
-    :math:`\varepsilon_r=1`.
-
-
     Parameters
     ----------
     ex, ey, ez : ndarray

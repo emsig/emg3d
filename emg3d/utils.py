@@ -718,9 +718,12 @@ class TensorMesh:
 class Model:
     r"""Create a resistivity model.
 
-    Class to provide model parameters (x-, y-, and z-directed resistivities)
-    to the solver. Relative electric permeability :math:`\varepsilon_r` and
-    relative magnetic permittivity :math:`\mu_r` are both fixed at 1.
+    Class to provide model parameters (x-, y-, and z-directed resistivities) to
+    the solver. Relative magnetic permeability :math:`\mu_r` is by default set
+    to one, but can be provided (isotropically). Relative electric permittivity
+    :math:`\varepsilon_r` is fixed at 1, as ``emg3d`` uses the diffusive
+    approximation of Maxwell's equations.
+
 
     Parameters
     ----------
@@ -734,9 +737,14 @@ class Model:
     freq : float
         Frequency.
 
+    mu_r : float or ndarray
+       Relative magnetic permeability (isotropic). If ndarray it must have the
+       shape of grid.vnC (F-ordered) or grid.nC.
+
     """
 
-    def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=1.):
+    def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=1.,
+                 mu_r=None):
         """Initiate a new resistivity model."""
 
         # Store frequency.
@@ -777,7 +785,7 @@ class Model:
             raise ValueError("Wrong Shape")
         self.__eta_x = self._calculate_eta(self.__res_x)
 
-        # Initiate y-directed resistivity
+        # Initiate y-directed resistivity.
         if self.case in [1, 3]:
             if isinstance(res_y, (float, int)):
                 self.__res_y = res_y*np.ones(self.vnC)
@@ -791,7 +799,7 @@ class Model:
                 raise ValueError("Wrong Shape")
             self.__eta_y = self._calculate_eta(self.__res_y)
 
-        # Initiate z-directed resistivity
+        # Initiate z-directed resistivity.
         if self.case in [2, 3]:
             if isinstance(res_z, (float, int)):
                 self.__res_z = res_z*np.ones(self.vnC)
@@ -804,6 +812,14 @@ class Model:
                 print(f"             Provided: {res_z.shape}.")
                 raise ValueError("Wrong Shape")
             self.__eta_z = self._calculate_eta(self.__res_z)
+
+        # Store magnetic permeability.
+        if mu_r is None or isinstance(mu_r, (float, int)):
+            self.__mu_r = mu_r
+        elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
+            self.__mu_r = mu_r
+        elif mu_r.size == self.nC and mu_r.ndim == 1:
+            self.__mu_r = mu_r.reshape(self.vnC, order='F')
 
     # RESISTIVITIES
     @property
@@ -856,12 +872,12 @@ class Model:
     # ETA's
     @property
     def eta_x(self):
-        r"""eta in x-direction (:math:`\eta_x`)."""
+        r"""Volume*eta in x-direction (:math:`V\eta_x`)."""
         return self.__eta_x
 
     @property
     def eta_y(self):
-        r"""eta in x-direction (:math:`\eta_y`)."""
+        r"""Volume*eta in x-direction (:math:`V\eta_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
             return self.__eta_y
         else:                    # Return eta_x.
@@ -869,25 +885,25 @@ class Model:
 
     @property
     def eta_z(self):
-        r"""eta in x-direction (:math:`\eta_z`)."""
+        r"""Volume*eta in x-direction (:math:`V\eta_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
             return self.__eta_z
         else:                    # Return eta_x.
             return self.__eta_x
 
     def _calculate_eta(self, res):
-        r"""Update eta vector [eta_x, eta_y, eta_z] (:math:`\eta`)."""
+        r"""Calculate vol*eta (:math:`V\eta`)."""
         iomega = 2j*np.pi*self.freq
         return iomega*mu_0*(1./res - iomega*epsilon_0)*self.__vol
 
     # MU_R's
     @property
     def v_mu_r(self):
-        r"""Volume divided by relative magnetic permittivity.
-
-        Relative magnetic permittivity is currently fixed to 1.
-        """
-        return self.__vol
+        r"""Volume divided by relative magnetic permeability."""
+        if self.__mu_r is None:
+            return self.__vol
+        else:
+            return self.__vol/self.__mu_r
 
 
 class Field(np.ndarray):

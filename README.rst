@@ -54,6 +54,7 @@ Features
   subspace methods implemented in SciPy, e.g., BiCGSTAB
   (`scipy.sparse.linalg.bicgstab`) or CGS (`scipy.sparse.linalg.cgs`).
 - Tri-axial electrical anisotropy.
+- Isotropic magnetic permeability.
 - Semicoarsening and line relaxation.
 - Grid-size can be anything.
 - As a multigrid method it scales with the number of unknowns *N* and has

@@ -291,16 +291,18 @@ def test_model():
         utils.Model(grid, res_z=np.array([1, 3]))
 
     # Check with all inputs
-    model3 = utils.Model(grid, res_x, res_y, res_z, freq=1.234)
+    model3 = utils.Model(grid, res_x, res_y, res_z, freq=1.234, mu_r=res_x)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
+    assert_allclose(model3._Model__vol/res_x, model3.v_mu_r)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
-                          res_z.ravel('F'), freq=1.234)
+                          res_z.ravel('F'), freq=1.234, mu_r=res_y.ravel('F'))
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
+    assert_allclose(model3b._Model__vol/res_y, model3b.v_mu_r)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
@@ -321,10 +323,10 @@ def test_model():
     assert_allclose(model3.eta_y, eta_y)
     assert_allclose(model3.eta_z, eta_z)
 
-    # Check volume / mu
+    # Check volume
     vol = np.outer(np.outer(grid.hx, grid.hy).ravel('F'), grid.hz)
     vol = vol.ravel('F').reshape(grid.vnC, order='F')
-    assert_allclose(vol, model3.v_mu_r)
+    assert_allclose(vol, model2.v_mu_r)
     grid.vol = vol
     model4 = utils.Model(grid, 1, freq=1)
     assert_allclose(model4.v_mu_r, vol)
