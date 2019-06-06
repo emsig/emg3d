@@ -1,4 +1,5 @@
 import re
+import os
 import pytest
 import numpy as np
 from scipy import constants
@@ -393,7 +394,7 @@ def test_Time():
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
-def test_data_write_read(tmpdir):
+def test_data_write_read(tmpdir, capsys):
     # Create test data
     grid = utils.TensorMesh(
             [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
@@ -405,14 +406,14 @@ def test_data_write_read(tmpdir):
     ee = utils.Field(e1, e2, e3)
 
     # Write and read data, single arguments
-    utils.data_write('testthis', 'ee', ee, tmpdir)
+    utils.data_write('testthis', 'ee', ee, tmpdir, -1)
     ee_out = utils.data_read('testthis', 'ee', tmpdir)
 
     # Compare data
     assert_allclose(ee, ee_out)
 
     # Write and read data, multi arguments
-    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir)
+    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)
     grid_out, ee_out = utils.data_read('testthis', ('grid', 'ee'), tmpdir)
 
     # Compare data
@@ -421,13 +422,38 @@ def test_data_write_read(tmpdir):
         assert getattr(grid, attr) == getattr(grid_out, attr)
 
     # Write and read data, None
-    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir)
+    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)
     out = utils.data_read('testthis', path=tmpdir)
 
     # Compare data
     assert_allclose(ee, ee_out)
     for attr in ['nCx', 'nCy', 'nCz']:
         assert getattr(grid, attr) == getattr(out['grid'], attr)
+
+    # Test exists-argument 0
+    _, _ = capsys.readouterr()  # Clean-up
+    utils.data_write('testthis', 'ee', ee*2, tmpdir, 0)
+    out, _ = capsys.readouterr()
+    datout = utils.data_read('testthis', path=tmpdir)
+    assert 'NOT SAVING THE DATA' in out
+    assert_allclose(datout['ee'], ee)
+
+    # Test exists-argument 1
+    utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, 1)
+    out, _ = capsys.readouterr()
+    datout = utils.data_read('testthis', path=tmpdir)
+    assert 'appending to it' in out
+    assert_allclose(datout['ee'], ee*2)
+    assert_allclose(datout['ee2'], ee)
+
+    # Check if file is missing.
+    os.remove(tmpdir+'/testthis.dat')
+    out = utils.data_read('testthis', path=tmpdir)
+    assert out is None
+    out1, out2 = utils.data_read('testthis', ['ee', 'ee2'], path=tmpdir)
+    assert out1 is None
+    assert out2 is None
+    utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, -1)
 
 
 # OTHER
