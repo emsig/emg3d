@@ -375,6 +375,56 @@ def test_field():
     assert abs(np.sum(ee.fz[:, 0, :] + ee.fz[:, -1, :])) == 0
 
 
+def test_get_h_field():
+    # Mainly regression tests, not ideal.
+
+    # Check it does still the same (pure regression).
+    dat = REGRES['reg_2'][()]
+    grid = dat['grid']
+    model = dat['model']
+    efield = dat['result']
+    hfield = dat['hresult']
+
+    hout = utils.get_h_field(grid, model, efield)
+    assert_allclose(hfield, hout)
+
+    # Add some mu_r - Just 1, to trigger, and compare.
+    dat = REGRES['res'][()]
+    grid = dat['grid']
+    efield = dat['Fresult']
+    model1 = utils.Model(**dat['input_model'])
+    model2 = utils.Model(**dat['input_model'], mu_r=1.)
+
+    hout1 = utils.get_h_field(grid, model1, efield)
+    hout2 = utils.get_h_field(grid, model2, efield)
+    assert_allclose(hout1, hout2)
+
+    # Ensure they are not the same if mu_r!=1/None provided
+    model3 = utils.Model(**dat['input_model'], mu_r=2.)
+    hout3 = utils.get_h_field(grid, model3, efield)
+    with pytest.raises(AssertionError):
+        assert_allclose(hout1, hout3)
+
+
+def test_get_receiver():
+    grid = utils.TensorMesh(
+            [np.array([1, 2]), np.array([1]), np.array([1])],
+            [0, 0, 0])
+    field = utils.Field(grid)
+
+    # Provide Field instance instead of Field.f{x/y/z}:
+    with pytest.raises(ValueError):
+        utils.get_receiver(grid, field, (1, 1, 1))
+
+    # Simple linear interpolation test.
+    field.fx = np.arange(1, field.fx.size+1)
+    field = field.real  # For simplicity
+    out1 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0))
+    assert_allclose(out1, [1., 1+1/3, 2])
+    out2 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], 1/3, 0.25))
+    assert_allclose(out2, [2+2/3., 3, 3+2/3])
+
+
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
     t0 = default_timer()  # Create almost at the same time a

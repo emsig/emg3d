@@ -28,9 +28,6 @@ intersphinx_mapping = {
     "discretize": ("https://discretize.readthedocs.io/en/stable", None),
 }
 
-# Todo settings
-autodoc_member_order = 'bysource'  # Include Python objects as they appear
-
 # ==== 2. General Settings ====
 description = 'A multigrid solver for 3D electromagnetic diffusion.'
 

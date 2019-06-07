@@ -4,6 +4,13 @@ Changelog
 *latest*
 --------
 
+- New routines:
+
+  - ``utils.get_h_field``: Small routine to calculate the magnetic field from
+    the electric field using Faraday's law.
+  - ``utils.get_receiver``: Small wrapper to interpolate a field at receiver
+    positions.
+
 - Re-implemented the possibility to define isotropic magnetic permeabilities in
   ``utils.Model``. Magnetic permeability is not tri-axially included in the
   solver currently; however, it would not be too difficult to include if there

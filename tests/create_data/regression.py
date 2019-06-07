@@ -104,6 +104,8 @@ efield = solver.solver(
         verb=verb, tol=tol, maxit=maxit, nu_init=nu_init, nu_pre=nu_pre,
         nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
+hfield = utils.get_h_field(grid, model, efield)
+
 # Store input and result
 reg_2 = {
     'grid': grid,
@@ -121,7 +123,8 @@ reg_2 = {
         'nu_post': nu_post,
         'clevel': clevel,
         },
-    'result': efield.field
+    'result': efield.field,
+    'hresult': hfield.field,
 }
 
 # # # # # # # # # # 3. TensorMesh check # # # # # # # # # #
