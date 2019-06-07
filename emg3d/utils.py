@@ -35,6 +35,7 @@ import numpy as np
 import multiprocessing
 from scipy import optimize
 from timeit import default_timer
+from scipy import interpolate as sint
 from datetime import datetime, timedelta
 
 import emg3d  # emg3d for Versions
@@ -60,9 +61,9 @@ else:
     mklinfo = False
 
 
-__all__ = ['get_domain', 'get_stretched_h', 'get_hx', 'get_source_field',
-           'Model', 'Field', 'TensorMesh', 'Time', 'data_write', 'data_read',
-           'Versions']
+__all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h', 'get_hx',
+           'get_source_field', 'get_receiver', 'get_h_field', 'TensorMesh',
+           'Time', 'data_write', 'data_read', 'Versions']
 
 
 # CONSTANTS
@@ -714,7 +715,7 @@ class TensorMesh:
         self.nE = int(self.vnE.sum())
 
 
-# MODEL AND FIELD CLASSES
+# RELATED TO MODELS AND FIELDS
 class Model:
     r"""Create a resistivity model.
 
@@ -957,19 +958,53 @@ class Field(np.ndarray):
             obj.vnEy = field.shape
             obj.vnEz = fz.shape
         else:                                     # If grid is provided
-            for attr in ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']:
+            attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+            for attr in attr_list:
                 setattr(obj, attr, getattr(grid, attr))
 
         return obj
 
     def __array_finalize__(self, obj):
         """Ensure relevant numbers are stored no matter how created."""
+        if obj is None:
+            return
+
         self.nEx = getattr(obj, 'nEx', None)
         self.nEy = getattr(obj, 'nEy', None)
         self.nEz = getattr(obj, 'nEz', None)
         self.vnEx = getattr(obj, 'vnEx', None)
         self.vnEy = getattr(obj, 'vnEy', None)
         self.vnEz = getattr(obj, 'vnEz', None)
+
+    def __reduce__(self):
+        """Customize __reduce__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Get the parent's __reduce__ tuple.
+        pickled_state = super(Field, self).__reduce__()
+
+        # Create our own tuple to pass to __setstate__.
+        new_state = pickled_state[2]
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        for attr in attr_list:
+            new_state += (getattr(self, attr),)
+
+        # Return tuple that replaces parent's __setstate__ tuple with our own.
+        return (pickled_state[0], pickled_state[1], new_state)
+
+    def __setstate__(self, state):
+        """Customize __setstate__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Set the necessary attributes (in reverse order).
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list.reverse()
+        for i, name in enumerate(attr_list):
+            i += 1  # We need it 1..#attr instead of 0..#attr-1.
+            setattr(self, name, state[-i])
+
+        # Call the parent's __setstate__ with the other tuple elements.
+        super(Field, self).__setstate__(state[0:-i])
 
     @property
     def field(self):
@@ -1031,6 +1066,151 @@ class Field(np.ndarray):
         self.fz[-1, :, :] = 0.+0.j
         self.fz[:, 0, :] = 0.+0.j
         self.fz[:, -1, :] = 0.+0.j
+
+
+def get_h_field(grid, model, field):
+    r"""Return magnetic field corresponding to provided electric field.
+
+    Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
+    :math:`\mathbf{H}`  using Farady's law, given by
+
+    .. math::
+
+        \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
+
+    Note that the magnetic field in x-direction is defined in the center of the
+    face defined by the electric field in y- and z-directions, and similar for
+    the other field directions. This means that the provided electric field and
+    the returned magnetic field have different dimensions::
+
+       E-field:  x: [grid.vectorCCx,  grid.vectorNy,  grid.vectorNz]
+                 y: [ grid.vectorNx, grid.vectorCCy,  grid.vectorNz]
+                 z: [ grid.vectorNx,  grid.vectorNy, grid.vectorCCz]
+
+       H-field:  x: [ grid.vectorNx, grid.vectorCCy, grid.vectorCCz]
+                 y: [grid.vectorCCx,  grid.vectorNy, grid.vectorCCz]
+                 z: [grid.vectorCCx, grid.vectorCCy,  grid.vectorNz]
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    model : Model
+        Model; ``emg3d.utils.Model`` instance.
+
+    field : Field
+        Electric field; ``emg3d.utils.Field`` instance.
+
+
+    Returns
+    -------
+    hfield : Field
+        Magnetic field; ``emg3d.utils.Field`` instance.
+
+    """
+    # Define the widths of the dual grid.
+    dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
+    dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
+    dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
+
+    # If relative magnetic permeability is not one, we have to take the volume
+    # into account, as mu_r is volume-averaged.
+    if model._Model__mu_r is not None:
+        # Plus and minus indices.
+        ixm = np.r_[0, np.arange(grid.nCx)]
+        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
+        iym = np.r_[0, np.arange(grid.nCy)]
+        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
+        izm = np.r_[0, np.arange(grid.nCz)]
+        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
+
+        # Average mu_r for dual-grid.
+        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
+        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
+        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
+
+    # Carry out the curl (^ corresponds to differentiation axis):
+    # H_x = (E_z^1 - E_y^2)
+    _, HY, HZ = np.meshgrid(dx, grid.hy, grid.hz, indexing='ij')
+    e3d_hx = (np.diff(field.fz, axis=1)/HY - np.diff(field.fy, axis=2)/HZ)
+
+    # H_y = (E_x^2 - E_z^0)
+    HX, _, HZ = np.meshgrid(grid.hx, dy, grid.hz, indexing='ij')
+    e3d_hy = (np.diff(field.fx, axis=2)/HZ - np.diff(field.fz, axis=0)/HX)
+
+    # H_z = (E_y^0 - E_x^1)
+    HX, HY, _ = np.meshgrid(grid.hx, grid.hy, dz, indexing='ij')
+    e3d_hz = (np.diff(field.fy, axis=0)/HX - np.diff(field.fx, axis=1)/HY)
+
+    # If relative magnetic permeability is not one, we have to take the volume
+    # into account, as mu_r is volume-averaged.
+    if model._Model__mu_r is not None:
+        hvx = grid.hx[:, None, None]
+        hvy = grid.hy[None, :, None]
+        hvz = grid.hz[None, None, :]
+
+        e3d_hx *= mu_r_x/(dx[:, None, None]*hvy*hvz)
+        e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
+        e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
+
+    # Create a Field-instance and divide by j omega mu_0 and return.
+    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(2j*np.pi*model.freq*mu_0)
+
+    return hfield
+
+
+def get_receiver(grid, fieldf, rec_loc, **kwargs):
+    """Return field at receiver locations.
+
+    Convenience wrapper for :func:`scipy.interpolate.interpn`. Works for
+    electric fields as well as magnetic fields obtained with
+    :func:`get_h_field`.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; a ``TensorMesh``-instance.
+
+    fieldf : ndarray
+        Field in a direction, e.g., for the x-direction ``Field.fx``, with
+        shape ``Field.vnEx``.
+
+    rec_loc : tuple (rec_x, rec_y, rec_z)
+        ``rec_x``, ``rec_y``, and ``rec_z`` positions. Corresponds to the
+        ``xi``-parameter in :func:`scipy.interpolate.interpn`.
+
+    **kwargs : Passed to :func:`scipy.interpolate.interpn`.
+
+
+    Returns
+    -------
+    values : ndarray
+        ``fieldf`` at positions ``rec_loc``.
+
+    """
+    if fieldf.ndim == 1:
+        print("* ERROR   :: Field must be x-, y-, or z-directed with ndim=3.")
+        print(f"             Shape of provided field: {fieldf.shape}.")
+        raise ValueError("Field error")
+
+    # Get the vectors corresponding to input data. Dimensions:
+    #
+    #        E-field       H-field
+    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]
+    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]
+    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]
+    #
+    inp = tuple()
+    for i, coord in enumerate(['x', 'y', 'z']):
+        if fieldf.shape[i] == getattr(grid, 'nN'+coord):
+            inp += (getattr(grid, 'vectorN'+coord), )
+        else:
+            inp += (getattr(grid, 'vectorCC'+coord), )
+
+    return sint.interpn(inp, fieldf, rec_loc, **kwargs)
 
 
 # TIMING FOR LOGS

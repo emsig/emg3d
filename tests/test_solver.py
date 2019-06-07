@@ -122,7 +122,6 @@ def test_solver_heterogeneous(capsys):
     grid = dat['grid']
     model = dat['model']
     sfield = dat['sfield']
-    sfield = utils.Field(grid, sfield)
     inp = dat['inp']
     inp['verb'] = 4
 
