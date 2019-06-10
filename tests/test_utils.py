@@ -417,13 +417,37 @@ def test_get_receiver():
     with pytest.raises(ValueError):
         utils.get_receiver(grid, field, (1, 1, 1))
 
+    # Provide wrong rec_loc input:
+    with pytest.raises(ValueError):
+        utils.get_receiver(grid, field.fx, (1, 1))
+
     # Simple linear interpolation test.
     field.fx = np.arange(1, field.fx.size+1)
     field = field.real  # For simplicity
-    out1 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0))
+    out1 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0), 'linear')
     assert_allclose(out1, [1., 1+1/3, 2])
-    out2 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], 1/3, 0.25))
+    out2 = utils.get_receiver(
+            grid, field.fx, ([0.5, 1, 2], 1/3, 0.25), 'linear')
     assert_allclose(out2, [2+2/3., 3, 3+2/3])
+
+    # Check 'cubic' is re-set to 'linear for tiny grids.
+    out3 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0), 'cubic')
+    assert_allclose(out1, out3)
+
+    # Check cubic spline runs fine (NOT CHECKING ACTUAL VALUES!.
+    grid = utils.TensorMesh(
+            [np.ones(4), np.array([1, 2, 3]), np.array([2, 1, 1])],
+            [0, 0, 0])
+    field = utils.Field(grid)
+    field.field = np.ones(field.size) + 1j*np.ones(field.size)
+
+    out4 = utils.get_receiver(
+            grid, field.fx, ([0.5, 1, 2], [0.5, 2, 3], 2), 'linear')
+    out5 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], [0.5, 2, 3], 2))
+    out5real = utils.get_receiver(
+            grid, field.fx.real, ([0.5, 1, 2], [0.5, 2, 3], 2))
+    assert_allclose(out5, out4)
+    assert_allclose(out5real, out4.real)
 
 
 # FUNCTIONS RELATED TO TIMING

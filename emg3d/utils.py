@@ -33,10 +33,9 @@ import textwrap
 import platform
 import numpy as np
 import multiprocessing
-from scipy import optimize
 from timeit import default_timer
-from scipy import interpolate as sint
 from datetime import datetime, timedelta
+from scipy import optimize, interpolate, ndimage
 
 import emg3d  # emg3d for Versions
 
@@ -1161,12 +1160,19 @@ def get_h_field(grid, model, field):
     return hfield
 
 
-def get_receiver(grid, fieldf, rec_loc, **kwargs):
+def get_receiver(grid, fieldf, rec_loc, method='cubic'):
     """Return field at receiver locations.
 
-    Convenience wrapper for :func:`scipy.interpolate.interpn`. Works for
-    electric fields as well as magnetic fields obtained with
+    Works for electric fields as well as magnetic fields obtained with
     :func:`get_h_field`.
+
+    If ``rec_loc`` is outside of ``grid``, the returned field is zero.
+
+    This is a modified version of :func:`scipy.interpolate.interpn`, using
+    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
+    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
+    ``method='cubic'``. If speed is important then choose 'linear', as it can
+    be significantly faster.
 
 
     Parameters
@@ -1179,10 +1185,12 @@ def get_receiver(grid, fieldf, rec_loc, **kwargs):
         shape ``Field.vnEx``.
 
     rec_loc : tuple (rec_x, rec_y, rec_z)
-        ``rec_x``, ``rec_y``, and ``rec_z`` positions. Corresponds to the
-        ``xi``-parameter in :func:`scipy.interpolate.interpn`.
+        ``rec_x``, ``rec_y``, and ``rec_z`` positions.
 
-    **kwargs : Passed to :func:`scipy.interpolate.interpn`.
+    method : str, optional
+        The method of interpolation to perform, 'linear' or 'cubic'.
+        Default is 'cubic' (forced to 'linear' if there are less than 3 points
+        in any direction).
 
 
     Returns
@@ -1191,10 +1199,17 @@ def get_receiver(grid, fieldf, rec_loc, **kwargs):
         ``fieldf`` at positions ``rec_loc``.
 
     """
+    # Ensure input field is a certain field, not a Field instance.
     if fieldf.ndim == 1:
         print("* ERROR   :: Field must be x-, y-, or z-directed with ndim=3.")
         print(f"             Shape of provided field: {fieldf.shape}.")
         raise ValueError("Field error")
+
+    # Ensure rec_loc has three entries.
+    if len(rec_loc) != 3:
+        print("* ERROR   :: Receiver location needs to be (rx, ry, rz).")
+        print(f"             Length of provided rec_loc: {len(rec_loc)}.")
+        raise ValueError("Receiver location error")
 
     # Get the vectors corresponding to input data. Dimensions:
     #
@@ -1203,14 +1218,60 @@ def get_receiver(grid, fieldf, rec_loc, **kwargs):
     #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]
     #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]
     #
-    inp = tuple()
+    points = tuple()
     for i, coord in enumerate(['x', 'y', 'z']):
         if fieldf.shape[i] == getattr(grid, 'nN'+coord):
-            inp += (getattr(grid, 'vectorN'+coord), )
+            pts = (getattr(grid, 'vectorN'+coord), )
         else:
-            inp += (getattr(grid, 'vectorCC'+coord), )
+            pts = (getattr(grid, 'vectorCC'+coord), )
 
-    return sint.interpn(inp, fieldf, rec_loc, **kwargs)
+        # Add to points
+        points += pts
+
+        # We need at least 3 points in each direction for cubic spline.
+        # This should never be an issue for a realistic 3D model.
+        if pts[0].size < 4:
+            method = 'linear'
+
+    # Interpolation.
+    if method == "linear":
+        ifn = interpolate.RegularGridInterpolator(
+                points=points, values=fieldf, method="linear",
+                bounds_error=False, fill_value=0.0)
+
+        return ifn(xi=rec_loc)
+
+    else:
+
+        # Replicate the same expansion of xi as used in
+        # RegularGridInterpolator, so the input xi can be quite flexible.
+        xi = interpolate.interpnd._ndim_coords_from_arrays(rec_loc, ndim=3)
+        xi_shape = xi.shape
+        xi = xi.reshape(-1, 3)
+
+        # map_coordinates uses the indices of the input data (fieldf in this
+        # case) as coordinates. We have therefore to transform our desired
+        # output coordinates to this artificial coordinate system too.
+        params = {'kind': 'cubic',
+                  'bounds_error': False,
+                  'fill_value': 'extrapolate'}
+        x = interpolate.interp1d(
+                points[0], np.arange(len(points[0])), **params)(xi[:, 0])
+        y = interpolate.interp1d(
+                points[1], np.arange(len(points[1])), **params)(xi[:, 1])
+        z = interpolate.interp1d(
+                points[2], np.arange(len(points[2])), **params)(xi[:, 2])
+        coords = np.vstack([x, y, z])
+
+        # map_coordinates only works for real data; split it up if complex.
+        if 'complex' in fieldf.dtype.name:
+            real = ndimage.map_coordinates(fieldf.real, coords, order=3)
+            imag = ndimage.map_coordinates(fieldf.imag, coords, order=3)
+            result = real + 1j*imag
+        else:
+            result = ndimage.map_coordinates(fieldf, coords, order=3)
+
+        return result.reshape(xi_shape[:-1])
 
 
 # TIMING FOR LOGS
