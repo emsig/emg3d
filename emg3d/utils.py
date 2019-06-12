@@ -1334,37 +1334,49 @@ def data_write(fname, keys, values, path='data', exists=0):
     os.makedirs(path, exist_ok=True)
 
     # File name full path.
-    full_path = path+'/'+fname
+    full_path = path+"/"+fname
 
     # Check if shelve exists.
-    bak_exists = os.path.isfile(full_path+'.bak')
-    dat_exists = os.path.isfile(full_path+'.dat')
-    dir_exists = os.path.isfile(full_path+'.dir')
+    bak_exists = os.path.isfile(full_path+".bak")
+    dat_exists = os.path.isfile(full_path+".dat")
+    dir_exists = os.path.isfile(full_path+".dir")
     if any([bak_exists, dat_exists, dir_exists]):
-        print('   > File exists, ', end='')
+        print("   > File exists, ", end="")
         if exists == 0:
-            print('NOT SAVING THE DATA.')
+            print("NOT SAVING THE DATA.")
             return
         elif exists > 0:
-            print('appending to it (same key names will be overwritten).')
+            print("appending to it", end='')
         else:
-            print('overwriting it.')
-            for ending in ['dat', 'bak', 'dir']:
+            print("overwriting it.")
+            for ending in ["dat", "bak", "dir"]:
                 try:
-                    os.remove(full_path+'.'+ending)
+                    os.remove(full_path+"."+ending)
                 except FileNotFoundError:
                     pass
 
+    # Cast into list.
+    if not isinstance(keys, (list, tuple)):
+        keys = [keys, ]
+        values = [values, ]
+
     # Shelve it.
     with shelve.open(full_path) as db:
-        if not isinstance(keys, (list, tuple)):  # single parameter
-            db[keys] = values
-        else:                                    # lists/tuples of parameters
-            for i, key in enumerate(keys):
-                db[key] = values[i]
+
+        # If appending, print the keys which will be overwritten.
+        if exists > 0:
+            over = [j for j in keys if any(i == j for i in list(db.keys()))]
+            if len(over) > 0:
+                print(f" (overwriting existing key(s) {', '.join(over)}).")
+            else:
+                print(".")
+
+        # Writing it to the shelve.
+        for i, key in enumerate(keys):
+            db[key] = values[i]
 
 
-def data_read(fname, keys=None, path='data'):
+def data_read(fname, keys=None, path="data"):
     """Read and return keys from file path/fname.
 
     ``data_write`` and ``data_read`` are probably better suited as ``tofile``
@@ -1394,10 +1406,10 @@ def data_read(fname, keys=None, path='data'):
     path = os.path.abspath(path)
 
     # File name full path.
-    full_path = path+'/'+fname
+    full_path = path+"/"+fname
 
     # Check if shelve exists.
-    for ending in ['.dat', '.bak', '.dir']:
+    for ending in [".dat", ".bak", ".dir"]:
         if not os.path.isfile(full_path+ending):
             print(f"   > File <{full_path+ending}> does not exist.")
             if isinstance(keys, (list, tuple)):
@@ -1406,7 +1418,7 @@ def data_read(fname, keys=None, path='data'):
                 return None
 
     # Get it from shelve.
-    with shelve.open(path+'/'+fname) as db:
+    with shelve.open(path+"/"+fname) as db:
         if keys is None:                           # None
             out = dict()
             for key, item in db.items():
