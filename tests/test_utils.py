@@ -513,10 +513,13 @@ def test_data_write_read(tmpdir, capsys):
     assert_allclose(datout['ee'], ee)
 
     # Test exists-argument 1
+    utils.data_write('testthis', 'ee2', ee, tmpdir, 1)
+    out, _ = capsys.readouterr()
+    assert 'appending to it' in out
     utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, 1)
     out, _ = capsys.readouterr()
+    assert "overwriting existing key(s) 'ee', 'ee2'" in out
     datout = utils.data_read('testthis', path=tmpdir)
-    assert 'appending to it' in out
     assert_allclose(datout['ee'], ee*2)
     assert_allclose(datout['ee2'], ee)
 

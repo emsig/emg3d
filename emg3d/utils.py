@@ -1367,7 +1367,7 @@ def data_write(fname, keys, values, path='data', exists=0):
         if exists > 0:
             over = [j for j in keys if any(i == j for i in list(db.keys()))]
             if len(over) > 0:
-                print(f" (overwriting existing key(s) {', '.join(over)}).")
+                print(" (overwriting existing key(s) "+f"{over}"[1:-1]+").")
             else:
                 print(".")
 
