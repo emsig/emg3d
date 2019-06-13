@@ -37,7 +37,6 @@ import numpy as np
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 
-@nb.njit(**_numba_setting)
 def alt_amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
     r"""Residual without the source term.
 
@@ -51,21 +50,21 @@ def alt_amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
     ny = len(hy)
     nz = len(hz)
 
-    ixm = np.concatenate((np.array([0]), np.arange(nx)))
-    ixp = np.concatenate((np.arange(nx), np.array([nx-1])))
-    iym = np.concatenate((np.array([0]), np.arange(ny)))
-    iyp = np.concatenate((np.arange(ny), np.array([ny-1])))
-    izm = np.concatenate((np.array([0]), np.arange(nz)))
-    izp = np.concatenate((np.arange(nz), np.array([nz-1])))
+    ixm = np.r_[0, np.arange(nx)]
+    ixp = np.r_[np.arange(nx), nx-1]
+    iym = np.r_[0, np.arange(ny)]
+    iyp = np.r_[np.arange(ny), ny-1]
+    izm = np.r_[0, np.arange(nz)]
+    izp = np.r_[np.arange(nz), nz-1]
 
     # Curl  [Muld06]_ equation 7:
     # v = nabla x E.
-    v1 = ((ez[:, 1:, :]-ez[:, :-1, :])/hy.reshape((ny, 1)) -
-          (ey[:, :, 1:]-ey[:, :, :-1])/hz)
-    v2 = ((ex[:, :, 1:]-ex[:, :, :-1])/hz -
-          (ez[1:, :, :]-ez[:-1, :, :])/hx.reshape((nx, 1, 1)))
-    v3 = ((ey[1:, :, :]-ey[:-1, :, :])/hx.reshape((nx, 1, 1)) -
-          (ex[:, 1:, :] - ex[:, :-1, :])/hy.reshape((ny, 1)))
+    v1 = ((ez[:, 1:, :] - ez[:, :-1, :])/hy[None, :, None] -
+          (ey[:, :, 1:] - ey[:, :, :-1])/hz[None, None, :])
+    v2 = ((ex[:, :, 1:] - ex[:, :, :-1])/hz[None, None, :] -
+          (ez[1:, :, :] - ez[:-1, :, :])/hx[:, None, None])
+    v3 = ((ey[1:, :, :] - ey[:-1, :, :])/hx[:, None, None] -
+          (ex[:, 1:, :] - ex[:, :-1, :])/hy[None, :, None])
 
     # Multiply by average of mu_r [Muld06]_ p 636 bottom-left.
     # u = M v = V mu_r^-1 v = V mu_r^-1 nabla x E

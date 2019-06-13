@@ -1132,16 +1132,16 @@ def get_h_field(grid, model, field):
 
     # Carry out the curl (^ corresponds to differentiation axis):
     # H_x = (E_z^1 - E_y^2)
-    _, HY, HZ = np.meshgrid(dx, grid.hy, grid.hz, indexing='ij')
-    e3d_hx = (np.diff(field.fz, axis=1)/HY - np.diff(field.fy, axis=2)/HZ)
+    e3d_hx = (np.diff(field.fz, axis=1)/grid.hy[None, :, None] -
+              np.diff(field.fy, axis=2)/grid.hz[None, None, :])
 
     # H_y = (E_x^2 - E_z^0)
-    HX, _, HZ = np.meshgrid(grid.hx, dy, grid.hz, indexing='ij')
-    e3d_hy = (np.diff(field.fx, axis=2)/HZ - np.diff(field.fz, axis=0)/HX)
+    e3d_hy = (np.diff(field.fx, axis=2)/grid.hz[None, None, :] -
+              np.diff(field.fz, axis=0)/grid.hx[:, None, None])
 
     # H_z = (E_y^0 - E_x^1)
-    HX, HY, _ = np.meshgrid(grid.hx, grid.hy, dz, indexing='ij')
-    e3d_hz = (np.diff(field.fy, axis=0)/HX - np.diff(field.fx, axis=1)/HY)
+    e3d_hz = (np.diff(field.fy, axis=0)/grid.hx[:, None, None] -
+              np.diff(field.fx, axis=1)/grid.hy[None, :, None])
 
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
