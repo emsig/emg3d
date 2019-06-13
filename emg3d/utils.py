@@ -1300,11 +1300,8 @@ class Time:
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
-def data_write(fname, keys, values, path='data'):
+def data_write(fname, keys, values, path='data', exists=0):
     """Write all values with their corresponding key to file path/fname.
-
-    ``data_write`` and ``data_read`` are probably better suited as ``tofile``
-    and ``fromfile`` instances in their specific classes.
 
 
     Parameters
@@ -1321,25 +1318,63 @@ def data_write(fname, keys, values, path='data'):
     path : str, optional
         Absolute or relative path where to store. Default is 'data'.
 
+    exists : int, optional
+        Flag how to act if a shelve with the given name already exists:
+
+        - < 0: Delete existing shelve.
+        - 0 (default): Do nothing (print that it exists).
+        - > 0: Append to existing shelve.
+
     """
-    # Get absolute path, create if it doesn't exist
+    # Get absolute path, create if it doesn't exist.
     path = os.path.abspath(path)
     os.makedirs(path, exist_ok=True)
 
-    # Shelve it
-    with shelve.open(path+'/'+fname) as db:
-        if not isinstance(keys, (list, tuple)):  # single parameter
-            db[keys] = values
-        else:                                    # lists/tuples of parameters
-            for i, key in enumerate(keys):
-                db[key] = values[i]
+    # File name full path.
+    full_path = path+"/"+fname
+
+    # Check if shelve exists.
+    bak_exists = os.path.isfile(full_path+".bak")
+    dat_exists = os.path.isfile(full_path+".dat")
+    dir_exists = os.path.isfile(full_path+".dir")
+    if any([bak_exists, dat_exists, dir_exists]):
+        print("   > File exists, ", end="")
+        if exists == 0:
+            print("NOT SAVING THE DATA.")
+            return
+        elif exists > 0:
+            print("appending to it", end='')
+        else:
+            print("overwriting it.")
+            for ending in ["dat", "bak", "dir"]:
+                try:
+                    os.remove(full_path+"."+ending)
+                except FileNotFoundError:
+                    pass
+
+    # Cast into list.
+    if not isinstance(keys, (list, tuple)):
+        keys = [keys, ]
+        values = [values, ]
+
+    # Shelve it.
+    with shelve.open(full_path) as db:
+
+        # If appending, print the keys which will be overwritten.
+        if exists > 0:
+            over = [j for j in keys if any(i == j for i in list(db.keys()))]
+            if len(over) > 0:
+                print(" (overwriting existing key(s) "+f"{over}"[1:-1]+").")
+            else:
+                print(".")
+
+        # Writing it to the shelve.
+        for i, key in enumerate(keys):
+            db[key] = values[i]
 
 
-def data_read(fname, keys=None, path='data'):
+def data_read(fname, keys=None, path="data"):
     """Read and return keys from file path/fname.
-
-    ``data_write`` and ``data_read`` are probably better suited as ``tofile``
-    and ``fromfile`` instances in their specific classes.
 
 
     Parameters
@@ -1352,7 +1387,7 @@ def data_read(fname, keys=None, path='data'):
         a dict. Default is None.
 
     path : str, optional
-        Absolute or relative path where to store. Default is 'data'.
+        Absolute or relative path where fname is stored. Default is 'data'.
 
 
     Returns
@@ -1361,11 +1396,23 @@ def data_read(fname, keys=None, path='data'):
         Requested value(s) or dict containing everything if keys=None.
 
     """
-    # Get absolute path
+    # Get absolute path.
     path = os.path.abspath(path)
 
-    # Get it from shelve
-    with shelve.open(path+'/'+fname) as db:
+    # File name full path.
+    full_path = path+"/"+fname
+
+    # Check if shelve exists.
+    for ending in [".dat", ".bak", ".dir"]:
+        if not os.path.isfile(full_path+ending):
+            print(f"   > File <{full_path+ending}> does not exist.")
+            if isinstance(keys, (list, tuple)):
+                return len(keys)*(None, )
+            else:
+                return None
+
+    # Get it from shelve.
+    with shelve.open(path+"/"+fname) as db:
         if keys is None:                           # None
             out = dict()
             for key, item in db.items():
