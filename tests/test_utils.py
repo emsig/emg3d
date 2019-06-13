@@ -456,7 +456,7 @@ def test_Time():
     time = utils.Time()   # t0-stamp and a Time-instance.
 
     # Ensure they are the same.
-    assert_allclose(t0, time.t0)
+    assert_allclose(t0, time.t0, atol=1e-3)
 
     # Ensure `now` is a string of numbers and :.
     out = time.now
