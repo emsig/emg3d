@@ -92,8 +92,14 @@ Citation
 ========
 
 If you publish results for which you used `emg3d`, please give credit by citing
-us. We will soon submit an article to `JOSS <https://joss.theoj.org>`_, and
-will post here the details as soon as we have them.
+`Werthmüller et al. (2019)
+<http://joss.theoj.org/papers/d559f2dbd8538007937797122887df0c>`_:
+
+    Werthmüller, D. and W. A. Mulder, and E. C. Slob, 2019, emg3d: A multigrid
+    solver for 3D electromagnetic diffusion: submitted to the Journal of Open
+    Source Software, 4(37), 1463; DOI:  `10.21105/joss.01463
+    <http://joss.theoj.org/papers/d559f2dbd8538007937797122887df0c>`_.
+
 
 All releases have a Zenodo-DOI, provided on the `release-page
 <https://github.com/empymod/emg3d/releases>`_.
