@@ -1303,9 +1303,6 @@ class Time:
 def data_write(fname, keys, values, path='data', exists=0):
     """Write all values with their corresponding key to file path/fname.
 
-    ``data_write`` and ``data_read`` are probably better suited as ``tofile``
-    and ``fromfile`` instances in their specific classes.
-
 
     Parameters
     ----------
@@ -1379,9 +1376,6 @@ def data_write(fname, keys, values, path='data', exists=0):
 def data_read(fname, keys=None, path="data"):
     """Read and return keys from file path/fname.
 
-    ``data_write`` and ``data_read`` are probably better suited as ``tofile``
-    and ``fromfile`` instances in their specific classes.
-
 
     Parameters
     ----------
@@ -1393,7 +1387,7 @@ def data_read(fname, keys=None, path="data"):
         a dict. Default is None.
 
     path : str, optional
-        Absolute or relative path where to store. Default is 'data'.
+        Absolute or relative path where fname is stored. Default is 'data'.
 
 
     Returns
