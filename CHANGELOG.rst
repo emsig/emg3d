@@ -17,8 +17,11 @@ Changelog
   is a need.
 - CPU-graph added on top of RAM-graph.
 - Expand ``utils.Field`` to work with pickle/shelve.
-- Small bugfix introduced in ebd2c9d5: ``sc_cycle`` and ``lr_cycle`` was not
-  updated any longer at the end of a cycle (only affected ``sslsolver=True``.
+- Bug fixes:
+
+  - Small bugfix introduced in ebd2c9d5: ``sc_cycle`` and ``lr_cycle`` was not
+    updated any longer at the end of a cycle (only affected ``sslsolver=True``.
+  - Small bugfix in ``utils.get_hx``.
 
 
 *v0.6.2* : CPU & RAM

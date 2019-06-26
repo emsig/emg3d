@@ -116,8 +116,8 @@ def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
     min_width : None, float, or list of two floats
         Minimum cell width is calculated as a function of skin depth:
         fact_min*sd. If ``min_width`` is a float, this is used. If a list of
-        two values [min, max] are provided, the are used to restrain min_width.
-        Default is None.
+        two values [min, max] are provided, they are used to restrain
+        min_width. Default is None.
 
     fact_min, fact_neg, fact_pos : floats
         The skin depth is multiplied with these factors to estimate:
@@ -138,24 +138,24 @@ def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
 
     """
 
-    # Set fact_pos to fact_neg if not provided
+    # Set fact_pos to fact_neg if not provided.
     if fact_pos is None:
         fact_pos = fact_neg
 
-    # Calculate the skin depth
+    # Calculate the skin depth.
     skind = 503.3*np.sqrt(rho/freq)
 
-    # Estimate minimum cell width
+    # Estimate minimum cell width.
     h_min = fact_min*skind
-    if min_width is not None:  # Respect user input
+    if min_width is not None:  # Respect user input.
         if np.array(min_width).size == 1:
             h_min = min_width
         else:
             h_min = np.clip(h_min, *min_width)
 
-    # Estimate calculation domain
+    # Estimate calculation domain.
     domain = [x0-fact_neg*skind, x0+fact_pos*skind]
-    if limits is not None:  # Respect user input
+    if limits is not None:  # Respect user input.
         domain = [min(limits[0], domain[0]), max(limits[1], domain[1])]
 
     return h_min, domain
@@ -288,6 +288,11 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
         hx = np.r_[hx[: np.argmin(hx)], np.ones(n_nos)*h_min,
                    hx[np.argmin(hx):]]
 
+    # Print warning h_min could not be respected.
+    if abs(hx.min() - h_min) > 0.1:
+        print(f"Warning :: Minimum cell width ({np.round(hx.min(), 2)} m) is "
+              "below `h_min`, because `nx` is too big for `domain`.")
+
     return hx
 
 
@@ -338,7 +343,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
 
     """
     if alpha <= 0.:  # If alpha <= 0: equal spacing (no stretching at all)
-        hx = np.ones(nx)*np.diff(domain)/nx
+        hx = np.ones(nx)*np.diff(np.squeeze(domain))/nx
 
     else:            # Get stretched hx
         a = alpha+1

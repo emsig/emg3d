@@ -204,8 +204,11 @@ Note that installations of ``em3gd`` via conda or pip do not have the
 test-suite included. To run the test-suite you must download ``emg3d`` from
 GitHub.
 
-There are no benchmarks yet, but they are planned and will hopefully come
-sooner than later.
+There is also a benchmark suite using *airspeed velocity*, located in the
+`empymod/emg3d-asv <https://github.com/empymod/emg3d-asv>`_-repository. The
+results of my machine can be found in the `empymod/emg3d-bench
+<https://github.com/empymod/emg3d-bench>`_, its rendered version at
+`empymod.github.io/emg3d-asv <https://empymod.github.io/emg3d-asv>`_.
 
 
 License
