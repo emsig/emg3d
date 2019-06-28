@@ -20,14 +20,13 @@ Example
 
 Here we show a *very* basic example. To see some more realistic models have a
 look at the `emg3d-examples <https://github.com/empymod/emg3d-examples>`_-repo
-on GitHub. If you are already familiar with SimPEG then
-`1c_3D_triaxial_SimPEG.ipynb
-<https://github.com/empymod/emg3d-examples/blob/master/1c_3D_triaxial_SimPEG.ipynb>`_
-might be of interest, a comparison between the ``PARDISO`` and the ``emg3d``
-solvers using SimPEG.
+on GitHub. This particular example is also there, with some further
+explanations and examples to show how to plot the model and the data; see
+`0a_Minimum_working_example.ipynb
+<https://github.com/empymod/emg3d-examples/blob/master/0a_Minimum_working_example.ipynb>`_.
 
-
-First, we load ``numpy``, ``discretize`` (to create a mesh), and ``emg3d``:
+First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
+``numpy``:
 
 .. code-block:: python
 
@@ -36,11 +35,11 @@ First, we load ``numpy``, ``discretize`` (to create a mesh), and ``emg3d``:
     >>> import numpy as np
 
 
-Now, we define the mesh (see :class:`discretize.TensorMesh` for more info). In
-reality, this task requires some careful considerations. E.g., to avoid edge
+First, we define the mesh (see :class:`discretize.TensorMesh` for more info).
+In reality, this task requires some careful considerations. E.g., to avoid edge
 effects, the mesh should be large enough in order for the fields to dissipate,
-yet fine enough around source and receiver to accurately model them. This
-grid is too small, but serves as a minimal example.
+yet fine enough around source and receiver to accurately model them. This grid
+is too small, but serves as a minimal example.
 
 .. code-block:: python
 
@@ -61,7 +60,7 @@ grid is too small, but serves as a minimal example.
        z     32       -540.80        540.80     30.00     44.32    1.05
 
 
-Now we define a very simple fullspace model with
+Next we define a very simple fullspace model with
 :math:`\rho_x=1.5\,\Omega\,\text{m}`, :math:`\rho_y=1.8\,\Omega\,\text{m}`, and
 :math:`\rho_z=3.3\,\Omega\,\text{m}`. The source is an x-directed dipole at the
 origin, with a 10 Hz signal of 1 A.

@@ -214,8 +214,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           level in any direction by its value.
           Default is -1.
 
-    .. |_| unicode:: 0xA0
-        :trim:
 
     Returns
     -------
