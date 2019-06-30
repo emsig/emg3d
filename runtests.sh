@@ -23,7 +23,7 @@ where:
 CHAN=defaults
 PYTHON3VERSION="7"
 PRINT="/dev/null"
-PCKGS="numpy scipy pytest pytest-cov matplotlib numba"
+PCKGS="numpy scipy pytest pytest-cov matplotlib numba scooby"
 PROPS="--flake8"
 INST="pytest-flake8 discretize"
 WARN=""

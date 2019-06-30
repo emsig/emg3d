@@ -1,5 +1,6 @@
 import re
 import os
+import scooby
 import pytest
 import numpy as np
 from scipy import constants
@@ -536,40 +537,10 @@ def test_data_write_read(tmpdir, capsys):
 # OTHER
 def test_versions(capsys):
 
-    # Check the default
-    print(utils.Versions())
-    out1, _ = capsys.readouterr()
+    out1 = utils.Versions()
+    out2 = scooby.Report(
+            core=['numpy', 'scipy', 'numba', 'emg3d'],
+            optional=['IPython', 'matplotlib'],
+            ncol=4)
 
-    # Check one of the standard packages
-    assert 'numpy' in out1
-
-    # Check with an additional package
-    print(utils.Versions(add_pckg=re))
-    out2, _ = capsys.readouterr()
-
-    # Check the provided package, with number
-    assert re.__version__ + ' : re' in out2
-
-    # Check the 'text'-version, providing a package as tuple
-    v1 = utils.Versions(add_pckg=(re, ))
-    print(v1.__repr__())
-    out3, _ = capsys.readouterr()
-
-    # They have to be the same, except time (run at slightly different times)
-    assert out2[75:] == out3[75:]
-
-    # Check 'HTML'/'html'-version, providing a package as a list
-    v2 = utils.Versions(add_pckg=[re])
-    print(v2._repr_html_())
-    out4, _ = capsys.readouterr()
-
-    assert 'numpy' in out4
-    assert 'td style=' in out4
-
-    # Check row of provided package, with number
-    teststr = "<td style='text-align: right; background-color: #ccc; "
-    teststr += "border: 2px solid #fff;'>"
-    teststr += re.__version__
-    teststr += "</td>\n    <td style='"
-    teststr += "text-align: left; border: 2px solid #fff;'>re</td>"
-    assert teststr in out4
+    assert out1.__repr__()[200:] == out2.__repr__()[200:]
