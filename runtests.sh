@@ -17,15 +17,12 @@ where:
 
 "
 
-# TODO: ONE run with NUMBA_DISABLE_JIT="1"; the rest without; for coverage.
-
 # Set default values
-CHAN=defaults
 PYTHON3VERSION="7"
 PRINT="/dev/null"
-PCKGS="numpy scipy pytest pytest-cov matplotlib numba scooby"
+PCKGS="numpy scipy pytest pytest-cov numba"
 PROPS="--flake8"
-INST="pytest-flake8 discretize"
+INST="pytest-flake8 scooby"
 WARN=""
 DISABLENUMBA=false
 
@@ -77,7 +74,7 @@ for i in ${PYTHON3VERSION[@]}; do
   printf '%*s\n' "${LENGTH}" '' | tr ' ' -
   printf "\e[0m\n"
 
-  # Create venv, with channel CHAN
+  # Create venv
   if [ ! -d "$HOME/anaconda3/envs/$NAME" ]; then
     conda create -y -n $NAME python=3.${i} $PCKGS &> $PRINT
   fi

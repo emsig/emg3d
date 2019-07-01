@@ -1447,7 +1447,7 @@ class Versions(scooby.Report):
 
     """
 
-    def __init__(self, add_pckg=None, ncol=4, **kwargs):
+    def __init__(self, add_pckg=None, ncol=3, **kwargs):
         """Initiate a scooby.Report instance."""
 
         # Mandatory packages.
