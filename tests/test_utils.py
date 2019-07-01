@@ -537,10 +537,13 @@ def test_data_write_read(tmpdir, capsys):
 # OTHER
 def test_versions(capsys):
 
+    # Reporting is now done by the external package scooby.
+    # We just ensure the shown packages do not change (core and optional).
     out1 = utils.Versions()
     out2 = scooby.Report(
             core=['numpy', 'scipy', 'numba', 'emg3d'],
             optional=['IPython', 'matplotlib'],
             ncol=4)
 
-    assert out1.__repr__()[200:] == out2.__repr__()[200:]
+    # Ensure they're the same; exclude time to avoid errors.
+    assert out1.__repr__()[115:] == out2.__repr__()[115:]
