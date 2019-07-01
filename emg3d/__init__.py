@@ -25,8 +25,8 @@ sped-up through jitted ``numba``-functions.
 
 from . import utils
 from . import solver
-from .utils import Versions
+from .utils import Report
 
-__all__ = ['solver', 'utils', 'Versions']
+__all__ = ['solver', 'utils', 'Report']
 
 __version__ = '0.6.3dev0'

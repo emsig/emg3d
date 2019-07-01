@@ -33,7 +33,7 @@ from scipy import optimize, interpolate, ndimage
 
 __all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h', 'get_hx',
            'get_source_field', 'get_receiver', 'get_h_field', 'TensorMesh',
-           'Time', 'data_write', 'data_read', 'Versions']
+           'Time', 'data_write', 'data_read', 'Report']
 
 
 # CONSTANTS
@@ -1406,7 +1406,7 @@ def data_read(fname, keys=None, path="data"):
 
 
 # OTHER
-class Versions(scooby.Report):
+class Report(scooby.Report):
     r"""Print date, time, and version information.
 
     Use scooby to print date, time, and package version information in any
@@ -1443,10 +1443,10 @@ class Versions(scooby.Report):
     --------
     >>> import pytest
     >>> import dateutil
-    >>> from emg3d import Versions
-    >>> Versions()                            # Default values
-    >>> Versions(pytest)                      # Provide additional package
-    >>> Versions([pytest, dateutil], ncol=5)  # Set nr of columns
+    >>> from emg3d import Report
+    >>> Report()                            # Default values
+    >>> Report(pytest)                      # Provide additional package
+    >>> Report([pytest, dateutil], ncol=5)  # Set nr of columns
 
     """
 
