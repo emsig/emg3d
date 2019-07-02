@@ -7,10 +7,10 @@ language: python
 # bookkeeping, so it prints the same version in the Travis info.
 matrix:
   include:
-    - python: 3.7  # => 3.7 no JIT
-      env: PYTHON=3.7 NUMBA_DISABLE_JIT=1
+    - python: 3.7  # => 3.7 no JIT; scooby
+      env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST="scooby"
     - python: 3.7  # => 3.7
-      env: PYTHON=3.7
+      env: PYTHON=3.7 INST=""
 
 install:
   - sudo apt-get update
@@ -28,7 +28,7 @@ install:
   # Install and activate environment, install packages
   - conda create -q -n tenv python=$PYTHON numpy scipy pytest pytest-cov numba
   - source activate tenv
-  - pip install coveralls pytest-flake8 scooby
+  - pip install coveralls pytest-flake8 $INST
   - python setup.py install
 
 
