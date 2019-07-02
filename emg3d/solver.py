@@ -214,12 +214,21 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           level in any direction by its value.
           Default is -1.
 
+        - ``return_info`` : bool
+
+          If True, a dictionary is returned with runtime info (final norm and
+          number of iterations of MG and the sslsolver).
+
 
     Returns
     -------
     efield : Field instance
         Resulting electric field. Is not returned but replaced in-place if an
         initial efield was provided.
+
+    info_dict : dict
+        Dictionary with runtime info (final norm and number of iterations of MG
+        and the sslsolver); only if ``return_info=True``.
 
 
     Examples
@@ -294,6 +303,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     """
 
+    # Get return_info from kwargs.
+    return_info = kwargs.pop('return_info', False)
+
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
             cycle=cycle, sslsolver=sslsolver, semicoarsening=semicoarsening,
@@ -362,9 +374,16 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # used in CSEM, we return the conjugate.
     np.conjugate(efield, efield)
 
-    # If efield was not provided, return it.
-    if do_return:
+    # Assemble the info_dict if return_info
+    info_dict = {'norm': var.l2, 'it_mg': var.it, 'it_ssl': var._ssl_it}
+
+    # Return depending on input arguments; or nothing.
+    if do_return and return_info:  # efield and info.
+        return efield, info_dict
+    elif do_return:                # efield.
         return efield
+    elif return_info:              # info.
+        return info_dict
 
 
 # SOLVERS

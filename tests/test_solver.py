@@ -84,9 +84,12 @@ def test_solver_homogeneous(capsys):
     assert ' emg3d END   :: ' in out
 
     # Max it
-    _ = solver.solver(grid, model, sfield, verb=2, maxit=1)
+    maxit = 2
+    _, info = solver.solver(
+            grid, model, sfield, verb=2, maxit=maxit, return_info=True)
     out, _ = capsys.readouterr()
     assert ' MAX. ITERATION REACHED' in out
+    assert maxit == info['it_mg']
 
     # BiCGSTAB with lower verbosity, print checking.
     _ = solver.solver(grid, model, sfield, verb=2, maxit=1, sslsolver=True)
@@ -109,6 +112,12 @@ def test_solver_homogeneous(capsys):
     assert "NOTHING DONE (provided efield already good enough)" in out
     # Ensure the field did not change.
     assert_allclose(efield, efield_copy)
+
+    # Provide initial field and return info.
+    info = solver.solver(
+            grid, model, sfield, efield_copy, return_info=True)
+    assert info['it_mg'] == 0
+    assert info['it_ssl'] == 0
 
     # Check stagnation by providing zero source field.
     _ = solver.solver(grid, model, sfield*0)
