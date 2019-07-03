@@ -24,12 +24,20 @@ Utility functions for the multigrid solver.
 
 
 import os
-import scooby
 import shelve
 import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy import optimize, interpolate, ndimage
+
+# scooby is a soft dependency for emg3d
+try:
+    from scooby import Report as ScoobyReport
+except ImportError:
+    class ScoobyReport:
+        def __init__(self, additional, core, optional, ncol, text_width, sort):
+            print("\n* WARNING :: `emg3d.Report` requires `scooby`."
+                  "\n             Install it via `pip install scooby`.\n")
 
 __all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h', 'get_hx',
            'get_source_field', 'get_receiver', 'get_h_field', 'TensorMesh',
@@ -1406,10 +1414,10 @@ def data_read(fname, keys=None, path="data"):
 
 
 # OTHER
-class Report(scooby.Report):
+class Report(ScoobyReport):
     r"""Print date, time, and version information.
 
-    Use scooby to print date, time, and package version information in any
+    Use ``scooby`` to print date, time, and package version information in any
     environment (Jupyter notebook, IPython console, Python console, QT
     console), either as html-table (notebook) or as plain text (anywhere).
 
@@ -1420,6 +1428,11 @@ class Report(scooby.Report):
     ``matplotlib``. It also shows MKL information, if available.
 
     All modules provided in ``add_pckg`` are also shown.
+
+    .. note::
+
+        The package ``scooby`` has to be installed in order to use ``Report``:
+        ``pip install scooby``.
 
 
     Parameters

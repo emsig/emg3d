@@ -1,6 +1,5 @@
 import re
 import os
-import scooby
 import pytest
 import numpy as np
 from scipy import constants
@@ -8,11 +7,11 @@ from timeit import default_timer
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
-# Optional imports
+# Optional import
 try:
-    import IPython
+    import scooby
 except ImportError:
-    IPython = False
+    scooby = False
 
 from emg3d import utils
 
@@ -536,14 +535,21 @@ def test_data_write_read(tmpdir, capsys):
 
 # OTHER
 def test_report(capsys):
+    out, _ = capsys.readouterr()  # Empty capsys
 
     # Reporting is now done by the external package scooby.
     # We just ensure the shown packages do not change (core and optional).
-    out1 = utils.Report()
-    out2 = scooby.Report(
-            core=['numpy', 'scipy', 'numba', 'emg3d'],
-            optional=['IPython', 'matplotlib'],
-            ncol=4)
+    if scooby:
+        out1 = utils.Report()
+        out2 = scooby.Report(
+                core=['numpy', 'scipy', 'numba', 'emg3d'],
+                optional=['IPython', 'matplotlib'],
+                ncol=4)
 
-    # Ensure they're the same; exclude time to avoid errors.
-    assert out1.__repr__()[115:] == out2.__repr__()[115:]
+        # Ensure they're the same; exclude time to avoid errors.
+        assert out1.__repr__()[115:] == out2.__repr__()[115:]
+
+    else:  # soft dependency
+        _ = utils.Report()
+        out, _ = capsys.readouterr()  # Empty capsys
+        assert 'WARNING :: `emg3d.Report` requires `scooby`' in out
