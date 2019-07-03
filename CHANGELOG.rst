@@ -17,6 +17,7 @@ Changelog
   is a need.
 - CPU-graph added on top of RAM-graph.
 - Expand ``utils.Field`` to work with pickle/shelve.
+- Jit ``np.linalg.norm`` (``njitted.l2norm``).
 - Bug fixes:
 
   - Small bugfix introduced in ebd2c9d5: ``sc_cycle`` and ``lr_cycle`` was not

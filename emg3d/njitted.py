@@ -1995,3 +1995,10 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
         wr[i] *= cvectorCC[i]-vectorCC[2*i]
 
     return wl, w0, wr
+
+
+# Simple wrapped functions
+@nb.njit(**_numba_setting)
+def l2norm(x):
+    """Jitted version of np.linalg.norm(x, ord=None); l2-norm."""
+    return np.linalg.norm(x)

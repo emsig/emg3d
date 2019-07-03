@@ -333,7 +333,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = residual(grid, model, sfield, efield, True)
-        if var.l2 < var.tol*np.linalg.norm(sfield):
+        if var.l2 < var.tol*njitted.l2norm(sfield):
 
             # Switch-off both sslsolver and multigrid.
             var.sslsolver = None
@@ -438,7 +438,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     cyc = 0  # Initiate cycle count.
 
     # Define various l2-norms.
-    l2_refe = np.linalg.norm(sfield)  # Reference norm for tolerance.
+    l2_refe = njitted.l2norm(sfield)  # Reference norm for tolerance.
     l2_last = residual(grid, model, sfield, efield, True)  # Current residual.
     l2_init = l2_last
     l2_prev = l2_last
@@ -962,7 +962,7 @@ def residual(grid, model, sfield, efield, norm=False):
                    model.v_mu_r, grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its norm.
-        return np.linalg.norm(rfield)
+        return njitted.l2norm(rfield)
     else:     # Return residual.
         return rfield
 
