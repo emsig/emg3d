@@ -324,7 +324,7 @@ def test_residual():
 
     # Compare
     assert_allclose(out, rfield)
-    assert outnorm == np.linalg.norm(out)
+    assert_allclose(outnorm, np.linalg.norm(out))
 
 
 def test_krylov(capsys):
