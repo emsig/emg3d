@@ -312,8 +312,13 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             linerelaxation=linerelaxation, vnC=grid.vnC, verb=verb, **kwargs
     )
 
-    # Start logging and print all parameters.
+    # Start logging
     var.cprint(f"\n:: emg3d START :: {var.time.now} ::\n", 1)
+
+    # Calculate reference norm for tolerance.
+    var.l2_refe = njitted.l2norm(sfield)
+
+    # Print all parameters.
     var.cprint(var, 1)
 
     # Get efield
@@ -333,7 +338,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = residual(grid, model, sfield, efield, True)
-        if var.l2 < var.tol*njitted.l2norm(sfield):
+        if var.l2 < var.tol*var.l2_refe:
 
             # Switch-off both sslsolver and multigrid.
             var.sslsolver = None
@@ -343,14 +348,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
 
     # Print header for iteration log.
-    header = f"   [hh:mm:ss]     {'error':<15}"
+    header = f"   [hh:mm:ss]  {'rel. error':<18}"
     if var.sslsolver:
         header += f"{'solver':<20} "
         if var.cycle:
             header += f"{'MG':<11} l s"
         var.cprint(header+"\n", 2)
     elif var.cycle:
-        var.cprint(header+f"{'l2:[last/init, last/prev]':>32} l s\n", 2)
+        var.cprint(header+f"{'l2:[absolut, last/prev]':>32} l s\n", 2)
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
@@ -365,7 +370,8 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             info += f"   > MG prec. steps : {var.it}\n"
     elif var.cycle:    # multigrid-specific info.
         info = f"   > MG cycles      : {var.it}\n"
-    info += f"   > Final l2-norm  : {var.l2:.3e}\n\n"  # Final error.
+    info += f"   > Final error    : {var.l2:.3e}"      # Final error.
+    info += f" ({var.l2/var.l2_refe:.3e} rel.)\n\n"    # Relative.
     info += f":: emg3d END   :: {var.time.now} :: "    # END and time.
     info += f"runtime = {var.time.runtime}\n"          # Total runtime.
     var.cprint(info, 1)
@@ -437,11 +443,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         cycmax = new_cycmax
     cyc = 0  # Initiate cycle count.
 
-    # Define various l2-norms.
-    l2_refe = njitted.l2norm(sfield)  # Reference norm for tolerance.
-    l2_last = residual(grid, model, sfield, efield, True)  # Current residual.
-    l2_init = l2_last
-    l2_prev = l2_last
+    # Calculate current error (l2-norms).
+    l2_last = residual(grid, model, sfield, efield, True)
 
     # Keep track on the levels during the first cycle, for QC.
     if var._first_cycle:
@@ -539,7 +542,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             l2_last = residual(grid, model, sfield, efield, True)
 
             # Print end-of-cycle info.
-            _print_cycle_info(var, l2_last, l2_prev, l2_init)
+            _print_cycle_info(var, l2_last, l2_prev)
 
             # Adjust semicoarsening and line relaxation if they cycle.
             if var.sc_cycle:
@@ -548,7 +551,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 var.lr_dir = next(var.lr_cycle)
 
             # Check if any termination criteria is fulfilled.
-            if _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+            if _terminate(var, l2_last, l2_prev, it):
                 break
 
     # Store final error (l2-norm).
@@ -640,7 +643,7 @@ def krylov(grid, model, sfield, efield, var):
                 var.l2 = residual(
                         grid, model, sfield, utils.Field(grid, x), True)
 
-            log = f"   [{var.time.now}] {var.l2:.3e} "
+            log = f"   [{var.time.now}] {var.l2/var.l2_refe:.3e} "
             log += f"after {var._ssl_it:2} {var.sslsolver}-cycles"
 
             # For those solvers who run an iteration before the first
@@ -1034,24 +1037,24 @@ class MGParameters:
 
         outstring = (
             f"   MG-cycle       : {self.cycle!r:17}"
-            f"   sslsolver : {self.sslsolver!r}\n"
+            f"   sslsolver  : {self.sslsolver!r}\n"
             f"   semicoarsening : {self.__p_sc_dir:17}"
-            f"   tol       : {self.tol}\n"
+            f"   maxit      : {self.__maxit}\n"
             f"   linerelaxation : {self.__p_lr_dir:17}"
-            f"   maxit     : {self.__maxit}\n"
+            f"   verb       : {self.verb}\n"
             f"   nu_{{i,1,c,2}}   : {self.nu_init}, {self.nu_pre}"
             f", {self.nu_coarse}, {self.nu_post}       "
-            f"   verb      : {self.verb}\n"
+            f"   tol        : {self.tol}\n"
+            f"   Coarsest level : {self.pclevel['clevel'][0]:3} "
+            f"; {self.pclevel['clevel'][1]:3} ;{self.pclevel['clevel'][2]:4} "
+            f"  {self.pclevel['message']}  ref. error : {self.l2_refe:1.2e}"
+            f"\n"
             f"   Original grid  "
             f": {self.vnC[0]:3} x {self.vnC[1]:3} x {self.vnC[2]:3}  "
             f"   => {self.vnC[0]*self.vnC[1]*self.vnC[2]:,} cells\n"
             f"   Coarsest grid  : {self.pclevel['vnC'][0]:3} "
             f"x {self.pclevel['vnC'][1]:3} x {self.pclevel['vnC'][2]:3}  "
             f"   => {self.pclevel['nC']:,} cells\n"
-            f"   Coarsest level : {self.pclevel['clevel'][0]:3} "
-            f"; {self.pclevel['clevel'][1]:3} ;{self.pclevel['clevel'][2]:4} "
-            f"  {self.pclevel['message']}"
-            f"\n"
         )
 
         return outstring
@@ -1463,7 +1466,7 @@ def _current_lr_dir(lr_dir, grid):
     return lr_dir
 
 
-def _print_cycle_info(var, l2_last, l2_prev, l2_init):
+def _print_cycle_info(var, l2_last, l2_prev):
     """Print cycle info to log.
 
     Parameters
@@ -1471,8 +1474,8 @@ def _print_cycle_info(var, l2_last, l2_prev, l2_init):
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
 
-    l2_last, l2_prev, l2_init : float
-        Last, previous, and initial l2-norms.
+    l2_last, l2_prev : float
+        Last and previous l2-norms.
 
     """
 
@@ -1518,16 +1521,14 @@ def _print_cycle_info(var, l2_last, l2_prev, l2_init):
         var._first_cycle = False
 
     # Add iteration log.
+    info += f"   [{var.time.now}] {l2_last/var.l2_refe:.3e} "
     if var.sslsolver:  # For multigrid as preconditioner.
-        info += f"   [{var.time.now}] {l2_last:.3e} "
-        info += f"after {20*' '} {var.it:2} {var.cycle}-cycles; "
-        info += f"  {var.lr_dir} {var.sc_dir}"
+        info += f"after {20*' '} {var.it:2} {var.cycle}-cycles;  "
 
     else:              # For multigrid as solver.
-        info += f"   [{var.time.now}] {l2_last:.3e} "
         info += f"after {var.it:2} {var.cycle}-cycles; "
-        info += f"[{l2_last/l2_init:.3e}, {l2_last/l2_prev:.3e}]"
-        info += f" {var.lr_dir} {var.sc_dir}"
+        info += f"[{l2_last:.3e}, {l2_last/l2_prev:.3e}]"
+    info += f" {var.lr_dir} {var.sc_dir}"
 
     if var.verb > 3:
         info += "\n"
@@ -1566,7 +1567,7 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
     print(info)
 
 
-def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+def _terminate(var, l2_last, l2_prev, it):
     """Return multigrid termination flag.
 
     Checks all termination criteria and returns True if at least one is
@@ -1578,8 +1579,8 @@ def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
 
-    l2_last, l2_prev, l2_init, l2_refe : float
-        Last, previous, initial, and reference l2-norms.
+    l2_last, l2_prev : float
+        Last and previous l2-norms.
 
     it : int
         Iteration number.
@@ -1607,11 +1608,11 @@ def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
         else:
             add = ""
 
-        if l2_last < var.tol*l2_refe:        # Converged.
+        if l2_last < var.tol*var.l2_refe:    # Converged.
             info += add+"   > CONVERGED\n"
             finished = True
 
-        elif l2_last > 10*l2_init:           # Diverged.
+        elif l2_last > 10*var.l2_refe:       # Diverged.
             info += add+"   > DIVERGED\n"
             finished = True
 
