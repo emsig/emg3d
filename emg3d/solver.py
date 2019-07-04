@@ -306,19 +306,18 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Get return_info from kwargs.
     return_info = kwargs.pop('return_info', False)
 
-    # Calculate reference norm for tolerance.
-    l2_refe = njitted.l2norm(sfield)
-
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
             cycle=cycle, sslsolver=sslsolver, semicoarsening=semicoarsening,
-            linerelaxation=linerelaxation, vnC=grid.vnC, verb=verb,
-            l2_refe=l2_refe, **kwargs
+            linerelaxation=linerelaxation, vnC=grid.vnC, verb=verb, **kwargs
     )
 
     # Start logging and print all parameters.
     var.cprint(f"\n:: emg3d START :: {var.time.now} ::\n", 1)
     var.cprint(var, 1)
+
+    # Calculate reference norm for tolerance.
+    var.l2_refe = njitted.l2norm(sfield)
 
     # Get efield
     if efield is None:
@@ -364,15 +363,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Print runtime information.
     if var.sslsolver:  # sslsolver-specific info.
-        info = f"   > Solver steps   : {var._ssl_it}\n"
+        info = f"   > Solver steps     : {var._ssl_it}\n"
         if var.cycle:
-            info += f"   > MG prec. steps : {var.it}\n"
+            info += f"   > MG prec. steps   : {var.it}\n"
     elif var.cycle:    # multigrid-specific info.
-        info = f"   > MG cycles      : {var.it}\n"
-    info += f"   > Final error    : {var.l2:.3e}"      # Final error.
-    info += f" ({var.l2/var.l2_refe:.3e} rel.)\n\n"    # Relative.
-    info += f":: emg3d END   :: {var.time.now} :: "    # END and time.
-    info += f"runtime = {var.time.runtime}\n"          # Total runtime.
+        info = f"   > MG cycles        : {var.it}\n"
+    info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"  # Error.
+    info += f":: emg3d END   :: {var.time.now} :: "  # END and time.
+    info += f"runtime = {var.time.runtime}\n"        # Total runtime.
     var.cprint(info, 1)
 
     # To use the same Fourier-transform convention as empymod and commonly
@@ -380,7 +378,12 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
-    info_dict = {'norm': var.l2, 'it_mg': var.it, 'it_ssl': var._ssl_it}
+    info_dict = {
+            'norm': var.l2,  # Abs. error; divide by ref_norm for rel. error.
+            'ref_norm': var.l2_refe,  # Reference error (sfield).
+            'it_mg': var.it,
+            'it_ssl': var._ssl_it
+    }
 
     # Return depending on input arguments; or nothing.
     if do_return and return_info:  # efield and info.
@@ -992,7 +995,6 @@ class MGParameters:
     linerelaxation: int
     semicoarsening: int
     vnC: tuple  # Finest grid dimension
-    l2_refe: float  # Reference error
 
     # (B) Parameters with default values
     # Convergence tolerance.
@@ -1018,7 +1020,8 @@ class MGParameters:
         self._first_cycle = True   # Flag if in first cycle for QC-figure.
         self.it = 0                # To store MG cycle count
         self._ssl_it = 0           # To store solver iteration count
-        self.l2 = 0                # To store current error
+        self.l2 = 0.0              # To store current error
+        self.l2_refe = 0.0         # To store reference error
 
         self.time = utils.Time()   # Timer
 
@@ -1037,24 +1040,24 @@ class MGParameters:
 
         outstring = (
             f"   MG-cycle       : {self.cycle!r:17}"
-            f"   sslsolver  : {self.sslsolver!r}\n"
+            f"   sslsolver : {self.sslsolver!r}\n"
             f"   semicoarsening : {self.__p_sc_dir:17}"
-            f"   maxit      : {self.__maxit}\n"
+            f"   tol       : {self.tol}\n"
             f"   linerelaxation : {self.__p_lr_dir:17}"
-            f"   verb       : {self.verb}\n"
+            f"   maxit     : {self.__maxit}\n"
             f"   nu_{{i,1,c,2}}   : {self.nu_init}, {self.nu_pre}"
             f", {self.nu_coarse}, {self.nu_post}       "
-            f"   tol        : {self.tol}\n"
-            f"   Coarsest level : {self.pclevel['clevel'][0]:3} "
-            f"; {self.pclevel['clevel'][1]:3} ;{self.pclevel['clevel'][2]:4} "
-            f"  {self.pclevel['message']}  ref. error : {self.l2_refe:1.2e}"
-            f"\n"
+            f"   verb      : {self.verb}\n"
             f"   Original grid  "
             f": {self.vnC[0]:3} x {self.vnC[1]:3} x {self.vnC[2]:3}  "
             f"   => {self.vnC[0]*self.vnC[1]*self.vnC[2]:,} cells\n"
             f"   Coarsest grid  : {self.pclevel['vnC'][0]:3} "
             f"x {self.pclevel['vnC'][1]:3} x {self.pclevel['vnC'][2]:3}  "
             f"   => {self.pclevel['nC']:,} cells\n"
+            f"   Coarsest level : {self.pclevel['clevel'][0]:3} "
+            f"; {self.pclevel['clevel'][1]:3} ;{self.pclevel['clevel'][2]:4} "
+            f"  {self.pclevel['message']}"
+            f"\n"
         )
 
         return outstring
