@@ -40,7 +40,7 @@ def test_solver_homogeneous(capsys):
     assert ' emg3d START ::' in out
     assert ' [hh:mm:ss] ' in out
     assert ' MG cycles ' in out
-    assert ' Final l2-norm ' in out
+    assert ' Final error ' in out
     assert ' emg3d END   :: ' in out
 
     # Check all fields (ex, ey, and ez)
@@ -67,7 +67,7 @@ def test_solver_homogeneous(capsys):
     assert ' CONVERGED' in out
     assert ' Solver steps ' in out
     assert ' MG prec. steps ' in out
-    assert ' Final l2-norm ' in out
+    assert ' Final error ' in out
     assert ' emg3d END   :: ' in out
 
     # Check all fields (ex, ey, and ez)
@@ -80,7 +80,7 @@ def test_solver_homogeneous(capsys):
     assert ' [hh:mm:ss] ' in out
     assert ' CONVERGED' in out
     assert ' MG cycles ' in out
-    assert ' Final l2-norm ' in out
+    assert ' Final error ' in out
     assert ' emg3d END   :: ' in out
 
     # Max it
@@ -119,8 +119,8 @@ def test_solver_homogeneous(capsys):
     assert info['it_mg'] == 0
     assert info['it_ssl'] == 0
 
-    # Check stagnation by providing zero source field.
-    _ = solver.solver(grid, model, sfield*0)
+    # Check stagnation by providing an almost zero source field.
+    _ = solver.solver(grid, model, sfield*0+1e-20)
     out, _ = capsys.readouterr()
     assert "STAGNATED" in out
 
@@ -340,9 +340,10 @@ def test_krylov(capsys):
     efield = utils.Field(grid)  # Initiate e-field.
 
     # Get var-instance
+    l2_refe = njitted.l2norm(sfield)
     var = solver.MGParameters(
             cycle=None, sslsolver=True, semicoarsening=False,
-            linerelaxation=False, vnC=grid.vnC, verb=3,
+            linerelaxation=False, vnC=grid.vnC, verb=3, l2_refe=l2_refe,
             maxit=-1,  # Set stupid input to make bicgstab fail.
     )
 
@@ -357,62 +358,67 @@ def test_mgparameters():
 
     # 1. semicoarsening
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=True,
-                              linerelaxation=False, vnC=vnC, verb=1)
+                              linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
     assert 'semicoarsening : True [1 2 3]' in var.__repr__()
+    assert 'ref. error : 1' in var.__repr__()
     var = solver.MGParameters(cycle='V', sslsolver=False, semicoarsening=1213,
-                              linerelaxation=False, vnC=vnC, verb=1)
+                              linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
     assert 'semicoarsening : True [1 2 1 3]' in var.__repr__()
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=2,
-                              linerelaxation=False, vnC=vnC, verb=1)
+                              linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
     assert 'semicoarsening : True [2]' in var.__repr__()
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=5,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
 
     # 2. linerelaxation
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=True, vnC=vnC, verb=1)
+                              linerelaxation=True, vnC=vnC, verb=1, l2_refe=1)
     assert 'linerelaxation : True [4 5 6]' in var.__repr__()
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=1247, vnC=vnC, verb=1)
+                              linerelaxation=1247, vnC=vnC, verb=1, l2_refe=1)
     assert 'linerelaxation : True [1 2 4 7]' in var.__repr__()
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=1, vnC=vnC, verb=1, clevel=1)
+                              linerelaxation=1, vnC=vnC, verb=1, l2_refe=1,
+                              clevel=1)
     assert 'linerelaxation : True [1]' in var.__repr__()
     assert_allclose(var.clevel, 1)
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                            linerelaxation=-9, vnC=vnC, verb=1)
+                            linerelaxation=-9, vnC=vnC, verb=1, l2_refe=1)
 
     # 3. sslsolver and cycle
     with pytest.raises(ValueError):
         solver.MGParameters(cycle=None, sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
     var = solver.MGParameters(cycle='F', sslsolver=True, semicoarsening=True,
-                              linerelaxation=False, vnC=vnC, verb=1, maxit=33)
-    assert "sslsolver : 'bicgstab'" in var.__repr__()
+                              linerelaxation=False, vnC=vnC, verb=1, l2_refe=1,
+                              maxit=33)
+    assert "sslsolver  : 'bicgstab'" in var.__repr__()
     assert var.ssl_maxit == 33
     assert var.maxit == 3
     var = solver.MGParameters(cycle='F', sslsolver='gmres', semicoarsening=0,
-                              linerelaxation=False, vnC=vnC, verb=1, maxit=5)
-    assert "sslsolver : 'gmres'" in var.__repr__()
+                              linerelaxation=False, vnC=vnC, verb=1, l2_refe=1,
+                              maxit=5)
+    assert "sslsolver  : 'gmres'" in var.__repr__()
     assert var.ssl_maxit == 5
     assert var.maxit == 1
     assert_allclose(var.clevel, np.array([4, 4, 3, 4]))
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='F', sslsolver='abcd', semicoarsening=0,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='F', sslsolver=4, semicoarsening=0,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='G', sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, vnC=vnC, verb=1, l2_refe=1)
 
     # 4. Wrong grid size
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, vnC=(1, 2, 3), verb=1)
+                            linerelaxation=False, vnC=(1, 2, 3), verb=1,
+                            l2_refe=1)
 
 
 def test_RegularGridProlongator():

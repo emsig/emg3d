@@ -306,19 +306,18 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Get return_info from kwargs.
     return_info = kwargs.pop('return_info', False)
 
+    # Calculate reference norm for tolerance.
+    l2_refe = njitted.l2norm(sfield)
+
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
             cycle=cycle, sslsolver=sslsolver, semicoarsening=semicoarsening,
-            linerelaxation=linerelaxation, vnC=grid.vnC, verb=verb, **kwargs
+            linerelaxation=linerelaxation, vnC=grid.vnC, verb=verb,
+            l2_refe=l2_refe, **kwargs
     )
 
-    # Start logging
+    # Start logging and print all parameters.
     var.cprint(f"\n:: emg3d START :: {var.time.now} ::\n", 1)
-
-    # Calculate reference norm for tolerance.
-    var.l2_refe = njitted.l2norm(sfield)
-
-    # Print all parameters.
     var.cprint(var, 1)
 
     # Get efield
@@ -993,6 +992,7 @@ class MGParameters:
     linerelaxation: int
     semicoarsening: int
     vnC: tuple  # Finest grid dimension
+    l2_refe: float  # Reference error
 
     # (B) Parameters with default values
     # Convergence tolerance.
