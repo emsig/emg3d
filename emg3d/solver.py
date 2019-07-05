@@ -269,7 +269,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
     .
-    :: emg3d START :: 15:24:40 ::
+    :: emg3d START :: 11:18:16 ::
     .
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
@@ -279,7 +279,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
        Coarsest grid  :   3 x   2 x   2     => 12 cells
        Coarsest level :   4 ;   4 ;   4
     .
-       [hh:mm:ss]  rel. error              error:[absolut, last/prev] l s
+       [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
     .
            h_
           2h_ \                  /
@@ -287,19 +287,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           8h_   \    /\  /  \  /
          16h_    \/\/  \/    \/
     .
-       [15:24:40] 2.623e-02 after  1 F-cycles; [1.464e-06, 2.623e-02] 0 0
-       [15:24:40] 2.253e-03 after  2 F-cycles; [1.258e-07, 8.589e-02] 0 0
-       [15:24:41] 3.051e-04 after  3 F-cycles; [1.704e-08, 1.354e-01] 0 0
-       [15:24:41] 5.500e-05 after  4 F-cycles; [3.071e-09, 1.803e-01] 0 0
-       [15:24:41] 1.170e-05 after  5 F-cycles; [6.531e-10, 2.127e-01] 0 0
-       [15:24:42] 2.745e-06 after  6 F-cycles; [1.532e-10, 2.346e-01] 0 0
-       [15:24:42] 6.873e-07 after  7 F-cycles; [3.837e-11, 2.504e-01] 0 0
+       [11:18:17]   2.623e-02  after   1 F-cycles   [1.464e-06, 0.026]   0 0
+       [11:18:17]   2.253e-03  after   2 F-cycles   [1.258e-07, 0.086]   0 0
+       [11:18:17]   3.051e-04  after   3 F-cycles   [1.704e-08, 0.135]   0 0
+       [11:18:17]   5.500e-05  after   4 F-cycles   [3.071e-09, 0.180]   0 0
+       [11:18:18]   1.170e-05  after   5 F-cycles   [6.531e-10, 0.213]   0 0
+       [11:18:18]   2.745e-06  after   6 F-cycles   [1.532e-10, 0.235]   0 0
+       [11:18:18]   6.873e-07  after   7 F-cycles   [3.837e-11, 0.250]   0 0
     .
        > CONVERGED
        > MG cycles        : 7
        > Final rel. error : 6.873e-07
     .
-    :: emg3d END :: 15:24:42 :: runtime = 0:00:02.177778
+    :: emg3d END   :: 11:18:18 :: runtime = 0:00:02
 
     """
 
@@ -346,14 +346,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
 
     # Print header for iteration log.
-    header = f"   [hh:mm:ss]  {'rel. error':<18}"
+    header = f"   [hh:mm:ss]  {'rel. error':<22}"
     if var.sslsolver:
-        header += f"{'solver':<20} "
+        header += f"{'solver':<20}"
         if var.cycle:
             header += f"{'MG':<11} l s"
         var.cprint(header+"\n", 2)
     elif var.cycle:
-        var.cprint(header+f"{'error:[absolut, last/prev]':>32} l s\n", 2)
+        var.cprint(header+f"{'[abs. error, last/prev]':>29}   l s\n", 2)
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
@@ -649,8 +649,8 @@ def krylov(grid, model, sfield, efield, var):
                 var.l2 = residual(
                         grid, model, sfield, utils.Field(grid, x), True)
 
-            log = f"   [{var.time.now}] {var.l2/var.l2_refe:.3e} "
-            log += f"after {var._ssl_it:2} {var.sslsolver}-cycles"
+            log = f"   [{var.time.now}]   {var.l2/var.l2_refe:.3e} "
+            log += f" after {var._ssl_it:3} {var.sslsolver}-cycles"
 
             # For those solvers who run an iteration before the first
             # preconditioner run ['lgmres', 'gcrotmk'].
@@ -1529,14 +1529,14 @@ def _print_cycle_info(var, l2_last, l2_prev):
         var._first_cycle = False
 
     # Add iteration log.
-    info += f"   [{var.time.now}] {l2_last/var.l2_refe:.3e} "
+    info += f"   [{var.time.now}]   {l2_last/var.l2_refe:.3e}  "
     if var.sslsolver:  # For multigrid as preconditioner.
-        info += f"after {20*' '} {var.it:2} {var.cycle}-cycles;  "
+        info += f"after {19*' '} {var.it:3} {var.cycle}-cycles "
 
     else:              # For multigrid as solver.
-        info += f"after {var.it:2} {var.cycle}-cycles; "
-        info += f"[{l2_last:.3e}, {l2_last/l2_prev:.3e}]"
-    info += f" {var.lr_dir} {var.sc_dir}"
+        info += f"after {var.it:3} {var.cycle}-cycles   "
+        info += f"[{l2_last:.3e}, {l2_last/l2_prev:.3f}]"
+    info += f"   {var.lr_dir} {var.sc_dir}"
 
     if var.verb > 3:
         info += "\n"

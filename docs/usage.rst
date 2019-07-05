@@ -79,7 +79,7 @@ Now we can calculate the electric field with ``emg3d``:
 
     >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
 
-    :: emg3d START :: 15:24:40 ::
+    :: emg3d START :: 11:18:16 ::
 
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
@@ -89,27 +89,27 @@ Now we can calculate the electric field with ``emg3d``:
        Coarsest grid  :   3 x   2 x   2     => 12 cells
        Coarsest level :   4 ;   4 ;   4
 
-       [hh:mm:ss]     error                 l2:[last/init, last/prev] l s
+       [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
 
            h_
-          2h_ \                  /
-          4h_  \          /\    /
-          8h_   \    /\  /  \  /
-         16h_    \/\/  \/    \/
+           2h_ \                  /
+           4h_  \          /\    /
+           8h_   \    /\  /  \  /
+          16h_    \/\/  \/    \/
 
-       [15:24:40] 2.623e-02 after  1 F-cycles; [1.464e-06, 2.623e-02] 0 0
-       [15:24:40] 2.253e-03 after  2 F-cycles; [1.258e-07, 8.589e-02] 0 0
-       [15:24:41] 3.051e-04 after  3 F-cycles; [1.704e-08, 1.354e-01] 0 0
-       [15:24:41] 5.500e-05 after  4 F-cycles; [3.071e-09, 1.803e-01] 0 0
-       [15:24:41] 1.170e-05 after  5 F-cycles; [6.531e-10, 2.127e-01] 0 0
-       [15:24:42] 2.745e-06 after  6 F-cycles; [1.532e-10, 2.346e-01] 0 0
-       [15:24:42] 6.873e-07 after  7 F-cycles; [3.837e-11, 2.504e-01] 0 0
+       [11:18:17]   2.623e-02  after   1 F-cycles   [1.464e-06, 0.026]   0 0
+       [11:18:17]   2.253e-03  after   2 F-cycles   [1.258e-07, 0.086]   0 0
+       [11:18:17]   3.051e-04  after   3 F-cycles   [1.704e-08, 0.135]   0 0
+       [11:18:17]   5.500e-05  after   4 F-cycles   [3.071e-09, 0.180]   0 0
+       [11:18:18]   1.170e-05  after   5 F-cycles   [6.531e-10, 0.213]   0 0
+       [11:18:18]   2.745e-06  after   6 F-cycles   [1.532e-10, 0.235]   0 0
+       [11:18:18]   6.873e-07  after   7 F-cycles   [3.837e-11, 0.250]   0 0
 
        > CONVERGED
-       > MG cycles       : 7
+       > MG cycles        : 7
        > Final rel. error : 6.873e-07
 
-    :: emg3d END :: 15:24:42 :: runtime = 0:00:02.177778
+    :: emg3d END   :: 11:18:18 :: runtime = 0:00:02
 
 So the calculation required seven multigrid F-cycles and took just a bit more
 than 2 seconds. It was able to coarsen in each dimension four times, where the
