@@ -97,17 +97,17 @@ Now we can calculate the electric field with ``emg3d``:
           8h_   \    /\  /  \  /
          16h_    \/\/  \/    \/
 
-       [15:24:40] 1.464e-06 after  1 F-cycles; [2.623e-02, 2.623e-02] 0 0
-       [15:24:40] 1.258e-07 after  2 F-cycles; [2.253e-03, 8.589e-02] 0 0
-       [15:24:41] 1.704e-08 after  3 F-cycles; [3.051e-04, 1.354e-01] 0 0
-       [15:24:41] 3.071e-09 after  4 F-cycles; [5.500e-05, 1.803e-01] 0 0
-       [15:24:41] 6.531e-10 after  5 F-cycles; [1.170e-05, 2.127e-01] 0 0
-       [15:24:42] 1.532e-10 after  6 F-cycles; [2.745e-06, 2.346e-01] 0 0
-       [15:24:42] 3.837e-11 after  7 F-cycles; [6.873e-07, 2.504e-01] 0 0
+       [15:24:40] 2.623e-02 after  1 F-cycles; [1.464e-06, 2.623e-02] 0 0
+       [15:24:40] 2.253e-03 after  2 F-cycles; [1.258e-07, 8.589e-02] 0 0
+       [15:24:41] 3.051e-04 after  3 F-cycles; [1.704e-08, 1.354e-01] 0 0
+       [15:24:41] 5.500e-05 after  4 F-cycles; [3.071e-09, 1.803e-01] 0 0
+       [15:24:41] 1.170e-05 after  5 F-cycles; [6.531e-10, 2.127e-01] 0 0
+       [15:24:42] 2.745e-06 after  6 F-cycles; [1.532e-10, 2.346e-01] 0 0
+       [15:24:42] 6.873e-07 after  7 F-cycles; [3.837e-11, 2.504e-01] 0 0
 
        > CONVERGED
-       > MG cycles      : 7
-       > Final l2-norm  : 3.837e-11
+       > MG cycles       : 7
+       > Final rel. error : 6.873e-07
 
     :: emg3d END :: 15:24:42 :: runtime = 0:00:02.177778
 
