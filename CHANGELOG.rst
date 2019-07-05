@@ -1,15 +1,18 @@
 Changelog
 #########
 
-*latest*
---------
+
+*v0.7.0* : H-field
+------------------
+
+**2019-07-05**
 
 - New routines:
 
   - ``utils.get_h_field``: Small routine to calculate the magnetic field from
     the electric field using Faraday's law.
   - ``utils.get_receiver``: Small wrapper to interpolate a field at receiver
-    positions. Added 3D spline interpolation; is the new the default.
+    positions. Added 3D spline interpolation; is the new default.
 
 - Re-implemented the possibility to define isotropic magnetic permeabilities in
   ``utils.Model``. Magnetic permeability is not tri-axially included in the
@@ -18,6 +21,9 @@ Changelog
 - CPU-graph added on top of RAM-graph.
 - Expand ``utils.Field`` to work with pickle/shelve.
 - Jit ``np.linalg.norm`` (``njitted.l2norm``).
+- Use ``scooby`` (soft dependency) for versioning, rename ``Version`` to
+  ``Report`` (backwards incompatible).
+
 - Bug fixes:
 
   - Small bugfix introduced in ebd2c9d5: ``sc_cycle`` and ``lr_cycle`` was not
