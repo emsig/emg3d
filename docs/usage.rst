@@ -138,7 +138,10 @@ described in its docstring. Here a few additional information.
   - :math:`5·2^{0, 1, ..., 7}`: 5, 10, 20, 40,  80, 160, 320, 640,
   - :math:`7·2^{0, 1, ..., 7}`: 7, 14, 28, 56, 112, 224, 448, 896,
 
-  and preference decreases from top to bottom row.
+  and preference decreases from top to bottom row. Good grid sizes in
+  sequential order: 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40,
+  48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640,
+  768, 896, 1024.
 
 - The multigrid method can be used as a solver or as a preconditioner, for
   instance for BiCGSTAB. Using multigrid as a preconditioner for BiCGSTAB
