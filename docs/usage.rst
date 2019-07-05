@@ -92,10 +92,10 @@ Now we can calculate the electric field with ``emg3d``:
        [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
 
            h_
-           2h_ \                  /
-           4h_  \          /\    /
-           8h_   \    /\  /  \  /
-          16h_    \/\/  \/    \/
+          2h_ \                  /
+          4h_  \          /\    /
+          8h_   \    /\  /  \  /
+         16h_    \/\/  \/    \/
 
        [11:18:17]   2.623e-02  after   1 F-cycles   [1.464e-06, 0.026]   0 0
        [11:18:17]   2.253e-03  after   2 F-cycles   [1.258e-07, 0.086]   0 0
