@@ -167,7 +167,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 1: Print warnings.
         - 2: Print runtime and information about the method.
         - 3: Print additional information for each MG-cycle.
-        - 4: Print everything (slower due to additional l2-norm calculations).
+        - 4: Print everything (slower due to additional error calculations).
 
     **kwargs : Optional solver options:
 
@@ -227,8 +227,8 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         initial efield was provided.
 
     info_dict : dict
-        Dictionary with runtime info (final norm and number of iterations of MG
-        and the sslsolver); only if ``return_info=True``.
+        Dictionary with runtime info (errors and number of iterations); only if
+        ``return_info=True``.
 
 
     Examples
@@ -279,7 +279,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
        Coarsest grid  :   3 x   2 x   2     => 12 cells
        Coarsest level :   4 ;   4 ;   4
     .
-       [hh:mm:ss]     error                 l2:[last/init, last/prev] l s
+       [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
     .
            h_
           2h_ \                  /
@@ -287,19 +287,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           8h_   \    /\  /  \  /
          16h_    \/\/  \/    \/
     .
-       [15:24:40] 1.464e-06 after  1 F-cycles; [2.623e-02, 2.623e-02] 0 0
-       [15:24:40] 1.258e-07 after  2 F-cycles; [2.253e-03, 8.589e-02] 0 0
-       [15:24:41] 1.704e-08 after  3 F-cycles; [3.051e-04, 1.354e-01] 0 0
-       [15:24:41] 3.071e-09 after  4 F-cycles; [5.500e-05, 1.803e-01] 0 0
-       [15:24:41] 6.531e-10 after  5 F-cycles; [1.170e-05, 2.127e-01] 0 0
-       [15:24:42] 1.532e-10 after  6 F-cycles; [2.745e-06, 2.346e-01] 0 0
-       [15:24:42] 3.837e-11 after  7 F-cycles; [6.873e-07, 2.504e-01] 0 0
+       [11:18:17]   2.623e-02  after   1 F-cycles   [1.464e-06, 0.026]   0 0
+       [11:18:17]   2.253e-03  after   2 F-cycles   [1.258e-07, 0.086]   0 0
+       [11:18:17]   3.051e-04  after   3 F-cycles   [1.704e-08, 0.135]   0 0
+       [11:18:17]   5.500e-05  after   4 F-cycles   [3.071e-09, 0.180]   0 0
+       [11:18:18]   1.170e-05  after   5 F-cycles   [6.531e-10, 0.213]   0 0
+       [11:18:18]   2.745e-06  after   6 F-cycles   [1.532e-10, 0.235]   0 0
+       [11:18:18]   6.873e-07  after   7 F-cycles   [3.837e-11, 0.250]   0 0
     .
        > CONVERGED
-       > MG cycles      : 7
-       > Final l2-norm  : 3.837e-11
+       > MG cycles        : 7
+       > Final rel. error : 6.873e-07
     .
-    :: emg3d END :: 15:24:42 :: runtime = 0:00:02.177778
+    :: emg3d END   :: 15:24:42 :: runtime = 0:00:02
 
     """
 
@@ -315,6 +315,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Start logging and print all parameters.
     var.cprint(f"\n:: emg3d START :: {var.time.now} ::\n", 1)
     var.cprint(var, 1)
+
+    # Calculate reference error for tolerance.
+    var.l2_refe = njitted.l2norm(sfield)
 
     # Get efield
     if efield is None:
@@ -333,7 +336,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = residual(grid, model, sfield, efield, True)
-        if var.l2 < var.tol*njitted.l2norm(sfield):
+        if var.l2 < var.tol*var.l2_refe:
 
             # Switch-off both sslsolver and multigrid.
             var.sslsolver = None
@@ -343,14 +346,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
 
     # Print header for iteration log.
-    header = f"   [hh:mm:ss]     {'error':<15}"
+    header = f"   [hh:mm:ss]  {'rel. error':<22}"
     if var.sslsolver:
-        header += f"{'solver':<20} "
+        header += f"{'solver':<20}"
         if var.cycle:
             header += f"{'MG':<11} l s"
         var.cprint(header+"\n", 2)
     elif var.cycle:
-        var.cprint(header+f"{'l2:[last/init, last/prev]':>32} l s\n", 2)
+        var.cprint(header+f"{'[abs. error, last/prev]':>29}   l s\n", 2)
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
@@ -360,14 +363,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Print runtime information.
     if var.sslsolver:  # sslsolver-specific info.
-        info = f"   > Solver steps   : {var._ssl_it}\n"
+        info = f"   > Solver steps     : {var._ssl_it}\n"
         if var.cycle:
-            info += f"   > MG prec. steps : {var.it}\n"
+            info += f"   > MG prec. steps   : {var.it}\n"
     elif var.cycle:    # multigrid-specific info.
-        info = f"   > MG cycles      : {var.it}\n"
-    info += f"   > Final l2-norm  : {var.l2:.3e}\n\n"  # Final error.
-    info += f":: emg3d END   :: {var.time.now} :: "    # END and time.
-    info += f"runtime = {var.time.runtime}\n"          # Total runtime.
+        info = f"   > MG cycles        : {var.it}\n"
+    info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"  # Error.
+    info += f":: emg3d END   :: {var.time.now} :: "  # END and time.
+    info += f"runtime = {var.time.runtime}\n"        # Total runtime.
     var.cprint(info, 1)
 
     # To use the same Fourier-transform convention as empymod and commonly
@@ -375,7 +378,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
-    info_dict = {'norm': var.l2, 'it_mg': var.it, 'it_ssl': var._ssl_it}
+    info_dict = {
+        'abs_error': var.l2,          # Absolute error.
+        'rel_error': var.l2/var.l2_refe,  # Relative error.
+        'ref_error': var.l2_refe,     # Reference error [norm(sfield)].
+        'tol': var.tol,               # Tolerance (abs_error<ref_error*tol).
+        'it_mg': var.it,              # Multigrid iterations.
+        'it_ssl': var._ssl_it         # SSL iterations.
+    }
 
     # Return depending on input arguments; or nothing.
     if do_return and return_info:  # efield and info.
@@ -396,6 +406,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     - The electric field is stored in-place in ``efield``.
     - The number of multigrid cycles is stored in ``var.it``.
     - The current error (l2-norm) is stored in ``var.l2``.
+    - The reference error (l2-norm of sfield) is stored in ``var.l2_refe``.
 
     This function is called by :func:`solver`.
 
@@ -437,11 +448,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         cycmax = new_cycmax
     cyc = 0  # Initiate cycle count.
 
-    # Define various l2-norms.
-    l2_refe = njitted.l2norm(sfield)  # Reference norm for tolerance.
-    l2_last = residual(grid, model, sfield, efield, True)  # Current residual.
-    l2_init = l2_last
-    l2_prev = l2_last
+    # Calculate current error (l2-norms).
+    l2_last = residual(grid, model, sfield, efield, True)
 
     # Keep track on the levels during the first cycle, for QC.
     if var._first_cycle:
@@ -539,7 +547,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             l2_last = residual(grid, model, sfield, efield, True)
 
             # Print end-of-cycle info.
-            _print_cycle_info(var, l2_last, l2_prev, l2_init)
+            _print_cycle_info(var, l2_last, l2_prev)
 
             # Adjust semicoarsening and line relaxation if they cycle.
             if var.sc_cycle:
@@ -548,7 +556,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 var.lr_dir = next(var.lr_cycle)
 
             # Check if any termination criteria is fulfilled.
-            if _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+            if _terminate(var, l2_last, l2_prev, it):
                 break
 
     # Store final error (l2-norm).
@@ -564,6 +572,7 @@ def krylov(grid, model, sfield, efield, var):
 
     - The electric field is stored in-place in ``efield``.
     - The current error (l2-norm) is stored in ``var.l2``.
+    - The reference error (l2-norm of sfield) is stored in ``var.l2_refe``.
 
     This function is called by :func:`solver`.
 
@@ -630,7 +639,7 @@ def krylov(grid, model, sfield, efield, var):
         # Update iteration count.
         var._ssl_it += 1
 
-        # Calculate and print l2-norm (only if verbose).
+        # Calculate and print error (only if verbose).
         if var.verb > 2:
 
             # 'gmres' returns the error, not the solution, in the callback.
@@ -640,8 +649,8 @@ def krylov(grid, model, sfield, efield, var):
                 var.l2 = residual(
                         grid, model, sfield, utils.Field(grid, x), True)
 
-            log = f"   [{var.time.now}] {var.l2:.3e} "
-            log += f"after {var._ssl_it:2} {var.sslsolver}-cycles"
+            log = f"   [{var.time.now}]   {var.l2/var.l2_refe:.3e} "
+            log += f" after {var._ssl_it:3} {var.sslsolver}-cycles"
 
             # For those solvers who run an iteration before the first
             # preconditioner run ['lgmres', 'gcrotmk'].
@@ -655,7 +664,7 @@ def krylov(grid, model, sfield, efield, var):
             A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
             atol=1e-30, M=M, callback=callback)
 
-    # Calculate final l2-norm, if not done in the callback.
+    # Calculate final error, if not done in the callback.
     if var.verb < 3:
         var.l2 = residual(grid, model, sfield, utils.Field(grid, efield), True)
 
@@ -942,7 +951,8 @@ def residual(grid, model, sfield, efield, norm=False):
         Source and electric fields; ``emg3d.utils.Field`` instances.
 
     norm : bool
-        If True, the l2-norm of the residual is returned, not the residual.
+        If True, the error (l2-norm) of the residual is returned, not the
+        residual.
 
 
     Returns
@@ -952,7 +962,7 @@ def residual(grid, model, sfield, efield, norm=False):
         instance.
 
     norm : float
-        Returned if ``norm=True``. The l2-norm of the residual
+        Returned if ``norm=True``. The error (l2-norm) of the residual
 
     """
     # Get residual.
@@ -961,7 +971,7 @@ def residual(grid, model, sfield, efield, norm=False):
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
                    model.v_mu_r, grid.hx, grid.hy, grid.hz)
 
-    if norm:  # Return its norm.
+    if norm:  # Return its error.
         return njitted.l2norm(rfield)
     else:     # Return residual.
         return rfield
@@ -1015,7 +1025,8 @@ class MGParameters:
         self._first_cycle = True   # Flag if in first cycle for QC-figure.
         self.it = 0                # To store MG cycle count
         self._ssl_it = 0           # To store solver iteration count
-        self.l2 = 0                # To store current error
+        self.l2 = 1.0              # To store current error
+        self.l2_refe = 1.0         # To store reference error
 
         self.time = utils.Time()   # Timer
 
@@ -1463,7 +1474,7 @@ def _current_lr_dir(lr_dir, grid):
     return lr_dir
 
 
-def _print_cycle_info(var, l2_last, l2_prev, l2_init):
+def _print_cycle_info(var, l2_last, l2_prev):
     """Print cycle info to log.
 
     Parameters
@@ -1471,8 +1482,8 @@ def _print_cycle_info(var, l2_last, l2_prev, l2_init):
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
 
-    l2_last, l2_prev, l2_init : float
-        Last, previous, and initial l2-norms.
+    l2_last, l2_prev : float
+        Last and previous errors (l2-norms).
 
     """
 
@@ -1518,16 +1529,14 @@ def _print_cycle_info(var, l2_last, l2_prev, l2_init):
         var._first_cycle = False
 
     # Add iteration log.
+    info += f"   [{var.time.now}]   {l2_last/var.l2_refe:.3e}  "
     if var.sslsolver:  # For multigrid as preconditioner.
-        info += f"   [{var.time.now}] {l2_last:.3e} "
-        info += f"after {20*' '} {var.it:2} {var.cycle}-cycles; "
-        info += f"  {var.lr_dir} {var.sc_dir}"
+        info += f"after {19*' '} {var.it:3} {var.cycle}-cycles "
 
     else:              # For multigrid as solver.
-        info += f"   [{var.time.now}] {l2_last:.3e} "
-        info += f"after {var.it:2} {var.cycle}-cycles; "
-        info += f"[{l2_last/l2_init:.3e}, {l2_last/l2_prev:.3e}]"
-        info += f" {var.lr_dir} {var.sc_dir}"
+        info += f"after {var.it:3} {var.cycle}-cycles   "
+        info += f"[{l2_last:.3e}, {l2_last/l2_prev:.3f}]"
+    info += f"   {var.lr_dir} {var.sc_dir}"
 
     if var.verb > 3:
         info += "\n"
@@ -1554,7 +1563,7 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
         Current grid; ``emg3d.utils.TensorMesh`` instance.
 
     norm : float
-        Current l2-norm.
+        Current error (l2-norm).
 
     text : str
         Info about Gauss-Seidel step.
@@ -1566,7 +1575,7 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
     print(info)
 
 
-def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
+def _terminate(var, l2_last, l2_prev, it):
     """Return multigrid termination flag.
 
     Checks all termination criteria and returns True if at least one is
@@ -1578,8 +1587,8 @@ def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
 
-    l2_last, l2_prev, l2_init, l2_refe : float
-        Last, previous, initial, and reference l2-norms.
+    l2_last, l2_prev : float
+        Last and previous erros (l2-norms).
 
     it : int
         Iteration number.
@@ -1607,11 +1616,11 @@ def _terminate(var, l2_last, l2_prev, l2_init, l2_refe, it):
         else:
             add = ""
 
-        if l2_last < var.tol*l2_refe:        # Converged.
+        if l2_last < var.tol*var.l2_refe:    # Converged.
             info += add+"   > CONVERGED\n"
             finished = True
 
-        elif l2_last > 10*l2_init:           # Diverged.
+        elif l2_last > 10*var.l2_refe:       # Diverged.
             info += add+"   > DIVERGED\n"
             finished = True
 

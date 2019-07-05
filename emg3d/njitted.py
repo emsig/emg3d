@@ -2000,5 +2000,17 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 # Simple wrapped functions
 @nb.njit(**_numba_setting)
 def l2norm(x):
-    """Jitted version of np.linalg.norm(x, ord=None); l2-norm."""
+    """Jitted version of np.linalg.norm(x, ord=None); l2-norm.
+
+    Similar speed could be achieved with
+
+    ``sp.linalg.get_blas_funcs('nrm2', dtype=x.dtype)(x)``
+
+    or with
+
+    ``sp.linalg.norm(x, check_finite=False)``
+
+    if this PR gets merged: https://github.com/scipy/scipy/pull/10397
+
+    """
     return np.linalg.norm(x)
