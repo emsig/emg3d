@@ -269,7 +269,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
     .
-    :: emg3d START :: 11:18:16 ::
+    :: emg3d START :: 15:24:40 ::
     .
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
@@ -299,7 +299,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
        > MG cycles        : 7
        > Final rel. error : 6.873e-07
     .
-    :: emg3d END   :: 11:18:18 :: runtime = 0:00:02
+    :: emg3d END   :: 15:24:42 :: runtime = 0:00:02
 
     """
 

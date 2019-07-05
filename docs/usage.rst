@@ -79,7 +79,7 @@ Now we can calculate the electric field with ``emg3d``:
 
     >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
 
-    :: emg3d START :: 11:18:16 ::
+    :: emg3d START :: 15:24:40 ::
 
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
@@ -109,7 +109,7 @@ Now we can calculate the electric field with ``emg3d``:
        > MG cycles        : 7
        > Final rel. error : 6.873e-07
 
-    :: emg3d END   :: 11:18:18 :: runtime = 0:00:02
+    :: emg3d END   :: 15:24:42 :: runtime = 0:00:02
 
 So the calculation required seven multigrid F-cycles and took just a bit more
 than 2 seconds. It was able to coarsen in each dimension four times, where the
