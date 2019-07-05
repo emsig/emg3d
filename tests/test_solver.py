@@ -40,7 +40,7 @@ def test_solver_homogeneous(capsys):
     assert ' emg3d START ::' in out
     assert ' [hh:mm:ss] ' in out
     assert ' MG cycles ' in out
-    assert ' Final l2-norm ' in out
+    assert ' Final rel. error ' in out
     assert ' emg3d END   :: ' in out
 
     # Check all fields (ex, ey, and ez)
@@ -67,7 +67,7 @@ def test_solver_homogeneous(capsys):
     assert ' CONVERGED' in out
     assert ' Solver steps ' in out
     assert ' MG prec. steps ' in out
-    assert ' Final l2-norm ' in out
+    assert ' Final rel. error ' in out
     assert ' emg3d END   :: ' in out
 
     # Check all fields (ex, ey, and ez)
@@ -80,7 +80,7 @@ def test_solver_homogeneous(capsys):
     assert ' [hh:mm:ss] ' in out
     assert ' CONVERGED' in out
     assert ' MG cycles ' in out
-    assert ' Final l2-norm ' in out
+    assert ' Final rel. error ' in out
     assert ' emg3d END   :: ' in out
 
     # Max it
@@ -119,8 +119,8 @@ def test_solver_homogeneous(capsys):
     assert info['it_mg'] == 0
     assert info['it_ssl'] == 0
 
-    # Check stagnation by providing zero source field.
-    _ = solver.solver(grid, model, sfield*0)
+    # Check stagnation by providing an almost zero source field.
+    _ = solver.solver(grid, model, sfield*0+1e-20)
     out, _ = capsys.readouterr()
     assert "STAGNATED" in out
 
@@ -345,6 +345,7 @@ def test_krylov(capsys):
             linerelaxation=False, vnC=grid.vnC, verb=3,
             maxit=-1,  # Set stupid input to make bicgstab fail.
     )
+    var.l2_refe = njitted.l2norm(sfield)
 
     # Call krylov and ensure it fails properly.
     solver.krylov(grid, model, sfield, efield, var)
