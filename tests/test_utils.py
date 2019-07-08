@@ -450,6 +450,47 @@ def test_get_receiver():
     assert_allclose(out5real, out4.real)
 
 
+def test_grid2grid():
+    igrid = utils.TensorMesh(
+            [np.array([1, 1]), np.array([1]), np.array([1])],
+            [0, 0, 0])
+    ogrid = utils.TensorMesh(
+            [np.array([1]), np.array([1]), np.array([1])],
+            [0, 0, 0])
+    values = np.array([1.0, 2.0]).reshape(igrid.vnC)
+
+    # Provide wrong dimension:
+    with pytest.raises(ValueError):
+        utils.grid2grid(igrid, values[1:, :, :], ogrid)
+
+    # Simple, linear example.
+    out = utils.grid2grid(igrid, values, ogrid, 'linear')
+    np.allclose(out, np.array([1.5]))
+
+    # Provide ogrid.gridCC.
+    ogrid.gridCC = np.array([[0.5, 0.5, 0.5]])
+    out2 = utils.grid2grid(igrid, values, ogrid, 'linear')
+    np.allclose(out2, np.array([1.5]))
+
+#     # Check cubic spline runs fine (NOT CHECKING ACTUAL VALUES!.
+#     igrid = utils.TensorMesh(
+#             [np.ones(4), np.array([1, 2, 3, 4]), np.array([20, 10, 1, 10])],
+#             [0, 0, 0])
+#     ogrid = utils.TensorMesh(
+#             [np.ones(2), np.array([1, 2, 3]), np.array([2, 1, 1])],
+#             [0, 0, 0])
+#     values = np.arange(1, igrid.nC+1).reshape(igrid.vnC)
+#
+#     out3 = utils.grid2grid(igrid, values, ogrid, 'cubic')
+#     assert
+#
+#     out5 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], [0.5, 2, 3], 2))
+#     out5real = utils.get_receiver(
+#             grid, field.fx.real, ([0.5, 1, 2], [0.5, 2, 3], 2))
+#     assert_allclose(out5, out4)
+#     assert_allclose(out5real, out4.real)
+
+
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
     t0 = default_timer()  # Create almost at the same time a

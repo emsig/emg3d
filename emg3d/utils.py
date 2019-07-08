@@ -1244,15 +1244,26 @@ def grid2grid(grid_in, values_in, grid_out, method='cubic'):
     if not np.all(grid_in.vnC == values_in.shape):
         print("* ERROR   :: ``values_in`` must have same shape as "
               "``grid_in``.")
-        print(f"             Shape of ``grid_in``   : {grid_in.shape}.")
+        print(f"             Shape of ``grid_in``   : {grid_in.vnC}.")
         print(f"             Shape of ``values_in`` : {values_in.shape}.")
         raise ValueError("grid_in or value_in error")
 
     # Get the vectors corresponding to input data.
     points = (grid_in.vectorCCx, grid_in.vectorCCy, grid_in.vectorCCz)
 
+    # Format the output points.
+    if hasattr(grid_out, 'gridCC'):
+        out_points = grid_out.gridCC
+    else:
+        xx, yy, zz = np.broadcast_arrays(
+                grid_out.vectorCCx[:, None, None],
+                grid_out.vectorCCy[None, :, None],
+                grid_out.vectorCCz[None, None, :])
+        out_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
+        out_points = out_points.reshape(-1, 3, order='F')
+
     return _interp3d(
-            points, values_in, grid_out.gridCC, method, None, 'nearest')
+            points, values_in, out_points, method, None, 'constant')
 
 
 # TIMING FOR LOGS
@@ -1553,6 +1564,7 @@ def _interp3d(points, values, new_points, method, fill_value=0.0,
                 points[2], np.arange(len(points[2])), **params1d)(xi[:, 2])
         coords = np.vstack([x, y, z])
 
+        print(mode)
         # map_coordinates only works for real data; split it up if complex.
         params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
         if 'complex' in values.dtype.name:
