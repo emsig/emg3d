@@ -32,8 +32,8 @@ from datetime import datetime, timedelta
 from scipy import optimize, interpolate, ndimage
 
 __all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h', 'get_hx',
-           'get_source_field', 'get_receiver', 'get_h_field', 'TensorMesh',
-           'Time', 'data_write', 'data_read', 'Report']
+           'get_source_field', 'get_receiver', 'get_h_field', 'grid2grid',
+           'TensorMesh', 'Time', 'data_write', 'data_read', 'Report']
 
 
 # CONSTANTS
