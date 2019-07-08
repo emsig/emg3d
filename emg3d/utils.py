@@ -40,8 +40,8 @@ except ImportError:
                   "\n             Install it via `pip install scooby`.\n")
 
 __all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h', 'get_hx',
-           'get_source_field', 'get_receiver', 'get_h_field', 'TensorMesh',
-           'Time', 'data_write', 'data_read', 'Report']
+           'get_source_field', 'get_receiver', 'get_h_field', 'grid2grid',
+           'TensorMesh', 'Time', 'data_write', 'data_read', 'Report']
 
 
 # CONSTANTS
@@ -1152,12 +1152,6 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
 
     If ``rec_loc`` is outside of ``grid``, the returned field is zero.
 
-    This is a modified version of :func:`scipy.interpolate.interpn`, using
-    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
-    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
-    ``method='cubic'``. If speed is important then choose 'linear', as it can
-    be significantly faster.
-
 
     Parameters
     ----------
@@ -1212,50 +1206,53 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
         # Add to points
         points += pts
 
-        # We need at least 3 points in each direction for cubic spline.
-        # This should never be an issue for a realistic 3D model.
-        if pts[0].size < 4:
-            method = 'linear'
+    return _interp3d(points, fieldf, rec_loc, method, 0.0, 'constant')
 
-    # Interpolation.
-    if method == "linear":
-        ifn = interpolate.RegularGridInterpolator(
-                points=points, values=fieldf, method="linear",
-                bounds_error=False, fill_value=0.0)
 
-        return ifn(xi=rec_loc)
+def grid2grid(grid_in, values_in, grid_out, method='cubic'):
+    """Interpolate values from one to another grid.
 
-    else:
+    Return ``values_in`` corresponding to ``grid_in`` on the points in
+    ``grid_out``.
 
-        # Replicate the same expansion of xi as used in
-        # RegularGridInterpolator, so the input xi can be quite flexible.
-        xi = interpolate.interpnd._ndim_coords_from_arrays(rec_loc, ndim=3)
-        xi_shape = xi.shape
-        xi = xi.reshape(-1, 3)
+    Points on ``grid_out`` which are outside of ``grid_in`` are extrapolated
+    (if ``method='linear'``) or the nearest value is taken (if
+    ``method='cubic'``).
 
-        # map_coordinates uses the indices of the input data (fieldf in this
-        # case) as coordinates. We have therefore to transform our desired
-        # output coordinates to this artificial coordinate system too.
-        params = {'kind': 'cubic',
-                  'bounds_error': False,
-                  'fill_value': 'extrapolate'}
-        x = interpolate.interp1d(
-                points[0], np.arange(len(points[0])), **params)(xi[:, 0])
-        y = interpolate.interp1d(
-                points[1], np.arange(len(points[1])), **params)(xi[:, 1])
-        z = interpolate.interp1d(
-                points[2], np.arange(len(points[2])), **params)(xi[:, 2])
-        coords = np.vstack([x, y, z])
 
-        # map_coordinates only works for real data; split it up if complex.
-        if 'complex' in fieldf.dtype.name:
-            real = ndimage.map_coordinates(fieldf.real, coords, order=3)
-            imag = ndimage.map_coordinates(fieldf.imag, coords, order=3)
-            result = real + 1j*imag
-        else:
-            result = ndimage.map_coordinates(fieldf, coords, order=3)
+    Parameters
+    ----------
+    grid_in, grid_out : TensorMesh
+        Input and output model grids; ``TensorMesh``-instances.
 
-        return result.reshape(xi_shape[:-1])
+    values_in : ndarray
+        Values corresponding to ``grid_in``.
+
+    method : str, optional
+        The method of interpolation to perform, 'linear' or 'cubic'.
+        Default is 'cubic' (forced to 'linear' if there are less than 3 points
+        in any direction).
+
+
+    Returns
+    -------
+    values_out : ndarray
+        Values corresponding to ``grid_out``.
+
+    """
+    # Ensure values has the dimensions of grid_in.
+    if not np.all(grid_in.vnC == values_in.shape):
+        print("* ERROR   :: ``values_in`` must have same shape as "
+              "``grid_in``.")
+        print(f"             Shape of ``grid_in``   : {grid_in.shape}.")
+        print(f"             Shape of ``values_in`` : {values_in.shape}.")
+        raise ValueError("grid_in or value_in error")
+
+    # Get the vectors corresponding to input data.
+    points = (grid_in.vectorCCx, grid_in.vectorCCy, grid_in.vectorCCz)
+
+    return _interp3d(
+            points, values_in, grid_out.gridCC, method, None, 'nearest')
 
 
 # TIMING FOR LOGS
@@ -1474,3 +1471,95 @@ class Report(ScoobyReport):
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
+
+
+def _interp3d(points, values, new_points, method, fill_value=0.0,
+              mode='constant'):
+    """Interpolate values in 3D either linearly or with a cubic spline.
+
+    Return ``values`` corresponding to a regular 3D grid defined by ``points``
+    on ``new_points``.
+
+    This is a modified version of :func:`scipy.interpolate.interpn`, using
+    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
+    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
+    ``method='cubic'``. If speed is important then choose 'linear', as it can
+    be significantly faster.
+
+
+    Parameters
+    ----------
+    points : tuple of ndarray of float, with shapes ((nx, ), (ny, ) (nz, ))
+        The points defining the regular grid in three dimensions.
+
+    values : array_like, shape (nx, ny, nz)
+        The data on the regular grid in three dimensions.
+
+    new_points : tuple (rec_x, rec_y, rec_z)
+        Coordinates (x, y, z) of new points.
+
+    method : str, optional
+        The method of interpolation to perform, 'linear' or 'cubic'.
+        Default is 'cubic' (forced to 'linear' if there are less than 3 points
+        in any direction).
+
+    fill_value : 0.0 or None
+        Passed to ``interpolate.RegularGridInterpolator``; either 0 or None.
+
+    mode : str
+        Passed to ``ndimage.map_coordinates``; either 'constant' or 'nearest'.
+
+
+    Returns
+    -------
+    new_values : ndarray
+        Values corresponding to ``new_points``.
+
+    """
+
+    # We need at least 3 points in each direction for cubic spline.
+    # This should never be an issue for a realistic 3D model.
+    for pts in points:
+        if len(pts) < 4:
+            method = 'linear'
+
+    # Interpolation.
+    if method == "linear":
+        ifn = interpolate.RegularGridInterpolator(
+                points=points, values=values, method="linear",
+                bounds_error=False, fill_value=fill_value)
+
+        return ifn(xi=new_points)
+
+    else:
+
+        # Replicate the same expansion of xi as used in
+        # RegularGridInterpolator, so the input xi can be quite flexible.
+        xi = interpolate.interpnd._ndim_coords_from_arrays(new_points, ndim=3)
+        xi_shape = xi.shape
+        xi = xi.reshape(-1, 3)
+
+        # map_coordinates uses the indices of the input data (values in this
+        # case) as coordinates. We have therefore to transform our desired
+        # output coordinates to this artificial coordinate system too.
+        params1d = {'kind': 'cubic',
+                    'bounds_error': False,
+                    'fill_value': 'extrapolate'}
+        x = interpolate.interp1d(
+                points[0], np.arange(len(points[0])), **params1d)(xi[:, 0])
+        y = interpolate.interp1d(
+                points[1], np.arange(len(points[1])), **params1d)(xi[:, 1])
+        z = interpolate.interp1d(
+                points[2], np.arange(len(points[2])), **params1d)(xi[:, 2])
+        coords = np.vstack([x, y, z])
+
+        # map_coordinates only works for real data; split it up if complex.
+        params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
+        if 'complex' in values.dtype.name:
+            real = ndimage.map_coordinates(values.real, coords, **params3d)
+            imag = ndimage.map_coordinates(values.imag, coords, **params3d)
+            result = real + 1j*imag
+        else:
+            result = ndimage.map_coordinates(values, coords, **params3d)
+
+        return result.reshape(xi_shape[:-1])
