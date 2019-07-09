@@ -1209,7 +1209,7 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
     return _interp3d(points, fieldf, rec_loc, method, 0.0, 'constant')
 
 
-def grid2grid(grid_in, values_in, grid_out, method='cubic'):
+def grid2grid(grid_in, values_in, grid_out, method='linear'):
     """Interpolate values from one to another grid.
 
     Return ``values_in`` corresponding to ``grid_in`` on the points in
@@ -1256,14 +1256,14 @@ def grid2grid(grid_in, values_in, grid_out, method='cubic'):
         out_points = grid_out.gridCC
     else:
         xx, yy, zz = np.broadcast_arrays(
-                grid_out.vectorCCx,
+                grid_out.vectorCCx[:, None, None],
                 grid_out.vectorCCy[:, None],
-                grid_out.vectorCCz[:, None, None])
+                grid_out.vectorCCz)
         out_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
         out_points = out_points.reshape(-1, 3, order='F')
 
     return _interp3d(
-            points, values_in, out_points, method, None, 'constant')
+            points, values_in, out_points, method, None, 'nearest')
 
 
 # TIMING FOR LOGS
@@ -1484,8 +1484,7 @@ class Report(ScoobyReport):
                          ncol=ncol, text_width=text_width, sort=sort)
 
 
-def _interp3d(points, values, new_points, method, fill_value=0.0,
-              mode='constant'):
+def _interp3d(points, values, new_points, method, fill_value, mode):
     """Interpolate values in 3D either linearly or with a cubic spline.
 
     Return ``values`` corresponding to a regular 3D grid defined by ``points``
@@ -1514,11 +1513,15 @@ def _interp3d(points, values, new_points, method, fill_value=0.0,
         Default is 'cubic' (forced to 'linear' if there are less than 3 points
         in any direction).
 
-    fill_value : 0.0 or None
-        Passed to ``interpolate.RegularGridInterpolator``; either 0 or None.
+    fill_value : float or None
+        Passed to ``interpolate.RegularGridInterpolator`` if
+        ``method='linear'``: The value to use for points outside of the
+        interpolation domain. If None, values outside the domain are
+        extrapolated.
 
-    mode : str
-        Passed to ``ndimage.map_coordinates``; either 'constant' or 'nearest'.
+    mode : {'constant', 'nearest', 'mirror', 'reflect', 'wrap'}
+        Passed to ``ndimage.map_coordinates`` if ``method='cubic'``: Determines
+        how the input array is extended beyond its boundaries.
 
 
     Returns
@@ -1528,8 +1531,8 @@ def _interp3d(points, values, new_points, method, fill_value=0.0,
 
     """
 
-    # We need at least 3 points in each direction for cubic spline.
-    # This should never be an issue for a realistic 3D model.
+    # We need at least 3 points in each direction for cubic spline. This should
+    # never be an issue for a realistic 3D model.
     for pts in points:
         if len(pts) < 4:
             method = 'linear'
@@ -1553,16 +1556,11 @@ def _interp3d(points, values, new_points, method, fill_value=0.0,
         # map_coordinates uses the indices of the input data (values in this
         # case) as coordinates. We have therefore to transform our desired
         # output coordinates to this artificial coordinate system too.
-        params1d = {'kind': 'cubic',
-                    'bounds_error': False,
-                    'fill_value': 'extrapolate'}
-        x = interpolate.interp1d(
-                points[0], np.arange(len(points[0])), **params1d)(xi[:, 0])
-        y = interpolate.interp1d(
-                points[1], np.arange(len(points[1])), **params1d)(xi[:, 1])
-        z = interpolate.interp1d(
-                points[2], np.arange(len(points[2])), **params1d)(xi[:, 2])
-        coords = np.vstack([x, y, z])
+        coords = np.empty(xi.T.shape)
+        for i in range(3):
+            coords[i] = interpolate.interp1d(
+                    points[i], np.arange(len(points[i])), kind='cubic',
+                    bounds_error=False, fill_value='extrapolate',)(xi[:, i])
 
         # map_coordinates only works for real data; split it up if complex.
         params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
