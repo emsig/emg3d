@@ -2,6 +2,13 @@ Changelog
 #########
 
 
+*latest*
+--------
+
+- New function ``utils.grid2grid`` to move between different model grids;
+  factor-out ``_interp3d`` from ``utils.get_receiver`` for that.
+
+
 *v0.7.0* : H-field
 ------------------
 

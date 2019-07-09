@@ -449,6 +449,77 @@ def test_get_receiver():
     assert_allclose(out5, out4)
     assert_allclose(out5real, out4.real)
 
+    # Check it returns 0 if outside.
+    out6 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'linear')
+    out7 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'cubic')
+
+    assert_allclose(out6, 0.+0j)
+    assert_allclose(out7, 0.+0j)
+
+
+def test_grid2grid():
+    igrid = utils.TensorMesh(
+            [np.array([1, 1]), np.array([1]), np.array([1])],
+            [0, 0, 0])
+    ogrid = utils.TensorMesh(
+            [np.array([1]), np.array([1]), np.array([1])],
+            [0, 0, 0])
+    values = np.array([1.0, 2.0]).reshape(igrid.vnC)
+
+    # Provide wrong dimension:
+    with pytest.raises(ValueError):
+        utils.grid2grid(igrid, values[1:, :, :], ogrid)
+
+    # Simple, linear example.
+    out = utils.grid2grid(igrid, values, ogrid, 'linear')
+    np.allclose(out, np.array([1.5]))
+
+    # Provide ogrid.gridCC.
+    ogrid.gridCC = np.array([[0.5, 0.5, 0.5]])
+    out2 = utils.grid2grid(igrid, values, ogrid, 'linear')
+    np.allclose(out2, np.array([1.5]))
+
+    # Check 'linear' and 'cubic' yield almost the same result for a well
+    # determined, very smoothly changing example.
+
+    # Fine grid.
+    fgrid = utils.TensorMesh(
+        [np.ones(2**6)*10, np.ones(2**5)*100, np.ones(2**4)*1000],
+        x0=np.array([-320., -1600, -8000]))
+
+    # Smoothly changing model for fine grid.
+    cmodel = np.arange(1, fgrid.nC+1).reshape(fgrid.vnC, order='F')
+
+    # Coarser grid.
+    cgrid = utils.TensorMesh(
+        [np.ones(2**5)*15, np.ones(2**4)*150, np.ones(2**3)*1500],
+        x0=np.array([-240., -1200, -6000]))
+
+    # Interpolate linearly and cubic spline.
+    lin_model = utils.grid2grid(fgrid, cmodel, cgrid, 'linear')
+    cub_model = utils.grid2grid(fgrid, cmodel, cgrid, 'cubic')
+
+    # Compare
+    assert np.max(np.abs((lin_model-cub_model)/lin_model*100)) < 1.0
+
+    # Assert it is 'nearest' or extrapolate if points are outside.
+    tgrid = utils.TensorMesh(
+            [np.array([1, 1, 1, 1]), np.array([1, 1, 1, 1]),
+             np.array([1, 1, 1, 1])], x0=np.array([0., 0, 0]))
+    tmodel = np.ones(tgrid.nC).reshape(tgrid.vnC, order='F')
+    tmodel[:, 0, :] = 2
+    t2grid = utils.TensorMesh(
+            [np.array([1]), np.array([1]), np.array([1])],
+            x0=np.array([2, -1, 2]))
+
+    # Nearest with cubic.
+    out = utils.grid2grid(tgrid, tmodel, t2grid, 'cubic')
+    assert_allclose(out, 2.)
+
+    # Extrapolate with linear.
+    out = utils.grid2grid(tgrid, tmodel, t2grid, 'linear')
+    assert_allclose(out, 3.)
+
 
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
@@ -553,3 +624,7 @@ def test_report(capsys):
         _ = utils.Report()
         out, _ = capsys.readouterr()  # Empty capsys
         assert 'WARNING :: `emg3d.Report` requires `scooby`' in out
+
+
+def test_interp3d():
+    pass
