@@ -1997,6 +1997,97 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
     return wl, w0, wr
 
 
+# Volume averaging
+@nb.njit(**_numba_setting)
+def volume_average(edges_x_in, edges_y_in, edges_z_in, values_in, edges_x_out,
+                   edges_y_out, edges_z_out, values_out):
+    """Interpolation using the volume averaging technique.
+
+    The result is added to values_out.
+
+    Parameters
+    ----------
+    edges_[x, y, z]_[in, out] : ndarray
+        The edges in x-, y-, and z-directions for the input and the output
+        grids, respectively.
+
+    values_in : ndarray
+        Values corresponding to ``grid_in``.
+
+    values_out : ndarray
+        Array where values corresponding to ``grid_out`` will be added.
+
+    """
+
+    # Get cell indices.
+    # First and last edges ignored => first and last cells extend to +/- infty.
+    ix_l = np.searchsorted(edges_x_in[1:-1], edges_x_out, 'left')
+    ix_r = np.searchsorted(edges_x_in[1:-1], edges_x_out, 'right')
+    iy_l = np.searchsorted(edges_y_in[1:-1], edges_y_out, 'left')
+    iy_r = np.searchsorted(edges_y_in[1:-1], edges_y_out, 'right')
+    iz_l = np.searchsorted(edges_z_in[1:-1], edges_z_out, 'left')
+    iz_r = np.searchsorted(edges_z_in[1:-1], edges_z_out, 'right')
+
+    # Get number of cells.
+    ncx = len(edges_x_out)-1
+    ncy = len(edges_y_out)-1
+    ncz = len(edges_z_out)-1
+
+    # Working arrays for edges; ensure they are big enough.
+    x_edges = np.zeros(max(ncx, len(edges_x_in))+3)
+    y_edges = np.zeros(max(ncy, len(edges_y_in))+3)
+    z_edges = np.zeros(max(ncz, len(edges_z_in))+3)
+
+    # Loop over grid_out cells.
+    for iz in range(ncz):
+        hz = np.diff(edges_z_out[iz:iz+2])[0]  # For current cell volume.
+        for iy in range(ncy):
+            hyz = hz*np.diff(edges_y_out[iy:iy+2])[0]  # "
+            for ix in range(ncx):
+                hxyz = hyz*np.diff(edges_x_out[ix:ix+2])[0]  # "
+
+                # Get start cell and number of cells of grid_in.
+                s_cx = ix_r[ix]
+                n_cx = ix_l[ix+1] - s_cx
+
+                s_cy = iy_r[iy]
+                n_cy = iy_l[iy+1] - s_cy
+
+                s_cz = iz_r[iz]
+                n_cz = iz_l[iz+1] - s_cz
+
+                # Get the edge locations.
+                x_edges[0] = edges_x_out[ix]
+                for i in range(n_cx):
+                    x_edges[i+1] = edges_x_in[s_cx+i+1]
+                x_edges[n_cx+1] = edges_x_out[ix+1]
+
+                y_edges[0] = edges_y_out[iy]
+                for j in range(n_cy):
+                    y_edges[j+1] = edges_y_in[s_cy+j+1]
+                y_edges[n_cy+1] = edges_y_out[iy+1]
+
+                z_edges[0] = edges_z_out[iz]
+                for k in range(n_cz):
+                    z_edges[k+1] = edges_z_in[s_cz+k+1]
+                z_edges[n_cz+1] = edges_z_out[iz+1]
+
+                # Calculate the cell value (times volume).
+                for k in range(n_cz+1):
+                    dz = np.diff(z_edges[k:k+2])[0]
+                    for j in range(n_cy+1):
+                        dyz = dz*np.diff(y_edges[j:j+2])[0]
+                        for i in range(n_cx+1):
+                            dxyz = dyz*np.diff(x_edges[i:i+2])[0]
+
+                            # Add this cell's contribution.
+                            values_out[ix, iy, iz] += values_in[
+                                    s_cx+i, s_cy+j, s_cz+k]*dxyz
+
+                # Normalize by grid_out-cell volume.
+                values_out[ix, iy, iz] /= hxyz
+
+
 # Simple wrapped functions
 @nb.njit(**_numba_setting)
 def l2norm(x):

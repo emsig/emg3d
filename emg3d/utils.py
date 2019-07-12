@@ -30,6 +30,8 @@ from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy import optimize, interpolate, ndimage
 
+from . import njitted
+
 # scooby is a soft dependency for emg3d
 try:
     from scooby import Report as ScoobyReport
@@ -1210,14 +1212,11 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
 
 
 def grid2grid(grid_in, values_in, grid_out, method='volume'):
-    """Interpolate values from one to another grid.
+    """Interpolate ``values_in`` located on ``grid_in`` to ``grid_out``.
 
-    Return ``values_in`` corresponding to ``grid_in`` on the points in
-    ``grid_out``.
-
-    Points on ``grid_out`` which are outside of ``grid_in`` are extrapolated
-    (if ``method='linear'``) or the nearest value is taken (if
-    ``method='volume'`` or ``method='cubic'``).
+    Points on ``grid_out`` which are outside of ``grid_in`` are filled by the
+    nearest value (if ``method='volume'`` or ``method='cubic'``) or by
+    extrapolation (if ``method='linear'``).
 
 
     Parameters
@@ -1242,6 +1241,7 @@ def grid2grid(grid_in, values_in, grid_out, method='volume'):
         Values corresponding to ``grid_out``.
 
     """
+
     # Ensure values has the dimensions of grid_in.
     if not np.all(grid_in.vnC == values_in.shape):
         print("* ERROR   :: ``values_in`` must have same shape as "
@@ -1253,7 +1253,10 @@ def grid2grid(grid_in, values_in, grid_out, method='volume'):
     if method == 'volume':
         points_in = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
         points_out = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
-        values_out = _volume_average(*points_in, values_in, *points_out)
+        values_out = np.zeros(grid_out.vnC, dtype=values_in.dtype)
+
+        # Get values from `volume_average`.
+        njitted.volume_average(*points_in, values_in, *points_out, values_out)
 
     else:
         # Get the vectors corresponding to input data.
@@ -1270,6 +1273,7 @@ def grid2grid(grid_in, values_in, grid_out, method='volume'):
             out_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
             out_points = out_points.reshape(-1, 3, order='F')
 
+        # Get values from `_interp3d`.
         values_out = _interp3d(
                 points, values_in, out_points, method, None, 'nearest')
 
@@ -1582,81 +1586,3 @@ def _interp3d(points, values, new_points, method, fill_value, mode):
             result = ndimage.map_coordinates(values, coords, **params3d)
 
         return result.reshape(xi_shape[:-1])
-
-
-def _volume_average(edges_x_in, edges_y_in, edges_z_in, values_in, edges_x_out,
-                    edges_y_out, edges_z_out):
-    """Interpolate values_in on grid_in to grid_out."""
-
-    # Get cell indices.
-    # First and last edges ignored => first and last cells extend to +/- infty.
-    ix_l = np.searchsorted(edges_x_in[1:-1], edges_x_out, 'left')
-    ix_r = np.searchsorted(edges_x_in[1:-1], edges_x_out, 'right')
-    iy_l = np.searchsorted(edges_y_in[1:-1], edges_y_out, 'left')
-    iy_r = np.searchsorted(edges_y_in[1:-1], edges_y_out, 'right')
-    iz_l = np.searchsorted(edges_z_in[1:-1], edges_z_out, 'left')
-    iz_r = np.searchsorted(edges_z_in[1:-1], edges_z_out, 'right')
-
-    # Get number of cells.
-    nx = len(edges_x_out)-1
-    ny = len(edges_y_out)-1
-    nz = len(edges_z_out)-1
-
-    # Pre-allocate values_out.
-    values_out = np.zeros((nx, ny, nz), dtype=values_in.dtype)
-
-    # Working arrays for edges; ensure they are big enough.
-    x_edges = np.zeros(max(nx, len(edges_x_in))+3)
-    y_edges = np.zeros(max(ny, len(edges_y_in))+3)
-    z_edges = np.zeros(max(nz, len(edges_z_in))+3)
-
-    # Loop over grid_out cells.
-    for iz in range(nz):
-        hz = np.diff(edges_z_out[iz:iz+2])  # For current cell volume.
-        for iy in range(ny):
-            hyz = hz*np.diff(edges_y_out[iy:iy+2])  # "
-            for ix in range(nx):
-                hxyz = hyz*np.diff(edges_x_out[ix:ix+2])  # "
-
-                # Get start cell and number of cells of grid_in.
-                s_cx = ix_r[ix]
-                n_cx = ix_l[ix+1] - s_cx
-
-                s_cy = iy_r[iy]
-                n_cy = iy_l[iy+1] - s_cy
-
-                s_cz = iz_r[iz]
-                n_cz = iz_l[iz+1] - s_cz
-
-                # Get the edge locations.
-                x_edges[0] = edges_x_out[ix]
-                for i in range(n_cx):
-                    x_edges[i+1] = edges_x_in[s_cx+i+1]
-                x_edges[n_cx+1] = edges_x_out[ix+1]
-
-                y_edges[0] = edges_y_out[iy]
-                for j in range(n_cy):
-                    y_edges[j+1] = edges_y_in[s_cy+j+1]
-                y_edges[n_cy+1] = edges_y_out[iy+1]
-
-                z_edges[0] = edges_z_out[iz]
-                for k in range(n_cz):
-                    z_edges[k+1] = edges_z_in[s_cz+k+1]
-                z_edges[n_cz+1] = edges_z_out[iz+1]
-
-                # Calculate the cell value (times volume).
-                for k in range(n_cz+1):
-                    dz = z_edges[k+1] - z_edges[k]
-                    for j in range(n_cy+1):
-                        dyz = dz*(y_edges[j+1] - y_edges[j])
-                        for i in range(n_cx+1):
-                            dxyz = dyz*(x_edges[i+1] - x_edges[i])
-
-                            # Add this cell's contribution.
-                            values_out[ix, iy, iz] += values_in[
-                                    s_cx+i, s_cy+j, s_cz+k]*dxyz
-
-                # Normalize by grid_out-cell volume.
-                values_out[ix, iy, iz] /= hxyz
-
-    return values_out
