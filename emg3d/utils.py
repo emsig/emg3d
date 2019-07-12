@@ -30,6 +30,8 @@ from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy import optimize, interpolate, ndimage
 
+from . import njitted
+
 # scooby is a soft dependency for emg3d
 try:
     from scooby import Report as ScoobyReport
@@ -1191,7 +1193,7 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
 
     # Get the vectors corresponding to input data. Dimensions:
     #
-    #        E-field       H-field
+    #         E-field          H-field
     #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]
     #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]
     #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]
@@ -1203,67 +1205,77 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
         else:
             pts = (getattr(grid, 'vectorCC'+coord), )
 
-        # Add to points
+        # Add to points.
         points += pts
 
     return _interp3d(points, fieldf, rec_loc, method, 0.0, 'constant')
 
 
-def grid2grid(grid_in, values_in, grid_out, method='linear'):
-    """Interpolate values from one to another grid.
+def grid2grid(grid, values, new_grid, method='volume'):
+    """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
-    Return ``values_in`` corresponding to ``grid_in`` on the points in
-    ``grid_out``.
-
-    Points on ``grid_out`` which are outside of ``grid_in`` are extrapolated
-    (if ``method='linear'``) or the nearest value is taken (if
-    ``method='cubic'``).
+    Points on ``new_grid`` which are outside of ``grid`` are filled by the
+    nearest value (if ``method='volume'`` or ``method='cubic'``) or by
+    extrapolation (if ``method='linear'``).
 
 
     Parameters
     ----------
-    grid_in, grid_out : TensorMesh
+    grid, new_grid : TensorMesh
         Input and output model grids; ``TensorMesh``-instances.
 
-    values_in : ndarray
-        Values corresponding to ``grid_in``.
+    values : ndarray
+        Values corresponding to ``grid``.
 
-    method : str, optional
-        The method of interpolation to perform, 'linear' or 'cubic'.
-        Default is 'cubic' (forced to 'linear' if there are less than 3 points
-        in any direction).
+    method : {<'volume'>, 'linear', 'cubic'}, optional
+        The method of interpolation to perform. The volume averaging method
+        ensures that the total sum of the property stays constant. Default is
+        'volume'. The method 'cubic' requires at least three points in any
+        direction, otherwise it will fall back to 'linear'.
 
 
     Returns
     -------
-    values_out : ndarray
-        Values corresponding to ``grid_out``.
+    new_values : ndarray
+        Values corresponding to ``new_grid``.
 
     """
-    # Ensure values has the dimensions of grid_in.
-    if not np.all(grid_in.vnC == values_in.shape):
-        print("* ERROR   :: ``values_in`` must have same shape as "
-              "``grid_in``.")
-        print(f"             Shape of ``grid_in``   : {grid_in.vnC}.")
-        print(f"             Shape of ``values_in`` : {values_in.shape}.")
-        raise ValueError("grid_in or value_in error")
 
-    # Get the vectors corresponding to input data.
-    points = (grid_in.vectorCCx, grid_in.vectorCCy, grid_in.vectorCCz)
+    # Ensure values has the dimensions of grid.
+    if not np.all(grid.vnC == values.shape):
+        print("* ERROR   :: ``values`` must have same shape as ``grid``.")
+        print(f"             Shape of ``grid``   : {grid.vnC}.")
+        print(f"             Shape of ``values`` : {values.shape}.")
+        raise ValueError("grid or values error")
 
-    # Format the output points.
-    if hasattr(grid_out, 'gridCC'):
-        out_points = grid_out.gridCC
+    if method == 'volume':
+        points = (grid.vectorNx, grid.vectorNy, grid.vectorNz)
+        new_points = (new_grid.vectorNx, new_grid.vectorNy, new_grid.vectorNz)
+        new_values = np.zeros(new_grid.vnC, dtype=values.dtype)
+
+        # Get values from `volume_average`.
+        njitted.volume_average(*points, values, *new_points, new_values)
+
     else:
-        xx, yy, zz = np.broadcast_arrays(
-                grid_out.vectorCCx[:, None, None],
-                grid_out.vectorCCy[:, None],
-                grid_out.vectorCCz)
-        out_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
-        out_points = out_points.reshape(-1, 3, order='F')
+        # Get the vectors corresponding to input data.
+        points = (grid.vectorCCx, grid.vectorCCy, grid.vectorCCz)
 
-    return _interp3d(
-            points, values_in, out_points, method, None, 'nearest')
+        # Format the output points.
+        if hasattr(new_grid, 'gridCC'):
+            new_points = new_grid.gridCC
+        else:
+            xx, yy, zz = np.broadcast_arrays(
+                    new_grid.vectorCCx[:, None, None],
+                    new_grid.vectorCCy[:, None],
+                    new_grid.vectorCCz)
+            new_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
+            new_points = new_points.reshape(-1, 3, order='F')
+
+        # Get values from `_interp3d`.
+        new_values = _interp3d(
+                points, values, new_points, method, None, 'nearest')
+
+    return new_values
 
 
 # TIMING FOR LOGS
@@ -1508,10 +1520,10 @@ def _interp3d(points, values, new_points, method, fill_value, mode):
     new_points : tuple (rec_x, rec_y, rec_z)
         Coordinates (x, y, z) of new points.
 
-    method : str, optional
-        The method of interpolation to perform, 'linear' or 'cubic'.
-        Default is 'cubic' (forced to 'linear' if there are less than 3 points
-        in any direction).
+    method : {'cubic', 'linear'}, optional
+        The method of interpolation to perform, 'linear' or 'cubic'. Default is
+        'cubic' (forced to 'linear' if there are less than 3 points in any
+        direction).
 
     fill_value : float or None
         Passed to ``interpolate.RegularGridInterpolator`` if
@@ -1543,7 +1555,7 @@ def _interp3d(points, values, new_points, method, fill_value, mode):
                 points=points, values=values, method="linear",
                 bounds_error=False, fill_value=fill_value)
 
-        return ifn(xi=new_points)
+        new_values = ifn(xi=new_points)
 
     else:
 
@@ -1571,4 +1583,6 @@ def _interp3d(points, values, new_points, method, fill_value, mode):
         else:
             result = ndimage.map_coordinates(values, coords, **params3d)
 
-        return result.reshape(xi_shape[:-1])
+        new_values = result.reshape(xi_shape[:-1])
+
+    return new_values
