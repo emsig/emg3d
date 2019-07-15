@@ -397,7 +397,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         'tol': var.tol,               # Tolerance (abs_error<ref_error*tol).
         'it_mg': var.it,              # Multigrid iterations.
         'it_ssl': var._ssl_it,        # SSL iterations.
-        'time': time,                 # Runtime.
+        'time': time.seconds,         # Runtime (s).
     }
 
     # Return depending on input arguments; or nothing.

@@ -1189,17 +1189,46 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
         ``fieldf`` at positions ``rec_loc``.
 
     """
+
+    # TODO          TODO          TODO
+    #
+    # Generalized it so
+    # - rec_loc can also be a grid.
+    # - fieldf can also be a Field-instance, in which case fx, fy, and fz are
+    #   calculated recursively and a Field-instance is returned.
+    #
+    # => Documentation and Tests are missing.
+    #
+    # => Combine grid2grid and get_receiver?
+    #
+    # TODO          TODO          TODO
+
+    if hasattr(fieldf, 'fx'):
+        fx = get_receiver(grid, np.asarray(fieldf.fx), rec_loc, method)
+        fy = get_receiver(grid, np.asarray(fieldf.fy), rec_loc, method)
+        fz = get_receiver(grid, np.asarray(fieldf.fz), rec_loc, method)
+
+        return Field(fx, fy, fz)
+
     # Ensure input field is a certain field, not a Field instance.
     if fieldf.ndim == 1:
         print("* ERROR   :: Field must be x-, y-, or z-directed with ndim=3.")
         print(f"             Shape of provided field: {fieldf.shape}.")
         raise ValueError("Field error")
 
-    # Ensure rec_loc has three entries.
-    if len(rec_loc) != 3:
-        print("* ERROR   :: Receiver location needs to be (rx, ry, rz).")
-        print(f"             Length of provided rec_loc: {len(rec_loc)}.")
-        raise ValueError("Receiver location error")
+    # Check if rec_loc is a grid or a tuple/list.
+    if hasattr(rec_loc, 'hx'):
+        calc_new_points = True
+        new_points = tuple()
+    else:
+        calc_new_points = False
+        new_points = rec_loc
+
+        # Ensure rec_loc has three entries.
+        if len(rec_loc) != 3:
+            print("* ERROR   :: Receiver location needs to be (rx, ry, rz).")
+            print(f"             Length of provided rec_loc: {len(rec_loc)}.")
+            raise ValueError("Receiver location error")
 
     # Get the vectors corresponding to input data. Dimensions:
     #
@@ -1212,13 +1241,32 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
     for i, coord in enumerate(['x', 'y', 'z']):
         if fieldf.shape[i] == getattr(grid, 'nN'+coord):
             pts = (getattr(grid, 'vectorN'+coord), )
+            if calc_new_points:
+                new_pts = (getattr(rec_loc, 'vectorN'+coord), )
         else:
             pts = (getattr(grid, 'vectorCC'+coord), )
+            if calc_new_points:
+                new_pts = (getattr(rec_loc, 'vectorCC'+coord), )
 
         # Add to points.
         points += pts
+        if calc_new_points:
+            new_points += new_pts
 
-    return _interp3d(points, fieldf, rec_loc, method, 0.0, 'constant')
+    if calc_new_points:
+        shape = (new_points[0].size, new_points[1].size, new_points[2].size)
+        xx, yy, zz = np.broadcast_arrays(
+                new_points[0][:, None, None],
+                new_points[1][:, None], new_points[2])
+        new_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
+        new_points = new_points.reshape(-1, 3, order='F')
+
+    new_fieldf = _interp3d(points, fieldf, new_points, method, 0.0, 'constant')
+
+    if calc_new_points:
+        new_fieldf = new_fieldf.reshape(shape, order='F')
+
+    return new_fieldf
 
 
 def grid2grid(grid, values, new_grid, method='volume'):
