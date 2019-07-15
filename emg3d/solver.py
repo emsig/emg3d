@@ -381,7 +381,8 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         info = f"   > MG cycles        : {var.it}\n"
     info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"  # Error.
     info += f":: emg3d END   :: {var.time.now} :: "  # END and time.
-    info += f"runtime = {var.time.runtime}\n"        # Total runtime.
+    time = var.time.runtime
+    info += f"runtime = {time}\n"                    # Total runtime.
     var.cprint(info, 1)
 
     # Take the conjugate if required.
@@ -395,7 +396,8 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         'ref_error': var.l2_refe,     # Reference error [norm(sfield)].
         'tol': var.tol,               # Tolerance (abs_error<ref_error*tol).
         'it_mg': var.it,              # Multigrid iterations.
-        'it_ssl': var._ssl_it         # SSL iterations.
+        'it_ssl': var._ssl_it,        # SSL iterations.
+        'time': time,                 # Runtime.
     }
 
     # Return depending on input arguments; or nothing.

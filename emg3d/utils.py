@@ -1314,7 +1314,7 @@ class Time:
     def runtime(self):
         """Return string of runtime since time zero."""
         t1 = default_timer() - self.__t0
-        return str(timedelta(seconds=np.round(t1)))
+        return timedelta(seconds=np.round(t1))
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
