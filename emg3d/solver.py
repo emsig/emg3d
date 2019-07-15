@@ -314,7 +314,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Get return_info and conjugate from kwargs.
     return_info = kwargs.pop('return_info', False)
-    conjugate = kwargs.pop('conjugate', False)
+    conjugate = kwargs.pop('conjugate', True)
 
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
