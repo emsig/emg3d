@@ -6,7 +6,10 @@ Changelog
 --------
 
 - New function ``utils.grid2grid`` to move between different model grids;
-  factor-out ``_interp3d`` from ``utils.get_receiver`` for that.
+  factor-out ``_interp3d`` from ``utils.get_receiver`` for that. Both functions
+  (``utils.get_receiver`` and ``utils.grid2grid``) can be used for fields and
+  model parameters (with or without extrapolation). They are very similar, the
+  former taking coordinates (x, y, z), the latter one a TensorMesh.
 - New jitted function ``njitted.volume_average`` for interpolation using the
   volume-average technique. Default method in ``utils.grid2grid``.
 

@@ -456,6 +456,13 @@ def test_get_receiver():
     assert_allclose(out6, 0.+0j)
     assert_allclose(out7, 0.+0j)
 
+    # Check it does not return 0 if outside.
+    out8 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'linear', True)
+    out9 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'cubic', True)
+
+    assert_allclose(out8, 1.+1j)
+    assert_allclose(out9, 1.+1j)
+
 
 def test_grid2grid_volume():
     # == X == Simple 1D model
@@ -598,6 +605,46 @@ def test_grid2grid():
     out = utils.grid2grid(tgrid, tmodel, t2grid, 'linear')
     assert_allclose(out, 3.)
 
+    # Assert it is 0 if points are outside.
+    out = utils.grid2grid(tgrid, tmodel, t2grid, 'cubic', False)
+    assert_allclose(out, 0.)
+    out = utils.grid2grid(tgrid, tmodel, t2grid, 'linear', False)
+    assert_allclose(out, 0.)
+
+    # Provide a Field instance
+    grid = utils.TensorMesh(
+            [np.array([1, 2]), np.array([1, 2]), np.array([1, 2])],
+            [0, 0, 0])
+    cgrid = utils.TensorMesh(
+            [np.array([1.5, 1]), np.array([1.5]), np.array([1.5])],
+            [0, 0, 0])
+    field = utils.Field(grid)
+
+    # Simple linear interpolation test.
+    field.fx = np.arange(1, field.fx.size+1)
+    field.fy = np.arange(1, field.fy.size+1)
+    field.fz = np.arange(1, field.fz.size+1)
+
+    new_field = utils.grid2grid(grid, field, cgrid, method='linear')
+    fx = utils.grid2grid(grid, field.fx, cgrid, method='linear')
+    fy = utils.grid2grid(grid, field.fy, cgrid, method='linear')
+    fz = utils.grid2grid(grid, field.fz, cgrid, method='linear')
+    assert_allclose(fx, new_field.fx)
+    assert_allclose(fy, new_field.fy)
+    assert_allclose(fz, new_field.fz)
+
+    new_field = utils.grid2grid(grid, field, cgrid, method='cubic')
+    fx = utils.grid2grid(grid, field.fx, cgrid, method='cubic')
+    fy = utils.grid2grid(grid, field.fy, cgrid, method='cubic')
+    fz = utils.grid2grid(grid, field.fz, cgrid, method='cubic')
+    assert_allclose(fx, new_field.fx)
+    assert_allclose(fy, new_field.fy)
+    assert_allclose(fz, new_field.fz)
+
+    # Ensure Field fails with 'volume'.
+    with pytest.raises(ValueError):
+        utils.grid2grid(grid, field, cgrid, method='volume')
+
 
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
@@ -613,7 +660,7 @@ def test_Time():
 
     # This should have taken less then 1s.
     out = time.runtime
-    assert "0:00:00" == out
+    assert "0:00:00" == str(out)
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
