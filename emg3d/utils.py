@@ -170,7 +170,8 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
     ----------
 
     h_min : float
-        Minimum cell width.
+        Minimum cell width. If x1 is provided, the actual minimum cell width
+        might be smaller than h_min.
 
     domain : list
         [start, end] of model domain.
@@ -185,7 +186,8 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
     x1 : float
         If provided, then no stretching is applied between ``x0`` and ``x1``.
         The non-stretched part starts at ``x0`` and stops at the first possible
-        location at or after ``x1``. ``x1`` is restricted to ``domain``.
+        location at or after ``x1``. ``x1`` is restricted to ``domain``. This
+        will h_min so that an integer number of cells fit within x0 and x1.
 
     resp_domain : bool
         If False (default), then the domain-end might shift slightly to assure
@@ -207,6 +209,7 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
     domain = np.array(domain, dtype=float)
     x0 = np.array(x0, dtype=float)
     x0 = np.clip(x0, *domain)  # Restrict to model domain
+    h_min = np.array(h_min, dtype=float)
     if x1 is not None:
         x1 = np.array(x1, dtype=float)
         x1 = np.clip(x1, *domain)  # Restrict to model domain
@@ -218,11 +221,17 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
         xlim_orig = domain.copy()
         nx_orig = int(nx)
         x0_orig = x0.copy()
+        h_min_orig = h_min.copy()
 
         # Get number of non-stretched cells
-        n_nos = int(np.ceil((x1-x0)/h_min))-1
-        # Note that wee subtract one cell, because the standard scheme provides
-        # one h_min-cell.
+        n_nos = int(np.ceil((x1-x0)/h_min))
+
+        # Re-calculate h_min to fit with x0-x1-limits:
+        h_min = (x1-x0)/n_nos
+
+        # Subtract one cell, because the standard scheme provides one
+        # h_min-cell.
+        n_nos -= 1
 
         # Reset x0, because the first h_min comes from normal scheme
         x0 += h_min
@@ -233,8 +242,8 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
         # Reset nx for normal scheme
         nx -= n_nos
 
-        # If there are not enough points reset to standard procedure
-        # This five is arbitrary. However, nx should be much bigger than five
+        # If there are not enough points reset to standard procedure. The limit
+        # of five is arbitrary. However, nx should be much bigger than five
         # anyways, otherwise stretched grid doesn't make sense.
         if nx <= 5:
             print("Warning :: Not enough points for non-stretched part,"
@@ -243,6 +252,7 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
             nx = nx_orig
             x0 = x0_orig
             x1 = None
+            h_min = h_min_orig
 
     # Get stretching factor (a = 1+alpha).
     if h_min == 0 or h_min > np.diff(domain)/nx:
@@ -1217,6 +1227,10 @@ def grid2grid(grid, values, new_grid, method='volume'):
     Points on ``new_grid`` which are outside of ``grid`` are filled by the
     nearest value (if ``method='volume'`` or ``method='cubic'``) or by
     extrapolation (if ``method='linear'``).
+
+    The linear method is the fastest, and the volume-averaging method is the
+    slowest. For big grids (millions of cells), the difference in runtime can
+    be substantial.
 
 
     Parameters
