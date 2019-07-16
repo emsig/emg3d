@@ -90,6 +90,8 @@ def test_solver_homogeneous(capsys):
     out, _ = capsys.readouterr()
     assert ' MAX. ITERATION REACHED' in out
     assert maxit == info['it_mg']
+    assert info['exit'] == 1
+    assert 'MAX. ITERATION REACHED' in info['exit_message']
 
     # BiCGSTAB with lower verbosity, print checking.
     _ = solver.solver(grid, model, sfield, verb=2, maxit=1, sslsolver=True)
@@ -123,6 +125,8 @@ def test_solver_homogeneous(capsys):
             grid, model, sfield, efield_copy, return_info=True)
     assert info['it_mg'] == 0
     assert info['it_ssl'] == 0
+    assert info['exit'] == 0
+    assert info['exit_message'] == 'CONVERGED'
 
     # Check stagnation by providing an almost zero source field.
     _ = solver.solver(grid, model, sfield*0+1e-20)
@@ -355,7 +359,7 @@ def test_krylov(capsys):
     # Call krylov and ensure it fails properly.
     solver.krylov(grid, model, sfield, efield, var)
     out, _ = capsys.readouterr()
-    assert '* ERROR   :: Error in bicgstab.' in out
+    assert '* ERROR   :: Error in bicgstab' in out
 
 
 def test_mgparameters():
