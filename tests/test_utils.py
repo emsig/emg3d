@@ -456,6 +456,13 @@ def test_get_receiver():
     assert_allclose(out6, 0.+0j)
     assert_allclose(out7, 0.+0j)
 
+    # Check it does not return 0 if outside.
+    out8 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'linear', True)
+    out9 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'cubic', True)
+
+    assert_allclose(out8, 1.+1j)
+    assert_allclose(out9, 1.+1j)
+
 
 def test_grid2grid_volume():
     # == X == Simple 1D model
@@ -466,7 +473,7 @@ def test_grid2grid_volume():
             [np.array([10, 25, 10, 5, 2]), np.array([1, ]), np.array([1, ])],
             x0=np.array([-5, 0, 0]))
     values_in = np.array([1., 5., 3, 7, 2])[:, None, None]
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     # Result 2nd cell: (5*1+10*5+10*3)/25=3.4
     assert_allclose(values_out[:, 0, 0], np.array([1, 3.4, 7, 2, 2]))
@@ -479,7 +486,7 @@ def test_grid2grid_volume():
             [np.array([1, ]), np.array([10, 25, 10, 5, 2]), np.array([1, ])],
             x0=np.array([0, -5, 0]))
     values_in = np.array([1, 3.4, 7, 2, 2])[None, :, None]
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     # Result 1st cell: (5*1+5*3.4)/10=2.2
     assert_allclose(values_out[0, :, 0], np.array([2.2, 3.4, 3.4, 7, 2]))
@@ -492,7 +499,7 @@ def test_grid2grid_volume():
             [np.array([1, ]), np.array([1, ]), np.array([20, 41, 9, 30])],
             x0=np.array([0, 0, 0]))
     values_in = np.arange(1., 10)[None, None, :]
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     assert_allclose(values_out[0, 0, :], np.array([1.5, 187/41, 7, 260/30]))
 
@@ -507,7 +514,7 @@ def test_grid2grid_volume():
     create = np.array([create, 2*create, create])
     values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
 
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     check = np.array([[1, 1.5, 1], [1.5, 2.25, 1.5]])[:, None, :]
     check = check*np.array([1, 3.4, 7, 2, 2])[None, :, None]
@@ -527,7 +534,7 @@ def test_grid2grid_volume():
     vol_in = np.outer(np.outer(grid_in.hx, grid_in.hy).ravel('F'), grid_in.hz)
     vol_in = vol_in.ravel('F').reshape(grid_in.vnC, order='F')
 
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
     vol_out = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'),
                        grid_out.hz)
     vol_out = vol_out.ravel('F').reshape(grid_out.vnC, order='F')
@@ -598,6 +605,46 @@ def test_grid2grid():
     out = utils.grid2grid(tgrid, tmodel, t2grid, 'linear')
     assert_allclose(out, 3.)
 
+    # Assert it is 0 if points are outside.
+    out = utils.grid2grid(tgrid, tmodel, t2grid, 'cubic', False)
+    assert_allclose(out, 0.)
+    out = utils.grid2grid(tgrid, tmodel, t2grid, 'linear', False)
+    assert_allclose(out, 0.)
+
+    # Provide a Field instance
+    grid = utils.TensorMesh(
+            [np.array([1, 2]), np.array([1, 2]), np.array([1, 2])],
+            [0, 0, 0])
+    cgrid = utils.TensorMesh(
+            [np.array([1.5, 1]), np.array([1.5]), np.array([1.5])],
+            [0, 0, 0])
+    field = utils.Field(grid)
+
+    # Simple linear interpolation test.
+    field.fx = np.arange(1, field.fx.size+1)
+    field.fy = np.arange(1, field.fy.size+1)
+    field.fz = np.arange(1, field.fz.size+1)
+
+    new_field = utils.grid2grid(grid, field, cgrid, method='linear')
+    fx = utils.grid2grid(grid, field.fx, cgrid, method='linear')
+    fy = utils.grid2grid(grid, field.fy, cgrid, method='linear')
+    fz = utils.grid2grid(grid, field.fz, cgrid, method='linear')
+    assert_allclose(fx, new_field.fx)
+    assert_allclose(fy, new_field.fy)
+    assert_allclose(fz, new_field.fz)
+
+    new_field = utils.grid2grid(grid, field, cgrid, method='cubic')
+    fx = utils.grid2grid(grid, field.fx, cgrid, method='cubic')
+    fy = utils.grid2grid(grid, field.fy, cgrid, method='cubic')
+    fz = utils.grid2grid(grid, field.fz, cgrid, method='cubic')
+    assert_allclose(fx, new_field.fx)
+    assert_allclose(fy, new_field.fy)
+    assert_allclose(fz, new_field.fz)
+
+    # Ensure Field fails with 'volume'.
+    with pytest.raises(ValueError):
+        utils.grid2grid(grid, field, cgrid, method='volume')
+
 
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
@@ -613,7 +660,7 @@ def test_Time():
 
     # This should have taken less then 1s.
     out = time.runtime
-    assert "0:00:00" == out
+    assert "0:00:00" == str(out)
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT

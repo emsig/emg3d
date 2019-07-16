@@ -170,7 +170,8 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
     ----------
 
     h_min : float
-        Minimum cell width.
+        Minimum cell width. If x1 is provided, the actual minimum cell width
+        might be smaller than h_min.
 
     domain : list
         [start, end] of model domain.
@@ -185,7 +186,8 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
     x1 : float
         If provided, then no stretching is applied between ``x0`` and ``x1``.
         The non-stretched part starts at ``x0`` and stops at the first possible
-        location at or after ``x1``. ``x1`` is restricted to ``domain``.
+        location at or after ``x1``. ``x1`` is restricted to ``domain``. This
+        will h_min so that an integer number of cells fit within x0 and x1.
 
     resp_domain : bool
         If False (default), then the domain-end might shift slightly to assure
@@ -207,6 +209,7 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
     domain = np.array(domain, dtype=float)
     x0 = np.array(x0, dtype=float)
     x0 = np.clip(x0, *domain)  # Restrict to model domain
+    h_min = np.array(h_min, dtype=float)
     if x1 is not None:
         x1 = np.array(x1, dtype=float)
         x1 = np.clip(x1, *domain)  # Restrict to model domain
@@ -218,11 +221,17 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
         xlim_orig = domain.copy()
         nx_orig = int(nx)
         x0_orig = x0.copy()
+        h_min_orig = h_min.copy()
 
         # Get number of non-stretched cells
-        n_nos = int(np.ceil((x1-x0)/h_min))-1
-        # Note that wee subtract one cell, because the standard scheme provides
-        # one h_min-cell.
+        n_nos = int(np.ceil((x1-x0)/h_min))
+
+        # Re-calculate h_min to fit with x0-x1-limits:
+        h_min = (x1-x0)/n_nos
+
+        # Subtract one cell, because the standard scheme provides one
+        # h_min-cell.
+        n_nos -= 1
 
         # Reset x0, because the first h_min comes from normal scheme
         x0 += h_min
@@ -233,8 +242,8 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
         # Reset nx for normal scheme
         nx -= n_nos
 
-        # If there are not enough points reset to standard procedure
-        # This five is arbitrary. However, nx should be much bigger than five
+        # If there are not enough points reset to standard procedure. The limit
+        # of five is arbitrary. However, nx should be much bigger than five
         # anyways, otherwise stretched grid doesn't make sense.
         if nx <= 5:
             print("Warning :: Not enough points for non-stretched part,"
@@ -243,6 +252,7 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
             nx = nx_orig
             x0 = x0_orig
             x1 = None
+            h_min = h_min_orig
 
     # Get stretching factor (a = 1+alpha).
     if h_min == 0 or h_min > np.diff(domain)/nx:
@@ -1146,13 +1156,11 @@ def get_h_field(grid, model, field):
     return hfield
 
 
-def get_receiver(grid, fieldf, rec_loc, method='cubic'):
-    """Return field at receiver locations.
+def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
+    """Return values corresponding to grid at coordinates.
 
     Works for electric fields as well as magnetic fields obtained with
-    :func:`get_h_field`.
-
-    If ``rec_loc`` is outside of ``grid``, the returned field is zero.
+    :func:`get_h_field`, and for model parameters.
 
 
     Parameters
@@ -1160,47 +1168,60 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
     grid : TensorMesh
         Model grid; a ``TensorMesh``-instance.
 
-    fieldf : ndarray
-        Field in a direction, e.g., for the x-direction ``Field.fx``, with
-        shape ``Field.vnEx``.
+    values : ndarray
+        Can be either a particular field, e.g., efield.fx, or a model
+        parameter.
 
-    rec_loc : tuple (rec_x, rec_y, rec_z)
-        ``rec_x``, ``rec_y``, and ``rec_z`` positions.
+    coordinates : tuple (x, y, z)
+        Coordinates (x, y, z) where to interpolate ``values``; e.g. receiver
+        locations.
 
     method : str, optional
         The method of interpolation to perform, 'linear' or 'cubic'.
         Default is 'cubic' (forced to 'linear' if there are less than 3 points
         in any direction).
 
+    extrapolate : bool
+        If True, points on ``new_grid`` which are outside of ``grid`` are
+        filled by the nearest value (if ``method='cubic'``) or by extrapolation
+        (if ``method='linear'``). If False, points outside are set to zero.
+
+        Default is False.
+
 
     Returns
     -------
-    values : ndarray
-        ``fieldf`` at positions ``rec_loc``.
+    new_values : ndarray
+        Values at ``coordinates``.
+
+
+    See Also
+    --------
+    grid2grid : Interpolation of model parameters or fields to a new grid.
 
     """
     # Ensure input field is a certain field, not a Field instance.
-    if fieldf.ndim == 1:
-        print("* ERROR   :: Field must be x-, y-, or z-directed with ndim=3.")
-        print(f"             Shape of provided field: {fieldf.shape}.")
-        raise ValueError("Field error")
+    if values.ndim == 1:
+        print("* ERROR   :: Values must be a x-, y-, or z-directed field or")
+        print("             model parameters with ndim=3.")
+        print(f"             Shape of provided field: {values.shape}.")
+        raise ValueError("Values error")
 
-    # Ensure rec_loc has three entries.
-    if len(rec_loc) != 3:
-        print("* ERROR   :: Receiver location needs to be (rx, ry, rz).")
-        print(f"             Length of provided rec_loc: {len(rec_loc)}.")
-        raise ValueError("Receiver location error")
+    if len(coordinates) != 3:
+        print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
+        print(f"             Length of provided coord.: {len(coordinates)}.")
+        raise ValueError("Coordinates error")
 
     # Get the vectors corresponding to input data. Dimensions:
     #
-    #         E-field          H-field
-    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]
-    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]
-    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]
+    #         E-field          H-field      |  Model Parameter
+    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]  |
+    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]  |  [nCx, nCy, nCz]
+    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]  |
     #
     points = tuple()
     for i, coord in enumerate(['x', 'y', 'z']):
-        if fieldf.shape[i] == getattr(grid, 'nN'+coord):
+        if values.shape[i] == getattr(grid, 'nN'+coord):
             pts = (getattr(grid, 'vectorN'+coord), )
         else:
             pts = (getattr(grid, 'vectorCC'+coord), )
@@ -1208,15 +1229,18 @@ def get_receiver(grid, fieldf, rec_loc, method='cubic'):
         # Add to points.
         points += pts
 
-    return _interp3d(points, fieldf, rec_loc, method, 0.0, 'constant')
+    if extrapolate:
+        return _interp3d(points, values, coordinates, method, None, 'nearest')
+    else:
+        return _interp3d(points, values, coordinates, method, 0.0, 'constant')
 
 
-def grid2grid(grid, values, new_grid, method='volume'):
+def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
-    Points on ``new_grid`` which are outside of ``grid`` are filled by the
-    nearest value (if ``method='volume'`` or ``method='cubic'``) or by
-    extrapolation (if ``method='linear'``).
+    The linear method is the fastest, and the volume-averaging method is the
+    slowest. For big grids (millions of cells), the difference in runtime can
+    be substantial.
 
 
     Parameters
@@ -1225,7 +1249,8 @@ def grid2grid(grid, values, new_grid, method='volume'):
         Input and output model grids; ``TensorMesh``-instances.
 
     values : ndarray
-        Values corresponding to ``grid``.
+        Model parameters; Field instance, or a particular field (e.g.
+        field.fx). For fields the method cannot be 'volume'.
 
     method : {<'volume'>, 'linear', 'cubic'}, optional
         The method of interpolation to perform. The volume averaging method
@@ -1233,20 +1258,45 @@ def grid2grid(grid, values, new_grid, method='volume'):
         'volume'. The method 'cubic' requires at least three points in any
         direction, otherwise it will fall back to 'linear'.
 
+        Volume averaging is only implemented for model parameters, not for
+        fields.
+
+    extrapolate : bool
+        If True, points on ``new_grid`` which are outside of ``grid`` are
+        filled by the nearest value (if ``method='cubic'``) or by extrapolation
+        (if ``method='linear'``). If False, points outside are set to zero.
+
+        For ``method='volume'`` it always uses the nearest value for points
+        outside of ``grid``.
+
+        Default is True.
+
 
     Returns
     -------
     new_values : ndarray
         Values corresponding to ``new_grid``.
 
+
+    See Also
+    --------
+    get_receiver : Interpolation of model parameters or fields to (x, y, z).
+
     """
 
-    # Ensure values has the dimensions of grid.
-    if not np.all(grid.vnC == values.shape):
-        print("* ERROR   :: ``values`` must have same shape as ``grid``.")
-        print(f"             Shape of ``grid``   : {grid.vnC}.")
-        print(f"             Shape of ``values`` : {values.shape}.")
-        raise ValueError("grid or values error")
+    # If values is a Field instance, call it recursively for each field.
+    if hasattr(values, 'field') and values.field.ndim == 1:
+        fx = grid2grid(grid, np.asarray(values.fx), new_grid, method)
+        fy = grid2grid(grid, np.asarray(values.fy), new_grid, method)
+        fz = grid2grid(grid, np.asarray(values.fz), new_grid, method)
+
+        # Return a field instance.
+        return Field(fx, fy, fz)
+
+    # If values is a particular field, ensure method is not 'volume'.
+    if not np.all(grid.vnC == values.shape) and method == 'volume':
+        print("* ERROR   :: ``method='volume'`` not implemented for fields.")
+        raise ValueError("Method not implemented.")
 
     if method == 'volume':
         points = (grid.vectorNx, grid.vectorNy, grid.vectorNz)
@@ -1258,22 +1308,39 @@ def grid2grid(grid, values, new_grid, method='volume'):
 
     else:
         # Get the vectors corresponding to input data.
-        points = (grid.vectorCCx, grid.vectorCCy, grid.vectorCCz)
+        points = tuple()
+        new_points = tuple()
+        shape = tuple()
+        for i, coord in enumerate(['x', 'y', 'z']):
+            if values.shape[i] == getattr(grid, 'nN'+coord):
+                pts = getattr(grid, 'vectorN'+coord)
+                new_pts = getattr(new_grid, 'vectorN'+coord)
+            else:
+                pts = getattr(grid, 'vectorCC'+coord)
+                new_pts = getattr(new_grid, 'vectorCC'+coord)
+
+            # Add to points.
+            points += (pts, )
+            new_points += (new_pts, )
+            shape += (len(new_pts), )
 
         # Format the output points.
-        if hasattr(new_grid, 'gridCC'):
-            new_points = new_grid.gridCC
-        else:
-            xx, yy, zz = np.broadcast_arrays(
-                    new_grid.vectorCCx[:, None, None],
-                    new_grid.vectorCCy[:, None],
-                    new_grid.vectorCCz)
-            new_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
-            new_points = new_points.reshape(-1, 3, order='F')
+        xx, yy, zz = np.broadcast_arrays(
+                new_points[0][:, None, None],
+                new_points[1][:, None],
+                new_points[2])
+        new_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
+        new_points = new_points.reshape(-1, 3, order='F')
 
         # Get values from `_interp3d`.
-        new_values = _interp3d(
-                points, values, new_points, method, None, 'nearest')
+        if extrapolate:
+            new_values = _interp3d(
+                    points, values, new_points, method, None, 'nearest')
+        else:
+            new_values = _interp3d(
+                    points, values, new_points, method, 0.0, 'constant')
+
+        new_values = new_values.reshape(shape, order='F')
 
     return new_values
 
@@ -1300,7 +1367,7 @@ class Time:
     def runtime(self):
         """Return string of runtime since time zero."""
         t1 = default_timer() - self.__t0
-        return str(timedelta(seconds=np.round(t1)))
+        return timedelta(seconds=np.round(t1))
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT

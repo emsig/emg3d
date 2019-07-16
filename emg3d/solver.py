@@ -214,6 +214,15 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           level in any direction by its value.
           Default is -1.
 
+        - ``conjugate`` : bool
+
+            The derivation by [Muld06]_ defines the Fourier transform to go
+            from frequency to time by :math:`e^{-i\omega t}`. If
+            ``conjugate=True``, the complex conjugate is returned which
+            corresponds then to :math:`e^{+i\omega t}`.
+            Default is True (this Fourier-transform convention corresponds to
+            the one used in empymod and is commonly used in CSEM).
+
         - ``return_info`` : bool
 
           If True, a dictionary is returned with runtime info (final norm and
@@ -303,8 +312,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     """
 
-    # Get return_info from kwargs.
+    # Get return_info and conjugate from kwargs.
     return_info = kwargs.pop('return_info', False)
+    conjugate = kwargs.pop('conjugate', True)
 
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
@@ -327,9 +337,10 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         # Set flag to return the field.
         do_return = True
     else:
-        # If provided, take the conjugate
-        # (see explanation at the end of the solver.solver-routine).
-        np.conjugate(efield, efield)
+
+        # Take the conjugate if required.
+        if conjugate:
+            np.conjugate(efield, efield)
 
         # Set flag to NOT return the field.
         do_return = False
@@ -370,12 +381,13 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         info = f"   > MG cycles        : {var.it}\n"
     info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"  # Error.
     info += f":: emg3d END   :: {var.time.now} :: "  # END and time.
-    info += f"runtime = {var.time.runtime}\n"        # Total runtime.
+    time = var.time.runtime
+    info += f"runtime = {time}\n"                    # Total runtime.
     var.cprint(info, 1)
 
-    # To use the same Fourier-transform convention as empymod and commonly
-    # used in CSEM, we return the conjugate.
-    np.conjugate(efield, efield)
+    # Take the conjugate if required.
+    if conjugate:
+        np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
     info_dict = {
@@ -384,7 +396,8 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         'ref_error': var.l2_refe,     # Reference error [norm(sfield)].
         'tol': var.tol,               # Tolerance (abs_error<ref_error*tol).
         'it_mg': var.it,              # Multigrid iterations.
-        'it_ssl': var._ssl_it         # SSL iterations.
+        'it_ssl': var._ssl_it,        # SSL iterations.
+        'time': time.seconds,         # Runtime (s).
     }
 
     # Return depending on input arguments; or nothing.
