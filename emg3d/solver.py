@@ -402,9 +402,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
-    exit = int(var.exit_message != 'CONVERGED')  # Get exit status.
+    exit_status = int(var.exit_message != 'CONVERGED')  # Get exit status.
     info_dict = {
-        'exit': exit,                      # Exit status.
+        'exit': exit_status,               # Exit status.
         'exit_message': var.exit_message,  # Exit message.
         'abs_error': var.l2,               # Absolute error.
         'rel_error': var.l2/var.l2_refe,   # Relative error.
