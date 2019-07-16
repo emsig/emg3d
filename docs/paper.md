@@ -1,5 +1,5 @@
 ---
-title: "emg3d: A multigrid solver for 3D electromagnetic diffusion."
+title: "emg3d: A multigrid solver for 3D electromagnetic diffusion"
 tags:
   - python
   - geophysics
@@ -42,7 +42,7 @@ $$ \eta \mathbf{E} - \nabla \times \mu_r^{-1} \nabla \times \mathbf{E} =
 where $\eta = \mathrm{i}\omega \mu_0(\sigma - \mathrm{i}\omega\varepsilon)$.
 
 Various open-source codes exist to model CSEM responses for a layered Earth,
-e.g., *DIPOLE1D* [@Key:2009] and *empymod* [@Werthmuller:2017]), and for a
+e.g., *DIPOLE1D* [@Key:2009] and *empymod* [@Werthmuller:2017], and for a
 two-dimensional Earth, e.g., *MARE2DEM* [@Key:2011]. Open-source modellers
 for a three-dimensional (3D) Earth only recently became available, notably
 *SimPEG* [@Cockett:2015]; *PETGEM* [@Castillo:2018]; and *custEM*
@@ -60,10 +60,10 @@ multigrid CSEM codes of these publications are proprietary. The code *emg3d* is
 a multigrid solver for 3D CSEM diffusion with tri-axial electrical anisotropy
 using a staggered grid [@Mulder:2006]; [@Mulder:2007].
 It can act as a solver on its own, or be used as a preconditioner for various
-Krylov subspace methods included the scientific Python library (SciPy).
+Krylov subspace methods included in the scientific Python library (SciPy).
 Multigrid solvers can struggle to converge with strong grid-stretching or
 strong anisotropy. We implemented *semicoarsening* (coarsening the grid only in
-some coordinate directions) and *line relaxation* (solve for the values of a
+some coordinate directions) and *line relaxation* (solving for the values of a
 whole gridline simultaneously in some directions) inside the multigrid
 technique to deal with these issues [@Jonsthovel:2006].
 
