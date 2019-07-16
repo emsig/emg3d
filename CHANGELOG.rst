@@ -15,6 +15,7 @@ Changelog
 - New parameter ``conjugate`` in ``solver.solver`` to permit both Fourier
   transform conventions.
 - Added ``exit`` and ``exit_message`` to ``info_dict``.
+- Add section ``Related ecosystem`` to documentation.
 
 
 *v0.7.0* : H-field

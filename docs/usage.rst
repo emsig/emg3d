@@ -116,6 +116,31 @@ than 2 seconds. It was able to coarsen in each dimension four times, where the
 input grid had 49,152 cells, and the coarsest grid had 12 cells.
 
 
+Related ecosystem
+-----------------
+
+The hard dependencies for emg3d are with *NumPy*, *SciPy*, and *numba*
+comparably low. However, emg3d is, as such, "only" a solver. It does not
+contain fancy grid- nor model-creation routines or plotting functions. There
+exist other packages which do that much better.
+
+To create advanced meshes it is recommended to use `discretize
+<https://discretize.simpeg.xyz>`_ from the SimPEG framework. It also comes with
+some neat plotting functionalities to plot model parameters and resulting
+fields. Furthermore, it can serve as a link to use `PyVista
+<https://docs.pyvista.org>`_ to create nice 3D plots even within a notebook.
+
+Projects which can be used to compare or validate the results are, e.g.,
+`empymod <https://empymod.github.io>`_ for layered models or `SimPEG
+<https://simpeg.xyz>`_ for 3D models. It is also possible to create a
+geological model with `GemPy <https://www.gempy.org>`_ and, again via
+discretize, move it to emg3d to calculate CSEM responses for it.
+
+Have a look at the `emg3d-examples
+<https://github.com/empymod/emg3d-examples>`_-repo for many examples of how to
+use emg3d together with the mentioned projects and more!
+
+
 Tipps and Tricks
 ----------------
 
