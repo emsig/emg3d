@@ -473,7 +473,7 @@ def test_grid2grid_volume():
             [np.array([10, 25, 10, 5, 2]), np.array([1, ]), np.array([1, ])],
             x0=np.array([-5, 0, 0]))
     values_in = np.array([1., 5., 3, 7, 2])[:, None, None]
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     # Result 2nd cell: (5*1+10*5+10*3)/25=3.4
     assert_allclose(values_out[:, 0, 0], np.array([1, 3.4, 7, 2, 2]))
@@ -486,7 +486,7 @@ def test_grid2grid_volume():
             [np.array([1, ]), np.array([10, 25, 10, 5, 2]), np.array([1, ])],
             x0=np.array([0, -5, 0]))
     values_in = np.array([1, 3.4, 7, 2, 2])[None, :, None]
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     # Result 1st cell: (5*1+5*3.4)/10=2.2
     assert_allclose(values_out[0, :, 0], np.array([2.2, 3.4, 3.4, 7, 2]))
@@ -499,7 +499,7 @@ def test_grid2grid_volume():
             [np.array([1, ]), np.array([1, ]), np.array([20, 41, 9, 30])],
             x0=np.array([0, 0, 0]))
     values_in = np.arange(1., 10)[None, None, :]
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     assert_allclose(values_out[0, 0, :], np.array([1.5, 187/41, 7, 260/30]))
 
@@ -514,7 +514,7 @@ def test_grid2grid_volume():
     create = np.array([create, 2*create, create])
     values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
 
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
 
     check = np.array([[1, 1.5, 1], [1.5, 2.25, 1.5]])[:, None, :]
     check = check*np.array([1, 3.4, 7, 2, 2])[None, :, None]
@@ -534,7 +534,7 @@ def test_grid2grid_volume():
     vol_in = np.outer(np.outer(grid_in.hx, grid_in.hy).ravel('F'), grid_in.hz)
     vol_in = vol_in.ravel('F').reshape(grid_in.vnC, order='F')
 
-    values_out = utils.grid2grid(grid_in, values_in, grid_out)
+    values_out = utils.grid2grid(grid_in, values_in, grid_out, 'volume')
     vol_out = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'),
                        grid_out.hz)
     vol_out = vol_out.ravel('F').reshape(grid_out.vnC, order='F')

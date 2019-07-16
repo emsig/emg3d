@@ -1235,7 +1235,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         return _interp3d(points, values, coordinates, method, 0.0, 'constant')
 
 
-def grid2grid(grid, values, new_grid, method='volume', extrapolate=True):
+def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
     The linear method is the fastest, and the volume-averaging method is the

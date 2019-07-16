@@ -5,13 +5,15 @@ Changelog
 *latest*
 --------
 
-- New function ``utils.grid2grid`` to move between different model grids;
-  factor-out ``_interp3d`` from ``utils.get_receiver`` for that. Both functions
-  (``utils.get_receiver`` and ``utils.grid2grid``) can be used for fields and
-  model parameters (with or without extrapolation). They are very similar, the
-  former taking coordinates (x, y, z), the latter one a TensorMesh.
+- New function ``utils.grid2grid`` to move from one grid to another one. Both
+  functions (``utils.get_receiver`` and ``utils.grid2grid``) can be used for
+  fields and model parameters (with or without extrapolation). They are very
+  similar, the former taking coordinates (x, y, z) as new points, the latter
+  one another TensorMesh instance.
 - New jitted function ``njitted.volume_average`` for interpolation using the
-  volume-average technique. Default method in ``utils.grid2grid``.
+  volume-average technique.
+- New parameter ``conjugate`` in ``solver.solver`` to permit both Fourier
+  transform conventions.
 
 
 *v0.7.0* : H-field
