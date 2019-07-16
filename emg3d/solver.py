@@ -1658,11 +1658,12 @@ def _terminate(var, l2_last, l2_prev, it):
             finished = True
 
         # Print info.
-        if var.verb < 4:
-            add = "\n"
-        else:
-            add = ""
-        var.cprint(add+"   > "+var.exit_message+"\n", 1, end="")
+        if finished:
+            if var.verb < 4:
+                add = "\n"
+            else:
+                add = ""
+            var.cprint(add+"   > "+var.exit_message, 1)
 
     return finished
 
