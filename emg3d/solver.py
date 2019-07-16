@@ -236,8 +236,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         initial efield was provided.
 
     info_dict : dict
-        Dictionary with runtime info (errors and number of iterations); only if
-        ``return_info=True``.
+        Dictionary with runtime info; only if ``return_info=True``.
+
+        Keys:
+
+        - ``exit``: Exit status, 0=Success, 1=Failure;
+        - ``exit_message``: Exit message, check this if ``exit=1``;
+        - ``abs_error``: Absolute error;
+        - ``rel_error``: Relative error;
+        - ``ref_error``: Reference error [norm(sfield)];
+        - ``tol``: Tolerance (abs_error<ref_error*tol);
+        - ``it_mg``: Number of multigrid iterations;
+        - ``it_ssl``: Number of SSL iterations;
+        - ``time``: Runtime (s).
 
 
     Examples
@@ -354,6 +365,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             var.cycle = None
 
             # Start final info.
+            var.exit_message = "CONVERGED"
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
 
     # Print header for iteration log.
@@ -390,9 +402,12 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
+    exit = int(var.exit_message != 'CONVERGED')  # Get exit status.
     info_dict = {
-        'abs_error': var.l2,          # Absolute error.
-        'rel_error': var.l2/var.l2_refe,  # Relative error.
+        'exit': exit,                      # Exit status.
+        'exit_message': var.exit_message,  # Exit message.
+        'abs_error': var.l2,               # Absolute error.
+        'rel_error': var.l2/var.l2_refe,   # Relative error.
         'ref_error': var.l2_refe,     # Reference error [norm(sfield)].
         'tol': var.tol,               # Tolerance (abs_error<ref_error*tol).
         'it_mg': var.it,              # Multigrid iterations.
@@ -682,12 +697,15 @@ def krylov(grid, model, sfield, efield, var):
         var.l2 = residual(grid, model, sfield, utils.Field(grid, efield), True)
 
     # Convergence-checks for sslsolver.
+    pre = "\n   > "
     if i < 0:
-        var.cprint(f"\n* ERROR   :: Error in {var.sslsolver}.", -1)
+        var.exit_message = f"Error in {var.sslsolver}"
+        pre = "\n* ERROR   :: "
     elif i > 0:
-        var.cprint("\n   > MAX. ITERATION REACHED, NOT CONVERGED", 1)
+        var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
     else:
-        var.cprint("\n   > CONVERGED", 1)
+        var.exit_message = "CONVERGED"
+    var.cprint(pre+var.exit_message, 1)
 
 
 # MULTIGRID SUB-ROUTINES
@@ -1033,15 +1051,16 @@ class MGParameters:
     def __post_init__(self):
         """Set and check some of the parameters."""
 
-        # 0. Set some additional variables
+        # 0. Set some additional variables.
         self._level_all = list()   # To keep track of the levels for QC-figure.
         self._first_cycle = True   # Flag if in first cycle for QC-figure.
-        self.it = 0                # To store MG cycle count
-        self._ssl_it = 0           # To store solver iteration count
-        self.l2 = 1.0              # To store current error
-        self.l2_refe = 1.0         # To store reference error
+        self.it = 0                # To store MG cycle count.
+        self._ssl_it = 0           # To store solver iteration count.
+        self.l2 = 1.0              # To store current error.
+        self.l2_refe = 1.0         # To store reference error.
+        self.exit_message = ''     # For convergence status.
 
-        self.time = utils.Time()   # Timer
+        self.time = utils.Time()   # Timer.
 
         # 1. Set everything related to semicoarsening and line relaxation.
         self._semicoarsening()
@@ -1050,7 +1069,7 @@ class MGParameters:
         # 2. Set everything to used solver and MG-cycle.
         self._solver_and_cycle()
 
-        # 3. Check max coarsening level
+        # 3. Check max coarsening level.
         self.max_level
 
     def __repr__(self):
@@ -1621,32 +1640,29 @@ def _terminate(var, l2_last, l2_prev, it):
             finished = True
 
     else:
-        # Initialize info string.
-        info = ""
 
+        if l2_last < var.tol*var.l2_refe:    # Converged.
+            var.exit_message = "CONVERGED"
+            finished = True
+
+        elif l2_last > 10*var.l2_refe:       # Diverged.
+            var.exit_message = "DIVERGED"
+            finished = True
+
+        elif it > 2 and l2_last >= l2_prev:  # Stagnated.
+            var.exit_message = "STAGNATED"
+            finished = True
+
+        elif it == var.maxit:                # Maximum iterations reached.
+            var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
+            finished = True
+
+        # Print info.
         if var.verb < 4:
             add = "\n"
         else:
             add = ""
-
-        if l2_last < var.tol*var.l2_refe:    # Converged.
-            info += add+"   > CONVERGED\n"
-            finished = True
-
-        elif l2_last > 10*var.l2_refe:       # Diverged.
-            info += add+"   > DIVERGED\n"
-            finished = True
-
-        elif it > 2 and l2_last >= l2_prev:  # Stagnated.
-            info += add+"   > STAGNATED\n"
-            finished = True
-
-        elif it == var.maxit:                # Maximum iterations reached.
-            info += add+"   > MAX. ITERATION REACHED, NOT CONVERGED\n"
-            finished = True
-
-        # Print info.
-        var.cprint(info, 1, end="")
+        var.cprint(add+"   > "+var.exit_message+"\n", 1, end="")
 
     return finished
 
