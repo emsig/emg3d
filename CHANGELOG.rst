@@ -2,10 +2,13 @@ Changelog
 #########
 
 
-*latest*
---------
+*v0.7.1* : JOSS article
+-----------------------
 
-- New function ``utils.grid2grid`` to move from one grid to another one. Both
+**2019-07-17**
+
+- Version of the JOSS article, https://doi.org/10.21105/joss.01463 .
+- New function ``utils.grid2grid`` to move from one grid to another. Both
   functions (``utils.get_receiver`` and ``utils.grid2grid``) can be used for
   fields and model parameters (with or without extrapolation). They are very
   similar, the former taking coordinates (x, y, z) as new points, the latter
@@ -14,7 +17,7 @@ Changelog
   volume-average technique.
 - New parameter ``conjugate`` in ``solver.solver`` to permit both Fourier
   transform conventions.
-- Added ``exit`` and ``exit_message`` to ``info_dict``.
+- Added ``exit_status`` and ``exit_message`` to ``info_dict``.
 - Add section ``Related ecosystem`` to documentation.
 
 
