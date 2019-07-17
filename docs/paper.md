@@ -53,23 +53,24 @@ a three-dimensional (3D) Earth only recently became available, notably *SimPEG*
 that not only includes CSEM but also other geophysical methods and can model
 them on various types of regular grids. It currently uses mostly the direct
 solver *PARDISO* [@PARDISO]. PETGEM and custEM use finite elements with the
-*FEniCS* [@FEniCS] solver. All three codes require substantial memory and are
+*FEniCS* solver [@FEniCS]. All three codes require substantial memory and are
 not easily run on a laptop for models with several million cells.
 
-![Example showing the optimal scaling of emg3d for both runtime and memory consumption. Here for a homogeneous fullspace of 1 S/m and a frequency of 1 Hz.](paper.png)
+@Mulder:2006 has shown that the multigrid method [@Briggs:2000], with its
+optimal scaling for both runtime and memory consumption, as shown in Figure 1,
+works fine for diffusive CSEM problems. This was later also confirmed by others
+[@Jaysaval:2016]. However, the multigrid CSEM codes of these publications are
+proprietary. The code *emg3d* is a multigrid solver for 3D CSEM diffusion with
+tri-axial electrical anisotropy using a staggered grid
+[@Mulder:2006;@Mulder:2007]. It can act as a solver on its own, or be used as a
+preconditioner for various Krylov subspace methods. Multigrid solvers can
+struggle to converge with strong grid-stretching or strong anisotropy. We
+implemented *semicoarsening* (coarsening the grid only in some coordinate
+directions) and *line relaxation* (solving for the values of a whole gridline
+simultaneously in some directions) inside the multigrid technique to deal with
+these issues [@Jonsthovel:2006].
 
-@Mulder:2006 has shown that the multigrid method [@Briggs:2000], which reduces
-memory requirement substantially, works fine for diffusive CSEM problems. This
-was later also confirmed by others [@Jaysaval:2016]. However, the multigrid
-CSEM codes of these publications are proprietary. The code *emg3d* is a
-multigrid solver for 3D CSEM diffusion with tri-axial electrical anisotropy
-using a staggered grid [@Mulder:2006;@Mulder:2007]. It can act as a solver on
-its own, or be used as a preconditioner for various Krylov subspace methods.
-Multigrid solvers can struggle to converge with strong grid-stretching or
-strong anisotropy. We implemented *semicoarsening* (coarsening the grid only in
-some coordinate directions) and *line relaxation* (solving for the values of a
-whole gridline simultaneously in some directions) inside the multigrid
-technique to deal with these issues [@Jonsthovel:2006].
+![Example showing the optimal scaling of emg3d for both runtime and memory consumption. Here for a homogeneous fullspace of 1 S/m and a frequency of 1 Hz.](paper.png)
 
 The code is written completely in Python using the NumPy/SciPy stack
 [@NumPy;@SciPy], where the most time- and memory-consuming parts are sped up
