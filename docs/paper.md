@@ -41,9 +41,10 @@ $$ \eta \mathbf{E} - \nabla \times \mu_\mathrm{r}^{-1} \nabla \times \mathbf{E}
 
 where $\eta = \mathrm{i}\omega \mu_0(\sigma - \mathrm{i}\omega\varepsilon)$.
 The electric field and the current source are denoted as $\mathbf{E}$ and
-$\mathbf{J}_\mathrm{s}$, respectively, $\sigma$ is conductivity, $\omega$ is
-angular frequency, $\varepsilon=\varepsilon_0\varepsilon_\mathrm{r}$ the
-electric permittivity, and $\mu=\mu_0\mu_\mathrm{r}$ the magnetic permeability.
+$\mathbf{J}_\mathrm{s}$, respectively, $\sigma$ is the conductivity, $\omega$
+is the angular frequency, $\varepsilon=\varepsilon_0\varepsilon_\mathrm{r}$ is
+the electric permittivity, and $\mu=\mu_0\mu_\mathrm{r}$ is the magnetic
+permeability.
 
 Various open-source codes exist to model CSEM responses for a layered Earth,
 e.g., *DIPOLE1D* [@DIPOLE1D] and *empymod* [@empymod], and for a
@@ -70,7 +71,7 @@ directions) and *line relaxation* (solving for the values of a whole gridline
 simultaneously in some directions) inside the multigrid technique to deal with
 these issues [@Jonsthovel:2006].
 
-![Example showing the optimal scaling of emg3d for both runtime and memory consumption. Here for a homogeneous fullspace of 1 S/m and a frequency of 1 Hz (single thread on an Intel(R) Xeon(R) CPU @ 2.50GHz).](paper.png)
+![Example showing the optimal scaling of emg3d for both (a) runtime and (b) memory consumption. The model is a homogeneous fullspace of 1 S/m and frequency is 1 Hz (running as a single thread on an Intel(R) Xeon(R) CPU @ 2.50GHz).](paper.png)
 
 The code is written completely in Python using the NumPy/SciPy stack
 [@NumPy;@SciPy], where the most time- and memory-consuming parts are sped up
