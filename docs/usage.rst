@@ -3,10 +3,10 @@
 Getting started
 ###############
 
-The code ``emg3d`` is a three-dimensional modeller for electromagnetic (EM)
-diffusion as used, for instance, in controlled-source EM (CSEM) surveys
-frequently applied in the search for, amongst other, groundwater, hydrocarbons,
-and minerals.
+The code ``emg3d`` ([WeMS19]_) is a three-dimensional modeller for
+electromagnetic (EM) diffusion as used, for instance, in controlled-source EM
+(CSEM) surveys frequently applied in the search for, amongst other,
+groundwater, hydrocarbons, and minerals.
 
 The core of the code is primarily based on [Muld06]_, [Muld07]_, and [Muld08]_.
 You can read more about the background of the code in the chapter
