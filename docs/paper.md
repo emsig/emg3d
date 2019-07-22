@@ -22,7 +22,7 @@ affiliations:
    index: 1
  - name: Shell Global Solutions International BV, Grasweg 31, 1031 HW Amsterdam, NL
    index: 2
-date: 17 July 2019
+date: 22 July 2019
 bibliography: paper.bib
 ---
 
@@ -33,8 +33,8 @@ investigation tool in the search for, amongst other, groundwater, hydrocarbons,
 and minerals. The numerical modelling of CSEM data requires the solution of the
 Maxwell equations. These can be simplified in the particular case of CSEM, as
 the frequencies used in surveys are usually sufficiently low to ignore any
-displacement currents. A diffusive problem remains, which resulting system of
-equations is given in the frequency domain by
+displacement currents. A diffusive problem remains, which has the resulting
+system of equations given in the frequency domain by
 
 $$ \eta \mathbf{E} - \nabla \times \mu_\mathrm{r}^{-1} \nabla \times \mathbf{E}
 = -\mathrm{i}\omega\mu_0\mathbf{J}_\mathrm{s} \, ,$$
@@ -52,7 +52,7 @@ two-dimensional Earth, e.g., *MARE2DEM* [@MARE2DEM]. Open-source modellers for
 a three-dimensional (3D) Earth only recently became available, notably *SimPEG*
 [@SimPEG], *PETGEM* [@PETGEM], and *custEM* [@custEM]. SimPEG is a framework
 that not only includes CSEM but also other geophysical methods and can model
-them on various types of regular grids. It currently uses mostly the direct
+them on various types of regular grids. It currently primarily uses the direct
 solver *PARDISO* [@PARDISO]. PETGEM and custEM use finite elements with the
 *FEniCS* solver [@FEniCS]. All three codes require substantial memory and are
 not easily run on a laptop for models with several million cells.
@@ -60,9 +60,9 @@ not easily run on a laptop for models with several million cells.
 @Mulder:2006 has shown that the multigrid method [@Briggs:2000], with its
 optimal scaling for both runtime and memory consumption as shown in Figure 1,
 works fine for diffusive CSEM problems. This was later also confirmed by others
-[@Jaysaval:2016]. However, the multigrid CSEM codes of these publications are
-proprietary. The code *emg3d* is a multigrid solver for 3D CSEM diffusion with
-tri-axial electrical anisotropy using a staggered grid
+[@Jaysaval:2016]. However, the multigrid CSEM codes discussed in these
+publications are proprietary. The code *emg3d* is a multigrid solver for 3D
+CSEM diffusion with tri-axial electrical anisotropy using a staggered grid
 [@Mulder:2006;@Mulder:2007]. It can act as a solver on its own, or be used as a
 preconditioner for various Krylov subspace methods. Multigrid solvers can
 struggle to converge with strong grid-stretching or strong anisotropy. We
