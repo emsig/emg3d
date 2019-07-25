@@ -2,14 +2,6 @@ Changelog
 #########
 
 
-*latest*
---------
-
-- Bugfix in ``solver.krylov`` (introduced in #697760f6; made error increase
-  after Krylov iteration in very rare cases, generally slowed down krylov I
-  think).
-
-
 *v0.7.1* : JOSS article
 -----------------------
 
