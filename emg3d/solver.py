@@ -688,13 +688,16 @@ def krylov(grid, model, sfield, efield, var):
             var.cprint(log, 2)
 
     # Solve the system with sslsolver.
-    efield.field, i = getattr(ssl, var.sslsolver)(
+    efield, i = getattr(ssl, var.sslsolver)(
             A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
             atol=1e-30, M=M, callback=callback)
 
+    # Cast result to Field instance.
+    efield = utils.Field(grid, efield)
+
     # Calculate final error, if not done in the callback.
     if var.verb < 3:
-        var.l2 = residual(grid, model, sfield, utils.Field(grid, efield), True)
+        var.l2 = residual(grid, model, sfield, efield, True)
 
     # Convergence-checks for sslsolver.
     pre = "\n   > "
