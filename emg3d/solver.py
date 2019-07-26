@@ -82,8 +82,10 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         If an initial efield is provided nothing is returned, but the final
         efield is directly put into the provided efield.
 
-        This works currently only properly for pure multigrid (hence
-        ``sslsolver=False``), otherwise it is reset to zeroes.
+        If an initial field is provided and a sslsolver is used, then it first
+        carries out one multigrid cycle without semicoarsening nor line
+        relaxation. The sslsolver is at times unstable with an initial guess,
+        carrying out one MG cycle helps to stabilize it.
 
     cycle : str; optional.
 
@@ -326,10 +328,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     """
 
-    # Get return_info and conjugate from kwargs.
-    return_info = kwargs.pop('return_info', False)
-    conjugate = kwargs.pop('conjugate', True)
-
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
             cycle=cycle, sslsolver=sslsolver, semicoarsening=semicoarsening,
@@ -349,15 +347,15 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         efield = utils.Field(grid)
 
         # Set flag to return the field.
-        do_return = True
+        var.do_return = True
     else:
 
         # Take the conjugate if required.
-        if conjugate:
+        if var.conjugate:
             np.conjugate(efield, efield)
 
         # Set flag to NOT return the field.
-        do_return = False
+        var.do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = residual(grid, model, sfield, efield, True)
@@ -370,9 +368,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             # Start final info.
             var.exit_message = "CONVERGED"
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
-
-        elif sslsolver:  # Initial guess with ssl does not work at the moment.
-            efield *= 0.+0j
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]  {'rel. error':<22}"
@@ -404,7 +399,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     var.cprint(info, 1)
 
     # Take the conjugate if required.
-    if conjugate:
+    if var.conjugate:
         np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
@@ -422,11 +417,11 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     }
 
     # Return depending on input arguments; or nothing.
-    if do_return and return_info:  # efield and info.
+    if var.do_return and var.return_info:  # efield and info.
         return efield, info_dict
-    elif do_return:                # efield.
+    elif var.do_return:                    # efield.
         return efield
-    elif return_info:              # info.
+    elif var.return_info:                  # info.
         return info_dict
 
 
@@ -626,6 +621,35 @@ def krylov(grid, model, sfield, efield, var):
         As returned by :func:`multigrid`.
 
     """
+
+    # If an initial efield was provided, we run first one multigrid cycle
+    # without semicoarsening nor line relaxation; this helps to stabilize the
+    # sslsolver later on.
+    if not var.do_return:
+        # Store variables.
+        tmp_maxit = var.maxit
+        tmp_sc_cycle = var.sc_cycle
+        tmp_lr_cycle = var.lr_cycle
+        tmp_sc_dir = var.sc_dir
+        tmp_lr_dir = var.lr_dir
+
+        # Re-define maxit and the cycles.
+        var.maxit = 1
+        var.sc_cycle = False
+        var.lr_cycle = False
+        var.sc_dir = 0
+        var.lr_dir = 0
+
+        # Run one multigrid cycle.
+        multigrid(grid, model, sfield, efield, var)
+        var.cprint("", 2)  # Enter an empty line to distinguish it.
+
+        # Re-set the variables.
+        var.maxit = tmp_maxit
+        var.sc_cycle = tmp_sc_cycle
+        var.lr_cycle = tmp_lr_cycle
+        var.sc_dir = tmp_sc_dir
+        var.lr_dir = tmp_lr_dir
 
     # Define matrix operation A x as LinearOperator.
     def amatvec(efield):
@@ -1054,6 +1078,11 @@ class MGParameters:
     # Coarsest level; automatically determined if a negative number is given.
     clevel: int = -1
 
+    # Whether or not to return info.
+    return_info: bool = False
+    # Whether or not to return the conjugate.
+    conjugate: bool = True
+
     def __post_init__(self):
         """Set and check some of the parameters."""
 
@@ -1067,6 +1096,7 @@ class MGParameters:
         self.exit_message = ''     # For convergence status.
 
         self.time = utils.Time()   # Timer.
+        self.do_return = True      # Whether or not to return the efield.
 
         # 1. Set everything related to semicoarsening and line relaxation.
         self._semicoarsening()
