@@ -82,6 +82,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         If an initial efield is provided nothing is returned, but the final
         efield is directly put into the provided efield.
 
+        This works currently only properly for pure multigrid (hence
+        ``sslsolver=False``), otherwise it is reset to zeroes.
+
     cycle : str; optional.
 
         Type of multigrid cycle. Default is 'F'.
@@ -367,6 +370,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             # Start final info.
             var.exit_message = "CONVERGED"
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
+
+        elif sslsolver:  # Initial guess with ssl does not work at the moment.
+            efield *= 0.+0j
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]  {'rel. error':<22}"
