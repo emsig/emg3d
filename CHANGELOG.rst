@@ -2,6 +2,13 @@ Changelog
 #########
 
 
+*latest*
+--------
+
+- Bugfix and workaround for the case where a ``sslsolver`` is used together
+  with a provided initial ``efield``.
+
+
 *v0.7.1* : JOSS article
 -----------------------
 
