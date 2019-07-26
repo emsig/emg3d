@@ -128,6 +128,17 @@ def test_solver_homogeneous(capsys):
     assert info['exit'] == 0
     assert info['exit_message'] == 'CONVERGED'
 
+    # Provide initial field, ensure one initial multigrid is carried out
+    # without linerelaxation nor semicoarsening.
+    _, _ = capsys.readouterr()  # empty
+    efield = utils.Field(grid)
+    outarray = solver.solver(
+            grid, model, sfield, efield, sslsolver=True, semicoarsening=True,
+            linerelaxation=True, maxit=2, verb=3)
+    out, _ = capsys.readouterr()
+    assert "after                       1 F-cycles    0 0" in out
+    assert "after                       2 F-cycles    4 1" in out
+
     # Check stagnation by providing an almost zero source field.
     _ = solver.solver(grid, model, sfield*0+1e-20)
     out, _ = capsys.readouterr()
