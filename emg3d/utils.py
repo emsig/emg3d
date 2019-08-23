@@ -287,6 +287,175 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
     return hx
 
 
+def get_stretched_h_new(
+        freq,
+        rho,
+        src,  # Centred around source; source is in middle of a cell.
+        survey_domain,  # [min, max]
+        possible_nx,  # list
+        min_width=None,   # Minimum cell width restriction.
+        pps=3,
+        alpha=[1.05, 11, 1.5, 11],  # max survey dom; nr; max calc dom; nr.
+        calc_domain_factors=[5, 10, 5, 10],  # min/max left; min/max right.
+        resp_survey_domain=False,
+        ):
+
+    space = 8*" "
+    print(f"{freq:6.2f} Hz")
+
+    # Skin depth.
+    skind = 503.3*np.sqrt(rho/freq)
+    print(space+f"- Skin depth          [m] : {skind:.0f}")
+
+    # Minimum cell width.
+    dmin = skind/pps
+    if min_width is not None:
+        dmin = np.clip(dmin, *np.array(min_width, dtype=float))
+
+    # Calculation domain.
+    survey_domain = np.array(survey_domain, dtype=float)
+    print(space+f"- Survey domain       [m] : {survey_domain[0]:.0f} - "
+          f"{survey_domain[1]:.0f}")
+    calc_domain = skind*np.array(calc_domain_factors, dtype=float)
+    calcmin = np.clip(survey_domain[0], *(src-calc_domain[:2][::-1]))
+    calcmax = np.clip(survey_domain[1], *(src+calc_domain[2:]))
+    calc_domain = [calcmin, calcmax]
+    print(space+f"- Calculation domain  [m] : {calc_domain[0]:.0f} - "
+          f"{calc_domain[1]:.0f}")
+
+    # If calc_domain is smaller than survey_domain, we restrict the latter, if
+    # resp_survey_domain is True, otherwise we restrict the former.
+    if resp_survey_domain:
+        calc_domain[0] = min(survey_domain[0], calc_domain[0])
+        calc_domain[1] = max(survey_domain[1], calc_domain[1])
+    else:
+        survey_domain[0] = max(survey_domain[0], calc_domain[0])
+        survey_domain[1] = min(survey_domain[1], calc_domain[1])
+
+    # Flag if there is no need to check the calc_domain.
+    if (calc_domain[0] == survey_domain[0] and
+            calc_domain[1] == survey_domain[1]):
+        same_bounds = True
+    else:
+        same_bounds = False
+
+    # Flag if terminated.
+    finished = False
+
+    # # TODO: Factor the following out, twice. The sa/ca are basically the
+    # same. On top, remove all the finished/break with a function call and
+    # return statements.
+    sa, ca = np.nan, np.nan
+
+    # Loop over possible cell numbers from small to big.
+    for nx in np.unique(possible_nx):
+
+        # Loop over possible alphas for survey_domain.
+        for sa in np.linspace(1.0, alpha[0], alpha[1]):
+
+            # Get current stretched grid cell sizes.
+            thx = dmin*sa**np.arange(1, nx+1)
+
+            # 1. Fill src to left survey_domain.
+            nl = np.sum((src-dmin/2-np.cumsum(thx)) > survey_domain[0])+1
+
+            # 2. Fill src to right survey_domain.
+            nr = np.sum((src+dmin/2+np.cumsum(thx)) < survey_domain[1])+1
+
+            # 3. Get remaining number of cells and check termination criteria.
+            nx_remain = nx-nl-nr-1
+            nsdc = nl+nr+1  # Number of survey_domain cells.
+            if same_bounds and nx_remain >= 0:  # Good enough, finish.
+
+                # Create hx-array.
+                nl += int(np.floor(nx_remain/2))  # If uneven, add one cell
+                nr += int(np.ceil(nx_remain/2))   # more on the right.
+                hx = np.r_[thx[:nl][::-1], dmin, thx[:nr]]
+
+                # Calculate origin.
+                x0 = float(src-dmin/2-np.sum(thx[:nl]))
+
+                # Mark it as finished and break out of the loop.
+                finished = True
+                break
+
+            elif nx_remain <= 0:  # Not good, try next.
+                continue
+
+            # Create the current hx-array.
+            hx = np.r_[thx[:nl][::-1], dmin, thx[:nr]]
+            hxo = np.r_[thx[:nl][::-1], dmin, thx[:nr]]
+
+            # Get actual surv_domain:
+            asurv_domain = [src-dmin/2-np.sum(thx[:nl]),
+                            src+dmin/2+np.sum(thx[:nr])]
+            x0 = float(src-dmin/2-np.sum(thx[:nl]))
+
+            # Loop over possible alphas for calc_domain.
+            for ca in np.linspace(sa, alpha[2], alpha[3]):
+
+                # 4. Fill to left calc_domain
+                thxl = hx[0]*ca**np.arange(1, nx_remain+1)
+                nl = np.sum((asurv_domain[0]-np.cumsum(thxl)) >
+                            calc_domain[0])+1
+
+                # 5. Fill to right calc domain
+                thxr = hx[-1]*ca**np.arange(1, nx_remain+1)
+                nr = np.sum((asurv_domain[1]+np.cumsum(thxr)) <
+                            calc_domain[1])+1
+
+                # 6. Get remaining number of cells and check termination
+                # criteria.
+                nx_remain2 = nx-nsdc-nl-nr
+                ncdc = nl+nr  # Number of calc_domain cells.
+
+                if nx_remain2 < 0:  # Not good, try next.
+                    continue
+
+                # Create hx-array.
+                nl += int(np.floor(nx_remain2/2))  # If uneven, add one cell
+                nr += int(np.ceil(nx_remain2/2))   # more on the right.
+                hx = np.r_[thxl[:nl][::-1], hx, thxr[:nr]]
+
+                # Calculate origin.
+                x0 = float(asurv_domain[0]-np.sum(thxl[:nl]))
+
+                # Mark it as finished and break out of the loop.
+                finished = True
+                break
+
+            if finished:
+                break
+
+        if finished:
+            break
+
+    if finished:  # Print info about found grid.
+        print(space+f"- Final extent        [m] : {x0:.0f} - "
+              f"{x0+np.sum(hx):.0f}")
+        extstr = space+f"- Min/max cell width  [m] : {min(hx):.0f} / "
+        alstr = space+f"- Alpha survey"
+        nrstr = space+"- Number of cells "
+        if same_bounds:
+            print(extstr+f"{max(hx):.0f}")
+            print(alstr+f"            : {sa:.3f}")
+            print(nrstr+f"  (s/r) : {nx} ({nsdc}/{nx_remain})")
+        else:
+            print(extstr+f"{max(hxo):.0f} / {max(hx):.0f}")
+            print(alstr+f"/calc       : {sa:.3f}/{ca:.3f}")
+            print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
+    else:  # Throw message if no solution was found.
+        print("\n* ERROR   :: No suitable grid found; relax your criteria.\n")
+        hx, x0 = None, None
+
+    info = {'dmin': dmin,
+            'dmax': np.nanmax(hx),
+            'amin': np.nanmin([ca, sa]),
+            'amax': np.nanmin([ca, sa])}
+
+    return hx, x0, info
+
+
 def get_hx(alpha, domain, nx, x0, resp_domain=True):
     r"""Return cell widths for given input.
 
