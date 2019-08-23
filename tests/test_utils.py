@@ -84,6 +84,19 @@ def test_get_stretched_h(capsys):
     assert "Warning :: Not enough points for non-stretched part" in out
 
 
+def test_get_cell_numbers(capsys):
+    numbers = utils.get_cell_numbers(max_nr=128, max_prime=5, min_div=3)
+    assert_allclose([16, 24, 32, 40, 48, 64, 80, 96, 128], numbers)
+
+    with pytest.raises(ValueError):
+        numbers = utils.get_cell_numbers(max_nr=128, max_prime=25, min_div=3)
+        out, _ = capsys.readouterr()
+        assert "* ERROR   :: Highest prime is 25" in out
+
+    numbers = utils.get_cell_numbers(max_nr=50, max_prime=3, min_div=5)
+    assert len(numbers) == 0
+
+
 def test_get_hx():
     # Test alpha <= 0
     hx1 = utils.get_hx(-.5, [0, 10], 5, 3.33)

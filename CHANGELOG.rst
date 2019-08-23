@@ -5,6 +5,8 @@ Changelog
 *latest*
 --------
 
+- New function ``utils.get_cell_numbers`` to get good values of number of cells
+  for given primes.
 - Bugfix and workaround for the case where a ``sslsolver`` is used together
   with a provided initial ``efield``.
 
