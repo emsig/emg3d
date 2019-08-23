@@ -89,9 +89,9 @@ def test_get_cell_numbers(capsys):
     assert_allclose([16, 24, 32, 40, 48, 64, 80, 96, 128], numbers)
 
     with pytest.raises(ValueError):
-        numbers = utils.get_cell_numbers(max_nr=128, max_prime=50, min_div=3)
+        numbers = utils.get_cell_numbers(max_nr=128, max_prime=25, min_div=3)
         out, _ = capsys.readouterr()
-        assert "* ERROR   :: Highest prime is 50" in out
+        assert "* ERROR   :: Highest prime is 25" in out
 
     numbers = utils.get_cell_numbers(max_nr=50, max_prime=3, min_div=5)
     assert len(numbers) == 0

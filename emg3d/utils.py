@@ -291,8 +291,8 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
 def get_cell_numbers(max_nr, max_prime=5, min_div=3):
     r"""Returns 'good' cell numbers for the multigrid method.
 
-    'Good' cell numbers are numbers which can be divided by two as many times
-    as possible. At the end there will be a low prime number.
+    'Good' cell numbers are numbers which can be divided by 2 as many times as
+    possible. At the end there will be a low prime number.
 
     The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
     p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
@@ -321,13 +321,13 @@ def get_cell_numbers(max_nr, max_prime=5, min_div=3):
         Array containing all possible cell numbers from lowest to highest.
 
     """
-    # Primes till 41.
-    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41])
+    # Primes till 20.
+    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19])
 
-    # Sanity check; 41 is already ridiculously high.
+    # Sanity check; 19 is already ridiculously high.
     if max_prime > primes[-1]:
         print(f"* ERROR   :: Highest prime is {max_prime}, "
-              "please use a value <= 97.")
+              "please use a value < 20.")
         raise ValueError("Highest prime too high")
 
     # Restrict to max_prime.
