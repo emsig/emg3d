@@ -42,9 +42,9 @@ except ImportError:
                   "\n             Install it via `pip install scooby`.\n")
 
 __all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h',
-           'get_cell_numbers', 'get_hx', 'get_source_field', 'get_receiver',
-           'get_h_field', 'grid2grid', 'TensorMesh', 'Time', 'data_write',
-           'data_read', 'Report']
+           'get_stretched_h_new', 'get_cell_numbers', 'get_hx',
+           'get_source_field', 'get_receiver', 'get_h_field', 'grid2grid',
+           'TensorMesh', 'Time', 'data_write', 'data_read', 'Report']
 
 
 # CONSTANTS
