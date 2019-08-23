@@ -41,9 +41,10 @@ except ImportError:
             print("\n* WARNING :: `emg3d.Report` requires `scooby`."
                   "\n             Install it via `pip install scooby`.\n")
 
-__all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h', 'get_hx',
-           'get_source_field', 'get_receiver', 'get_h_field', 'grid2grid',
-           'TensorMesh', 'Time', 'data_write', 'data_read', 'Report']
+__all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h',
+           'get_cell_numbers', 'get_hx', 'get_source_field', 'get_receiver',
+           'get_h_field', 'grid2grid', 'TensorMesh', 'Time', 'data_write',
+           'data_read', 'Report']
 
 
 # CONSTANTS
@@ -285,6 +286,62 @@ def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
               "below `h_min`, because `nx` is too big for `domain`.")
 
     return hx
+
+
+def get_cell_numbers(max_nr, max_prime=5, min_div=3):
+    r"""Returns 'good' cell numbers for the multigrid method.
+
+    'Good' cell numbers are numbers which can be divided by two as many times
+    as possible. At the end there will be a low prime number.
+
+    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
+    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
+    :math:`M, p_\text{max}, n_\text{min}` correspond to ``max_nr``,
+    ``max_prime``, and ``min_div``, respectively.
+
+
+    Parameters
+    ----------
+    max_nr : int
+        Maximum number of cells.
+
+    max_prime : int
+        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
+        limits in order to avoid too big lowest grids in the multigrid method.
+        Default is 5.
+
+    min_div : int
+        Minimum times the number can be divided by two.
+        Default is 3.
+
+
+    Returns
+    -------
+    numbers : array
+        Array containing all possible cell numbers from lowest to highest.
+
+    """
+    # Primes till 41.
+    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41])
+
+    # Sanity check; 41 is already ridiculously high.
+    if max_prime > primes[-1]:
+        print(f"* ERROR   :: Highest prime is {max_prime}, "
+              "please use a value <= 97.")
+        raise ValueError("Highest prime too high")
+
+    # Restrict to max_prime.
+    primes = primes[primes <= max_prime]
+
+    # Get possible values.
+    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
+    numbers = primes[:, None]*2**np.arange(min_div, 30)
+
+    # Get unique values.
+    numbers = np.unique(numbers)
+
+    # Restrict to max_nr and return.
+    return numbers[numbers <= max_nr]
 
 
 def get_hx(alpha, domain, nx, x0, resp_domain=True):
