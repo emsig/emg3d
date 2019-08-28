@@ -98,11 +98,11 @@ resulting system of equations is
 
     \eta \mathbf{\hat{E}} - \nabla \times
     \mu_r^{-1} \nabla \times \mathbf{\hat{E}} =
-    -\mathrm{i}\omega\mu_0\mathbf{\hat{J}}_s ,
+    s\mu_0\mathbf{\hat{J}}_s ,
 
-where :math:`\eta = \mathrm{i}\omega \mu_0(\sigma -
-\mathrm{i}\omega\varepsilon)`. Here, only low frequencies are considered that
-obey :math:`|\omega\epsilon| \ll \sigma`. From here on, the hats are omitted.
+where :math:`\eta = -s \mu_0(\sigma + s\varepsilon)` and :math:`s =
+-\mathrm{i}\omega``. Here, only low frequencies are considered that obey
+:math:`|\omega\epsilon| \ll \sigma`. From here on, the hats are omitted.
 
 We use the perfectly electrically conducting boundary
 
@@ -116,8 +116,22 @@ We use the perfectly electrically conducting boundary
 where :math:`\mathbf{n}` is the outward normal on the boundary of the domain.
 
 
-The Maxwell's equations and Ohm's law are solved in the frequency domain. The
-time-domain solution can be obtained by taking the inverse Fourier transform.
+The Maxwell's equations and Ohm's law are solved in the **frequency domain**.
+The **time-domain** solution can be obtained by taking the inverse Fourier
+transform.
+
+Laplace domain
+``````````````
+It is also possible to solve the problem in the **Laplace domain**, by
+using a real value for :math:`s` in Equation :eq:`fdomain`, instead of the
+complex value :math:`-\mathrm{i}\omega``. This simplifies the problem from
+complex numbers to real numbers, which accelerates the calculation. It also
+improves the convergence rate, as the solution is a smoother function. The
+solver :func:`emg3d.solver.solver` is agnostic to the data type of the provided
+source field, and can solve for real and complex problems, hence frequency and
+Laplace domain. See the documentation of the functions
+:func:`emg3d.utils.get_source_field` and :func:`emg3d.utils.Model` to see how
+you can use `emg3d` for Laplace-domain calculations.
 
 
 Discretisation

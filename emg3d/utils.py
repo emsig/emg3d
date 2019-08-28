@@ -82,7 +82,13 @@ def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
         Default is 0.
 
     freq : float
-        Frequency (Hz) to calculate the skin depth.
+        Frequency (Hz) to calculate the skin depth. The skin depth is a concept
+        defined in the frequency domain. If a negative frequency is provided,
+        it is assumed that the calculation is carried out in the Laplace
+        domain. To calculate the skin depth, the value of ``freq`` is then
+        multiplied by :math:`-2\pi`, to simulate the closest
+        frequency-equivalent.
+
         Default is 1 Hz.
 
     rho : float, optional
@@ -125,7 +131,9 @@ def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
         fact_pos = fact_neg
 
     # Calculate the skin depth.
-    skind = 503.3*np.sqrt(rho/freq)
+    skind = 503.3*np.sqrt(rho/abs(freq))
+    if freq < 0:  # For Laplace-domain calculations.
+        skind /= np.sqrt(2*np.pi)
 
     # Estimate minimum cell width.
     h_min = fact_min*skind
@@ -445,12 +453,12 @@ def get_source_field(grid, src, freq, strength=0):
 
     .. math::
 
-        \mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} .
+        s \mu_0 \mathbf{J}_\mathrm{s} ,
 
-    Either finite length dipoles or infinitesimal small point dipoles can be
-    defined, whereas the return source field corresponds to a normalized (1 Am)
-    source distributed within the cell(s) it resides (can be changed with the
-    ``strength``-parameter).
+    where :math:`s = -\mathrm{i} \omega`. Either finite length dipoles or
+    infinitesimal small point dipoles can be defined, whereas the return source
+    field corresponds to a normalized (1 Am) source distributed within the
+    cell(s) it resides (can be changed with the ``strength``-parameter).
 
 
     Parameters
@@ -465,7 +473,13 @@ def get_source_field(grid, src, freq, strength=0):
           - Point dipole: ``[x, y, z, azimuth, dip]``.
 
     freq : float
-        Source frequency (Hz).
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
 
     strength : float, optional
         Source strength (A):
@@ -488,10 +502,10 @@ def get_source_field(grid, src, freq, strength=0):
     strength = float(strength)
 
     # Get Laplace parameter.
-    if freq > 0:  # Frequency domain.
+    if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
         sval = 2j*np.pi*freq
         dtype = complex
-    else:         # Laplace domain.
+    else:         # Laplace domain; s.
         sval = freq
         dtype = float
 
@@ -796,7 +810,13 @@ class Model:
         shape of grid.vnC (F-ordered) or grid.nC.
 
     freq : float
-        Frequency.
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
 
     mu_r : float or ndarray
        Relative magnetic permeability (isotropic). If ndarray it must have the
@@ -808,12 +828,11 @@ class Model:
                  mu_r=None):
         """Initiate a new resistivity model."""
 
-        # Laplace parameter and frequency.
-        if freq > 0:  # Frequency domain.
-            self.freq = freq
+        # Get Laplace parameter.
+        self.freq = freq  # Store input value.
+        if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
             self.sval = 2j*np.pi*freq
-        else:         # Laplace domain.
-            self.freq = -freq
+        else:         # Laplace domain; s.
             self.sval = freq
 
         # Store required info from grid.
@@ -1007,7 +1026,7 @@ class Field(np.ndarray):
             new = np.zeros(grid.nE, dtype=dtype)
         elif fz is None:                  # grid and field provided
             new = field
-        else:                                   # fx, fy, fz provided
+        else:                             # fx, fy, fz provided
             new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
 
         # Store the field as object

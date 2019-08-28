@@ -901,8 +901,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     wx, wy, wz = _get_restriction_weights(grid, cgrid, sc_dir)
 
     # Calculate the source terms (Equation 8 in [Muld06]_).
-    # Create empty coarse source field instance.
-    csfield = utils.Field(cgrid, dtype=sfield.dtype)
+    csfield = utils.Field(cgrid, dtype=sfield.dtype)  # Initiate zero field.
     njitted.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
                      residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
