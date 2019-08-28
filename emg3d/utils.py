@@ -313,7 +313,9 @@ def get_stretched_h_new(
     print(f"{freq:6.2f} Hz")
 
     # Skin depth.
-    skind = 503.3*np.sqrt(rho/freq)
+    skind = 503.3*np.sqrt(rho/abs(freq))
+    if freq < 0:  # For Laplace-domain calculations.
+        skind /= np.sqrt(2*np.pi)
     print(space+f"- Skin depth          [m] : {skind:.0f}")
 
     # Minimum cell width.
