@@ -279,7 +279,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
 
     # Pre-allocating A for the six edges attached to one node; will be
     # overwritten at each iteration
-    amat = np.zeros(36, dtype=np.complex128)
+    amat = np.zeros(36, dtype=eta_x.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -367,7 +367,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
                     st = np.array([st0, st1, st2, st3, st4, st5])/4.
 
                     # Fill amat
-                    amat[:] = 0+0j  # Reset
+                    amat[:] = 0.  # Reset
 
                     # Initial diagonal elements
                     for k in range(6):
@@ -560,14 +560,14 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
 
     # Pre-allocating middle and left for the 5x5-temporary middle and left
     # matrices; will be overwritten at each iteration
-    middle = np.zeros(25, dtype=np.complex128)
+    middle = np.zeros(25, dtype=eta_x.dtype)
     left = np.zeros(25)
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete x-loop.
     nr = 5*nCx-4  # Number of unknowns
-    bvec = np.zeros(nr, dtype=np.complex128)
-    amat = np.zeros(6*nr, dtype=np.complex128)
+    bvec = np.zeros(nr, dtype=eta_x.dtype)
+    amat = np.zeros(6*nr, dtype=eta_x.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -839,14 +839,14 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
 
     # Pre-allocating middle and left for the 5x5-temporary middle and left
     # matrices; will be overwritten at each iteration
-    middle = np.zeros(25, dtype=np.complex128)
+    middle = np.zeros(25, dtype=eta_x.dtype)
     left = np.zeros(25)
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete y-loop.
     nr = 5*nCy-4  # Number of unknowns
-    bvec = np.zeros(nr, dtype=np.complex128)
-    amat = np.zeros(6*nr, dtype=np.complex128)
+    bvec = np.zeros(nr, dtype=eta_x.dtype)
+    amat = np.zeros(6*nr, dtype=eta_x.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -1113,14 +1113,14 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
 
     # Pre-allocating middle and left for the 5x5-temporary middle and left
     # matrices; will be overwritten at each iteration
-    middle = np.zeros(25, dtype=np.complex128)
+    middle = np.zeros(25, dtype=eta_x.dtype)
     left = np.zeros(25)
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete z-loop.
     nr = 5*nCz-4  # Number of unknowns
-    bvec = np.zeros(nr, dtype=np.complex128)
-    amat = np.zeros(6*nr, dtype=np.complex128)
+    bvec = np.zeros(nr, dtype=eta_x.dtype)
+    amat = np.zeros(6*nr, dtype=eta_x.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -1509,6 +1509,9 @@ def solve(amat, bvec):
     # Number of unknowns
     n = len(bvec)
 
+    # Pre-allocate h
+    h = np.zeros(1, dtype=amat.dtype)[0]
+
     # 1. Get L from non-standard Cholesky L D L^T factorisation
 
     # First element (i = j = 0). Warning: Diagonals of amat cannot be 0!
@@ -1521,7 +1524,7 @@ def solve(amat, bvec):
     # Other columns (1 to n)
     for j in range(1, n):
 
-        h = 0+0j
+        h *= 0.  # Reset h
         for k in range(max(0, j-5), j):
             h += amat[j+5*k]*amat[j+5*k]*amat[6*k]
 
@@ -1533,7 +1536,7 @@ def solve(amat, bvec):
         # Off-diagonals, rows i > j
         for i in range(j+1, min(n, j+6)):
 
-            h = 0+0j
+            h *= 0.  # Reset h
             for k in range(max(0, i-5), j):
                 h += amat[i+5*k]*amat[j+5*k]*amat[6*k]
 
@@ -1543,15 +1546,14 @@ def solve(amat, bvec):
     # Replace diagonal by 1/D
     amat[6*(n-1)] = d  # Last one is still around
     for j in range(n-2, -1, -1):
-        if amat[6*j].real != 0. + amat[6*j] != 0.:
-            amat[6*j] = 1./amat[6*j]
+        amat[6*j] = 1./amat[6*j]
 
     # 2. Solve A x = b
 
     # All elements except first column
     for j in range(1, n):
 
-        h = 0.+0j
+        h *= 0.  # Reset h
         for k in range(max(0, j-5), j):
             h += amat[j+5*k]*bvec[k]
 
@@ -1564,7 +1566,7 @@ def solve(amat, bvec):
     # Solve L^T x = b, x stored in b, L is 1 on diagonal
     for j in range(n-2, -1, -1):
 
-        h = 0.+0.j
+        h *= 0.  # Reset h
         for k in range(j+1, min(n, j+6)):
             h += amat[k+5*j]*bvec[k]
 

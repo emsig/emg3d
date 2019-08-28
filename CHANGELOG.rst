@@ -5,6 +5,10 @@ Changelog
 *latest*
 --------
 
+- Laplace-domain calculation: By providing a negative ``freq``-value to
+  ``utils.get_source_field`` and ``utils.Model``, the calculation is carried
+  out in the real Laplace domain ``s = freq`` instead of the complex frequency
+  domain ``s = 2i*pi*freq``.
 - New function ``utils.get_cell_numbers`` to get good values of number of cells
   for given primes.
 - Bugfix and workaround for the case where a ``sslsolver`` is used together

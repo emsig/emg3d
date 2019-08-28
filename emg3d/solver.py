@@ -341,14 +341,30 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Calculate reference error for tolerance.
     var.l2_refe = njitted.l2norm(sfield)
 
+    # Ensure sfield and model have same data types.
+    if sfield.dtype != model.eta_x.dtype:
+        print("* ERROR   :: Source field and model parameters must have the "
+              "same dtype;\n             complex (f-domain) or real (s-domain)"
+              f". Provided:\n             sfield: {sfield.dtype}; "
+              f"model: {model.eta_x.dtype}.")
+        raise ValueError('Input data types')
+
     # Get efield
     if efield is None:
         # If not provided, initiate an empty one.
-        efield = utils.Field(grid)
+        efield = utils.Field(grid, dtype=sfield.dtype)
 
         # Set flag to return the field.
         var.do_return = True
     else:
+
+        # Ensure efield has same data type as sfield.
+        if sfield.dtype != efield.dtype:
+            print("* ERROR   :: Source field and electric field must have the "
+                  "same dtype;\n             complex (f-domain) or real (s-"
+                  f"domain). Provided:\n             sfield: {sfield.dtype}; "
+                  f"efield: {efield.dtype}.")
+            raise ValueError('Input data types')
 
         # Take the conjugate if required.
         if var.conjugate:
@@ -659,7 +675,7 @@ def krylov(grid, model, sfield, efield, var):
         efield = utils.Field(grid, efield)
 
         # Calculate A x.
-        rfield = utils.Field(grid)
+        rfield = utils.Field(grid, dtype=efield.dtype)
         njitted.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
@@ -670,7 +686,7 @@ def krylov(grid, model, sfield, efield, var):
 
     # Initiate LinearOperator A x.
     A = ssl.LinearOperator(
-            shape=(grid.nE, grid.nE), dtype=complex, matvec=amatvec)
+            shape=(grid.nE, grid.nE), dtype=sfield.dtype, matvec=amatvec)
 
     # Define MG pre-conditioner as LinearOperator, if `var.cycle`.
     def mg_matvec(sfield):
@@ -678,7 +694,7 @@ def krylov(grid, model, sfield, efield, var):
 
         # Cast current fields to Field instances.
         sfield = utils.Field(grid, sfield)
-        efield = utils.Field(grid)
+        efield = utils.Field(grid, dtype=sfield.dtype)
 
         # Solve for these fields.
         multigrid(grid, model, sfield, efield, var)
@@ -689,7 +705,7 @@ def krylov(grid, model, sfield, efield, var):
     M = None
     if var.cycle:
         M = ssl.LinearOperator(
-                shape=(grid.nE, grid.nE), dtype=complex, matvec=mg_matvec)
+                shape=(grid.nE, grid.nE), dtype=sfield.dtype, matvec=mg_matvec)
 
     # Define callback to keep track of sslsolver-iterations.
     def callback(x):
@@ -892,13 +908,13 @@ def restriction(grid, model, sfield, residual, sc_dir):
     wx, wy, wz = _get_restriction_weights(grid, cgrid, sc_dir)
 
     # Calculate the source terms (Equation 8 in [Muld06]_).
-    csfield = utils.Field(cgrid)  # Create empty coarse source field instance.
+    csfield = utils.Field(cgrid, dtype=sfield.dtype)  # Initiate zero field.
     njitted.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
                      residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Ensure PEC and initiate empty e-field.
     csfield.ensure_pec
-    cefield = utils.Field(cgrid)
+    cefield = utils.Field(cgrid, dtype=sfield.dtype)
 
     return cgrid, cmodel, csfield, cefield
 

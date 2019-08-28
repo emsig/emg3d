@@ -62,6 +62,12 @@ def test_get_domain():
     assert h4 == 5.5
     assert np.sum(d4) == 0
 
+    # Ensure Laplace and frequency
+    h5a, d5a = utils.get_domain(freq=1.)
+    h5b, d5b = utils.get_domain(freq=-1./2/np.pi)
+    assert h5a == h5b
+    assert d5a == d5b
+
 
 def test_get_stretched_h(capsys):
     # Test min_space bigger (11) then required (10)
@@ -166,6 +172,28 @@ def test_get_source_field(capsys):
     out, _ = capsys.readouterr()
     assert "* ERROR   :: Provided source is a point dipole" in out
 
+    # Same for Laplace domain
+    src = [100, 200, 300, 27, 31]
+    h = np.ones(4)
+    grid = utils.TensorMesh([h*200, h*400, h*800], -np.array(src[:3]))
+    freq = 1.2458
+    sfield = utils.get_source_field(grid, src, -freq)
+    smu = freq*4e-7*np.pi
+
+    # Check zeros
+    assert 0 == np.sum(np.r_[sfield.fx[:, 2:, :].ravel(),
+                             sfield.fy[:, 2:, :].ravel(),
+                             sfield.fz[:, 2:, :].ravel()])
+
+    # Check source cells
+    h = np.cos(np.deg2rad(src[4]))
+    y = np.sin(np.deg2rad(src[3]))*h
+    x = np.cos(np.deg2rad(src[3]))*h
+    z = np.sin(np.deg2rad(src[4]))
+    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/smu), -1)
+    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/smu), -1)
+    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/smu), -1)
+
 
 def test_get_source_field_point_vs_finite(capsys):
     # === Point dipole to finite dipole comparisons ===
@@ -249,7 +277,7 @@ def test_TensorMesh():
 
 
 # MODEL AND FIELD CLASSES
-def test_model():
+def test_Model():
     # Mainly regression tests
 
     # Create some dummy data
@@ -344,6 +372,27 @@ def test_model():
     grid.vol = vol
     model4 = utils.Model(grid, 1, freq=1)
     assert_allclose(model4.v_mu_r, vol)
+
+    # Check Laplace domain
+    model5 = utils.Model(grid, res_x, res_y, res_z, freq=-1.234, mu_r=res_x)
+
+    # Check eta
+    smu = model5.freq*utils.mu_0
+    sep = model5.freq*utils.epsilon_0
+    eta_x = smu*(1./model5.res_x - sep)*model5._Model__vol
+    eta_y = smu*(1./model5.res_y - sep)*model5._Model__vol
+    eta_z = smu*(1./model5.res_z - sep)*model5._Model__vol
+    assert_allclose(model5.eta_x, eta_x)
+    assert_allclose(model5.eta_y, eta_y)
+    assert_allclose(model5.eta_z, eta_z)
+
+    # Check volume
+    vol = np.outer(np.outer(grid.hx, grid.hy).ravel('F'), grid.hz)
+    vol = vol.ravel('F').reshape(grid.vnC, order='F')
+    assert_allclose(vol, model2.v_mu_r)
+    grid.vol = vol
+    model6 = utils.Model(grid, 1, freq=-1)
+    assert_allclose(model6.v_mu_r, vol)
 
 
 def test_field():

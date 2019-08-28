@@ -48,7 +48,9 @@ reports, and much more, see
 Features
 ========
 
-- Multigrid solver for 3D electromagnetic diffusion with regular grids.
+- Multigrid solver for 3D electromagnetic (EM) diffusion with regular grids.
+- Calculate the 3D EM field in the complex frequency domain or in the real
+  Laplace domain.
 - Can be used together with the `SimPEG <https://simpeg.xyz>`_-framework.
 - Can be used as a standalone solver or as a pre-conditioner for various Krylov
   subspace methods implemented in SciPy, e.g., BiCGSTAB
