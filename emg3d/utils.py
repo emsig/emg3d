@@ -82,7 +82,13 @@ def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
         Default is 0.
 
     freq : float
-        Frequency (Hz) to calculate the skin depth.
+        Frequency (Hz) to calculate the skin depth. The skin depth is a concept
+        defined in the frequency domain. If a negative frequency is provided,
+        it is assumed that the calculation is carried out in the Laplace
+        domain. To calculate the skin depth, the value of ``freq`` is then
+        multiplied by :math:`-2\pi`, to simulate the closest
+        frequency-equivalent.
+
         Default is 1 Hz.
 
     rho : float, optional
@@ -125,7 +131,9 @@ def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
         fact_pos = fact_neg
 
     # Calculate the skin depth.
-    skind = 503.3*np.sqrt(rho/freq)
+    skind = 503.3*np.sqrt(rho/abs(freq))
+    if freq < 0:  # For Laplace-domain calculations.
+        skind /= np.sqrt(2*np.pi)
 
     # Estimate minimum cell width.
     h_min = fact_min*skind
@@ -445,12 +453,12 @@ def get_source_field(grid, src, freq, strength=0):
 
     .. math::
 
-        \mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} .
+        s \mu_0 \mathbf{J}_\mathrm{s} ,
 
-    Either finite length dipoles or infinitesimal small point dipoles can be
-    defined, whereas the return source field corresponds to a normalized (1 Am)
-    source distributed within the cell(s) it resides (can be changed with the
-    ``strength``-parameter).
+    where :math:`s = -\mathrm{i} \omega`. Either finite length dipoles or
+    infinitesimal small point dipoles can be defined, whereas the return source
+    field corresponds to a normalized (1 Am) source distributed within the
+    cell(s) it resides (can be changed with the ``strength``-parameter).
 
 
     Parameters
@@ -465,7 +473,13 @@ def get_source_field(grid, src, freq, strength=0):
           - Point dipole: ``[x, y, z, azimuth, dip]``.
 
     freq : float
-        Source frequency (Hz).
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
 
     strength : float, optional
         Source strength (A):
@@ -483,11 +497,19 @@ def get_source_field(grid, src, freq, strength=0):
         Source field, normalized to 1 A m.
 
     """
-    # Cast some parameters
+    # Cast some parameters.
     src = np.array(src, dtype=float)
     strength = float(strength)
 
-    # Ensure source is a point or a finite dipole
+    # Get Laplace parameter.
+    if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
+        sval = 2j*np.pi*freq
+        dtype = complex
+    else:         # Laplace domain; s.
+        sval = freq
+        dtype = float
+
+    # Ensure source is a point or a finite dipole.
     if len(src) not in [5, 6]:
         print("* ERROR   :: Source is wrong defined. Must be either a point,\n"
               "             [x, y, z, azimuth, dip], or a finite dipole,\n"
@@ -505,7 +527,7 @@ def get_source_field(grid, src, freq, strength=0):
                   "use the format [x, y, z, azimuth, dip] instead.")
             raise ValueError("Source error")
 
-    # Ensure source is within grid
+    # Ensure source is within grid.
     if finite:
         ii = [0, 1, 2, 3, 4, 5]
     else:
@@ -548,7 +570,7 @@ def get_source_field(grid, src, freq, strength=0):
         """Set the source-field in idir."""
 
         # Initiate zero source field.
-        sfield = Field(grid)
+        sfield = Field(grid, dtype=dtype)
 
         # Return source-field depending if point or finite dipole.
         vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
@@ -563,10 +585,10 @@ def get_source_field(grid, src, freq, strength=0):
             point_source(*vec2, src, sfield.fy)
             point_source(*vec3, src, sfield.fz)
 
-        # Multiply by strength*i*omega*mu in per direction.
-        sfield.fx *= strength[0]*2j*np.pi*freq*mu_0
-        sfield.fy *= strength[1]*2j*np.pi*freq*mu_0
-        sfield.fz *= strength[2]*2j*np.pi*freq*mu_0
+        # Multiply by strength*sval*mu in per direction.
+        sfield.fx *= strength[0]*sval*mu_0
+        sfield.fy *= strength[1]*sval*mu_0
+        sfield.fz *= strength[2]*sval*mu_0
 
         return sfield
 
@@ -788,7 +810,13 @@ class Model:
         shape of grid.vnC (F-ordered) or grid.nC.
 
     freq : float
-        Frequency.
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
 
     mu_r : float or ndarray
        Relative magnetic permeability (isotropic). If ndarray it must have the
@@ -800,8 +828,12 @@ class Model:
                  mu_r=None):
         """Initiate a new resistivity model."""
 
-        # Store frequency.
-        self.freq = freq
+        # Get Laplace parameter.
+        self.freq = freq  # Store input value.
+        if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
+            self.sval = 2j*np.pi*freq
+        else:         # Laplace domain; s.
+            self.sval = freq
 
         # Store required info from grid.
         self.nC = grid.nC
@@ -946,8 +978,7 @@ class Model:
 
     def _calculate_eta(self, res):
         r"""Calculate vol*eta (:math:`V\eta`)."""
-        iomega = 2j*np.pi*self.freq
-        return iomega*mu_0*(1./res - iomega*epsilon_0)*self.__vol
+        return self.sval*mu_0*(1./res - self.sval*epsilon_0)*self.__vol
 
     # MU_R's
     @property
@@ -987,15 +1018,15 @@ class Field(np.ndarray):
 
     """
 
-    def __new__(cls, grid, field=None, fz=None):
+    def __new__(cls, grid, field=None, fz=None, dtype=complex):
         """Initiate a new Field-instance."""
 
         # Collect field
         if field is None and fz is None:  # Empty Field with dimension grid.nE.
-            new = np.zeros(grid.nE, dtype=complex)
-        elif field is not None and fz is None:  # grid and field provided
+            new = np.zeros(grid.nE, dtype=dtype)
+        elif fz is None:                  # grid and field provided
             new = field
-        else:                                   # fx, fy, fz provided
+        else:                             # fx, fy, fz provided
             new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
 
         # Store the field as object
@@ -1102,22 +1133,22 @@ class Field(np.ndarray):
     def ensure_pec(self):
         """Set Perfect Electric Conductor (PEC) boundary condition."""
         # Apply PEC to fx
-        self.fx[:, 0, :] = 0.+0.j
-        self.fx[:, -1, :] = 0.+0.j
-        self.fx[:, :, 0] = 0.+0.j
-        self.fx[:, :, -1] = 0.+0.j
+        self.fx[:, 0, :] = 0.
+        self.fx[:, -1, :] = 0.
+        self.fx[:, :, 0] = 0.
+        self.fx[:, :, -1] = 0.
 
         # Apply PEC to fy
-        self.fy[0, :, :] = 0.+0.j
-        self.fy[-1, :, :] = 0.+0.j
-        self.fy[:, :, 0] = 0.+0.j
-        self.fy[:, :, -1] = 0.+0.j
+        self.fy[0, :, :] = 0.
+        self.fy[-1, :, :] = 0.
+        self.fy[:, :, 0] = 0.
+        self.fy[:, :, -1] = 0.
 
         # Apply PEC to fz
-        self.fz[0, :, :] = 0.+0.j
-        self.fz[-1, :, :] = 0.+0.j
-        self.fz[:, 0, :] = 0.+0.j
-        self.fz[:, -1, :] = 0.+0.j
+        self.fz[0, :, :] = 0.
+        self.fz[-1, :, :] = 0.
+        self.fz[:, 0, :] = 0.
+        self.fz[:, -1, :] = 0.
 
 
 def get_h_field(grid, model, field):
@@ -1207,8 +1238,8 @@ def get_h_field(grid, model, field):
         e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
         e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
 
-    # Create a Field-instance and divide by j omega mu_0 and return.
-    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(2j*np.pi*model.freq*mu_0)
+    # Create a Field-instance and divide by sval*mu_0 and return.
+    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
 
     return hfield
 

@@ -7,16 +7,16 @@ from emg3d import utils, solver
 
 # # # # # # # # # # 1. Homogeneous VTI fullspace # # # # # # # # # #
 
-hx_min, xdomain = utils.get_domain(x0=0, freq=.1)
-hy_min, ydomain = utils.get_domain(x0=0, freq=.1)
-hz_min, zdomain = utils.get_domain(x0=250, freq=.1)
+freq = 1.
+hx_min, xdomain = utils.get_domain(x0=0, freq=freq)
+hy_min, ydomain = utils.get_domain(x0=0, freq=freq)
+hz_min, zdomain = utils.get_domain(x0=250, freq=freq)
 nx = 2**3
 hx = utils.get_stretched_h(hx_min, xdomain, nx, 0)
 hy = utils.get_stretched_h(hy_min, ydomain, nx, 0)
 hz = utils.get_stretched_h(hz_min, zdomain, nx, 250)
 input_grid = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
 grid = utils.TensorMesh(**input_grid)
-freq = 1.
 
 input_model = {
     'grid': grid,
@@ -37,7 +37,6 @@ input_source = {
 sfield = utils.get_source_field(**input_source)
 
 # F-cycle
-fsfield = utils.get_source_field(**input_source)
 fefield = solver.solver(grid, model, sfield)
 
 # W-cycle
@@ -149,4 +148,54 @@ for attr in all_attr:
     mesh[attr] = getattr(grid, attr)
 
 
-np.savez_compressed('../data/regression.npz', res=out, reg_2=reg_2, grid=mesh)
+# # # # # # # # # # 4. Homogeneous VTI fullspace LAPLACE # # # # # # # # # #
+
+freq = -2*np.pi
+hx_min, xdomain = utils.get_domain(x0=0, freq=freq)
+hy_min, ydomain = utils.get_domain(x0=0, freq=freq)
+hz_min, zdomain = utils.get_domain(x0=250, freq=freq)
+nx = 2**3
+hx = utils.get_stretched_h(hx_min, xdomain, nx, 0)
+hy = utils.get_stretched_h(hy_min, ydomain, nx, 0)
+hz = utils.get_stretched_h(hz_min, zdomain, nx, 250)
+input_grid_l = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
+grid_l = utils.TensorMesh(**input_grid_l)
+
+input_model_l = {
+    'grid': grid_l,
+    'res_x': 1.5,
+    'res_y': 2.0,
+    'res_z': 3.3,
+    'freq': freq
+    }
+model_l = utils.Model(**input_model_l)
+
+input_source_l = {
+    'grid': grid_l,
+    'src': [0, 0, 250., 30, 10],  # A rotated source to include all
+    'freq': freq
+    }
+
+# Fields
+sfield_l = utils.get_source_field(**input_source_l)
+
+# F-cycle
+fefield_l = solver.solver(grid_l, model_l, sfield_l)
+
+# BiCGSTAB; F-cycle
+bicefield_l = solver.solver(grid_l, model_l, sfield_l, sslsolver=True)
+
+out_l = {
+    'input_grid': input_grid_l,
+    'input_model': input_model_l,
+    'input_source': input_source_l,
+    'grid': grid_l,
+    'model': model_l,
+    'sfield': sfield_l,
+    'Fresult': fefield_l,
+    'bicresult': bicefield_l,
+    }
+
+
+np.savez_compressed(
+        '../data/regression.npz', res=out, reg_2=reg_2, grid=mesh, lap=out_l)

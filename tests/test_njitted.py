@@ -130,44 +130,66 @@ def test_gauss_seidel():
 
 
 def test_solve():
-    # Create complex symmetric matrix A
-    amat = np.array([
-        [100+100j, 2, 3j, 4, 5, 6],
-        [2, 1, 2, 10+10j, 5, 0],
-        [3j, 2, 1, 2+10j, 4, 2],
-        [4, 10+10j, 2+10j, 1, 3, 4],
-        [5, 5, 4, 3, 2, 3+6.j],
-        [6, 0, 2, 4, 3+6.j, 40+3j]
-    ])
+    # Create real and complex symmetric matrix A in the form as required by
+    # njitted.solve, hence only main diagonal and five lower diagonals in a
+    # vector.
+
+    # Create real symmetric matrix A.
+    avec_real = np.zeros(36, dtype=float)
+    avec_real[::6] = np.array([100, 1, 1, 1, 2, 40])
+    avec_real[1:-6:6] = np.array([2, 2, 2, 3, 3])
+    avec_real[2:-12:6] = np.array([3, 10, 4, 4])
+    avec_real[3:-18:6] = np.array([4, 5, 2])
+    avec_real[4:-24:6] = np.array([5, 6])
+
+    # Create complex symmetric matrix A.
+    avec_complex = np.zeros(36, dtype=complex)
+    avec_complex[::6] = np.array([100+100j, 1, 1, 1, 2, 40+3j])
+    avec_complex[1:-6:6] = np.array([2, 2, 2+10j, 3, 3+6j])
+    avec_complex[2:-12:6] = np.array([3j, 10+10j, 4, 4])
+    avec_complex[3:-18:6] = np.array([4, 5, 2])
+    avec_complex[4:-24:6] = np.array([5, 6])
 
     # Create solution vector x
-    x = np.array([1.+1j, 1, 1j, 2+1j, 1+2j, 3+3.j])
+    x_real = np.array([10., 3., 2., 40., 4., 3.])
+    x_complex = np.array([1.+1j, 1, 1j, 2+1j, 1+2j, 3+3.j])
 
-    # Calculate b = A x
-    b = amat@x
+    for avec, x in zip([avec_complex, avec_real], [x_complex, x_real]):
+        # Re-arrange to full (symmetric) other numpy solvers.
+        amat = np.zeros((6, 6), dtype=avec.dtype)
+        for i in range(6):
+            for j in range(i+1):
+                amat[i, j] = avec[i+5*j]
+                amat[j, i] = avec[i+5*j]
 
-    # 1. Check with numpy
-    # Ensure that our dummy-linear-equation system works fine.
-    xnp = np.linalg.solve(amat, b)                 # Solve A x = b
-    assert_allclose(x, xnp)                        # Check
+        # Calculate b = A x
+        b = amat@x
 
-    # 2. Check the implementation
-    # The implemented non-standard Cholesky factorisation uses only the main
-    # diagonal and first five lower off-diagonals, arranged in a vector one
-    # after the other. Convert matrix A into required vector A.
-    avec = np.zeros(36, dtype=complex)
-    for i in range(6):
-        for j in range(i+1):
-            avec[i+5*j] = amat[i, j]
-    res1 = b.copy()
+        # 1. Check with numpy
+        # Ensure that our dummy-linear-equation system works fine.
+        xnp = np.linalg.solve(amat, b)                 # Solve A x = b
+        assert_allclose(x, xnp)                        # Check
 
-    njitted.solve(avec, res1)                      # Solve A x = b
-    assert_allclose(x, res1)                       # Check
+        # 2. Check the implementation
+        # The implemented non-standard Cholesky factorisation uses only the
+        # main diagonal and first five lower off-diagonals, arranged in a
+        # vector one after the other. Convert matrix A into required vector A.
+        res1 = b.copy()
+        njitted.solve(avec.copy(), res1)               # Solve A x = b
+        assert_allclose(x, res1)                       # Check
 
-    # 3. Compare to alternative solver
-    res2 = b.copy()
-    alternatives.alt_solve(amat.ravel('F'), res2)  # Solve A x = b
-    assert_allclose(x, res2)                       # Check
+        # 3. Compare to alternative solver
+
+        # Re-arrange to full, F-ordered vector for alternative solver.
+        amat = np.zeros(36, dtype=avec.dtype)
+        for i in range(6):
+            for j in range(i+1):
+                amat[i+6*j] = avec[i+5*j]
+                amat[j+6*i] = avec[i+5*j]
+
+        res2 = b.copy()
+        alternatives.alt_solve(amat, res2)             # Solve A x = b
+        assert_allclose(x, res2)                       # Check
 
 
 def test_restrict():
