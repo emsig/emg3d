@@ -140,7 +140,7 @@ def test_solver_homogeneous(capsys):
     assert "after                       2 F-cycles    4 1" in out
 
     # Check stagnation by providing an almost zero source field.
-    _ = solver.solver(grid, model, sfield*0+1e-20)
+    _ = solver.solver(grid, model, sfield*0+1e-20, maxit=100)
     out, _ = capsys.readouterr()
     assert "STAGNATED" in out
 
@@ -185,6 +185,50 @@ def test_solver_heterogeneous(capsys):
     out, _ = capsys.readouterr()
     assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
     assert "DIVERGED" in out
+
+
+def test_solver_homogeneous_laplace():
+    # Regression test for homogeneous halfspace in Laplace domain.
+    # Not very sophisticated; replace/extend by more detailed tests.
+    dat = REGRES['lap'][()]
+
+    grid = utils.TensorMesh(**dat['input_grid'])
+    model = utils.Model(**dat['input_model'])
+    sfield = utils.get_source_field(**dat['input_source'])
+
+    # F-cycle
+    efield = solver.solver(grid, model, sfield, verb=1)
+
+    # Check all fields (ex, ey, and ez)
+    assert_allclose(dat['Fresult'], efield)
+
+    # BiCGSTAB with some print checking.
+    efield = solver.solver(grid, model, sfield, verb=1, sslsolver=True)
+
+    # Check all fields (ex, ey, and ez)
+    assert_allclose(dat['bicresult'], efield)
+
+    # If Model is complex, assert it fails.
+    input_model = dat['input_model'].copy()
+    input_model['freq'] = -input_model['freq']
+    model2 = utils.Model(**input_model)
+
+    with pytest.raises(ValueError):
+        efield = solver.solver(grid, model2, sfield, verb=1)
+
+    # If sfield is complex, assert it fails.
+    input_source = dat['input_source'].copy()
+    input_source['freq'] = -input_source['freq']
+    sfield2 = utils.get_source_field(**input_source)
+
+    with pytest.raises(ValueError):
+        efield = solver.solver(grid, model, sfield2, verb=1)
+
+    # If efield is complex, assert it fails.
+    efield = utils.Field(grid, dtype=complex)
+
+    with pytest.raises(ValueError):
+        efield = solver.solver(grid, model, sfield, efield=efield, verb=1)
 
 
 def multigrid():

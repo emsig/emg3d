@@ -341,6 +341,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Calculate reference error for tolerance.
     var.l2_refe = njitted.l2norm(sfield)
 
+    # Ensure sfield and model have same data types.
+    if sfield.dtype != model.eta_x.dtype:
+        print("* ERROR   :: Source field and model parameters must have the "
+              "same dtype;\n             complex (f-domain) or real (s-domain)"
+              f". Provided:\n             sfield: {sfield.dtype}; "
+              f"model: {model.eta_x.dtype}.")
+        raise ValueError('Input data types')
+
     # Get efield
     if efield is None:
         # If not provided, initiate an empty one.
@@ -349,6 +357,14 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         # Set flag to return the field.
         var.do_return = True
     else:
+
+        # Ensure efield has same data type as sfield.
+        if sfield.dtype != efield.dtype:
+            print("* ERROR   :: Source field and electric field must have the "
+                  "same dtype;\n             complex (f-domain) or real (s-"
+                  f"domain). Provided:\n             sfield: {sfield.dtype}; "
+                  f"efield: {efield.dtype}.")
+            raise ValueError('Input data types')
 
         # Take the conjugate if required.
         if var.conjugate:
@@ -368,15 +384,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             # Start final info.
             var.exit_message = "CONVERGED"
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
-
-    # Ensure sfield, efield, and model have same data types.
-    if sfield.dtype != efield.dtype or sfield.dtype != model.eta_x.dtype:
-        print("* ERROR   :: Source field, electric field, and model "
-              "parameters must have the\n             same dtype; complex "
-              "(f-domain) or real (s-domain). Provided:\n"
-              f"             sfield: {sfield.dtype}; efield: {efield.dtype}; "
-              f"model: {model.eta_x.dtype}.")
-        raise ValueError('Input data types')
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]  {'rel. error':<22}"
