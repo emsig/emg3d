@@ -124,7 +124,7 @@ def alt_solve(amat, bvec):
     ir = np.zeros(n, dtype=np.int8)
     jc = np.zeros(n, dtype=np.int8)
     pq = 0.
-    pv = 0.+0j
+    pv = np.zeros(1, dtype=amat.dtype)[0]
 
     # 1. LU-decomposition
     for k in range(n):

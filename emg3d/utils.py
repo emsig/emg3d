@@ -483,11 +483,19 @@ def get_source_field(grid, src, freq, strength=0):
         Source field, normalized to 1 A m.
 
     """
-    # Cast some parameters
+    # Cast some parameters.
     src = np.array(src, dtype=float)
     strength = float(strength)
 
-    # Ensure source is a point or a finite dipole
+    # Get Laplace parameter.
+    if freq > 0:  # Frequency domain.
+        sval = 2j*np.pi*freq
+        dtype = complex
+    else:         # Laplace domain.
+        sval = freq
+        dtype = float
+
+    # Ensure source is a point or a finite dipole.
     if len(src) not in [5, 6]:
         print("* ERROR   :: Source is wrong defined. Must be either a point,\n"
               "             [x, y, z, azimuth, dip], or a finite dipole,\n"
@@ -505,7 +513,7 @@ def get_source_field(grid, src, freq, strength=0):
                   "use the format [x, y, z, azimuth, dip] instead.")
             raise ValueError("Source error")
 
-    # Ensure source is within grid
+    # Ensure source is within grid.
     if finite:
         ii = [0, 1, 2, 3, 4, 5]
     else:
@@ -548,7 +556,7 @@ def get_source_field(grid, src, freq, strength=0):
         """Set the source-field in idir."""
 
         # Initiate zero source field.
-        sfield = Field(grid)
+        sfield = Field(grid, dtype=dtype)
 
         # Return source-field depending if point or finite dipole.
         vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
@@ -563,10 +571,10 @@ def get_source_field(grid, src, freq, strength=0):
             point_source(*vec2, src, sfield.fy)
             point_source(*vec3, src, sfield.fz)
 
-        # Multiply by strength*i*omega*mu in per direction.
-        sfield.fx *= strength[0]*2j*np.pi*freq*mu_0
-        sfield.fy *= strength[1]*2j*np.pi*freq*mu_0
-        sfield.fz *= strength[2]*2j*np.pi*freq*mu_0
+        # Multiply by strength*sval*mu in per direction.
+        sfield.fx *= strength[0]*sval*mu_0
+        sfield.fy *= strength[1]*sval*mu_0
+        sfield.fz *= strength[2]*sval*mu_0
 
         return sfield
 
@@ -800,8 +808,13 @@ class Model:
                  mu_r=None):
         """Initiate a new resistivity model."""
 
-        # Store frequency.
-        self.freq = freq
+        # Laplace parameter and frequency.
+        if freq > 0:  # Frequency domain.
+            self.freq = freq
+            self.sval = 2j*np.pi*freq
+        else:         # Laplace domain.
+            self.freq = -freq
+            self.sval = freq
 
         # Store required info from grid.
         self.nC = grid.nC
@@ -946,8 +959,7 @@ class Model:
 
     def _calculate_eta(self, res):
         r"""Calculate vol*eta (:math:`V\eta`)."""
-        iomega = 2j*np.pi*self.freq
-        return iomega*mu_0*(1./res - iomega*epsilon_0)*self.__vol
+        return self.sval*mu_0*(1./res - self.sval*epsilon_0)*self.__vol
 
     # MU_R's
     @property
@@ -987,13 +999,13 @@ class Field(np.ndarray):
 
     """
 
-    def __new__(cls, grid, field=None, fz=None):
+    def __new__(cls, grid, field=None, fz=None, dtype=complex):
         """Initiate a new Field-instance."""
 
         # Collect field
         if field is None and fz is None:  # Empty Field with dimension grid.nE.
-            new = np.zeros(grid.nE, dtype=complex)
-        elif field is not None and fz is None:  # grid and field provided
+            new = np.zeros(grid.nE, dtype=dtype)
+        elif fz is None:                  # grid and field provided
             new = field
         else:                                   # fx, fy, fz provided
             new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
@@ -1102,22 +1114,22 @@ class Field(np.ndarray):
     def ensure_pec(self):
         """Set Perfect Electric Conductor (PEC) boundary condition."""
         # Apply PEC to fx
-        self.fx[:, 0, :] = 0.+0.j
-        self.fx[:, -1, :] = 0.+0.j
-        self.fx[:, :, 0] = 0.+0.j
-        self.fx[:, :, -1] = 0.+0.j
+        self.fx[:, 0, :] = 0.
+        self.fx[:, -1, :] = 0.
+        self.fx[:, :, 0] = 0.
+        self.fx[:, :, -1] = 0.
 
         # Apply PEC to fy
-        self.fy[0, :, :] = 0.+0.j
-        self.fy[-1, :, :] = 0.+0.j
-        self.fy[:, :, 0] = 0.+0.j
-        self.fy[:, :, -1] = 0.+0.j
+        self.fy[0, :, :] = 0.
+        self.fy[-1, :, :] = 0.
+        self.fy[:, :, 0] = 0.
+        self.fy[:, :, -1] = 0.
 
         # Apply PEC to fz
-        self.fz[0, :, :] = 0.+0.j
-        self.fz[-1, :, :] = 0.+0.j
-        self.fz[:, 0, :] = 0.+0.j
-        self.fz[:, -1, :] = 0.+0.j
+        self.fz[0, :, :] = 0.
+        self.fz[-1, :, :] = 0.
+        self.fz[:, 0, :] = 0.
+        self.fz[:, -1, :] = 0.
 
 
 def get_h_field(grid, model, field):
@@ -1207,8 +1219,8 @@ def get_h_field(grid, model, field):
         e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
         e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
 
-    # Create a Field-instance and divide by j omega mu_0 and return.
-    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(2j*np.pi*model.freq*mu_0)
+    # Create a Field-instance and divide by sval*mu_0 and return.
+    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
 
     return hfield
 
