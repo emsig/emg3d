@@ -1387,12 +1387,28 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
         raise ValueError("Method not implemented.")
 
     if method == 'volume':
+
         points = (grid.vectorNx, grid.vectorNy, grid.vectorNz)
         new_points = (new_grid.vectorNx, new_grid.vectorNy, new_grid.vectorNz)
         new_values = np.zeros(new_grid.vnC, dtype=values.dtype)
 
-        # Get values from `volume_average`.
-        njitted.volume_average(*points, values, *new_points, new_values)
+        # TODO : Change vol-calculation from utils.Model to utils.TensorMesh,
+        #        and remove this if/else.
+        # Get the volume of the new_grid. If it is a discretize-TensorMesh, it
+        # is already stored, else, we have to calculate it.
+        if hasattr(new_grid, 'vol'):
+            vol = new_grid.vol.reshape(new_grid.vnC, order='F')
+        else:
+            vol = np.outer(np.outer(new_grid.hx, new_grid.hy).ravel('F'),
+                           new_grid.hz)
+            vol = vol.ravel('F').reshape(new_grid.vnC, order='F')
+
+        # Get values from NEW `volume_average`.
+        njitted.volume_average(*points, values, *new_points, new_values, vol)
+
+        # Get values from OLD `volume_average`.
+        old_values = np.zeros(new_grid.vnC, dtype=values.dtype)
+        njitted.old_volume_average(*points, values, *new_points, old_values)
 
     else:
         # Get the vectors corresponding to input data.

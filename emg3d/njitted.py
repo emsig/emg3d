@@ -2001,9 +2001,10 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
 # Volume averaging
 @nb.njit(**_numba_setting)
-def volume_average(edges_x, edges_y, edges_z, values,
-                   new_edges_x, new_edges_y, new_edges_z, new_values):
-    """Interpolation using the volume averaging technique.
+def old_volume_average(edges_x, edges_y, edges_z, values,
+                       new_edges_x, new_edges_y, new_edges_z, new_values):
+    """ TODO : Move to tests/alternatives.py, include in testing.
+    Interpolation using the volume averaging technique.
 
     The result is added to new_values.
 
@@ -2099,6 +2100,91 @@ def volume_average(edges_x, edges_y, edges_z, values,
 
                 # Normalize by new_grid-cell volume.
                 new_values[ix, iy, iz] /= hxyz
+
+
+@nb.njit(**_numba_setting)
+def volume_average(edges_x, edges_y, edges_z, values,
+                   new_edges_x, new_edges_y, new_edges_z, new_values, new_vol):
+    """TODO : DOCUMENT
+    First version was based on Plessix, Geophysics, 2007, more formulae in
+    Plessix, IP, 2008. Link to last version on GitHub.
+
+    Current version is based on an improvement by @jcapriot, 2019. Link to last
+    version on GitHub (branch).
+    """
+
+    w1, i1_in, i1_out = _volume_avg_weights(edges_x, new_edges_x)
+    w2, i2_in, i2_out = _volume_avg_weights(edges_y, new_edges_y)
+    w3, i3_in, i3_out = _volume_avg_weights(edges_z, new_edges_z)
+
+    # If given a values array, do the operation
+    for i3 in range(len(w3)):
+        i3i = i3_in[i3]
+        i3o = i3_out[i3]
+        w_3 = w3[i3]
+        for i2 in range(len(w2)):
+            i2i = i2_in[i2]
+            i2o = i2_out[i2]
+            w_32 = w_3*w2[i2]
+            for i1 in range(len(w1)):
+                i1i = i1_in[i1]
+                i1o = i1_out[i1]
+                new_values[i1o, i2o, i3o] += w_32*w1[i1]*values[i1i, i2i, i3i]
+
+    new_values /= new_vol
+
+
+@nb.njit(**_numba_setting)
+def _volume_avg_weights(x1, x2):
+    """TODO : DOCUMENT"""
+    n1 = len(x1)
+    n2 = len(x2)
+    xs = np.empty(n1 + n2)
+    i1, i2, i = 0, 0, 0
+
+    # Fill xs with uniques and truncate
+    while i1 < n1 or i2 < n2:
+        if i1 < n1 and i2 < n2:
+            if x1[i1] < x2[i2]:
+                xs[i] = x1[i1]
+                i1 += 1
+            elif x1[i1] > x2[i2]:
+                xs[i] = x2[i2]
+                i2 += 1
+            else:
+                xs[i] = x1[i1]
+                i1 += 1
+                i2 += 1
+        elif i1 < n1 and i2 == n2:
+            xs[i] = x1[i1]
+            i1 += 1
+        elif i2 < n2 and i1 == n1:
+            xs[i] = x2[i2]
+            i2 += 1
+        i += 1
+
+    nh = i-1
+    hs = np.empty(nh)
+    ix1 = np.zeros(nh, dtype=np.int32)
+    ix2 = np.zeros(nh, dtype=np.int32)
+    center = 0.0
+    i1, i2, i = 0, 0, 0
+
+    for i in range(nh):
+        hs[i] = xs[i+1]-xs[i]
+        center = xs[i]+0.5*hs[i]
+        if center < x2[0]:
+            hs[i] = 0.0
+        elif center > x2[n2-1]:
+            hs[i] = 0.0
+        while i1 < n1-1 and center >= x1[i1]:
+            i1 += 1
+        while i2 < n2-1 and center >= x2[i2]:
+            i2 += 1
+        ix1[i] = min(max(i1-1, 0), n1-1)
+        ix2[i] = min(max(i2-1, 0), n2-1)
+
+    return hs, ix1, ix2
 
 
 # Simple wrapped functions
