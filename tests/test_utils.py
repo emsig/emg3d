@@ -366,12 +366,9 @@ def test_Model():
     assert_allclose(model3.eta_z, eta_z)
 
     # Check volume
-    vol = np.outer(np.outer(grid.hx, grid.hy).ravel('F'), grid.hz)
-    vol = vol.ravel('F').reshape(grid.vnC, order='F')
-    assert_allclose(vol, model2.v_mu_r)
-    grid.vol = vol
+    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.v_mu_r)
     model4 = utils.Model(grid, 1, freq=1)
-    assert_allclose(model4.v_mu_r, vol)
+    assert_allclose(model4.v_mu_r, grid.vol.reshape(grid.vnC, order='F'))
 
     # Check Laplace domain
     model5 = utils.Model(grid, res_x, res_y, res_z, freq=-1.234, mu_r=res_x)
@@ -387,12 +384,9 @@ def test_Model():
     assert_allclose(model5.eta_z, eta_z)
 
     # Check volume
-    vol = np.outer(np.outer(grid.hx, grid.hy).ravel('F'), grid.hz)
-    vol = vol.ravel('F').reshape(grid.vnC, order='F')
-    assert_allclose(vol, model2.v_mu_r)
-    grid.vol = vol
+    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.v_mu_r)
     model6 = utils.Model(grid, 1, freq=-1)
-    assert_allclose(model6.v_mu_r, vol)
+    assert_allclose(model6.v_mu_r, grid.vol.reshape(grid.vnC, order='F'))
 
 
 def test_field():
