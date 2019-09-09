@@ -2039,18 +2039,17 @@ def volume_average(edges_x, edges_y, edges_z, values,
     w3, i3_in, i3_out = _volume_avg_weights(edges_z, new_edges_z)
 
     # Loop over the elements and sum up the contributions.
-    for i3 in range(len(w3)):
+    for i3, w_3 in enumerate(w3):
         i3i = i3_in[i3]
         i3o = i3_out[i3]
-        w_3 = w3[i3]
-        for i2 in range(len(w2)):
+        for i2, w_2 in enumerate(w2):
             i2i = i2_in[i2]
             i2o = i2_out[i2]
-            w_32 = w_3*w2[i2]
-            for i1 in range(len(w1)):
+            w_32 = w_3*w_2
+            for i1, w_1 in enumerate(w1):
                 i1i = i1_in[i1]
                 i1o = i1_out[i1]
-                new_values[i1o, i2o, i3o] += w_32*w1[i1]*values[i1i, i2i, i3i]
+                new_values[i1o, i2o, i3o] += w_32*w_1*values[i1i, i2i, i3i]
 
     # Normalize by new volume.
     new_values /= new_vol
