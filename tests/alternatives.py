@@ -211,3 +211,107 @@ def alt_restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
     wr /= d[1:]
 
     return wl, w0, wr
+
+
+@nb.njit(**_numba_setting)
+def alt_volume_average(edges_x, edges_y, edges_z, values,
+                       new_edges_x, new_edges_y, new_edges_z, new_values):
+    """Interpolation using the volume averaging technique.
+
+    This corresponds more or less to the version used by Mulder/Plessix, and
+    is much slower then the improved version by Capriot.
+
+    The result is added to new_values.
+
+
+    Parameters
+    ----------
+    edges_[x, y, z] : ndarray
+        The edges in x-, y-, and z-directions for the original grid.
+
+    values : ndarray
+        Values corresponding to ``grid``.
+
+    new_edges_[x, y, z] : ndarray
+        The edges in x-, y-, and z-directions for the new grid.
+
+    new_values : ndarray
+        Array where values corresponding to ``new_grid`` will be added.
+
+    """
+
+    # Get cell indices.
+    # First and last edges ignored => first and last cells extend to +/- infty.
+    ix_l = np.searchsorted(edges_x[1:-1], new_edges_x, 'left')
+    ix_r = np.searchsorted(edges_x[1:-1], new_edges_x, 'right')
+    iy_l = np.searchsorted(edges_y[1:-1], new_edges_y, 'left')
+    iy_r = np.searchsorted(edges_y[1:-1], new_edges_y, 'right')
+    iz_l = np.searchsorted(edges_z[1:-1], new_edges_z, 'left')
+    iz_r = np.searchsorted(edges_z[1:-1], new_edges_z, 'right')
+
+    # Get number of cells.
+    ncx = len(new_edges_x)-1
+    ncy = len(new_edges_y)-1
+    ncz = len(new_edges_z)-1
+
+    # Working arrays for edges.
+    x_edges = np.empty(len(edges_x)+2)
+    y_edges = np.empty(len(edges_y)+2)
+    z_edges = np.empty(len(edges_z)+2)
+
+    # Loop over new_grid cells.
+    for iz in range(ncz):
+        hz = np.diff(new_edges_z[iz:iz+2])[0]  # To calc. current cell volume.
+
+        for iy in range(ncy):
+            hyz = hz*np.diff(new_edges_y[iy:iy+2])[0]  # " "
+
+            for ix in range(ncx):
+                hxyz = hyz*np.diff(new_edges_x[ix:ix+2])[0]  # " "
+
+                # Get start edge and number of cells of original grid involved.
+                s_cx = ix_r[ix]
+                n_cx = ix_l[ix+1] - s_cx
+
+                s_cy = iy_r[iy]
+                n_cy = iy_l[iy+1] - s_cy
+
+                s_cz = iz_r[iz]
+                n_cz = iz_l[iz+1] - s_cz
+
+                # Get the involved original grid edges for this cell.
+                x_edges[0] = new_edges_x[ix]
+                for i in range(n_cx):
+                    x_edges[i+1] = edges_x[s_cx+i+1]
+                x_edges[n_cx+1] = new_edges_x[ix+1]
+
+                y_edges[0] = new_edges_y[iy]
+                for j in range(n_cy):
+                    y_edges[j+1] = edges_y[s_cy+j+1]
+                y_edges[n_cy+1] = new_edges_y[iy+1]
+
+                z_edges[0] = new_edges_z[iz]
+                for k in range(n_cz):
+                    z_edges[k+1] = edges_z[s_cz+k+1]
+                z_edges[n_cz+1] = new_edges_z[iz+1]
+
+                # Loop over each (partial) cell of the original grid which
+                # contributes to the current cell of the new grid and add its
+                # (partial) value.
+                for k in range(n_cz+1):
+                    dz = np.diff(z_edges[k:k+2])[0]
+                    k += s_cz
+
+                    for j in range(n_cy+1):
+                        dyz = dz*np.diff(y_edges[j:j+2])[0]
+                        j += s_cy
+
+                        for i in range(n_cx+1):
+                            dxyz = dyz*np.diff(x_edges[i:i+2])[0]
+                            i += s_cx
+
+                            # Add this cell's contribution.
+                            new_values[ix, iy, iz] += values[i, j, k]*dxyz
+
+                # Normalize by new_grid-cell volume.
+                new_values[ix, iy, iz] /= hxyz

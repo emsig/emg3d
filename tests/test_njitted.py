@@ -331,3 +331,33 @@ def test_blocks_to_amat():
     # Check it
     assert_allclose(amat_res, amat)
     assert_allclose(bvec_res, bvec)
+
+
+def test_volume_average():
+    # Comparison to alt_version.
+    grid_in = utils.TensorMesh(
+            [np.ones(30), np.ones(20)*5, np.ones(10)*10],
+            x0=np.array([0, 0, 0]))
+    grid_out = utils.TensorMesh(
+            [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
+            x0=np.array([0.5, 3.33, 5]))
+
+    values = np.arange(grid_in.nC, dtype=float).reshape(grid_in.vnC, order='F')
+
+    points = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
+    new_points = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
+
+    # Calculate volume.
+    vol = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'), grid_out.hz)
+    vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
+
+    # New solution.
+    new_values = np.zeros(grid_out.vnC, dtype=values.dtype)
+    njitted.volume_average(*points, values, *new_points, new_values, vol)
+
+    # Old solution.
+    new_values_alt = np.zeros(grid_out.vnC, dtype=values.dtype)
+    alternatives.alt_volume_average(
+            *points, values, *new_points, new_values_alt)
+
+    assert_allclose(new_values, new_values_alt)

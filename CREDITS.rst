@@ -10,7 +10,8 @@ listed here and is considered to be part of «The emg3d Developers»:
 Various bits got improved through discussions on Slack at `SWUNG
 <https://softwareunderground.org>`_ and at `SimPEG <https://simpeg.xyz>`_,
 thanks to both communities. Special thanks to @jokva (general), @banesullivan
-(visualization), and @joferkington (interpolation).
+(visualization), @joferkington (interpolation), and @jcapriot (volume
+averaging).
 
 
 Historical credits
