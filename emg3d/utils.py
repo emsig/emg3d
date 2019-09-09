@@ -959,6 +959,14 @@ class TensorMesh:
         self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
         self.nE = int(self.vnE.sum())
 
+    @property
+    def vol(self):
+        """Construct cell volumes of the 3D model as 1D array."""
+        if getattr(self, '__vol', None) is None:
+            vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
+            self.__vol = vol.ravel('F')
+        return self.__vol
+
 
 # RELATED TO MODELS AND FIELDS
 class Model:
@@ -1009,13 +1017,7 @@ class Model:
         # Store required info from grid.
         self.nC = grid.nC
         self.vnC = grid.vnC
-
-        # Construct cell volumes of the 3D model as 1D array.
-        if hasattr(grid, 'vol'):  # If discretize-grid, take it from there.
-            self.__vol = grid.vol.reshape(self.vnC, order='F')
-        else:                     # Calculate it otherwise.
-            vol = np.outer(np.outer(grid.hx, grid.hy).ravel('F'), grid.hz)
-            self.__vol = vol.ravel('F').reshape(self.vnC, order='F')
+        self.__vol = grid.vol.reshape(self.vnC, order='F')
 
         # Check case.
         if res_y is None and res_z is None:   # Isotropic (0).
@@ -1561,9 +1563,10 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
         points = (grid.vectorNx, grid.vectorNy, grid.vectorNz)
         new_points = (new_grid.vectorNx, new_grid.vectorNy, new_grid.vectorNz)
         new_values = np.zeros(new_grid.vnC, dtype=values.dtype)
+        vol = new_grid.vol.reshape(new_grid.vnC, order='F')
 
         # Get values from `volume_average`.
-        njitted.volume_average(*points, values, *new_points, new_values)
+        njitted.volume_average(*points, values, *new_points, new_values, vol)
 
     else:
         # Get the vectors corresponding to input data.

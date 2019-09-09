@@ -2002,10 +2002,16 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 # Volume averaging
 @nb.njit(**_numba_setting)
 def volume_average(edges_x, edges_y, edges_z, values,
-                   new_edges_x, new_edges_y, new_edges_z, new_values):
+                   new_edges_x, new_edges_y, new_edges_z, new_values, new_vol):
     """Interpolation using the volume averaging technique.
 
     The result is added to new_values.
+
+    The original implementation (see ``emg3d v0.7.1``) followed [PlDM07]_. Joe
+    Capriot took that algorithm and made it much faster for implementation in
+    ``discretize``. The current implementation is a simplified Numba-version of
+    his Cython version (the ``discretize`` version works for 1D, 2D, and 3D
+    meshes and can also return a sparse matrix representing the operation).
 
 
     Parameters
@@ -2022,83 +2028,103 @@ def volume_average(edges_x, edges_y, edges_z, values,
     new_values : ndarray
         Array where values corresponding to ``new_grid`` will be added.
 
+    new_vol : ndarray
+        The volumes of the ``new_grid``-cells.
+
     """
 
-    # Get cell indices.
-    # First and last edges ignored => first and last cells extend to +/- infty.
-    ix_l = np.searchsorted(edges_x[1:-1], new_edges_x, 'left')
-    ix_r = np.searchsorted(edges_x[1:-1], new_edges_x, 'right')
-    iy_l = np.searchsorted(edges_y[1:-1], new_edges_y, 'left')
-    iy_r = np.searchsorted(edges_y[1:-1], new_edges_y, 'right')
-    iz_l = np.searchsorted(edges_z[1:-1], new_edges_z, 'left')
-    iz_r = np.searchsorted(edges_z[1:-1], new_edges_z, 'right')
+    # Get the weights and indices for each direction.
+    w1, i1_in, i1_out = _volume_avg_weights(edges_x, new_edges_x)
+    w2, i2_in, i2_out = _volume_avg_weights(edges_y, new_edges_y)
+    w3, i3_in, i3_out = _volume_avg_weights(edges_z, new_edges_z)
 
-    # Get number of cells.
-    ncx = len(new_edges_x)-1
-    ncy = len(new_edges_y)-1
-    ncz = len(new_edges_z)-1
+    # Loop over the elements and sum up the contributions.
+    for i3, w_3 in enumerate(w3):
+        i3i = i3_in[i3]
+        i3o = i3_out[i3]
+        for i2, w_2 in enumerate(w2):
+            i2i = i2_in[i2]
+            i2o = i2_out[i2]
+            w_32 = w_3*w_2
+            for i1, w_1 in enumerate(w1):
+                i1i = i1_in[i1]
+                i1o = i1_out[i1]
+                new_values[i1o, i2o, i3o] += w_32*w_1*values[i1i, i2i, i3i]
 
-    # Working arrays for edges.
-    x_edges = np.empty(len(edges_x)+2)
-    y_edges = np.empty(len(edges_y)+2)
-    z_edges = np.empty(len(edges_z)+2)
+    # Normalize by new volume.
+    new_values /= new_vol
 
-    # Loop over new_grid cells.
-    for iz in range(ncz):
-        hz = np.diff(new_edges_z[iz:iz+2])[0]  # To calc. current cell volume.
 
-        for iy in range(ncy):
-            hyz = hz*np.diff(new_edges_y[iy:iy+2])[0]  # " "
+@nb.njit(**_numba_setting)
+def _volume_avg_weights(x1, x2):
+    """Returns the weights for the volume averaging technique.
 
-            for ix in range(ncx):
-                hxyz = hyz*np.diff(new_edges_x[ix:ix+2])[0]  # " "
 
-                # Get start edge and number of cells of original grid involved.
-                s_cx = ix_r[ix]
-                n_cx = ix_l[ix+1] - s_cx
+    Parameters
+    ----------
+    x1, x2 : ndarray
+        The edges in x-, y-, or z-directions for the original (x1) and the new
+        (x2) grids.
 
-                s_cy = iy_r[iy]
-                n_cy = iy_l[iy+1] - s_cy
 
-                s_cz = iz_r[iz]
-                n_cz = iz_l[iz+1] - s_cz
+    Returns
+    -------
+    hs : ndarray
+        Weights for the mapping of x1 to x2.
 
-                # Get the involved original grid edges for this cell.
-                x_edges[0] = new_edges_x[ix]
-                for i in range(n_cx):
-                    x_edges[i+1] = edges_x[s_cx+i+1]
-                x_edges[n_cx+1] = new_edges_x[ix+1]
+    ix1, ix2 : ndarray
+        Indices to map x1 to x2.
 
-                y_edges[0] = new_edges_y[iy]
-                for j in range(n_cy):
-                    y_edges[j+1] = edges_y[s_cy+j+1]
-                y_edges[n_cy+1] = new_edges_y[iy+1]
+    """
+    # Fill xs with uniques and truncate.
+    # Corresponds to np.unique(np.concatenate([x1, x2])).
+    n1, n2 = len(x1), len(x2)
+    xs = np.empty(n1 + n2)  # Pre-allocate array containing all edges.
+    i1, i2, i = 0, 0, 0
+    while i1 < n1 or i2 < n2:
+        if i1 < n1 and i2 < n2:
+            if x1[i1] < x2[i2]:
+                xs[i] = x1[i1]
+                i1 += 1
+            elif x1[i1] > x2[i2]:
+                xs[i] = x2[i2]
+                i2 += 1
+            else:
+                xs[i] = x1[i1]
+                i1 += 1
+                i2 += 1
+        elif i1 < n1 and i2 == n2:
+            xs[i] = x1[i1]
+            i1 += 1
+        elif i2 < n2 and i1 == n1:
+            xs[i] = x2[i2]
+            i2 += 1
+        i += 1
 
-                z_edges[0] = new_edges_z[iz]
-                for k in range(n_cz):
-                    z_edges[k+1] = edges_z[s_cz+k+1]
-                z_edges[n_cz+1] = new_edges_z[iz+1]
+    # Get weights and indices for the two arrays.
+    # - hs corresponds to np.diff(xs) where x1 and x2 overlap; zero outside.
+    # - x1[ix1] can be mapped to x2[ix2] with the corresponding weight.
+    nh = i-1
+    hs = np.empty(nh)                   # Pre-allocate weights.
+    ix1 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x1.
+    ix2 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x2.
+    center = 0.0
+    i1, i2, i = 0, 0, 0
+    for i in range(nh):
+        hs[i] = xs[i+1]-xs[i]
+        center = xs[i]+0.5*hs[i]
+        if center < x2[0]:
+            hs[i] = 0.0
+        elif center > x2[n2-1]:
+            hs[i] = 0.0
+        while i1 < n1-1 and center >= x1[i1]:
+            i1 += 1
+        while i2 < n2-1 and center >= x2[i2]:
+            i2 += 1
+        ix1[i] = min(max(i1-1, 0), n1-1)
+        ix2[i] = min(max(i2-1, 0), n2-1)
 
-                # Loop over each (partial) cell of the original grid which
-                # contributes to the current cell of the new grid and add its
-                # (partial) value.
-                for k in range(n_cz+1):
-                    dz = np.diff(z_edges[k:k+2])[0]
-                    k += s_cz
-
-                    for j in range(n_cy+1):
-                        dyz = dz*np.diff(y_edges[j:j+2])[0]
-                        j += s_cy
-
-                        for i in range(n_cx+1):
-                            dxyz = dyz*np.diff(x_edges[i:i+2])[0]
-                            i += s_cx
-
-                            # Add this cell's contribution.
-                            new_values[ix, iy, iz] += values[i, j, k]*dxyz
-
-                # Normalize by new_grid-cell volume.
-                new_values[ix, iy, iz] /= hxyz
+    return hs, ix1, ix2
 
 
 # Simple wrapped functions
