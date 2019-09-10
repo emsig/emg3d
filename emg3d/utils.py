@@ -53,7 +53,692 @@ mu_0 = 4e-7*np.pi          # Magn. permeability of free space [H/m]
 epsilon_0 = 1./(mu_0*c*c)  # Elec. permittivity of free space [F/m]
 
 
-# HELPER FUNCTIONS TO CREATE MESH => These will probably move to discretize.
+# FIELDS
+class Field(np.ndarray):
+    """Create a Field instance with x-, y-, and z-views of the field.
+
+    A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
+    z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
+    default array contains the whole field, which can be the electric field,
+    the source field, or the residual field, in a 1D array. A ``Field``
+    instance has additionally the property ``ensure_pec`` which, if called,
+    ensures Perfect Electric Conductor (PEC) boundary condition.
+
+    A ``Field`` can be initiated in three ways:
+
+    1. ``Field(grid)``:
+    Calling it with a ``TensorMesh``-instance returns a ``Field``-instance of
+    correct dimensions initiated with complex zeroes.
+
+    2. ``Field(grid, field)``:
+    Calling it with a ``TensorMesh``-instance and an ``ndarray`` returns a
+    ``Field``-instance of the provided ``ndarray``.
+
+    3. ``Field(fx, fy, fz)``:
+    Calling it with three ``ndarray``'s which represent the field in x-, y-,
+    and z-direction returns a ``Field``-instance with these views.
+
+    Sort-order is 'F'.
+
+    """
+
+    def __new__(cls, grid, field=None, fz=None, dtype=complex):
+        """Initiate a new Field-instance."""
+
+        # Collect field
+        if field is None and fz is None:  # Empty Field with dimension grid.nE.
+            new = np.zeros(grid.nE, dtype=dtype)
+        elif fz is None:                  # grid and field provided
+            new = field
+        else:                             # fx, fy, fz provided
+            new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
+
+        # Store the field as object
+        obj = np.asarray(new).view(cls)
+
+        # Store relevant numbers for the views.
+        if field is not None and fz is not None:  # Deduce from arrays
+            obj.nEx = grid.size
+            obj.nEy = field.size
+            obj.nEz = fz.size
+            obj.vnEx = grid.shape
+            obj.vnEy = field.shape
+            obj.vnEz = fz.shape
+        else:                                     # If grid is provided
+            attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+            for attr in attr_list:
+                setattr(obj, attr, getattr(grid, attr))
+
+        return obj
+
+    def __array_finalize__(self, obj):
+        """Ensure relevant numbers are stored no matter how created."""
+        if obj is None:
+            return
+
+        self.nEx = getattr(obj, 'nEx', None)
+        self.nEy = getattr(obj, 'nEy', None)
+        self.nEz = getattr(obj, 'nEz', None)
+        self.vnEx = getattr(obj, 'vnEx', None)
+        self.vnEy = getattr(obj, 'vnEy', None)
+        self.vnEz = getattr(obj, 'vnEz', None)
+
+    def __reduce__(self):
+        """Customize __reduce__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Get the parent's __reduce__ tuple.
+        pickled_state = super(Field, self).__reduce__()
+
+        # Create our own tuple to pass to __setstate__.
+        new_state = pickled_state[2]
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        for attr in attr_list:
+            new_state += (getattr(self, attr),)
+
+        # Return tuple that replaces parent's __setstate__ tuple with our own.
+        return (pickled_state[0], pickled_state[1], new_state)
+
+    def __setstate__(self, state):
+        """Customize __setstate__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Set the necessary attributes (in reverse order).
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list.reverse()
+        for i, name in enumerate(attr_list):
+            i += 1  # We need it 1..#attr instead of 0..#attr-1.
+            setattr(self, name, state[-i])
+
+        # Call the parent's __setstate__ with the other tuple elements.
+        super(Field, self).__setstate__(state[0:-i])
+
+    @property
+    def field(self):
+        """Entire field, 1D [fx, fy, fz]."""
+        return self.view()
+
+    @field.setter
+    def field(self, field):
+        """Update field, 1D [fx, fy, fz]."""
+        self.view()[:] = field
+
+    @property
+    def fx(self):
+        """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
+        return self.view()[:self.nEx].reshape(self.vnEx, order='F')
+
+    @fx.setter
+    def fx(self, fx):
+        """Update field in x-direction."""
+        self.view()[:self.nEx] = fx.ravel('F')
+
+    @property
+    def fy(self):
+        """View of the field in the y-direction (nNx, nCy, nNz)."""
+        return self.view()[self.nEx:-self.nEz].reshape(self.vnEy, order='F')
+
+    @fy.setter
+    def fy(self, fy):
+        """Update field in y-direction."""
+        self.view()[self.nEx:-self.nEz] = fy.ravel('F')
+
+    @property
+    def fz(self):
+        """View of the field in the z-direction (nNx, nNy, nCz)."""
+        return self.view()[-self.nEz:].reshape(self.vnEz, order='F')
+
+    @fz.setter
+    def fz(self, fz):
+        """Update electric field in z-direction."""
+        self.view()[-self.nEz:] = fz.ravel('F')
+
+    @property
+    def ensure_pec(self):
+        """Set Perfect Electric Conductor (PEC) boundary condition."""
+        # Apply PEC to fx
+        self.fx[:, 0, :] = 0.
+        self.fx[:, -1, :] = 0.
+        self.fx[:, :, 0] = 0.
+        self.fx[:, :, -1] = 0.
+
+        # Apply PEC to fy
+        self.fy[0, :, :] = 0.
+        self.fy[-1, :, :] = 0.
+        self.fy[:, :, 0] = 0.
+        self.fy[:, :, -1] = 0.
+
+        # Apply PEC to fz
+        self.fz[0, :, :] = 0.
+        self.fz[-1, :, :] = 0.
+        self.fz[:, 0, :] = 0.
+        self.fz[:, -1, :] = 0.
+
+
+def get_source_field(grid, src, freq, strength=0):
+    r"""Return the source field.
+
+    The source field is given in Equation 2 in [Muld06]_,
+
+    .. math::
+
+        s \mu_0 \mathbf{J}_\mathrm{s} ,
+
+    where :math:`s = -\mathrm{i} \omega`. Either finite length dipoles or
+    infinitesimal small point dipoles can be defined, whereas the return source
+    field corresponds to a normalized (1 Am) source distributed within the
+    cell(s) it resides (can be changed with the ``strength``-parameter).
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; a ``TensorMesh``-instance.
+
+    src : list of floats
+        Source coordinates (m). There are two formats:
+
+          - Finite length dipole: ``[x0, x1, y0, y1, z0, z1]``.
+          - Point dipole: ``[x, y, z, azimuth, dip]``.
+
+    freq : float
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
+
+    strength : float, optional
+        Source strength (A):
+
+          - If 0, output is normalized to a source of 1 m length, and source
+            strength of 1 A.
+          - If != 0, output is returned for given source length and strength.
+
+        Default is 0.
+
+
+    Returns
+    -------
+    sfield : :func:`Field`-instance
+        Source field, normalized to 1 A m.
+
+    """
+    # Cast some parameters.
+    src = np.array(src, dtype=float)
+    strength = float(strength)
+
+    # Get Laplace parameter.
+    if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
+        sval = 2j*np.pi*freq
+        dtype = complex
+    else:         # Laplace domain; s.
+        sval = freq
+        dtype = float
+
+    # Ensure source is a point or a finite dipole.
+    if len(src) not in [5, 6]:
+        print("* ERROR   :: Source is wrong defined. Must be either a point,\n"
+              "             [x, y, z, azimuth, dip], or a finite dipole,\n"
+              "             [x1, x2, y1, y2, z1, z2]. Provided source:\n"
+              f"             {src}.")
+        raise ValueError("Source error")
+    elif len(src) == 5:
+        finite = False  # Infinitesimal small dipole.
+    else:
+        finite = True   # Finite length dipole.
+
+        # Ensure finite length dipole is not a point dipole.
+        if np.allclose(np.linalg.norm(src[1::2]-src[::2]), 0):
+            print("* ERROR   :: Provided source is a point dipole, "
+                  "use the format [x, y, z, azimuth, dip] instead.")
+            raise ValueError("Source error")
+
+    # Ensure source is within grid.
+    if finite:
+        ii = [0, 1, 2, 3, 4, 5]
+    else:
+        ii = [0, 0, 1, 1, 2, 2]
+
+    source_in = np.any(src[ii[0]] >= grid.vectorNx[0])
+    source_in *= np.any(src[ii[1]] <= grid.vectorNx[-1])
+    source_in *= np.any(src[ii[2]] >= grid.vectorNy[0])
+    source_in *= np.any(src[ii[3]] <= grid.vectorNy[-1])
+    source_in *= np.any(src[ii[4]] >= grid.vectorNz[0])
+    source_in *= np.any(src[ii[5]] <= grid.vectorNz[-1])
+
+    if not source_in:
+        print(f"* ERROR   :: Provided source outside grid: {src}.")
+        raise ValueError("Source error")
+
+    # Get source orientation (dxs, dys, dzs)
+    if not finite:  # Point dipole: convert azimuth/dip to weights.
+        h = np.cos(np.deg2rad(src[4]))
+        dys = np.sin(np.deg2rad(src[3]))*h
+        dxs = np.cos(np.deg2rad(src[3]))*h
+        dzs = np.sin(np.deg2rad(src[4]))
+        srcdir = np.array([dxs, dys, dzs])
+        src = src[:3]
+
+    else:           # Finite dipole: get length and normalize.
+        srcdir = np.diff(src.reshape(3, 2)).ravel()
+
+        # Normalize to one if strength is 0.
+        if strength == 0:
+            srcdir /= np.linalg.norm(srcdir)
+
+    # Set source strength.
+    if strength == 0:  # 1 A m
+        strength = srcdir
+    else:              # Multiply source length with source strength
+        strength *= srcdir
+
+    def set_source(grid, strength, finite):
+        """Set the source-field in idir."""
+
+        # Initiate zero source field.
+        sfield = Field(grid, dtype=dtype)
+
+        # Return source-field depending if point or finite dipole.
+        vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
+        vec2 = (grid.vectorNx, grid.vectorCCy, grid.vectorNz)
+        vec3 = (grid.vectorNx, grid.vectorNy, grid.vectorCCz)
+        if finite:
+            finite_source(*vec1, src, sfield.fx, 0, grid)
+            finite_source(*vec2, src, sfield.fy, 1, grid)
+            finite_source(*vec3, src, sfield.fz, 2, grid)
+        else:
+            point_source(*vec1, src, sfield.fx)
+            point_source(*vec2, src, sfield.fy)
+            point_source(*vec3, src, sfield.fz)
+
+        # Multiply by strength*sval*mu in per direction.
+        sfield.fx *= strength[0]*sval*mu_0
+        sfield.fy *= strength[1]*sval*mu_0
+        sfield.fz *= strength[2]*sval*mu_0
+
+        return sfield
+
+    def point_source(xx, yy, zz, src, s):
+        """Set point dipole source."""
+        nx, ny, nz = s.shape
+
+        # Get indices of cells in which source resides.
+        ix = max(0, np.where(src[0] < np.r_[xx, np.infty])[0][0]-1)
+        iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
+        iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
+
+        # Indices and field strength in x-direction
+        if ix == nx-1:
+            rx = 1.0
+            ex = 1.0
+            ix1 = ix
+        else:
+            ix1 = ix+1
+            rx = (src[0]-xx[ix])/(xx[ix1]-xx[ix])
+            ex = 1.0-rx
+
+        # Indices and field strength in y-direction
+        if iy == ny-1:
+            ry = 1.0
+            ey = 1.0
+            iy1 = iy
+        else:
+            iy1 = iy+1
+            ry = (src[1]-yy[iy])/(yy[iy1]-yy[iy])
+            ey = 1.0-ry
+
+        # Indices and field strength in z-direction
+        if iz == nz-1:
+            rz = 1.0
+            ez = 1.0
+            iz1 = iz
+        else:
+            iz1 = iz+1
+            rz = (src[2]-zz[iz])/(zz[iz1]-zz[iz])
+            ez = 1.0-rz
+
+        s[ix, iy, iz] = ex*ey*ez
+        s[ix1, iy, iz] = rx*ey*ez
+        s[ix, iy1, iz] = ex*ry*ez
+        s[ix1, iy1, iz] = rx*ry*ez
+        s[ix, iy, iz1] = ex*ey*rz
+        s[ix1, iy, iz1] = rx*ey*rz
+        s[ix, iy1, iz1] = ex*ry*rz
+        s[ix1, iy1, iz1] = rx*ry*rz
+
+    def finite_source(xx, yy, zz, src, s, idir, grid):
+        """Set finite dipole source.
+
+        Using adjoint interpolation method, probably not the most efficient
+        implementation.
+        """
+        # Source lengths in x-, y-, and z-directions.
+        d_xyz = src[1::2]-src[::2]
+
+        # Inverse source lengths.
+        id_xyz = d_xyz.copy()
+        id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
+
+        # Cell fractions.
+        a1 = (grid.vectorNx-src[0])*id_xyz[0]
+        a2 = (grid.vectorNy-src[2])*id_xyz[1]
+        a3 = (grid.vectorNz-src[4])*id_xyz[2]
+
+        # Get range of indices of cells in which source resides.
+        def min_max_ind(vector, i):
+            """Return [min, max]-index of cells in which source resides."""
+            vmin = min(src[2*i:2*i+2])
+            vmax = max(src[2*i:2*i+2])
+            return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
+                    max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
+
+        rix = min_max_ind(grid.vectorNx, 0)
+        riy = min_max_ind(grid.vectorNy, 1)
+        riz = min_max_ind(grid.vectorNz, 2)
+
+        # Loop over these indices.
+        for iz in range(riz[0], riz[1]+1):
+            for iy in range(riy[0], riy[1]+1):
+                for ix in range(rix[0], rix[1]+1):
+
+                    # Determine centre of gravity of line segment in cell.
+                    aa = np.vstack([[a1[ix], a1[ix+1]], [a2[iy], a2[iy+1]],
+                                   [a3[iz], a3[iz+1]]])
+                    aa = np.sort(aa[d_xyz != 0, :], 1)
+                    al = max(0, aa[:, 0].max())  # Left and right
+                    ar = min(1, aa[:, 1].min())  # elements.
+
+                    # Characteristics of this cell.
+                    xmin = src[::2]+al*d_xyz
+                    xmax = src[::2]+ar*d_xyz
+                    x_c = (xmin+xmax)/2.0
+                    slen = np.linalg.norm(src[1::2]-src[::2])
+                    x_len = np.linalg.norm(xmax-xmin)/slen
+
+                    # Contribution to edge (coordinate idir)
+                    rx = (x_c[0]-grid.vectorNx[ix])/grid.hx[ix]
+                    ex = 1-rx
+                    ry = (x_c[1]-grid.vectorNy[iy])/grid.hy[iy]
+                    ey = 1-ry
+                    rz = (x_c[2]-grid.vectorNz[iz])/grid.hz[iz]
+                    ez = 1-rz
+
+                    # Add to field (only if segment inside cell).
+                    if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
+
+                        if idir == 0:
+                            s[ix, iy, iz] += ey*ez*x_len
+                            s[ix, iy+1, iz] += ry*ez*x_len
+                            s[ix, iy, iz+1] += ey*rz*x_len
+                            s[ix, iy+1, iz+1] += ry*rz*x_len
+                        if idir == 1:
+                            s[ix, iy, iz] += ex*ez*x_len
+                            s[ix+1, iy, iz] += rx*ez*x_len
+                            s[ix, iy, iz+1] += ex*rz*x_len
+                            s[ix+1, iy, iz+1] += rx*rz*x_len
+                        if idir == 2:
+                            s[ix, iy, iz] += ex*ey*x_len
+                            s[ix+1, iy, iz] += rx*ey*x_len
+                            s[ix, iy+1, iz] += ex*ry*x_len
+                            s[ix+1, iy+1, iz] += rx*ry*x_len
+
+    # Return the source field.
+    return set_source(grid, strength, finite)
+
+
+def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
+    """Return values corresponding to grid at coordinates.
+
+    Works for electric fields as well as magnetic fields obtained with
+    :func:`get_h_field`, and for model parameters.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; a ``TensorMesh``-instance.
+
+    values : ndarray
+        Can be either a particular field, e.g., efield.fx, or a model
+        parameter.
+
+    coordinates : tuple (x, y, z)
+        Coordinates (x, y, z) where to interpolate ``values``; e.g. receiver
+        locations.
+
+    method : str, optional
+        The method of interpolation to perform, 'linear' or 'cubic'.
+        Default is 'cubic' (forced to 'linear' if there are less than 3 points
+        in any direction).
+
+    extrapolate : bool
+        If True, points on ``new_grid`` which are outside of ``grid`` are
+        filled by the nearest value (if ``method='cubic'``) or by extrapolation
+        (if ``method='linear'``). If False, points outside are set to zero.
+
+        Default is False.
+
+
+    Returns
+    -------
+    new_values : ndarray
+        Values at ``coordinates``.
+
+
+    See Also
+    --------
+    grid2grid : Interpolation of model parameters or fields to a new grid.
+
+    """
+    # Ensure input field is a certain field, not a Field instance.
+    if values.ndim == 1:
+        print("* ERROR   :: Values must be a x-, y-, or z-directed field or")
+        print("             model parameters with ndim=3.")
+        print(f"             Shape of provided field: {values.shape}.")
+        raise ValueError("Values error")
+
+    if len(coordinates) != 3:
+        print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
+        print(f"             Length of provided coord.: {len(coordinates)}.")
+        raise ValueError("Coordinates error")
+
+    # Get the vectors corresponding to input data. Dimensions:
+    #
+    #         E-field          H-field      |  Model Parameter
+    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]  |
+    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]  |  [nCx, nCy, nCz]
+    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]  |
+    #
+    points = tuple()
+    for i, coord in enumerate(['x', 'y', 'z']):
+        if values.shape[i] == getattr(grid, 'nN'+coord):
+            pts = (getattr(grid, 'vectorN'+coord), )
+        else:
+            pts = (getattr(grid, 'vectorCC'+coord), )
+
+        # Add to points.
+        points += pts
+
+    if extrapolate:
+        return _interp3d(points, values, coordinates, method, None, 'nearest')
+    else:
+        return _interp3d(points, values, coordinates, method, 0.0, 'constant')
+
+
+def get_h_field(grid, model, field):
+    r"""Return magnetic field corresponding to provided electric field.
+
+    Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
+    :math:`\mathbf{H}`  using Farady's law, given by
+
+    .. math::
+
+        \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
+
+    Note that the magnetic field in x-direction is defined in the center of the
+    face defined by the electric field in y- and z-directions, and similar for
+    the other field directions. This means that the provided electric field and
+    the returned magnetic field have different dimensions::
+
+       E-field:  x: [grid.vectorCCx,  grid.vectorNy,  grid.vectorNz]
+                 y: [ grid.vectorNx, grid.vectorCCy,  grid.vectorNz]
+                 z: [ grid.vectorNx,  grid.vectorNy, grid.vectorCCz]
+
+       H-field:  x: [ grid.vectorNx, grid.vectorCCy, grid.vectorCCz]
+                 y: [grid.vectorCCx,  grid.vectorNy, grid.vectorCCz]
+                 z: [grid.vectorCCx, grid.vectorCCy,  grid.vectorNz]
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    model : Model
+        Model; ``emg3d.utils.Model`` instance.
+
+    field : Field
+        Electric field; ``emg3d.utils.Field`` instance.
+
+
+    Returns
+    -------
+    hfield : Field
+        Magnetic field; ``emg3d.utils.Field`` instance.
+
+    """
+    # Define the widths of the dual grid.
+    dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
+    dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
+    dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
+
+    # If relative magnetic permeability is not one, we have to take the volume
+    # into account, as mu_r is volume-averaged.
+    if model._Model__mu_r is not None:
+        # Plus and minus indices.
+        ixm = np.r_[0, np.arange(grid.nCx)]
+        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
+        iym = np.r_[0, np.arange(grid.nCy)]
+        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
+        izm = np.r_[0, np.arange(grid.nCz)]
+        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
+
+        # Average mu_r for dual-grid.
+        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
+        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
+        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
+
+    # Carry out the curl (^ corresponds to differentiation axis):
+    # H_x = (E_z^1 - E_y^2)
+    e3d_hx = (np.diff(field.fz, axis=1)/grid.hy[None, :, None] -
+              np.diff(field.fy, axis=2)/grid.hz[None, None, :])
+
+    # H_y = (E_x^2 - E_z^0)
+    e3d_hy = (np.diff(field.fx, axis=2)/grid.hz[None, None, :] -
+              np.diff(field.fz, axis=0)/grid.hx[:, None, None])
+
+    # H_z = (E_y^0 - E_x^1)
+    e3d_hz = (np.diff(field.fy, axis=0)/grid.hx[:, None, None] -
+              np.diff(field.fx, axis=1)/grid.hy[None, :, None])
+
+    # If relative magnetic permeability is not one, we have to take the volume
+    # into account, as mu_r is volume-averaged.
+    if model._Model__mu_r is not None:
+        hvx = grid.hx[:, None, None]
+        hvy = grid.hy[None, :, None]
+        hvz = grid.hz[None, None, :]
+
+        e3d_hx *= mu_r_x/(dx[:, None, None]*hvy*hvz)
+        e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
+        e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
+
+    # Create a Field-instance and divide by sval*mu_0 and return.
+    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
+
+    return hfield
+
+
+# MESH
+class TensorMesh:
+    """Rudimentary mesh for multigrid calculation.
+
+    The tensor-mesh :class:`discretize.TensorMesh` is a powerful tool,
+    including sophisticated mesh-generation possibilities in 1D, 2D, and 3D,
+    plotting routines, and much more. However, in the multigrid solver we have
+    to generate a mesh at each level, many times over and over again, and we
+    only need a very limited set of attributes. This tensor-mesh class provides
+    all required attributes. All attributes here are the same as their
+    counterparts in :class:`discretize.TensorMesh` (both in name and value).
+
+    .. warning::
+        This is a slimmed-down version of :class:`discretize.TensorMesh`, meant
+        principally for internal use by the multigrid modeller. It is highly
+        recommended to use :class:`discretize.TensorMesh` to create the input
+        meshes instead of this class. There are no input-checks carried out
+        here, and there is only one accepted input format for ``h`` and ``x0``.
+
+
+    Parameters
+    ----------
+    h : list of three ndarrays
+        Cell widths in [x, y, z] directions.
+
+    x0 : ndarray of dimension (3, )
+        Origin (x, y, z).
+
+    """
+
+    def __init__(self, h, x0):
+        """Initialize the mesh."""
+        self.x0 = x0
+
+        # Width of cells.
+        self.hx = h[0]
+        self.hy = h[1]
+        self.hz = h[2]
+
+        # Cell related properties.
+        self.nCx = int(self.hx.size)
+        self.nCy = int(self.hy.size)
+        self.nCz = int(self.hz.size)
+        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
+        self.nC = int(self.vnC.prod())
+        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
+        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
+        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
+
+        # Node related properties.
+        self.nNx = self.nCx + 1
+        self.nNy = self.nCy + 1
+        self.nNz = self.nCz + 1
+        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
+        self.nN = int(self.vnN.prod())
+        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
+        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
+        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
+
+        # Edge related properties.
+        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
+        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
+        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
+        self.nEx = int(self.vnEx.prod())
+        self.nEy = int(self.vnEy.prod())
+        self.nEz = int(self.vnEz.prod())
+        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
+        self.nE = int(self.vnE.sum())
+
+    @property
+    def vol(self):
+        """Construct cell volumes of the 3D model as 1D array."""
+        if getattr(self, '__vol', None) is None:
+            vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
+            self.__vol = vol.ravel('F')
+        return self.__vol
+
+
 def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
                fact_min=0.2, fact_neg=5, fact_pos=None):
     r"""Get domain extent and minimum cell width as a function of skin depth.
@@ -617,358 +1302,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
     return hx
 
 
-def get_source_field(grid, src, freq, strength=0):
-    r"""Return the source field.
-
-    The source field is given in Equation 2 in [Muld06]_,
-
-    .. math::
-
-        s \mu_0 \mathbf{J}_\mathrm{s} ,
-
-    where :math:`s = -\mathrm{i} \omega`. Either finite length dipoles or
-    infinitesimal small point dipoles can be defined, whereas the return source
-    field corresponds to a normalized (1 Am) source distributed within the
-    cell(s) it resides (can be changed with the ``strength``-parameter).
-
-
-    Parameters
-    ----------
-    grid : TensorMesh
-        Model grid; a ``TensorMesh``-instance.
-
-    src : list of floats
-        Source coordinates (m). There are two formats:
-
-          - Finite length dipole: ``[x0, x1, y0, y1, z0, z1]``.
-          - Point dipole: ``[x, y, z, azimuth, dip]``.
-
-    freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
-        Either positive or negative:
-
-        - ``freq`` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - ``freq`` < 0: Laplace domain, hence
-          :math:`s = f` (real).
-
-    strength : float, optional
-        Source strength (A):
-
-          - If 0, output is normalized to a source of 1 m length, and source
-            strength of 1 A.
-          - If != 0, output is returned for given source length and strength.
-
-        Default is 0.
-
-
-    Returns
-    -------
-    sfield : :func:`Field`-instance
-        Source field, normalized to 1 A m.
-
-    """
-    # Cast some parameters.
-    src = np.array(src, dtype=float)
-    strength = float(strength)
-
-    # Get Laplace parameter.
-    if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-        sval = 2j*np.pi*freq
-        dtype = complex
-    else:         # Laplace domain; s.
-        sval = freq
-        dtype = float
-
-    # Ensure source is a point or a finite dipole.
-    if len(src) not in [5, 6]:
-        print("* ERROR   :: Source is wrong defined. Must be either a point,\n"
-              "             [x, y, z, azimuth, dip], or a finite dipole,\n"
-              "             [x1, x2, y1, y2, z1, z2]. Provided source:\n"
-              f"             {src}.")
-        raise ValueError("Source error")
-    elif len(src) == 5:
-        finite = False  # Infinitesimal small dipole.
-    else:
-        finite = True   # Finite length dipole.
-
-        # Ensure finite length dipole is not a point dipole.
-        if np.allclose(np.linalg.norm(src[1::2]-src[::2]), 0):
-            print("* ERROR   :: Provided source is a point dipole, "
-                  "use the format [x, y, z, azimuth, dip] instead.")
-            raise ValueError("Source error")
-
-    # Ensure source is within grid.
-    if finite:
-        ii = [0, 1, 2, 3, 4, 5]
-    else:
-        ii = [0, 0, 1, 1, 2, 2]
-
-    source_in = np.any(src[ii[0]] >= grid.vectorNx[0])
-    source_in *= np.any(src[ii[1]] <= grid.vectorNx[-1])
-    source_in *= np.any(src[ii[2]] >= grid.vectorNy[0])
-    source_in *= np.any(src[ii[3]] <= grid.vectorNy[-1])
-    source_in *= np.any(src[ii[4]] >= grid.vectorNz[0])
-    source_in *= np.any(src[ii[5]] <= grid.vectorNz[-1])
-
-    if not source_in:
-        print(f"* ERROR   :: Provided source outside grid: {src}.")
-        raise ValueError("Source error")
-
-    # Get source orientation (dxs, dys, dzs)
-    if not finite:  # Point dipole: convert azimuth/dip to weights.
-        h = np.cos(np.deg2rad(src[4]))
-        dys = np.sin(np.deg2rad(src[3]))*h
-        dxs = np.cos(np.deg2rad(src[3]))*h
-        dzs = np.sin(np.deg2rad(src[4]))
-        srcdir = np.array([dxs, dys, dzs])
-        src = src[:3]
-
-    else:           # Finite dipole: get length and normalize.
-        srcdir = np.diff(src.reshape(3, 2)).ravel()
-
-        # Normalize to one if strength is 0.
-        if strength == 0:
-            srcdir /= np.linalg.norm(srcdir)
-
-    # Set source strength.
-    if strength == 0:  # 1 A m
-        strength = srcdir
-    else:              # Multiply source length with source strength
-        strength *= srcdir
-
-    def set_source(grid, strength, finite):
-        """Set the source-field in idir."""
-
-        # Initiate zero source field.
-        sfield = Field(grid, dtype=dtype)
-
-        # Return source-field depending if point or finite dipole.
-        vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
-        vec2 = (grid.vectorNx, grid.vectorCCy, grid.vectorNz)
-        vec3 = (grid.vectorNx, grid.vectorNy, grid.vectorCCz)
-        if finite:
-            finite_source(*vec1, src, sfield.fx, 0, grid)
-            finite_source(*vec2, src, sfield.fy, 1, grid)
-            finite_source(*vec3, src, sfield.fz, 2, grid)
-        else:
-            point_source(*vec1, src, sfield.fx)
-            point_source(*vec2, src, sfield.fy)
-            point_source(*vec3, src, sfield.fz)
-
-        # Multiply by strength*sval*mu in per direction.
-        sfield.fx *= strength[0]*sval*mu_0
-        sfield.fy *= strength[1]*sval*mu_0
-        sfield.fz *= strength[2]*sval*mu_0
-
-        return sfield
-
-    def point_source(xx, yy, zz, src, s):
-        """Set point dipole source."""
-        nx, ny, nz = s.shape
-
-        # Get indices of cells in which source resides.
-        ix = max(0, np.where(src[0] < np.r_[xx, np.infty])[0][0]-1)
-        iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
-        iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
-
-        # Indices and field strength in x-direction
-        if ix == nx-1:
-            rx = 1.0
-            ex = 1.0
-            ix1 = ix
-        else:
-            ix1 = ix+1
-            rx = (src[0]-xx[ix])/(xx[ix1]-xx[ix])
-            ex = 1.0-rx
-
-        # Indices and field strength in y-direction
-        if iy == ny-1:
-            ry = 1.0
-            ey = 1.0
-            iy1 = iy
-        else:
-            iy1 = iy+1
-            ry = (src[1]-yy[iy])/(yy[iy1]-yy[iy])
-            ey = 1.0-ry
-
-        # Indices and field strength in z-direction
-        if iz == nz-1:
-            rz = 1.0
-            ez = 1.0
-            iz1 = iz
-        else:
-            iz1 = iz+1
-            rz = (src[2]-zz[iz])/(zz[iz1]-zz[iz])
-            ez = 1.0-rz
-
-        s[ix, iy, iz] = ex*ey*ez
-        s[ix1, iy, iz] = rx*ey*ez
-        s[ix, iy1, iz] = ex*ry*ez
-        s[ix1, iy1, iz] = rx*ry*ez
-        s[ix, iy, iz1] = ex*ey*rz
-        s[ix1, iy, iz1] = rx*ey*rz
-        s[ix, iy1, iz1] = ex*ry*rz
-        s[ix1, iy1, iz1] = rx*ry*rz
-
-    def finite_source(xx, yy, zz, src, s, idir, grid):
-        """Set finite dipole source.
-
-        Using adjoint interpolation method, probably not the most efficient
-        implementation.
-        """
-        # Source lengths in x-, y-, and z-directions.
-        d_xyz = src[1::2]-src[::2]
-
-        # Inverse source lengths.
-        id_xyz = d_xyz.copy()
-        id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
-
-        # Cell fractions.
-        a1 = (grid.vectorNx-src[0])*id_xyz[0]
-        a2 = (grid.vectorNy-src[2])*id_xyz[1]
-        a3 = (grid.vectorNz-src[4])*id_xyz[2]
-
-        # Get range of indices of cells in which source resides.
-        def min_max_ind(vector, i):
-            """Return [min, max]-index of cells in which source resides."""
-            vmin = min(src[2*i:2*i+2])
-            vmax = max(src[2*i:2*i+2])
-            return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
-                    max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
-
-        rix = min_max_ind(grid.vectorNx, 0)
-        riy = min_max_ind(grid.vectorNy, 1)
-        riz = min_max_ind(grid.vectorNz, 2)
-
-        # Loop over these indices.
-        for iz in range(riz[0], riz[1]+1):
-            for iy in range(riy[0], riy[1]+1):
-                for ix in range(rix[0], rix[1]+1):
-
-                    # Determine centre of gravity of line segment in cell.
-                    aa = np.vstack([[a1[ix], a1[ix+1]], [a2[iy], a2[iy+1]],
-                                   [a3[iz], a3[iz+1]]])
-                    aa = np.sort(aa[d_xyz != 0, :], 1)
-                    al = max(0, aa[:, 0].max())  # Left and right
-                    ar = min(1, aa[:, 1].min())  # elements.
-
-                    # Characteristics of this cell.
-                    xmin = src[::2]+al*d_xyz
-                    xmax = src[::2]+ar*d_xyz
-                    x_c = (xmin+xmax)/2.0
-                    slen = np.linalg.norm(src[1::2]-src[::2])
-                    x_len = np.linalg.norm(xmax-xmin)/slen
-
-                    # Contribution to edge (coordinate idir)
-                    rx = (x_c[0]-grid.vectorNx[ix])/grid.hx[ix]
-                    ex = 1-rx
-                    ry = (x_c[1]-grid.vectorNy[iy])/grid.hy[iy]
-                    ey = 1-ry
-                    rz = (x_c[2]-grid.vectorNz[iz])/grid.hz[iz]
-                    ez = 1-rz
-
-                    # Add to field (only if segment inside cell).
-                    if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
-
-                        if idir == 0:
-                            s[ix, iy, iz] += ey*ez*x_len
-                            s[ix, iy+1, iz] += ry*ez*x_len
-                            s[ix, iy, iz+1] += ey*rz*x_len
-                            s[ix, iy+1, iz+1] += ry*rz*x_len
-                        if idir == 1:
-                            s[ix, iy, iz] += ex*ez*x_len
-                            s[ix+1, iy, iz] += rx*ez*x_len
-                            s[ix, iy, iz+1] += ex*rz*x_len
-                            s[ix+1, iy, iz+1] += rx*rz*x_len
-                        if idir == 2:
-                            s[ix, iy, iz] += ex*ey*x_len
-                            s[ix+1, iy, iz] += rx*ey*x_len
-                            s[ix, iy+1, iz] += ex*ry*x_len
-                            s[ix+1, iy+1, iz] += rx*ry*x_len
-
-    # Return the source field.
-    return set_source(grid, strength, finite)
-
-
-class TensorMesh:
-    """Rudimentary mesh for multigrid calculation.
-
-    The tensor-mesh :class:`discretize.TensorMesh` is a powerful tool,
-    including sophisticated mesh-generation possibilities in 1D, 2D, and 3D,
-    plotting routines, and much more. However, in the multigrid solver we have
-    to generate a mesh at each level, many times over and over again, and we
-    only need a very limited set of attributes. This tensor-mesh class provides
-    all required attributes. All attributes here are the same as their
-    counterparts in :class:`discretize.TensorMesh` (both in name and value).
-
-    .. warning::
-        This is a slimmed-down version of :class:`discretize.TensorMesh`, meant
-        principally for internal use by the multigrid modeller. It is highly
-        recommended to use :class:`discretize.TensorMesh` to create the input
-        meshes instead of this class. There are no input-checks carried out
-        here, and there is only one accepted input format for ``h`` and ``x0``.
-
-
-    Parameters
-    ----------
-    h : list of three ndarrays
-        Cell widths in [x, y, z] directions.
-
-    x0 : ndarray of dimension (3, )
-        Origin (x, y, z).
-
-    """
-
-    def __init__(self, h, x0):
-        """Initialize the mesh."""
-        self.x0 = x0
-
-        # Width of cells.
-        self.hx = h[0]
-        self.hy = h[1]
-        self.hz = h[2]
-
-        # Cell related properties.
-        self.nCx = int(self.hx.size)
-        self.nCy = int(self.hy.size)
-        self.nCz = int(self.hz.size)
-        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
-        self.nC = int(self.vnC.prod())
-        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
-        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
-        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
-
-        # Node related properties.
-        self.nNx = self.nCx + 1
-        self.nNy = self.nCy + 1
-        self.nNz = self.nCz + 1
-        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
-        self.nN = int(self.vnN.prod())
-        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
-        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
-        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
-
-        # Edge related properties.
-        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
-        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
-        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
-        self.nEx = int(self.vnEx.prod())
-        self.nEy = int(self.vnEy.prod())
-        self.nEz = int(self.vnEz.prod())
-        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
-        self.nE = int(self.vnE.sum())
-
-    @property
-    def vol(self):
-        """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '__vol', None) is None:
-            vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
-            self.__vol = vol.ravel('F')
-        return self.__vol
-
-
-# RELATED TO MODELS AND FIELDS
+# MODEL
 class Model:
     r"""Create a resistivity model.
 
@@ -1163,339 +1497,7 @@ class Model:
             return self.__vol/self.__mu_r
 
 
-class Field(np.ndarray):
-    """Create a Field instance with x-, y-, and z-views of the field.
-
-    A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
-    z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
-    default array contains the whole field, which can be the electric field,
-    the source field, or the residual field, in a 1D array. A ``Field``
-    instance has additionally the property ``ensure_pec`` which, if called,
-    ensures Perfect Electric Conductor (PEC) boundary condition.
-
-    A ``Field`` can be initiated in three ways:
-
-    1. ``Field(grid)``:
-    Calling it with a ``TensorMesh``-instance returns a ``Field``-instance of
-    correct dimensions initiated with complex zeroes.
-
-    2. ``Field(grid, field)``:
-    Calling it with a ``TensorMesh``-instance and an ``ndarray`` returns a
-    ``Field``-instance of the provided ``ndarray``.
-
-    3. ``Field(fx, fy, fz)``:
-    Calling it with three ``ndarray``'s which represent the field in x-, y-,
-    and z-direction returns a ``Field``-instance with these views.
-
-    Sort-order is 'F'.
-
-    """
-
-    def __new__(cls, grid, field=None, fz=None, dtype=complex):
-        """Initiate a new Field-instance."""
-
-        # Collect field
-        if field is None and fz is None:  # Empty Field with dimension grid.nE.
-            new = np.zeros(grid.nE, dtype=dtype)
-        elif fz is None:                  # grid and field provided
-            new = field
-        else:                             # fx, fy, fz provided
-            new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
-
-        # Store the field as object
-        obj = np.asarray(new).view(cls)
-
-        # Store relevant numbers for the views.
-        if field is not None and fz is not None:  # Deduce from arrays
-            obj.nEx = grid.size
-            obj.nEy = field.size
-            obj.nEz = fz.size
-            obj.vnEx = grid.shape
-            obj.vnEy = field.shape
-            obj.vnEz = fz.shape
-        else:                                     # If grid is provided
-            attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
-            for attr in attr_list:
-                setattr(obj, attr, getattr(grid, attr))
-
-        return obj
-
-    def __array_finalize__(self, obj):
-        """Ensure relevant numbers are stored no matter how created."""
-        if obj is None:
-            return
-
-        self.nEx = getattr(obj, 'nEx', None)
-        self.nEy = getattr(obj, 'nEy', None)
-        self.nEz = getattr(obj, 'nEz', None)
-        self.vnEx = getattr(obj, 'vnEx', None)
-        self.vnEy = getattr(obj, 'vnEy', None)
-        self.vnEz = getattr(obj, 'vnEz', None)
-
-    def __reduce__(self):
-        """Customize __reduce__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Get the parent's __reduce__ tuple.
-        pickled_state = super(Field, self).__reduce__()
-
-        # Create our own tuple to pass to __setstate__.
-        new_state = pickled_state[2]
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
-        for attr in attr_list:
-            new_state += (getattr(self, attr),)
-
-        # Return tuple that replaces parent's __setstate__ tuple with our own.
-        return (pickled_state[0], pickled_state[1], new_state)
-
-    def __setstate__(self, state):
-        """Customize __setstate__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Set the necessary attributes (in reverse order).
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
-        attr_list.reverse()
-        for i, name in enumerate(attr_list):
-            i += 1  # We need it 1..#attr instead of 0..#attr-1.
-            setattr(self, name, state[-i])
-
-        # Call the parent's __setstate__ with the other tuple elements.
-        super(Field, self).__setstate__(state[0:-i])
-
-    @property
-    def field(self):
-        """Entire field, 1D [fx, fy, fz]."""
-        return self.view()
-
-    @field.setter
-    def field(self, field):
-        """Update field, 1D [fx, fy, fz]."""
-        self.view()[:] = field
-
-    @property
-    def fx(self):
-        """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
-        return self.view()[:self.nEx].reshape(self.vnEx, order='F')
-
-    @fx.setter
-    def fx(self, fx):
-        """Update field in x-direction."""
-        self.view()[:self.nEx] = fx.ravel('F')
-
-    @property
-    def fy(self):
-        """View of the field in the y-direction (nNx, nCy, nNz)."""
-        return self.view()[self.nEx:-self.nEz].reshape(self.vnEy, order='F')
-
-    @fy.setter
-    def fy(self, fy):
-        """Update field in y-direction."""
-        self.view()[self.nEx:-self.nEz] = fy.ravel('F')
-
-    @property
-    def fz(self):
-        """View of the field in the z-direction (nNx, nNy, nCz)."""
-        return self.view()[-self.nEz:].reshape(self.vnEz, order='F')
-
-    @fz.setter
-    def fz(self, fz):
-        """Update electric field in z-direction."""
-        self.view()[-self.nEz:] = fz.ravel('F')
-
-    @property
-    def ensure_pec(self):
-        """Set Perfect Electric Conductor (PEC) boundary condition."""
-        # Apply PEC to fx
-        self.fx[:, 0, :] = 0.
-        self.fx[:, -1, :] = 0.
-        self.fx[:, :, 0] = 0.
-        self.fx[:, :, -1] = 0.
-
-        # Apply PEC to fy
-        self.fy[0, :, :] = 0.
-        self.fy[-1, :, :] = 0.
-        self.fy[:, :, 0] = 0.
-        self.fy[:, :, -1] = 0.
-
-        # Apply PEC to fz
-        self.fz[0, :, :] = 0.
-        self.fz[-1, :, :] = 0.
-        self.fz[:, 0, :] = 0.
-        self.fz[:, -1, :] = 0.
-
-
-def get_h_field(grid, model, field):
-    r"""Return magnetic field corresponding to provided electric field.
-
-    Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
-    :math:`\mathbf{H}`  using Farady's law, given by
-
-    .. math::
-
-        \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
-
-    Note that the magnetic field in x-direction is defined in the center of the
-    face defined by the electric field in y- and z-directions, and similar for
-    the other field directions. This means that the provided electric field and
-    the returned magnetic field have different dimensions::
-
-       E-field:  x: [grid.vectorCCx,  grid.vectorNy,  grid.vectorNz]
-                 y: [ grid.vectorNx, grid.vectorCCy,  grid.vectorNz]
-                 z: [ grid.vectorNx,  grid.vectorNy, grid.vectorCCz]
-
-       H-field:  x: [ grid.vectorNx, grid.vectorCCy, grid.vectorCCz]
-                 y: [grid.vectorCCx,  grid.vectorNy, grid.vectorCCz]
-                 z: [grid.vectorCCx, grid.vectorCCy,  grid.vectorNz]
-
-
-    Parameters
-    ----------
-    grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
-
-    model : Model
-        Model; ``emg3d.utils.Model`` instance.
-
-    field : Field
-        Electric field; ``emg3d.utils.Field`` instance.
-
-
-    Returns
-    -------
-    hfield : Field
-        Magnetic field; ``emg3d.utils.Field`` instance.
-
-    """
-    # Define the widths of the dual grid.
-    dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
-    dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
-    dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
-
-    # If relative magnetic permeability is not one, we have to take the volume
-    # into account, as mu_r is volume-averaged.
-    if model._Model__mu_r is not None:
-        # Plus and minus indices.
-        ixm = np.r_[0, np.arange(grid.nCx)]
-        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
-        iym = np.r_[0, np.arange(grid.nCy)]
-        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
-        izm = np.r_[0, np.arange(grid.nCz)]
-        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
-
-        # Average mu_r for dual-grid.
-        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
-        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
-        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
-
-    # Carry out the curl (^ corresponds to differentiation axis):
-    # H_x = (E_z^1 - E_y^2)
-    e3d_hx = (np.diff(field.fz, axis=1)/grid.hy[None, :, None] -
-              np.diff(field.fy, axis=2)/grid.hz[None, None, :])
-
-    # H_y = (E_x^2 - E_z^0)
-    e3d_hy = (np.diff(field.fx, axis=2)/grid.hz[None, None, :] -
-              np.diff(field.fz, axis=0)/grid.hx[:, None, None])
-
-    # H_z = (E_y^0 - E_x^1)
-    e3d_hz = (np.diff(field.fy, axis=0)/grid.hx[:, None, None] -
-              np.diff(field.fx, axis=1)/grid.hy[None, :, None])
-
-    # If relative magnetic permeability is not one, we have to take the volume
-    # into account, as mu_r is volume-averaged.
-    if model._Model__mu_r is not None:
-        hvx = grid.hx[:, None, None]
-        hvy = grid.hy[None, :, None]
-        hvz = grid.hz[None, None, :]
-
-        e3d_hx *= mu_r_x/(dx[:, None, None]*hvy*hvz)
-        e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
-        e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
-
-    # Create a Field-instance and divide by sval*mu_0 and return.
-    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
-
-    return hfield
-
-
-def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
-    """Return values corresponding to grid at coordinates.
-
-    Works for electric fields as well as magnetic fields obtained with
-    :func:`get_h_field`, and for model parameters.
-
-
-    Parameters
-    ----------
-    grid : TensorMesh
-        Model grid; a ``TensorMesh``-instance.
-
-    values : ndarray
-        Can be either a particular field, e.g., efield.fx, or a model
-        parameter.
-
-    coordinates : tuple (x, y, z)
-        Coordinates (x, y, z) where to interpolate ``values``; e.g. receiver
-        locations.
-
-    method : str, optional
-        The method of interpolation to perform, 'linear' or 'cubic'.
-        Default is 'cubic' (forced to 'linear' if there are less than 3 points
-        in any direction).
-
-    extrapolate : bool
-        If True, points on ``new_grid`` which are outside of ``grid`` are
-        filled by the nearest value (if ``method='cubic'``) or by extrapolation
-        (if ``method='linear'``). If False, points outside are set to zero.
-
-        Default is False.
-
-
-    Returns
-    -------
-    new_values : ndarray
-        Values at ``coordinates``.
-
-
-    See Also
-    --------
-    grid2grid : Interpolation of model parameters or fields to a new grid.
-
-    """
-    # Ensure input field is a certain field, not a Field instance.
-    if values.ndim == 1:
-        print("* ERROR   :: Values must be a x-, y-, or z-directed field or")
-        print("             model parameters with ndim=3.")
-        print(f"             Shape of provided field: {values.shape}.")
-        raise ValueError("Values error")
-
-    if len(coordinates) != 3:
-        print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
-        print(f"             Length of provided coord.: {len(coordinates)}.")
-        raise ValueError("Coordinates error")
-
-    # Get the vectors corresponding to input data. Dimensions:
-    #
-    #         E-field          H-field      |  Model Parameter
-    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]  |
-    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]  |  [nCx, nCy, nCz]
-    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]  |
-    #
-    points = tuple()
-    for i, coord in enumerate(['x', 'y', 'z']):
-        if values.shape[i] == getattr(grid, 'nN'+coord):
-            pts = (getattr(grid, 'vectorN'+coord), )
-        else:
-            pts = (getattr(grid, 'vectorCC'+coord), )
-
-        # Add to points.
-        points += pts
-
-    if extrapolate:
-        return _interp3d(points, values, coordinates, method, None, 'nearest')
-    else:
-        return _interp3d(points, values, coordinates, method, 0.0, 'constant')
-
-
+# INTERPOLATION
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
@@ -1607,29 +1609,96 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     return new_values
 
 
-# TIMING FOR LOGS
-class Time:
-    """Class for timing (now; runtime)."""
+def _interp3d(points, values, new_points, method, fill_value, mode):
+    """Interpolate values in 3D either linearly or with a cubic spline.
 
-    def __init__(self):
-        """Initialize time zero (t0) with current time stamp."""
-        self.__t0 = default_timer()
+    Return ``values`` corresponding to a regular 3D grid defined by ``points``
+    on ``new_points``.
 
-    @property
-    def t0(self):
-        """Return time zero of this class instance."""
-        return self.__t0
+    This is a modified version of :func:`scipy.interpolate.interpn`, using
+    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
+    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
+    ``method='cubic'``. If speed is important then choose 'linear', as it can
+    be significantly faster.
 
-    @property
-    def now(self):
-        """Return string of current time."""
-        return datetime.now().strftime("%H:%M:%S")
 
-    @property
-    def runtime(self):
-        """Return string of runtime since time zero."""
-        t1 = default_timer() - self.__t0
-        return timedelta(seconds=np.round(t1))
+    Parameters
+    ----------
+    points : tuple of ndarray of float, with shapes ((nx, ), (ny, ) (nz, ))
+        The points defining the regular grid in three dimensions.
+
+    values : array_like, shape (nx, ny, nz)
+        The data on the regular grid in three dimensions.
+
+    new_points : tuple (rec_x, rec_y, rec_z)
+        Coordinates (x, y, z) of new points.
+
+    method : {'cubic', 'linear'}, optional
+        The method of interpolation to perform, 'linear' or 'cubic'. Default is
+        'cubic' (forced to 'linear' if there are less than 3 points in any
+        direction).
+
+    fill_value : float or None
+        Passed to ``interpolate.RegularGridInterpolator`` if
+        ``method='linear'``: The value to use for points outside of the
+        interpolation domain. If None, values outside the domain are
+        extrapolated.
+
+    mode : {'constant', 'nearest', 'mirror', 'reflect', 'wrap'}
+        Passed to ``ndimage.map_coordinates`` if ``method='cubic'``: Determines
+        how the input array is extended beyond its boundaries.
+
+
+    Returns
+    -------
+    new_values : ndarray
+        Values corresponding to ``new_points``.
+
+    """
+
+    # We need at least 3 points in each direction for cubic spline. This should
+    # never be an issue for a realistic 3D model.
+    for pts in points:
+        if len(pts) < 4:
+            method = 'linear'
+
+    # Interpolation.
+    if method == "linear":
+        ifn = interpolate.RegularGridInterpolator(
+                points=points, values=values, method="linear",
+                bounds_error=False, fill_value=fill_value)
+
+        new_values = ifn(xi=new_points)
+
+    else:
+
+        # Replicate the same expansion of xi as used in
+        # RegularGridInterpolator, so the input xi can be quite flexible.
+        xi = interpolate.interpnd._ndim_coords_from_arrays(new_points, ndim=3)
+        xi_shape = xi.shape
+        xi = xi.reshape(-1, 3)
+
+        # map_coordinates uses the indices of the input data (values in this
+        # case) as coordinates. We have therefore to transform our desired
+        # output coordinates to this artificial coordinate system too.
+        coords = np.empty(xi.T.shape)
+        for i in range(3):
+            coords[i] = interpolate.interp1d(
+                    points[i], np.arange(len(points[i])), kind='cubic',
+                    bounds_error=False, fill_value='extrapolate',)(xi[:, i])
+
+        # map_coordinates only works for real data; split it up if complex.
+        params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
+        if 'complex' in values.dtype.name:
+            real = ndimage.map_coordinates(values.real, coords, **params3d)
+            imag = ndimage.map_coordinates(values.imag, coords, **params3d)
+            result = real + 1j*imag
+        else:
+            result = ndimage.map_coordinates(values, coords, **params3d)
+
+        new_values = result.reshape(xi_shape[:-1])
+
+    return new_values
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
@@ -1762,7 +1831,31 @@ def data_read(fname, keys=None, path="data"):
             return out
 
 
-# OTHER
+# TIMING AND REPORTING
+class Time:
+    """Class for timing (now; runtime)."""
+
+    def __init__(self):
+        """Initialize time zero (t0) with current time stamp."""
+        self.__t0 = default_timer()
+
+    @property
+    def t0(self):
+        """Return time zero of this class instance."""
+        return self.__t0
+
+    @property
+    def now(self):
+        """Return string of current time."""
+        return datetime.now().strftime("%H:%M:%S")
+
+    @property
+    def runtime(self):
+        """Return string of runtime since time zero."""
+        t1 = default_timer() - self.__t0
+        return timedelta(seconds=np.round(t1))
+
+
 class Report(ScoobyReport):
     r"""Print date, time, and version information.
 
@@ -1823,95 +1916,3 @@ class Report(ScoobyReport):
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
-
-
-def _interp3d(points, values, new_points, method, fill_value, mode):
-    """Interpolate values in 3D either linearly or with a cubic spline.
-
-    Return ``values`` corresponding to a regular 3D grid defined by ``points``
-    on ``new_points``.
-
-    This is a modified version of :func:`scipy.interpolate.interpn`, using
-    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
-    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
-    ``method='cubic'``. If speed is important then choose 'linear', as it can
-    be significantly faster.
-
-
-    Parameters
-    ----------
-    points : tuple of ndarray of float, with shapes ((nx, ), (ny, ) (nz, ))
-        The points defining the regular grid in three dimensions.
-
-    values : array_like, shape (nx, ny, nz)
-        The data on the regular grid in three dimensions.
-
-    new_points : tuple (rec_x, rec_y, rec_z)
-        Coordinates (x, y, z) of new points.
-
-    method : {'cubic', 'linear'}, optional
-        The method of interpolation to perform, 'linear' or 'cubic'. Default is
-        'cubic' (forced to 'linear' if there are less than 3 points in any
-        direction).
-
-    fill_value : float or None
-        Passed to ``interpolate.RegularGridInterpolator`` if
-        ``method='linear'``: The value to use for points outside of the
-        interpolation domain. If None, values outside the domain are
-        extrapolated.
-
-    mode : {'constant', 'nearest', 'mirror', 'reflect', 'wrap'}
-        Passed to ``ndimage.map_coordinates`` if ``method='cubic'``: Determines
-        how the input array is extended beyond its boundaries.
-
-
-    Returns
-    -------
-    new_values : ndarray
-        Values corresponding to ``new_points``.
-
-    """
-
-    # We need at least 3 points in each direction for cubic spline. This should
-    # never be an issue for a realistic 3D model.
-    for pts in points:
-        if len(pts) < 4:
-            method = 'linear'
-
-    # Interpolation.
-    if method == "linear":
-        ifn = interpolate.RegularGridInterpolator(
-                points=points, values=values, method="linear",
-                bounds_error=False, fill_value=fill_value)
-
-        new_values = ifn(xi=new_points)
-
-    else:
-
-        # Replicate the same expansion of xi as used in
-        # RegularGridInterpolator, so the input xi can be quite flexible.
-        xi = interpolate.interpnd._ndim_coords_from_arrays(new_points, ndim=3)
-        xi_shape = xi.shape
-        xi = xi.reshape(-1, 3)
-
-        # map_coordinates uses the indices of the input data (values in this
-        # case) as coordinates. We have therefore to transform our desired
-        # output coordinates to this artificial coordinate system too.
-        coords = np.empty(xi.T.shape)
-        for i in range(3):
-            coords[i] = interpolate.interp1d(
-                    points[i], np.arange(len(points[i])), kind='cubic',
-                    bounds_error=False, fill_value='extrapolate',)(xi[:, i])
-
-        # map_coordinates only works for real data; split it up if complex.
-        params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
-        if 'complex' in values.dtype.name:
-            real = ndimage.map_coordinates(values.real, coords, **params3d)
-            imag = ndimage.map_coordinates(values.imag, coords, **params3d)
-            result = real + 1j*imag
-        else:
-            result = ndimage.map_coordinates(values, coords, **params3d)
-
-        new_values = result.reshape(xi_shape[:-1])
-
-    return new_values
