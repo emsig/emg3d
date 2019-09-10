@@ -1302,7 +1302,7 @@ def get_hx_h0(
     finished = False
 
     # Initiate alpha variables for survey and calculation domains.
-    sa, ca = 1.0, 1.0
+    sa, sa_adj, ca = 1.0, 1.0, 1.0
 
     # Loop over possible cell numbers from small to big.
     for nx in np.unique(possible_nx):
@@ -1377,8 +1377,6 @@ def get_hx_h0(
             # Get stretching for seafloor and air-surface adjustments.
             if has_seafloor:
                 sa_adj = np.max([hx[1:]/hx[:-1], hx[:-1]/hx[1:]])
-            else:
-                sa_adj = sa
 
             # Loop over possible alphas for calc_domain.
             for ca in np.linspace(sa, alpha[2], alpha[3]):
