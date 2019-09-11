@@ -1137,11 +1137,9 @@ class TensorMesh:
         return self.__vol
 
 
-def get_hx_h0(
-        freq, rho, src, survey_domain, possible_nx, min_width=None, pps=3,
-        alpha=[1.05, 11, 1.5, 11], calc_domain_factors=[5, 10, 5, 10],
-        resp_survey_domain=False, raise_error=True, verb=1,
-        ):
+def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
+              pps=3, alpha=None, calc_domain_factors=None,
+              resp_survey_domain=False, raise_error=True, verb=1):
     r"""Return cell widths and origin for given parameters.
 
     Returns cell widths given the provided ``survey_domain`` and other
@@ -1232,6 +1230,9 @@ def get_hx_h0(
         Mesh information.
 
     """
+    # Get variables with default lists:
+    alpha = alpha or [1.05, 11, 1.5, 11]
+    calc_domain_factors = calc_domain_factors or [5, 10, 5, 10]
 
     # Start log.
     if verb > 0:
