@@ -609,26 +609,6 @@ def get_h_field(grid, model, field):
         Magnetic field; ``emg3d.utils.Field`` instance.
 
     """
-    # Define the widths of the dual grid.
-    dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
-    dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
-    dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
-
-    # If relative magnetic permeability is not one, we have to take the volume
-    # into account, as mu_r is volume-averaged.
-    if model._Model__mu_r is not None:
-        # Plus and minus indices.
-        ixm = np.r_[0, np.arange(grid.nCx)]
-        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
-        iym = np.r_[0, np.arange(grid.nCy)]
-        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
-        izm = np.r_[0, np.arange(grid.nCz)]
-        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
-
-        # Average mu_r for dual-grid.
-        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
-        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
-        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
 
     # Carry out the curl (^ corresponds to differentiation axis):
     # H_x = (E_z^1 - E_y^2)
@@ -646,10 +626,30 @@ def get_h_field(grid, model, field):
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
     if model._Model__mu_r is not None:
+
+        # Plus and minus indices.
+        ixm = np.r_[0, np.arange(grid.nCx)]
+        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
+        iym = np.r_[0, np.arange(grid.nCy)]
+        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
+        izm = np.r_[0, np.arange(grid.nCz)]
+        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
+
+        # Average mu_r for dual-grid.
+        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
+        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
+        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
+
         hvx = grid.hx[:, None, None]
         hvy = grid.hy[None, :, None]
         hvz = grid.hz[None, None, :]
 
+        # Define the widths of the dual grid.
+        dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
+        dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
+        dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
+
+        # Multiply fields by mu_r.
         e3d_hx *= mu_r_x/(dx[:, None, None]*hvy*hvz)
         e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
         e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
