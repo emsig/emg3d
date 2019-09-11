@@ -1302,7 +1302,7 @@ def get_hx_h0(
     finished = False
 
     # Initiate alpha variables for survey and calculation domains.
-    sa, sa_adj, ca = 1.0, 1.0, 1.0
+    sa, ca = 1.0, 1.0
 
     # Loop over possible cell numbers from small to big.
     for nx in np.unique(possible_nx):
@@ -1321,9 +1321,10 @@ def get_hx_h0(
                 # If seafloor or sea-surface is too close to source, we move
                 # the source location (so actual source won't be in the middle
                 # of the cell).
-                if np.any(abs(survey_domain[1:]-src) < dmin/2):
-                    asrc = np.clip(src, survey_domain[1]+dmin/2,
-                                   survey_domain[2]-dmin/2)
+                if np.any(abs(survey_domain[1]-src) < dmin):
+                    asrc = survey_domain[1]+dmin/2
+                elif np.any(abs(survey_domain[2]-src) < dmin):
+                    asrc = survey_domain[2]-dmin/2
 
                 # Move mesh to seafloor.
                 t_x0 = asrc-dmin/2
@@ -1446,10 +1447,12 @@ def get_hx_h0(
             print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
         print()
 
+    if not has_seafloor:
+        sa_adj = sa
     info = {'dmin': dmin,
             'dmax': np.nanmax(hx),
             'amin': np.nanmin([ca, sa, sa_adj]),
-            'amax': np.nanmin([ca, sa, sa_adj])}
+            'amax': np.nanmax([ca, sa, sa_adj])}
 
     return hx, x0, info
 
