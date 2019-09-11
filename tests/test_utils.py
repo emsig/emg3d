@@ -41,6 +41,112 @@ def create_dummy(nx, ny, nz, imag=True):
 
 
 # HELPER FUNCTIONS TO CREATE MESH
+def test_get_hx_h0(capsys):
+
+    # == A == Just the defaults, no big thing (regression).
+    out1 = utils.get_hx_h0(
+            freq=.5, rho=10, src=900, survey_domain=[-2000, 2000],
+            possible_nx=[20, 32])
+    outstr1, _ = capsys.readouterr()
+
+    # Partially regression, partially from output-info.
+    info = (
+        "  = = = = = = = =   0.5000 Hz = = = = = = = =\n"
+        "    Skin depth          [m] : 2251\n"
+        "    Survey domain       [m] : -2000 - 2000\n"
+        "    Calculation domain  [m] : -10354 - 12154\n"
+        "    Final extent        [m] : -11416 - 16880\n"
+        f"    Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3226\n"
+        "    Alpha survey/calc       : "
+        f"{out1[2]['amin']:.3f}/{out1[2]['amax']:.3f}\n"
+        "    Number of cells (s/c/r) : 20 (6/13/1)\n"
+    )
+    # Just check x0 and the output.
+    assert out1[1] == -11416.447988667012
+    assert info in outstr1
+
+    # == B == Laplace and verb=0, parameter positions and defaults.
+    out2 = utils.get_hx_h0(
+            -.5/np.pi/2, 10, 900, [-2000, 2000], [20, 32], None, 3,
+            [1.05, 11, 1.5, 11], [5, 10, 5, 10], False, True, 0)
+    outstr2, _ = capsys.readouterr()
+
+    # Assert they are the same.
+    assert_allclose(out1[0], out2[0])
+
+    # Assert nothing is printed with verb=0.
+    assert outstr2 == ""
+
+    # == C == User limits.
+    out3 = utils.get_hx_h0(
+            freq=.5, rho=10, src=900, survey_domain=[-11000, 14000],
+            possible_nx=[20, 32], min_width=[20, 600], resp_survey_domain=True)
+    outstr3, _ = capsys.readouterr()
+
+    # Check dmin.
+    assert out3[2]['dmin'] == 600
+    # Calculation domain has to be at least survey_domain.
+    assert out3[1]+np.sum(out3[0]) > 14000
+    assert out3[1] <= -11000
+
+    # == D == Check failure.
+    # (a) With raise.
+    with pytest.raises(ArithmeticError):
+        utils.get_hx_h0(
+                freq=.5, rho=10, src=900, survey_domain=[-10000, 10000],
+                possible_nx=[20])
+
+    # (b) With raise=False.
+    out4 = utils.get_hx_h0(
+            freq=.5, rho=10, src=900, survey_domain=[-500, 500],
+            possible_nx=[32, 40], min_width=[20, 40],
+            alpha=[1.045, 3, 1.66, 3],
+            calc_domain_factors=[10, 15, 10, 15], raise_error=False)
+    outstr4, _ = capsys.readouterr()
+    assert out4[0] is None
+    assert out4[1] is None
+    assert out4[2]['amin'] == 1.045  # If fails, must have biggest default
+    assert out4[2]['amax'] == 1.66   # anisotropy values for both domains.
+
+    # == E == Seafloor.
+    # Source NOT IN water.
+    with pytest.raises(ValueError):
+        utils.get_hx_h0(
+            freq=1, rho=1, src=900, survey_domain=[-2000, -1000, 0],
+            possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
+
+    # Source IN water.
+    out5 = utils.get_hx_h0(
+            freq=1, rho=1, src=-900, survey_domain=[-2000, -1000, 0],
+            possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
+    outstr5, _ = capsys.readouterr()
+
+    nodes5 = out5[1]+np.cumsum(out5[0])
+    assert_allclose(0.0, min(abs(nodes5)), atol=1e-8)  # Check sea-surface.
+    assert_allclose(0.0, min(abs(nodes5+1000)), atol=1e-8)  # Check seafloor.
+    assert out5[2]['amax'] < 1.01
+
+    # Source close to seafloor.
+    out6 = utils.get_hx_h0(
+            freq=1, rho=1, src=-950, survey_domain=[-2000, -1000, 0],
+            possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
+    outstr6, _ = capsys.readouterr()
+    nodes6 = out6[1]+np.cumsum(out6[0])
+    assert_allclose(0.0, min(abs(nodes6)), atol=1e-8)  # Check sea-surface.
+    assert_allclose(0.0, min(abs(nodes6+1000)), atol=1e-8)  # Check seafloor.
+    assert out6[2]['amax'] < 1.01
+
+    # Source close to sea-surface.
+    out7 = utils.get_hx_h0(
+            freq=1, rho=1, src=-5, survey_domain=[-2000, -1000, 0],
+            possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
+    outstr7, _ = capsys.readouterr()
+    nodes7 = out7[1]+np.cumsum(out7[0])
+    assert_allclose(0.0, min(abs(nodes7)), atol=1e-8)  # Check sea-surface.
+    assert_allclose(0.0, min(abs(nodes7+1000)), atol=1e-8)  # Check seafloor.
+    assert out7[2]['amax'] < 1.01
+
+
 def test_get_domain():
     # Test default values (and therefore skindepth etc)
     h1, d1 = utils.get_domain()

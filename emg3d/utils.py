@@ -41,11 +41,10 @@ except ImportError:
             print("\n* WARNING :: `emg3d.Report` requires `scooby`."
                   "\n             Install it via `pip install scooby`.\n")
 
-__all__ = ['Model', 'Field', 'get_domain', 'get_stretched_h',
-           'get_cell_numbers', 'get_hx', 'get_source_field', 'get_receiver',
-           'get_h_field', 'grid2grid', 'TensorMesh', 'Time', 'data_write',
-           'data_read', 'Report']
-
+__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_h_field', 'Model',
+           'grid2grid', 'TensorMesh', 'get_hx_h0', 'get_cell_numbers',
+           'get_stretched_h', 'get_domain', 'get_hx', 'data_write',
+           'data_read', 'Time', 'Report']
 
 # CONSTANTS
 c = 299792458              # Speed of light m/s
@@ -53,397 +52,166 @@ mu_0 = 4e-7*np.pi          # Magn. permeability of free space [H/m]
 epsilon_0 = 1./(mu_0*c*c)  # Elec. permittivity of free space [F/m]
 
 
-# HELPER FUNCTIONS TO CREATE MESH => These will probably move to discretize.
-def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
-               fact_min=0.2, fact_neg=5, fact_pos=None):
-    r"""Get domain extent and minimum cell width as a function of skin depth.
+# FIELDS
+class Field(np.ndarray):
+    """Create a Field instance with x-, y-, and z-views of the field.
 
-    Returns the extent of the calculation domain and the minimum cell width as
-    a multiple of the skin depth, with possible user restrictions on minimum
-    calculation domain and range of possible minimum cell widths.
+    A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
+    z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
+    default array contains the whole field, which can be the electric field,
+    the source field, or the residual field, in a 1D array. A ``Field``
+    instance has additionally the property ``ensure_pec`` which, if called,
+    ensures Perfect Electric Conductor (PEC) boundary condition.
 
-    .. math::
+    A ``Field`` can be initiated in three ways:
 
-            \delta &= 503.3 \sqrt{\frac{\rho}{f}} , \\
-            x_\text{start} &= x_0-k_\text{neg}\delta , \\
-            x_\text{end} &= x_0+k_\text{pos}\delta , \\
-            h_\text{min} &= k_\text{min} \delta .
+    1. ``Field(grid)``:
+    Calling it with a ``TensorMesh``-instance returns a ``Field``-instance of
+    correct dimensions initiated with complex zeroes.
 
-    .. note::
+    2. ``Field(grid, field)``:
+    Calling it with a ``TensorMesh``-instance and an ``ndarray`` returns a
+    ``Field``-instance of the provided ``ndarray``.
 
-        This utility will probably move into discretize in the future.
+    3. ``Field(fx, fy, fz)``:
+    Calling it with three ``ndarray``'s which represent the field in x-, y-,
+    and z-direction returns a ``Field``-instance with these views.
 
-
-    Parameters
-    ----------
-
-    x0 : float
-        Center of the calculation domain. Normally the source location.
-        Default is 0.
-
-    freq : float
-        Frequency (Hz) to calculate the skin depth. The skin depth is a concept
-        defined in the frequency domain. If a negative frequency is provided,
-        it is assumed that the calculation is carried out in the Laplace
-        domain. To calculate the skin depth, the value of ``freq`` is then
-        multiplied by :math:`-2\pi`, to simulate the closest
-        frequency-equivalent.
-
-        Default is 1 Hz.
-
-    rho : float, optional
-        Resistivity (Ohm m) to calculate skin depth.
-        Default is 0.3 Ohm m (sea water).
-
-    limits : None or list
-        [start, end] of model domain. This extent represents the minimum extent
-        of the domain. The domain is therefore only adjusted if it has to reach
-        outside of [start, end].
-        Default is None.
-
-    min_width : None, float, or list of two floats
-        Minimum cell width is calculated as a function of skin depth:
-        fact_min*sd. If ``min_width`` is a float, this is used. If a list of
-        two values [min, max] are provided, they are used to restrain
-        min_width. Default is None.
-
-    fact_min, fact_neg, fact_pos : floats
-        The skin depth is multiplied with these factors to estimate:
-
-            - Minimum cell width (``fact_min``, default 0.2)
-            - Domain-start (``fact_neg``, default 5), and
-            - Domain-end (``fact_pos``, defaults to ``fact_neg``).
-
-
-    Returns
-    -------
-
-    h_min : float
-        Minimum cell width.
-
-    domain : list
-        Start- and end-points of calculation domain.
+    Sort-order is 'F'.
 
     """
 
-    # Set fact_pos to fact_neg if not provided.
-    if fact_pos is None:
-        fact_pos = fact_neg
-
-    # Calculate the skin depth.
-    skind = 503.3*np.sqrt(rho/abs(freq))
-    if freq < 0:  # For Laplace-domain calculations.
-        skind /= np.sqrt(2*np.pi)
-
-    # Estimate minimum cell width.
-    h_min = fact_min*skind
-    if min_width is not None:  # Respect user input.
-        if np.array(min_width).size == 1:
-            h_min = min_width
-        else:
-            h_min = np.clip(h_min, *min_width)
-
-    # Estimate calculation domain.
-    domain = [x0-fact_neg*skind, x0+fact_pos*skind]
-    if limits is not None:  # Respect user input.
-        domain = [min(limits[0], domain[0]), max(limits[1], domain[1])]
-
-    return h_min, domain
-
-
-def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
-    """Return cell widths for a stretched grid within the domain.
-
-    Returns ``nx`` cell widths within ``domain``, where the minimum cell width
-    is ``h_min``. The cells are not stretched within ``x0`` and ``x1``, and
-    outside uses a power-law stretching. The actual stretching factor and the
-    number of cells left and right of ``x0`` and ``x1`` are find in a
-    minimization process.
-
-    The domain is not completely respected. The starting point of the domain
-    is, but the endpoint of the domain might slightly shift (this is more
-    likely the case for small ``nx``, for big ``nx`` the shift should be
-    small). The new endpoint can be obtained with ``domain[0]+np.sum(hx)``. If
-    you want the domain to be respected absolutely, set ``resp_domain=True``.
-    However, be aware that this will introduce one stretch-factor which is
-    different from the other stretch factors, to accommodate the restriction.
-    This one-off factor is between the left- and right-side of ``x0``, or, if
-    ``x1`` is provided, just after ``x1``.
-
-    .. note::
-
-        This utility will probably move into discretize in the future.
-
-
-    Parameters
-    ----------
-
-    h_min : float
-        Minimum cell width. If x1 is provided, the actual minimum cell width
-        might be smaller than h_min.
-
-    domain : list
-        [start, end] of model domain.
-
-    nx : int
-        Number of cells.
-
-    x0 : float
-        Center of the grid. ``x0`` is restricted to ``domain``.
-        Default is 0.
-
-    x1 : float
-        If provided, then no stretching is applied between ``x0`` and ``x1``.
-        The non-stretched part starts at ``x0`` and stops at the first possible
-        location at or after ``x1``. ``x1`` is restricted to ``domain``. This
-        will h_min so that an integer number of cells fit within x0 and x1.
-
-    resp_domain : bool
-        If False (default), then the domain-end might shift slightly to assure
-        that the same stretching factor is applied throughout. If set to True,
-        however, the domain is respected absolutely. This will introduce one
-        stretch-factor which is different from the other stretch factors, to
-        accommodate the restriction. This one-off factor is between the left-
-        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
-
-
-    Returns
-    -------
-    hx : ndarray
-        Cell widths of mesh.
-
-    """
-
-    # Cast to arrays
-    domain = np.array(domain, dtype=float)
-    x0 = np.array(x0, dtype=float)
-    x0 = np.clip(x0, *domain)  # Restrict to model domain
-    h_min = np.array(h_min, dtype=float)
-    if x1 is not None:
-        x1 = np.array(x1, dtype=float)
-        x1 = np.clip(x1, *domain)  # Restrict to model domain
-
-    # If x1 is provided (a part is not stretched)
-    if x1 is not None:
-
-        # Store original values
-        xlim_orig = domain.copy()
-        nx_orig = int(nx)
-        x0_orig = x0.copy()
-        h_min_orig = h_min.copy()
-
-        # Get number of non-stretched cells
-        n_nos = int(np.ceil((x1-x0)/h_min))
-
-        # Re-calculate h_min to fit with x0-x1-limits:
-        h_min = (x1-x0)/n_nos
-
-        # Subtract one cell, because the standard scheme provides one
-        # h_min-cell.
-        n_nos -= 1
-
-        # Reset x0, because the first h_min comes from normal scheme
-        x0 += h_min
-
-        # Reset xmax for normal scheme
-        domain[1] -= n_nos*h_min
-
-        # Reset nx for normal scheme
-        nx -= n_nos
-
-        # If there are not enough points reset to standard procedure. The limit
-        # of five is arbitrary. However, nx should be much bigger than five
-        # anyways, otherwise stretched grid doesn't make sense.
-        if nx <= 5:
-            print("Warning :: Not enough points for non-stretched part,"
-                  "ignoring therefore `x1`.")
-            domain = xlim_orig
-            nx = nx_orig
-            x0 = x0_orig
-            x1 = None
-            h_min = h_min_orig
-
-    # Get stretching factor (a = 1+alpha).
-    if h_min == 0 or h_min > np.diff(domain)/nx:
-        # If h_min is bigger than the domain-extent divided by nx, no
-        # stretching is required at all.
-        alpha = 0
-    else:
-
-        # Wrap _get_dx into a minimization function to call with fsolve.
-        def find_alpha(alpha, h_min, args):
-            """Find alpha such that min(hx) = h_min."""
-            return min(get_hx(alpha, *args))/h_min-1
-
-        # Search for best alpha, must be at least 0
-        args = (domain, nx, x0)
-        alpha = max(0, optimize.fsolve(find_alpha, 0.02, (h_min, args)))
-
-    # With alpha get actual cell spacing with `resp_domain` to respect the
-    # users decision.
-    hx = get_hx(alpha, domain, nx, x0, resp_domain)
-
-    # Add the non-stretched center if x1 is provided
-    if x1 is not None:
-        hx = np.r_[hx[: np.argmin(hx)], np.ones(n_nos)*h_min,
-                   hx[np.argmin(hx):]]
-
-    # Print warning h_min could not be respected.
-    if abs(hx.min() - h_min) > 0.1:
-        print(f"Warning :: Minimum cell width ({np.round(hx.min(), 2)} m) is "
-              "below `h_min`, because `nx` is too big for `domain`.")
-
-    return hx
-
-
-def get_cell_numbers(max_nr, max_prime=5, min_div=3):
-    r"""Returns 'good' cell numbers for the multigrid method.
-
-    'Good' cell numbers are numbers which can be divided by 2 as many times as
-    possible. At the end there will be a low prime number.
-
-    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
-    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
-    :math:`M, p_\text{max}, n_\text{min}` correspond to ``max_nr``,
-    ``max_prime``, and ``min_div``, respectively.
-
-
-    Parameters
-    ----------
-    max_nr : int
-        Maximum number of cells.
-
-    max_prime : int
-        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
-        limits in order to avoid too big lowest grids in the multigrid method.
-        Default is 5.
-
-    min_div : int
-        Minimum times the number can be divided by two.
-        Default is 3.
-
-
-    Returns
-    -------
-    numbers : array
-        Array containing all possible cell numbers from lowest to highest.
-
-    """
-    # Primes till 20.
-    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19])
-
-    # Sanity check; 19 is already ridiculously high.
-    if max_prime > primes[-1]:
-        print(f"* ERROR   :: Highest prime is {max_prime}, "
-              "please use a value < 20.")
-        raise ValueError("Highest prime too high")
-
-    # Restrict to max_prime.
-    primes = primes[primes <= max_prime]
-
-    # Get possible values.
-    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
-    numbers = primes[:, None]*2**np.arange(min_div, 30)
-
-    # Get unique values.
-    numbers = np.unique(numbers)
-
-    # Restrict to max_nr and return.
-    return numbers[numbers <= max_nr]
-
-
-def get_hx(alpha, domain, nx, x0, resp_domain=True):
-    r"""Return cell widths for given input.
-
-    Find the number of cells left and right of ``x0``, ``nl`` and ``nr``
-    respectively, for the provided alpha. For this, we solve
-
-    .. math::   \frac{x_\text{max}-x_0}{x_0-x_\text{min}} =
-                \frac{a^{nr}-1}{a^{nl}-1}
-
-    where :math:`a = 1+\alpha`.
-
-    .. note::
-
-        This utility will probably move into discretize in the future.
-
-
-    Parameters
-    ----------
-
-    alpha : float
-        Stretching factor ``a`` is given by ``a=1+alpha``.
-
-    domain : list
-        [start, end] of model domain.
-
-    nx : int
-        Number of cells.
-
-    x0 : float
-        Center of the grid. ``x0`` is restricted to ``domain``.
-
-    resp_domain : bool
-        If False (default), then the domain-end might shift slightly to assure
-        that the same stretching factor is applied throughout. If set to True,
-        however, the domain is respected absolutely. This will introduce one
-        stretch-factor which is different from the other stretch factors, to
-        accommodate the restriction. This one-off factor is between the left-
-        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
-
-
-    Returns
-    -------
-    hx : ndarray
-        Cell widths of mesh.
-
-    """
-    if alpha <= 0.:  # If alpha <= 0: equal spacing (no stretching at all)
-        hx = np.ones(nx)*np.diff(np.squeeze(domain))/nx
-
-    else:            # Get stretched hx
-        a = alpha+1
-
-        # Get hx depending if x0 is on the domain boundary or not.
-        if x0 == domain[0] or x0 == domain[1]:
-            # Get al a's
-            alr = np.diff(domain)*alpha/(a**nx-1)*a**np.arange(nx)
-            if x0 == domain[1]:
-                alr = alr[::-1]
-
-            # Calculate differences
-            hx = alr*np.diff(domain)/sum(alr)
-
-        else:
-            # Find number of elements left and right by solving:
-            #     (xmax-x0)/(x0-xmin) = a**nr-1/(a**nl-1)
-            nr = np.arange(2, nx+1)
-            er = (domain[1]-x0)/(x0-domain[0]) - (a**nr[::-1]-1)/(a**nr-1)
-            nl = np.argmin(abs(np.floor(er)))+1
-            nr = nx-nl
-
-            # Get all a's
-            al = a**np.arange(nl-1, -1, -1)
-            ar = a**np.arange(1, nr+1)
-
-            # Calculate differences
-            if resp_domain:
-                # This version honours domain[0] and domain[1], but to achieve
-                # this it introduces one stretch-factor which is different from
-                # all the others between al to ar.
-                hx = np.r_[al*(x0-domain[0])/sum(al),
-                           ar*(domain[1]-x0)/sum(ar)]
-            else:
-                # This version moves domain[1], but each stretch-factor is
-                # exactly the same.
-                fact = (x0-domain[0])/sum(al)  # Take distance from al.
-                hx = np.r_[al, ar]*fact
-
-                # Note: this hx is equivalent as providing the following h
-                # to TensorMesh:
-                # h = [(h_min, nl-1, -a), (h_min, n_nos+1), (h_min, nr, a)]
-
-    return hx
+    def __new__(cls, grid, field=None, fz=None, dtype=complex):
+        """Initiate a new Field-instance."""
+
+        # Collect field
+        if field is None and fz is None:  # Empty Field with dimension grid.nE.
+            new = np.zeros(grid.nE, dtype=dtype)
+        elif fz is None:                  # grid and field provided
+            new = field
+        else:                             # fx, fy, fz provided
+            new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
+
+        # Store the field as object
+        obj = np.asarray(new).view(cls)
+
+        # Store relevant numbers for the views.
+        if field is not None and fz is not None:  # Deduce from arrays
+            obj.nEx = grid.size
+            obj.nEy = field.size
+            obj.nEz = fz.size
+            obj.vnEx = grid.shape
+            obj.vnEy = field.shape
+            obj.vnEz = fz.shape
+        else:                                     # If grid is provided
+            attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+            for attr in attr_list:
+                setattr(obj, attr, getattr(grid, attr))
+
+        return obj
+
+    def __array_finalize__(self, obj):
+        """Ensure relevant numbers are stored no matter how created."""
+        if obj is None:
+            return
+
+        self.nEx = getattr(obj, 'nEx', None)
+        self.nEy = getattr(obj, 'nEy', None)
+        self.nEz = getattr(obj, 'nEz', None)
+        self.vnEx = getattr(obj, 'vnEx', None)
+        self.vnEy = getattr(obj, 'vnEy', None)
+        self.vnEz = getattr(obj, 'vnEz', None)
+
+    def __reduce__(self):
+        """Customize __reduce__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Get the parent's __reduce__ tuple.
+        pickled_state = super(Field, self).__reduce__()
+
+        # Create our own tuple to pass to __setstate__.
+        new_state = pickled_state[2]
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        for attr in attr_list:
+            new_state += (getattr(self, attr),)
+
+        # Return tuple that replaces parent's __setstate__ tuple with our own.
+        return (pickled_state[0], pickled_state[1], new_state)
+
+    def __setstate__(self, state):
+        """Customize __setstate__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Set the necessary attributes (in reverse order).
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list.reverse()
+        for i, name in enumerate(attr_list):
+            i += 1  # We need it 1..#attr instead of 0..#attr-1.
+            setattr(self, name, state[-i])
+
+        # Call the parent's __setstate__ with the other tuple elements.
+        super(Field, self).__setstate__(state[0:-i])
+
+    @property
+    def field(self):
+        """Entire field, 1D [fx, fy, fz]."""
+        return self.view()
+
+    @field.setter
+    def field(self, field):
+        """Update field, 1D [fx, fy, fz]."""
+        self.view()[:] = field
+
+    @property
+    def fx(self):
+        """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
+        return self.view()[:self.nEx].reshape(self.vnEx, order='F')
+
+    @fx.setter
+    def fx(self, fx):
+        """Update field in x-direction."""
+        self.view()[:self.nEx] = fx.ravel('F')
+
+    @property
+    def fy(self):
+        """View of the field in the y-direction (nNx, nCy, nNz)."""
+        return self.view()[self.nEx:-self.nEz].reshape(self.vnEy, order='F')
+
+    @fy.setter
+    def fy(self, fy):
+        """Update field in y-direction."""
+        self.view()[self.nEx:-self.nEz] = fy.ravel('F')
+
+    @property
+    def fz(self):
+        """View of the field in the z-direction (nNx, nNy, nCz)."""
+        return self.view()[-self.nEz:].reshape(self.vnEz, order='F')
+
+    @fz.setter
+    def fz(self, fz):
+        """Update electric field in z-direction."""
+        self.view()[-self.nEz:] = fz.ravel('F')
+
+    @property
+    def ensure_pec(self):
+        """Set Perfect Electric Conductor (PEC) boundary condition."""
+        # Apply PEC to fx
+        self.fx[:, 0, :] = 0.
+        self.fx[:, -1, :] = 0.
+        self.fx[:, :, 0] = 0.
+        self.fx[:, :, -1] = 0.
+
+        # Apply PEC to fy
+        self.fy[0, :, :] = 0.
+        self.fy[-1, :, :] = 0.
+        self.fy[:, :, 0] = 0.
+        self.fy[:, :, -1] = 0.
+
+        # Apply PEC to fz
+        self.fz[0, :, :] = 0.
+        self.fz[-1, :, :] = 0.
+        self.fz[:, 0, :] = 0.
+        self.fz[:, -1, :] = 0.
 
 
 def get_source_field(grid, src, freq, strength=0):
@@ -720,84 +488,179 @@ def get_source_field(grid, src, freq, strength=0):
     return set_source(grid, strength, finite)
 
 
-class TensorMesh:
-    """Rudimentary mesh for multigrid calculation.
+def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
+    """Return values corresponding to grid at coordinates.
 
-    The tensor-mesh :class:`discretize.TensorMesh` is a powerful tool,
-    including sophisticated mesh-generation possibilities in 1D, 2D, and 3D,
-    plotting routines, and much more. However, in the multigrid solver we have
-    to generate a mesh at each level, many times over and over again, and we
-    only need a very limited set of attributes. This tensor-mesh class provides
-    all required attributes. All attributes here are the same as their
-    counterparts in :class:`discretize.TensorMesh` (both in name and value).
-
-    .. warning::
-        This is a slimmed-down version of :class:`discretize.TensorMesh`, meant
-        principally for internal use by the multigrid modeller. It is highly
-        recommended to use :class:`discretize.TensorMesh` to create the input
-        meshes instead of this class. There are no input-checks carried out
-        here, and there is only one accepted input format for ``h`` and ``x0``.
+    Works for electric fields as well as magnetic fields obtained with
+    :func:`get_h_field`, and for model parameters.
 
 
     Parameters
     ----------
-    h : list of three ndarrays
-        Cell widths in [x, y, z] directions.
+    grid : TensorMesh
+        Model grid; a ``TensorMesh``-instance.
 
-    x0 : ndarray of dimension (3, )
-        Origin (x, y, z).
+    values : ndarray
+        Can be either a particular field, e.g., efield.fx, or a model
+        parameter.
+
+    coordinates : tuple (x, y, z)
+        Coordinates (x, y, z) where to interpolate ``values``; e.g. receiver
+        locations.
+
+    method : str, optional
+        The method of interpolation to perform, 'linear' or 'cubic'.
+        Default is 'cubic' (forced to 'linear' if there are less than 3 points
+        in any direction).
+
+    extrapolate : bool
+        If True, points on ``new_grid`` which are outside of ``grid`` are
+        filled by the nearest value (if ``method='cubic'``) or by extrapolation
+        (if ``method='linear'``). If False, points outside are set to zero.
+
+        Default is False.
+
+
+    Returns
+    -------
+    new_values : ndarray
+        Values at ``coordinates``.
+
+
+    See Also
+    --------
+    grid2grid : Interpolation of model parameters or fields to a new grid.
+
+    """
+    # Ensure input field is a certain field, not a Field instance.
+    if values.ndim == 1:
+        print("* ERROR   :: Values must be a x-, y-, or z-directed field or")
+        print("             model parameters with ndim=3.")
+        print(f"             Shape of provided field: {values.shape}.")
+        raise ValueError("Values error")
+
+    if len(coordinates) != 3:
+        print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
+        print(f"             Length of provided coord.: {len(coordinates)}.")
+        raise ValueError("Coordinates error")
+
+    # Get the vectors corresponding to input data. Dimensions:
+    #
+    #         E-field          H-field      |  Model Parameter
+    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]  |
+    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]  |  [nCx, nCy, nCz]
+    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]  |
+    #
+    points = tuple()
+    for i, coord in enumerate(['x', 'y', 'z']):
+        if values.shape[i] == getattr(grid, 'nN'+coord):
+            pts = (getattr(grid, 'vectorN'+coord), )
+        else:
+            pts = (getattr(grid, 'vectorCC'+coord), )
+
+        # Add to points.
+        points += pts
+
+    if extrapolate:
+        return _interp3d(points, values, coordinates, method, None, 'nearest')
+    else:
+        return _interp3d(points, values, coordinates, method, 0.0, 'constant')
+
+
+def get_h_field(grid, model, field):
+    r"""Return magnetic field corresponding to provided electric field.
+
+    Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
+    :math:`\mathbf{E}` using Farady's law, given by
+
+    .. math::
+
+        \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
+
+    Note that the magnetic field in x-direction is defined in the center of the
+    face defined by the electric field in y- and z-directions, and similar for
+    the other field directions. This means that the provided electric field and
+    the returned magnetic field have different dimensions::
+
+       E-field:  x: [grid.vectorCCx,  grid.vectorNy,  grid.vectorNz]
+                 y: [ grid.vectorNx, grid.vectorCCy,  grid.vectorNz]
+                 z: [ grid.vectorNx,  grid.vectorNy, grid.vectorCCz]
+
+       H-field:  x: [ grid.vectorNx, grid.vectorCCy, grid.vectorCCz]
+                 y: [grid.vectorCCx,  grid.vectorNy, grid.vectorCCz]
+                 z: [grid.vectorCCx, grid.vectorCCy,  grid.vectorNz]
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; ``emg3d.utils.TensorMesh`` instance.
+
+    model : Model
+        Model; ``emg3d.utils.Model`` instance.
+
+    field : Field
+        Electric field; ``emg3d.utils.Field`` instance.
+
+
+    Returns
+    -------
+    hfield : Field
+        Magnetic field; ``emg3d.utils.Field`` instance.
 
     """
 
-    def __init__(self, h, x0):
-        """Initialize the mesh."""
-        self.x0 = x0
+    # Carry out the curl (^ corresponds to differentiation axis):
+    # H_x = (E_z^1 - E_y^2)
+    e3d_hx = (np.diff(field.fz, axis=1)/grid.hy[None, :, None] -
+              np.diff(field.fy, axis=2)/grid.hz[None, None, :])
 
-        # Width of cells.
-        self.hx = h[0]
-        self.hy = h[1]
-        self.hz = h[2]
+    # H_y = (E_x^2 - E_z^0)
+    e3d_hy = (np.diff(field.fx, axis=2)/grid.hz[None, None, :] -
+              np.diff(field.fz, axis=0)/grid.hx[:, None, None])
 
-        # Cell related properties.
-        self.nCx = int(self.hx.size)
-        self.nCy = int(self.hy.size)
-        self.nCz = int(self.hz.size)
-        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
-        self.nC = int(self.vnC.prod())
-        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
-        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
-        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
+    # H_z = (E_y^0 - E_x^1)
+    e3d_hz = (np.diff(field.fy, axis=0)/grid.hx[:, None, None] -
+              np.diff(field.fx, axis=1)/grid.hy[None, :, None])
 
-        # Node related properties.
-        self.nNx = self.nCx + 1
-        self.nNy = self.nCy + 1
-        self.nNz = self.nCz + 1
-        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
-        self.nN = int(self.vnN.prod())
-        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
-        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
-        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
+    # If relative magnetic permeability is not one, we have to take the volume
+    # into account, as mu_r is volume-averaged.
+    if model._Model__mu_r is not None:
 
-        # Edge related properties.
-        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
-        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
-        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
-        self.nEx = int(self.vnEx.prod())
-        self.nEy = int(self.vnEy.prod())
-        self.nEz = int(self.vnEz.prod())
-        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
-        self.nE = int(self.vnE.sum())
+        # Plus and minus indices.
+        ixm = np.r_[0, np.arange(grid.nCx)]
+        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
+        iym = np.r_[0, np.arange(grid.nCy)]
+        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
+        izm = np.r_[0, np.arange(grid.nCz)]
+        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
 
-    @property
-    def vol(self):
-        """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '__vol', None) is None:
-            vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
-            self.__vol = vol.ravel('F')
-        return self.__vol
+        # Average mu_r for dual-grid.
+        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
+        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
+        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
+
+        hvx = grid.hx[:, None, None]
+        hvy = grid.hy[None, :, None]
+        hvz = grid.hz[None, None, :]
+
+        # Define the widths of the dual grid.
+        dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
+        dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
+        dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
+
+        # Multiply fields by mu_r.
+        e3d_hx *= mu_r_x/(dx[:, None, None]*hvy*hvz)
+        e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
+        e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
+
+    # Create a Field-instance and divide by sval*mu_0 and return.
+    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
+
+    return hfield
 
 
-# RELATED TO MODELS AND FIELDS
+# MODEL
 class Model:
     r"""Create a resistivity model.
 
@@ -992,339 +855,7 @@ class Model:
             return self.__vol/self.__mu_r
 
 
-class Field(np.ndarray):
-    """Create a Field instance with x-, y-, and z-views of the field.
-
-    A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
-    z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
-    default array contains the whole field, which can be the electric field,
-    the source field, or the residual field, in a 1D array. A ``Field``
-    instance has additionally the property ``ensure_pec`` which, if called,
-    ensures Perfect Electric Conductor (PEC) boundary condition.
-
-    A ``Field`` can be initiated in three ways:
-
-    1. ``Field(grid)``:
-    Calling it with a ``TensorMesh``-instance returns a ``Field``-instance of
-    correct dimensions initiated with complex zeroes.
-
-    2. ``Field(grid, field)``:
-    Calling it with a ``TensorMesh``-instance and an ``ndarray`` returns a
-    ``Field``-instance of the provided ``ndarray``.
-
-    3. ``Field(fx, fy, fz)``:
-    Calling it with three ``ndarray``'s which represent the field in x-, y-,
-    and z-direction returns a ``Field``-instance with these views.
-
-    Sort-order is 'F'.
-
-    """
-
-    def __new__(cls, grid, field=None, fz=None, dtype=complex):
-        """Initiate a new Field-instance."""
-
-        # Collect field
-        if field is None and fz is None:  # Empty Field with dimension grid.nE.
-            new = np.zeros(grid.nE, dtype=dtype)
-        elif fz is None:                  # grid and field provided
-            new = field
-        else:                             # fx, fy, fz provided
-            new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
-
-        # Store the field as object
-        obj = np.asarray(new).view(cls)
-
-        # Store relevant numbers for the views.
-        if field is not None and fz is not None:  # Deduce from arrays
-            obj.nEx = grid.size
-            obj.nEy = field.size
-            obj.nEz = fz.size
-            obj.vnEx = grid.shape
-            obj.vnEy = field.shape
-            obj.vnEz = fz.shape
-        else:                                     # If grid is provided
-            attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
-            for attr in attr_list:
-                setattr(obj, attr, getattr(grid, attr))
-
-        return obj
-
-    def __array_finalize__(self, obj):
-        """Ensure relevant numbers are stored no matter how created."""
-        if obj is None:
-            return
-
-        self.nEx = getattr(obj, 'nEx', None)
-        self.nEy = getattr(obj, 'nEy', None)
-        self.nEz = getattr(obj, 'nEz', None)
-        self.vnEx = getattr(obj, 'vnEx', None)
-        self.vnEy = getattr(obj, 'vnEy', None)
-        self.vnEz = getattr(obj, 'vnEz', None)
-
-    def __reduce__(self):
-        """Customize __reduce__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Get the parent's __reduce__ tuple.
-        pickled_state = super(Field, self).__reduce__()
-
-        # Create our own tuple to pass to __setstate__.
-        new_state = pickled_state[2]
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
-        for attr in attr_list:
-            new_state += (getattr(self, attr),)
-
-        # Return tuple that replaces parent's __setstate__ tuple with our own.
-        return (pickled_state[0], pickled_state[1], new_state)
-
-    def __setstate__(self, state):
-        """Customize __setstate__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Set the necessary attributes (in reverse order).
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
-        attr_list.reverse()
-        for i, name in enumerate(attr_list):
-            i += 1  # We need it 1..#attr instead of 0..#attr-1.
-            setattr(self, name, state[-i])
-
-        # Call the parent's __setstate__ with the other tuple elements.
-        super(Field, self).__setstate__(state[0:-i])
-
-    @property
-    def field(self):
-        """Entire field, 1D [fx, fy, fz]."""
-        return self.view()
-
-    @field.setter
-    def field(self, field):
-        """Update field, 1D [fx, fy, fz]."""
-        self.view()[:] = field
-
-    @property
-    def fx(self):
-        """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
-        return self.view()[:self.nEx].reshape(self.vnEx, order='F')
-
-    @fx.setter
-    def fx(self, fx):
-        """Update field in x-direction."""
-        self.view()[:self.nEx] = fx.ravel('F')
-
-    @property
-    def fy(self):
-        """View of the field in the y-direction (nNx, nCy, nNz)."""
-        return self.view()[self.nEx:-self.nEz].reshape(self.vnEy, order='F')
-
-    @fy.setter
-    def fy(self, fy):
-        """Update field in y-direction."""
-        self.view()[self.nEx:-self.nEz] = fy.ravel('F')
-
-    @property
-    def fz(self):
-        """View of the field in the z-direction (nNx, nNy, nCz)."""
-        return self.view()[-self.nEz:].reshape(self.vnEz, order='F')
-
-    @fz.setter
-    def fz(self, fz):
-        """Update electric field in z-direction."""
-        self.view()[-self.nEz:] = fz.ravel('F')
-
-    @property
-    def ensure_pec(self):
-        """Set Perfect Electric Conductor (PEC) boundary condition."""
-        # Apply PEC to fx
-        self.fx[:, 0, :] = 0.
-        self.fx[:, -1, :] = 0.
-        self.fx[:, :, 0] = 0.
-        self.fx[:, :, -1] = 0.
-
-        # Apply PEC to fy
-        self.fy[0, :, :] = 0.
-        self.fy[-1, :, :] = 0.
-        self.fy[:, :, 0] = 0.
-        self.fy[:, :, -1] = 0.
-
-        # Apply PEC to fz
-        self.fz[0, :, :] = 0.
-        self.fz[-1, :, :] = 0.
-        self.fz[:, 0, :] = 0.
-        self.fz[:, -1, :] = 0.
-
-
-def get_h_field(grid, model, field):
-    r"""Return magnetic field corresponding to provided electric field.
-
-    Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
-    :math:`\mathbf{H}`  using Farady's law, given by
-
-    .. math::
-
-        \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
-
-    Note that the magnetic field in x-direction is defined in the center of the
-    face defined by the electric field in y- and z-directions, and similar for
-    the other field directions. This means that the provided electric field and
-    the returned magnetic field have different dimensions::
-
-       E-field:  x: [grid.vectorCCx,  grid.vectorNy,  grid.vectorNz]
-                 y: [ grid.vectorNx, grid.vectorCCy,  grid.vectorNz]
-                 z: [ grid.vectorNx,  grid.vectorNy, grid.vectorCCz]
-
-       H-field:  x: [ grid.vectorNx, grid.vectorCCy, grid.vectorCCz]
-                 y: [grid.vectorCCx,  grid.vectorNy, grid.vectorCCz]
-                 z: [grid.vectorCCx, grid.vectorCCy,  grid.vectorNz]
-
-
-    Parameters
-    ----------
-    grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
-
-    model : Model
-        Model; ``emg3d.utils.Model`` instance.
-
-    field : Field
-        Electric field; ``emg3d.utils.Field`` instance.
-
-
-    Returns
-    -------
-    hfield : Field
-        Magnetic field; ``emg3d.utils.Field`` instance.
-
-    """
-    # Define the widths of the dual grid.
-    dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
-    dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
-    dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
-
-    # If relative magnetic permeability is not one, we have to take the volume
-    # into account, as mu_r is volume-averaged.
-    if model._Model__mu_r is not None:
-        # Plus and minus indices.
-        ixm = np.r_[0, np.arange(grid.nCx)]
-        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
-        iym = np.r_[0, np.arange(grid.nCy)]
-        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
-        izm = np.r_[0, np.arange(grid.nCz)]
-        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
-
-        # Average mu_r for dual-grid.
-        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
-        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
-        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
-
-    # Carry out the curl (^ corresponds to differentiation axis):
-    # H_x = (E_z^1 - E_y^2)
-    e3d_hx = (np.diff(field.fz, axis=1)/grid.hy[None, :, None] -
-              np.diff(field.fy, axis=2)/grid.hz[None, None, :])
-
-    # H_y = (E_x^2 - E_z^0)
-    e3d_hy = (np.diff(field.fx, axis=2)/grid.hz[None, None, :] -
-              np.diff(field.fz, axis=0)/grid.hx[:, None, None])
-
-    # H_z = (E_y^0 - E_x^1)
-    e3d_hz = (np.diff(field.fy, axis=0)/grid.hx[:, None, None] -
-              np.diff(field.fx, axis=1)/grid.hy[None, :, None])
-
-    # If relative magnetic permeability is not one, we have to take the volume
-    # into account, as mu_r is volume-averaged.
-    if model._Model__mu_r is not None:
-        hvx = grid.hx[:, None, None]
-        hvy = grid.hy[None, :, None]
-        hvz = grid.hz[None, None, :]
-
-        e3d_hx *= mu_r_x/(dx[:, None, None]*hvy*hvz)
-        e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
-        e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
-
-    # Create a Field-instance and divide by sval*mu_0 and return.
-    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
-
-    return hfield
-
-
-def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
-    """Return values corresponding to grid at coordinates.
-
-    Works for electric fields as well as magnetic fields obtained with
-    :func:`get_h_field`, and for model parameters.
-
-
-    Parameters
-    ----------
-    grid : TensorMesh
-        Model grid; a ``TensorMesh``-instance.
-
-    values : ndarray
-        Can be either a particular field, e.g., efield.fx, or a model
-        parameter.
-
-    coordinates : tuple (x, y, z)
-        Coordinates (x, y, z) where to interpolate ``values``; e.g. receiver
-        locations.
-
-    method : str, optional
-        The method of interpolation to perform, 'linear' or 'cubic'.
-        Default is 'cubic' (forced to 'linear' if there are less than 3 points
-        in any direction).
-
-    extrapolate : bool
-        If True, points on ``new_grid`` which are outside of ``grid`` are
-        filled by the nearest value (if ``method='cubic'``) or by extrapolation
-        (if ``method='linear'``). If False, points outside are set to zero.
-
-        Default is False.
-
-
-    Returns
-    -------
-    new_values : ndarray
-        Values at ``coordinates``.
-
-
-    See Also
-    --------
-    grid2grid : Interpolation of model parameters or fields to a new grid.
-
-    """
-    # Ensure input field is a certain field, not a Field instance.
-    if values.ndim == 1:
-        print("* ERROR   :: Values must be a x-, y-, or z-directed field or")
-        print("             model parameters with ndim=3.")
-        print(f"             Shape of provided field: {values.shape}.")
-        raise ValueError("Values error")
-
-    if len(coordinates) != 3:
-        print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
-        print(f"             Length of provided coord.: {len(coordinates)}.")
-        raise ValueError("Coordinates error")
-
-    # Get the vectors corresponding to input data. Dimensions:
-    #
-    #         E-field          H-field      |  Model Parameter
-    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]  |
-    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]  |  [nCx, nCy, nCz]
-    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]  |
-    #
-    points = tuple()
-    for i, coord in enumerate(['x', 'y', 'z']):
-        if values.shape[i] == getattr(grid, 'nN'+coord):
-            pts = (getattr(grid, 'vectorN'+coord), )
-        else:
-            pts = (getattr(grid, 'vectorCC'+coord), )
-
-        # Add to points.
-        points += pts
-
-    if extrapolate:
-        return _interp3d(points, values, coordinates, method, None, 'nearest')
-    else:
-        return _interp3d(points, values, coordinates, method, 0.0, 'constant')
-
-
+# INTERPOLATION
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
@@ -1436,29 +967,881 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     return new_values
 
 
-# TIMING FOR LOGS
-class Time:
-    """Class for timing (now; runtime)."""
+def _interp3d(points, values, new_points, method, fill_value, mode):
+    """Interpolate values in 3D either linearly or with a cubic spline.
 
-    def __init__(self):
-        """Initialize time zero (t0) with current time stamp."""
-        self.__t0 = default_timer()
+    Return ``values`` corresponding to a regular 3D grid defined by ``points``
+    on ``new_points``.
+
+    This is a modified version of :func:`scipy.interpolate.interpn`, using
+    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
+    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
+    ``method='cubic'``. If speed is important then choose 'linear', as it can
+    be significantly faster.
+
+
+    Parameters
+    ----------
+    points : tuple of ndarray of float, with shapes ((nx, ), (ny, ) (nz, ))
+        The points defining the regular grid in three dimensions.
+
+    values : array_like, shape (nx, ny, nz)
+        The data on the regular grid in three dimensions.
+
+    new_points : tuple (rec_x, rec_y, rec_z)
+        Coordinates (x, y, z) of new points.
+
+    method : {'cubic', 'linear'}, optional
+        The method of interpolation to perform, 'linear' or 'cubic'. Default is
+        'cubic' (forced to 'linear' if there are less than 3 points in any
+        direction).
+
+    fill_value : float or None
+        Passed to ``interpolate.RegularGridInterpolator`` if
+        ``method='linear'``: The value to use for points outside of the
+        interpolation domain. If None, values outside the domain are
+        extrapolated.
+
+    mode : {'constant', 'nearest', 'mirror', 'reflect', 'wrap'}
+        Passed to ``ndimage.map_coordinates`` if ``method='cubic'``: Determines
+        how the input array is extended beyond its boundaries.
+
+
+    Returns
+    -------
+    new_values : ndarray
+        Values corresponding to ``new_points``.
+
+    """
+
+    # We need at least 3 points in each direction for cubic spline. This should
+    # never be an issue for a realistic 3D model.
+    for pts in points:
+        if len(pts) < 4:
+            method = 'linear'
+
+    # Interpolation.
+    if method == "linear":
+        ifn = interpolate.RegularGridInterpolator(
+                points=points, values=values, method="linear",
+                bounds_error=False, fill_value=fill_value)
+
+        new_values = ifn(xi=new_points)
+
+    else:
+
+        # Replicate the same expansion of xi as used in
+        # RegularGridInterpolator, so the input xi can be quite flexible.
+        xi = interpolate.interpnd._ndim_coords_from_arrays(new_points, ndim=3)
+        xi_shape = xi.shape
+        xi = xi.reshape(-1, 3)
+
+        # map_coordinates uses the indices of the input data (values in this
+        # case) as coordinates. We have therefore to transform our desired
+        # output coordinates to this artificial coordinate system too.
+        coords = np.empty(xi.T.shape)
+        for i in range(3):
+            coords[i] = interpolate.interp1d(
+                    points[i], np.arange(len(points[i])), kind='cubic',
+                    bounds_error=False, fill_value='extrapolate',)(xi[:, i])
+
+        # map_coordinates only works for real data; split it up if complex.
+        params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
+        if 'complex' in values.dtype.name:
+            real = ndimage.map_coordinates(values.real, coords, **params3d)
+            imag = ndimage.map_coordinates(values.imag, coords, **params3d)
+            result = real + 1j*imag
+        else:
+            result = ndimage.map_coordinates(values, coords, **params3d)
+
+        new_values = result.reshape(xi_shape[:-1])
+
+    return new_values
+
+
+# MESH
+class TensorMesh:
+    """Rudimentary mesh for multigrid calculation.
+
+    The tensor-mesh :class:`discretize.TensorMesh` is a powerful tool,
+    including sophisticated mesh-generation possibilities in 1D, 2D, and 3D,
+    plotting routines, and much more. However, in the multigrid solver we have
+    to generate a mesh at each level, many times over and over again, and we
+    only need a very limited set of attributes. This tensor-mesh class provides
+    all required attributes. All attributes here are the same as their
+    counterparts in :class:`discretize.TensorMesh` (both in name and value).
+
+    .. warning::
+        This is a slimmed-down version of :class:`discretize.TensorMesh`, meant
+        principally for internal use by the multigrid modeller. It is highly
+        recommended to use :class:`discretize.TensorMesh` to create the input
+        meshes instead of this class. There are no input-checks carried out
+        here, and there is only one accepted input format for ``h`` and ``x0``.
+
+
+    Parameters
+    ----------
+    h : list of three ndarrays
+        Cell widths in [x, y, z] directions.
+
+    x0 : ndarray of dimension (3, )
+        Origin (x, y, z).
+
+    """
+
+    def __init__(self, h, x0):
+        """Initialize the mesh."""
+        self.x0 = x0
+
+        # Width of cells.
+        self.hx = h[0]
+        self.hy = h[1]
+        self.hz = h[2]
+
+        # Cell related properties.
+        self.nCx = int(self.hx.size)
+        self.nCy = int(self.hy.size)
+        self.nCz = int(self.hz.size)
+        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
+        self.nC = int(self.vnC.prod())
+        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
+        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
+        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
+
+        # Node related properties.
+        self.nNx = self.nCx + 1
+        self.nNy = self.nCy + 1
+        self.nNz = self.nCz + 1
+        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
+        self.nN = int(self.vnN.prod())
+        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
+        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
+        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
+
+        # Edge related properties.
+        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
+        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
+        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
+        self.nEx = int(self.vnEx.prod())
+        self.nEy = int(self.vnEy.prod())
+        self.nEz = int(self.vnEz.prod())
+        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
+        self.nE = int(self.vnE.sum())
 
     @property
-    def t0(self):
-        """Return time zero of this class instance."""
-        return self.__t0
+    def vol(self):
+        """Construct cell volumes of the 3D model as 1D array."""
+        if getattr(self, '__vol', None) is None:
+            vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
+            self.__vol = vol.ravel('F')
+        return self.__vol
 
-    @property
-    def now(self):
-        """Return string of current time."""
-        return datetime.now().strftime("%H:%M:%S")
 
-    @property
-    def runtime(self):
-        """Return string of runtime since time zero."""
-        t1 = default_timer() - self.__t0
-        return timedelta(seconds=np.round(t1))
+def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
+              pps=3, alpha=None, calc_domain_factors=None,
+              resp_survey_domain=False, raise_error=True, verb=1):
+    r"""Return cell widths and origin for given parameters.
+
+    Returns cell widths given the provided ``survey_domain`` and other
+    parameters using a flexible amount of cells. See input parameters for more
+    details.
+
+    Current there is no possibility to define additional hard/fixed boundaries.
+
+
+    See Also
+    --------
+    get_stretched_h : Get ``hx`` for a fixed number ``nx`` and within a fixed
+                      domain.
+
+
+    Parameters
+    ----------
+
+    freq : float
+        Frequency (Hz) to calculate the skin depth. The skin depth is a concept
+        defined in the frequency domain. If a negative frequency is provided,
+        it is assumed that the calculation is carried out in the Laplace
+        domain. To calculate the skin depth, the value of ``freq`` is then
+        multiplied by :math:`-2\pi`, to simulate the closest
+        frequency-equivalent.
+
+    rho : float
+        Resistivity (Ohm m) to calculate skin depth.
+
+    src : float
+        Source location. The grid is centred around source location, where the
+        source is in the middle of a cell, unless the source is too close by
+        a hard boundary.
+
+    survey_domain : list {[min, max] or [min, seafloor, sea-surface]}
+        Contains the survey-domain limits. If the list contains three values,
+        then it is assumed to be the vertical direction, where the second and
+        third values are taken as seafloor and sea-surface. In this case, the
+        source has to be within the water layer.
+
+    possible_nx : list
+        List of possible number of cells. See :func:`get_cell_numbers`.
+
+    min_width : list or None, optional
+        Minimum cell width restriction, [min, max].
+        Default is None.
+
+    pps : int, optional
+        Points per skindepth; minimum cell width is calculated via
+        `dmin = skind/pps`.
+        Default = 3.
+
+    alpha : list, optional
+        Maximum alpha and how many steps it takes to find a good alpha. The
+        higher this number is, the longer it will take, but the finer it
+        samples alpha: [max. survey alpha, nr, max calc alpha, nr].
+        Default = [1.05, 11, 1.5, 11].
+
+    calc_domain_factors : list, optional
+        Defines boundary of how many skin-depths for
+        [min left, max left, min right, max right].
+        Default = [5, 10, 5, 10]
+
+    resp_survey_domain : bool, optional
+        If True, the survey_domain is respected even if the calculation_domain
+        is smaller.
+        Default is False.
+
+    raise_error : bool, optional
+        If True, an error is raised if no suitable grid is found. Otherwise it
+        just prints a message and returns None's.
+        Default is True.
+
+    verb : int, optional
+        Verbosity, 0 or 1.
+        Default = 1.
+
+
+    Returns
+    -------
+    hx : ndarray
+        Cell widths of mesh.
+
+    x0 : float
+        Origin corresponding to ``hx``.
+
+    info : dict
+        Mesh information.
+
+    """
+    # Get variables with default lists:
+    alpha = alpha or [1.05, 11, 1.5, 11]
+    calc_domain_factors = calc_domain_factors or [5, 10, 5, 10]
+
+    # Start log.
+    if verb > 0:
+        space = 4*" "
+        print(f"  = = = = = = = = {freq:8.4f} Hz = = = = = = = =")
+
+    # Check if a seafloor and air-surface was provided.
+    if len(survey_domain) == 3:
+        has_seafloor = True
+
+        # Ensure source is in the water.
+        if src < survey_domain[1] or src > survey_domain[2]:
+            print("\n* ERROR   :: Source must be in the water. Provided\n"
+                  f"             src, seafloor, sea-surface:: {src}, "
+                  f"{survey_domain[1]}, {survey_domain[2]}.")
+            raise ValueError("Source not in water.")
+    else:
+        has_seafloor = False
+
+    # Calculate skin depth.
+    skind = 503.3*np.sqrt(rho/abs(freq))
+    if freq < 0:  # For Laplace-domain calculations.
+        skind /= np.sqrt(2*np.pi)
+    if verb > 0:
+        print(space+f"Skin depth          [m] : {skind:.0f}")
+
+    # Minimum cell width.
+    dmin = skind/pps
+    if min_width is not None:  # Respect user input.
+        dmin = np.clip(dmin, *np.array(min_width, dtype=float))
+
+    # Survey domain.
+    survey_domain = np.array(survey_domain, dtype=float)
+    if verb > 0:  # Print original survey domain info.
+        print(space+f"Survey domain       [m] : {survey_domain[0]:.0f} - "
+              f"{survey_domain[-1]:.0f}")
+
+    # Calculation domain.
+
+    # Get boundary.
+    calc_domain = skind*np.array(calc_domain_factors, dtype=float)
+
+    # Now get calculation domain by clipping survey to boundary.
+    calcmin = np.clip(survey_domain[0], *(src-calc_domain[:2][::-1]))
+    calcmax = np.clip(survey_domain[-1], *(src+calc_domain[2:]))
+    calc_domain = [calcmin, calcmax]
+    if verb > 0:  # Print original calculation domain info.
+        print(space+f"Calculation domain  [m] : {calc_domain[0]:.0f} - "
+              f"{calc_domain[1]:.0f}")
+
+    # If calc_domain < survey_domain, we restrict the calc_domain if
+    # resp_survey_domain is True, else the survey_domain.
+    if resp_survey_domain:
+        calc_domain[0] = min(survey_domain[0], calc_domain[0])
+        calc_domain[1] = max(survey_domain[-1], calc_domain[1])
+    else:
+        survey_domain[0] = max(survey_domain[0], calc_domain[0])
+        survey_domain[-1] = min(survey_domain[-1], calc_domain[1])
+
+    # Flag if there is no need to check the calc_domain.
+    if (np.isclose(calc_domain[0], survey_domain[0]) and
+            np.isclose(calc_domain[1], survey_domain[-1])):
+        same_bounds = True
+    else:
+        same_bounds = False
+
+    # Initiate flag if terminated.
+    finished = False
+
+    # Initiate alpha variables for survey and calculation domains.
+    sa, ca = 1.0, 1.0
+
+    # Loop over possible cell numbers from small to big.
+    for nx in np.unique(possible_nx):
+
+        # Loop over possible alphas for survey_domain.
+        for sa in np.linspace(1.0, alpha[0], alpha[1]):
+
+            # Get current stretched grid cell sizes.
+            thxl = dmin*sa**np.arange(1, nx+1)  # Left of source.
+            thxr = dmin*sa**np.arange(1, nx+1)  # right of source.
+
+            # 0. Adjust stretching for seafloor and air-surface.
+            asrc = src
+            if has_seafloor:
+
+                # If seafloor or sea-surface is too close to source, we move
+                # the source location (so actual source won't be in the middle
+                # of the cell).
+                if np.any(abs(survey_domain[1]-src) < dmin):
+                    asrc = survey_domain[1]+dmin/2
+                elif np.any(abs(survey_domain[2]-src) < dmin):
+                    asrc = survey_domain[2]-dmin/2
+
+                # Move mesh to seafloor.
+                t_x0 = asrc-dmin/2
+                if not np.isclose(t_x0, survey_domain[1]):
+                    t_nx = t_x0-np.cumsum(thxl)
+                    ii = np.argmin(abs(t_nx-survey_domain[1]))+1
+                    thxl *= abs(survey_domain[1]-t_x0)/np.sum(thxl[:ii])
+
+                # Move mesh to sea-surface.
+                t_x0 = asrc+dmin/2
+                if not np.isclose(t_x0, survey_domain[2]):
+                    t_nx = t_x0+np.cumsum(thxr)
+                    ii = np.argmin(abs(t_nx-survey_domain[2]))+1
+                    thxr *= abs(survey_domain[2]-t_x0)/np.sum(thxr[:ii])
+
+            # 1. Fill src to left survey_domain.
+            nl = np.sum((asrc-dmin/2-np.cumsum(thxl)) > survey_domain[0])+1
+
+            # 2. Fill src to right survey_domain.
+            nr = np.sum((asrc+dmin/2+np.cumsum(thxr)) < survey_domain[-1])+1
+
+            # 3. Get remaining number of cells and check termination criteria.
+            nx_remain = nx-nl-nr-1
+            nsdc = nl+nr+1  # Number of survey_domain cells.
+            if same_bounds and nx_remain >= 0:  # Good enough, finish.
+
+                # Create hx-array.
+                nl += int(np.floor(nx_remain/2))  # If uneven, add one cell
+                nr += int(np.ceil(nx_remain/2))   # more on the right.
+                hx = np.r_[thxl[:nl][::-1], dmin, thxr[:nr]]
+
+                # Calculate origin.
+                x0 = float(asrc-dmin/2-np.sum(thxl[:nl]))
+
+                # Mark it as finished and break out of the loop.
+                finished = True
+                break
+
+            elif nx_remain <= 0:  # Not good, try next.
+                continue
+
+            # Create the current hx-array.
+            hx = np.r_[thxl[:nl][::-1], dmin, thxr[:nr]]
+            hxo = np.r_[thxl[:nl][::-1], dmin, thxr[:nr]]
+
+            # Get actual survey_domain:
+            asurv_domain = [asrc-dmin/2-np.sum(thxl[:nl]),
+                            asrc+dmin/2+np.sum(thxr[:nr])]
+            x0 = float(asrc-dmin/2-np.sum(thxl[:nl]))
+
+            # Get stretching for seafloor and air-surface adjustments.
+            if has_seafloor:
+                sa_adj = np.max([hx[1:]/hx[:-1], hx[:-1]/hx[1:]])
+
+            # Loop over possible alphas for calc_domain.
+            for ca in np.linspace(sa, alpha[2], alpha[3]):
+
+                # 4. Fill to left calc_domain.
+                thxl = hx[0]*ca**np.arange(1, nx_remain+1)
+                nl = np.sum((asurv_domain[0]-np.cumsum(thxl)) >
+                            calc_domain[0])+1
+
+                # 5. Fill to right calc_domain.
+                thxr = hx[-1]*ca**np.arange(1, nx_remain+1)
+                nr = np.sum((asurv_domain[1]+np.cumsum(thxr)) <
+                            calc_domain[1])+1
+
+                # 6. Get remaining number of cells and check termination
+                # criteria.
+                nx_remain2 = nx-nsdc-nl-nr
+                ncdc = nl+nr  # Number of calc_domain cells.
+
+                if nx_remain2 < 0:  # Not good, try next.
+                    continue
+
+                # Create hx-array.
+                nl += int(np.floor(nx_remain2/2))  # If uneven, add one cell
+                nr += int(np.ceil(nx_remain2/2))   # more on the right.
+                hx = np.r_[thxl[:nl][::-1], hx, thxr[:nr]]
+
+                # Calculate origin.
+                x0 = float(asurv_domain[0]-np.sum(thxl[:nl]))
+
+                # Mark it as finished and break out of the loop.
+                finished = True
+                break
+
+            if finished:
+                break
+
+        if finished:
+            break
+
+    # Check finished and print info about found grid.
+    if not finished:
+        # Throw message if no solution was found.
+        print("\n* ERROR   :: No suitable grid found; relax your criteria.\n")
+        if raise_error:
+            raise ArithmeticError("No grid found!")
+        else:
+            hx, x0 = None, None
+
+    elif verb > 0:
+        print(space+f"Final extent        [m] : {x0:.0f} - "
+              f"{x0+np.sum(hx):.0f}")
+        extstr = space+f"Min/max cell width  [m] : {min(hx):.0f} / "
+        alstr = space+f"Alpha survey"
+        nrstr = space+"Number of cells "
+        if has_seafloor:
+            sastr = f"{sa:.3f}({sa_adj:.3f})"
+        else:
+            sastr = f"{sa:.3f}"
+        if same_bounds:
+            print(extstr+f"{max(hx):.0f}")
+            print(alstr+f"            : {sastr}")
+            print(nrstr+f"  (s/r) : {nx} ({nsdc}/{nx_remain})")
+        else:
+            print(extstr+f"{max(hxo):.0f} / {max(hx):.0f}")
+            print(alstr+f"/calc       : {sastr}/{ca:.3f}")
+            print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
+        print()
+
+    if not has_seafloor:
+        sa_adj = sa
+    info = {'dmin': dmin,
+            'dmax': np.nanmax(hx),
+            'amin': np.nanmin([ca, sa, sa_adj]),
+            'amax': np.nanmax([ca, sa, sa_adj])}
+
+    return hx, x0, info
+
+
+def get_cell_numbers(max_nr, max_prime=5, min_div=3):
+    r"""Returns 'good' cell numbers for the multigrid method.
+
+    'Good' cell numbers are numbers which can be divided by 2 as many times as
+    possible. At the end there will be a low prime number.
+
+    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
+    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
+    :math:`M, p_\text{max}, n_\text{min}` correspond to ``max_nr``,
+    ``max_prime``, and ``min_div``, respectively.
+
+
+    Parameters
+    ----------
+    max_nr : int
+        Maximum number of cells.
+
+    max_prime : int
+        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
+        limits in order to avoid too big lowest grids in the multigrid method.
+        Default is 5.
+
+    min_div : int
+        Minimum times the number can be divided by two.
+        Default is 3.
+
+
+    Returns
+    -------
+    numbers : array
+        Array containing all possible cell numbers from lowest to highest.
+
+    """
+    # Primes till 20.
+    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19])
+
+    # Sanity check; 19 is already ridiculously high.
+    if max_prime > primes[-1]:
+        print(f"* ERROR   :: Highest prime is {max_prime}, "
+              "please use a value < 20.")
+        raise ValueError("Highest prime too high")
+
+    # Restrict to max_prime.
+    primes = primes[primes <= max_prime]
+
+    # Get possible values.
+    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
+    numbers = primes[:, None]*2**np.arange(min_div, 30)
+
+    # Get unique values.
+    numbers = np.unique(numbers)
+
+    # Restrict to max_nr and return.
+    return numbers[numbers <= max_nr]
+
+
+def get_stretched_h(h_min, domain, nx, x0=0, x1=None, resp_domain=False):
+    """Return cell widths for a stretched grid within the domain.
+
+    Returns ``nx`` cell widths within ``domain``, where the minimum cell width
+    is ``h_min``. The cells are not stretched within ``x0`` and ``x1``, and
+    outside uses a power-law stretching. The actual stretching factor and the
+    number of cells left and right of ``x0`` and ``x1`` are find in a
+    minimization process.
+
+    The domain is not completely respected. The starting point of the domain
+    is, but the endpoint of the domain might slightly shift (this is more
+    likely the case for small ``nx``, for big ``nx`` the shift should be
+    small). The new endpoint can be obtained with ``domain[0]+np.sum(hx)``. If
+    you want the domain to be respected absolutely, set ``resp_domain=True``.
+    However, be aware that this will introduce one stretch-factor which is
+    different from the other stretch factors, to accommodate the restriction.
+    This one-off factor is between the left- and right-side of ``x0``, or, if
+    ``x1`` is provided, just after ``x1``.
+
+
+    See Also
+    --------
+    get_hx_x0 : Get ``hx`` and ``x0`` for a flexible number of ``nx`` with
+                given bounds.
+
+
+    Parameters
+    ----------
+
+    h_min : float
+        Minimum cell width. If x1 is provided, the actual minimum cell width
+        might be smaller than h_min.
+
+    domain : list
+        [start, end] of model domain.
+
+    nx : int
+        Number of cells.
+
+    x0 : float
+        Center of the grid. ``x0`` is restricted to ``domain``.
+        Default is 0.
+
+    x1 : float
+        If provided, then no stretching is applied between ``x0`` and ``x1``.
+        The non-stretched part starts at ``x0`` and stops at the first possible
+        location at or after ``x1``. ``x1`` is restricted to ``domain``. This
+        will h_min so that an integer number of cells fit within x0 and x1.
+
+    resp_domain : bool
+        If False (default), then the domain-end might shift slightly to assure
+        that the same stretching factor is applied throughout. If set to True,
+        however, the domain is respected absolutely. This will introduce one
+        stretch-factor which is different from the other stretch factors, to
+        accommodate the restriction. This one-off factor is between the left-
+        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
+
+
+    Returns
+    -------
+    hx : ndarray
+        Cell widths of mesh.
+
+    """
+
+    # Cast to arrays
+    domain = np.array(domain, dtype=float)
+    x0 = np.array(x0, dtype=float)
+    x0 = np.clip(x0, *domain)  # Restrict to model domain
+    h_min = np.array(h_min, dtype=float)
+    if x1 is not None:
+        x1 = np.array(x1, dtype=float)
+        x1 = np.clip(x1, *domain)  # Restrict to model domain
+
+    # If x1 is provided (a part is not stretched)
+    if x1 is not None:
+
+        # Store original values
+        xlim_orig = domain.copy()
+        nx_orig = int(nx)
+        x0_orig = x0.copy()
+        h_min_orig = h_min.copy()
+
+        # Get number of non-stretched cells
+        n_nos = int(np.ceil((x1-x0)/h_min))
+
+        # Re-calculate h_min to fit with x0-x1-limits:
+        h_min = (x1-x0)/n_nos
+
+        # Subtract one cell, because the standard scheme provides one
+        # h_min-cell.
+        n_nos -= 1
+
+        # Reset x0, because the first h_min comes from normal scheme
+        x0 += h_min
+
+        # Reset xmax for normal scheme
+        domain[1] -= n_nos*h_min
+
+        # Reset nx for normal scheme
+        nx -= n_nos
+
+        # If there are not enough points reset to standard procedure. The limit
+        # of five is arbitrary. However, nx should be much bigger than five
+        # anyways, otherwise stretched grid doesn't make sense.
+        if nx <= 5:
+            print("Warning :: Not enough points for non-stretched part,"
+                  "ignoring therefore `x1`.")
+            domain = xlim_orig
+            nx = nx_orig
+            x0 = x0_orig
+            x1 = None
+            h_min = h_min_orig
+
+    # Get stretching factor (a = 1+alpha).
+    if h_min == 0 or h_min > np.diff(domain)/nx:
+        # If h_min is bigger than the domain-extent divided by nx, no
+        # stretching is required at all.
+        alpha = 0
+    else:
+
+        # Wrap _get_dx into a minimization function to call with fsolve.
+        def find_alpha(alpha, h_min, args):
+            """Find alpha such that min(hx) = h_min."""
+            return min(get_hx(alpha, *args))/h_min-1
+
+        # Search for best alpha, must be at least 0
+        args = (domain, nx, x0)
+        alpha = max(0, optimize.fsolve(find_alpha, 0.02, (h_min, args)))
+
+    # With alpha get actual cell spacing with `resp_domain` to respect the
+    # users decision.
+    hx = get_hx(alpha, domain, nx, x0, resp_domain)
+
+    # Add the non-stretched center if x1 is provided
+    if x1 is not None:
+        hx = np.r_[hx[: np.argmin(hx)], np.ones(n_nos)*h_min,
+                   hx[np.argmin(hx):]]
+
+    # Print warning h_min could not be respected.
+    if abs(hx.min() - h_min) > 0.1:
+        print(f"Warning :: Minimum cell width ({np.round(hx.min(), 2)} m) is "
+              "below `h_min`, because `nx` is too big for `domain`.")
+
+    return hx
+
+
+def get_domain(x0=0, freq=1, rho=0.3, limits=None, min_width=None,
+               fact_min=0.2, fact_neg=5, fact_pos=None):
+    r"""Get domain extent and minimum cell width as a function of skin depth.
+
+    Returns the extent of the calculation domain and the minimum cell width as
+    a multiple of the skin depth, with possible user restrictions on minimum
+    calculation domain and range of possible minimum cell widths.
+
+    .. math::
+
+            \delta &= 503.3 \sqrt{\frac{\rho}{f}} , \\
+            x_\text{start} &= x_0-k_\text{neg}\delta , \\
+            x_\text{end} &= x_0+k_\text{pos}\delta , \\
+            h_\text{min} &= k_\text{min} \delta .
+
+
+    Parameters
+    ----------
+
+    x0 : float
+        Center of the calculation domain. Normally the source location.
+        Default is 0.
+
+    freq : float
+        Frequency (Hz) to calculate the skin depth. The skin depth is a concept
+        defined in the frequency domain. If a negative frequency is provided,
+        it is assumed that the calculation is carried out in the Laplace
+        domain. To calculate the skin depth, the value of ``freq`` is then
+        multiplied by :math:`-2\pi`, to simulate the closest
+        frequency-equivalent.
+
+        Default is 1 Hz.
+
+    rho : float, optional
+        Resistivity (Ohm m) to calculate skin depth.
+        Default is 0.3 Ohm m (sea water).
+
+    limits : None or list
+        [start, end] of model domain. This extent represents the minimum extent
+        of the domain. The domain is therefore only adjusted if it has to reach
+        outside of [start, end].
+        Default is None.
+
+    min_width : None, float, or list of two floats
+        Minimum cell width is calculated as a function of skin depth:
+        fact_min*sd. If ``min_width`` is a float, this is used. If a list of
+        two values [min, max] are provided, they are used to restrain
+        min_width. Default is None.
+
+    fact_min, fact_neg, fact_pos : floats
+        The skin depth is multiplied with these factors to estimate:
+
+            - Minimum cell width (``fact_min``, default 0.2)
+            - Domain-start (``fact_neg``, default 5), and
+            - Domain-end (``fact_pos``, defaults to ``fact_neg``).
+
+
+    Returns
+    -------
+
+    h_min : float
+        Minimum cell width.
+
+    domain : list
+        Start- and end-points of calculation domain.
+
+    """
+
+    # Set fact_pos to fact_neg if not provided.
+    if fact_pos is None:
+        fact_pos = fact_neg
+
+    # Calculate the skin depth.
+    skind = 503.3*np.sqrt(rho/abs(freq))
+    if freq < 0:  # For Laplace-domain calculations.
+        skind /= np.sqrt(2*np.pi)
+
+    # Estimate minimum cell width.
+    h_min = fact_min*skind
+    if min_width is not None:  # Respect user input.
+        if np.array(min_width).size == 1:
+            h_min = min_width
+        else:
+            h_min = np.clip(h_min, *min_width)
+
+    # Estimate calculation domain.
+    domain = [x0-fact_neg*skind, x0+fact_pos*skind]
+    if limits is not None:  # Respect user input.
+        domain = [min(limits[0], domain[0]), max(limits[1], domain[1])]
+
+    return h_min, domain
+
+
+def get_hx(alpha, domain, nx, x0, resp_domain=True):
+    r"""Return cell widths for given input.
+
+    Find the number of cells left and right of ``x0``, ``nl`` and ``nr``
+    respectively, for the provided alpha. For this, we solve
+
+    .. math::   \frac{x_\text{max}-x_0}{x_0-x_\text{min}} =
+                \frac{a^{nr}-1}{a^{nl}-1}
+
+    where :math:`a = 1+\alpha`.
+
+
+    Parameters
+    ----------
+
+    alpha : float
+        Stretching factor ``a`` is given by ``a=1+alpha``.
+
+    domain : list
+        [start, end] of model domain.
+
+    nx : int
+        Number of cells.
+
+    x0 : float
+        Center of the grid. ``x0`` is restricted to ``domain``.
+
+    resp_domain : bool
+        If False (default), then the domain-end might shift slightly to assure
+        that the same stretching factor is applied throughout. If set to True,
+        however, the domain is respected absolutely. This will introduce one
+        stretch-factor which is different from the other stretch factors, to
+        accommodate the restriction. This one-off factor is between the left-
+        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
+
+
+    Returns
+    -------
+    hx : ndarray
+        Cell widths of mesh.
+
+    """
+    if alpha <= 0.:  # If alpha <= 0: equal spacing (no stretching at all)
+        hx = np.ones(nx)*np.diff(np.squeeze(domain))/nx
+
+    else:            # Get stretched hx
+        a = alpha+1
+
+        # Get hx depending if x0 is on the domain boundary or not.
+        if np.isclose(x0, domain[0]) or np.isclose(x0, domain[1]):
+            # Get al a's
+            alr = np.diff(domain)*alpha/(a**nx-1)*a**np.arange(nx)
+            if x0 == domain[1]:
+                alr = alr[::-1]
+
+            # Calculate differences
+            hx = alr*np.diff(domain)/sum(alr)
+
+        else:
+            # Find number of elements left and right by solving:
+            #     (xmax-x0)/(x0-xmin) = a**nr-1/(a**nl-1)
+            nr = np.arange(2, nx+1)
+            er = (domain[1]-x0)/(x0-domain[0]) - (a**nr[::-1]-1)/(a**nr-1)
+            nl = np.argmin(abs(np.floor(er)))+1
+            nr = nx-nl
+
+            # Get all a's
+            al = a**np.arange(nl-1, -1, -1)
+            ar = a**np.arange(1, nr+1)
+
+            # Calculate differences
+            if resp_domain:
+                # This version honours domain[0] and domain[1], but to achieve
+                # this it introduces one stretch-factor which is different from
+                # all the others between al to ar.
+                hx = np.r_[al*(x0-domain[0])/sum(al),
+                           ar*(domain[1]-x0)/sum(ar)]
+            else:
+                # This version moves domain[1], but each stretch-factor is
+                # exactly the same.
+                fact = (x0-domain[0])/sum(al)  # Take distance from al.
+                hx = np.r_[al, ar]*fact
+
+                # Note: this hx is equivalent as providing the following h
+                # to TensorMesh:
+                # h = [(h_min, nl-1, -a), (h_min, n_nos+1), (h_min, nr, a)]
+
+    return hx
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
@@ -1591,7 +1974,31 @@ def data_read(fname, keys=None, path="data"):
             return out
 
 
-# OTHER
+# TIMING AND REPORTING
+class Time:
+    """Class for timing (now; runtime)."""
+
+    def __init__(self):
+        """Initialize time zero (t0) with current time stamp."""
+        self.__t0 = default_timer()
+
+    @property
+    def t0(self):
+        """Return time zero of this class instance."""
+        return self.__t0
+
+    @property
+    def now(self):
+        """Return string of current time."""
+        return datetime.now().strftime("%H:%M:%S")
+
+    @property
+    def runtime(self):
+        """Return string of runtime since time zero."""
+        t1 = default_timer() - self.__t0
+        return timedelta(seconds=np.round(t1))
+
+
 class Report(ScoobyReport):
     r"""Print date, time, and version information.
 
@@ -1652,95 +2059,3 @@ class Report(ScoobyReport):
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
-
-
-def _interp3d(points, values, new_points, method, fill_value, mode):
-    """Interpolate values in 3D either linearly or with a cubic spline.
-
-    Return ``values`` corresponding to a regular 3D grid defined by ``points``
-    on ``new_points``.
-
-    This is a modified version of :func:`scipy.interpolate.interpn`, using
-    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
-    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
-    ``method='cubic'``. If speed is important then choose 'linear', as it can
-    be significantly faster.
-
-
-    Parameters
-    ----------
-    points : tuple of ndarray of float, with shapes ((nx, ), (ny, ) (nz, ))
-        The points defining the regular grid in three dimensions.
-
-    values : array_like, shape (nx, ny, nz)
-        The data on the regular grid in three dimensions.
-
-    new_points : tuple (rec_x, rec_y, rec_z)
-        Coordinates (x, y, z) of new points.
-
-    method : {'cubic', 'linear'}, optional
-        The method of interpolation to perform, 'linear' or 'cubic'. Default is
-        'cubic' (forced to 'linear' if there are less than 3 points in any
-        direction).
-
-    fill_value : float or None
-        Passed to ``interpolate.RegularGridInterpolator`` if
-        ``method='linear'``: The value to use for points outside of the
-        interpolation domain. If None, values outside the domain are
-        extrapolated.
-
-    mode : {'constant', 'nearest', 'mirror', 'reflect', 'wrap'}
-        Passed to ``ndimage.map_coordinates`` if ``method='cubic'``: Determines
-        how the input array is extended beyond its boundaries.
-
-
-    Returns
-    -------
-    new_values : ndarray
-        Values corresponding to ``new_points``.
-
-    """
-
-    # We need at least 3 points in each direction for cubic spline. This should
-    # never be an issue for a realistic 3D model.
-    for pts in points:
-        if len(pts) < 4:
-            method = 'linear'
-
-    # Interpolation.
-    if method == "linear":
-        ifn = interpolate.RegularGridInterpolator(
-                points=points, values=values, method="linear",
-                bounds_error=False, fill_value=fill_value)
-
-        new_values = ifn(xi=new_points)
-
-    else:
-
-        # Replicate the same expansion of xi as used in
-        # RegularGridInterpolator, so the input xi can be quite flexible.
-        xi = interpolate.interpnd._ndim_coords_from_arrays(new_points, ndim=3)
-        xi_shape = xi.shape
-        xi = xi.reshape(-1, 3)
-
-        # map_coordinates uses the indices of the input data (values in this
-        # case) as coordinates. We have therefore to transform our desired
-        # output coordinates to this artificial coordinate system too.
-        coords = np.empty(xi.T.shape)
-        for i in range(3):
-            coords[i] = interpolate.interp1d(
-                    points[i], np.arange(len(points[i])), kind='cubic',
-                    bounds_error=False, fill_value='extrapolate',)(xi[:, i])
-
-        # map_coordinates only works for real data; split it up if complex.
-        params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
-        if 'complex' in values.dtype.name:
-            real = ndimage.map_coordinates(values.real, coords, **params3d)
-            imag = ndimage.map_coordinates(values.imag, coords, **params3d)
-            result = real + 1j*imag
-        else:
-            result = ndimage.map_coordinates(values, coords, **params3d)
-
-        new_values = result.reshape(xi_shape[:-1])
-
-    return new_values
