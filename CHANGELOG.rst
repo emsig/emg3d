@@ -2,18 +2,26 @@ Changelog
 #########
 
 
-*latest*
---------
+*latest* : Laplace
+------------------
 
 - Laplace-domain calculation: By providing a negative ``freq``-value to
   ``utils.get_source_field`` and ``utils.Model``, the calculation is carried
   out in the real Laplace domain ``s = freq`` instead of the complex frequency
   domain ``s = 2i*pi*freq``.
-- New function ``utils.get_cell_numbers`` to get good values of number of cells
-  for given primes.
+- New routines:
+
+  - ``utils.get_hx_h0`` to get cell widths and origin for given parameters
+    including a fixed seafloor and sea-surface boundaries.
+  - ``utils.get_cell_numbers`` to get good values of number of cells for given
+    primes.
+
 - Speed-up ``njitted.volume_average`` significantly thanks to @jcapriot.
-- Bugfix and workaround for the case where a ``sslsolver`` is used together
-  with a provided initial ``efield``.
+- Bugfixex:
+
+  - Abort if l2-norm is NaN (only works for MG).
+  - Workaround for the case where a ``sslsolver`` is used together with a
+    provided initial ``efield``.
 
 
 *v0.7.1* : JOSS article
