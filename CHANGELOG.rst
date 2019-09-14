@@ -12,7 +12,8 @@ Changelog
 - New routines:
 
   - ``utils.get_hx_h0`` to get cell widths and origin for given parameters
-    including a fixed seafloor and sea-surface boundaries.
+    including a few fixed interfaces (center plus two, e.g. top anomaly,
+    sea-floor, and sea-surface).
   - ``utils.get_cell_numbers`` to get good values of number of cells for given
     primes.
 

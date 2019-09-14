@@ -1137,16 +1137,15 @@ class TensorMesh:
         return self.__vol
 
 
-def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
+def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
               pps=3, alpha=None, calc_domain_factors=None,
               resp_survey_domain=False, raise_error=True, verb=1):
     r"""Return cell widths and origin for given parameters.
 
     Returns cell widths given the provided ``survey_domain`` and other
     parameters using a flexible amount of cells. See input parameters for more
-    details.
-
-    Current there is no possibility to define additional hard/fixed boundaries.
+    details. A maximum of three hard/fixed boundaries can be provided (one of
+    which is the grid center).
 
 
     See Also
@@ -1169,10 +1168,11 @@ def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
     rho : float
         Resistivity (Ohm m) to calculate skin depth.
 
-    src : float
-        Source location. The grid is centred around source location, where the
-        source is in the middle of a cell, unless the source is too close by
-        a hard boundary.
+    fixed : array
+        Fixed boundaries, one, two, or maximum three values. The grid is
+        centered around the first value. Hence it is the location of the
+        smallest cell. Two more fixed boundaries can be added, at most one on
+        each side of the first one.
 
     survey_domain : list {[min, max] or [min, seafloor, sea-surface]}
         Contains the survey-domain limits. If the list contains three values,
@@ -1239,18 +1239,18 @@ def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
         space = 4*" "
         print(f"  = = = = = = = = {freq:8.4f} Hz = = = = = = = =")
 
-    # Check if a seafloor and air-surface was provided.
-    if len(survey_domain) == 3:
-        has_seafloor = True
-
-        # Ensure source is in the water.
-        if src < survey_domain[1] or src > survey_domain[2]:
-            print("\n* ERROR   :: Source must be in the water. Provided\n"
-                  f"             src, seafloor, sea-surface:: {src}, "
-                  f"{survey_domain[1]}, {survey_domain[2]}.")
-            raise ValueError("Source not in water.")
-    else:
-        has_seafloor = False
+    # Cast fixed.
+    fixed = np.array(fixed, ndmin=1)
+    if fixed.size > 2:
+        if np.sign(np.diff(fixed[:2])) == np.sign(np.diff(fixed[::2])):
+            print("\n* ERROR   :: 2nd and 3rd fixed boundaries have to be "
+                  "left and right of the first one.\n             "
+                  f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
+            raise ValueError("Wrong input for fixed")
+        if fixed.size > 3:
+            print("\n* ERROR   :: Maximum three fixed boundaries permitted.\n"
+                  f"             Provided: {fixed.size}.")
+            raise ValueError("Wrong input for fixed")
 
     # Calculate skin depth.
     skind = 503.3*np.sqrt(rho/abs(freq))
@@ -1276,8 +1276,8 @@ def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
     calc_domain = skind*np.array(calc_domain_factors, dtype=float)
 
     # Now get calculation domain by clipping survey to boundary.
-    calcmin = np.clip(survey_domain[0], *(src-calc_domain[:2][::-1]))
-    calcmax = np.clip(survey_domain[-1], *(src+calc_domain[2:]))
+    calcmin = np.clip(survey_domain[0], *(fixed[0]-calc_domain[:2][::-1]))
+    calcmax = np.clip(survey_domain[-1], *(fixed[0]+calc_domain[2:]))
     calc_domain = [calcmin, calcmax]
     if verb > 0:  # Print original calculation domain info.
         print(space+f"Calculation domain  [m] : {calc_domain[0]:.0f} - "
@@ -1312,73 +1312,52 @@ def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
         for sa in np.linspace(1.0, alpha[0], alpha[1]):
 
             # Get current stretched grid cell sizes.
-            thxl = dmin*sa**np.arange(1, nx+1)  # Left of source.
-            thxr = dmin*sa**np.arange(1, nx+1)  # right of source.
+            thxl = dmin*sa**np.arange(nx)  # Left of origin.
+            thxr = dmin*sa**np.arange(nx)  # right of origin.
 
-            # 0. Adjust stretching for seafloor and air-surface.
-            asrc = src
-            if has_seafloor:
+            # 0. Adjust stretching for fixed boundaries.
+            if fixed.size > 1:  # Move mesh to first fixed boundary.
+                t_nx = np.r_[fixed[0], fixed[0]+np.cumsum(thxr)]
+                ii = np.argmin(abs(t_nx-fixed[1]))
+                thxr *= abs(fixed[1]-fixed[0])/np.sum(thxr[:ii])
 
-                # If seafloor or sea-surface is too close to source, we move
-                # the source location (so actual source won't be in the middle
-                # of the cell).
-                if np.any(abs(survey_domain[1]-src) < dmin):
-                    asrc = survey_domain[1]+dmin/2
-                elif np.any(abs(survey_domain[2]-src) < dmin):
-                    asrc = survey_domain[2]-dmin/2
+            if fixed.size > 2:  # Move mesh to second fixed boundary.
+                t_nx = np.r_[fixed[0], fixed[0]-np.cumsum(thxl)]
+                ii = np.argmin(abs(t_nx-fixed[2]))
+                thxl *= abs(fixed[2]-fixed[0])/np.sum(thxl[:ii])
 
-                # Move mesh to seafloor.
-                t_x0 = asrc-dmin/2
-                if not np.isclose(t_x0, survey_domain[1]):
-                    t_nx = t_x0-np.cumsum(thxl)
-                    ii = np.argmin(abs(t_nx-survey_domain[1]))+1
-                    thxl *= abs(survey_domain[1]-t_x0)/np.sum(thxl[:ii])
+            # 1. Fill from center to left survey_domain.
+            nl = np.sum((fixed[0]-np.cumsum(thxl)) > survey_domain[0])+1
 
-                # Move mesh to sea-surface.
-                t_x0 = asrc+dmin/2
-                if not np.isclose(t_x0, survey_domain[2]):
-                    t_nx = t_x0+np.cumsum(thxr)
-                    ii = np.argmin(abs(t_nx-survey_domain[2]))+1
-                    thxr *= abs(survey_domain[2]-t_x0)/np.sum(thxr[:ii])
-
-            # 1. Fill src to left survey_domain.
-            nl = np.sum((asrc-dmin/2-np.cumsum(thxl)) > survey_domain[0])+1
-
-            # 2. Fill src to right survey_domain.
-            nr = np.sum((asrc+dmin/2+np.cumsum(thxr)) < survey_domain[-1])+1
+            # 2. Fill from center to right survey_domain.
+            nr = np.sum((fixed[0]+np.cumsum(thxr)) < survey_domain[-1])+1
 
             # 3. Get remaining number of cells and check termination criteria.
-            nx_remain = nx-nl-nr-1
-            nsdc = nl+nr+1  # Number of survey_domain cells.
-            if same_bounds and nx_remain >= 0:  # Good enough, finish.
-
-                # Create hx-array.
+            nsdc = nl+nr  # Number of survey_domain cells.
+            nx_remain = nx-nsdc
+            if same_bounds and nx_remain >= 0:
+                # Good enough, distribute remaining cells.
                 nl += int(np.floor(nx_remain/2))  # If uneven, add one cell
                 nr += int(np.ceil(nx_remain/2))   # more on the right.
-                hx = np.r_[thxl[:nl][::-1], dmin, thxr[:nr]]
-
-                # Calculate origin.
-                x0 = float(asrc-dmin/2-np.sum(thxl[:nl]))
-
-                # Mark it as finished and break out of the loop.
-                finished = True
-                break
-
             elif nx_remain <= 0:  # Not good, try next.
                 continue
 
             # Create the current hx-array.
-            hx = np.r_[thxl[:nl][::-1], dmin, thxr[:nr]]
-            hxo = np.r_[thxl[:nl][::-1], dmin, thxr[:nr]]
+            hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
+            hxo = np.r_[thxl[:nl][::-1], thxr[:nr]]
 
             # Get actual survey_domain:
-            asurv_domain = [asrc-dmin/2-np.sum(thxl[:nl]),
-                            asrc+dmin/2+np.sum(thxr[:nr])]
-            x0 = float(asrc-dmin/2-np.sum(thxl[:nl]))
+            asurv_domain = [fixed[0]-np.sum(thxl[:nl]),
+                            fixed[0]+np.sum(thxr[:nr])]
+            x0 = float(fixed[0]-np.sum(thxl[:nl]))
 
-            # Get stretching for seafloor and air-surface adjustments.
-            if has_seafloor:
-                sa_adj = np.max([hx[1:]/hx[:-1], hx[:-1]/hx[1:]])
+            # Get actual stretching (differs in case of fixed layers).
+            sa_adj = np.max([hx[1:]/hx[:-1], hx[:-1]/hx[1:]])
+
+            # If good enough, mark it as finished and break out of the loop.
+            if same_bounds and nx_remain >= 0:
+                finished = True
+                break
 
             # Loop over possible alphas for calc_domain.
             for ca in np.linspace(sa, alpha[2], alpha[3]):
@@ -1395,8 +1374,8 @@ def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
 
                 # 6. Get remaining number of cells and check termination
                 # criteria.
-                nx_remain2 = nx-nsdc-nl-nr
                 ncdc = nl+nr  # Number of calc_domain cells.
+                nx_remain2 = nx-nsdc-ncdc
 
                 if nx_remain2 < 0:  # Not good, try next.
                     continue
@@ -1434,8 +1413,8 @@ def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
         extstr = space+f"Min/max cell width  [m] : {min(hx):.0f} / "
         alstr = space+f"Alpha survey"
         nrstr = space+"Number of cells "
-        if has_seafloor:
-            sastr = f"{sa:.3f}({sa_adj:.3f})"
+        if not np.isclose(sa, sa_adj):
+            sastr = f"{sa:.3f} ({sa_adj:.3f})"
         else:
             sastr = f"{sa:.3f}"
         if same_bounds:
@@ -1444,11 +1423,11 @@ def get_hx_h0(freq, rho, src, survey_domain, possible_nx, min_width=None,
             print(nrstr+f"  (s/r) : {nx} ({nsdc}/{nx_remain})")
         else:
             print(extstr+f"{max(hxo):.0f} / {max(hx):.0f}")
-            print(alstr+f"/calc       : {sastr}/{ca:.3f}")
+            print(alstr+f"/calc       : {sastr} / {ca:.3f}")
             print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
         print()
 
-    if not has_seafloor:
+    if not fixed.size > 1:
         sa_adj = sa
     info = {'dmin': dmin,
             'dmax': np.nanmax(hx),
