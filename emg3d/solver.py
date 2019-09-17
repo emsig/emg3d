@@ -1697,7 +1697,7 @@ def _terminate(var, l2_last, l2_prev, it):
             var.exit_message = "CONVERGED"
             finished = True
 
-        elif l2_last > 10*var.l2_refe:       # Diverged.
+        elif l2_last > 10*var.l2_refe or np.isnan(l2_last):  # Diverged.
             var.exit_message = "DIVERGED"
             finished = True
 
