@@ -1137,15 +1137,27 @@ class TensorMesh:
         return self.__vol
 
 
-def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
-              pps=3, alpha=None, calc_domain_factors=None,
-              resp_survey_domain=False, raise_error=True, verb=1):
+def get_hx_h0(freq, rho, fixed, domain, possible_nx=None, min_width=None,
+              pps=3, alpha=None, raise_error=True, verb=1):
     r"""Return cell widths and origin for given parameters.
 
-    Returns cell widths given the provided ``survey_domain`` and other
-    parameters using a flexible amount of cells. See input parameters for more
-    details. A maximum of three hard/fixed boundaries can be provided (one of
-    which is the grid center).
+    Returns cell widths given the provided ``domain`` and other parameters
+    using a flexible amount of cells. See input parameters for more details. A
+    maximum of three hard/fixed boundaries can be provided (one of which is the
+    grid center).
+
+    The actual calculation domain adds a buffer zone around the survey domain.
+    The thickness of the buffer is six times the skin depth. The field is
+    basically zero after two wavelengths. A wavelength is 2*pi*skindepth, hence
+    roughly 6 times the skin depth. Taking a factor 6 gives roughly two
+    wavelengths, as the field travels to the boundary and back. The actual
+    buffer thickness can be steered with the ``rho`` parameter.
+
+    One has to take into account that the air is very resistive, which has to
+    be considered not just in the vertical direction, but also in the
+    horizontal directions, as the airwave will bounce back from the sides
+    otherwise. In the marine case this issue reduces with increasing water
+    depth.
 
 
     See Also
@@ -1165,8 +1177,14 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
         multiplied by :math:`-2\pi`, to simulate the closest
         frequency-equivalent.
 
-    rho : float
-        Resistivity (Ohm m) to calculate skin depth.
+    rho : float or list
+        Resistivity (Ohm m) to calculate the skin depth, required to get the
+        calculation domain. A float or a list with up to three values can be
+        provided, in which case it is used as resistivity for
+
+        - float: everything;
+        - [min_width, boundaries];
+        - [min_width, left boundary, right boundary].
 
     fixed : array
         Fixed boundaries, one, two, or maximum three values. The grid is
@@ -1174,14 +1192,16 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
         smallest cell. Two more fixed boundaries can be added, at most one on
         each side of the first one.
 
-    survey_domain : list {[min, max] or [min, seafloor, sea-surface]}
+    domain : list {[min, max] or [min, seafloor, sea-surface]}
         Contains the survey-domain limits. If the list contains three values,
         then it is assumed to be the vertical direction, where the second and
         third values are taken as seafloor and sea-surface. In this case, the
         source has to be within the water layer.
 
-    possible_nx : list
+    possible_nx : list, optional
         List of possible number of cells. See :func:`get_cell_numbers`.
+        Default is ``get_cell_numbers(500, 5, 3)``, which corresponds to
+        [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384].
 
     min_width : list or None, optional
         Minimum cell width restriction, [min, max].
@@ -1196,17 +1216,7 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
         Maximum alpha and how many steps it takes to find a good alpha. The
         higher this number is, the longer it will take, but the finer it
         samples alpha: [max. survey alpha, nr, max calc alpha, nr].
-        Default = [1.05, 11, 1.5, 11].
-
-    calc_domain_factors : list, optional
-        Defines boundary of how many skin-depths for
-        [min left, max left, min right, max right].
-        Default = [5, 10, 5, 10]
-
-    resp_survey_domain : bool, optional
-        If True, the survey_domain is respected even if the calculation_domain
-        is smaller.
-        Default is False.
+        Default = [1, 1, 1.5, 51].
 
     raise_error : bool, optional
         If True, an error is raised if no suitable grid is found. Otherwise it
@@ -1231,13 +1241,19 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
 
     """
     # Get variables with default lists:
-    alpha = alpha or [1.05, 11, 1.5, 11]
-    calc_domain_factors = calc_domain_factors or [5, 10, 5, 10]
+    alpha = alpha or [1, 1, 1.5, 51]
+    possible_nx = possible_nx or get_cell_numbers(500, 5, 3)
+
+    if not isinstance(rho, (list, tuple)):
+        rho_min = rho
+        rho_bound = rho
+    else:
+        rho_min = rho[0]
+        rho_bound = rho[1:]
 
     # Start log.
     if verb > 0:
-        space = 4*" "
-        print(f"  = = = = = = = = {freq:8.4f} Hz = = = = = = = =")
+        print(f"  = = = = = = = = {freq:10.6f} Hz = = = = = = = =")
 
     # Cast fixed.
     fixed = np.array(fixed, ndmin=1)
@@ -1253,51 +1269,24 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
             raise ValueError("Wrong input for fixed")
 
     # Calculate skin depth.
-    skind = 503.3*np.sqrt(rho/abs(freq))
+    skind_min = 503.3*np.sqrt(rho_min/abs(freq))
+    skind = 503.3*np.sqrt(rho_bound/abs(freq))
     if freq < 0:  # For Laplace-domain calculations.
+        skind_min /= np.sqrt(2*np.pi)
         skind /= np.sqrt(2*np.pi)
-    if verb > 0:
-        print(space+f"Skin depth          [m] : {skind:.0f}")
 
     # Minimum cell width.
-    dmin = skind/pps
+    dmin = skind_min/pps
     if min_width is not None:  # Respect user input.
         dmin = np.clip(dmin, *np.array(min_width, dtype=float))
 
     # Survey domain.
-    survey_domain = np.array(survey_domain, dtype=float)
-    if verb > 0:  # Print original survey domain info.
-        print(space+f"Survey domain       [m] : {survey_domain[0]:.0f} - "
-              f"{survey_domain[-1]:.0f}")
+    domain = np.array(domain, dtype=float)
 
     # Calculation domain.
-
-    # Get boundary.
-    calc_domain = skind*np.array(calc_domain_factors, dtype=float)
-
-    # Now get calculation domain by clipping survey to boundary.
-    calcmin = np.clip(survey_domain[0], *(fixed[0]-calc_domain[:2][::-1]))
-    calcmax = np.clip(survey_domain[-1], *(fixed[0]+calc_domain[2:]))
-    calc_domain = [calcmin, calcmax]
-    if verb > 0:  # Print original calculation domain info.
-        print(space+f"Calculation domain  [m] : {calc_domain[0]:.0f} - "
-              f"{calc_domain[1]:.0f}")
-
-    # If calc_domain < survey_domain, we restrict the calc_domain if
-    # resp_survey_domain is True, else the survey_domain.
-    if resp_survey_domain:
-        calc_domain[0] = min(survey_domain[0], calc_domain[0])
-        calc_domain[1] = max(survey_domain[-1], calc_domain[1])
-    else:
-        survey_domain[0] = max(survey_domain[0], calc_domain[0])
-        survey_domain[-1] = min(survey_domain[-1], calc_domain[1])
-
-    # Flag if there is no need to check the calc_domain.
-    if (np.isclose(calc_domain[0], survey_domain[0]) and
-            np.isclose(calc_domain[1], survey_domain[-1])):
-        same_bounds = True
-    else:
-        same_bounds = False
+    calc_domain = skind*np.array([6., 6.])  # 6 x sd => buffer zone.
+    calc_domain[0] = domain[0] - calc_domain[0]
+    calc_domain[1] = domain[1] + calc_domain[1]
 
     # Initiate flag if terminated.
     finished = False
@@ -1308,12 +1297,12 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
     # Loop over possible cell numbers from small to big.
     for nx in np.unique(possible_nx):
 
-        # Loop over possible alphas for survey_domain.
+        # Loop over possible alphas for domain.
         for sa in np.linspace(1.0, alpha[0], alpha[1]):
 
             # Get current stretched grid cell sizes.
             thxl = dmin*sa**np.arange(nx)  # Left of origin.
-            thxr = dmin*sa**np.arange(nx)  # right of origin.
+            thxr = dmin*sa**np.arange(nx)  # Right of origin.
 
             # 0. Adjust stretching for fixed boundaries.
             if fixed.size > 1:  # Move mesh to first fixed boundary.
@@ -1326,38 +1315,31 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
                 ii = np.argmin(abs(t_nx-fixed[2]))
                 thxl *= abs(fixed[2]-fixed[0])/np.sum(thxl[:ii])
 
-            # 1. Fill from center to left survey_domain.
-            nl = np.sum((fixed[0]-np.cumsum(thxl)) > survey_domain[0])+1
+            # 1. Fill from center to left domain.
+            nl = np.sum((fixed[0]-np.cumsum(thxl)) > domain[0])+1
 
-            # 2. Fill from center to right survey_domain.
-            nr = np.sum((fixed[0]+np.cumsum(thxr)) < survey_domain[-1])+1
+            # 2. Fill from center to right domain.
+            nr = np.sum((fixed[0]+np.cumsum(thxr)) < domain[-1])+1
 
             # 3. Get remaining number of cells and check termination criteria.
-            nsdc = nl+nr  # Number of survey_domain cells.
+            nsdc = nl+nr  # Number of domain cells.
             nx_remain = nx-nsdc
-            if same_bounds and nx_remain >= 0:
-                # Good enough, distribute remaining cells.
-                nl += int(np.floor(nx_remain/2))  # If uneven, add one cell
-                nr += int(np.ceil(nx_remain/2))   # more on the right.
-            elif nx_remain <= 0:  # Not good, try next.
+
+            # Not good, try next.
+            if nx_remain <= 0:
                 continue
 
             # Create the current hx-array.
             hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
             hxo = np.r_[thxl[:nl][::-1], thxr[:nr]]
 
-            # Get actual survey_domain:
+            # Get actual domain:
             asurv_domain = [fixed[0]-np.sum(thxl[:nl]),
                             fixed[0]+np.sum(thxr[:nr])]
             x0 = float(fixed[0]-np.sum(thxl[:nl]))
 
             # Get actual stretching (differs in case of fixed layers).
             sa_adj = np.max([hx[1:]/hx[:-1], hx[:-1]/hx[1:]])
-
-            # If good enough, mark it as finished and break out of the loop.
-            if same_bounds and nx_remain >= 0:
-                finished = True
-                break
 
             # Loop over possible alphas for calc_domain.
             for ca in np.linspace(sa, alpha[2], alpha[3]):
@@ -1408,6 +1390,16 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
             hx, x0 = None, None
 
     elif verb > 0:
+        space = 4*" "
+        print(space+f"Skin depth (m/l/r)  [m] : {skind_min:.0f} / ", end="")
+        if len(skind) > 1:
+            print(f"{skind[0]:.0f} / {skind[1]:.0f}")
+        else:
+            print(f"{skind[0]:.0f}")
+        print(space+f"Survey domain       [m] : {domain[0]:.0f} - "
+              f"{domain[-1]:.0f}")
+        print(space+f"Calculation domain  [m] : {calc_domain[0]:.0f} - "
+              f"{calc_domain[1]:.0f}")
         print(space+f"Final extent        [m] : {x0:.0f} - "
               f"{x0+np.sum(hx):.0f}")
         extstr = space+f"Min/max cell width  [m] : {min(hx):.0f} / "
@@ -1417,14 +1409,9 @@ def get_hx_h0(freq, rho, fixed, survey_domain, possible_nx, min_width=None,
             sastr = f"{sa:.3f} ({sa_adj:.3f})"
         else:
             sastr = f"{sa:.3f}"
-        if same_bounds:
-            print(extstr+f"{max(hx):.0f}")
-            print(alstr+f"            : {sastr}")
-            print(nrstr+f"  (s/r) : {nx} ({nsdc}/{nx_remain})")
-        else:
-            print(extstr+f"{max(hxo):.0f} / {max(hx):.0f}")
-            print(alstr+f"/calc       : {sastr} / {ca:.3f}")
-            print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
+        print(extstr+f"{max(hxo):.0f} / {max(hx):.0f}")
+        print(alstr+f"/calc       : {sastr} / {ca:.3f}")
+        print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
         print()
 
     if not fixed.size > 1:
