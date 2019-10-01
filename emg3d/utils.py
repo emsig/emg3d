@@ -1137,8 +1137,8 @@ class TensorMesh:
         return self.__vol
 
 
-def get_hx_h0(freq, rho, fixed, domain, possible_nx=None, min_width=None,
-              pps=3, alpha=None, raise_error=True, verb=1):
+def get_hx_h0(freq, rho, fixed, domain, possible_nx=None, dmin=100.,
+              alpha=None, raise_error=True, verb=1):
     r"""Return cell widths and origin for given parameters.
 
     Returns cell widths given the provided ``domain`` and other parameters
@@ -1179,12 +1179,8 @@ def get_hx_h0(freq, rho, fixed, domain, possible_nx=None, min_width=None,
 
     rho : float or list
         Resistivity (Ohm m) to calculate the skin depth, required to get the
-        calculation domain. A float or a list with up to three values can be
-        provided, in which case it is used as resistivity for
-
-        - float: everything;
-        - [min_width, boundaries];
-        - [min_width, left boundary, right boundary].
+        calculation domain. A list can be provided, in which case it is used as
+        resistivity for [left, right] boundary.
 
     fixed : array
         Fixed boundaries, one, two, or maximum three values. The grid is
@@ -1203,14 +1199,9 @@ def get_hx_h0(freq, rho, fixed, domain, possible_nx=None, min_width=None,
         Default is ``get_cell_numbers(500, 5, 3)``, which corresponds to
         [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384].
 
-    min_width : list or None, optional
-        Minimum cell width restriction, [min, max].
-        Default is None.
-
-    pps : int, optional
-        Points per skindepth; minimum cell width is calculated via
-        `dmin = skind/pps`.
-        Default = 3.
+    dmin : float, optional
+        Minimum cell width.
+        Default is 100..
 
     alpha : list, optional
         Maximum alpha and how many steps it takes to find a good alpha. The
@@ -1269,16 +1260,9 @@ def get_hx_h0(freq, rho, fixed, domain, possible_nx=None, min_width=None,
             raise ValueError("Wrong input for fixed")
 
     # Calculate skin depth.
-    skind_min = 503.3*np.sqrt(rho_min/abs(freq))
-    skind = 503.3*np.sqrt(rho_bound/abs(freq))
+    skind = 503.3*np.sqrt(rho/abs(freq))
     if freq < 0:  # For Laplace-domain calculations.
-        skind_min /= np.sqrt(2*np.pi)
         skind /= np.sqrt(2*np.pi)
-
-    # Minimum cell width.
-    dmin = skind_min/pps
-    if min_width is not None:  # Respect user input.
-        dmin = np.clip(dmin, *np.array(min_width, dtype=float))
 
     # Survey domain.
     domain = np.array(domain, dtype=float)
@@ -1391,11 +1375,11 @@ def get_hx_h0(freq, rho, fixed, domain, possible_nx=None, min_width=None,
 
     elif verb > 0:
         space = 4*" "
-        print(space+f"Skin depth (m/l/r)  [m] : {skind_min:.0f} / ", end="")
-        if len(skind) > 1:
+        print(space+f"Skin depth (m/l/r)  [m] : ", end="")
+        if len(np.atleast_1d(skind)) > 1:
             print(f"{skind[0]:.0f} / {skind[1]:.0f}")
         else:
-            print(f"{skind[0]:.0f}")
+            print(f"{skind:.0f}")
         print(space+f"Survey domain       [m] : {domain[0]:.0f} - "
               f"{domain[-1]:.0f}")
         print(space+f"Calculation domain  [m] : {calc_domain[0]:.0f} - "
