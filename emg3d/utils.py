@@ -1280,18 +1280,20 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     fixed = np.array(fixed, ndmin=1)
     if fixed.size > 2:
 
+        # Check length.
+        if fixed.size > 3:
+            print("\n* ERROR   :: Maximum three fixed boundaries permitted.\n"
+                  f"             Provided: {fixed.size}.")
+            raise ValueError("Wrong input for fixed")
+
         # Sort second and third, so it doesn't matter how it was provided.
         fixed = np.array([fixed[0], max(fixed[1:]), min(fixed[1:])])
 
-        # Check them.
+        # Check side.
         if np.sign(np.diff(fixed[:2])) == np.sign(np.diff(fixed[::2])):
             print("\n* ERROR   :: 2nd and 3rd fixed boundaries have to be "
                   "left and right of the first one.\n             "
                   f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
-            raise ValueError("Wrong input for fixed")
-        if fixed.size > 3:
-            print("\n* ERROR   :: Maximum three fixed boundaries permitted.\n"
-                  f"             Provided: {fixed.size}.")
             raise ValueError("Wrong input for fixed")
 
     # Calculate skin depth.
@@ -1414,8 +1416,6 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         print("\n* ERROR   :: No suitable grid found; relax your criteria.\n")
         if raise_error:
             raise ArithmeticError("No grid found!")
-        elif return_info:
-            hx, x0 = None, None, None
         else:
             hx, x0 = None, None
 
