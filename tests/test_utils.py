@@ -45,7 +45,7 @@ def test_get_hx_h0(capsys):
 
     # == A == Just the defaults, no big thing (regression).
     out1 = utils.get_hx_h0(
-            freq=.5, rho=10, fixed=900, survey_domain=[-2000, 2000],
+            freq=.5, res=10, fixed=900, survey_domain=[-2000, 2000],
             possible_nx=[20, 32])
     outstr1, _ = capsys.readouterr()
 
@@ -79,7 +79,7 @@ def test_get_hx_h0(capsys):
 
     # == C == User limits.
     out3 = utils.get_hx_h0(
-            freq=.5, rho=10, fixed=900, survey_domain=[-11000, 14000],
+            freq=.5, res=10, fixed=900, survey_domain=[-11000, 14000],
             possible_nx=[20, 32], min_width=[20, 600], resp_survey_domain=True)
     outstr3, _ = capsys.readouterr()
 
@@ -93,12 +93,12 @@ def test_get_hx_h0(capsys):
     # (a) With raise.
     with pytest.raises(ArithmeticError):
         utils.get_hx_h0(
-                freq=.5, rho=10, fixed=900, survey_domain=[-10000, 10000],
+                freq=.5, res=10, fixed=900, survey_domain=[-10000, 10000],
                 possible_nx=[20])
 
     # (b) With raise=False.
     out4 = utils.get_hx_h0(
-            freq=.5, rho=10, fixed=900, survey_domain=[-500, 500],
+            freq=.5, res=10, fixed=900, survey_domain=[-500, 500],
             possible_nx=[32, 40], min_width=[20, 40],
             alpha=[1.045, 3, 1.66, 3],
             calc_domain_factors=[10, 15, 10, 15], raise_error=False)
@@ -112,17 +112,17 @@ def test_get_hx_h0(capsys):
     # Too many values.
     with pytest.raises(ValueError):
         utils.get_hx_h0(
-            freq=1, rho=1, fixed=[-900, -1000, 0, 5], survey_domain=[-2000, 0],
+            freq=1, res=1, fixed=[-900, -1000, 0, 5], survey_domain=[-2000, 0],
             possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
     # Two additional values, but both on same side.
     with pytest.raises(ValueError):
         utils.get_hx_h0(
-            freq=1, rho=1, fixed=[900, -1000, -1200], survey_domain=[-2000, 0],
+            freq=1, res=1, fixed=[900, -1000, -1200], survey_domain=[-2000, 0],
             possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
 
     # One additional fixed.
     out5 = utils.get_hx_h0(
-            freq=1, rho=1, fixed=[-900, 0], survey_domain=[-2000, 0],
+            freq=1, res=1, fixed=[-900, 0], survey_domain=[-2000, 0],
             possible_nx=[64, 128], min_width=[50, 100],
             alpha=[1., 1, 1, 1],
             calc_domain_factors=[5, 8, 10, 12])
@@ -134,7 +134,7 @@ def test_get_hx_h0(capsys):
 
     # Two additional fixed.
     out6 = utils.get_hx_h0(
-            freq=1, rho=1, fixed=[-890, 0, -1000], survey_domain=[-2000, 0],
+            freq=1, res=1, fixed=[-890, 0, -1000], survey_domain=[-2000, 0],
             possible_nx=[64, 128], min_width=[60, 70],
             calc_domain_factors=[5, 8, 10, 12])
     outstr6, _ = capsys.readouterr()
