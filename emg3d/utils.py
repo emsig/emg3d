@@ -1723,7 +1723,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
     Returns
     -------
 
-    min_width : float
+    h_min : float
         Minimum cell width.
 
     domain : list
@@ -1741,19 +1741,19 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         skind /= np.sqrt(2*np.pi)
 
     # Estimate minimum cell width.
-    min_width = fact_min*skind
+    h_min = fact_min*skind
     if min_width is not None:  # Respect user input.
         if np.array(min_width).size == 1:
-            min_width = min_width
+            h_min = min_width
         else:
-            min_width = np.clip(min_width, *min_width)
+            h_min = np.clip(h_min, *min_width)
 
     # Estimate calculation domain.
     domain = [x0-fact_neg*skind, x0+fact_pos*skind]
     if limits is not None:  # Respect user input.
         domain = [min(limits[0], domain[0]), max(limits[1], domain[1])]
 
-    return min_width, domain
+    return h_min, domain
 
 
 def get_hx(alpha, domain, nx, x0, resp_domain=True):

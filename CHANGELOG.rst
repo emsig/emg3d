@@ -26,7 +26,7 @@ Changelog
   - Changed parameter ``rho`` to ``res`` for consistency reasons in
     ``utils.get_domain``.
   - Changed parameter ``h_min`` to ``min_width`` for consistency reasons in
-    ``utils.get_stretched_h`` and ``utils.get_domain``.
+    ``utils.get_stretched_h``.
 
 
 *v0.7.1* : JOSS article
