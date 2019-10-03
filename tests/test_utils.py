@@ -45,30 +45,30 @@ def test_get_hx_h0(capsys):
 
     # == A == Just the defaults, no big thing (regression).
     out1 = utils.get_hx_h0(
-            freq=.5, rho=10, fixed=900, survey_domain=[-2000, 2000],
-            possible_nx=[20, 32])
+            freq=.5, res=10, fixed=900, domain=[-2000, 2000],
+            possible_nx=[20, 32], return_info=True)
     outstr1, _ = capsys.readouterr()
 
     # Partially regression, partially from output-info.
     info = (
-        "  = = = = = = = =   0.5000 Hz = = = = = = = =\n"
-        "    Skin depth          [m] : 2251\n"
-        "    Survey domain       [m] : -2000 - 2000\n"
-        "    Calculation domain  [m] : -10354 - 12154\n"
-        "    Final extent        [m] : -11041 - 17255\n"
-        f"    Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3226\n"
-        "    Alpha survey/calc       : "
+        "   Skin depth          [m] : 2251\n"
+        "   Survey domain       [m] : -2000 - 2000\n"
+        "   Calculation domain  [m] : -15505 - 15505\n"
+        "   Final extent        [m] : -15698 - 15998\n"
+        f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3382\n"
+        "   Alpha survey/calc       : "
         f"{out1[2]['amin']:.3f} / {out1[2]['amax']:.3f}\n"
-        "    Number of cells (s/c/r) : 20 (6/13/1)\n"
+        "   Number of cells (s/c/r) : 20 (6/14/0)\n"
     )
+
     # Just check x0 and the output.
-    assert out1[1] == -11041.310317641799
+    assert out1[1] == -15698.299823718215
     assert info in outstr1
 
     # == B == Laplace and verb=0, parameter positions and defaults.
     out2 = utils.get_hx_h0(
-            -.5/np.pi/2, 10, 900, [-2000, 2000], [20, 32], None, 3,
-            [1.05, 11, 1.5, 11], [5, 10, 5, 10], False, True, 0)
+            -.5/np.pi/2, 10, [-2000, 2000], 900, [20, 32], None, 3,
+            [1.05, 1.5, 0.01], False, 0, True)
     outstr2, _ = capsys.readouterr()
 
     # Assert they are the same.
@@ -79,13 +79,14 @@ def test_get_hx_h0(capsys):
 
     # == C == User limits.
     out3 = utils.get_hx_h0(
-            freq=.5, rho=10, fixed=900, survey_domain=[-11000, 14000],
-            possible_nx=[20, 32], min_width=[20, 600], resp_survey_domain=True)
+            freq=.5, res=10, fixed=900, domain=[-11000, 14000],
+            possible_nx=[20, 32, 64, 128], min_width=[20, 600],
+            return_info=True)
     outstr3, _ = capsys.readouterr()
 
     # Check dmin.
     assert out3[2]['dmin'] == 600
-    # Calculation domain has to be at least survey_domain.
+    # Calculation domain has to be at least domain.
     assert out3[1]+np.sum(out3[0]) > 14000
     assert out3[1] <= -11000
 
@@ -93,39 +94,37 @@ def test_get_hx_h0(capsys):
     # (a) With raise.
     with pytest.raises(ArithmeticError):
         utils.get_hx_h0(
-                freq=.5, rho=10, fixed=900, survey_domain=[-10000, 10000],
+                freq=.5, res=[10., 12.], fixed=900, domain=[-10000, 10000],
                 possible_nx=[20])
 
     # (b) With raise=False.
     out4 = utils.get_hx_h0(
-            freq=.5, rho=10, fixed=900, survey_domain=[-500, 500],
-            possible_nx=[32, 40], min_width=[20, 40],
-            alpha=[1.045, 3, 1.66, 3],
-            calc_domain_factors=[10, 15, 10, 15], raise_error=False)
+            freq=.5, res=10, fixed=900, domain=[-500, 500],
+            possible_nx=[32, 40], min_width=40.,
+            alpha=[1.045, 1.66, 0.005], raise_error=False, return_info=True)
     outstr4, _ = capsys.readouterr()
     assert out4[0] is None
     assert out4[1] is None
-    assert out4[2]['amin'] == 1.045  # If fails, must have biggest default
-    assert out4[2]['amax'] == 1.66   # anisotropy values for both domains.
+    assert_allclose(out4[2]['amin'], 1.045)  # If fails, must have big. def.
+    assert_allclose(out4[2]['amax'], 1.66)   # anis-values for both domains.
 
     # == E == Fixed boundaries
     # Too many values.
     with pytest.raises(ValueError):
         utils.get_hx_h0(
-            freq=1, rho=1, fixed=[-900, -1000, 0, 5], survey_domain=[-2000, 0],
-            possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
+            freq=1, res=1, fixed=[-900, -1000, 0, 5], domain=[-2000, 0],
+            possible_nx=[64, 128])
     # Two additional values, but both on same side.
     with pytest.raises(ValueError):
         utils.get_hx_h0(
-            freq=1, rho=1, fixed=[900, -1000, -1200], survey_domain=[-2000, 0],
-            possible_nx=[64, 128], calc_domain_factors=[5, 8, 10, 12])
+            freq=1, res=1, fixed=[900, -1000, -1200], domain=[-2000, 0],
+            possible_nx=[64, 128])
 
     # One additional fixed.
     out5 = utils.get_hx_h0(
-            freq=1, rho=1, fixed=[-900, 0], survey_domain=[-2000, 0],
+            freq=1, res=1, fixed=[-900, 0], domain=[-2000, 0],
             possible_nx=[64, 128], min_width=[50, 100],
-            alpha=[1., 1, 1, 1],
-            calc_domain_factors=[5, 8, 10, 12])
+            alpha=[1., 1, 1, 1], return_info=True)
     outstr5, _ = capsys.readouterr()
 
     nodes5 = out5[1]+np.cumsum(out5[0])
@@ -134,13 +133,21 @@ def test_get_hx_h0(capsys):
 
     # Two additional fixed.
     out6 = utils.get_hx_h0(
-            freq=1, rho=1, fixed=[-890, 0, -1000], survey_domain=[-2000, 0],
-            possible_nx=[64, 128], min_width=[60, 70],
-            calc_domain_factors=[5, 8, 10, 12])
+            freq=1, res=1, fixed=[-890, 0, -1000], domain=[-2000, 0],
+            possible_nx=[64, 128], min_width=[60, 70])
     outstr6, _ = capsys.readouterr()
     nodes6 = out6[1]+np.cumsum(out6[0])
     assert_allclose(0.0, min(abs(nodes6)), atol=1e-8)  # Check sea-surface.
     assert_allclose(0.0, min(abs(nodes6+1000)), atol=1e-8)  # Check seafloor.
+
+    # == F == Several resistivities
+    out7 = utils.get_hx_h0(1, [0.3, 10], [-1000, 1000], alpha=[1, 1, 1])
+    assert out7[1] < -10000
+    assert out7[1]+np.sum(out7[0]) > 10000
+
+    out8 = utils.get_hx_h0(1, [0.3, 1, 100], [-1000, 1000], alpha=[1, 1, 1])
+    assert out8[1] > -5000                  # Left buffer much smaller than
+    assert out8[1]+np.sum(out8[0]) > 30000  # right buffer.
 
 
 def test_get_domain():

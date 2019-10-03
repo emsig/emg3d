@@ -419,18 +419,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
-    exit_status = int(var.exit_message != 'CONVERGED')  # Get exit status.
-    info_dict = {
-        'exit': exit_status,               # Exit status.
-        'exit_message': var.exit_message,  # Exit message.
-        'abs_error': var.l2,               # Absolute error.
-        'rel_error': var.l2/var.l2_refe,   # Relative error.
-        'ref_error': var.l2_refe,     # Reference error [norm(sfield)].
-        'tol': var.tol,               # Tolerance (abs_error<ref_error*tol).
-        'it_mg': var.it,              # Multigrid iterations.
-        'it_ssl': var._ssl_it,        # SSL iterations.
-        'time': time.seconds,         # Runtime (s).
-    }
+    if var.return_info:
+        exit_status = int(var.exit_message != 'CONVERGED')  # Get exit status.
+        info_dict = {
+            'exit': exit_status,               # Exit status.
+            'exit_message': var.exit_message,  # Exit message.
+            'abs_error': var.l2,               # Absolute error.
+            'rel_error': var.l2/var.l2_refe,   # Relative error.
+            'ref_error': var.l2_refe,    # Reference error [norm(sfield)].
+            'tol': var.tol,              # Tolerance (abs_error<ref_error*tol).
+            'it_mg': var.it,             # Multigrid iterations.
+            'it_ssl': var._ssl_it,       # SSL iterations.
+            'time': time.seconds,        # Runtime (s).
+        }
 
     # Return depending on input arguments; or nothing.
     if var.do_return and var.return_info:  # efield and info.

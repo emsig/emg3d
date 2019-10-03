@@ -18,11 +18,15 @@ Changelog
     primes.
 
 - Speed-up ``njitted.volume_average`` significantly thanks to @jcapriot.
-- Bugfixex:
+- Bugfixes and other minor things:
 
   - Abort if l2-norm is NaN (only works for MG).
   - Workaround for the case where a ``sslsolver`` is used together with a
     provided initial ``efield``.
+  - Changed parameter ``rho`` to ``res`` for consistency reasons in
+    ``utils.get_domain``.
+  - Changed parameter ``h_min`` to ``min_width`` for consistency reasons in
+    ``utils.get_stretched_h``.
 
 
 *v0.7.1* : JOSS article
