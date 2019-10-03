@@ -9,8 +9,8 @@ matrix:
   include:
     - python: 3.7  # => 3.7 no JIT; scooby
       env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST="scooby"
-    - python: 3.7  # => Will become 3.8; currently just to fix coveralls
-      env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST="scooby"
+    - python: 3.7  # => 3.8 no JIT; no scooby (will become 3.8 soon).
+      env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST=""
     - python: 3.7  # => 3.7
       env: PYTHON=3.7 INST=""
 
@@ -36,4 +36,8 @@ install:
 
 script: pytest --cov=emg3d --flake8
 
-after_success: coveralls
+after_success:
+  - |
+    if [ $NUMBA_DISABLE_JIT == "1" ]; then
+      coveralls
+    fi
