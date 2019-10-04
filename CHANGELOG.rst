@@ -2,14 +2,17 @@ Changelog
 #########
 
 
-*latest* : Laplace
+*v0.8.0* : Laplace
 ------------------
+
+**2019-10-04**
 
 - Laplace-domain calculation: By providing a negative ``freq``-value to
   ``utils.get_source_field`` and ``utils.Model``, the calculation is carried
   out in the real Laplace domain ``s = freq`` instead of the complex frequency
   domain ``s = 2i*pi*freq``.
-- New routines:
+- New meshing helper routines (particularly useful for transient modelling
+  where frequency-dependent/adaptive meshes are inevitable):
 
   - ``utils.get_hx_h0`` to get cell widths and origin for given parameters
     including a few fixed interfaces (center plus two, e.g. top anomaly,
