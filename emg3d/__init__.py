@@ -29,4 +29,4 @@ from .utils import Report
 
 __all__ = ['solver', 'utils', 'Report']
 
-__version__ = '0.9.0'
+__version__ = '0.8.1dev0'
