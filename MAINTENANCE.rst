@@ -11,8 +11,6 @@ Making a release
 1. Update:
 
    - ``CHANGELOG``
-   - ``setup.py``: Version number, download url; DO NOT CHANGE THAT
-   - ``emg3d/__init__.py``: Check version number, remove '.dev?'.
    - ``README.md``: Remove all badges
 
 2. Check syntax of README::
@@ -86,6 +84,4 @@ Making a release
 
 10. Post-commit changes
 
-    - ``setup.py``: Bump number, add '.dev0' to version number
-    - ``emg3d/__init__.py``: Bump number, add '.dev0' to version number
     - ``README.md``: Add the current badges (|docs| |tests| |coverage|)

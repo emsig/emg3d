@@ -27,6 +27,9 @@ from . import utils
 from . import solver
 from .utils import Report
 
-__all__ = ['solver', 'utils', 'Report']
+try:
+    from .version import version as __version__
+except ImportError:
+    __version__ = '0.0.0'
 
-__version__ = '0.8.1dev0'
+__all__ = ['solver', 'utils', 'Report']
