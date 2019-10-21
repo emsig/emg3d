@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 from setuptools import setup
 
 readme = open('README.rst').read()
@@ -27,7 +28,9 @@ setup(
     setup_requires=[
         'setuptools_scm'
     ],
-    use_scm_version=dict(root = '.',
-                         relative_to = __file__,
-                         write_to = src('emg3d/version.py')),
+    use_scm_version=dict(
+        root = '.',
+        relative_to = __file__,
+        write_to = os.path.join(os.path.dirname(__file__), 'emg3d/version.py')
+    ),
 )
