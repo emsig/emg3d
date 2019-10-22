@@ -1,8 +1,7 @@
 Maintainers Guide
 =================
 
-A release is currently done completely manually, no automatic deployment is
-set up.
+Releases of ``emg3d`` are currently done manually. This is the 'recipe'.
 
 
 Making a release
@@ -11,77 +10,88 @@ Making a release
 1. Update:
 
    - ``CHANGELOG``
-   - ``README.md``: Remove all badges
+   - ``emg3d/__init__.py``: Update version number.
 
-2. Check syntax of README::
-
-       python setup.py --long-description | rst2html.py --no-raw > index.html
-
-3. Remove any old stuff (just in case)::
+2. Remove any old stuff (just in case)::
 
        rm -rf build/ dist/ emg3d.egg-info/
 
-4. Push it to GitHub, create a release tagging it
+3. Push it to GitHub, create a release tagging it
+   (ensure correct tag is in local home with ``python setup.py --version``).
 
-5. Get the Zenodo-DOI and add it to release notes
+4. Get the Zenodo-DOI and add it to release notes; also RTFD, which might have
+   to be triggered first.
 
-6. Ensure ``python3-setuptools`` is installed::
-
-       sudo apt install python3-setuptools
-
-7. Create tar and wheel::
+5. Create tar and wheel::
 
        python setup.py sdist
        python setup.py bdist_wheel
 
-8. Test it on testpypi (requires ~/.pypirc)::
-
-       ~/anaconda3/bin/twine upload dist/* -r testpypi
-
-   Optionally test it already in conda if skeleton builds::
-
-       conda skeleton pypi --pypi-url https://test.pypi.io/pypi/ emg3d
-
-9. Push it to PyPi (requires ~/.pypircs)::
+6. Push it to PyPi (requires ~/.pypircs)::
 
        ~/anaconda3/bin/twine upload dist/*
 
-10. conda build
+7. ``conda`` build:
 
-    Has to be done outside of ~/, because conda skeleton cannot handle, at the
-    moment, the encrypted home
-    (https://conda.io/docs/build_tutorials/pkgs.html).
+   Has to be done outside of ~/, because conda skeleton cannot handle, at the
+   moment, the encrypted home
+   (https://conda.io/docs/build_tutorials/pkgs.html). Also, ensure you leave
+   any current conda environment with ``conda deactivate``.
 
 
-    1. Install miniconda in /opt::
+   1. Install miniconda in /opt::
 
-           wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-           bash miniconda.sh -b -p /opt/miniconda/miniconda
-           export PATH="/opt/miniconda/miniconda/bin:$PATH"
-           conda update conda
-           conda install -y conda-build anaconda-client
-           conda config --set anaconda_upload yes
-           anaconda login
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+          bash miniconda.sh -b -p /opt/miniconda/miniconda
+          export PATH="/opt/miniconda/miniconda/bin:$PATH"
+          conda update conda
+          conda install -y conda-build anaconda-client
+          conda config --set anaconda_upload yes
+          anaconda login
 
-    2. Now to the conda-build part::
+   2. Create the skeleton for conda from PyPi::
 
-           conda skeleton pypi emg3d
-           conda build --python 3.7 emg3d
+          conda skeleton pypi emg3d
 
-    3. Convert for all platforms::
+      Edit the ``emg3d/meta.yml`` in the following way:
 
-           conda convert --platform all /opt/miniconda/miniconda/conda-bld/linux-64/emg3d-[version]-py37_0.tar.bz2
+      - under ``build:``, add ``preserve_egg_dir: True``
+      - under ``requirement: host:``, add ``- setuptools_scm``
 
-    4. Upload them::
+   3. Now to the conda-build part::
 
-           anaconda upload osx-64/*
-           anaconda upload win-*/*
-           anaconda upload linux-32/*
+          conda build --python 3.7 emg3d
 
-    5. Logout::
+   4. Convert for all platforms::
 
-           anaconda logout
+          conda convert --platform all /opt/miniconda/miniconda/conda-bld/linux-64/emg3d-[version]-py37_0.tar.bz2
 
-10. Post-commit changes
+   5. Upload them::
 
-    - ``README.md``: Add the current badges (|docs| |tests| |coverage|)
+          anaconda upload osx-64/*
+          anaconda upload win-*/*
+          anaconda upload linux-32/*
+
+   6. Logout::
+
+          anaconda logout
+
+
+Useful things
+-------------
+
+- If unsure, test it first on testpypi (requires ~/.pypirc)::
+
+       ~/anaconda3/bin/twine upload dist/* -r testpypi
+
+- If unsure, test the test-pypi for conda if the skeleton builds::
+
+       conda skeleton pypi --pypi-url https://test.pypi.io/pypi/ emg3d
+
+- If there were changes to README, check it with::
+
+       python setup.py --long-description | rst2html.py --no-raw > index.html
+
+- If it fails, you might have to install ``python3-setuptools``::
+
+       sudo apt install python3-setuptools

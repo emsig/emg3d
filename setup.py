@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 from setuptools import setup
 
+# Get README and remove badges.
 readme = open('README.rst').read()
+readme = re.sub('----.*marker', '----', readme, flags=re.DOTALL)
 
 description = 'A multigrid solver for 3D electromagnetic diffusion.'
 
@@ -25,12 +28,10 @@ setup(
         'scipy>=1.1.0',
         'numba>=0.40.0',
     ],
-    setup_requires=[
-        'setuptools_scm'
-    ],
-    use_scm_version=dict(
-        root = '.',
-        relative_to = __file__,
-        write_to = os.path.join(os.path.dirname(__file__), 'emg3d/version.py')
-    ),
+    use_scm_version={
+        'root': '.',
+        'relative_to': __file__,
+        'write_to': os.path.join('emg3d', 'version.py'),
+    },
+    setup_requires=['setuptools_scm'],
 )
