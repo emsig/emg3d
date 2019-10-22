@@ -27,6 +27,8 @@ from . import utils
 from . import solver
 from .utils import Report
 
+__all__ = ['solver', 'utils', 'Report']
+
 # Version
 try:
     # - Released versions just tags: v0.8.0;
@@ -41,5 +43,3 @@ except ImportError:
     # So v0.8.0-hc is most likely v0.8.0, but it can be anything between
     # v0.8.0 and v0.8.1.
     __version__ = '0.8.1-hc'
-
-__all__ = ['solver', 'utils', 'Report']
