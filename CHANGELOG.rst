@@ -2,6 +2,15 @@ Changelog
 #########
 
 
+*v0.8.1* : setuptools_scm
+-------------------------
+
+**2019-10-22**
+
+- Implement ``setuptools_scm`` for versioning (adds git hashes for
+  dev-versions).
+
+
 *v0.8.0* : Laplace
 ------------------
 

@@ -2,7 +2,7 @@
 __pycache__/
 
 # Sphinx
-_build/
+docs/_build/
 
 # Pytest and coverage related
 htmlcov
@@ -10,3 +10,12 @@ htmlcov
 .coverage.*
 .pytest_cache/
 tests/create_data/tmp/
+
+# setuptools_scm
+emg3d/version.py
+
+# Build related
+.eggs/
+build/
+dist/
+emg3d.egg-info/

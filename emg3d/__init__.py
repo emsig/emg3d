@@ -29,4 +29,17 @@ from .utils import Report
 
 __all__ = ['solver', 'utils', 'Report']
 
-__version__ = '0.8.1dev0'
+# Version
+try:
+    # - Released versions just tags: v0.8.0;
+    # - GitHub commits add 'dev#'+hash: 0.8.1.dev4+g2785721;
+    # - Uncommited changes add timestamp: 0.8.1.dev4+g2785721.d20191022.
+    from .version import version as __version__
+except ImportError:
+    # If used without using setup.py or without the .git-directory, or using
+    # the Git or Zenodo zip-files or other unthought of ways of using it, we
+    # provide here the last stable released version number, with a '-hc' for
+    # hard-coded.
+    # So v0.8.0-hc is most likely v0.8.0, but it can be anything between
+    # v0.8.0 and v0.8.1.
+    __version__ = '0.8.1-hc'
