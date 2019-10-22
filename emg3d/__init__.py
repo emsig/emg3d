@@ -40,6 +40,6 @@ except ImportError:
     # hard-coded.
     # So v0.8.0-hc is most likely v0.8.0, but it can be anything between
     # v0.8.0 and v0.8.1.
-    __version__ = '0.8.0-hc'
+    __version__ = '0.8.1-hc'
 
 __all__ = ['solver', 'utils', 'Report']
