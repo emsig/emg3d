@@ -196,8 +196,7 @@ you prefer to get in touch outside of GitHub/Slack use the contact form on
 https://werthmuller.org.
 
 To install emg3d from source, you can download the latest version from GitHub
-and either add the path to ``emg3d`` to your python-path variable, or install
-it in your python distribution via:
+and install it in your python distribution via:
 
 .. code-block:: console
 
