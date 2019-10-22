@@ -1,5 +1,5 @@
 import time
-from pkg_resources import get_distribution
+from emg3d import __version__
 
 # ==== 1. Extensions  ====
 
@@ -46,9 +46,8 @@ copyright = u'2018-{}, The emg3d Developers.'.format(time.strftime("%Y"))
 author = 'The emg3d Developers'
 
 # |version| and |today| tags (|release|-tag is not used).
-version = get_distribution('pylops').version
-if len(version.split('+')) > 1 or version == 'unknown':
-    version = 'dev'
+version = __version__
+release = __version__
 today_fmt = '%d %B %Y'
 
 # List of patterns to ignore, relative to source directory.
