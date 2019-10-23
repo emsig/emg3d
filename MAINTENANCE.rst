@@ -7,10 +7,7 @@ Releases of ``emg3d`` are currently done manually. This is the 'recipe'.
 Making a release
 ----------------
 
-1. Update:
-
-   - ``CHANGELOG``
-   - ``emg3d/__init__.py``: Update version number.
+1. Update ``CHANGELOG.rst``.
 
 2. Remove any old stuff (just in case)::
 
