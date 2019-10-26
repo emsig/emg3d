@@ -223,7 +223,7 @@ def get_source_field(grid, src, freq, strength=0):
 
         s \mu_0 \mathbf{J}_\mathrm{s} ,
 
-    where :math:`s = -\mathrm{i} \omega`. Either finite length dipoles or
+    where :math:`s = \mathrm{i} \omega`. Either finite length dipoles or
     infinitesimal small point dipoles can be defined, whereas the return source
     field corresponds to a normalized (1 Am) source distributed within the
     cell(s) it resides (can be changed with the ``strength``-parameter).
@@ -358,7 +358,7 @@ def get_source_field(grid, src, freq, strength=0):
         sfield.fy *= strength[1]*sval*mu_0
         sfield.fz *= strength[2]*sval*mu_0
 
-        return sfield
+        return -sfield
 
     def point_source(xx, yy, zz, src, s):
         """Set point dipole source."""
@@ -843,7 +843,7 @@ class Model:
 
     def _calculate_eta(self, res):
         r"""Calculate vol*eta (:math:`V\eta`)."""
-        return self.sval*mu_0*(1./res - self.sval*epsilon_0)*self.__vol
+        return -self.sval*mu_0*(1./res + self.sval*epsilon_0)*self.__vol
 
     # MU_R's
     @property
