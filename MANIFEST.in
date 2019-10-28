@@ -1,4 +1,8 @@
-include README.rst
-include CHANGELOG.rst
-include CREDITS.rst
-include LICENSE
+prune docs
+prune tests
+exclude MAINTENANCE.rst
+exclude requirements.txt
+exclude requirements-dev.txt
+exclude runtests.sh
+exclude .gitignore
+exclude .travis.yml
