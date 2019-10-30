@@ -48,7 +48,8 @@ reports, and much more, see
 Features
 ========
 
-- Multigrid solver for 3D electromagnetic (EM) diffusion with regular grids.
+- Multigrid solver for 3D electromagnetic (EM) diffusion with regular grids
+  (where source and receiver can be electric or magnetic).
 - Calculate the 3D EM field in the complex frequency domain or in the real
   Laplace domain.
 - Can be used together with the `SimPEG <https://simpeg.xyz>`_-framework.
