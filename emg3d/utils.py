@@ -282,10 +282,10 @@ def get_source_field(grid, src, freq, strength=0):
 
     # Get Laplace parameter.
     if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-        sval = 2j*np.pi*freq
+        sval = -2j*np.pi*freq
         dtype = complex
     else:         # Laplace domain; s.
-        sval = -freq
+        sval = freq
         dtype = float
 
     # Ensure source is a point or a finite dipole.
@@ -369,7 +369,7 @@ def get_source_field(grid, src, freq, strength=0):
         sfield.fy *= strength[1]*sval*mu_0
         sfield.fz *= strength[2]*sval*mu_0
 
-        return -sfield
+        return sfield
 
     def point_source(xx, yy, zz, src, s):
         """Set point dipole source."""
@@ -717,9 +717,9 @@ class Model:
         # Get Laplace parameter.
         self.freq = freq  # Store input value.
         if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-            self.sval = 2j*np.pi*freq
+            self.sval = -2j*np.pi*freq
         else:         # Laplace domain; s.
-            self.sval = -freq
+            self.sval = freq
 
         # Store required info from grid.
         self.nC = grid.nC
@@ -858,7 +858,7 @@ class Model:
 
     def _calculate_eta(self, res):
         r"""Calculate vol*eta (:math:`V\eta`)."""
-        return -self.sval*mu_0*(1./res + self.sval*epsilon_0)*self.__vol
+        return self.sval*mu_0*(1./res - self.sval*epsilon_0)*self.__vol
 
     # MU_R's
     @property
