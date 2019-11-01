@@ -13,6 +13,12 @@ matrix:
       env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST=""
     - python: 3.7  # => 3.7
       env: PYTHON=3.7 INST=""
+    - python: 3.7  # just linkcheck
+      env: PYTHON=3.7 INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" CHCKLNKS=true
+
+jobs:
+  allow_failures:  # env must be EXACTLY as env allowed to fail.
+    - env: PYTHON=3.7 INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" CHCKLNKS=true
 
 install:
   - sudo apt-get update
@@ -30,14 +36,18 @@ install:
   # Install and activate environment, install packages
   - conda create -q -n tenv python=$PYTHON numpy scipy pytest pytest-cov numba
   - source activate tenv
+  - conda install -c prisae empymod
   - pip install setuptools_scm coveralls pytest-flake8 $INST
   - python setup.py install
 
 
-script: pytest --cov=emg3d --flake8
+
+script:  # No pytest for linkcheck-run.
+  - if [ "$CHCKLNKS" = true ]; then
+        cd docs; make html -b linkcheck;
+    else
+        pytest --cov=emg3d --flake8;
+    fi
 
 after_success:
-  - |
-    if [ $NUMBA_DISABLE_JIT == "1" ]; then
-      coveralls
-    fi
+  - if [ "$NUMBA_DISABLE_JIT" == "1" ]; then coveralls; fi

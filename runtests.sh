@@ -87,6 +87,7 @@ for i in ${PYTHON3VERSION[@]}; do
 
   # Install flake8
   if [ ! -d "$HOME/anaconda3/envs"+$NAME ]; then
+    conda install -c prisae empymod &> $PRINT
     pip install $INST &> $PRINT
   fi
 

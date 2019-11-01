@@ -515,6 +515,10 @@ def test_field():
     assert_allclose(ee.fy, ey)
     assert_allclose(ee.fz, ez)
 
+    # Test amplitude and phase.
+    assert_allclose(ee.fx.amp, np.abs(ee.fx))
+    assert_allclose(ee.fy.pha, np.rad2deg(np.unwrap(np.angle(ee.fy))))
+
     # Test the other possibilities to initiate a Field-instance.
     ee2 = utils.Field(grid, ee.field)
     assert_allclose(ee.field, ee2.field)
@@ -613,6 +617,10 @@ def test_get_receiver():
             grid, field.fx.real, ([0.5, 1, 2], [0.5, 2, 3], 2))
     assert_allclose(out5, out4)
     assert_allclose(out5real, out4.real)
+
+    # Check amplitude and phase
+    assert_allclose(out5.amp, np.abs(out5))
+    assert_allclose(out5.pha, np.rad2deg(np.unwrap(np.angle(out5))))
 
     # Check it returns 0 if outside.
     out6 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'linear')
