@@ -25,6 +25,7 @@ Utility functions for the multigrid solver.
 
 import os
 import shelve
+import empymod
 import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
@@ -191,6 +192,16 @@ class Field(np.ndarray):
     def fz(self, fz):
         """Update electric field in z-direction."""
         self.view()[-self.nEz:] = fz.ravel('F')
+
+    @property
+    def amp(self):
+        """Amplitude of the electromagnetic field."""
+        return np.abs(self.view())
+
+    @property
+    def pha(self):
+        """Phase of the electromagnetic field, unwrapped and in degrees."""
+        return 180*np.unwrap(np.angle(self.view()))/np.pi
 
     @property
     def ensure_pec(self):
@@ -523,8 +534,10 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
 
     Returns
     -------
-    new_values : ndarray
+    new_values : EMArray
         Values at ``coordinates``.
+
+        EMArray is a subclassed ndarray with ``.pha`` and ``.amp`` attributes.
 
 
     See Also
@@ -562,9 +575,11 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         points += pts
 
     if extrapolate:
-        return _interp3d(points, values, coordinates, method, None, 'nearest')
+        out = _interp3d(points, values, coordinates, method, None, 'nearest')
     else:
-        return _interp3d(points, values, coordinates, method, 0.0, 'constant')
+        out = _interp3d(points, values, coordinates, method, 0.0, 'constant')
+
+    return empymod.utils.EMArray(out)
 
 
 def get_h_field(grid, model, field):

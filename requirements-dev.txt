@@ -1,13 +1,21 @@
-numpydoc
-sphinx_numfig
-sphinx_rtd_theme
-
 numpy >= 1.15.0
 scipy >= 1.1.0
 numba >= 0.40.0
+matplotlib
+
+empymod
 
 # sphinx fixed below 2.0
 # https://github.com/numpy/numpydoc/issues/215
 sphinx < 2.0.
+numpydoc
+sphinx_numfig
+sphinx_rtd_theme
 
 setuptools_scm
+
+pytest
+pytest-cov
+pytest-flake8
+empymod
+scooby

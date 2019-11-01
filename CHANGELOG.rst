@@ -2,6 +2,17 @@ Changelog
 #########
 
 
+latest
+------
+
+- ``empymod`` is a new dependency.
+- ``Fields`` and returned receiver-arrays (``EMArray``) both have amplitude
+  (``.amp``) and phase (``.pha``) attributes.
+- Travis now checks all the url's in the documentation, so there should be no
+  broken links down the road. (Check is allowed to fail, it is visual QC.)
+- Fixes to the ``setuptools_scm``-implementation (``MANIFEST.in``).
+
+
 *v0.8.1* : setuptools_scm
 -------------------------
 
