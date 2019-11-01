@@ -219,15 +219,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           level in any direction by its value.
           Default is -1.
 
-        - ``conjugate`` : bool
-
-            The derivation by [Muld06]_ defines the Fourier transform to go
-            from frequency to time by :math:`e^{-i\omega t}`. If
-            ``conjugate=True``, the complex conjugate is returned which
-            corresponds then to :math:`e^{+i\omega t}`.
-            Default is True (this Fourier-transform convention corresponds to
-            the one used in empymod and is commonly used in CSEM).
-
         - ``return_info`` : bool
 
           If True, a dictionary is returned with runtime info (final norm and
@@ -366,10 +357,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
                   f"efield: {efield.dtype}.")
             raise ValueError('Input data types')
 
-        # Take the conjugate if required.
-        if var.conjugate:
-            np.conjugate(efield, efield)
-
         # Set flag to NOT return the field.
         var.do_return = False
 
@@ -413,10 +400,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     time = var.time.runtime
     info += f"runtime = {time}\n"                    # Total runtime.
     var.cprint(info, 1)
-
-    # Take the conjugate if required.
-    if var.conjugate:
-        np.conjugate(efield, efield)
 
     # Assemble the info_dict if return_info
     if var.return_info:
@@ -1097,8 +1080,6 @@ class MGParameters:
 
     # Whether or not to return info.
     return_info: bool = False
-    # Whether or not to return the conjugate.
-    conjugate: bool = True
 
     def __post_init__(self):
         """Set and check some of the parameters."""

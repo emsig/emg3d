@@ -103,7 +103,7 @@ def test_solver_homogeneous(capsys):
     _ = solver.solver(grid, model, sfield, verb=3, maxit=1,
                       sslsolver='gcrotmk')
 
-    # Provide initial field, with and without conjugate.
+    # Provide initial field.
     _, _ = capsys.readouterr()  # empty
     efield_copy = efield.copy()
     outarray = solver.solver(grid, model, sfield, efield_copy)
@@ -114,11 +114,6 @@ def test_solver_homogeneous(capsys):
     assert "NOTHING DONE (provided efield already good enough)" in out
     # Ensure the field did not change.
     assert_allclose(efield, efield_copy)
-
-    # ``conjugate=False``.
-    efield_copy2 = efield.conjugate()
-    solver.solver(grid, model, sfield, efield_copy2, conjugate=False)
-    assert_allclose(efield_copy.conjugate(), efield_copy2)
 
     # Provide initial field and return info.
     info = solver.solver(

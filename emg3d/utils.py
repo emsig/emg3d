@@ -234,7 +234,7 @@ def get_source_field(grid, src, freq, strength=0):
 
         s \mu_0 \mathbf{J}_\mathrm{s} ,
 
-    where :math:`s = -\mathrm{i} \omega`. Either finite length dipoles or
+    where :math:`s = \mathrm{i} \omega`. Either finite length dipoles or
     infinitesimal small point dipoles can be defined, whereas the return source
     field corresponds to a normalized (1 Am) source distributed within the
     cell(s) it resides (can be changed with the ``strength``-parameter).
@@ -282,7 +282,7 @@ def get_source_field(grid, src, freq, strength=0):
 
     # Get Laplace parameter.
     if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-        sval = 2j*np.pi*freq
+        sval = -2j*np.pi*freq
         dtype = complex
     else:         # Laplace domain; s.
         sval = freq
@@ -717,7 +717,7 @@ class Model:
         # Get Laplace parameter.
         self.freq = freq  # Store input value.
         if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-            self.sval = 2j*np.pi*freq
+            self.sval = -2j*np.pi*freq
         else:         # Laplace domain; s.
             self.sval = freq
 

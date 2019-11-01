@@ -47,7 +47,7 @@ def test_amat_x():
             grid.hy, grid.hz)
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(-rr1, rr2)
+    assert_allclose(-rr1, rr2, atol=1e-23)
 
     # 2. Compare to other solution
 

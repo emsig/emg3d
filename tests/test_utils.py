@@ -247,9 +247,9 @@ def test_get_source_field(capsys):
     y = np.sin(np.deg2rad(src[3]))*h
     x = np.cos(np.deg2rad(src[3]))*h
     z = np.sin(np.deg2rad(src[4]))
-    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/iomegamu).real, 1)
-    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/iomegamu).real, 1)
-    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/iomegamu).real, 1)
+    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/iomegamu).real, -1)
+    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/iomegamu).real, -1)
+    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/iomegamu).real, -1)
 
     # Put source on final node, should still work.
     src = [grid.vectorNx[-1], grid.vectorNy[-1], grid.vectorNz[-1],
@@ -467,9 +467,9 @@ def test_Model():
     # Check eta
     iommu = 2j*np.pi*model3.freq*utils.mu_0
     iomep = 2j*np.pi*model3.freq*utils.epsilon_0
-    eta_x = iommu*(1./model3.res_x - iomep)*model3._Model__vol
-    eta_y = iommu*(1./model3.res_y - iomep)*model3._Model__vol
-    eta_z = iommu*(1./model3.res_z - iomep)*model3._Model__vol
+    eta_x = -iommu*(1./model3.res_x + iomep)*model3._Model__vol
+    eta_y = -iommu*(1./model3.res_y + iomep)*model3._Model__vol
+    eta_z = -iommu*(1./model3.res_z + iomep)*model3._Model__vol
     assert_allclose(model3.eta_x, eta_x)
     assert_allclose(model3.eta_y, eta_y)
     assert_allclose(model3.eta_z, eta_z)
@@ -485,9 +485,9 @@ def test_Model():
     # Check eta
     smu = model5.freq*utils.mu_0
     sep = model5.freq*utils.epsilon_0
-    eta_x = smu*(1./model5.res_x - sep)*model5._Model__vol
-    eta_y = smu*(1./model5.res_y - sep)*model5._Model__vol
-    eta_z = smu*(1./model5.res_z - sep)*model5._Model__vol
+    eta_x = smu*(1./model5.res_x + sep)*model5._Model__vol
+    eta_y = smu*(1./model5.res_y + sep)*model5._Model__vol
+    eta_z = smu*(1./model5.res_z + sep)*model5._Model__vol
     assert_allclose(model5.eta_x, eta_x)
     assert_allclose(model5.eta_y, eta_y)
     assert_allclose(model5.eta_z, eta_z)
