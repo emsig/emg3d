@@ -36,6 +36,7 @@ install:
   # Install and activate environment, install packages
   - conda create -q -n tenv python=$PYTHON numpy scipy pytest pytest-cov numba
   - source activate tenv
+  - conda install -c prisae empymod
   - pip install setuptools_scm coveralls pytest-flake8 $INST
   - python setup.py install
 
