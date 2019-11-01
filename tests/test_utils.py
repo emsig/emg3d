@@ -299,9 +299,9 @@ def test_get_source_field(capsys):
     y = np.sin(np.deg2rad(src[3]))*h
     x = np.cos(np.deg2rad(src[3]))*h
     z = np.sin(np.deg2rad(src[4]))
-    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/smu), 1)
-    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/smu), 1)
-    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/smu), 1)
+    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/smu), -1)
+    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/smu), -1)
+    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/smu), -1)
 
 
 def test_get_source_field_point_vs_finite(capsys):
@@ -485,9 +485,9 @@ def test_Model():
     # Check eta
     smu = model5.freq*utils.mu_0
     sep = model5.freq*utils.epsilon_0
-    eta_x = -smu*(1./model5.res_x + sep)*model5._Model__vol
-    eta_y = -smu*(1./model5.res_y + sep)*model5._Model__vol
-    eta_z = -smu*(1./model5.res_z + sep)*model5._Model__vol
+    eta_x = smu*(1./model5.res_x + sep)*model5._Model__vol
+    eta_y = smu*(1./model5.res_y + sep)*model5._Model__vol
+    eta_z = smu*(1./model5.res_z + sep)*model5._Model__vol
     assert_allclose(model5.eta_x, eta_x)
     assert_allclose(model5.eta_y, eta_y)
     assert_allclose(model5.eta_z, eta_z)

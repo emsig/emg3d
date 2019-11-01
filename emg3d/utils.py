@@ -285,7 +285,7 @@ def get_source_field(grid, src, freq, strength=0):
         sval = 2j*np.pi*freq
         dtype = complex
     else:         # Laplace domain; s.
-        sval = freq
+        sval = -freq
         dtype = float
 
     # Ensure source is a point or a finite dipole.
@@ -719,7 +719,7 @@ class Model:
         if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
             self.sval = 2j*np.pi*freq
         else:         # Laplace domain; s.
-            self.sval = freq
+            self.sval = -freq
 
         # Store required info from grid.
         self.nC = grid.nC
