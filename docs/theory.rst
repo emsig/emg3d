@@ -120,6 +120,15 @@ The Maxwell's equations and Ohm's law are solved in the **frequency domain**.
 The **time-domain** solution can be obtained by taking the inverse Fourier
 transform.
 
+.. note::
+
+    [Muld06]_ uses the time convention :math:`e^{-\mathrm{i}\omega t}`, see
+    Equation :eq:`fourierdef`, with :math:`s=-\mathrm{i}\omega`. However, the
+    code `emg3d` uses the convention :math:`e^{\mathrm{i}\omega t}`, hence
+    :math:`s=\mathrm{i}\omega`. This is the same convention as used in
+    `empymod`, and commonly in CSEM.
+
+
 Laplace domain
 ``````````````
 It is also possible to solve the problem in the **Laplace domain**, by

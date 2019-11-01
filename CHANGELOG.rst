@@ -5,6 +5,9 @@ Changelog
 latest
 ------
 
+- Change time convention from ``exp(-iwt)`` to ``exp(iwt``, as used in
+  ``empymod`` and commonly in CSEM. Removed the parameter ``conjugate`` from
+  the solver, to simplify.
 - ``empymod`` is a new dependency.
 - ``Fields`` and returned receiver-arrays (``EMArray``) both have amplitude
   (``.amp``) and phase (``.pha``) attributes.
