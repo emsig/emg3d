@@ -96,15 +96,28 @@ resulting system of equations is
 .. math::
     :label: fdomain
 
-    \eta \mathbf{\hat{E}} - \nabla \times
+    -s \mu_0(\sigma + s\varepsilon) \mathbf{\hat{E}} - \nabla \times
     \mu_r^{-1} \nabla \times \mathbf{\hat{E}} =
     s\mu_0\mathbf{\hat{J}}_s ,
 
-where :math:`\eta = -s \mu_0(\sigma + s\varepsilon)` and :math:`s =
--\mathrm{i}\omega``. Here, only low frequencies are considered that obey
-:math:`|\omega\epsilon| \ll \sigma`. From here on, the hats are omitted.
+where :math:`s = -\mathrm{i}\omega``. The multigrid method converges in the
+case of the diffusive approximation (with its smoothing and approximation
+properties), but not in the high-frequency range (at least not in the
+implemented form of the multigrid method in ``emg3d``). The code ``emg3d``
+assumes therefore the diffusive approximation, hence only low frequencies are
+considered that obey :math:`|\omega\varepsilon| \ll \sigma`. In this case we
+can set :math:`\varepsilon=0`, and Equation :eq:`fdomain` simplifies to
 
-We use the perfectly electrically conducting boundary
+.. math::
+    :label: fdomaindiff
+
+    -s \mu_0 \sigma \mathbf{\hat{E}} - \nabla \times
+    \mu_r^{-1} \nabla \times \mathbf{\hat{E}} =
+    s\mu_0\mathbf{\hat{J}}_s ,
+
+
+From here on, the hats are omitted. We use the perfectly electrically
+conducting boundary
 
 .. math::
     :label: pec
@@ -132,7 +145,7 @@ transform.
 Laplace domain
 ``````````````
 It is also possible to solve the problem in the **Laplace domain**, by
-using a real value for :math:`s` in Equation :eq:`fdomain`, instead of the
+using a real value for :math:`s` in Equation :eq:`fdomaindiff`, instead of the
 complex value :math:`-\mathrm{i}\omega``. This simplifies the problem from
 complex numbers to real numbers, which accelerates the calculation. It also
 improves the convergence rate, as the solution is a smoother function. The
@@ -146,8 +159,8 @@ you can use `emg3d` for Laplace-domain calculations.
 Discretisation
 --------------
 
-Equation :eq:`fdomain` can be discretised by the finite-integration technique
-([Weil77]_, [ClWe01]_). This scheme can be viewed as a finite-volume
+Equation :eq:`fdomaindiff` can be discretised by the finite-integration
+technique ([Weil77]_, [ClWe01]_). This scheme can be viewed as a finite-volume
 generalization of [Yee66]_'s  scheme for tensor-product Cartesian grids with
 variable grid spacings. An error analysis for the constant-coefficient case
 ([MoSu94]_) showed that both the electric and magnetic field components have
@@ -165,8 +178,8 @@ as vertices. The cell centres are located at
     y_{l+1/2} &= {\textstyle \frac{1}{2}}\left(y_l + y_{l+1}\right) , \\
     z_{m+1/2} &= {\textstyle \frac{1}{2}}\left(z_m + z_{m+1}\right) .
 
-The material properties, :math:`\eta` and :math:`\mu_\mathrm{r}^{-1}`, are
-assumed to be given as cell-averaged values. The electric field components are
+The material properties, :math:`\sigma` and :math:`\mu_\mathrm{r}`, are assumed
+to be given as cell-averaged values. The electric field components are
 positioned at the edges of the cells, as shown in :numref:`Figure %s
 <Muld06_Fig1>`, in a manner similar to Yee’s scheme. The first component of the
 electric field :math:`E_{1, k+1/2, l, m}` should approximate the average of
@@ -197,11 +210,11 @@ The averages and point-values are the same within second-order accuracy.
    taking the curl of the electric field.
 
 
-For the discretisation of the term :math:`\eta\mathbf{E}` related to Ohm's law,
-dual volumes related to edges are introduced. For a given edge, the dual volume
-is a quarter of the total volume of the four adjacent cells. An example for
-:math:`E_1` is shown in :numref:`Figure %s(b) <Muld06_Fig2>`. The vertices of
-the dual cell are located at the midpoints of the cell faces.
+For the discretisation of the term :math:`-s\mu_0\sigma\mathbf{E}` related to
+Ohm's law, dual volumes related to edges are introduced. For a given edge, the
+dual volume is a quarter of the total volume of the four adjacent cells. An
+example for :math:`E_1` is shown in :numref:`Figure %s(b) <Muld06_Fig2>`. The
+vertices of the dual cell are located at the midpoints of the cell faces.
 
 .. figure:: _static/Muld06_Fig2.png
    :scale: 100 %
@@ -269,12 +282,12 @@ the boundaries. We may simply take :math:`d^x_0 = h^x_{1/2}` at :math:`k = 0`,
 :math:`d^x_{N_x} = h^x_{N_x-1/2}` at :math:`k = N_x` and so on, or use half of
 these values as was done by [MoSu94]_.
 
-The discrete form of the term
-:math:`\eta\mathbf{E}` in Equation :eq:`fdomain`, with each component
-multiplied by the corresponding dual volume, becomes :math:`\mathcal{S}_{k+1/2,
-l, m}\ E_{1, k+1/2, l, m}`, :math:`\mathcal{S}_{k, l+1/2, m}\ E_{2, k, l+1/2,
-m}` and :math:`\mathcal{S}_{k, l, m+1/2}\ E_{3, k, l, m+1/2}` for the first,
-second and third components, respectively. Here :math:`\mathcal{S} = \eta V` is
+The discrete form of the term :math:`-s\mu_0\sigma\mathbf{E}` in Equation
+:eq:`fdomaindiff`, with each component multiplied by the corresponding dual
+volume, becomes :math:`\mathcal{S}_{k+1/2, l, m}\ E_{1, k+1/2, l, m}`,
+:math:`\mathcal{S}_{k, l+1/2, m}\ E_{2, k, l+1/2, m}` and
+:math:`\mathcal{S}_{k, l, m+1/2}\ E_{3, k, l, m+1/2}` for the first, second and
+third components, respectively. Here :math:`\mathcal{S} = -s\mu_0\sigma V` is
 defined in terms of cell-averages. At the edges parallel to the x-axis, an
 averaging procedure similar to :eq:`dualvolume` gives
 
@@ -300,7 +313,7 @@ to the face is obtained. In order to find the curl of the magnetic field, the
 magnetic field components that are normal to faces are interpreted as
 tangential components at the faces of the dual volumes. For :math:`E_1`, this
 is shown in :numref:`Figure %s <Muld06_Fig2>`. For the first component of
-Equation :eq:`fdomain` on the edge :math:`(k+1/2, l, m)` connecting
+Equation :eq:`fdomaindiff` on the edge :math:`(k+1/2, l, m)` connecting
 :math:`(x_k, y_l, z_m)` and :math:`(x_{k+1}, y_l, z_m)`, the corresponding dual
 volume comprises the set :math:`[x_k, x_{k+1}] \times [y_{l-1/2}, y_{l+1/2}]
 \times [z_{m-1/2}, z_{m+1/2}]` having volume :math:`V_{k+1/2,l,m}`.
@@ -401,7 +414,7 @@ solution to the problem be defined as
     :label: residualeq
 
     \mathbf{r} = V \left(\mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} +
-    \eta \mathbf{E} -
+    -s\mu_0\sigma \mathbf{E} -
     \nabla \times \mu^{-1}_\mathrm{r} \nabla \times \mathbf{E}\right) .
 
 Its discretisation is

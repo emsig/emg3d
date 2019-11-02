@@ -33,7 +33,7 @@ _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 # LinearOperator to calculate A x
 @nb.njit(**_numba_setting)
-def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
+def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
     r"""Residual without or with source term.
 
     Calculate the residual as given in [Muld06]_ in middle of the right column
@@ -54,7 +54,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
     .. math::
 
         \mathrm{i}\omega\mu_0 \tilde{\sigma} \mathrm{E}
-        - \nabla \times \mu_r^{-1} \nabla \times \mathrm{E}
+        - \nabla \times \zeta^{-1} \nabla \times \mathrm{E}
         = - \mathrm{i} \omega \mu_0 \mathrm{J_s} .
 
     It can therefore be used as ``matvec`` to create a ``LinearOperator``,
@@ -79,7 +79,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
         Electric fields in x-, y-, and z-directions, as obtained from
         :class:`emg3d.utils.Field`.
 
-    eta_x, eta_y, eta_z, mu_r : ndarray
+    eta_x, eta_y, eta_z, zeta : ndarray
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
@@ -131,19 +131,19 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
                 v3pm = ((ey[ixp, iym, iz] - ey[ix, iym, iz])/hx[ix] -
                         (ex[ix, iy, iz] - ex[ix, iym, iz])/hy[iym])
 
-                # 2. Multiply by average of mu_r [Muld06]_ p 636 bottom-left.
+                # 2. Multiply by average of zeta [Muld06]_ p 636 bottom-left.
                 # u = M v = V mu_r^-1 v = V mu_r^-1 nabla x E
-                v1pp *= 0.5*(mu_r[ixm, iy, iz] + mu_r[ix, iy, iz])
-                v1mp *= 0.5*(mu_r[ixm, iym, iz] + mu_r[ix, iym, iz])
-                v1pm *= 0.5*(mu_r[ixm, iy, izm] + mu_r[ix, iy, izm])
+                v1pp *= 0.5*(zeta[ixm, iy, iz] + zeta[ix, iy, iz])
+                v1mp *= 0.5*(zeta[ixm, iym, iz] + zeta[ix, iym, iz])
+                v1pm *= 0.5*(zeta[ixm, iy, izm] + zeta[ix, iy, izm])
 
-                v2pp *= 0.5*(mu_r[ix, iym, iz] + mu_r[ix, iy, iz])
-                v2mp *= 0.5*(mu_r[ixm, iym, iz] + mu_r[ixm, iy, iz])
-                v2pm *= 0.5*(mu_r[ix, iym, izm] + mu_r[ix, iy, izm])
+                v2pp *= 0.5*(zeta[ix, iym, iz] + zeta[ix, iy, iz])
+                v2mp *= 0.5*(zeta[ixm, iym, iz] + zeta[ixm, iy, iz])
+                v2pm *= 0.5*(zeta[ix, iym, izm] + zeta[ix, iy, izm])
 
-                v3pp *= 0.5*(mu_r[ix, iy, izm] + mu_r[ix, iy, iz])
-                v3mp *= 0.5*(mu_r[ixm, iy, izm] + mu_r[ixm, iy, iz])
-                v3pm *= 0.5*(mu_r[ix, iym, izm] + mu_r[ix, iym, iz])
+                v3pp *= 0.5*(zeta[ix, iy, izm] + zeta[ix, iy, iz])
+                v3mp *= 0.5*(zeta[ixm, iy, izm] + zeta[ixm, iy, iz])
+                v3pm *= 0.5*(zeta[ix, iym, izm] + zeta[ix, iym, iz])
 
                 # 3. Another curl [Muld06]_ p. 636 bottom-right; completes:
                 # nabla x M v = nabla x V mu_r^-1 nabla x E
@@ -183,7 +183,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
 
 # Gauss-Seidel method
 @nb.njit(**_numba_setting)
-def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
+def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                  nu):
     r"""Gauss-Seidel method.
 
@@ -252,7 +252,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
         Source fields in x-, y-, and z-directions, as obtained from
         :class:`emg3d.utils.Field`.
 
-    eta_x, eta_y, eta_z, mu_r :
+    eta_x, eta_y, eta_z, zeta :
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
@@ -325,30 +325,30 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
                     ixp = ix+1
 
                     # Averaging of 1/mu_r: mzyRxm etc.
-                    mzyLxm = ky[iym]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzyRxm = ky[iy]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    myzLxm = kz[izm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myzRxm = kz[iz]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    mzyLxp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    mzyRxp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    myzLxp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    myzRxp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    mzxLym = kx[ixm]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzxRym = kx[ix]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    mxzLym = kz[izm]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxzRym = kz[iz]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    mzxLyp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    mzxRyp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    mxzLyp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    mxzRyp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
-                    myxLzm = kx[ixm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myxRzm = kx[ix]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    mxyLzm = ky[iym]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxyRzm = ky[iy]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    myxLzp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    myxRzp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    mxyLzp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    mxyRzp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
+                    mzyLxm = ky[iym]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzyRxm = ky[iy]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    myzLxm = kz[izm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myzRxm = kz[iz]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    mzyLxp = ky[iym]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    mzyRxp = ky[iy]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    myzLxp = kz[izm]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    myzRxp = kz[iz]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    mzxLym = kx[ixm]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzxRym = kx[ix]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    mxzLym = kz[izm]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxzRym = kz[iz]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    mzxLyp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    mzxRyp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    mxzLyp = kz[izm]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    mxzRyp = kz[iz]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
+                    myxLzm = kx[ixm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myxRzm = kx[ix]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    mxyLzm = ky[iym]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxyRzm = ky[iy]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    myxLzp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    myxRzp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    mxyLzp = ky[iym]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    mxyRzp = ky[iy]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
 
                     # Diagonal elements
                     st0 = (eta_x[ixm, iy, iz] + eta_x[ixm, iy, izm] +
@@ -481,7 +481,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy, hz,
 
 
 @nb.njit(**_numba_setting)
-def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
+def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                    hz, nu):
     r"""Gauss-Seidel method with line relaxation in x-direction.
 
@@ -533,7 +533,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
         Source fields in x-, y-, and z-directions, as obtained from
         :class:`emg3d.utils.Field`.
 
-    eta_x, eta_y, eta_z, mu_r :
+    eta_x, eta_y, eta_z, zeta :
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
@@ -607,30 +607,30 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
                     ixm = ixh-1
 
                     # Averaging of 1/mu_r: mzyRxm etc.
-                    mzyLxm = ky[iym]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzyRxm = ky[iy]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    myzLxm = kz[izm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myzRxm = kz[iz]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    # mzyLxp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    # mzyRxp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    # myzLxp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    # myzRxp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    mzxLym = kx[ixm]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzxRym = kx[ix]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    mxzLym = kz[izm]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxzRym = kz[iz]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    mzxLyp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    mzxRyp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    mxzLyp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    mxzRyp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
-                    myxLzm = kx[ixm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myxRzm = kx[ix]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    mxyLzm = ky[iym]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxyRzm = ky[iy]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    myxLzp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    myxRzp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    mxyLzp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    mxyRzp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
+                    mzyLxm = ky[iym]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzyRxm = ky[iy]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    myzLxm = kz[izm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myzRxm = kz[iz]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    # mzyLxp = ky[iym]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    # mzyRxp = ky[iy]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    # myzLxp = kz[izm]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    # myzRxp = kz[iz]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    mzxLym = kx[ixm]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzxRym = kx[ix]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    mxzLym = kz[izm]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxzRym = kz[iz]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    mzxLyp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    mzxRyp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    mxzLyp = kz[izm]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    mxzRyp = kz[iz]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
+                    myxLzm = kx[ixm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myxRzm = kx[ix]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    mxyLzm = ky[iym]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxyRzm = ky[iy]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    myxLzp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    myxRzp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    mxyLzp = ky[iym]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    mxyRzp = ky[iy]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
 
                     # Diagonal elements
                     st0 = (eta_x[ixm, iy, iz] + eta_x[ixm, iy, izm] +
@@ -755,7 +755,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
 
 
 @nb.njit(**_numba_setting)
-def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
+def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                    hz, nu):
     r"""Gauss-Seidel method with line relaxation in y-direction.
 
@@ -812,7 +812,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
         Source fields in x-, y-, and z-directions, as obtained from
         :class:`emg3d.utils.Field`.
 
-    eta_x, eta_y, eta_z, mu_r :
+    eta_x, eta_y, eta_z, zeta :
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
@@ -886,30 +886,30 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
                     iym = iyh-1
 
                     # Averaging of 1/mu_r: mzyRxm etc.
-                    mzyLxm = ky[iym]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzyRxm = ky[iy]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    myzLxm = kz[izm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myzRxm = kz[iz]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    mzyLxp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    mzyRxp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    myzLxp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    myzRxp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    mzxLym = kx[ixm]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzxRym = kx[ix]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    mxzLym = kz[izm]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxzRym = kz[iz]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    # mzxLyp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    # mzxRyp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    # mxzLyp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    # mxzRyp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
-                    myxLzm = kx[ixm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myxRzm = kx[ix]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    mxyLzm = ky[iym]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxyRzm = ky[iy]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    myxLzp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    myxRzp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    mxyLzp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    mxyRzp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
+                    mzyLxm = ky[iym]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzyRxm = ky[iy]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    myzLxm = kz[izm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myzRxm = kz[iz]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    mzyLxp = ky[iym]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    mzyRxp = ky[iy]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    myzLxp = kz[izm]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    myzRxp = kz[iz]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    mzxLym = kx[ixm]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzxRym = kx[ix]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    mxzLym = kz[izm]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxzRym = kz[iz]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    # mzxLyp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    # mzxRyp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    # mxzLyp = kz[izm]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    # mxzRyp = kz[iz]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
+                    myxLzm = kx[ixm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myxRzm = kx[ix]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    mxyLzm = ky[iym]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxyRzm = ky[iy]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    myxLzp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    myxRzp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    mxyLzp = ky[iym]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    mxyRzp = ky[iy]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
 
                     # Diagonal elements
                     st0 = (eta_x[ixm, iy, iz] + eta_x[ixm, iy, izm] +
@@ -1034,7 +1034,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
 
 
 @nb.njit(**_numba_setting)
-def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
+def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                    hz, nu):
     r"""Gauss-Seidel method with line relaxation in z-direction.
 
@@ -1086,7 +1086,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
         Source fields in x-, y-, and z-directions, as obtained from
         :class:`emg3d.utils.Field`.
 
-    eta_x, eta_y, eta_z, mu_r :
+    eta_x, eta_y, eta_z, zeta :
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
@@ -1160,30 +1160,30 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, mu_r, hx, hy,
                     izm = izh-1
 
                     # Averaging of 1/mu_r: mzyRxm etc.
-                    mzyLxm = ky[iym]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzyRxm = ky[iy]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    myzLxm = kz[izm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myzRxm = kz[iz]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    mzyLxp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    mzyRxp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    myzLxp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    myzRxp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    mzxLym = kx[ixm]*(mu_r[ixm, iym, iz] + mu_r[ixm, iym, izm])
-                    mzxRym = kx[ix]*(mu_r[ix, iym, iz] + mu_r[ix, iym, izm])
-                    mxzLym = kz[izm]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxzRym = kz[iz]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    mzxLyp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iy, izm])
-                    mzxRyp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iy, izm])
-                    mxzLyp = kz[izm]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    mxzRyp = kz[iz]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
-                    myxLzm = kx[ixm]*(mu_r[ixm, iy, izm] + mu_r[ixm, iym, izm])
-                    myxRzm = kx[ix]*(mu_r[ix, iy, izm] + mu_r[ix, iym, izm])
-                    mxyLzm = ky[iym]*(mu_r[ix, iym, izm] + mu_r[ixm, iym, izm])
-                    mxyRzm = ky[iy]*(mu_r[ix, iy, izm] + mu_r[ixm, iy, izm])
-                    # myxLzp = kx[ixm]*(mu_r[ixm, iy, iz] + mu_r[ixm, iym, iz])
-                    # myxRzp = kx[ix]*(mu_r[ix, iy, iz] + mu_r[ix, iym, iz])
-                    # mxyLzp = ky[iym]*(mu_r[ix, iym, iz] + mu_r[ixm, iym, iz])
-                    # mxyRzp = ky[iy]*(mu_r[ix, iy, iz] + mu_r[ixm, iy, iz])
+                    mzyLxm = ky[iym]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzyRxm = ky[iy]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    myzLxm = kz[izm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myzRxm = kz[iz]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    mzyLxp = ky[iym]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    mzyRxp = ky[iy]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    myzLxp = kz[izm]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    myzRxp = kz[iz]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    mzxLym = kx[ixm]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    mzxRym = kx[ix]*(zeta[ix, iym, iz] + zeta[ix, iym, izm])
+                    mxzLym = kz[izm]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxzRym = kz[iz]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    mzxLyp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
+                    mzxRyp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iy, izm])
+                    mxzLyp = kz[izm]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    mxzRyp = kz[iz]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
+                    myxLzm = kx[ixm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
+                    myxRzm = kx[ix]*(zeta[ix, iy, izm] + zeta[ix, iym, izm])
+                    mxyLzm = ky[iym]*(zeta[ix, iym, izm] + zeta[ixm, iym, izm])
+                    mxyRzm = ky[iy]*(zeta[ix, iy, izm] + zeta[ixm, iy, izm])
+                    # myxLzp = kx[ixm]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
+                    # myxRzp = kx[ix]*(zeta[ix, iy, iz] + zeta[ix, iym, iz])
+                    # mxyLzp = ky[iym]*(zeta[ix, iym, iz] + zeta[ixm, iym, iz])
+                    # mxyRzp = ky[iy]*(zeta[ix, iy, iz] + zeta[ixm, iy, iz])
 
                     # Diagonal elements
                     st0 = (eta_x[ixm, iy, iz] + eta_x[ixm, iy, izm] +

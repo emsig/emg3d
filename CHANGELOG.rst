@@ -5,6 +5,10 @@ Changelog
 latest
 ------
 
+- The multigrid method, as implemented, only works for the diffusive
+  approximation. Nevertheless, we always used ``\sigma-i\omega\epsilon``, hence
+  a complex number. This is now changed and ``\epsilon`` set to 0, leaving only
+  ``\sigma``.
 - Change time convention from ``exp(-iwt)`` to ``exp(iwt)``, as used in
   ``empymod`` and commonly in CSEM. Removed the parameter ``conjugate`` from
   the solver, to simplify.

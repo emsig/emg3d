@@ -663,7 +663,7 @@ def krylov(grid, model, sfield, efield, var):
         njitted.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz)
+                model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz)
 
         # Return Field instance.
         return -rfield
@@ -781,7 +781,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Collect Gauss-Seidel input (same for all routines)
     inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz, nu)
+           model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz, nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
@@ -884,7 +884,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
         cmodel.eta_z = _restrict_model_parameters(model.eta_z, sc_dir)
     else:
         cmodel.eta_z = cmodel.eta_x
-    cmodel.v_mu_r = _restrict_model_parameters(model.v_mu_r, sc_dir)
+    cmodel.zeta = _restrict_model_parameters(model.zeta, sc_dir)
 
     # 3. RESTRICT FIELDS
 
@@ -1030,7 +1030,7 @@ def residual(grid, model, sfield, efield, norm=False):
     rfield = sfield.copy()
     njitted.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
-                   model.v_mu_r, grid.hx, grid.hy, grid.hz)
+                   model.zeta, grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
         return njitted.l2norm(rfield)

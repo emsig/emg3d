@@ -48,9 +48,7 @@ __all__ = ['Field', 'get_source_field', 'get_receiver', 'get_h_field', 'Model',
            'data_read', 'Time', 'Report']
 
 # CONSTANTS
-c = 299792458              # Speed of light m/s
 mu_0 = 4e-7*np.pi          # Magn. permeability of free space [H/m]
-epsilon_0 = 1./(mu_0*c*c)  # Elec. permittivity of free space [F/m]
 
 
 # FIELDS
@@ -640,7 +638,7 @@ def get_h_field(grid, model, field):
 
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
-    if model._Model__mu_r is not None:
+    if model._Model__zeta is not None:
 
         # Plus and minus indices.
         ixm = np.r_[0, np.arange(grid.nCx)]
@@ -651,9 +649,9 @@ def get_h_field(grid, model, field):
         izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
 
         # Average mu_r for dual-grid.
-        mu_r_x = (model.v_mu_r[ixm, :, :] + model.v_mu_r[ixp, :, :])/2.
-        mu_r_y = (model.v_mu_r[:, iym, :] + model.v_mu_r[:, iyp, :])/2.
-        mu_r_z = (model.v_mu_r[:, :, izm] + model.v_mu_r[:, :, izp])/2.
+        zeta_x = (model.zeta[ixm, :, :] + model.zeta[ixp, :, :])/2.
+        zeta_y = (model.zeta[:, iym, :] + model.zeta[:, iyp, :])/2.
+        zeta_z = (model.zeta[:, :, izm] + model.zeta[:, :, izp])/2.
 
         hvx = grid.hx[:, None, None]
         hvy = grid.hy[None, :, None]
@@ -665,9 +663,9 @@ def get_h_field(grid, model, field):
         dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
 
         # Multiply fields by mu_r.
-        e3d_hx *= mu_r_x/(dx[:, None, None]*hvy*hvz)
-        e3d_hy *= mu_r_y/(hvx*dy[None, :, None]*hvz)
-        e3d_hz *= mu_r_z/(hvx*hvy*dz[None, None, :])
+        e3d_hx *= zeta_x/(dx[:, None, None]*hvy*hvz)
+        e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
+        e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
 
     # Create a Field-instance and divide by sval*mu_0 and return.
     hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
@@ -681,9 +679,9 @@ class Model:
 
     Class to provide model parameters (x-, y-, and z-directed resistivities) to
     the solver. Relative magnetic permeability :math:`\mu_r` is by default set
-    to one, but can be provided (isotropically). Relative electric permittivity
-    :math:`\varepsilon_r` is fixed at 1, as ``emg3d`` uses the diffusive
-    approximation of Maxwell's equations.
+    to one, but can be provided (isotropically). The multigrid method as
+    implemented in ``emg3d`` only works for the diffusive approximation, the
+    relative electric permittivity :math:`\varepsilon_r` is therefore set to 0.
 
 
     Parameters
@@ -780,11 +778,11 @@ class Model:
 
         # Store magnetic permeability.
         if mu_r is None or isinstance(mu_r, (float, int)):
-            self.__mu_r = mu_r
+            self.__zeta = mu_r
         elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
-            self.__mu_r = mu_r
+            self.__zeta = mu_r
         elif mu_r.size == self.nC and mu_r.ndim == 1:
-            self.__mu_r = mu_r.reshape(self.vnC, order='F')
+            self.__zeta = mu_r.reshape(self.vnC, order='F')
 
     # RESISTIVITIES
     @property
@@ -857,17 +855,17 @@ class Model:
             return self.__eta_x
 
     def _calculate_eta(self, res):
-        r"""Calculate vol*eta (:math:`V\eta`)."""
-        return self.sval*mu_0*(1./res - self.sval*epsilon_0)*self.__vol
+        r"""eta: volume divided by resistivity."""
+        return self.sval*mu_0*self.__vol/res
 
     # MU_R's
     @property
-    def v_mu_r(self):
-        r"""Volume divided by relative magnetic permeability."""
-        if self.__mu_r is None:
+    def zeta(self):
+        r"""zeta: volume divided by relative magnetic permeability."""
+        if self.__zeta is None:
             return self.__vol
         else:
-            return self.__vol/self.__mu_r
+            return self.__vol/self.__zeta
 
 
 # INTERPOLATION

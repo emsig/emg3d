@@ -401,7 +401,6 @@ def test_Model():
     # Using defaults
     model1 = utils.Model(grid)
     assert utils.mu_0 == constants.mu_0            # Check constants
-    assert utils.epsilon_0 == constants.epsilon_0  # Check constants
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
@@ -446,14 +445,14 @@ def test_Model():
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert_allclose(model3._Model__vol/res_x, model3.v_mu_r)
+    assert_allclose(model3._Model__vol/res_x, model3.zeta)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
                           res_z.ravel('F'), freq=1.234, mu_r=res_y.ravel('F'))
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
-    assert_allclose(model3b._Model__vol/res_y, model3b.v_mu_r)
+    assert_allclose(model3b._Model__vol/res_y, model3b.zeta)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
@@ -466,36 +465,34 @@ def test_Model():
 
     # Check eta
     iommu = 2j*np.pi*model3.freq*utils.mu_0
-    iomep = 2j*np.pi*model3.freq*utils.epsilon_0
-    eta_x = -iommu*(1./model3.res_x + iomep)*model3._Model__vol
-    eta_y = -iommu*(1./model3.res_y + iomep)*model3._Model__vol
-    eta_z = -iommu*(1./model3.res_z + iomep)*model3._Model__vol
+    eta_x = -iommu/model3.res_x*model3._Model__vol
+    eta_y = -iommu/model3.res_y*model3._Model__vol
+    eta_z = -iommu/model3.res_z*model3._Model__vol
     assert_allclose(model3.eta_x, eta_x)
     assert_allclose(model3.eta_y, eta_y)
     assert_allclose(model3.eta_z, eta_z)
 
     # Check volume
-    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.v_mu_r)
+    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.zeta)
     model4 = utils.Model(grid, 1, freq=1)
-    assert_allclose(model4.v_mu_r, grid.vol.reshape(grid.vnC, order='F'))
+    assert_allclose(model4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
     # Check Laplace domain
     model5 = utils.Model(grid, res_x, res_y, res_z, freq=-1.234, mu_r=res_x)
 
     # Check eta
     smu = model5.freq*utils.mu_0
-    sep = model5.freq*utils.epsilon_0
-    eta_x = smu*(1./model5.res_x + sep)*model5._Model__vol
-    eta_y = smu*(1./model5.res_y + sep)*model5._Model__vol
-    eta_z = smu*(1./model5.res_z + sep)*model5._Model__vol
+    eta_x = smu/model5.res_x*model5._Model__vol
+    eta_y = smu/model5.res_y*model5._Model__vol
+    eta_z = smu/model5.res_z*model5._Model__vol
     assert_allclose(model5.eta_x, eta_x)
     assert_allclose(model5.eta_y, eta_y)
     assert_allclose(model5.eta_z, eta_z)
 
     # Check volume
-    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.v_mu_r)
+    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.zeta)
     model6 = utils.Model(grid, 1, freq=-1)
-    assert_allclose(model6.v_mu_r, grid.vol.reshape(grid.vnC, order='F'))
+    assert_allclose(model6.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
 
 def test_field():

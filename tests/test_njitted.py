@@ -36,14 +36,14 @@ def test_amat_x():
     rr1 = utils.Field(grid)
     njitted.amat_x(
             rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
-            model.eta_x, model.eta_y, model.eta_z, model.v_mu_r, grid.hx,
+            model.eta_x, model.eta_y, model.eta_z, model.zeta, grid.hx,
             grid.hy, grid.hz)
 
     # amat_x - alternative
     rr2 = utils.Field(grid)
     alternatives.alt_amat_x(
             rr2.fx, rr2.fy, rr2.fz, efield.fx, efield.fy, efield.fz,
-            model.eta_x, model.eta_y, model.eta_z, model.v_mu_r, grid.hx,
+            model.eta_x, model.eta_y, model.eta_z, model.zeta, grid.hx,
             grid.hy, grid.hz)
 
     # Check all fields (ex, ey, and ez)
@@ -111,7 +111,7 @@ def test_gauss_seidel():
         efield = solver.solver(grid, model, sfield, maxit=2, verb=1)
 
         inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-               model.eta_z, model.v_mu_r, grid.hx, grid.hy, grid.hz, nu)
+               model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz, nu)
 
         # Get result from `gauss_seidel`.
         cfield = utils.Field(grid, efield.copy())
