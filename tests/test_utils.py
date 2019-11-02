@@ -235,7 +235,7 @@ def test_get_source_field(capsys):
     grid = utils.TensorMesh([h*200, h*400, h*800], -np.array(src[:3]))
     freq = 1.2458
     sfield = utils.get_source_field(grid, src, freq)
-    iomegamu = 2j*np.pi*freq*4e-7*np.pi
+    iomegamu = 2j*np.pi*freq*constants.mu_0
 
     # Check zeros
     assert 0 == np.sum(np.r_[sfield.fx[:, 2:, :].ravel(),
@@ -250,6 +250,12 @@ def test_get_source_field(capsys):
     assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/iomegamu).real, -1)
     assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/iomegamu).real, -1)
     assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/iomegamu).real, -1)
+    assert_allclose(np.sum(sfield.vx[:2, 1, :2]/x), 1)
+    assert_allclose(np.sum(sfield.vy[1, :2, :2]/y), 1)
+    assert_allclose(np.sum(sfield.vz[1, 1:2, :2]/z), 1)
+    assert sfield._freq == freq
+    assert sfield.freq == freq
+    assert_allclose(sfield.smu0, -iomegamu)
 
     # Put source on final node, should still work.
     src = [grid.vectorNx[-1], grid.vectorNy[-1], grid.vectorNz[-1],
@@ -287,7 +293,7 @@ def test_get_source_field(capsys):
     grid = utils.TensorMesh([h*200, h*400, h*800], -np.array(src[:3]))
     freq = 1.2458
     sfield = utils.get_source_field(grid, src, -freq)
-    smu = freq*4e-7*np.pi
+    smu = freq*constants.mu_0
 
     # Check zeros
     assert 0 == np.sum(np.r_[sfield.fx[:, 2:, :].ravel(),
@@ -302,6 +308,12 @@ def test_get_source_field(capsys):
     assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/smu), -1)
     assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/smu), -1)
     assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/smu), -1)
+    assert_allclose(np.sum(sfield.vx[:2, 1, :2]/x), 1)
+    assert_allclose(np.sum(sfield.vy[1, :2, :2]/y), 1)
+    assert_allclose(np.sum(sfield.vz[1, 1:2, :2]/z), 1)
+    assert sfield._freq == -freq
+    assert sfield.freq == freq
+    assert_allclose(sfield.smu0, -freq*constants.mu_0)
 
 
 def test_get_source_field_point_vs_finite(capsys):
@@ -400,9 +412,6 @@ def test_Model():
 
     # Using defaults
     model1 = utils.Model(grid)
-    assert utils.mu_0 == constants.mu_0            # Check constants
-    assert model1.sval == -2j*np.pi
-    assert model1.smu0 == -2j*np.pi*constants.mu_0
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
@@ -444,14 +453,14 @@ def test_Model():
         utils.Model(grid, res_z=np.array([1, 3]))
 
     # Check with all inputs
-    model3 = utils.Model(grid, res_x, res_y, res_z, freq=1.234, mu_r=res_x)
+    model3 = utils.Model(grid, res_x, res_y, res_z, mu_r=res_x)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
     assert_allclose(model3._vol/res_x, model3.zeta)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
-                          res_z.ravel('F'), freq=1.234, mu_r=res_y.ravel('F'))
+                          res_z.ravel('F'), mu_r=res_y.ravel('F'))
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
@@ -476,24 +485,8 @@ def test_Model():
 
     # Check volume
     assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.zeta)
-    model4 = utils.Model(grid, 1, freq=1)
+    model4 = utils.Model(grid, 1)
     assert_allclose(model4.zeta, grid.vol.reshape(grid.vnC, order='F'))
-
-    # Check Laplace domain
-    model5 = utils.Model(grid, res_x, res_y, res_z, freq=-1.234, mu_r=res_x)
-
-    # Check eta
-    eta_x = 1/model5.res_x*model5._vol
-    eta_y = 1/model5.res_y*model5._vol
-    eta_z = 1/model5.res_z*model5._vol
-    assert_allclose(model5.eta_x, eta_x)
-    assert_allclose(model5.eta_y, eta_y)
-    assert_allclose(model5.eta_z, eta_z)
-
-    # Check volume
-    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.zeta)
-    model6 = utils.Model(grid, 1, freq=-1)
-    assert_allclose(model6.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
 
 def test_field():
@@ -541,6 +534,19 @@ def test_field():
     assert abs(np.sum(ee.fy[:, :, 0] + ee.fy[:, :, -1])) == 0
     assert abs(np.sum(ee.fz[0, :, :] + ee.fz[-1, :, :])) == 0
     assert abs(np.sum(ee.fz[:, 0, :] + ee.fz[:, -1, :])) == 0
+
+
+def test_source_field():
+    # Create some dummy data
+    grid = utils.TensorMesh(
+            [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
+            np.zeros(3))
+
+    freq = np.pi
+    ss = utils.SourceField(grid, freq=freq)
+    assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
+    assert hasattr(ss, 'vector')
+    assert hasattr(ss, 'vx')
 
 
 def test_get_h_field():
@@ -841,6 +847,8 @@ def test_data_write_read(tmpdir, capsys):
             [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
             np.zeros(3))
 
+    freq = np.pi
+
     model = utils.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
     _ = model.eta_x  # Force these to build
     _ = model.eta_y  # Force these to build
@@ -850,7 +858,7 @@ def test_data_write_read(tmpdir, capsys):
     e1 = create_dummy(*grid.vnEx)
     e2 = create_dummy(*grid.vnEy)
     e3 = create_dummy(*grid.vnEz)
-    ee = utils.Field(e1, e2, e3)
+    ee = utils.Field(e1, e2, e3, freq=freq)
 
     # Write and read data, single arguments
     utils.data_write('testthis', 'ee', ee, tmpdir, -1)
@@ -858,6 +866,8 @@ def test_data_write_read(tmpdir, capsys):
 
     # Compare data
     assert_allclose(ee, ee_out)
+    assert_allclose(ee.smu0, ee_out.smu0)
+    assert_allclose(ee.freq, ee_out.freq)
 
     # Write and read data, multi arguments
     args = ('grid', 'ee', 'model')

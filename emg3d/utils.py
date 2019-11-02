@@ -42,45 +42,78 @@ except ImportError:
             print("\n* WARNING :: `emg3d.Report` requires `scooby`."
                   "\n             Install it via `pip install scooby`.\n")
 
-__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_h_field', 'Model',
-           'grid2grid', 'TensorMesh', 'get_hx_h0', 'get_cell_numbers',
-           'get_stretched_h', 'get_domain', 'get_hx', 'data_write',
-           'data_read', 'Time', 'Report']
-
-# CONSTANTS
-mu_0 = 4e-7*np.pi          # Magn. permeability of free space [H/m]
+__all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
+           'get_h_field', 'Model', 'grid2grid', 'TensorMesh', 'get_hx_h0',
+           'get_cell_numbers', 'get_stretched_h', 'get_domain', 'get_hx',
+           'data_write', 'data_read', 'Time', 'Report']
 
 
 # FIELDS
 class Field(np.ndarray):
-    """Create a Field instance with x-, y-, and z-views of the field.
+    r"""Create a Field instance with x-, y-, and z-views of the field.
 
     A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
     z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
     default array contains the whole field, which can be the electric field,
     the source field, or the residual field, in a 1D array. A ``Field``
     instance has additionally the property ``ensure_pec`` which, if called,
-    ensures Perfect Electric Conductor (PEC) boundary condition.
+    ensures Perfect Electric Conductor (PEC) boundary condition. It also has
+    the two attributes ``amp`` and ``pha`` for the amplitude and phase, as
+    common in frequency-domain CSEM.
 
     A ``Field`` can be initiated in three ways:
 
-    1. ``Field(grid)``:
-    Calling it with a ``TensorMesh``-instance returns a ``Field``-instance of
-    correct dimensions initiated with complex zeroes.
-
+    1. ``Field(grid, dtype=complex)``:
+       Calling it with a :class:`TensorMesh`-instance returns a
+       ``Field``-instance of correct dimensions initiated with zeroes of data
+       type ``dtype``.
     2. ``Field(grid, field)``:
-    Calling it with a ``TensorMesh``-instance and an ``ndarray`` returns a
-    ``Field``-instance of the provided ``ndarray``.
-
+       Calling it with a :class:`TensorMesh`-instance and an ``ndarray``
+       returns a ``Field``-instance of the provided ``ndarray``, of same data
+       type.
     3. ``Field(fx, fy, fz)``:
-    Calling it with three ``ndarray``'s which represent the field in x-, y-,
-    and z-direction returns a ``Field``-instance with these views.
+       Calling it with three ``ndarray``'s which represent the field in x-, y-,
+       and z-direction returns a ``Field``-instance with these views, of same
+       data type.
 
     Sort-order is 'F'.
 
+
+    Parameters
+    ----------
+
+    fx_or_grid : TensorMesh or ndarray
+        Either a TensorMesh instance or an ndarray of shape grid.nEx or
+        grid.vnEx. See explanations above. Only mandatory parameter; if the
+        only one provided, it will initiate a zero-field of ``dtype``.
+
+    fy_or_field : Field or ndarray
+        Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
+        See explanations above.
+
+    fz : ndarray
+        An ndarray of shape grid.nEz or grid.vnEz. See explanations above.
+
+    dtype : dtype,
+        Only used if ``fy_or_field=None`` and ``fz=None``; the initiated
+        zero-field for the provided TensorMesh has data type ``dtype``.
+        Default: complex.
+
+    freq : float, optional
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
+
+        Just added as info if provided.
+
     """
 
-    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
+                freq=None):
         """Initiate a new Field-instance."""
 
         # Collect field
@@ -108,6 +141,18 @@ class Field(np.ndarray):
             for attr in attr_list:
                 setattr(obj, attr, getattr(fx_or_grid, attr))
 
+        # Get Laplace parameter.
+        if freq is None and hasattr(fy_or_field, 'freq'):
+            freq = fy_or_field._freq
+        obj._freq = freq
+        if freq is not None:
+            if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
+                obj._smu0 = np.array(-2j*np.pi*freq*4e-7*np.pi)
+            else:         # Laplace domain; s.
+                obj._smu0 = np.array(freq*4e-7*np.pi)
+        else:
+            obj._smu0 = None
+
         return obj
 
     def __array_finalize__(self, obj):
@@ -121,6 +166,8 @@ class Field(np.ndarray):
         self.vnEx = getattr(obj, 'vnEx', None)
         self.vnEy = getattr(obj, 'vnEy', None)
         self.vnEz = getattr(obj, 'vnEz', None)
+        self._freq = getattr(obj, '_freq', None)
+        self._smu0 = getattr(obj, '_smu0', None)
 
     def __reduce__(self):
         """Customize __reduce__ to make `Field` work with pickle.
@@ -131,7 +178,8 @@ class Field(np.ndarray):
 
         # Create our own tuple to pass to __setstate__.
         new_state = pickled_state[2]
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
+                     '_smu0']
         for attr in attr_list:
             new_state += (getattr(self, attr),)
 
@@ -143,7 +191,8 @@ class Field(np.ndarray):
         => https://stackoverflow.com/a/26599346
         """
         # Set the necessary attributes (in reverse order).
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
+                     '_smu0']
         attr_list.reverse()
         for i, name in enumerate(attr_list):
             i += 1  # We need it 1..#attr instead of 0..#attr-1.
@@ -203,6 +252,19 @@ class Field(np.ndarray):
         return 180*np.unwrap(np.angle(self.view()))/np.pi
 
     @property
+    def freq(self):
+        """Return frequency."""
+        if self._freq is None:
+            return None
+        else:
+            return abs(self._freq)
+
+    @property
+    def smu0(self):
+        """Return s*mu_0; mu_0 = Magn. permeability of free space [H/m]."""
+        return self._smu0
+
+    @property
     def ensure_pec(self):
         """Set Perfect Electric Conductor (PEC) boundary condition."""
         # Apply PEC to fx
@@ -222,6 +284,60 @@ class Field(np.ndarray):
         self.fz[-1, :, :] = 0.
         self.fz[:, 0, :] = 0.
         self.fz[:, -1, :] = 0.
+
+
+class SourceField(Field):
+    r"""Create a Source-Field instance with x-, y-, and z-views of the field.
+
+    A subclass of :class:`Field`. Additional properties are the real-valued
+    source vector (``vector``, ``vx``, ``vy``, ``vz``), which sum is always
+    one. For a ``SourceField`` frequency is a mandatory  parameter, unlike
+    for a ``Field`` (recommended also for ``Field`` though),
+
+    Parameters
+    ----------
+
+    grid : TensorMesh
+        A TensorMesh instance.
+
+    freq : float
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
+
+    """
+
+    def __new__(cls, grid, freq):
+        """Initiate a new Source Field."""
+        if freq > 0:
+            dtype = complex
+        else:
+            dtype = float
+        return super().__new__(cls, grid, dtype=dtype, freq=freq)
+
+    @property
+    def vector(self):
+        """Entire vector, 1D [vx, vy, vz]."""
+        return np.real(self.field/self.smu0)
+
+    @property
+    def vx(self):
+        """View of the x-directed vector in the x-direction (nCx, nNy, nNz)."""
+        return np.real(self.field.fx/self.smu0)
+
+    @property
+    def vy(self):
+        """View of the vector in the y-direction (nNx, nCy, nNz)."""
+        return np.real(self.field.fy/self.smu0)
+
+    @property
+    def vz(self):
+        """View of the vector in the z-direction (nNx, nNy, nCz)."""
+        return np.real(self.field.fz/self.smu0)
 
 
 def get_source_field(grid, src, freq, strength=0):
@@ -271,21 +387,13 @@ def get_source_field(grid, src, freq, strength=0):
 
     Returns
     -------
-    sfield : :func:`Field`-instance
+    sfield : :func:`SourceField`-instance
         Source field, normalized to 1 A m.
 
     """
     # Cast some parameters.
     src = np.array(src, dtype=float)
     strength = float(strength)
-
-    # Get Laplace parameter.
-    if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-        sval = -2j*np.pi*freq
-        dtype = complex
-    else:         # Laplace domain; s.
-        sval = freq
-        dtype = float
 
     # Ensure source is a point or a finite dipole.
     if len(src) not in [5, 6]:
@@ -348,7 +456,7 @@ def get_source_field(grid, src, freq, strength=0):
         """Set the source-field in idir."""
 
         # Initiate zero source field.
-        sfield = Field(grid, dtype=dtype)
+        sfield = SourceField(grid, freq)
 
         # Return source-field depending if point or finite dipole.
         vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
@@ -363,10 +471,10 @@ def get_source_field(grid, src, freq, strength=0):
             point_source(*vec2, src, sfield.fy)
             point_source(*vec3, src, sfield.fz)
 
-        # Multiply by strength*sval*mu in per direction.
-        sfield.fx *= strength[0]*sval*mu_0
-        sfield.fy *= strength[1]*sval*mu_0
-        sfield.fz *= strength[2]*sval*mu_0
+        # Multiply by strength*s*mu in per direction.
+        sfield.fx *= strength[0]*sfield.smu0
+        sfield.fy *= strength[1]*sfield.smu0
+        sfield.fz *= strength[2]*sfield.smu0
 
         return sfield
 
@@ -668,8 +776,8 @@ def get_h_field(grid, model, field):
         e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
         e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
 
-    # Create a Field-instance and divide by sval*mu_0 and return.
-    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
+    # Create a Field-instance and divide by s*mu_0 and return.
+    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(field.smu0)
 
     return hfield
 
@@ -694,32 +802,14 @@ class Model:
         Resistivity in x-, y-, and z-directions. If ndarray, they must have the
         shape of grid.vnC (F-ordered) or grid.nC.
 
-    freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
-        Either positive or negative:
-
-        - ``freq`` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - ``freq`` < 0: Laplace domain, hence
-          :math:`s = f` (real).
-
     mu_r : float or ndarray
        Relative magnetic permeability (isotropic). If ndarray it must have the
        shape of grid.vnC (F-ordered) or grid.nC.
 
     """
 
-    def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=1.,
-                 mu_r=None):
+    def __init__(self, grid, res_x=1., res_y=None, res_z=None, mu_r=None):
         """Initiate a new resistivity model."""
-
-        # Get Laplace parameter.
-        self.freq = freq  # Store input value.
-        if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-            self.sval = -2j*np.pi*freq
-        else:         # Laplace domain; s.
-            self.sval = freq
-        self.smu0 = np.array(self.sval*mu_0)
 
         # Store required info from grid.
         self.nC = grid.nC

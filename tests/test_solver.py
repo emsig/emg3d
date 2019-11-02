@@ -126,13 +126,20 @@ def test_solver_homogeneous(capsys):
     # Provide initial field, ensure one initial multigrid is carried out
     # without linerelaxation nor semicoarsening.
     _, _ = capsys.readouterr()  # empty
-    efield = utils.Field(grid)
+    efield = utils.Field(grid, freq=sfield._freq)
     outarray = solver.solver(
             grid, model, sfield, efield, sslsolver=True, semicoarsening=True,
             linerelaxation=True, maxit=2, verb=3)
     out, _ = capsys.readouterr()
     assert "after                       1 F-cycles    0 0" in out
     assert "after                       2 F-cycles    4 1" in out
+
+    # Provide an initial field without frequency information.
+    efield2 = utils.Field(grid)
+    with pytest.raises(ValueError):
+        solver.solver(grid, model, sfield, efield=efield2, verb=2)
+    out, _ = capsys.readouterr()
+    assert "ERROR   :: Provided electric field must contain" in out
 
     # Check stagnation by providing an almost zero source field.
     _ = solver.solver(grid, model, sfield*0+1e-20, maxit=100)
@@ -203,22 +210,6 @@ def test_solver_homogeneous_laplace():
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['bicresult'], efield)
 
-    # If Model is complex, assert it fails.
-    input_model = dat['input_model'].copy()
-    input_model['freq'] = -input_model['freq']
-    model2 = utils.Model(**input_model)
-
-    with pytest.raises(ValueError):
-        efield = solver.solver(grid, model2, sfield, verb=1)
-
-    # If sfield is complex, assert it fails.
-    input_source = dat['input_source'].copy()
-    input_source['freq'] = -input_source['freq']
-    sfield2 = utils.get_source_field(**input_source)
-
-    with pytest.raises(ValueError):
-        efield = solver.solver(grid, model, sfield2, verb=1)
-
     # If efield is complex, assert it fails.
     efield = utils.Field(grid, dtype=complex)
 
@@ -259,7 +250,7 @@ def test_smoothing():
         z = np.arange(1, grid.nCz+1)[::-1]/10
         res_x = np.outer(np.outer(x, y), z).ravel()
         freq = 0.319
-        model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x, freq=freq)
+        model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x)
 
         # Create a source field
         sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
@@ -269,7 +260,7 @@ def test_smoothing():
 
         # Collect Gauss-Seidel input (same for all routines)
         inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-               model.eta_z, model.smu0, model.zeta, grid.hx, grid.hy, grid.hz,
+               model.eta_z, sfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz,
                nu)
 
         func = ['', '_x', '_y', '_z']
@@ -363,7 +354,7 @@ def test_residual():
     z = np.arange(1, grid.nCz+1)[::-1]/10
     res_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x, freq=freq)
+    model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x)
 
     # Create a source field
     sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
@@ -375,7 +366,7 @@ def test_residual():
     rfield = sfield.copy()
     njitted.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
-            model.eta_x, model.eta_y, model.eta_z, model.smu0, model.zeta,
+            model.eta_x, model.eta_y, model.eta_z, sfield.smu0, model.zeta,
             grid.hx, grid.hy, grid.hz)
 
     # Calculate residual

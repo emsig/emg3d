@@ -23,7 +23,6 @@ input_model = {
     'res_x': 1.5,
     'res_y': 2.0,
     'res_z': 3.3,
-    'freq': freq
     }
 model = utils.Model(**input_model)
 
@@ -81,7 +80,7 @@ grid = utils.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
 res_x = np.random.random(grid.nC)*50
 res_y = np.random.random(grid.nC)*50
 res_z = np.random.random(grid.nC)*50
-model = utils.Model(grid, res_x, res_y, res_z, freq)
+model = utils.Model(grid, res_x, res_y, res_z)
 
 # Initialize source field
 sfield = utils.get_source_field(grid, src, freq)
@@ -166,7 +165,6 @@ input_model_l = {
     'res_x': 1.5,
     'res_y': 2.0,
     'res_z': 3.3,
-    'freq': freq
     }
 model_l = utils.Model(**input_model_l)
 

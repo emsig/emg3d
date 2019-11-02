@@ -77,7 +77,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     efield : Field instance, optional
         Initial electric field; ``emg3d.utils.Field`` instance. It is
-        initiated with zeroes if not provided.
+        initiated with zeroes if not provided. A provided efield MUST have
+        frequency information (initiated with ``emg3d.utils.Field(...,
+        freq)``).
 
         If an initial efield is provided nothing is returned, but the final
         efield is directly put into the provided efield.
@@ -335,7 +337,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Get efield
     if efield is None:
         # If not provided, initiate an empty one.
-        efield = utils.Field(grid, dtype=sfield.dtype)
+        efield = utils.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
 
         # Set flag to return the field.
         var.do_return = True
@@ -347,6 +349,13 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
                   "same dtype;\n             complex (f-domain) or real (s-"
                   f"domain). Provided:\n             sfield: {sfield.dtype}; "
                   f"efield: {efield.dtype}.")
+            raise ValueError('Input data types')
+
+        # Ensure provided efield has frequency information.
+        if efield.freq is None:
+            print("* ERROR   :: Provided electric field must contain "
+                  "frequency information.;\n             Initiate it with "
+                  f"``emg3d.utils.Field(..., freq)``.")
             raise ValueError('Input data types')
 
         # Set flag to NOT return the field.
@@ -613,6 +622,8 @@ def krylov(grid, model, sfield, efield, var):
         As returned by :func:`multigrid`.
 
     """
+    # Get frequency
+    freq = sfield._freq
 
     # If an initial efield was provided, we run first one multigrid cycle
     # without semicoarsening nor line relaxation; this helps to stabilize the
@@ -651,11 +662,12 @@ def krylov(grid, model, sfield, efield, var):
         efield = utils.Field(grid, efield)
 
         # Calculate A x.
-        rfield = utils.Field(grid, dtype=efield.dtype)
+        rfield = utils.Field(grid, dtype=efield.dtype, freq=freq)
         njitted.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, model.smu0, model.zeta, grid.hx, grid.hy, grid.hz)
+                model.eta_z, rfield.smu0, model.zeta, grid.hx, grid.hy,
+                grid.hz)
 
         # Return Field instance.
         return -rfield
@@ -669,8 +681,8 @@ def krylov(grid, model, sfield, efield, var):
         """Use multigrid as pre-conditioner."""
 
         # Cast current fields to Field instances.
-        sfield = utils.Field(grid, sfield)
-        efield = utils.Field(grid, dtype=sfield.dtype)
+        sfield = utils.Field(grid, sfield, freq=freq)
+        efield = utils.Field(grid, dtype=sfield.dtype, freq=freq)
 
         # Solve for these fields.
         multigrid(grid, model, sfield, efield, var)
@@ -773,7 +785,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Collect Gauss-Seidel input (same for all routines)
     inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, model.smu0, model.zeta, grid.hx, grid.hy, grid.hz, nu)
+           model.eta_z, sfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz, nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
@@ -867,7 +879,6 @@ def restriction(grid, model, sfield, residual, sc_dir):
             self.case = case
 
     cmodel = Model(model.case)
-    cmodel.smu0 = model.smu0
     cmodel.eta_x = _restrict_model_parameters(model.eta_x, sc_dir)
     if model.case in [1, 3]:  # HTI or tri-axial.
         cmodel.eta_y = _restrict_model_parameters(model.eta_y, sc_dir)
@@ -885,13 +896,14 @@ def restriction(grid, model, sfield, residual, sc_dir):
     wx, wy, wz = _get_restriction_weights(grid, cgrid, sc_dir)
 
     # Calculate the source terms (Equation 8 in [Muld06]_).
-    csfield = utils.Field(cgrid, dtype=sfield.dtype)  # Initiate zero field.
+    # Initiate zero field.
+    csfield = utils.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
     njitted.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
                      residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Ensure PEC and initiate empty e-field.
     csfield.ensure_pec
-    cefield = utils.Field(cgrid, dtype=sfield.dtype)
+    cefield = utils.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
 
     return cgrid, cmodel, csfield, cefield
 
@@ -1023,7 +1035,7 @@ def residual(grid, model, sfield, efield, norm=False):
     rfield = sfield.copy()
     njitted.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
-                   model.smu0, model.zeta, grid.hx, grid.hy, grid.hz)
+                   rfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
         return njitted.l2norm(rfield)
