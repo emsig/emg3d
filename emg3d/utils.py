@@ -80,32 +80,33 @@ class Field(np.ndarray):
 
     """
 
-    def __new__(cls, grid, field=None, fz=None, dtype=complex):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex):
         """Initiate a new Field-instance."""
 
         # Collect field
-        if field is None and fz is None:  # Empty Field with dimension grid.nE.
-            new = np.zeros(grid.nE, dtype=dtype)
+        if fy_or_field is None and fz is None:          # Empty Field with
+            new = np.zeros(fx_or_grid.nE, dtype=dtype)  # dimension grid.nE.
         elif fz is None:                  # grid and field provided
-            new = field
+            new = fy_or_field
         else:                             # fx, fy, fz provided
-            new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
+            new = np.r_[fx_or_grid.ravel('F'), fy_or_field.ravel('F'),
+                        fz.ravel('F')]
 
         # Store the field as object
         obj = np.asarray(new).view(cls)
 
         # Store relevant numbers for the views.
-        if field is not None and fz is not None:  # Deduce from arrays
-            obj.nEx = grid.size
-            obj.nEy = field.size
+        if fy_or_field is not None and fz is not None:  # Deduce from arrays
+            obj.nEx = fx_or_grid.size
+            obj.nEy = fy_or_field.size
             obj.nEz = fz.size
-            obj.vnEx = grid.shape
-            obj.vnEy = field.shape
+            obj.vnEx = fx_or_grid.shape
+            obj.vnEy = fy_or_field.shape
             obj.vnEz = fz.shape
         else:                                     # If grid is provided
             attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
             for attr in attr_list:
-                setattr(obj, attr, getattr(grid, attr))
+                setattr(obj, attr, getattr(fx_or_grid, attr))
 
         return obj
 
