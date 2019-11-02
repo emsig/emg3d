@@ -1113,10 +1113,10 @@ class MGParameters:
         outstring = (
             f"   MG-cycle       : {self.cycle!r:17}"
             f"   sslsolver : {self.sslsolver!r}\n"
-            f"   semicoarsening : {self.__p_sc_dir:17}"
+            f"   semicoarsening : {self._p_sc_dir:17}"
             f"   tol       : {self.tol}\n"
-            f"   linerelaxation : {self.__p_lr_dir:17}"
-            f"   maxit     : {self.__maxit}\n"
+            f"   linerelaxation : {self._p_lr_dir:17}"
+            f"   maxit     : {self._maxit}\n"
             f"   nu_{{i,1,c,2}}   : {self.nu_init}, {self.nu_pre}"
             f", {self.nu_coarse}, {self.nu_post}       "
             f"   verb      : {self.verb}\n"
@@ -1252,8 +1252,8 @@ class MGParameters:
 
         # Set semicoarsening to True/False; print statement
         self.semicoarsening = self.sc_dir != 0
-        self.__p_sc_dir = f"{self.semicoarsening} {sc_cycle}"
-        self.__raw_sc_cycle = sc_cycle
+        self._p_sc_dir = f"{self.semicoarsening} {sc_cycle}"
+        self._raw_sc_cycle = sc_cycle
 
     def _linerelaxation(self):
         """Set everything related to line relaxation."""
@@ -1287,8 +1287,8 @@ class MGParameters:
 
         # Set linerelaxation to True/False; print statement
         self.linerelaxation = self.lr_dir != 0
-        self.__p_lr_dir = f"{self.linerelaxation} {lr_cycle}"
-        self.__raw_lr_cycle = lr_cycle
+        self._p_lr_dir = f"{self.linerelaxation} {lr_cycle}"
+        self._raw_lr_cycle = lr_cycle
 
     def _solver_and_cycle(self):
         """Set everything related to solver and MG-cycle."""
@@ -1323,13 +1323,13 @@ class MGParameters:
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
         self.ssl_maxit = 0              # Maximum iteration
-        self.__maxit = f"{self.maxit}"  # For printing
+        self._maxit = f"{self.maxit}"  # For printing
         if self.sslsolver:
             self.ssl_maxit = self.maxit
             if self.cycle is not None:  # Only if MG is used
-                self.maxit = max(len(self.__raw_sc_cycle),
-                                 len(self.__raw_lr_cycle))
-                self.__maxit += f" ({self.maxit})"  # For printing
+                self.maxit = max(len(self._raw_sc_cycle),
+                                 len(self._raw_lr_cycle))
+                self._maxit += f" ({self.maxit})"  # For printing
 
 
 # INTERPOLATION DATACLASS

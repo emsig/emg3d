@@ -638,7 +638,7 @@ def get_h_field(grid, model, field):
 
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
-    if model._Model__zeta is not None:
+    if model._mu_r is not None:
 
         # Plus and minus indices.
         ixm = np.r_[0, np.arange(grid.nCx)]
@@ -723,9 +723,10 @@ class Model:
         # Store required info from grid.
         self.nC = grid.nC
         self.vnC = grid.vnC
-        self.__vol = grid.vol.reshape(self.vnC, order='F')
+        self._vol = grid.vol.reshape(self.vnC, order='F')
 
         # Check case.
+        self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
         if res_y is None and res_z is None:   # Isotropic (0).
             self.case = 0
         elif res_y is None or res_z is None:  # HTI (1) or VTI (2).
@@ -738,135 +739,150 @@ class Model:
 
         # Initiate x-directed resistivity.
         if isinstance(res_x, (float, int)):
-            self.__res_x = res_x*np.ones(self.vnC)
+            self._res_x = res_x*np.ones(self.vnC)
         elif np.all(res_x.shape == self.vnC) and res_x.ndim == 3:
-            self.__res_x = res_x
+            self._res_x = res_x
         elif res_x.size == self.nC and res_x.ndim == 1:
-            self.__res_x = res_x.reshape(self.vnC, order='F')
+            self._res_x = res_x.reshape(self.vnC, order='F')
         else:
             print(f"* ERROR   :: res_x must be {grid.vnC} or {grid.nC}.")
             print(f"             Provided: {res_x.shape}.")
             raise ValueError("Wrong Shape")
-        self.__eta_x = self._calculate_eta(self.__res_x)
+        self._eta_x = None
 
         # Initiate y-directed resistivity.
         if self.case in [1, 3]:
             if isinstance(res_y, (float, int)):
-                self.__res_y = res_y*np.ones(self.vnC)
+                self._res_y = res_y*np.ones(self.vnC)
             elif np.all(res_y.shape == self.vnC) and res_y.ndim == 3:
-                self.__res_y = res_y
+                self._res_y = res_y
             elif res_y.size == self.nC and res_y.ndim == 1:
-                self.__res_y = res_y.reshape(self.vnC, order='F')
+                self._res_y = res_y.reshape(self.vnC, order='F')
             else:
                 print(f"* ERROR   :: res_y must be {grid.vnC} or {grid.nC}.")
                 print(f"             Provided: {res_y.shape}.")
                 raise ValueError("Wrong Shape")
-            self.__eta_y = self._calculate_eta(self.__res_y)
+        self._eta_y = None
 
         # Initiate z-directed resistivity.
         if self.case in [2, 3]:
             if isinstance(res_z, (float, int)):
-                self.__res_z = res_z*np.ones(self.vnC)
+                self._res_z = res_z*np.ones(self.vnC)
             elif np.all(res_z.shape == self.vnC) and res_z.ndim == 3:
-                self.__res_z = res_z
+                self._res_z = res_z
             elif res_z.size == self.nC and res_z.ndim == 1:
-                self.__res_z = res_z.reshape(self.vnC, order='F')
+                self._res_z = res_z.reshape(self.vnC, order='F')
             else:
                 print(f"* ERROR   :: res_z must be {grid.vnC} or {grid.nC}.")
                 print(f"             Provided: {res_z.shape}.")
                 raise ValueError("Wrong Shape")
-            self.__eta_z = self._calculate_eta(self.__res_z)
+        self._eta_z = None
 
         # Store magnetic permeability.
         if mu_r is None or isinstance(mu_r, (float, int)):
-            self.__zeta = mu_r
+            self._mu_r = mu_r
         elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
-            self.__zeta = mu_r
+            self._mu_r = mu_r
         elif mu_r.size == self.nC and mu_r.ndim == 1:
-            self.__zeta = mu_r.reshape(self.vnC, order='F')
+            self._mu_r = mu_r.reshape(self.vnC, order='F')
+        self._zeta = None
 
     # RESISTIVITIES
     @property
     def res_x(self):
         r"""Resistivity in x-direction (:math:`\rho_x`)."""
-        return self.__res_x
+        return self._res_x
 
     @res_x.setter
     def res_x(self, res):
         r"""Update resistivity in x-direction (:math:`\rho_x`)."""
-        self.__res_x = res
-        self.__eta_x = self._calculate_eta(res)
+        self._res_x = res
+        self._eta_x = self._calculate_eta(res)
 
     @property
     def res_y(self):
         r"""Resistivity in y-direction (:math:`\rho_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self.__res_y
+            return self._res_y
         else:                    # Return res_x.
-            return self.__res_x
+            return self._res_x
 
     @res_y.setter
     def res_y(self, res):
         r"""Update resistivity in y-direction (:math:`\rho_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            self.__res_y = res
-            self.__eta_y = self._calculate_eta(res)
+            self._res_y = res
+            self._eta_y = self._calculate_eta(res)
         else:
-            print("Cannot set res_y, as it was initialized as res_x.")
+            print("Cannot set res_y, as resistivity model is "
+                  f"{self.case_names[self.case]}.")
             raise ValueError
 
     @property
     def res_z(self):
         r"""Resistivity in z-direction (:math:`\rho_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self.__res_z
+            return self._res_z
         else:                    # Return res_x.
-            return self.__res_x
+            return self._res_x
 
     @res_z.setter
     def res_z(self, res):
         r"""Update resistivity in z-direction (:math:`\rho_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            self.__res_z = res
-            self.__eta_z = self._calculate_eta(res)
+            self._res_z = res
+            self._eta_z = self._calculate_eta(res)
         else:
-            print("Cannot set res_z, as it was initialized as res_x.")
+            print("Cannot set res_z, as resistivity model is "
+                  f"{self.case_names[self.case]}.")
             raise ValueError
 
     # ETA's
     @property
     def eta_x(self):
         r"""Volume*eta in x-direction (:math:`V\eta_x`)."""
-        return self.__eta_x
+        if self._eta_x is None:
+            self._eta_x = self._calculate_eta(self.res_x)
+        return self._eta_x
 
     @property
     def eta_y(self):
         r"""Volume*eta in x-direction (:math:`V\eta_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self.__eta_y
+            if self._eta_y is None:
+                self._eta_y = self._calculate_eta(self.res_y)
+            return self._eta_y
         else:                    # Return eta_x.
-            return self.__eta_x
+            if self._eta_x is None:
+                self._eta_x = self._calculate_eta(self.res_x)
+            return self._eta_x
 
     @property
     def eta_z(self):
         r"""Volume*eta in x-direction (:math:`V\eta_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self.__eta_z
+            if self._eta_z is None:
+                self._eta_z = self._calculate_eta(self.res_z)
+            return self._eta_z
         else:                    # Return eta_x.
-            return self.__eta_x
+            if self._eta_x is None:
+                self._eta_x = self._calculate_eta(self.res_x)
+            return self._eta_x
 
     def _calculate_eta(self, res):
         r"""eta: volume divided by resistivity."""
-        return self.__vol/res
+        return self._vol/res
 
     # MU_R's
     @property
     def zeta(self):
         r"""zeta: volume divided by relative magnetic permeability."""
-        if self.__zeta is None:
-            return self.__vol
-        else:
-            return self.__vol/self.__zeta
+        if self._zeta is None:
+            if self._mu_r is None:
+                self._zeta = self._vol
+            else:
+                self._zeta = self._vol/self._mu_r
+        return self._zeta
 
 
 # INTERPOLATION
@@ -1145,10 +1161,10 @@ class TensorMesh:
     @property
     def vol(self):
         """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '__vol', None) is None:
+        if getattr(self, '_vol', None) is None:
             vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
-            self.__vol = vol.ravel('F')
-        return self.__vol
+            self._vol = vol.ravel('F')
+        return self._vol
 
 
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
@@ -1932,6 +1948,22 @@ def data_write(fname, keys, values, path='data', exists=0):
 
         # Writing it to the shelve.
         for i, key in enumerate(keys):
+
+            # If the parameter is a Model- or TensorMesh-instance, we set the
+            # volume and volume-averaged values to None. This saves space, and
+            # they are not needed and will simply be reconstructed if required.
+            if type(values[i]).__name__ == 'TensorMesh':
+                values[i]._vol = None
+
+            # Note: Model-instances also have a `_vol`-attribute. However,
+            #       currently a Model-instance cannot reconstruct that, so we
+            #       leave it in.
+            if type(values[i]).__name__ == 'Model':
+                values[i]._eta_x = None
+                values[i]._eta_y = None
+                values[i]._eta_z = None
+                values[i]._zeta = None
+
             db[key] = values[i]
 
 
@@ -1997,12 +2029,12 @@ class Time:
 
     def __init__(self):
         """Initialize time zero (t0) with current time stamp."""
-        self.__t0 = default_timer()
+        self._t0 = default_timer()
 
     @property
     def t0(self):
         """Return time zero of this class instance."""
-        return self.__t0
+        return self._t0
 
     @property
     def now(self):
@@ -2012,7 +2044,7 @@ class Time:
     @property
     def runtime(self):
         """Return string of runtime since time zero."""
-        t1 = default_timer() - self.__t0
+        t1 = default_timer() - self._t0
         return timedelta(seconds=np.round(t1))
 
 

@@ -406,6 +406,7 @@ def test_Model():
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
+    assert_allclose(model1.eta_z, model1.eta_y)
 
     # Assert you can not set res_y nor res_z if not provided from the start.
     with pytest.raises(ValueError):
@@ -421,16 +422,16 @@ def test_Model():
     # VTI: Setting res_x and res_z, not res_y
     model2b = utils.Model(grid, 2., res_z=4.)
     assert_allclose(model2b.res_x, model2b.res_y)
-    assert_allclose(model2b.eta_x, model2b.eta_y)
+    assert_allclose(model2b.eta_y, model2b.eta_x)
     model2b.res_z = model2b.res_x
     model2c = utils.Model(grid, 2., res_z=model2b.res_z.copy())
     assert_allclose(model2c.res_x, model2c.res_z)
-    assert_allclose(model2c.eta_x, model2c.eta_z)
+    assert_allclose(model2c.eta_z, model2c.eta_x)
 
     # HTI: Setting res_x and res_y, not res_z
     model2d = utils.Model(grid, 2., 4.)
     assert_allclose(model2d.res_x, model2d.res_z)
-    assert_allclose(model2d.eta_x, model2d.eta_z)
+    assert_allclose(model2d.eta_z, model2d.eta_x)
 
     # Check wrong shape
     with pytest.raises(ValueError):
@@ -447,14 +448,14 @@ def test_Model():
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert_allclose(model3._Model__vol/res_x, model3.zeta)
+    assert_allclose(model3._vol/res_x, model3.zeta)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
                           res_z.ravel('F'), freq=1.234, mu_r=res_y.ravel('F'))
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
-    assert_allclose(model3b._Model__vol/res_y, model3b.zeta)
+    assert_allclose(model3b._vol/res_y, model3b.zeta)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
@@ -466,9 +467,9 @@ def test_Model():
     assert_allclose(tres*4., model3.res_z)
 
     # Check eta
-    eta_x = 1/model3.res_x*model3._Model__vol
-    eta_y = 1/model3.res_y*model3._Model__vol
-    eta_z = 1/model3.res_z*model3._Model__vol
+    eta_x = 1/model3.res_x*model3._vol
+    eta_y = 1/model3.res_y*model3._vol
+    eta_z = 1/model3.res_z*model3._vol
     assert_allclose(model3.eta_x, eta_x)
     assert_allclose(model3.eta_y, eta_y)
     assert_allclose(model3.eta_z, eta_z)
@@ -482,9 +483,9 @@ def test_Model():
     model5 = utils.Model(grid, res_x, res_y, res_z, freq=-1.234, mu_r=res_x)
 
     # Check eta
-    eta_x = 1/model5.res_x*model5._Model__vol
-    eta_y = 1/model5.res_y*model5._Model__vol
-    eta_z = 1/model5.res_z*model5._Model__vol
+    eta_x = 1/model5.res_x*model5._vol
+    eta_y = 1/model5.res_y*model5._vol
+    eta_z = 1/model5.res_z*model5._vol
     assert_allclose(model5.eta_x, eta_x)
     assert_allclose(model5.eta_y, eta_y)
     assert_allclose(model5.eta_z, eta_z)
@@ -840,6 +841,12 @@ def test_data_write_read(tmpdir, capsys):
             [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
             np.zeros(3))
 
+    model = utils.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
+    _ = model.eta_x  # Force these to build
+    _ = model.eta_y  # Force these to build
+    _ = model.eta_z  # Force these to build
+    _ = model.zeta   # Force these to build
+
     e1 = create_dummy(*grid.vnEx)
     e2 = create_dummy(*grid.vnEy)
     e3 = create_dummy(*grid.vnEz)
@@ -853,13 +860,26 @@ def test_data_write_read(tmpdir, capsys):
     assert_allclose(ee, ee_out)
 
     # Write and read data, multi arguments
-    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)
-    grid_out, ee_out = utils.data_read('testthis', ('grid', 'ee'), tmpdir)
+    args = ('grid', 'ee', 'model')
+    utils.data_write('testthis', args, (grid, ee, model), tmpdir, -1)
+    grid_out, ee_out, model_out = utils.data_read('testthis', args, tmpdir)
 
     # Compare data
     assert_allclose(ee, ee_out)
     for attr in ['nCx', 'nCy', 'nCz']:
         assert getattr(grid, attr) == getattr(grid_out, attr)
+
+    # Ensure volume averages got deleted
+    assert grid_out._vol is None
+    assert model_out._eta_x is None
+    assert model_out._zeta is None
+
+    # Ensure they can be reconstructed
+    assert_allclose(grid.vol, grid_out.vol)
+    assert_allclose(model.eta_x, model_out.eta_x)
+    assert_allclose(model.eta_y, model_out.eta_y)
+    assert_allclose(model.eta_z, model_out.eta_z)
+    assert_allclose(model.zeta, model_out.zeta)
 
     # Write and read data, None
     utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)
