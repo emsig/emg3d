@@ -332,14 +332,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Calculate reference error for tolerance.
     var.l2_refe = njitted.l2norm(sfield)
 
-    # Ensure sfield and model have same data types.
-    if sfield.dtype != model.smu0.dtype:
-        print("* ERROR   :: Source field and model parameters must have the "
-              "same dtype;\n             complex (f-domain) or real (s-domain)"
-              f". Provided:\n             sfield: {sfield.dtype}; "
-              f"model: {model.smu0.dtype}.")
-        raise ValueError('Input data types')
-
     # Get efield
     if efield is None:
         # If not provided, initiate an empty one.
