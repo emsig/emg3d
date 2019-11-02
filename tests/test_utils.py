@@ -401,6 +401,8 @@ def test_Model():
     # Using defaults
     model1 = utils.Model(grid)
     assert utils.mu_0 == constants.mu_0            # Check constants
+    assert model1.sval == -2j*np.pi
+    assert model1.smu0 == -2j*np.pi*constants.mu_0
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
@@ -464,10 +466,9 @@ def test_Model():
     assert_allclose(tres*4., model3.res_z)
 
     # Check eta
-    iommu = 2j*np.pi*model3.freq*utils.mu_0
-    eta_x = -iommu/model3.res_x*model3._Model__vol
-    eta_y = -iommu/model3.res_y*model3._Model__vol
-    eta_z = -iommu/model3.res_z*model3._Model__vol
+    eta_x = 1/model3.res_x*model3._Model__vol
+    eta_y = 1/model3.res_y*model3._Model__vol
+    eta_z = 1/model3.res_z*model3._Model__vol
     assert_allclose(model3.eta_x, eta_x)
     assert_allclose(model3.eta_y, eta_y)
     assert_allclose(model3.eta_z, eta_z)
@@ -481,10 +482,9 @@ def test_Model():
     model5 = utils.Model(grid, res_x, res_y, res_z, freq=-1.234, mu_r=res_x)
 
     # Check eta
-    smu = model5.freq*utils.mu_0
-    eta_x = smu/model5.res_x*model5._Model__vol
-    eta_y = smu/model5.res_y*model5._Model__vol
-    eta_z = smu/model5.res_z*model5._Model__vol
+    eta_x = 1/model5.res_x*model5._Model__vol
+    eta_y = 1/model5.res_y*model5._Model__vol
+    eta_z = 1/model5.res_z*model5._Model__vol
     assert_allclose(model5.eta_x, eta_x)
     assert_allclose(model5.eta_y, eta_y)
     assert_allclose(model5.eta_z, eta_z)

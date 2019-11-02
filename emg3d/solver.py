@@ -333,11 +333,11 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     var.l2_refe = njitted.l2norm(sfield)
 
     # Ensure sfield and model have same data types.
-    if sfield.dtype != model.eta_x.dtype:
+    if sfield.dtype != model.smu0.dtype:
         print("* ERROR   :: Source field and model parameters must have the "
               "same dtype;\n             complex (f-domain) or real (s-domain)"
               f". Provided:\n             sfield: {sfield.dtype}; "
-              f"model: {model.eta_x.dtype}.")
+              f"model: {model.smu0.dtype}.")
         raise ValueError('Input data types')
 
     # Get efield
@@ -663,7 +663,7 @@ def krylov(grid, model, sfield, efield, var):
         njitted.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz)
+                model.eta_z, model.smu0, model.zeta, grid.hx, grid.hy, grid.hz)
 
         # Return Field instance.
         return -rfield
@@ -781,7 +781,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Collect Gauss-Seidel input (same for all routines)
     inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz, nu)
+           model.eta_z, model.smu0, model.zeta, grid.hx, grid.hy, grid.hz, nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
@@ -875,6 +875,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
             self.case = case
 
     cmodel = Model(model.case)
+    cmodel.smu0 = model.smu0
     cmodel.eta_x = _restrict_model_parameters(model.eta_x, sc_dir)
     if model.case in [1, 3]:  # HTI or tri-axial.
         cmodel.eta_y = _restrict_model_parameters(model.eta_y, sc_dir)
@@ -1030,7 +1031,7 @@ def residual(grid, model, sfield, efield, norm=False):
     rfield = sfield.copy()
     njitted.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
-                   model.zeta, grid.hx, grid.hy, grid.hz)
+                   model.smu0, model.zeta, grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
         return njitted.l2norm(rfield)

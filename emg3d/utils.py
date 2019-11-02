@@ -718,6 +718,7 @@ class Model:
             self.sval = -2j*np.pi*freq
         else:         # Laplace domain; s.
             self.sval = freq
+        self.smu0 = np.array(self.sval*mu_0)
 
         # Store required info from grid.
         self.nC = grid.nC
@@ -856,7 +857,7 @@ class Model:
 
     def _calculate_eta(self, res):
         r"""eta: volume divided by resistivity."""
-        return self.sval*mu_0*self.__vol/res
+        return self.__vol/res
 
     # MU_R's
     @property
