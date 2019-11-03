@@ -42,70 +42,116 @@ except ImportError:
             print("\n* WARNING :: `emg3d.Report` requires `scooby`."
                   "\n             Install it via `pip install scooby`.\n")
 
-__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_h_field', 'Model',
-           'grid2grid', 'TensorMesh', 'get_hx_h0', 'get_cell_numbers',
-           'get_stretched_h', 'get_domain', 'get_hx', 'data_write',
-           'data_read', 'Time', 'Report']
-
-# CONSTANTS
-mu_0 = 4e-7*np.pi          # Magn. permeability of free space [H/m]
+__all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
+           'get_h_field', 'Model', 'grid2grid', 'TensorMesh', 'get_hx_h0',
+           'get_cell_numbers', 'get_stretched_h', 'get_domain', 'get_hx',
+           'data_write', 'data_read', 'Time', 'Report']
 
 
 # FIELDS
 class Field(np.ndarray):
-    """Create a Field instance with x-, y-, and z-views of the field.
+    r"""Create a Field instance with x-, y-, and z-views of the field.
 
     A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
     z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
     default array contains the whole field, which can be the electric field,
     the source field, or the residual field, in a 1D array. A ``Field``
     instance has additionally the property ``ensure_pec`` which, if called,
-    ensures Perfect Electric Conductor (PEC) boundary condition.
+    ensures Perfect Electric Conductor (PEC) boundary condition. It also has
+    the two attributes ``amp`` and ``pha`` for the amplitude and phase, as
+    common in frequency-domain CSEM.
 
     A ``Field`` can be initiated in three ways:
 
-    1. ``Field(grid)``:
-    Calling it with a ``TensorMesh``-instance returns a ``Field``-instance of
-    correct dimensions initiated with complex zeroes.
-
+    1. ``Field(grid, dtype=complex)``:
+       Calling it with a :class:`TensorMesh`-instance returns a
+       ``Field``-instance of correct dimensions initiated with zeroes of data
+       type ``dtype``.
     2. ``Field(grid, field)``:
-    Calling it with a ``TensorMesh``-instance and an ``ndarray`` returns a
-    ``Field``-instance of the provided ``ndarray``.
-
+       Calling it with a :class:`TensorMesh`-instance and an ``ndarray``
+       returns a ``Field``-instance of the provided ``ndarray``, of same data
+       type.
     3. ``Field(fx, fy, fz)``:
-    Calling it with three ``ndarray``'s which represent the field in x-, y-,
-    and z-direction returns a ``Field``-instance with these views.
+       Calling it with three ``ndarray``'s which represent the field in x-, y-,
+       and z-direction returns a ``Field``-instance with these views, of same
+       data type.
 
     Sort-order is 'F'.
 
+
+    Parameters
+    ----------
+
+    fx_or_grid : TensorMesh or ndarray
+        Either a TensorMesh instance or an ndarray of shape grid.nEx or
+        grid.vnEx. See explanations above. Only mandatory parameter; if the
+        only one provided, it will initiate a zero-field of ``dtype``.
+
+    fy_or_field : Field or ndarray
+        Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
+        See explanations above.
+
+    fz : ndarray
+        An ndarray of shape grid.nEz or grid.vnEz. See explanations above.
+
+    dtype : dtype,
+        Only used if ``fy_or_field=None`` and ``fz=None``; the initiated
+        zero-field for the provided TensorMesh has data type ``dtype``.
+        Default: complex.
+
+    freq : float, optional
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
+
+        Just added as info if provided.
+
     """
 
-    def __new__(cls, grid, field=None, fz=None, dtype=complex):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
+                freq=None):
         """Initiate a new Field-instance."""
 
         # Collect field
-        if field is None and fz is None:  # Empty Field with dimension grid.nE.
-            new = np.zeros(grid.nE, dtype=dtype)
+        if fy_or_field is None and fz is None:          # Empty Field with
+            new = np.zeros(fx_or_grid.nE, dtype=dtype)  # dimension grid.nE.
         elif fz is None:                  # grid and field provided
-            new = field
+            new = fy_or_field
         else:                             # fx, fy, fz provided
-            new = np.r_[grid.ravel('F'), field.ravel('F'), fz.ravel('F')]
+            new = np.r_[fx_or_grid.ravel('F'), fy_or_field.ravel('F'),
+                        fz.ravel('F')]
 
         # Store the field as object
         obj = np.asarray(new).view(cls)
 
         # Store relevant numbers for the views.
-        if field is not None and fz is not None:  # Deduce from arrays
-            obj.nEx = grid.size
-            obj.nEy = field.size
+        if fy_or_field is not None and fz is not None:  # Deduce from arrays
+            obj.nEx = fx_or_grid.size
+            obj.nEy = fy_or_field.size
             obj.nEz = fz.size
-            obj.vnEx = grid.shape
-            obj.vnEy = field.shape
+            obj.vnEx = fx_or_grid.shape
+            obj.vnEy = fy_or_field.shape
             obj.vnEz = fz.shape
         else:                                     # If grid is provided
             attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
             for attr in attr_list:
-                setattr(obj, attr, getattr(grid, attr))
+                setattr(obj, attr, getattr(fx_or_grid, attr))
+
+        # Get Laplace parameter.
+        if freq is None and hasattr(fy_or_field, 'freq'):
+            freq = fy_or_field._freq
+        obj._freq = freq
+        if freq is not None:
+            if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
+                obj._smu0 = np.array(-2j*np.pi*freq*4e-7*np.pi)
+            else:         # Laplace domain; s.
+                obj._smu0 = np.array(freq*4e-7*np.pi)
+        else:
+            obj._smu0 = None
 
         return obj
 
@@ -120,6 +166,8 @@ class Field(np.ndarray):
         self.vnEx = getattr(obj, 'vnEx', None)
         self.vnEy = getattr(obj, 'vnEy', None)
         self.vnEz = getattr(obj, 'vnEz', None)
+        self._freq = getattr(obj, '_freq', None)
+        self._smu0 = getattr(obj, '_smu0', None)
 
     def __reduce__(self):
         """Customize __reduce__ to make `Field` work with pickle.
@@ -130,7 +178,8 @@ class Field(np.ndarray):
 
         # Create our own tuple to pass to __setstate__.
         new_state = pickled_state[2]
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
+                     '_smu0']
         for attr in attr_list:
             new_state += (getattr(self, attr),)
 
@@ -142,7 +191,8 @@ class Field(np.ndarray):
         => https://stackoverflow.com/a/26599346
         """
         # Set the necessary attributes (in reverse order).
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
+                     '_smu0']
         attr_list.reverse()
         for i, name in enumerate(attr_list):
             i += 1  # We need it 1..#attr instead of 0..#attr-1.
@@ -202,6 +252,19 @@ class Field(np.ndarray):
         return 180*np.unwrap(np.angle(self.view()))/np.pi
 
     @property
+    def freq(self):
+        """Return frequency."""
+        if self._freq is None:
+            return None
+        else:
+            return abs(self._freq)
+
+    @property
+    def smu0(self):
+        """Return s*mu_0; mu_0 = Magn. permeability of free space [H/m]."""
+        return self._smu0
+
+    @property
     def ensure_pec(self):
         """Set Perfect Electric Conductor (PEC) boundary condition."""
         # Apply PEC to fx
@@ -221,6 +284,60 @@ class Field(np.ndarray):
         self.fz[-1, :, :] = 0.
         self.fz[:, 0, :] = 0.
         self.fz[:, -1, :] = 0.
+
+
+class SourceField(Field):
+    r"""Create a Source-Field instance with x-, y-, and z-views of the field.
+
+    A subclass of :class:`Field`. Additional properties are the real-valued
+    source vector (``vector``, ``vx``, ``vy``, ``vz``), which sum is always
+    one. For a ``SourceField`` frequency is a mandatory  parameter, unlike
+    for a ``Field`` (recommended also for ``Field`` though),
+
+    Parameters
+    ----------
+
+    grid : TensorMesh
+        A TensorMesh instance.
+
+    freq : float
+        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Either positive or negative:
+
+        - ``freq`` > 0: Frequency domain, hence
+          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
+        - ``freq`` < 0: Laplace domain, hence
+          :math:`s = f` (real).
+
+    """
+
+    def __new__(cls, grid, freq):
+        """Initiate a new Source Field."""
+        if freq > 0:
+            dtype = complex
+        else:
+            dtype = float
+        return super().__new__(cls, grid, dtype=dtype, freq=freq)
+
+    @property
+    def vector(self):
+        """Entire vector, 1D [vx, vy, vz]."""
+        return np.real(self.field/self.smu0)
+
+    @property
+    def vx(self):
+        """View of the x-directed vector in the x-direction (nCx, nNy, nNz)."""
+        return np.real(self.field.fx/self.smu0)
+
+    @property
+    def vy(self):
+        """View of the vector in the y-direction (nNx, nCy, nNz)."""
+        return np.real(self.field.fy/self.smu0)
+
+    @property
+    def vz(self):
+        """View of the vector in the z-direction (nNx, nNy, nCz)."""
+        return np.real(self.field.fz/self.smu0)
 
 
 def get_source_field(grid, src, freq, strength=0):
@@ -270,21 +387,13 @@ def get_source_field(grid, src, freq, strength=0):
 
     Returns
     -------
-    sfield : :func:`Field`-instance
+    sfield : :func:`SourceField`-instance
         Source field, normalized to 1 A m.
 
     """
     # Cast some parameters.
     src = np.array(src, dtype=float)
     strength = float(strength)
-
-    # Get Laplace parameter.
-    if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-        sval = -2j*np.pi*freq
-        dtype = complex
-    else:         # Laplace domain; s.
-        sval = freq
-        dtype = float
 
     # Ensure source is a point or a finite dipole.
     if len(src) not in [5, 6]:
@@ -347,7 +456,7 @@ def get_source_field(grid, src, freq, strength=0):
         """Set the source-field in idir."""
 
         # Initiate zero source field.
-        sfield = Field(grid, dtype=dtype)
+        sfield = SourceField(grid, freq)
 
         # Return source-field depending if point or finite dipole.
         vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
@@ -362,10 +471,10 @@ def get_source_field(grid, src, freq, strength=0):
             point_source(*vec2, src, sfield.fy)
             point_source(*vec3, src, sfield.fz)
 
-        # Multiply by strength*sval*mu in per direction.
-        sfield.fx *= strength[0]*sval*mu_0
-        sfield.fy *= strength[1]*sval*mu_0
-        sfield.fz *= strength[2]*sval*mu_0
+        # Multiply by strength*s*mu in per direction.
+        sfield.fx *= strength[0]*sfield.smu0
+        sfield.fy *= strength[1]*sfield.smu0
+        sfield.fz *= strength[2]*sfield.smu0
 
         return sfield
 
@@ -638,7 +747,7 @@ def get_h_field(grid, model, field):
 
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
-    if model._Model__zeta is not None:
+    if model._mu_r is not None:
 
         # Plus and minus indices.
         ixm = np.r_[0, np.arange(grid.nCx)]
@@ -667,8 +776,8 @@ def get_h_field(grid, model, field):
         e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
         e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
 
-    # Create a Field-instance and divide by sval*mu_0 and return.
-    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(model.sval*mu_0)
+    # Create a Field-instance and divide by s*mu_0 and return.
+    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(field.smu0)
 
     return hfield
 
@@ -693,39 +802,22 @@ class Model:
         Resistivity in x-, y-, and z-directions. If ndarray, they must have the
         shape of grid.vnC (F-ordered) or grid.nC.
 
-    freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
-        Either positive or negative:
-
-        - ``freq`` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - ``freq`` < 0: Laplace domain, hence
-          :math:`s = f` (real).
-
     mu_r : float or ndarray
        Relative magnetic permeability (isotropic). If ndarray it must have the
        shape of grid.vnC (F-ordered) or grid.nC.
 
     """
 
-    def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=1.,
-                 mu_r=None):
+    def __init__(self, grid, res_x=1., res_y=None, res_z=None, mu_r=None):
         """Initiate a new resistivity model."""
-
-        # Get Laplace parameter.
-        self.freq = freq  # Store input value.
-        if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-            self.sval = -2j*np.pi*freq
-        else:         # Laplace domain; s.
-            self.sval = freq
-        self.smu0 = np.array(self.sval*mu_0)
 
         # Store required info from grid.
         self.nC = grid.nC
         self.vnC = grid.vnC
-        self.__vol = grid.vol.reshape(self.vnC, order='F')
+        self._vol = grid.vol.reshape(self.vnC, order='F')
 
         # Check case.
+        self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
         if res_y is None and res_z is None:   # Isotropic (0).
             self.case = 0
         elif res_y is None or res_z is None:  # HTI (1) or VTI (2).
@@ -738,135 +830,150 @@ class Model:
 
         # Initiate x-directed resistivity.
         if isinstance(res_x, (float, int)):
-            self.__res_x = res_x*np.ones(self.vnC)
+            self._res_x = res_x*np.ones(self.vnC)
         elif np.all(res_x.shape == self.vnC) and res_x.ndim == 3:
-            self.__res_x = res_x
+            self._res_x = res_x
         elif res_x.size == self.nC and res_x.ndim == 1:
-            self.__res_x = res_x.reshape(self.vnC, order='F')
+            self._res_x = res_x.reshape(self.vnC, order='F')
         else:
             print(f"* ERROR   :: res_x must be {grid.vnC} or {grid.nC}.")
             print(f"             Provided: {res_x.shape}.")
             raise ValueError("Wrong Shape")
-        self.__eta_x = self._calculate_eta(self.__res_x)
+        self._eta_x = None
 
         # Initiate y-directed resistivity.
         if self.case in [1, 3]:
             if isinstance(res_y, (float, int)):
-                self.__res_y = res_y*np.ones(self.vnC)
+                self._res_y = res_y*np.ones(self.vnC)
             elif np.all(res_y.shape == self.vnC) and res_y.ndim == 3:
-                self.__res_y = res_y
+                self._res_y = res_y
             elif res_y.size == self.nC and res_y.ndim == 1:
-                self.__res_y = res_y.reshape(self.vnC, order='F')
+                self._res_y = res_y.reshape(self.vnC, order='F')
             else:
                 print(f"* ERROR   :: res_y must be {grid.vnC} or {grid.nC}.")
                 print(f"             Provided: {res_y.shape}.")
                 raise ValueError("Wrong Shape")
-            self.__eta_y = self._calculate_eta(self.__res_y)
+        self._eta_y = None
 
         # Initiate z-directed resistivity.
         if self.case in [2, 3]:
             if isinstance(res_z, (float, int)):
-                self.__res_z = res_z*np.ones(self.vnC)
+                self._res_z = res_z*np.ones(self.vnC)
             elif np.all(res_z.shape == self.vnC) and res_z.ndim == 3:
-                self.__res_z = res_z
+                self._res_z = res_z
             elif res_z.size == self.nC and res_z.ndim == 1:
-                self.__res_z = res_z.reshape(self.vnC, order='F')
+                self._res_z = res_z.reshape(self.vnC, order='F')
             else:
                 print(f"* ERROR   :: res_z must be {grid.vnC} or {grid.nC}.")
                 print(f"             Provided: {res_z.shape}.")
                 raise ValueError("Wrong Shape")
-            self.__eta_z = self._calculate_eta(self.__res_z)
+        self._eta_z = None
 
         # Store magnetic permeability.
         if mu_r is None or isinstance(mu_r, (float, int)):
-            self.__zeta = mu_r
+            self._mu_r = mu_r
         elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
-            self.__zeta = mu_r
+            self._mu_r = mu_r
         elif mu_r.size == self.nC and mu_r.ndim == 1:
-            self.__zeta = mu_r.reshape(self.vnC, order='F')
+            self._mu_r = mu_r.reshape(self.vnC, order='F')
+        self._zeta = None
 
     # RESISTIVITIES
     @property
     def res_x(self):
         r"""Resistivity in x-direction (:math:`\rho_x`)."""
-        return self.__res_x
+        return self._res_x
 
     @res_x.setter
     def res_x(self, res):
         r"""Update resistivity in x-direction (:math:`\rho_x`)."""
-        self.__res_x = res
-        self.__eta_x = self._calculate_eta(res)
+        self._res_x = res
+        self._eta_x = self._calculate_eta(res)
 
     @property
     def res_y(self):
         r"""Resistivity in y-direction (:math:`\rho_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self.__res_y
+            return self._res_y
         else:                    # Return res_x.
-            return self.__res_x
+            return self._res_x
 
     @res_y.setter
     def res_y(self, res):
         r"""Update resistivity in y-direction (:math:`\rho_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            self.__res_y = res
-            self.__eta_y = self._calculate_eta(res)
+            self._res_y = res
+            self._eta_y = self._calculate_eta(res)
         else:
-            print("Cannot set res_y, as it was initialized as res_x.")
+            print("Cannot set res_y, as resistivity model is "
+                  f"{self.case_names[self.case]}.")
             raise ValueError
 
     @property
     def res_z(self):
         r"""Resistivity in z-direction (:math:`\rho_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self.__res_z
+            return self._res_z
         else:                    # Return res_x.
-            return self.__res_x
+            return self._res_x
 
     @res_z.setter
     def res_z(self, res):
         r"""Update resistivity in z-direction (:math:`\rho_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            self.__res_z = res
-            self.__eta_z = self._calculate_eta(res)
+            self._res_z = res
+            self._eta_z = self._calculate_eta(res)
         else:
-            print("Cannot set res_z, as it was initialized as res_x.")
+            print("Cannot set res_z, as resistivity model is "
+                  f"{self.case_names[self.case]}.")
             raise ValueError
 
     # ETA's
     @property
     def eta_x(self):
         r"""Volume*eta in x-direction (:math:`V\eta_x`)."""
-        return self.__eta_x
+        if self._eta_x is None:
+            self._eta_x = self._calculate_eta(self.res_x)
+        return self._eta_x
 
     @property
     def eta_y(self):
         r"""Volume*eta in x-direction (:math:`V\eta_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self.__eta_y
+            if self._eta_y is None:
+                self._eta_y = self._calculate_eta(self.res_y)
+            return self._eta_y
         else:                    # Return eta_x.
-            return self.__eta_x
+            if self._eta_x is None:
+                self._eta_x = self._calculate_eta(self.res_x)
+            return self._eta_x
 
     @property
     def eta_z(self):
         r"""Volume*eta in x-direction (:math:`V\eta_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self.__eta_z
+            if self._eta_z is None:
+                self._eta_z = self._calculate_eta(self.res_z)
+            return self._eta_z
         else:                    # Return eta_x.
-            return self.__eta_x
+            if self._eta_x is None:
+                self._eta_x = self._calculate_eta(self.res_x)
+            return self._eta_x
 
     def _calculate_eta(self, res):
         r"""eta: volume divided by resistivity."""
-        return self.__vol/res
+        return self._vol/res
 
     # MU_R's
     @property
     def zeta(self):
         r"""zeta: volume divided by relative magnetic permeability."""
-        if self.__zeta is None:
-            return self.__vol
-        else:
-            return self.__vol/self.__zeta
+        if self._zeta is None:
+            if self._mu_r is None:
+                self._zeta = self._vol
+            else:
+                self._zeta = self._vol/self._mu_r
+        return self._zeta
 
 
 # INTERPOLATION
@@ -1145,10 +1252,10 @@ class TensorMesh:
     @property
     def vol(self):
         """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '__vol', None) is None:
+        if getattr(self, '_vol', None) is None:
             vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
-            self.__vol = vol.ravel('F')
-        return self.__vol
+            self._vol = vol.ravel('F')
+        return self._vol
 
 
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
@@ -1932,6 +2039,22 @@ def data_write(fname, keys, values, path='data', exists=0):
 
         # Writing it to the shelve.
         for i, key in enumerate(keys):
+
+            # If the parameter is a Model- or TensorMesh-instance, we set the
+            # volume and volume-averaged values to None. This saves space, and
+            # they are not needed and will simply be reconstructed if required.
+            if type(values[i]).__name__ == 'TensorMesh':
+                values[i]._vol = None
+
+            # Note: Model-instances also have a `_vol`-attribute. However,
+            #       currently a Model-instance cannot reconstruct that, so we
+            #       leave it in.
+            if type(values[i]).__name__ == 'Model':
+                values[i]._eta_x = None
+                values[i]._eta_y = None
+                values[i]._eta_z = None
+                values[i]._zeta = None
+
             db[key] = values[i]
 
 
@@ -1997,12 +2120,12 @@ class Time:
 
     def __init__(self):
         """Initialize time zero (t0) with current time stamp."""
-        self.__t0 = default_timer()
+        self._t0 = default_timer()
 
     @property
     def t0(self):
         """Return time zero of this class instance."""
-        return self.__t0
+        return self._t0
 
     @property
     def now(self):
@@ -2012,7 +2135,7 @@ class Time:
     @property
     def runtime(self):
         """Return string of runtime since time zero."""
-        t1 = default_timer() - self.__t0
+        t1 = default_timer() - self._t0
         return timedelta(seconds=np.round(t1))
 
 

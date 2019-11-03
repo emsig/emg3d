@@ -2,22 +2,46 @@ Changelog
 #########
 
 
-latest
-------
+latest - will be *v0.9.0*
+-------------------------
 
-- The multigrid method, as implemented, only works for the diffusive
-  approximation. Nevertheless, we always used ``\sigma-i\omega\epsilon``, hence
-  a complex number. This is now changed and ``\epsilon`` set to 0, leaving only
-  ``\sigma``.
-- Change time convention from ``exp(-iwt)`` to ``exp(iwt)``, as used in
-  ``empymod`` and commonly in CSEM. Removed the parameter ``conjugate`` from
-  the solver, to simplify.
-- ``empymod`` is a new dependency.
-- ``Fields`` and returned receiver-arrays (``EMArray``) both have amplitude
-  (``.amp``) and phase (``.pha``) attributes.
-- Travis now checks all the url's in the documentation, so there should be no
-  broken links down the road. (Check is allowed to fail, it is visual QC.)
-- Fixes to the ``setuptools_scm``-implementation (``MANIFEST.in``).
+Backwards incompatible in many senses, but mainly for ``emg3d.utils.Model``.
+
+- Utilities:
+
+  - ``Fields`` and returned receiver-arrays (``EMArray``) both have amplitude
+    (``.amp``) and phase (``.pha``) attributes.
+  - ``Fields`` have attributes containing frequency-information (``freq``,
+    ``smu0``).
+  - New class ``SourceField``; a subclass of ``Field``, adding ``vector`` and
+    ``v{x,y,z}`` attributes for the real valued source vectors.
+  - The ``Model`` is not frequency-dependent any longer and does NOT take
+    a ``freq``-parameter any more.
+  - ``data_write`` automatically removes ``_vol`` from ``TensorMesh``
+    instances, and ``_eta_{x,y,z}``, ``_zeta`` from ``Model`` instances. This
+    makes the archives smaller, and they are not required, as they are simply
+    reconstructed if needed.
+
+- Internal changes:
+
+  - The multigrid method, as implemented, only works for the diffusive
+    approximation. Nevertheless, we always used ``\sigma-i\omega\epsilon``,
+    hence a complex number. This is now changed and ``\epsilon`` set to 0,
+    leaving only ``\sigma``.
+  - Change time convention from ``exp(-iwt)`` to ``exp(iwt)``, as used in
+    ``empymod`` and commonly in CSEM. Removed the parameter ``conjugate`` from
+    the solver, to simplify.
+  - Change own private class variables from ``__`` to ``_``.
+
+- New dependencies and maintenance:
+
+  - ``empymod`` is a new dependency.
+  - Travis now checks all the url's in the documentation, so there should be no
+    broken links down the road. (Check is allowed to fail, it is visual QC.)
+
+- Bugfixes:
+
+  - Fixes to the ``setuptools_scm``-implementation (``MANIFEST.in``).
 
 
 *v0.8.1* : setuptools_scm
