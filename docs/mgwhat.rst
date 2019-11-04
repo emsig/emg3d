@@ -4,9 +4,10 @@ Multi-what?
 If you have never heard of the multigrid method before you might ask yourself
 "*multi-what?*" The following is an intent to describe the multigrid method
 without the maths; just some keywords and some figures. **It is a heavily
-simplified intro, using a 2D grid for simplicity.** A good, four-page intro
-with some maths is given by [Muld11]_. Have a look at the :doc:`theory`-section
-for more details.
+simplified intro, using a 2D grid for simplicity.** Have a look at the
+:doc:`theory`-section for more details. A good, four-page intro with some maths
+is given by [Muld11]_. More in-depth information can be found, e.g., in
+[BrHM00]_, [Hack85]_, and [Wess91]_.
 
 The multigrid method ([Fedo64]_)
 

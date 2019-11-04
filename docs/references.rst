@@ -21,6 +21,10 @@ References
    European Conference on Computational Fluid Dynamics; UUID:
    `df65da5c-e43f-47ab-b80d-2f8ee7f35464
    <http://resolver.tudelft.nl/uuid:df65da5c-e43f-47ab-b80d-2f8ee7f35464>`_.
+.. [Hack85] Hackbusch, W., 1985, Multi-grid methods and applications: Springer,
+   Berlin, Heidelberg, Volume 4 of Springer Series in Computational
+   Mathematics; DOI: `10.1007/978- 3-662-02427-0 <https://doi.org/10.1007/978-
+   3-662-02427-0>`_.
 .. [MoSu94] Monk, P., and E. Süli, 1994, A convergence analysis of Yee's scheme
    on nonuniform grids: SIAM Journal on Numerical Analysis, 31, 393--412; DOI
    `10.1137/0731021 <https://doi.org/10.1137/0731021>`_.
@@ -58,6 +62,8 @@ References
    multigrid solver for 3D electromagnetic diffusion: Journal of Open Source
    Software, 4(39), 1463;
    DOI: `10.21105/joss.01463 <https://doi.org/10.21105/joss.01463>`_.
+.. [Wess91] Wesseling, P., 1991, An introduction to multigrid methods: John
+   Wiley & Sons. Pure and Applied Mathematics; ISBN: 0-471-93083-0.
 .. [WiMS10] Wirianto, M., W. A. Mulder, and E. C. Slob, 2010, A feasibility
    study of land CSEM reservoir monitoring in a complex 3-D model: Geophysical
    Journal International, **181**, 741--755; DOI:

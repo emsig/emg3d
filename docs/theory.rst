@@ -31,7 +31,8 @@ solver is :func:`emg3d.solver.multigrid`.
       from the book.
 
     **Please consult these original resources for more details, and refer to
-    them for citation purposes and not to this manual.**
+    them for citation purposes and not to this manual.** More in-depth
+    information can also be found in, e.g., [Hack85]_ and [Wess91]_.
 
 
 Maxwell's equations
