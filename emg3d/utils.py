@@ -846,7 +846,6 @@ class Model:
             raise ValueError("Wrong Shape")
         # Check 0 < res_x < inf.
         _check_parameter(self._res_x, 'res_x')
-        self._eta_x = None
 
         # Initiate y-directed resistivity.
         if self.case in [1, 3]:
@@ -862,7 +861,6 @@ class Model:
                 raise ValueError("Wrong Shape")
             # Check 0 < res_y < inf.
             _check_parameter(self._res_y, 'res_y')
-        self._eta_y = None
 
         # Initiate z-directed resistivity.
         if self.case in [2, 3]:
@@ -878,7 +876,6 @@ class Model:
                 raise ValueError("Wrong Shape")
             # Check 0 < res_z < inf.
             _check_parameter(self._res_z, 'res_z')
-        self._eta_z = None
 
         # Store magnetic permeability.
         if mu_r is None:
@@ -892,7 +889,6 @@ class Model:
         if mu_r is not None:
             # Check 0 < mu_r < inf.
             _check_parameter(self._mu_r, 'mu_r')
-        self._zeta = None
 
     # RESISTIVITIES
     @property
@@ -948,7 +944,7 @@ class Model:
     @property
     def eta_x(self):
         r"""Volume*eta in x-direction (:math:`V\eta_x`)."""
-        if self._eta_x is None:
+        if getattr(self, '_eta_x', None) is None:
             self._eta_x = self._calculate_eta(self.res_x)
         return self._eta_x
 
@@ -956,11 +952,11 @@ class Model:
     def eta_y(self):
         r"""Volume*eta in x-direction (:math:`V\eta_y`)."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            if self._eta_y is None:
+            if getattr(self, '_eta_y', None) is None:
                 self._eta_y = self._calculate_eta(self.res_y)
             return self._eta_y
         else:                    # Return eta_x.
-            if self._eta_x is None:
+            if getattr(self, '_eta_x', None) is None:
                 self._eta_x = self._calculate_eta(self.res_x)
             return self._eta_x
 
@@ -968,11 +964,11 @@ class Model:
     def eta_z(self):
         r"""Volume*eta in x-direction (:math:`V\eta_z`)."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            if self._eta_z is None:
+            if getattr(self, '_eta_z', None) is None:
                 self._eta_z = self._calculate_eta(self.res_z)
             return self._eta_z
         else:                    # Return eta_x.
-            if self._eta_x is None:
+            if getattr(self, '_eta_x', None) is None:
                 self._eta_x = self._calculate_eta(self.res_x)
             return self._eta_x
 
@@ -984,7 +980,7 @@ class Model:
     @property
     def zeta(self):
         r"""zeta: volume divided by relative magnetic permeability."""
-        if self._zeta is None:
+        if getattr(self, '_zeta', None) is None:
             if self._mu_r is None:
                 self._zeta = self._vol
             else:
@@ -2060,16 +2056,16 @@ def data_write(fname, keys, values, path='data', exists=0):
             # volume and volume-averaged values to None. This saves space, and
             # they are not needed and will simply be reconstructed if required.
             if type(values[i]).__name__ == 'TensorMesh':
-                values[i]._vol = None
+                delattr(values[i], '_vol')
 
             # Note: Model-instances also have a `_vol`-attribute. However,
             #       currently a Model-instance cannot reconstruct that, so we
             #       leave it in.
             if type(values[i]).__name__ == 'Model':
-                values[i]._eta_x = None
-                values[i]._eta_y = None
-                values[i]._eta_z = None
-                values[i]._zeta = None
+                delattr(values[i], '_eta_x')
+                delattr(values[i], '_eta_y')
+                delattr(values[i], '_eta_z')
+                delattr(values[i], '_zeta')
 
             db[key] = values[i]
 

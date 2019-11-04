@@ -894,9 +894,9 @@ def test_data_write_read(tmpdir, capsys):
         assert getattr(grid, attr) == getattr(grid_out, attr)
 
     # Ensure volume averages got deleted
-    assert grid_out._vol is None
-    assert model_out._eta_x is None
-    assert model_out._zeta is None
+    assert hasattr(grid_out, '_vol') is False
+    assert hasattr(model_out, '_eta_x') is False
+    assert hasattr(model_out, '_zeta') is False
 
     # Ensure they can be reconstructed
     assert_allclose(grid.vol, grid_out.vol)
