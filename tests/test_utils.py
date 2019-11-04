@@ -488,6 +488,16 @@ def test_Model():
     model4 = utils.Model(grid, 1)
     assert_allclose(model4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
+    # Check a couple of failures
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, res_x=res_x*0)
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, res_y=np.inf)
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, res_z=res_z*np.inf)
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, mu_r=-1)
+
 
 def test_field():
     # Create some dummy data
@@ -547,6 +557,10 @@ def test_source_field():
     assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
     assert hasattr(ss, 'vector')
     assert hasattr(ss, 'vx')
+
+    # Check 0 Hz frequency.
+    with pytest.raises(ValueError):
+        ss = utils.SourceField(grid, freq=0)
 
 
 def test_get_h_field():
@@ -880,9 +894,9 @@ def test_data_write_read(tmpdir, capsys):
         assert getattr(grid, attr) == getattr(grid_out, attr)
 
     # Ensure volume averages got deleted
-    assert grid_out._vol is None
-    assert model_out._eta_x is None
-    assert model_out._zeta is None
+    assert hasattr(grid_out, '_vol') is False
+    assert hasattr(model_out, '_eta_x') is False
+    assert hasattr(model_out, '_zeta') is False
 
     # Ensure they can be reconstructed
     assert_allclose(grid.vol, grid_out.vol)

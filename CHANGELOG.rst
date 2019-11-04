@@ -32,6 +32,8 @@ Backwards incompatible in many senses, but mainly for ``emg3d.utils.Model``.
     ``empymod`` and commonly in CSEM. Removed the parameter ``conjugate`` from
     the solver, to simplify.
   - Change own private class variables from ``__`` to ``_``.
+  - ``res`` and ``mu_r`` are now checked to ensure they are >0; ``freq`` is
+    checked to ensure !=0.
 
 - New dependencies and maintenance:
 
