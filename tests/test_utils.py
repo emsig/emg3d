@@ -488,6 +488,16 @@ def test_Model():
     model4 = utils.Model(grid, 1)
     assert_allclose(model4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
+    # Check a couple of failures
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, res_x=res_x*0)
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, res_y=np.inf)
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, res_z=res_z*np.inf)
+    with pytest.raises(ValueError):
+        _ = utils.Model(grid, mu_r=-1)
+
 
 def test_field():
     # Create some dummy data
@@ -547,6 +557,10 @@ def test_source_field():
     assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
     assert hasattr(ss, 'vector')
     assert hasattr(ss, 'vx')
+
+    # Check 0 Hz frequency.
+    with pytest.raises(ValueError):
+        ss = utils.SourceField(grid, freq=0)
 
 
 def test_get_h_field():

@@ -148,8 +148,13 @@ class Field(np.ndarray):
         if freq is not None:
             if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
                 obj._smu0 = np.array(-2j*np.pi*freq*4e-7*np.pi)
-            else:         # Laplace domain; s.
+            elif freq < 0:  # Laplace domain; s.
                 obj._smu0 = np.array(freq*4e-7*np.pi)
+            else:
+                print("* ERROR   :: ``freq`` must be >0 (frequency domain) "
+                      "or <0 (Laplace domain)."
+                      f"             Provided frequency: {freq} Hz.")
+                raise ValueError("Source error")
         else:
             obj._smu0 = None
 
@@ -839,6 +844,8 @@ class Model:
             print(f"* ERROR   :: res_x must be {grid.vnC} or {grid.nC}.")
             print(f"             Provided: {res_x.shape}.")
             raise ValueError("Wrong Shape")
+        # Check 0 < res_x < inf.
+        _check_parameter(self._res_x, 'res_x')
         self._eta_x = None
 
         # Initiate y-directed resistivity.
@@ -853,6 +860,8 @@ class Model:
                 print(f"* ERROR   :: res_y must be {grid.vnC} or {grid.nC}.")
                 print(f"             Provided: {res_y.shape}.")
                 raise ValueError("Wrong Shape")
+            # Check 0 < res_y < inf.
+            _check_parameter(self._res_y, 'res_y')
         self._eta_y = None
 
         # Initiate z-directed resistivity.
@@ -867,15 +876,22 @@ class Model:
                 print(f"* ERROR   :: res_z must be {grid.vnC} or {grid.nC}.")
                 print(f"             Provided: {res_z.shape}.")
                 raise ValueError("Wrong Shape")
+            # Check 0 < res_z < inf.
+            _check_parameter(self._res_z, 'res_z')
         self._eta_z = None
 
         # Store magnetic permeability.
-        if mu_r is None or isinstance(mu_r, (float, int)):
+        if mu_r is None:
             self._mu_r = mu_r
+        elif isinstance(mu_r, (float, int)):
+            self._mu_r = np.array(mu_r, dtype=float)
         elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
             self._mu_r = mu_r
         elif mu_r.size == self.nC and mu_r.ndim == 1:
             self._mu_r = mu_r.reshape(self.vnC, order='F')
+        if mu_r is not None:
+            # Check 0 < mu_r < inf.
+            _check_parameter(self._mu_r, 'mu_r')
         self._zeta = None
 
     # RESISTIVITIES
@@ -2199,3 +2215,11 @@ class Report(ScoobyReport):
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
+
+
+# INTERNAL UTILITIES
+def _check_parameter(var, name):
+    """Check 0 < var < inf."""
+    if not np.all(var > 0) or not np.all(var < np.inf):
+        print(f"* ERROR   :: ``{name}`` must be all `0 < var < inf`.")
+        raise ValueError("Parameter error")
