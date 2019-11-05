@@ -14,7 +14,8 @@ latest - will be *v0.9.0*
   - New class ``SourceField``; a subclass of ``Field``, adding ``vector`` and
     ``v{x,y,z}`` attributes for the real valued source vectors.
   - The ``Model`` is not frequency-dependent any longer and does NOT take
-    a ``freq``-parameter any more.
+    a ``freq``-parameter any more (currently it still takes it, but it is
+    deprecated and will be removed in the future).
   - ``data_write`` automatically removes ``_vol`` from ``TensorMesh``
     instances. This makes the archives smaller, and it is not required, as it
     is simply reconstructed if needed.
