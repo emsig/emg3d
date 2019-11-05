@@ -84,6 +84,11 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, smu0, zeta, hx, hy,
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
+    smu0 : float
+        Imaginary or real Laplace parameter 's' times mu_0, where
+        :math:`s=i\omega` if the calculation is in the frequency domain, or
+        simply :math:`s=f` in the Laplace domain.
+
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -256,6 +261,11 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
     eta_x, eta_y, eta_z, zeta :
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
+
+    smu0 : float
+        Imaginary or real Laplace parameter 's' times mu_0, where
+        :math:`s=i\omega` if the calculation is in the frequency domain, or
+        simply :math:`s=f` in the Laplace domain.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -538,6 +548,11 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
+    smu0 : float
+        Imaginary or real Laplace parameter 's' times mu_0, where
+        :math:`s=i\omega` if the calculation is in the frequency domain, or
+        simply :math:`s=f` in the Laplace domain.
+
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -817,6 +832,11 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
 
+    smu0 : float
+        Imaginary or real Laplace parameter 's' times mu_0, where
+        :math:`s=i\omega` if the calculation is in the frequency domain, or
+        simply :math:`s=f` in the Laplace domain.
+
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -1090,6 +1110,11 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
     eta_x, eta_y, eta_z, zeta :
         Model parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.Model`.
+
+    smu0 : float
+        Imaginary or real Laplace parameter 's' times mu_0, where
+        :math:`s=i\omega` if the calculation is in the frequency domain, or
+        simply :math:`s=f` in the Laplace domain.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.

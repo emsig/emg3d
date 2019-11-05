@@ -167,13 +167,17 @@ def test_solver_heterogeneous(capsys):
 
     assert_allclose(efield2, efield3)
 
+    out, _ = capsys.readouterr()  # Clean up
+
     # One test without post-smoothing to check if it runs.
     efield4 = solver.solver(
-            grid, model, sfield, maxit=20, nu_pre=0, nu_post=4, verb=3)
+            grid, model, sfield, sslsolver=True, semicoarsening=True,
+            linerelaxation=True, maxit=20, nu_pre=0, nu_post=4, verb=3)
     efield5 = solver.solver(
-            grid, model, sfield, maxit=20, nu_pre=4, nu_post=0, verb=3)
+            grid, model, sfield, sslsolver=True, semicoarsening=True,
+            linerelaxation=True, maxit=20, nu_pre=4, nu_post=0, verb=3)
     # They don't converge, and hence don't agree. Just a lazy test.
-    assert_allclose(efield4, efield5, atol=1e-8)
+    assert_allclose(efield4, efield5, atol=1e-15, rtol=1e-5)
 
     # Check the QC plot if it is too long.
     # Coincidently, this one also diverges if nu_pre=0!

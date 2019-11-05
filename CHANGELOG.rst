@@ -5,8 +5,6 @@ Changelog
 latest - will be *v0.9.0*
 -------------------------
 
-Backwards incompatible in many senses, but mainly for ``emg3d.utils.Model``.
-
 - Utilities:
 
   - ``Fields`` and returned receiver-arrays (``EMArray``) both have amplitude
@@ -18,9 +16,8 @@ Backwards incompatible in many senses, but mainly for ``emg3d.utils.Model``.
   - The ``Model`` is not frequency-dependent any longer and does NOT take
     a ``freq``-parameter any more.
   - ``data_write`` automatically removes ``_vol`` from ``TensorMesh``
-    instances, and ``_eta_{x,y,z}``, ``_zeta`` from ``Model`` instances. This
-    makes the archives smaller, and they are not required, as they are simply
-    reconstructed if needed.
+    instances. This makes the archives smaller, and it is not required, as it
+    is simply reconstructed if needed.
 
 - Internal changes:
 
