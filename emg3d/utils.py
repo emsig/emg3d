@@ -781,9 +781,7 @@ def get_h_field(grid, model, field):
     e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
 
     # Create a Field-instance and divide by s*mu_0 and return.
-    hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(field.smu0)
-
-    return hfield
+    return -Field(e3d_hx, e3d_hy, e3d_hz)/field.smu0
 
 
 # MODEL
