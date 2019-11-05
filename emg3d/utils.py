@@ -750,36 +750,35 @@ def get_h_field(grid, model, field):
     e3d_hz = (np.diff(field.fy, axis=0)/grid.hx[:, None, None] -
               np.diff(field.fx, axis=1)/grid.hy[None, :, None])
 
-    # If relative magnetic permeability is not one, we have to take the volume
-    # into account, as mu_r is volume-averaged.
-    if model._mu_r is not None:
+    # For the relative magnetic permeability we have to take the volume into
+    # account, as mu_r is volume-averaged.
 
-        # Plus and minus indices.
-        ixm = np.r_[0, np.arange(grid.nCx)]
-        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
-        iym = np.r_[0, np.arange(grid.nCy)]
-        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
-        izm = np.r_[0, np.arange(grid.nCz)]
-        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
+    # Plus and minus indices.
+    ixm = np.r_[0, np.arange(grid.nCx)]
+    ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
+    iym = np.r_[0, np.arange(grid.nCy)]
+    iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
+    izm = np.r_[0, np.arange(grid.nCz)]
+    izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
 
-        # Average mu_r for dual-grid.
-        zeta_x = (model.zeta[ixm, :, :] + model.zeta[ixp, :, :])/2.
-        zeta_y = (model.zeta[:, iym, :] + model.zeta[:, iyp, :])/2.
-        zeta_z = (model.zeta[:, :, izm] + model.zeta[:, :, izp])/2.
+    # Average mu_r for dual-grid.
+    zeta_x = (model.zeta[ixm, :, :] + model.zeta[ixp, :, :])/2.
+    zeta_y = (model.zeta[:, iym, :] + model.zeta[:, iyp, :])/2.
+    zeta_z = (model.zeta[:, :, izm] + model.zeta[:, :, izp])/2.
 
-        hvx = grid.hx[:, None, None]
-        hvy = grid.hy[None, :, None]
-        hvz = grid.hz[None, None, :]
+    hvx = grid.hx[:, None, None]
+    hvy = grid.hy[None, :, None]
+    hvz = grid.hz[None, None, :]
 
-        # Define the widths of the dual grid.
-        dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
-        dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
-        dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
+    # Define the widths of the dual grid.
+    dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
+    dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
+    dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
 
-        # Multiply fields by mu_r.
-        e3d_hx *= zeta_x/(dx[:, None, None]*hvy*hvz)
-        e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
-        e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
+    # Multiply fields by mu_r.
+    e3d_hx *= zeta_x/(dx[:, None, None]*hvy*hvz)
+    e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
+    e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
 
     # Create a Field-instance and divide by s*mu_0 and return.
     hfield = Field(e3d_hx, e3d_hy, e3d_hz)/(field.smu0)
@@ -813,8 +812,14 @@ class Model:
 
     """
 
-    def __init__(self, grid, res_x=1., res_y=None, res_z=None, mu_r=None):
+    def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=None,
+                 mu_r=1.):
         """Initiate a new resistivity model."""
+
+        # Issue warning for backwards compatibility.
+        if freq is not None:
+            print("\n    ``Model`` does not take frequency ``freq`` any "
+                  "longer;\n    providing it will break in the future.")
 
         # Store required info from grid.
         self.nC = grid.nC
@@ -877,45 +882,44 @@ class Model:
             # Check 0 < res_z < inf.
             _check_parameter(self._res_z, 'res_z')
 
-        # Store magnetic permeability.
-        if mu_r is None:
-            self._mu_r = mu_r
-        elif isinstance(mu_r, (float, int)):
-            self._mu_r = np.array(mu_r, dtype=float)
+        # Initiate magnetic permeability.
+        if isinstance(mu_r, (float, int)):
+            self._mu_r = mu_r*np.ones(self.vnC)
         elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
             self._mu_r = mu_r
         elif mu_r.size == self.nC and mu_r.ndim == 1:
             self._mu_r = mu_r.reshape(self.vnC, order='F')
-        if mu_r is not None:
-            # Check 0 < mu_r < inf.
-            _check_parameter(self._mu_r, 'mu_r')
+        else:
+            print(f"* ERROR   :: mu_r must be {grid.vnC} or {grid.nC}.")
+            print(f"             Provided: {mu_r.shape}.")
+            raise ValueError("Wrong Shape")
+        # Check 0 < mu_r < inf.
+        _check_parameter(self._mu_r, 'mu_r')
 
     # RESISTIVITIES
     @property
     def res_x(self):
-        r"""Resistivity in x-direction (:math:`\rho_x`)."""
+        r"""Resistivity in x-direction."""
         return self._res_x
 
     @res_x.setter
     def res_x(self, res):
-        r"""Update resistivity in x-direction (:math:`\rho_x`)."""
-        self._res_x = res
-        self._eta_x = self._calculate_eta(res)
+        r"""Update resistivity in x-direction."""
+        self._res_x[:, :, :] = res
 
     @property
     def res_y(self):
-        r"""Resistivity in y-direction (:math:`\rho_y`)."""
+        r"""Resistivity in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
             return self._res_y
-        else:                    # Return res_x.
+        else:                   # Return res_x.
             return self._res_x
 
     @res_y.setter
     def res_y(self, res):
-        r"""Update resistivity in y-direction (:math:`\rho_y`)."""
+        r"""Update resistivity in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            self._res_y = res
-            self._eta_y = self._calculate_eta(res)
+            self._res_y[:, :, :] = res
         else:
             print("Cannot set res_y, as resistivity model is "
                   f"{self.case_names[self.case]}.")
@@ -923,7 +927,7 @@ class Model:
 
     @property
     def res_z(self):
-        r"""Resistivity in z-direction (:math:`\rho_z`)."""
+        r"""Resistivity in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
             return self._res_z
         else:                    # Return res_x.
@@ -931,10 +935,9 @@ class Model:
 
     @res_z.setter
     def res_z(self, res):
-        r"""Update resistivity in z-direction (:math:`\rho_z`)."""
+        r"""Update resistivity in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            self._res_z = res
-            self._eta_z = self._calculate_eta(res)
+            self._res_z[:, :, :] = res
         else:
             print("Cannot set res_z, as resistivity model is "
                   f"{self.case_names[self.case]}.")
@@ -943,49 +946,41 @@ class Model:
     # ETA's
     @property
     def eta_x(self):
-        r"""Volume*eta in x-direction (:math:`V\eta_x`)."""
-        if getattr(self, '_eta_x', None) is None:
-            self._eta_x = self._calculate_eta(self.res_x)
-        return self._eta_x
+        r"""Volume/res in x-direction."""
+        return self._vol/self.res_x
 
     @property
     def eta_y(self):
-        r"""Volume*eta in x-direction (:math:`V\eta_y`)."""
+        r"""Volume/res in x-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            if getattr(self, '_eta_y', None) is None:
-                self._eta_y = self._calculate_eta(self.res_y)
-            return self._eta_y
+            return self._vol/self.res_y
         else:                    # Return eta_x.
-            if getattr(self, '_eta_x', None) is None:
-                self._eta_x = self._calculate_eta(self.res_x)
-            return self._eta_x
+            return self._vol/self.res_x
 
     @property
     def eta_z(self):
-        r"""Volume*eta in x-direction (:math:`V\eta_z`)."""
+        r"""Volume/res in x-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            if getattr(self, '_eta_z', None) is None:
-                self._eta_z = self._calculate_eta(self.res_z)
-            return self._eta_z
+            return self._vol/self.res_z
         else:                    # Return eta_x.
-            if getattr(self, '_eta_x', None) is None:
-                self._eta_x = self._calculate_eta(self.res_x)
-            return self._eta_x
+            return self._vol/self.res_x
 
-    def _calculate_eta(self, res):
-        r"""eta: volume divided by resistivity."""
-        return self._vol/res
+    # MAGNETIC PERMEABILITIES
+    @property
+    def mu_r(self):
+        r"""Magnetic permeability."""
+        return self._mu_r
 
-    # MU_R's
+    @mu_r.setter
+    def mu_r(self, mu_r):
+        r"""Update magnetic permeability."""
+        self._mu_r[:, :, :] = mu_r
+
+    # ZETA
     @property
     def zeta(self):
-        r"""zeta: volume divided by relative magnetic permeability."""
-        if getattr(self, '_zeta', None) is None:
-            if self._mu_r is None:
-                self._zeta = self._vol
-            else:
-                self._zeta = self._vol/self._mu_r
-        return self._zeta
+        r"""Volume/mu_r."""
+        return self._vol/self.mu_r
 
 
 # INTERPOLATION
@@ -2052,20 +2047,11 @@ def data_write(fname, keys, values, path='data', exists=0):
         # Writing it to the shelve.
         for i, key in enumerate(keys):
 
-            # If the parameter is a Model- or TensorMesh-instance, we set the
-            # volume and volume-averaged values to None. This saves space, and
-            # they are not needed and will simply be reconstructed if required.
+            # If the parameter is a TensorMesh-instance, we set the volume
+            # None. This saves space, and it will simply be reconstructed if
+            # required.
             if type(values[i]).__name__ == 'TensorMesh':
                 delattr(values[i], '_vol')
-
-            # Note: Model-instances also have a `_vol`-attribute. However,
-            #       currently a Model-instance cannot reconstruct that, so we
-            #       leave it in.
-            if type(values[i]).__name__ == 'Model':
-                delattr(values[i], '_eta_x')
-                delattr(values[i], '_eta_y')
-                delattr(values[i], '_eta_z')
-                delattr(values[i], '_zeta')
 
             db[key] = values[i]
 

@@ -409,6 +409,7 @@ def test_Model():
     res_x = create_dummy(*grid.vnC, False)
     res_y = res_x/2.0
     res_z = res_x*1.4
+    mu_r = res_x*1.11
 
     # Using defaults
     model1 = utils.Model(grid)
@@ -451,29 +452,33 @@ def test_Model():
         utils.Model(grid, res_y=np.ones((2, 5, 6)))
     with pytest.raises(ValueError):
         utils.Model(grid, res_z=np.array([1, 3]))
+    with pytest.raises(ValueError):
+        utils.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
     # Check with all inputs
-    model3 = utils.Model(grid, res_x, res_y, res_z, mu_r=res_x)
+    model3 = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert_allclose(model3._vol/res_x, model3.zeta)
+    assert_allclose(model3._vol/mu_r, model3.zeta)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
-                          res_z.ravel('F'), mu_r=res_y.ravel('F'))
+                          res_z.ravel('F'), mu_r=mu_r.ravel('F'))
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
-    assert_allclose(model3b._vol/res_y, model3b.zeta)
+    assert_allclose(model3b._vol/mu_r, model3b.zeta)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
     model3.res_x = tres*2.0
     model3.res_y = tres*3.0
     model3.res_z = tres*4.0
+    model3.mu_r = tres*5.0
     assert_allclose(tres*2., model3.res_x)
     assert_allclose(tres*3., model3.res_y)
     assert_allclose(tres*4., model3.res_z)
+    assert_allclose(tres*5., model3.mu_r)
 
     # Check eta
     eta_x = 1/model3.res_x*model3._vol
