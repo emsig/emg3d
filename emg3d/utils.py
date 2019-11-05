@@ -45,7 +45,7 @@ except ImportError:
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_h_field', 'Model', 'grid2grid', 'TensorMesh', 'get_hx_h0',
            'get_cell_numbers', 'get_stretched_h', 'get_domain', 'get_hx',
-           'data_write', 'data_read', 'Time', 'Report']
+           'Fourier', 'data_write', 'data_read', 'Time', 'Report']
 
 
 # FIELDS
@@ -1971,6 +1971,158 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
                 #      (min_width, nr, a)]
 
     return hx
+
+
+# TIME DOMAIN
+class Fourier:
+    # TODO make empymod optional?
+    # TODO document this function.
+    # TODO add tests.
+
+    def __init__(self, time, fmin=0.01, fmax=100, signal=0, ft='sin',
+                 ftarg=None, verb=3):
+
+        self.__time = time
+        self.__fmin = fmin
+        self.__fmax = fmax
+        self.__signal = signal
+        self.__ft = ft
+        self.__ftarg = ftarg
+        self.verb = verb
+
+        self.__nfreq = 301
+
+        self._check_time()
+
+    # PURE PROPERTIES
+    @property
+    def freq(self):
+        return self.__freq
+
+    @property
+    def calc_ind(self):
+        return (self.freq > self.fmin) & (self.freq < self.fmax)
+
+    @property
+    def calc_freq(self):
+        return self.freq[self.calc_ind]
+
+    @property
+    def int_ind(self):
+        return self.freq < self.fmax
+
+    @property
+    def int_freq(self):
+        return self.freq[self.int_ind]
+
+    @property
+    def dense_freq(self):
+        return np.logspace(np.log10(self.freq.min()),
+                           np.log10(self.freq.max()), self.nfreq)
+
+    @property
+    def ft(self):
+        return self.__ft
+
+    @property
+    def ftarg(self):
+        return self.__ftarg
+
+    # PROPERTIES WITH SETTERS
+    @property
+    def time(self):
+        return self.__time
+
+    @time.setter
+    def time(self, time):
+        self.__time = time
+        self._check_time()
+
+    @property
+    def fmax(self):
+        return self.__fmax
+
+    @fmax.setter
+    def fmax(self, fmax):
+        self.__fmax = fmax
+        self._print_freq_calc()
+
+    @property
+    def fmin(self):
+        return self.__fmin
+
+    @fmin.setter
+    def fmin(self, fmin):
+        self.__fmin = fmin
+        self._print_freq_calc()
+
+    @property
+    def signal(self):
+        return self.__signal
+
+    @signal.setter
+    def signal(self, signal):
+        self.__signal = signal
+
+    @property
+    def nfreq(self):
+        return self.__nfreq
+
+    @nfreq.setter
+    def nfreq(self, nfreq):
+        self.__nfreq = nfreq
+
+    # OTHER STUFF
+    def fourier_arguments(self, ft, ftarg):
+        self.__ft = ft
+        self.__ftarg = ftarg
+        self._check_time()
+
+    def interpolate(self, fdata):
+        # Extend freq_req/data by adding a point at 1e-100 Hz with
+        # - same real part as lowest calculated frequency and
+        # - zero imaginary part.
+        freq_ext = np.r_[1e-100, self.calc_freq]
+        data_ext = np.r_[fdata[0].real+0.0j, fdata]
+
+        # Interpolation from 'freq_req', to 'freq' using PCHIP.
+        int_real = interpolate.pchip_interpolate(
+                freq_ext, data_ext.real, self.int_freq)
+        int_imag = interpolate.pchip_interpolate(
+                freq_ext, data_ext.imag, self.int_freq)
+
+        int_fdata = np.zeros(self.freq.size, dtype=complex)
+        int_fdata[self.int_ind] = int_real + 1j*int_imag
+
+        return int_fdata
+
+    def freq2time(self, fdata, off):
+        # Calculate corresponding time-domain signal.
+        tdata, _ = empymod.model.tem(
+                fdata[:, None], np.array(off), freq=self.freq,
+                time=self.time, signal=self.signal, ft=self.ft,
+                ftarg=self.ftarg)
+        return np.squeeze(tdata)
+
+    # PRIVATE ROUTINES
+    def _check_time(self):
+        _, freq, ft, ftarg = empymod.utils.check_time(
+            self.time, self.signal, self.ft, self.ftarg, self.verb)
+        self.__freq = freq
+        self.__ft = ft
+        self.__ftarg = ftarg
+
+        self._print_freq_ftarg()
+        self._print_freq_calc()
+
+    # PRINTING ROUTINES
+    def _print_freq_ftarg(self):
+        empymod.utils._prnt_min_max_val(
+                self.freq, "   All freq   [Hz] : ", self.verb)
+
+    def _print_freq_calc(self):
+        empymod.utils._prnt_min_max_val(
+                self.calc_freq, "   Calc. freq [Hz] : ", self.verb)
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
