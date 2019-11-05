@@ -6,6 +6,7 @@ latest - will be *v0.9.0*
 -------------------------
 
 - New routine:
+
   - ``emg3d.utils.Fourier``, a class do handle Fourier-transform related stuff
     for time-domain modelling. See the example notebooks for its usage.
 

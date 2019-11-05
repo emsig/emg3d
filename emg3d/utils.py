@@ -1975,37 +1975,77 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
 
 # TIME DOMAIN
 class Fourier:
-    # TODO make empymod optional?
+    """
     # TODO document this function.
     # TODO add tests.
 
-    def __init__(self, time, fmin=0.01, fmax=100, signal=0, ft='sin',
-                 ftarg=None, verb=3):
+    For more details about the implementations of the Fourier transforms and
+    its parameters see the manual of `empymod <https://empymod.rtfd.org>`_.
 
-        self.__time = time
-        self.__fmin = fmin
-        self.__fmax = fmax
-        self.__signal = signal
-        self.__ft = ft
-        self.__ftarg = ftarg
+    .. note::
+
+        Experimental. Should work fine for impulse responses and reasonably
+        "normal" models and survey layouts. Please open an issue on GitHub if
+        it fails for your case.
+
+
+    Parameters
+    ----------
+
+    time : ndarray
+        Desired times (s).
+
+
+    """
+
+    def __init__(self, time, fmin=0.01, fmax=100, signal=0, ft='sin',
+                 ftarg=None, ft_calc=None, ftarg_calc=None, verb=3):
+
+        self._time = time
+        self._fmin = fmin
+        self._fmax = fmax
+        self._signal = signal
+        self._ft = ft
+        self._ftarg = ftarg
+        self._ft_calc = ft_calc
+        self._ftarg_calc = ftarg_calc
         self.verb = verb
 
-        self.__nfreq = 301
+        self._nfreq = 301
 
         self._check_time()
 
     # PURE PROPERTIES
     @property
     def freq(self):
-        return self.__freq
+        """Frequencies required by chosen Fourier transform."""
+        return self._freq
 
     @property
-    def calc_ind(self):
-        return (self.freq > self.fmin) & (self.freq < self.fmax)
+    def calc_ind(self):  # TODO WRONG, to simple, doesn't work for DLF.
+        # These might (FFTLog) or might not (DLF) coincide with freqs.
+        if self.ft_calc is None:
+            freq = self.freq
+        else:
+            freq = self.freq_calc
+        return (freq > self.fmin) & (freq < self.fmax)
 
     @property
     def calc_freq(self):
-        return self.freq[self.calc_ind]
+        """Frequencies at which the model has to be calculated."""
+        # These might (FFTLog) or might not (DLF) coincide with freqs.
+        if self.ft_calc is None:
+            return self.freq[self.calc_ind]
+        else:
+            return self.freq_calc[self.calc_ind]
+        # TODO
+        # TODO
+        # TODO
+        # Confusion, freq_calc and calc_freq
+        # => Decide on a good naming.
+        # TODO
+        # TODO
+        # TODO
 
     @property
     def int_ind(self):
@@ -2022,60 +2062,76 @@ class Fourier:
 
     @property
     def ft(self):
-        return self.__ft
+        """Set via ``fourier_arguments(ft, ftarg)``."""
+        return self._ft
 
     @property
     def ftarg(self):
-        return self.__ftarg
+        """Set via ``fourier_arguments(ft, ftarg)``."""
+        return self._ftarg
+
+    @property
+    def ft_calc(self):
+        """Set via ``fourier_arguments(ft, ftarg, True)``."""
+        return self._ft
+
+    @property
+    def ftarg_calc(self):
+        """Set via ``fourier_arguments(ft, ftarg, True)``."""
+        return self._ftarg
 
     # PROPERTIES WITH SETTERS
     @property
     def time(self):
-        return self.__time
+        return self._time
 
     @time.setter
     def time(self, time):
-        self.__time = time
+        self._time = time
         self._check_time()
 
     @property
     def fmax(self):
-        return self.__fmax
+        return self._fmax
 
     @fmax.setter
     def fmax(self, fmax):
-        self.__fmax = fmax
+        self._fmax = fmax
         self._print_freq_calc()
 
     @property
     def fmin(self):
-        return self.__fmin
+        return self._fmin
 
     @fmin.setter
     def fmin(self, fmin):
-        self.__fmin = fmin
+        self._fmin = fmin
         self._print_freq_calc()
 
     @property
     def signal(self):
-        return self.__signal
+        return self._signal
 
     @signal.setter
     def signal(self, signal):
-        self.__signal = signal
+        self._signal = signal
 
     @property
     def nfreq(self):
-        return self.__nfreq
+        return self._nfreq
 
     @nfreq.setter
     def nfreq(self, nfreq):
-        self.__nfreq = nfreq
+        self._nfreq = nfreq
 
     # OTHER STUFF
-    def fourier_arguments(self, ft, ftarg):
-        self.__ft = ft
-        self.__ftarg = ftarg
+    def fourier_arguments(self, ft, ftarg, calc=False):
+        if calc:
+            self._ft_calc = ft
+            self._ftarg_calc = ftarg
+        else:
+            self._ft = ft
+            self._ftarg = ftarg
         self._check_time()
 
     def interpolate(self, fdata):
@@ -2108,9 +2164,18 @@ class Fourier:
     def _check_time(self):
         _, freq, ft, ftarg = empymod.utils.check_time(
             self.time, self.signal, self.ft, self.ftarg, self.verb)
-        self.__freq = freq
-        self.__ft = ft
-        self.__ftarg = ftarg
+        self._freq = freq
+        self._ft = ft
+        self._ftarg = ftarg
+
+        if self.ft_calc is not None:
+            _, freq_calc, ft_calc, ftarg_calc = empymod.utils.check_time(
+                self.time, self.signal, self.ft_calc, self.ftarg_calc,
+                self.verb)
+
+        self._freq_calc = freq_calc
+        self._ft_calc = ft_calc
+        self._ftarg_calc = ftarg_calc
 
         self._print_freq_ftarg()
         self._print_freq_calc()
