@@ -30,6 +30,7 @@ import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy import optimize, interpolate, ndimage
+from scipy.interpolate import InterpolatedUnivariateSpline as iuSpline
 
 from . import njitted
 
@@ -1975,12 +1976,17 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
 
 # TIME DOMAIN
 class Fourier:
-    """
-    # TODO document this function.
-    # TODO add tests.
+    """Time-domain CSEM calculation.
 
-    For more details about the implementations of the Fourier transforms and
-    its parameters see the manual of `empymod <https://empymod.rtfd.org>`_.
+    Class to carry out time-domain modelling with the frequency-domain code
+    ``emg3d``. It takes care of calculating the required frequencies, the
+    interpolation from coarse, limited-band frequencies to the required
+    frequencies, and carrying out the actual transform.
+
+    The parameters ``time``, ``signal``, ``ft``, ``ftarg`` are passed to
+    ``empymod``. For more details about the implementations of the Fourier
+    transforms and its parameters see the manual of `empymod
+    <https://empymod.rtfd.org>`_.
 
     .. note::
 
@@ -1995,199 +2001,387 @@ class Fourier:
     time : ndarray
         Desired times (s).
 
+    fmin, fmax : float
+        Minimum and maximum frequencies (Hz) to calculate:
+
+          - Data for freq > fmax is set to 0+0j.
+          - Data for freq < fmin is interpolated, using an extra data-point at
+            f = 1e-100 Hz, with value data.real[0]+0j. (Hence zero imaginary
+            part, and the lowest calculated real value.)
+
+    signal : {0, 1, -1}, optional
+        Source signal, default is 0:
+            - None: Frequency-domain response
+            - -1 : Switch-off time-domain response
+            - 0 : Impulse time-domain response
+            - +1 : Switch-on time-domain response
+
+    ft : {'sin', 'cos', 'qwe', 'fftlog', 'fft'}, optional
+        Flag to choose either the Digital Linear Filter method (Sine- or
+        Cosine-Filter), the Quadrature-With-Extrapolation (QWE), the FFTLog, or
+        the FFT for the Fourier transform.  Defaults to 'sin'.
+
+    ftarg : dict, optional
+        Depends on the value for ``ft``:
+            - If ``ft`` = 'sin' or 'cos':
+
+                - fftfilt: string of filter name in ``empymod.filters`` or
+                           the filter method itself.
+                           (Default: ``empymod.filters.key_201_CosSin_2012()``)
+                - pts_per_dec: points per decade; (default: -1)
+                    - If 0: Standard DLF.
+                    - If < 0: Lagged Convolution DLF.
+                    - If > 0: Splined DLF
+
+            - If ``ft`` = 'qwe':
+
+                - rtol: relative tolerance (default: 1e-8)
+                - atol: absolute tolerance (default: 1e-20)
+                - nquad: order of Gaussian quadrature (default: 21)
+                - maxint: maximum number of partial integral intervals
+                          (default: 200)
+                - pts_per_dec: points per decade (default: 20)
+                - diff_quad: criteria when to swap to QUAD (default: 100)
+                - a: lower limit for QUAD (default: first interval from QWE)
+                - b: upper limit for QUAD (default: last interval from QWE)
+                - limit: limit for quad (default: maxint)
+
+            - If ``ft`` = 'fftlog':
+
+                - pts_per_dec: sampels per decade (default: 10)
+                - add_dec: additional decades [left, right] (default: [-2, 1])
+                - q: exponent of power law bias (default: 0); -1 <= q <= 1
+
+            - If ``ft`` = 'fft':
+
+                - dfreq: Linear step-size of frequencies (default: 0.002)
+                - nfreq: Number of frequencies (default: 2048)
+                - ntot:  Total number for FFT; difference between nfreq and
+                         ntot is padded with zeroes. This number is ideally a
+                         power of 2, e.g. 2048 or 4096 (default: nfreq).
+                - pts_per_dec : points per decade (default: None)
+
+                Padding can sometimes improve the result, not always. The
+                default samples from 0.002 Hz - 4.096 Hz. If pts_per_dec is set
+                to an integer, calculated frequencies are logarithmically
+                spaced with the given number per decade, and then interpolated
+                to yield the required frequencies for the FFT.
+
+    freq_inp : array
+        Frequencies to use for calculation. Mutually exclusive with
+        `every_x_calc`.
+
+    every_x_calc : int
+        Every `every_x_calc`-th frequency of the required frequency-range is
+        used for calculation. Mutually exclusive with `freq_calc`.
+
 
     """
 
-    def __init__(self, time, fmin=0.01, fmax=100, signal=0, ft='sin',
-                 ftarg=None, ft_calc=None, ftarg_calc=None, verb=3):
+    def __init__(self, time, fmin, fmax, signal=0, ft='sin', ftarg=None,
+                 verb=3, **kwargs):
+        """Initialize a Fourier instance."""
 
+        # Store the input parameters.
         self._time = time
         self._fmin = fmin
         self._fmax = fmax
         self._signal = signal
         self._ft = ft
         self._ftarg = ftarg
-        self._ft_calc = ft_calc
-        self._ftarg_calc = ftarg_calc
-        self.verb = verb
 
-        self._nfreq = 301
+        # Check kwargs.
+        self._freq_inp = kwargs.pop('freq_inp', None)
+        self._every_x_calc = kwargs.pop('every_x_calc', None)
+        self.verb = kwargs.pop('verb', 3)
 
+        # Ensure no kwargs left.
+        if kwargs:
+            raise TypeError('Unexpected **kwargs: %r' % kwargs)
+
+        # Ensure freq_inp and every_x_calc are not both set.
+        self._check_coarse_inputs(keep_freq_inp=True)
+
+        # Get required frequencies.
         self._check_time()
 
     # PURE PROPERTIES
     @property
-    def freq(self):
-        """Frequencies required by chosen Fourier transform."""
-        return self._freq
+    def freq_req(self):
+        """Frequencies required to carry out the Fourier transform."""
+        return self._freq_req
 
     @property
-    def calc_ind(self):  # TODO WRONG, to simple, doesn't work for DLF.
-        # These might (FFTLog) or might not (DLF) coincide with freqs.
-        if self.ft_calc is None:
-            freq = self.freq
+    def freq_coarse(self):
+        """Coarse frequency range, can be different from ``freq_req``."""
+        if self.every_x_calc is None and self.freq_inp is None:
+            # If none of {every_x_calc, freq_inp} given, then
+            # freq_coarse = freq_req.
+            return self.freq_req
+
+        elif self.every_x_calc is None:
+            # If freq_inp given, then freq_coarse = freq_inp.
+            return self.freq_inp
+
         else:
-            freq = self.freq_calc
-        return (freq > self.fmin) & (freq < self.fmax)
+            # If every_x_calc given, get subset of freq_req.
+            return self.freq_req[::self.every_x_calc]
 
     @property
-    def calc_freq(self):
+    def freq_calc_i(self):
+        """Indices of ``freq_coarse`` which have to be calculated."""
+        return (self.freq_coarse > self.fmin) & (self.freq_coarse < self.fmax)
+
+    @property
+    def freq_calc(self):
         """Frequencies at which the model has to be calculated."""
-        # These might (FFTLog) or might not (DLF) coincide with freqs.
-        if self.ft_calc is None:
-            return self.freq[self.calc_ind]
-        else:
-            return self.freq_calc[self.calc_ind]
-        # TODO
-        # TODO
-        # TODO
-        # Confusion, freq_calc and calc_freq
-        # => Decide on a good naming.
-        # TODO
-        # TODO
-        # TODO
+        return self.freq_coarse[self.freq_calc_i]
 
     @property
-    def int_ind(self):
-        return self.freq < self.fmax
+    def freq_extrapolate_i(self):
+        """Indices of the frequencies to extrapolate."""
+        return self.freq_req < self.fmin
 
     @property
-    def int_freq(self):
-        return self.freq[self.int_ind]
+    def freq_extrapolate(self):
+        """These are the frequencies to extrapolate.
+
+        In fact, it is dow via interpolation, using an extra data-point at f =
+        1e-100 Hz, with value data.real[0]+0j. (Hence zero imaginary part, and
+        the lowest calculated real value.)
+        """
+        return self.freq_req[self.freq_extrapolate_i]
 
     @property
-    def dense_freq(self):
-        return np.logspace(np.log10(self.freq.min()),
-                           np.log10(self.freq.max()), self.nfreq)
+    def freq_interpolate_i(self):
+        """Indices of the frequencies to interpolate.
+
+        If freq_req is equal freq_coarse, then this is eual to freq_calc_i.
+        """
+        return (self.freq_req > self.fmin) & (self.freq_req < self.fmax)
+
+    @property
+    def freq_interpolate(self):
+        """These are the frequencies to interpolate.
+
+        If freq_req is equal freq_coarse, then this is eual to freq_calc.
+        """
+        return self.freq_req[self.freq_interpolate_i]
 
     @property
     def ft(self):
-        """Set via ``fourier_arguments(ft, ftarg)``."""
+        """Type of Fourier transform.
+        Set via ``fourier_arguments(ft, ftarg)``.
+        """
         return self._ft
 
     @property
     def ftarg(self):
-        """Set via ``fourier_arguments(ft, ftarg)``."""
-        return self._ftarg
-
-    @property
-    def ft_calc(self):
-        """Set via ``fourier_arguments(ft, ftarg, True)``."""
-        return self._ft
-
-    @property
-    def ftarg_calc(self):
-        """Set via ``fourier_arguments(ft, ftarg, True)``."""
+        """Fourier transform arguments.
+        Set via ``fourier_arguments(ft, ftarg)``.
+        """
         return self._ftarg
 
     # PROPERTIES WITH SETTERS
     @property
     def time(self):
+        """Desired times (s)."""
         return self._time
 
     @time.setter
     def time(self, time):
+        """Update desired times (s)."""
         self._time = time
         self._check_time()
 
     @property
     def fmax(self):
+        """Maximum frequency (Hz) to calculate."""
         return self._fmax
 
     @fmax.setter
     def fmax(self, fmax):
+        """Update maximum frequency (Hz) to calculate."""
         self._fmax = fmax
         self._print_freq_calc()
 
     @property
     def fmin(self):
+        """Minimum frequency (Hz) to calculate."""
         return self._fmin
 
     @fmin.setter
     def fmin(self, fmin):
+        """Update minimum frequency (Hz) to calculate."""
         self._fmin = fmin
         self._print_freq_calc()
 
     @property
     def signal(self):
+        """Signal in time domain {0, 1, -1}."""
         return self._signal
 
     @signal.setter
     def signal(self, signal):
+        """Update signal in time domain {0, 1, -1}."""
         self._signal = signal
 
     @property
-    def nfreq(self):
-        return self._nfreq
+    def freq_inp(self):
+        """If set, freq_coarse is set to freq_inp."""
+        return self._freq_inp
 
-    @nfreq.setter
-    def nfreq(self, nfreq):
-        self._nfreq = nfreq
+    @freq_inp.setter
+    def freq_inp(self, freq_inp):
+        """Update freq_inp. Erases every_x_freq if set."""
+        self._freq_inp = freq_inp
+        self._check_coarse_inputs(keep_freq_inp=True)
+
+    @property
+    def every_x_calc(self):
+        """If set, freq_coarse is every_x_calc-frequency of freq_req."""
+        return self._every_x_calc
+
+    @every_x_calc.setter
+    def every_x_calc(self, every_x_calc):
+        """Update every_x_calc. Erases freq_inp if set."""
+        self._every_x_calc = every_x_calc
+        self._check_coarse_inputs(keep_freq_inp=False)
 
     # OTHER STUFF
-    def fourier_arguments(self, ft, ftarg, calc=False):
-        if calc:
-            self._ft_calc = ft
-            self._ftarg_calc = ftarg
-        else:
-            self._ft = ft
-            self._ftarg = ftarg
+    def fourier_arguments(self, ft, ftarg):
+        """Set Fourier type and its arguments."""
+        self._ft = ft
+        self._ftarg = ftarg
         self._check_time()
 
     def interpolate(self, fdata):
-        # Extend freq_req/data by adding a point at 1e-100 Hz with
+        """Interpolate from calculated data to required data.
+
+        Parameters
+        ----------
+
+        fdata : ndarray
+            Frequency-domain data corresponding to `freq_calc`.
+
+        Returns
+        -------
+        full_data : ndarray
+            Frequency-domain data corresponding to `freq_req`.
+
+        """
+
+        # Pre-allocate result.
+        out = np.zeros(self.freq_req.size, dtype=complex)
+
+        # 1. Interpolate between fmin and fmax.
+
+        # If freq_coarse is not exactly freq_req, we use cubic spline to
+        # interpolate from fmin to fmax.
+        if self.freq_coarse.size != self.freq_req.size:
+
+            int_real = iuSpline(np.log(self.freq_calc),
+                                fdata.real)(np.log(self.freq_interpolate))
+            int_imag = iuSpline(np.log(self.freq_calc),
+                                fdata.imag)(np.log(self.freq_interpolate))
+
+            out[self.freq_interpolate_i] = int_real + 1j*int_imag
+
+        else:  # If they are the same, just fill in the data.
+            out[self.freq_interpolate_i] = fdata
+
+        # 2. Extrapolate from freq_req.min to fmin using PCHIP.
+
+        # 2.a Extend freq_req/data by adding a point at 1e-100 Hz with
         # - same real part as lowest calculated frequency and
         # - zero imaginary part.
-        freq_ext = np.r_[1e-100, self.calc_freq]
+        freq_ext = np.r_[1e-100, self.freq_calc]
         data_ext = np.r_[fdata[0].real+0.0j, fdata]
 
-        # Interpolation from 'freq_req', to 'freq' using PCHIP.
-        int_real = interpolate.pchip_interpolate(
-                freq_ext, data_ext.real, self.int_freq)
-        int_imag = interpolate.pchip_interpolate(
-                freq_ext, data_ext.imag, self.int_freq)
+        # 2.b Actual 'extrapolation' (now an interpolation).
+        ext_real = interpolate.pchip_interpolate(
+                freq_ext, data_ext.real, self.freq_extrapolate)
+        ext_imag = interpolate.pchip_interpolate(
+                freq_ext, data_ext.imag, self.freq_extrapolate)
 
-        int_fdata = np.zeros(self.freq.size, dtype=complex)
-        int_fdata[self.int_ind] = int_real + 1j*int_imag
+        out[self.freq_extrapolate_i] = ext_real + 1j*ext_imag
 
-        return int_fdata
+        return out
 
     def freq2time(self, fdata, off):
-        # Calculate corresponding time-domain signal.
+        """Calculate corresponding time-domain signal.
+
+        Carry out the actual Fourier transform.
+
+        Parameters
+        ----------
+
+        fdata : ndarray
+            Frequency-domain data corresponding to `freq_calc`.
+
+        off : float
+            Corresponding offset (m).
+
+        Returns
+        -------
+        tdata : ndarray
+            Time-domain data corresponding to Fourier.time.
+
+        """
+        # Interpolate the calculated data at the required frequencies.
+        inp_data = self.interpolate(fdata)
+
+        # Carry out the Fourier transform.
         tdata, _ = empymod.model.tem(
-                fdata[:, None], np.array(off), freq=self.freq,
+                inp_data[:, None], np.array(off), freq=self.freq_req,
                 time=self.time, signal=self.signal, ft=self.ft,
                 ftarg=self.ftarg)
+
         return np.squeeze(tdata)
 
     # PRIVATE ROUTINES
     def _check_time(self):
+        """Get required frequencies for given times and ft/ftarg."""
+
+        # Get freq via empymod.
         _, freq, ft, ftarg = empymod.utils.check_time(
             self.time, self.signal, self.ft, self.ftarg, self.verb)
-        self._freq = freq
+
+        # Store required frequencies and check ft, ftarg.
+        self._freq_req = freq
         self._ft = ft
         self._ftarg = ftarg
 
-        if self.ft_calc is not None:
-            _, freq_calc, ft_calc, ftarg_calc = empymod.utils.check_time(
-                self.time, self.signal, self.ft_calc, self.ftarg_calc,
-                self.verb)
-
-        self._freq_calc = freq_calc
-        self._ft_calc = ft_calc
-        self._ftarg_calc = ftarg_calc
-
+        # Print frequency information (if verbose).
         self._print_freq_ftarg()
         self._print_freq_calc()
 
+    def _check_coarse_inputs(self, keep_freq_inp=True):
+        """Parameters `freq_inp` and `every_x_freq` are mutually exclusive."""
+
+        # If they are both set, reset one depending on `keep_freq_inp`.
+        if self._freq_inp is not None and self._every_x_calc is not None:
+            print("\n* WARNING :: `freq_inp` and `every_x_calc` are mutually "
+                  "exclusive.\n             Re-setting ", end="")
+
+            if keep_freq_inp:  # Keep freq_inp.
+                print("`every_x_calc=None`.\n")
+                self._every_x_calc = None
+
+            else:              # Keep every_x_freq.
+                print("`freq_inp=None`.\n")
+                self._freq_inp = None
+
     # PRINTING ROUTINES
     def _print_freq_ftarg(self):
+        """Print required frequency range."""
         empymod.utils._prnt_min_max_val(
-                self.freq, "   All freq   [Hz] : ", self.verb)
+                self.freq_req, "   Req. freq  [Hz] : ", self.verb)
 
     def _print_freq_calc(self):
+        """Print actually calculated frequency range."""
         empymod.utils._prnt_min_max_val(
-                self.calc_freq, "   Calc. freq [Hz] : ", self.verb)
+                self.freq_calc, "   Calc. freq [Hz] : ", self.verb)
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
