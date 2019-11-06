@@ -19,8 +19,9 @@ Version: |version| ~ Date: |today|
    theory
    cpu_and_ram
    references
-   changelog
    credits
+   changelog
+   maintenance
 
 .. toctree::
    :maxdepth: 2
