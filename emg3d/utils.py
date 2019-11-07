@@ -1991,6 +1991,7 @@ class Fourier:
     actual transform is subsequently carried out by calling
     :func:`empymod.model.tem`. See these functions for more details about the
     exact implementations of the Fourier transforms and its parameters.
+    Note that also the ``verb``-argument follows the definition in ``empymod``.
 
     The mapping from calculated frequencies to the frequencies required for the
     Fourier transform is done in three steps:
@@ -2084,17 +2085,17 @@ class Fourier:
 
     freq_inp : array
         Frequencies to use for calculation. Mutually exclusive with
-        `every_x_calc`.
+        `every_x_freq`.
 
-    every_x_calc : int
-        Every `every_x_calc`-th frequency of the required frequency-range is
+    every_x_freq : int
+        Every `every_x_freq`-th frequency of the required frequency-range is
         used for calculation. Mutually exclusive with `freq_calc`.
 
 
     """
 
     def __init__(self, time, fmin, fmax, signal=0, ft='sin', ftarg=None,
-                 verb=3, **kwargs):
+                 **kwargs):
         """Initialize a Fourier instance."""
 
         # Store the input parameters.
@@ -2107,14 +2108,14 @@ class Fourier:
 
         # Check kwargs.
         self._freq_inp = kwargs.pop('freq_inp', None)
-        self._every_x_calc = kwargs.pop('every_x_calc', None)
+        self._every_x_freq = kwargs.pop('every_x_freq', None)
         self.verb = kwargs.pop('verb', 3)
 
         # Ensure no kwargs left.
         if kwargs:
             raise TypeError('Unexpected **kwargs: %r' % kwargs)
 
-        # Ensure freq_inp and every_x_calc are not both set.
+        # Ensure freq_inp and every_x_freq are not both set.
         self._check_coarse_inputs(keep_freq_inp=True)
 
         # Get required frequencies.
@@ -2129,18 +2130,18 @@ class Fourier:
     @property
     def freq_coarse(self):
         """Coarse frequency range, can be different from ``freq_req``."""
-        if self.every_x_calc is None and self.freq_inp is None:
-            # If none of {every_x_calc, freq_inp} given, then
+        if self.every_x_freq is None and self.freq_inp is None:
+            # If none of {every_x_freq, freq_inp} given, then
             # freq_coarse = freq_req.
             return self.freq_req
 
-        elif self.every_x_calc is None:
+        elif self.every_x_freq is None:
             # If freq_inp given, then freq_coarse = freq_inp.
             return self.freq_inp
 
         else:
-            # If every_x_calc given, get subset of freq_req.
-            return self.freq_req[::self.every_x_calc]
+            # If every_x_freq given, get subset of freq_req.
+            return self.freq_req[::self.every_x_freq]
 
     @property
     def freq_calc_i(self):
@@ -2254,14 +2255,14 @@ class Fourier:
         self._check_coarse_inputs(keep_freq_inp=True)
 
     @property
-    def every_x_calc(self):
-        """If set, freq_coarse is every_x_calc-frequency of freq_req."""
-        return self._every_x_calc
+    def every_x_freq(self):
+        """If set, freq_coarse is every_x_freq-frequency of freq_req."""
+        return self._every_x_freq
 
-    @every_x_calc.setter
-    def every_x_calc(self, every_x_calc):
-        """Update every_x_calc. Erases freq_inp if set."""
-        self._every_x_calc = every_x_calc
+    @every_x_freq.setter
+    def every_x_freq(self, every_x_freq):
+        """Update every_x_freq. Erases freq_inp if set."""
+        self._every_x_freq = every_x_freq
         self._check_coarse_inputs(keep_freq_inp=False)
 
     # OTHER STUFF
@@ -2367,20 +2368,21 @@ class Fourier:
         self._ftarg = ftarg
 
         # Print frequency information (if verbose).
-        self._print_freq_ftarg()
-        self._print_freq_calc()
+        if self.verb > 2:
+            self._print_freq_ftarg()
+            self._print_freq_calc()
 
     def _check_coarse_inputs(self, keep_freq_inp=True):
         """Parameters `freq_inp` and `every_x_freq` are mutually exclusive."""
 
         # If they are both set, reset one depending on `keep_freq_inp`.
-        if self._freq_inp is not None and self._every_x_calc is not None:
-            print("\n* WARNING :: `freq_inp` and `every_x_calc` are mutually "
+        if self._freq_inp is not None and self._every_x_freq is not None:
+            print("\n* WARNING :: `freq_inp` and `every_x_freq` are mutually "
                   "exclusive.\n             Re-setting ", end="")
 
             if keep_freq_inp:  # Keep freq_inp.
-                print("`every_x_calc=None`.\n")
-                self._every_x_calc = None
+                print("`every_x_freq=None`.\n")
+                self._every_x_freq = None
 
             else:              # Keep every_x_freq.
                 print("`freq_inp=None`.\n")
