@@ -399,7 +399,7 @@ def get_source_field(grid, src, freq, strength=0):
 
     """
     # Cast some parameters.
-    src = np.array(src, dtype=float)
+    src = np.array(src, dtype=float, copy=False)
     strength = float(strength)
 
     # Ensure source is a point or a finite dipole.
@@ -841,7 +841,7 @@ class Model:
             self.case = 3
 
         # Initiate x-directed resistivity.
-        res_x = np.array(res_x, dtype=float)
+        res_x = np.array(res_x, dtype=float, copy=False)
         if res_x.size == 1:
             self._res_x = res_x
         elif np.all(res_x.shape == self.vnC) and res_x.ndim == 3:
@@ -857,7 +857,7 @@ class Model:
 
         # Initiate y-directed resistivity.
         if self.case in [1, 3]:
-            res_y = np.array(res_y, dtype=float)
+            res_y = np.array(res_y, dtype=float, copy=False)
             if res_y.size == 1:
                 self._res_y = res_y
             elif np.all(res_y.shape == self.vnC) and res_y.ndim == 3:
@@ -873,7 +873,7 @@ class Model:
 
         # Initiate z-directed resistivity.
         if self.case in [2, 3]:
-            res_z = np.array(res_z, dtype=float)
+            res_z = np.array(res_z, dtype=float, copy=False)
             if res_z.size == 1:
                 self._res_z = res_z
             elif np.all(res_z.shape == self.vnC) and res_z.ndim == 3:
@@ -891,7 +891,7 @@ class Model:
         if mu_r is None:
             self._mu_r = mu_r
         else:
-            mu_r = np.array(mu_r, dtype=float)
+            mu_r = np.array(mu_r, dtype=float, copy=False)
             if mu_r.size == 1:
                 self._mu_r = mu_r
             elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
