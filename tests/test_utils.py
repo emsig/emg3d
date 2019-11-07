@@ -450,7 +450,7 @@ def test_Model(capsys):
 
     # Check wrong shape
     with pytest.raises(ValueError):
-        model1.res_x = model1.res_x.ravel('F')
+        model1.res_x = np.ones(grid.nC)
     with pytest.raises(ValueError):
         utils.Model(grid, np.arange(1, 11))
     with pytest.raises(ValueError):
