@@ -421,6 +421,7 @@ def test_Model(capsys):
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
     assert_allclose(model1.eta_z, model1.eta_y)
+    assert model1.mu_r is None
 
     # Assert you can not set res_y nor res_z if not provided from the start.
     with pytest.raises(ValueError):
