@@ -30,7 +30,8 @@ import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy import optimize, interpolate, ndimage
-from scipy.interpolate import InterpolatedUnivariateSpline as iuSpline
+from scipy.interpolate import PchipInterpolator as Pchip
+from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
 from . import njitted
 
@@ -1976,23 +1977,37 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
 
 # TIME DOMAIN
 class Fourier:
-    """Time-domain CSEM calculation.
+    r"""Time-domain CSEM calculation.
 
     Class to carry out time-domain modelling with the frequency-domain code
-    ``emg3d``. It takes care of calculating the required frequencies, the
-    interpolation from coarse, limited-band frequencies to the required
-    frequencies, and carrying out the actual transform.
+    ``emg3d``. Instances of the class take care of calculating the required
+    frequencies, the interpolation from coarse, limited-band frequencies to the
+    required frequencies, and carrying out the actual transform.
 
-    The parameters ``time``, ``signal``, ``ft``, ``ftarg`` are passed to
-    ``empymod``. For more details about the implementations of the Fourier
-    transforms and its parameters see the manual of `empymod
-    <https://empymod.rtfd.org>`_.
+    Everything related to the Fourier transform is done by utilising the
+    capabilities of the 1D modeller :mod:`empymod`. The input parameters
+    ``time``, ``signal``, ``ft``, and ``ftarg`` are passed to the function
+    :func:`empymod.utils.check_time` to obtain the required frequencies. The
+    actual transform is subsequently carried out by calling
+    :func:`empymod.model.tem`. See these functions for more details about the
+    exact implementations of the Fourier transforms and its parameters.
 
-    .. note::
+    The mapping from calculated frequencies to the frequencies required for the
+    Fourier transform is done in three steps:
 
-        Experimental. Should work fine for impulse responses and reasonably
-        "normal" models and survey layouts. Please open an issue on GitHub if
-        it fails for your case.
+    - Data for :math:`f>f_\mathrm{max}` is set to 0+0j.
+    - Data for :math:`f<f_\mathrm{min}` is interpolated by adding an additional
+      data point at a frequency of 1e-100 Hz. The data for this point is
+      ``data.real[0]+0j``, hence the real part of the lowest calculated
+      frequency and zero imaginary part. Interpolation is carried out using
+      PCHIP :func:`scipy.interpolate.pchip_interpolate`.
+    - Data for :math:`f_\mathrm{min}\le f \le f_\mathrm{max}` is calculated
+      with cubic spline interpolation (on a log-scale)
+      :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
+
+    Note that ``fmin`` and ``fmax`` should be chosen wide enough such that the
+    mapping for :math:`f>f_\mathrm{max}` :math:`f<f_\mathrm{min}` does not
+    matter that much.
 
 
     Parameters
@@ -2130,7 +2145,8 @@ class Fourier:
     @property
     def freq_calc_i(self):
         """Indices of ``freq_coarse`` which have to be calculated."""
-        return (self.freq_coarse > self.fmin) & (self.freq_coarse < self.fmax)
+        ind = (self.freq_coarse >= self.fmin) & (self.freq_coarse <= self.fmax)
+        return ind
 
     @property
     def freq_calc(self):
@@ -2158,7 +2174,7 @@ class Fourier:
 
         If freq_req is equal freq_coarse, then this is eual to freq_calc_i.
         """
-        return (self.freq_req > self.fmin) & (self.freq_req < self.fmax)
+        return (self.freq_req >= self.fmin) & (self.freq_req <= self.fmax)
 
     @property
     def freq_interpolate(self):
@@ -2280,10 +2296,10 @@ class Fourier:
         # interpolate from fmin to fmax.
         if self.freq_coarse.size != self.freq_req.size:
 
-            int_real = iuSpline(np.log(self.freq_calc),
-                                fdata.real)(np.log(self.freq_interpolate))
-            int_imag = iuSpline(np.log(self.freq_calc),
-                                fdata.imag)(np.log(self.freq_interpolate))
+            int_real = Spline(np.log(self.freq_calc),
+                              fdata.real)(np.log(self.freq_interpolate))
+            int_imag = Spline(np.log(self.freq_calc),
+                              fdata.imag)(np.log(self.freq_interpolate))
 
             out[self.freq_interpolate_i] = int_real + 1j*int_imag
 
@@ -2299,10 +2315,8 @@ class Fourier:
         data_ext = np.r_[fdata[0].real+0.0j, fdata]
 
         # 2.b Actual 'extrapolation' (now an interpolation).
-        ext_real = interpolate.pchip_interpolate(
-                freq_ext, data_ext.real, self.freq_extrapolate)
-        ext_imag = interpolate.pchip_interpolate(
-                freq_ext, data_ext.imag, self.freq_extrapolate)
+        ext_real = Pchip(freq_ext, data_ext.real)(self.freq_extrapolate)
+        ext_imag = Pchip(freq_ext, data_ext.imag)(self.freq_extrapolate)
 
         out[self.freq_extrapolate_i] = ext_real + 1j*ext_imag
 

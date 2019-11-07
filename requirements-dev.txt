@@ -7,7 +7,7 @@ empymod
 
 # sphinx fixed below 2.0
 # https://github.com/numpy/numpydoc/issues/215
-sphinx < 2.0.
+sphinx < 2.0
 numpydoc
 sphinx_numfig
 sphinx_rtd_theme
