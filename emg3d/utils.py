@@ -2032,10 +2032,10 @@ class Fourier:
             - 0 : Impulse time-domain response
             - +1 : Switch-on time-domain response
 
-    ft : {'sin', 'cos', 'qwe', 'fftlog', 'fft'}, optional
+    ft : {'sin', 'cos', 'fftlog'}, optional
         Flag to choose either the Digital Linear Filter method (Sine- or
-        Cosine-Filter), the Quadrature-With-Extrapolation (QWE), the FFTLog, or
-        the FFT for the Fourier transform.  Defaults to 'sin'.
+        Cosine-Filter) or the FFTLog for the Fourier transform.
+        Defaults to 'sin'.
 
     ftarg : dict, optional
         Depends on the value for ``ft``:
@@ -2049,39 +2049,11 @@ class Fourier:
                     - If < 0: Lagged Convolution DLF.
                     - If > 0: Splined DLF
 
-            - If ``ft`` = 'qwe':
-
-                - rtol: relative tolerance (default: 1e-8)
-                - atol: absolute tolerance (default: 1e-20)
-                - nquad: order of Gaussian quadrature (default: 21)
-                - maxint: maximum number of partial integral intervals
-                          (default: 200)
-                - pts_per_dec: points per decade (default: 20)
-                - diff_quad: criteria when to swap to QUAD (default: 100)
-                - a: lower limit for QUAD (default: first interval from QWE)
-                - b: upper limit for QUAD (default: last interval from QWE)
-                - limit: limit for quad (default: maxint)
-
             - If ``ft`` = 'fftlog':
 
                 - pts_per_dec: sampels per decade (default: 10)
                 - add_dec: additional decades [left, right] (default: [-2, 1])
                 - q: exponent of power law bias (default: 0); -1 <= q <= 1
-
-            - If ``ft`` = 'fft':
-
-                - dfreq: Linear step-size of frequencies (default: 0.002)
-                - nfreq: Number of frequencies (default: 2048)
-                - ntot:  Total number for FFT; difference between nfreq and
-                         ntot is padded with zeroes. This number is ideally a
-                         power of 2, e.g. 2048 or 4096 (default: nfreq).
-                - pts_per_dec : points per decade (default: None)
-
-                Padding can sometimes improve the result, not always. The
-                default samples from 0.002 Hz - 4.096 Hz. If pts_per_dec is set
-                to an integer, calculated frequencies are logarithmically
-                spaced with the given number per decade, and then interpolated
-                to yield the required frequencies for the FFT.
 
     freq_inp : array
         Frequencies to use for calculation. Mutually exclusive with
@@ -2106,7 +2078,7 @@ class Fourier:
         self._ft = ft
         self._ftarg = ftarg
 
-        # Check kwargs.
+        # Get kwargs.
         self._freq_inp = kwargs.pop('freq_inp', None)
         self._every_x_freq = kwargs.pop('every_x_freq', None)
         self.verb = kwargs.pop('verb', 3)
