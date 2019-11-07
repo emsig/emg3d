@@ -91,3 +91,30 @@ Useful things
 - If it fails, you might have to install ``python3-setuptools``::
 
        sudo apt install python3-setuptools
+
+
+CI
+--
+
+- Testing on `Travis <https://travis-ci.org/empymod/emg3d>`_, includes:
+
+  - Tests using ``pytest``
+  - Linting / code style with ``pytest-flake8``
+  - Ensure all http(s)-links work (``sphinx linkcheck``)
+
+- Line-coverage with ``pytest-cov`` on `Coveralls
+  <https://coveralls.io/github/empymod/emg3d>`_
+- Code-quality on `Codacy
+  <https://app.codacy.com/manual/prisae/emg3d/dashboard>`_
+- Manual on `ReadTheDocs <https://emg3d.readthedocs.io/en/latest>`_
+- DOI minting on `Zenodo <https://doi.org/10.5281/zenodo.3229006>`_
+- Benchmarks with `Airspeed Velocity <https://empymod.github.io/emg3d-asv>`_
+  (``asv``) [currently manually]
+- Examples in `emg3d-examples <https://github.com/empymod/emg3d-examples>`_;
+  should move to a sphinx-gallery instance (`#45
+  <https://github.com/empymod/emg3d/issues/45>`_) [currently manually]
+- deploy (`#43 <https://github.com/empymod/emg3d/issues/43>`_)
+
+  - `PyPi <https://pypi.org/project/emg3d>`_ [currently manually]
+  - `conda -c prisae <https://anaconda.org/prisae/emg3d>`_; should move to
+    conda-forge [currently manually]
