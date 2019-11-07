@@ -21,9 +21,10 @@ latest - will be *v0.9.0*
   - The ``Model`` is not frequency-dependent any longer and does NOT take
     a ``freq``-parameter any more (currently it still takes it, but it is
     deprecated and will be removed in the future).
-  - ``data_write`` automatically removes ``_vol`` from ``TensorMesh``
-    instances. This makes the archives smaller, and it is not required, as it
-    is simply reconstructed if needed.
+  - ``data_write`` automatically removes ``_vol`` from ``TensorMesh`` instances
+    and ``_eta_{x,y,z}``, ``_zeta`` from ``Model`` instances. This makes the
+    archives smaller, and they are not required, as they are simply
+    reconstructed if needed.
 
 - Internal changes:
 
