@@ -1045,6 +1045,7 @@ def test_data_write_read(tmpdir, capsys):
     # Compare data
     assert_allclose(ee, ee_out)
     assert_allclose(ee.smu0, ee_out.smu0)
+    assert_allclose(ee.sval, ee_out.sval)
     assert_allclose(ee.freq, ee_out.freq)
 
     # Write and read data, multi arguments
