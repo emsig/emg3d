@@ -340,7 +340,12 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
               "           Create it with ``emg3d.utils.get_source_field``, or"
               "\n             initiate it with ``emg3d.utils.SourceField``.")
         raise ValueError('Input data types')
-    elif efield is None:
+
+    # Get volume-averaged model values.
+    vmodel = utils._VolumeModel(grid, model, sfield)
+
+    # Get efield
+    if efield is None:
         # If not provided, initiate an empty one.
         efield = utils.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
 
@@ -366,7 +371,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         var.do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
-        var.l2 = residual(grid, model, sfield, efield, True)
+        var.l2 = residual(grid, vmodel, sfield, efield, True)
         if var.l2 < var.tol*var.l2_refe:
 
             # Switch-off both sslsolver and multigrid.
@@ -389,9 +394,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
-        krylov(grid, model, sfield, efield, var)
+        krylov(grid, vmodel, sfield, efield, var)
     elif var.cycle:    # ... multigrid.
-        multigrid(grid, model, sfield, efield, var)
+        multigrid(grid, vmodel, sfield, efield, var)
 
     # Print runtime information.
     if var.sslsolver:  # sslsolver-specific info.

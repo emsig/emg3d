@@ -29,7 +29,7 @@ import empymod
 import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
-from scipy.constants import mu_0  # , epsilon_0
+from scipy.constants import mu_0, epsilon_0
 from scipy import optimize, interpolate, ndimage
 from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
@@ -916,6 +916,11 @@ class Model:
             # Check 0 < mu_r < inf.
             _check_parameter(self._mu_r, 'mu_r')
 
+        # Currently a hidden feature:
+        # _epsilon_r = None => diffusive approximation.
+        # set it to a float > 0 to use full wave equation.
+        self._epsilon_r = None
+
     # RESISTIVITIES
     @property
     def res_x(self):
@@ -979,7 +984,7 @@ class Model:
 
     @property
     def eta_y(self):
-        r"""Volume/res in x-direction."""
+        r"""Volume/res in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
             if getattr(self, '_eta_y', None) is None:
                 self._eta_y = self._calculate_eta(self.res_y)
@@ -991,7 +996,7 @@ class Model:
 
     @property
     def eta_z(self):
-        r"""Volume/res in x-direction."""
+        r"""Volume/res in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
             if getattr(self, '_eta_z', None) is None:
                 self._eta_z = self._calculate_eta(self.res_z)
@@ -1035,6 +1040,76 @@ class Model:
             else:
                 self._zeta = self._vol/self.mu_r
         return self._zeta
+
+
+class _VolumeModel:
+    # TODO
+    def __init__(self, grid, model, sfield):
+        """Initiate a new model with volume-averaged properties."""
+
+        # TODO REMOVE
+        model._epsilon_r = None
+
+        # Store case, for restriction.
+        self.case = model.case
+
+        # eta_x
+        self._eta_x = self.calculate_eta('res_x', grid, model, sfield)
+
+        # eta_y
+        if model.case in [1, 3]:  # HTI or tri-axial.
+            self._eta_y = self.calculate_eta('res_y', grid, model, sfield)
+
+        # eta_z
+        if self.case in [2, 3]:  # VTI or tri-axial.
+            self._eta_z = self.calculate_eta('res_z', grid, model, sfield)
+
+        # zeta
+        self._zeta = self.calculate_zeta('mu_r', grid, model)
+
+    # ETA's
+    @property
+    def eta_x(self):
+        r"""eta in x-direction."""
+        return self._eta_x
+
+    @property
+    def eta_y(self):
+        r"""eta in y-direction."""
+        if self.case in [1, 3]:  # HTI or tri-axial.
+            return self._eta_y
+        else:                    # Return eta_x.
+            return self._eta_x
+
+    @property
+    def eta_z(self):
+        r"""eta in z-direction."""
+        if self.case in [2, 3]:  # VTI or tri-axial.
+            return self._eta_z
+        else:                    # Return eta_x.
+            return self._eta_x
+
+    @property
+    def zeta(self):
+        r"""zeta."""
+        return self._zeta
+
+    @staticmethod
+    def calculate_eta(name, grid, model, field):
+        r"""eta: volume divided by resistivity."""
+        eta = 1./getattr(model, name)
+        if model._epsilon_r is not None:
+            eta += field.sval*epsilon_0
+        # return -eta*field.smu0*grid.vol.reshape(grid.vnC, order='F')
+        return eta*grid.vol.reshape(grid.vnC, order='F')
+
+    @staticmethod
+    def calculate_zeta(name, grid, model):
+        r"""zeta: volume divided by mu_r."""
+        if getattr(model, name) is None:
+            return grid.vol.reshape(grid.vnC, order='F')
+        else:
+            return grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
 
 
 # INTERPOLATION
