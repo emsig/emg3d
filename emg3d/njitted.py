@@ -81,8 +81,8 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, smu0, zeta, hx, hy,
         :class:`emg3d.utils.Field`.
 
     eta_x, eta_y, eta_z, zeta : ndarray
-        Model parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.Model`.
+        VolumeModel parameters (multiplied by volumes) as obtained from
+        :func:`emg3d.utils.VolumeModel`.
 
     smu0 : float
         Imaginary or real Laplace parameter 's' times mu_0, where
@@ -259,8 +259,8 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         :class:`emg3d.utils.Field`.
 
     eta_x, eta_y, eta_z, zeta :
-        Model parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.Model`.
+        VolumeModel parameters (multiplied by volumes) as obtained from
+        :func:`emg3d.utils.VolumeModel`.
 
     smu0 : float
         Imaginary or real Laplace parameter 's' times mu_0, where
@@ -545,8 +545,8 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         :class:`emg3d.utils.Field`.
 
     eta_x, eta_y, eta_z, zeta :
-        Model parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.Model`.
+        VolumeModel parameters (multiplied by volumes) as obtained from
+        :func:`emg3d.utils.VolumeModel`.
 
     smu0 : float
         Imaginary or real Laplace parameter 's' times mu_0, where
@@ -829,8 +829,8 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         :class:`emg3d.utils.Field`.
 
     eta_x, eta_y, eta_z, zeta :
-        Model parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.Model`.
+        VolumeModel parameters (multiplied by volumes) as obtained from
+        :func:`emg3d.utils.VolumeModel`.
 
     smu0 : float
         Imaginary or real Laplace parameter 's' times mu_0, where
@@ -1108,8 +1108,8 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         :class:`emg3d.utils.Field`.
 
     eta_x, eta_y, eta_z, zeta :
-        Model parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.Model`.
+        VolumeModel parameters (multiplied by volumes) as obtained from
+        :func:`emg3d.utils.VolumeModel`.
 
     smu0 : float
         Imaginary or real Laplace parameter 's' times mu_0, where

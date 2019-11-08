@@ -260,13 +260,16 @@ def test_smoothing():
         # Create a source field
         sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
 
+        # Get volume-averaged model parameters.
+        vmodel = utils.VolumeModel(grid, model, sfield)
+
         # Run two iterations to get an e-field
         field = solver.solver(grid, model, sfield, maxit=2, verb=1)
 
         # Collect Gauss-Seidel input (same for all routines)
-        inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-               model.eta_z, sfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz,
-               nu)
+        inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
+               vmodel.eta_z, sfield.smu0, vmodel.zeta, grid.hx, grid.hy,
+               grid.hz, nu)
 
         func = ['', '_x', '_y', '_z']
         for lr_dir in range(8):
@@ -291,7 +294,7 @@ def test_smoothing():
 
             # Use solver.smoothing
             ofield = utils.Field(grid, field)
-            solver.smoothing(grid, model, sfield, ofield, nu, lr_dir)
+            solver.smoothing(grid, vmodel, sfield, ofield, nu, lr_dir)
 
             # Compare
             assert_allclose(efield, ofield)
@@ -308,6 +311,9 @@ def test_restriction():
     model = utils.Model(grid, 1, 1, 1, 1)
     sfield = utils.get_source_field(grid, src, 1)
 
+    # Get volume-averaged model parameters.
+    vmodel = utils.VolumeModel(grid, model, sfield)
+
     rx = np.arange(sfield.fx.size, dtype=complex).reshape(sfield.fx.shape)
     ry = np.arange(sfield.fy.size, dtype=complex).reshape(sfield.fy.shape)
     rz = np.arange(sfield.fz.size, dtype=complex).reshape(sfield.fz.shape)
@@ -315,14 +321,14 @@ def test_restriction():
 
     # Restrict it
     cgrid, cmodel, csfield, cefield = solver.restriction(
-            grid, model, sfield, rr, sc_dir=0)
+            grid, vmodel, sfield, rr, sc_dir=0)
 
     assert_allclose(csfield.fx[:, 1:-1, 1], np.array([[196.+0.j], [596.+0.j]]))
     assert_allclose(csfield.fy[1:-1, :, 1], np.array([[356.+0.j, 436.+0.j]]))
     assert_allclose(csfield.fz[1:-1, 1:-1, :],
                     np.array([[[388.+0.j, 404.+0.j]]]))
     assert cgrid.nNx == cgrid.nNy == cgrid.nNz == 3
-    assert cmodel.eta_x[0, 0, 0]/8. == model.eta_x[0, 0, 0]
+    assert cmodel.eta_x[0, 0, 0]/8. == vmodel.eta_x[0, 0, 0]
     assert np.sum(grid.hx) == np.sum(cgrid.hx)
     assert np.sum(grid.hy) == np.sum(cgrid.hy)
     assert np.sum(grid.hz) == np.sum(cgrid.hz)
@@ -364,6 +370,9 @@ def test_residual():
     # Create a source field
     sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
 
+    # Get volume-averaged model parameters.
+    vmodel = utils.VolumeModel(grid, model, sfield)
+
     # Run two iterations to get an e-field
     efield = solver.solver(grid, model, sfield, maxit=2, verb=1)
 
@@ -371,12 +380,12 @@ def test_residual():
     rfield = sfield.copy()
     njitted.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
-            model.eta_x, model.eta_y, model.eta_z, sfield.smu0, model.zeta,
+            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, sfield.smu0, vmodel.zeta,
             grid.hx, grid.hy, grid.hz)
 
     # Calculate residual
-    out = solver.residual(grid, model, sfield, efield)
-    outnorm = solver.residual(grid, model, sfield, efield, True)
+    out = solver.residual(grid, vmodel, sfield, efield)
+    outnorm = solver.residual(grid, vmodel, sfield, efield, True)
 
     # Compare
     assert_allclose(out, rfield)
@@ -393,6 +402,7 @@ def test_krylov(capsys):
     grid = utils.TensorMesh(**dat['input_grid'])
     model = utils.Model(**dat['input_model'])
     sfield = utils.get_source_field(**dat['input_source'])
+    vmodel = utils.VolumeModel(grid, model, sfield)
     efield = utils.Field(grid)  # Initiate e-field.
 
     # Get var-instance
@@ -404,7 +414,7 @@ def test_krylov(capsys):
     var.l2_refe = njitted.l2norm(sfield)
 
     # Call krylov and ensure it fails properly.
-    solver.krylov(grid, model, sfield, efield, var)
+    solver.krylov(grid, vmodel, sfield, efield, var)
     out, _ = capsys.readouterr()
     assert '* ERROR   :: Error in bicgstab' in out
 

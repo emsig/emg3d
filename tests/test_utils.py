@@ -416,7 +416,8 @@ def test_Model(capsys):
     # Using defaults; check backwards compatibility for freq.
     sfield = utils.SourceField(grid, freq=1)
     model1 = utils.Model(grid, freq=1)
-    vmodel1 = utils._VolumeModel(grid, model1, sfield)
+    model1.mu_r = None
+    vmodel1 = utils.VolumeModel(grid, model1, sfield)
     out, _ = capsys.readouterr()
     assert '``Model`` does not take frequency' in out
     assert_allclose(model1.res_x, model1.res_y)
@@ -431,26 +432,31 @@ def test_Model(capsys):
     with pytest.raises(ValueError):
         model1.res_z = 2*model1.res_x
 
+    model1._epsilon_r = 1e100  # Just set to 1 CURRENTLY.
+    vmodel1b = utils.VolumeModel(grid, model1, sfield)
+    assert_allclose(vmodel1b.eta_x.real, vmodel1.eta_x)
+    assert np.iscomplex(vmodel1b.eta_x[0, 0, 0])
+
     # Using ints
     model2 = utils.Model(grid, 2., 3., 4.)
-    vmodel2 = utils._VolumeModel(grid, model2, sfield)
+    vmodel2 = utils.VolumeModel(grid, model2, sfield)
     assert_allclose(model2.res_x*1.5, model2.res_y)
     assert_allclose(model2.res_x*2, model2.res_z)
 
     # VTI: Setting res_x and res_z, not res_y
     model2b = utils.Model(grid, 2., res_z=4.)
-    vmodel2b = utils._VolumeModel(grid, model2b, sfield)
+    vmodel2b = utils.VolumeModel(grid, model2b, sfield)
     assert_allclose(model2b.res_x, model2b.res_y)
     assert_allclose(vmodel2b.eta_y, vmodel2b.eta_x)
     model2b.res_z = model2b.res_x
     model2c = utils.Model(grid, 2., res_z=model2b.res_z.copy())
-    vmodel2c = utils._VolumeModel(grid, model2c, sfield)
+    vmodel2c = utils.VolumeModel(grid, model2c, sfield)
     assert_allclose(model2c.res_x, model2c.res_z)
     assert_allclose(vmodel2c.eta_z, vmodel2c.eta_x)
 
     # HTI: Setting res_x and res_y, not res_z
     model2d = utils.Model(grid, 2., 4.)
-    vmodel2d = utils._VolumeModel(grid, model2d, sfield)
+    vmodel2d = utils.VolumeModel(grid, model2d, sfield)
     assert_allclose(model2d.res_x, model2d.res_z)
     assert_allclose(vmodel2d.eta_z, vmodel2d.eta_x)
 
@@ -466,7 +472,7 @@ def test_Model(capsys):
 
     # Check with all inputs
     model3 = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
-    vmodel3 = utils._VolumeModel(grid, model3, sfield)
+    vmodel3 = utils.VolumeModel(grid, model3, sfield)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
@@ -474,7 +480,7 @@ def test_Model(capsys):
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
                           res_z.ravel('F'), mu_r=mu_r.ravel('F'))
-    vmodel3b = utils._VolumeModel(grid, model3b, sfield)
+    vmodel3b = utils.VolumeModel(grid, model3b, sfield)
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
@@ -495,7 +501,7 @@ def test_Model(capsys):
     eta_x = 1/model3.res_x*model3._vol
     eta_y = 1/model3.res_y*model3._vol
     eta_z = 1/model3.res_z*model3._vol
-    vmodel3 = utils._VolumeModel(grid, model3, sfield)
+    vmodel3 = utils.VolumeModel(grid, model3, sfield)
     assert_allclose(vmodel3.eta_x, eta_x)
     assert_allclose(vmodel3.eta_y, eta_y)
     assert_allclose(vmodel3.eta_z, eta_z)
@@ -503,7 +509,7 @@ def test_Model(capsys):
     # Check volume
     assert_allclose(grid.vol.reshape(grid.vnC, order='F'), vmodel2.zeta)
     model4 = utils.Model(grid, 1)
-    vmodel4 = utils._VolumeModel(grid, model4, sfield)
+    vmodel4 = utils.VolumeModel(grid, model4, sfield)
     assert_allclose(vmodel4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
     # Check a couple of failures

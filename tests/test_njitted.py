@@ -29,6 +29,9 @@ def test_amat_x():
     # Create a source field
     sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
 
+    # Get volume-averaged model parameters.
+    vmodel = utils.VolumeModel(grid, model, sfield)
+
     # Run two iterations to get a e-field
     efield = solver.solver(grid, model, sfield, maxit=2, verb=1)
 
@@ -36,15 +39,15 @@ def test_amat_x():
     rr1 = utils.Field(grid)
     njitted.amat_x(
             rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
-            model.eta_x, model.eta_y, model.eta_z, sfield.smu0, model.zeta,
+            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, sfield.smu0, vmodel.zeta,
             grid.hx, grid.hy, grid.hz)
 
     # amat_x - alternative
     rr2 = utils.Field(grid)
     alternatives.alt_amat_x(
             rr2.fx, rr2.fy, rr2.fz, efield.fx, efield.fy, efield.fz,
-            sfield.smu0*model.eta_x, sfield.smu0*model.eta_y,
-            sfield.smu0*model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz)
+            sfield.smu0*vmodel.eta_x, sfield.smu0*vmodel.eta_y,
+            sfield.smu0*vmodel.eta_z, vmodel.zeta, grid.hx, grid.hy, grid.hz)
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(-rr1, rr2, atol=1e-23)
@@ -107,12 +110,15 @@ def test_gauss_seidel():
         # Initialize source field.
         sfield = utils.get_source_field(grid, src, freq)
 
+        # Get volume-averaged model parameters.
+        vmodel = utils.VolumeModel(grid, model, sfield)
+
         # Run two iterations to get some e-field.
         efield = solver.solver(grid, model, sfield, maxit=2, verb=1)
 
-        inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-               model.eta_z, sfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz,
-               nu)
+        inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
+               vmodel.eta_z, sfield.smu0, vmodel.zeta, grid.hx, grid.hy,
+               grid.hz, nu)
 
         # Get result from `gauss_seidel`.
         cfield = utils.Field(grid, efield.copy())

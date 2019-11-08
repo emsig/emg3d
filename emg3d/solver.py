@@ -342,7 +342,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         raise ValueError('Input data types')
 
     # Get volume-averaged model values.
-    vmodel = utils._VolumeModel(grid, model, sfield)
+    vmodel = utils.VolumeModel(grid, model, sfield)
 
     # Get efield
     if efield is None:
@@ -455,8 +455,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     grid : TensorMesh
         Model grid; ``emg3d.utils.TensorMesh`` instance.
 
-    model : Model
-        Model; ``emg3d.utils.Model`` instance.
+    model : VolumeModel
+        Model; ``emg3d.utils.VolumeModel`` instance.
 
     sfield, efield : Field
         Source and electric fields; ``emg3d.utils.SourceField`` and
@@ -622,8 +622,8 @@ def krylov(grid, model, sfield, efield, var):
     grid : TensorMesh
         Model grid; ``emg3d.utils.TensorMesh`` instance.
 
-    model : Model
-        Model; ``emg3d.utils.Model`` instance.
+    model : VolumeModel
+        Model; ``emg3d.utils.VolumeModel`` instance.
 
     sfield, efield : Field
         Source and electric fields; ``emg3d.utils.SourceField`` and
@@ -778,8 +778,8 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     grid : TensorMesh
         Model grid; ``emg3d.utils.TensorMesh`` instance.
 
-    model : Model
-        Model; ``emg3d.utils.Model`` instances.
+    model : VolumeModel
+        Model; ``emg3d.utils.VolumeModel`` instances.
 
     sfield, efield : Field
         Source and electric fields; ``emg3d.utils.SourceField`` and
@@ -835,8 +835,8 @@ def restriction(grid, model, sfield, residual, sc_dir):
     grid : TensorMesh
         Fine grid; ``emg3d.utils.TensorMesh`` instances.
 
-    model : Model
-        Fine model; ``emg3d.utils.Model`` instances.
+    model : VolumeModel
+        Fine model; ``emg3d.utils.VolumeModel`` instances.
 
     sfield : SourceField
         Fine source field; ``emg3d.utils.SourceField`` instances.
@@ -850,8 +850,8 @@ def restriction(grid, model, sfield, residual, sc_dir):
     cgrid : TensorMesh
         Coarse grid; ``emg3d.utils.TensorMesh`` instances.
 
-    cmodel : Model
-        Coarse model; ``emg3d.utils.Model`` instances.
+    cmodel : VolumeModel
+        Coarse model; ``emg3d.utils.VolumeModel`` instances.
 
     csfield : SourceField
         Coarse source field; ``emg3d.utils.SourceField`` instances.
@@ -884,13 +884,13 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     # 2. RESTRICT MODEL
 
-    class Model:
+    class VolumeModel:
         """Dummy class to create coarse-grid model."""
         def __init__(self, case):
             """Initialize with case."""
             self.case = case
 
-    cmodel = Model(model.case)
+    cmodel = VolumeModel(model.case)
     cmodel.eta_x = _restrict_model_parameters(model.eta_x, sc_dir)
     if model.case in [1, 3]:  # HTI or tri-axial.
         cmodel.eta_y = _restrict_model_parameters(model.eta_y, sc_dir)
@@ -1022,8 +1022,8 @@ def residual(grid, model, sfield, efield, norm=False):
     grid : TensorMesh
         Fine grid; ``emg3d.utils.TensorMesh``-instance.
 
-    model : Model
-        Fine model; ``emg3d.utils.Model`` instance.
+    model : VolumeModel
+        Fine model; ``emg3d.utils.VolumeModel`` instance.
 
     sfield, efield : Field
         Source and electric fields; ``emg3d.utils.SourceField`` and

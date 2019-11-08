@@ -46,9 +46,9 @@ except ImportError:
                   "\n             Install it via `pip install scooby`.\n")
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
-           'get_h_field', 'Model', 'grid2grid', 'TensorMesh', 'get_hx_h0',
-           'get_cell_numbers', 'get_stretched_h', 'get_domain', 'get_hx',
-           'Fourier', 'data_write', 'data_read', 'Time', 'Report']
+           'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'TensorMesh',
+           'get_hx_h0', 'get_cell_numbers', 'get_stretched_h', 'get_domain',
+           'get_hx', 'Fourier', 'data_write', 'data_read', 'Time', 'Report']
 
 
 # FIELDS
@@ -766,7 +766,7 @@ def get_h_field(grid, model, field):
     # into account, as mu_r is volume-averaged.
     if model._mu_r is not None:
 
-        vmodel = _VolumeModel(grid, model, field)
+        vmodel = VolumeModel(grid, model, field)
 
         # Plus and minus indices.
         ixm = np.r_[0, np.arange(grid.nCx)]
@@ -967,7 +967,7 @@ class Model:
         return var
 
 
-class _VolumeModel:
+class VolumeModel:
     # TODO  DOCUMENT, all parameters too.
     def __init__(self, grid, model, sfield):
         """Initiate a new model with volume-averaged properties."""
@@ -1020,12 +1020,12 @@ class _VolumeModel:
     def calculate_eta(name, grid, model, field):
         r"""eta: volume divided by resistivity."""
 
-        # Volume-averaged sigma.
-        eta = grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
-
         # If epsilon_r is not None, we use the full wave equation.
         if getattr(model, '_epsilon_r', None) is not None:
-            eta += grid.vol.reshape(grid.vnC, order='F')*field.sval*epsilon_0
+            eta = grid.vol.reshape(grid.vnC, order='F')*(
+                    1./getattr(model, name) + field.sval*epsilon_0)
+        else:
+            eta = grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
 
         return eta
 
