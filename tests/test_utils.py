@@ -414,13 +414,15 @@ def test_Model(capsys):
 
     _, _ = capsys.readouterr()  # Clean-up
     # Using defaults; check backwards compatibility for freq.
+    sfield = utils.SourceField(grid, freq=1)
     model1 = utils.Model(grid, freq=1)
+    vmodel1 = utils._VolumeModel(grid, model1, sfield)
     out, _ = capsys.readouterr()
     assert '``Model`` does not take frequency' in out
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
-    assert_allclose(model1.eta_z, model1.eta_y)
+    assert_allclose(vmodel1.eta_z, vmodel1.eta_y)
     assert model1.mu_r is None
 
     # Assert you can not set res_y nor res_z if not provided from the start.
@@ -431,26 +433,28 @@ def test_Model(capsys):
 
     # Using ints
     model2 = utils.Model(grid, 2., 3., 4.)
+    vmodel2 = utils._VolumeModel(grid, model2, sfield)
     assert_allclose(model2.res_x*1.5, model2.res_y)
     assert_allclose(model2.res_x*2, model2.res_z)
 
     # VTI: Setting res_x and res_z, not res_y
     model2b = utils.Model(grid, 2., res_z=4.)
+    vmodel2b = utils._VolumeModel(grid, model2b, sfield)
     assert_allclose(model2b.res_x, model2b.res_y)
-    assert_allclose(model2b.eta_y, model2b.eta_x)
+    assert_allclose(vmodel2b.eta_y, vmodel2b.eta_x)
     model2b.res_z = model2b.res_x
     model2c = utils.Model(grid, 2., res_z=model2b.res_z.copy())
+    vmodel2c = utils._VolumeModel(grid, model2c, sfield)
     assert_allclose(model2c.res_x, model2c.res_z)
-    assert_allclose(model2c.eta_z, model2c.eta_x)
+    assert_allclose(vmodel2c.eta_z, vmodel2c.eta_x)
 
     # HTI: Setting res_x and res_y, not res_z
     model2d = utils.Model(grid, 2., 4.)
+    vmodel2d = utils._VolumeModel(grid, model2d, sfield)
     assert_allclose(model2d.res_x, model2d.res_z)
-    assert_allclose(model2d.eta_z, model2d.eta_x)
+    assert_allclose(vmodel2d.eta_z, vmodel2d.eta_x)
 
     # Check wrong shape
-    with pytest.raises(ValueError):
-        model1.res_x = np.ones(grid.nC)
     with pytest.raises(ValueError):
         utils.Model(grid, np.arange(1, 11))
     with pytest.raises(ValueError):
@@ -462,17 +466,19 @@ def test_Model(capsys):
 
     # Check with all inputs
     model3 = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
+    vmodel3 = utils._VolumeModel(grid, model3, sfield)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert_allclose(model3._vol/mu_r, model3.zeta)
+    assert_allclose(model3._vol/mu_r, vmodel3.zeta)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
                           res_z.ravel('F'), mu_r=mu_r.ravel('F'))
+    vmodel3b = utils._VolumeModel(grid, model3b, sfield)
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
-    assert_allclose(model3b._vol/mu_r, model3b.zeta)
+    assert_allclose(model3b._vol/mu_r, vmodel3b.zeta)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
@@ -489,14 +495,16 @@ def test_Model(capsys):
     eta_x = 1/model3.res_x*model3._vol
     eta_y = 1/model3.res_y*model3._vol
     eta_z = 1/model3.res_z*model3._vol
-    assert_allclose(model3.eta_x, eta_x)
-    assert_allclose(model3.eta_y, eta_y)
-    assert_allclose(model3.eta_z, eta_z)
+    vmodel3 = utils._VolumeModel(grid, model3, sfield)
+    assert_allclose(vmodel3.eta_x, eta_x)
+    assert_allclose(vmodel3.eta_y, eta_y)
+    assert_allclose(vmodel3.eta_z, eta_z)
 
     # Check volume
-    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), model2.zeta)
+    assert_allclose(grid.vol.reshape(grid.vnC, order='F'), vmodel2.zeta)
     model4 = utils.Model(grid, 1)
-    assert_allclose(model4.zeta, grid.vol.reshape(grid.vnC, order='F'))
+    vmodel4 = utils._VolumeModel(grid, model4, sfield)
+    assert_allclose(vmodel4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
     # Check a couple of failures
     with pytest.raises(ValueError):
@@ -1028,10 +1036,6 @@ def test_data_write_read(tmpdir, capsys):
     freq = np.pi
 
     model = utils.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
-    _ = model.eta_x  # Force these to build
-    _ = model.eta_y  # Force these to build
-    _ = model.eta_z  # Force these to build
-    _ = model.zeta   # Force these to build
 
     e1 = create_dummy(*grid.vnEx)
     e2 = create_dummy(*grid.vnEy)
@@ -1058,17 +1062,13 @@ def test_data_write_read(tmpdir, capsys):
     for attr in ['nCx', 'nCy', 'nCz']:
         assert getattr(grid, attr) == getattr(grid_out, attr)
 
-    # Ensure volume averages got deleted
+    # Ensure volume averages got deleted or do not exist anyway.
     assert hasattr(grid_out, '_vol') is False
     assert hasattr(model_out, '_eta_x') is False
     assert hasattr(model_out, '_zeta') is False
 
     # Ensure they can be reconstructed
     assert_allclose(grid.vol, grid_out.vol)
-    assert_allclose(model.eta_x, model_out.eta_x)
-    assert_allclose(model.eta_y, model_out.eta_y)
-    assert_allclose(model.eta_z, model_out.eta_z)
-    assert_allclose(model.zeta, model_out.zeta)
 
     # Write and read data, None
     utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)

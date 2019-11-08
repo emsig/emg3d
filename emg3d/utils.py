@@ -766,6 +766,8 @@ def get_h_field(grid, model, field):
     # into account, as mu_r is volume-averaged.
     if model._mu_r is not None:
 
+        vmodel = _VolumeModel(grid, model, field)
+
         # Plus and minus indices.
         ixm = np.r_[0, np.arange(grid.nCx)]
         ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
@@ -775,9 +777,9 @@ def get_h_field(grid, model, field):
         izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
 
         # Average mu_r for dual-grid.
-        zeta_x = (model.zeta[ixm, :, :] + model.zeta[ixp, :, :])/2.
-        zeta_y = (model.zeta[:, iym, :] + model.zeta[:, iyp, :])/2.
-        zeta_z = (model.zeta[:, :, izm] + model.zeta[:, :, izp])/2.
+        zeta_x = (vmodel.zeta[ixm, :, :] + vmodel.zeta[ixp, :, :])/2.
+        zeta_y = (vmodel.zeta[:, iym, :] + vmodel.zeta[:, iyp, :])/2.
+        zeta_z = (vmodel.zeta[:, :, izm] + vmodel.zeta[:, :, izp])/2.
 
         hvx = grid.hx[:, None, None]
         hvy = grid.hy[None, :, None]
@@ -851,70 +853,21 @@ class Model:
             self.case = 3
 
         # Initiate x-directed resistivity.
-        res_x = np.array(res_x, dtype=float, copy=False)
-        if res_x.size == 1:
-            self._res_x = res_x
-        elif np.all(res_x.shape == self.vnC) and res_x.ndim == 3:
-            self._res_x = res_x
-        elif res_x.size == self.nC and res_x.ndim == 1:
-            self._res_x = res_x.reshape(self.vnC, order='F')
-        else:
-            print(f"* ERROR   :: res_x must be {grid.vnC} or {grid.nC}.")
-            print(f"             Provided: {res_x.shape}.")
-            raise ValueError("Wrong Shape")
-        # Check 0 < res_x < inf.
-        _check_parameter(self._res_x, 'res_x')
+        self._res_x = self._check_parameter(res_x, 'res_x')
 
         # Initiate y-directed resistivity.
         if self.case in [1, 3]:
-            res_y = np.array(res_y, dtype=float, copy=False)
-            if res_y.size == 1:
-                self._res_y = res_y
-            elif np.all(res_y.shape == self.vnC) and res_y.ndim == 3:
-                self._res_y = res_y
-            elif res_y.size == self.nC and res_y.ndim == 1:
-                self._res_y = res_y.reshape(self.vnC, order='F')
-            else:
-                print(f"* ERROR   :: res_y must be {grid.vnC} or {grid.nC}.")
-                print(f"             Provided: {res_y.shape}.")
-                raise ValueError("Wrong Shape")
-            # Check 0 < res_y < inf.
-            _check_parameter(self._res_y, 'res_y')
+            self._res_y = self._check_parameter(res_y, 'res_y')
 
         # Initiate z-directed resistivity.
         if self.case in [2, 3]:
-            res_z = np.array(res_z, dtype=float, copy=False)
-            if res_z.size == 1:
-                self._res_z = res_z
-            elif np.all(res_z.shape == self.vnC) and res_z.ndim == 3:
-                self._res_z = res_z
-            elif res_z.size == self.nC and res_z.ndim == 1:
-                self._res_z = res_z.reshape(self.vnC, order='F')
-            else:
-                print(f"* ERROR   :: res_z must be {grid.vnC} or {grid.nC}.")
-                print(f"             Provided: {res_z.shape}.")
-                raise ValueError("Wrong Shape")
-            # Check 0 < res_z < inf.
-            _check_parameter(self._res_z, 'res_z')
+            self._res_z = self._check_parameter(res_z, 'res_y')
 
         # Store magnetic permeability.
         if mu_r is None:
             self._mu_r = mu_r
         else:
-            mu_r = np.array(mu_r, dtype=float, copy=False)
-            if mu_r.size == 1:
-                self._mu_r = mu_r
-            elif np.all(mu_r.shape == self.vnC) and mu_r.ndim == 3:
-                self._mu_r = mu_r
-            elif mu_r.size == self.nC and mu_r.ndim == 1:
-                self._mu_r = mu_r.reshape(self.vnC, order='F')
-            else:
-                print(f"* ERROR   :: mu_r must be {grid.vnC} or {grid.nC}.")
-                print(f"             Provided: {mu_r.shape}.")
-                raise ValueError("Wrong Shape")
-        if mu_r is not None:
-            # Check 0 < mu_r < inf.
-            _check_parameter(self._mu_r, 'mu_r')
+            self._mu_r = self._check_parameter(mu_r, 'mu_r')
 
         # Currently a hidden feature:
         # _epsilon_r = None => diffusive approximation.
@@ -930,8 +883,7 @@ class Model:
     @res_x.setter
     def res_x(self, res):
         r"""Update resistivity in x-direction."""
-        self._res_x = res
-        _check_parameter(self._res_x, 'res_x')
+        self._res_x = self._check_parameter(res, 'res_x')
 
     @property
     def res_y(self):
@@ -945,8 +897,7 @@ class Model:
     def res_y(self, res):
         r"""Update resistivity in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            self._res_y = res
-            _check_parameter(self._res_y, 'res_y')
+            self._res_y = self._check_parameter(res, 'res_y')
         else:
             print("Cannot set res_y, as resistivity model is "
                   f"{self.case_names[self.case]}.")
@@ -964,8 +915,7 @@ class Model:
     def res_z(self, res):
         r"""Update resistivity in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            self._res_z = res
-            _check_parameter(self._res_z, 'res_z')
+            self._res_z = self._check_parameter(res, 'res_z')
         else:
             print("Cannot set res_z, as resistivity model is "
                   f"{self.case_names[self.case]}.")
@@ -980,14 +930,45 @@ class Model:
     @mu_r.setter
     def mu_r(self, mu_r):
         r"""Update magnetic permeability."""
-        self._mu_r = mu_r
-        if self._mu_r is not None:
-            _check_parameter(self._mu_r, 'mu_r')
-        self._zeta = self._calculate_zeta(mu_r)
+        if mu_r is None:
+            self._mu_r = None
+        else:
+            self._mu_r = self._check_parameter(mu_r, 'mu_r')
+
+    # INTERNAL UTILITIES
+    def _check_parameter(self, var, name):
+        """Check parameter.
+
+        - Shape must be (), (1,), nC, or vnC.
+        - Value(s) must be 0 < var < inf.
+        """
+
+        # Cast it to floats.
+        var = np.array(var, dtype=float, copy=False)
+
+        # Float is good, correct shape is good too.
+        good = (var.size == 1)
+        good = good or (np.all(var.shape == self.vnC) and var.ndim == 3)
+
+        # Correct size but wrong shape => re-arrange.
+        if var.shape == (self.nC, ):
+            var = var.reshape(self.vnC, order='F')
+
+        elif not good:
+            print(f"* ERROR   :: Shape of {name} must be (), {self.vnC}, or "
+                  f"{self.nC}.\n             Provided: {var.shape}.")
+            raise ValueError("Wrong Shape")
+
+        # Check 0 < val < inf.
+        if not np.all(var > 0) or not np.all(var < np.inf):
+            print(f"* ERROR   :: ``{name}`` must be all `0 < var < inf`.")
+            raise ValueError("Parameter error")
+
+        return var
 
 
 class _VolumeModel:
-    # TODO
+    # TODO  DOCUMENT, all parameters too.
     def __init__(self, grid, model, sfield):
         """Initiate a new model with volume-averaged properties."""
 
@@ -1039,17 +1020,19 @@ class _VolumeModel:
     def calculate_eta(name, grid, model, field):
         r"""eta: volume divided by resistivity."""
 
-        # Get sigma
-        eta = 1./getattr(model, name)
+        # Volume-averaged sigma.
+        eta = grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
+
+        # If epsilon_r is not None, we use the full wave equation.
         if getattr(model, '_epsilon_r', None) is not None:
-            eta += field.sval*epsilon_0
-        # return -eta*field.smu0*grid.vol.reshape(grid.vnC, order='F')
-        return eta*grid.vol.reshape(grid.vnC, order='F')
+            eta += grid.vol.reshape(grid.vnC, order='F')*field.sval*epsilon_0
+
+        return eta
 
     @staticmethod
     def calculate_zeta(name, grid, model):
         r"""zeta: volume divided by mu_r."""
-        if getattr(model, name) is None:
+        if getattr(model, name, None) is None:
             return grid.vol.reshape(grid.vnC, order='F')
         else:
             return grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
@@ -2522,15 +2505,6 @@ def data_write(fname, keys, values, path='data', exists=0):
             if type(values[i]).__name__ == 'TensorMesh':
                 delattr(values[i], '_vol')
 
-            # Note: Model-instances also have a `_vol`-attribute. However,
-            #       currently a Model-instance cannot reconstruct that, so we
-            #       leave it in.
-            if type(values[i]).__name__ == 'Model':
-                delattr(values[i], '_eta_x')
-                delattr(values[i], '_eta_y')
-                delattr(values[i], '_eta_z')
-                delattr(values[i], '_zeta')
-
             db[key] = values[i]
 
 
@@ -2675,11 +2649,3 @@ class Report(ScoobyReport):
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
-
-
-# INTERNAL UTILITIES
-def _check_parameter(var, name):
-    """Check 0 < var < inf."""
-    if not np.all(var > 0) or not np.all(var < np.inf):
-        print(f"* ERROR   :: ``{name}`` must be all `0 < var < inf`.")
-        raise ValueError("Parameter error")
