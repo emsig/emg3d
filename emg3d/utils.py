@@ -932,7 +932,6 @@ class Model:
         r"""Update resistivity in x-direction."""
         self._res_x = res
         _check_parameter(self._res_x, 'res_x')
-        self._eta_x = self._calculate_eta(res)
 
     @property
     def res_y(self):
@@ -948,7 +947,6 @@ class Model:
         if self.case in [1, 3]:  # HTI or tri-axial.
             self._res_y = res
             _check_parameter(self._res_y, 'res_y')
-            self._eta_y = self._calculate_eta(res)
         else:
             print("Cannot set res_y, as resistivity model is "
                   f"{self.case_names[self.case]}.")
@@ -968,47 +966,10 @@ class Model:
         if self.case in [2, 3]:  # VTI or tri-axial.
             self._res_z = res
             _check_parameter(self._res_z, 'res_z')
-            self._eta_z = self._calculate_eta(res)
         else:
             print("Cannot set res_z, as resistivity model is "
                   f"{self.case_names[self.case]}.")
             raise ValueError
-
-    # ETA's
-    @property
-    def eta_x(self):
-        r"""Volume/res in x-direction."""
-        if getattr(self, '_eta_x', None) is None:
-            self._eta_x = self._calculate_eta(self.res_x)
-        return self._eta_x
-
-    @property
-    def eta_y(self):
-        r"""Volume/res in y-direction."""
-        if self.case in [1, 3]:  # HTI or tri-axial.
-            if getattr(self, '_eta_y', None) is None:
-                self._eta_y = self._calculate_eta(self.res_y)
-            return self._eta_y
-        else:                    # Return eta_x.
-            if getattr(self, '_eta_x', None) is None:
-                self._eta_x = self._calculate_eta(self.res_x)
-            return self._eta_x
-
-    @property
-    def eta_z(self):
-        r"""Volume/res in z-direction."""
-        if self.case in [2, 3]:  # VTI or tri-axial.
-            if getattr(self, '_eta_z', None) is None:
-                self._eta_z = self._calculate_eta(self.res_z)
-            return self._eta_z
-        else:                    # Return eta_x.
-            if getattr(self, '_eta_x', None) is None:
-                self._eta_x = self._calculate_eta(self.res_x)
-            return self._eta_x
-
-    def _calculate_eta(self, res):
-        r"""eta: volume divided by resistivity."""
-        return self._vol/res
 
     # MAGNETIC PERMEABILITIES
     @property
@@ -1024,31 +985,11 @@ class Model:
             _check_parameter(self._mu_r, 'mu_r')
         self._zeta = self._calculate_zeta(mu_r)
 
-    # ZETA
-    @property
-    def zeta(self):
-        r"""Volume/mu_r."""
-        if getattr(self, '_zeta', None) is None:
-            self._zeta = self._calculate_zeta(self.mu_r)
-        return self._zeta
-
-    def _calculate_zeta(self, mu_r):
-        r"""zeta: volume divided by mu_r."""
-        if getattr(self, '_zeta', None) is None:
-            if self._mu_r is None:
-                self._zeta = self._vol
-            else:
-                self._zeta = self._vol/self.mu_r
-        return self._zeta
-
 
 class _VolumeModel:
     # TODO
     def __init__(self, grid, model, sfield):
         """Initiate a new model with volume-averaged properties."""
-
-        # TODO REMOVE
-        model._epsilon_r = None
 
         # Store case, for restriction.
         self.case = model.case
@@ -1097,8 +1038,10 @@ class _VolumeModel:
     @staticmethod
     def calculate_eta(name, grid, model, field):
         r"""eta: volume divided by resistivity."""
+
+        # Get sigma
         eta = 1./getattr(model, name)
-        if model._epsilon_r is not None:
+        if getattr(model, '_epsilon_r', None) is not None:
             eta += field.sval*epsilon_0
         # return -eta*field.smu0*grid.vol.reshape(grid.vnC, order='F')
         return eta*grid.vol.reshape(grid.vnC, order='F')
