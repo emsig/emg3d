@@ -126,7 +126,7 @@ def test_solver_homogeneous(capsys):
     # Provide initial field, ensure one initial multigrid is carried out
     # without linerelaxation nor semicoarsening.
     _, _ = capsys.readouterr()  # empty
-    efield = utils.Field(grid, freq=sfield._freq)
+    efield = utils.Field(grid)
     outarray = solver.solver(
             grid, model, sfield, efield, sslsolver=True, semicoarsening=True,
             linerelaxation=True, maxit=2, verb=3)
@@ -134,12 +134,13 @@ def test_solver_homogeneous(capsys):
     assert "after                       1 F-cycles    0 0" in out
     assert "after                       2 F-cycles    4 1" in out
 
-    # Provide an initial field without frequency information.
-    efield2 = utils.Field(grid)
+    # Provide an initial source-field without frequency information.
+    wrong_sfield = utils.Field(grid)
+    wrong_sfield.field = sfield.field
     with pytest.raises(ValueError):
-        solver.solver(grid, model, sfield, efield=efield2, verb=2)
+        solver.solver(grid, model, wrong_sfield, efield=efield, verb=2)
     out, _ = capsys.readouterr()
-    assert "ERROR   :: Provided electric field must contain" in out
+    assert "ERROR   :: Source field is missing frequency information" in out
 
     # Check stagnation by providing an almost zero source field.
     _ = solver.solver(grid, model, sfield*0+1e-20, maxit=100)

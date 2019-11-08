@@ -72,10 +72,10 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     model : Model
         Model; ``emg3d.utils.Model`` instance.
 
-    sfield : Field instance
-        Source field; ``emg3d.utils.Field`` instance.
+    sfield : SourceField
+        Source field; ``emg3d.utils.SourceField`` instance.
 
-    efield : Field instance, optional
+    efield : Field, optional
         Initial electric field; ``emg3d.utils.Field`` instance. It is
         initiated with zeroes if not provided. A provided efield MUST have
         frequency information (initiated with ``emg3d.utils.Field(...,
@@ -334,8 +334,13 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Calculate reference error for tolerance.
     var.l2_refe = njitted.l2norm(sfield)
 
-    # Get efield
-    if efield is None:
+    # Check sfield and get efield
+    if sfield.freq is None:
+        print("* ERROR   :: Source field is missing frequency information;\n  "
+              "           Create it with ``emg3d.utils.get_source_field``, or"
+              "\n             initiate it with ``emg3d.utils.SourceField``.")
+        raise ValueError('Input data types')
+    elif efield is None:
         # If not provided, initiate an empty one.
         efield = utils.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
 
@@ -351,12 +356,11 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
                   f"efield: {efield.dtype}.")
             raise ValueError('Input data types')
 
-        # Ensure provided efield has frequency information.
+        # If provided efield is missing frequency information, add it from the
+        # source field.
         if efield.freq is None:
-            print("* ERROR   :: Provided electric field must contain "
-                  "frequency information.;\n             Initiate it with "
-                  f"``emg3d.utils.Field(..., freq)``.")
-            raise ValueError('Input data types')
+            efield._freq = sfield._freq
+            efield._smu0 = sfield._smu0
 
         # Set flag to NOT return the field.
         var.do_return = False
@@ -450,7 +454,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         Model; ``emg3d.utils.Model`` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
@@ -616,7 +621,8 @@ def krylov(grid, model, sfield, efield, var):
         Model; ``emg3d.utils.Model`` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
@@ -771,7 +777,8 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
         Model; ``emg3d.utils.Model`` instances.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     nu : int
         Number of Gauss-Seidel steps; odd numbers are forward, even numbers are
@@ -826,8 +833,8 @@ def restriction(grid, model, sfield, residual, sc_dir):
     model : Model
         Fine model; ``emg3d.utils.Model`` instances.
 
-    sfield : Field
-        Fine source field; ``emg3d.utils.Field`` instances.
+    sfield : SourceField
+        Fine source field; ``emg3d.utils.SourceField`` instances.
 
     sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
@@ -841,8 +848,8 @@ def restriction(grid, model, sfield, residual, sc_dir):
     cmodel : Model
         Coarse model; ``emg3d.utils.Model`` instances.
 
-    csfield : Field
-        Coarse source field; ``emg3d.utils.Field`` instances.
+    csfield : SourceField
+        Coarse source field; ``emg3d.utils.SourceField`` instances.
         Corresponds to the restriction of the fine-grid residual.
 
     cefield : Field
@@ -1014,7 +1021,8 @@ def residual(grid, model, sfield, efield, norm=False):
         Fine model; ``emg3d.utils.Model`` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     norm : bool
         If True, the error (l2-norm) of the residual is returned, not the
