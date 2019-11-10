@@ -15,8 +15,57 @@ is given in the chapter :doc:`theory`, and further literature is provided in
 the :doc:`references`.
 
 
-Example
--------
+Installation
+------------
+
+You can install emg3d either via ``conda``:
+
+.. code-block:: console
+
+   conda install -c conda-forge emg3d
+
+or via ``pip``:
+
+.. code-block:: console
+
+   pip install emg3d
+
+Required are Python version 3.7 or higher and the modules ``NumPy`` and
+``SciPy``, ``Numba``, and ``empymod``; ``discretize`` (from `SimPEG
+<https://simpeg.xyz>`_) is highly recommended.
+
+If you are new to Python we recommend using a Python distribution, which will
+ensure that all dependencies are met, specifically properly compiled versions
+of ``NumPy`` and ``SciPy``; we recommend using `Anaconda
+<https://www.anaconda.com/distribution>`_. If you install Anaconda you can
+simply start the *Anaconda Navigator*, add the channel ``conda-forge`` and
+``emg3d`` will appear in the package list and can be installed with a click.
+
+You should ensure that you have ``NumPy`` and ``SciPy`` installed with the
+Intel Math Kernel Library ``mkl``, as this makes quite a difference in terms of
+speed. You can check that by running
+
+.. code-block:: python
+
+    >>> import numpy as np
+    >>> np.show_config()
+
+The output should contain a lot of references to ``mkl``, and it should NOT
+contain references to ``blas``, ``lapack``, ``openblas``, or similar.
+
+
+The structure of emg3d is:
+
+- **solver.py**: The main multigrid solver routine, where
+  ``emg3d.solver.solver`` is the principal user-facing routine
+  (see :doc:`solver`).
+- **utils.py**: Utilities such as helper functions to create meshes, models,
+  and source fields.
+- **njitted.py**: The heavy calculations, all ``numba``-jitted functions.
+
+
+Basic Example
+-------------
 
 Here we show a *very* basic example. To see some more realistic models have a
 look at the `emg3d-examples <https://github.com/empymod/emg3d-examples>`_-repo
