@@ -1,8 +1,6 @@
 Maintainers Guide
 =================
 
-Releases of ``emg3d`` are currently done manually. This is the 'recipe'.
-
 
 Making a release
 ----------------
