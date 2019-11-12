@@ -79,10 +79,6 @@ or via ``pip``:
 
    pip install emg3d
 
-**NOTE** The install via ``conda install -c prisae emg3d`` is not possible
-since ``v0.9.0``; it will hopefully be soon possible via `` ``conda install -c
-conda-forge emg3d``.
-
 Required are Python version 3.7 or higher and the modules ``NumPy``, ``SciPy``,
 and ``numba``; ``discretize`` (from `SimPEG <https://simpeg.xyz>`_) is highly
 recommended.
