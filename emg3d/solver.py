@@ -365,6 +365,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         # source field.
         if efield.freq is None:
             efield._freq = sfield._freq
+            efield._sval = sfield._sval
             efield._smu0 = sfield._smu0
 
         # Set flag to NOT return the field.
@@ -677,8 +678,7 @@ def krylov(grid, model, sfield, efield, var):
         njitted.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, rfield.smu0, model.zeta, grid.hx, grid.hy,
-                grid.hz)
+                model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz)
 
         # Return Field instance.
         return -rfield
@@ -797,7 +797,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Collect Gauss-Seidel input (same for all routines)
     inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, sfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz, nu)
+           model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz, nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
@@ -1048,7 +1048,7 @@ def residual(grid, model, sfield, efield, norm=False):
     rfield = sfield.copy()
     njitted.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
-                   rfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz)
+                   model.zeta, grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
         return njitted.l2norm(rfield)

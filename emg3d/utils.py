@@ -766,6 +766,7 @@ def get_h_field(grid, model, field):
     # into account, as mu_r is volume-averaged.
     if model._mu_r is not None:
 
+        # Get volume-averaged values.
         vmodel = VolumeModel(grid, model, field)
 
         # Plus and minus indices.
@@ -1020,12 +1021,16 @@ class VolumeModel:
     def calculate_eta(name, grid, model, field):
         r"""eta: volume divided by resistivity."""
 
+        # Initiate eta
+        eta = field.smu0*grid.vol.reshape(grid.vnC, order='F')
+
+        # TODO : epsilon_r missing
+
         # If epsilon_r is not None, we use the full wave equation.
         if getattr(model, '_epsilon_r', None) is not None:
-            eta = grid.vol.reshape(grid.vnC, order='F')*(
-                    1./getattr(model, name) + field.sval*epsilon_0)
+            eta *= 1./getattr(model, name) + field.sval*epsilon_0
         else:
-            eta = grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
+            eta /= getattr(model, name)
 
         return eta
 

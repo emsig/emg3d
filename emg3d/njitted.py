@@ -33,8 +33,7 @@ _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 # LinearOperator to calculate A x
 @nb.njit(**_numba_setting)
-def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, smu0, zeta, hx, hy,
-           hz):
+def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
     r"""Residual without or with source term.
 
     Calculate the residual as given in [Muld06]_ in middle of the right column
@@ -84,11 +83,6 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, smu0, zeta, hx, hy,
         VolumeModel parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.VolumeModel`.
 
-    smu0 : float
-        Imaginary or real Laplace parameter 's' times mu_0, where
-        :math:`s=i\omega` if the calculation is in the frequency domain, or
-        simply :math:`s=f` in the Laplace domain.
-
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -137,7 +131,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, smu0, zeta, hx, hy,
                 v3pm = ((ey[ixp, iym, iz] - ey[ix, iym, iz])/hx[ix] -
                         (ex[ix, iy, iz] - ex[ix, iym, iz])/hy[iym])
 
-                # 2. Multiply by average of zeta [Muld06]_ p 636 bottom-left.
+                # 2. Multiply by average of mu_r [Muld06]_ p 636 bottom-left.
                 # u = M v = V mu_r^-1 v = V mu_r^-1 nabla x E
                 v1pp *= 0.5*(zeta[ixm, iy, iz] + zeta[ix, iy, iz])
                 v1mp *= 0.5*(zeta[ixm, iym, iz] + zeta[ix, iym, iz])
@@ -182,15 +176,15 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, smu0, zeta, hx, hy,
                 # -V (i omega mu_0 sigma~ E - nabla x mu_r^-1 nabla x E)
                 # Subtracting this from the source terms will yield the
                 # residual.
-                rx[ix, iy, iz] -= rrx - smu0*stx*ex[ix, iy, iz]
-                ry[ix, iy, iz] -= rry - smu0*sty*ey[ix, iy, iz]
-                rz[ix, iy, iz] -= rrz - smu0*stz*ez[ix, iy, iz]
+                rx[ix, iy, iz] -= rrx - stx*ex[ix, iy, iz]
+                ry[ix, iy, iz] -= rry - sty*ey[ix, iy, iz]
+                rz[ix, iy, iz] -= rrz - stz*ez[ix, iy, iz]
 
 
 # Gauss-Seidel method
 @nb.njit(**_numba_setting)
-def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
-                 hy, hz, nu):
+def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
+                 nu):
     r"""Gauss-Seidel method.
 
     Solves the linear equation system :math:`A x = b` iteratively using the
@@ -262,11 +256,6 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         VolumeModel parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.VolumeModel`.
 
-    smu0 : float
-        Imaginary or real Laplace parameter 's' times mu_0, where
-        :math:`s=i\omega` if the calculation is in the frequency domain, or
-        simply :math:`s=f` in the Laplace domain.
-
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -290,7 +279,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
     # Pre-allocating A for the six edges attached to one node; will be
     # overwritten at each iteration
-    amat = np.zeros(36, dtype=smu0.dtype)
+    amat = np.zeros(36, dtype=ex.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -382,7 +371,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
                     # Initial diagonal elements
                     for k in range(6):
-                        amat[6*k] = -smu0*st[k]
+                        amat[6*k] = -st[k]
 
                     # Complete diagonals
                     # A is symmetric and curl curl part is real-valued
@@ -492,8 +481,8 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
 
 @nb.njit(**_numba_setting)
-def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
-                   hy, hz, nu):
+def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
+                   hz, nu):
     r"""Gauss-Seidel method with line relaxation in x-direction.
 
     This is the equivalent to :func:`gauss_seidel`, but with line relaxation in
@@ -548,11 +537,6 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         VolumeModel parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.VolumeModel`.
 
-    smu0 : float
-        Imaginary or real Laplace parameter 's' times mu_0, where
-        :math:`s=i\omega` if the calculation is in the frequency domain, or
-        simply :math:`s=f` in the Laplace domain.
-
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -576,14 +560,14 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
     # Pre-allocating middle and left for the 5x5-temporary middle and left
     # matrices; will be overwritten at each iteration
-    middle = np.zeros(25, dtype=smu0.dtype)
+    middle = np.zeros(25, dtype=ex.dtype)
     left = np.zeros(25)
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete x-loop.
     nr = 5*nCx-4  # Number of unknowns
-    bvec = np.zeros(nr, dtype=smu0.dtype)
-    amat = np.zeros(6*nr, dtype=smu0.dtype)
+    bvec = np.zeros(nr, dtype=ex.dtype)
+    amat = np.zeros(6*nr, dtype=ex.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -668,7 +652,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
                     # Initial diagonal elements
                     for k in range(5):
-                        middle[6*k] = -smu0*st[k]
+                        middle[6*k] = -st[k]
 
                     # Complete diagonals.
                     # middle is symmetric and curl curl part is real-valued.
@@ -771,8 +755,8 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
 
 @nb.njit(**_numba_setting)
-def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
-                   hy, hz, nu):
+def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
+                   hz, nu):
     r"""Gauss-Seidel method with line relaxation in y-direction.
 
     This is the equivalent to :func:`gauss_seidel`, but with line relaxation in
@@ -832,11 +816,6 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         VolumeModel parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.VolumeModel`.
 
-    smu0 : float
-        Imaginary or real Laplace parameter 's' times mu_0, where
-        :math:`s=i\omega` if the calculation is in the frequency domain, or
-        simply :math:`s=f` in the Laplace domain.
-
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -860,14 +839,14 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
     # Pre-allocating middle and left for the 5x5-temporary middle and left
     # matrices; will be overwritten at each iteration
-    middle = np.zeros(25, dtype=smu0.dtype)
+    middle = np.zeros(25, dtype=ex.dtype)
     left = np.zeros(25)
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete y-loop.
     nr = 5*nCy-4  # Number of unknowns
-    bvec = np.zeros(nr, dtype=smu0.dtype)
-    amat = np.zeros(6*nr, dtype=smu0.dtype)
+    bvec = np.zeros(nr, dtype=ex.dtype)
+    amat = np.zeros(6*nr, dtype=ex.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -952,7 +931,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
                     # Initial diagonal elements
                     for k in range(5):
-                        middle[6*k] = -smu0*st[k]
+                        middle[6*k] = -st[k]
 
                     # Complete diagonals.
                     # middle is symmetric and curl curl part is real-valued.
@@ -1055,8 +1034,8 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
 
 @nb.njit(**_numba_setting)
-def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
-                   hy, hz, nu):
+def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
+                   hz, nu):
     r"""Gauss-Seidel method with line relaxation in z-direction.
 
     This is the equivalent to :func:`gauss_seidel`, but with line relaxation in
@@ -1111,11 +1090,6 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
         VolumeModel parameters (multiplied by volumes) as obtained from
         :func:`emg3d.utils.VolumeModel`.
 
-    smu0 : float
-        Imaginary or real Laplace parameter 's' times mu_0, where
-        :math:`s=i\omega` if the calculation is in the frequency domain, or
-        simply :math:`s=f` in the Laplace domain.
-
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
 
@@ -1139,14 +1113,14 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
     # Pre-allocating middle and left for the 5x5-temporary middle and left
     # matrices; will be overwritten at each iteration
-    middle = np.zeros(25, dtype=smu0.dtype)
+    middle = np.zeros(25, dtype=ex.dtype)
     left = np.zeros(25)
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete z-loop.
     nr = 5*nCz-4  # Number of unknowns
-    bvec = np.zeros(nr, dtype=smu0.dtype)
-    amat = np.zeros(6*nr, dtype=smu0.dtype)
+    bvec = np.zeros(nr, dtype=ex.dtype)
+    amat = np.zeros(6*nr, dtype=ex.dtype)
 
     # Smoothing steps
     for _ in range(nu):
@@ -1231,7 +1205,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, smu0, zeta, hx,
 
                     # Initial diagonal elements
                     for k in range(5):
-                        middle[6*k] = -smu0*st[k]
+                        middle[6*k] = -st[k]
 
                     # Complete diagonals.
                     # middle is symmetric and curl curl part is real-valued.

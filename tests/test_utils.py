@@ -434,7 +434,7 @@ def test_Model(capsys):
 
     model1._epsilon_r = 1e100  # Just set to 1 CURRENTLY.
     vmodel1b = utils.VolumeModel(grid, model1, sfield)
-    assert_allclose(vmodel1b.eta_x.real, vmodel1.eta_x)
+    assert_allclose(vmodel1b.eta_x, vmodel1.eta_x)
     assert np.iscomplex(vmodel1b.eta_x[0, 0, 0])
 
     # Using ints
@@ -498,9 +498,10 @@ def test_Model(capsys):
     assert_allclose(tres*5., model3.mu_r)
 
     # Check eta
-    eta_x = 1/model3.res_x*model3._vol
-    eta_y = 1/model3.res_y*model3._vol
-    eta_z = 1/model3.res_z*model3._vol
+    iomep = sfield.sval*utils.epsilon_0
+    eta_x = sfield.smu0*(1./model3.res_x + iomep)*model3._vol
+    eta_y = sfield.smu0*(1./model3.res_y + iomep)*model3._vol
+    eta_z = sfield.smu0*(1./model3.res_z + iomep)*model3._vol
     vmodel3 = utils.VolumeModel(grid, model3, sfield)
     assert_allclose(vmodel3.eta_x, eta_x)
     assert_allclose(vmodel3.eta_y, eta_y)

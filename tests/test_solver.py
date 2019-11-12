@@ -268,8 +268,7 @@ def test_smoothing():
 
         # Collect Gauss-Seidel input (same for all routines)
         inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
-               vmodel.eta_z, sfield.smu0, vmodel.zeta, grid.hx, grid.hy,
-               grid.hz, nu)
+               vmodel.eta_z, vmodel.zeta, grid.hx, grid.hy, grid.hz, nu)
 
         func = ['', '_x', '_y', '_z']
         for lr_dir in range(8):
@@ -380,8 +379,8 @@ def test_residual():
     rfield = sfield.copy()
     njitted.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
-            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, sfield.smu0, vmodel.zeta,
-            grid.hx, grid.hy, grid.hz)
+            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
+            grid.hy, grid.hz)
 
     # Calculate residual
     out = solver.residual(grid, vmodel, sfield, efield)
