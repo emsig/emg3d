@@ -417,6 +417,7 @@ def test_Model(capsys):
     sfield = utils.SourceField(grid, freq=1)
     model1 = utils.Model(grid, freq=1)
     model1.mu_r = None
+    model1.epsilon_r = None
     vmodel1 = utils.VolumeModel(grid, model1, sfield)
     out, _ = capsys.readouterr()
     assert '``Model`` does not take frequency' in out
@@ -425,6 +426,7 @@ def test_Model(capsys):
     assert_allclose(model1.vnC, grid.vnC)
     assert_allclose(vmodel1.eta_z, vmodel1.eta_y)
     assert model1.mu_r is None
+    assert model1.epsilon_r is None
 
     # Assert you can not set res_y nor res_z if not provided from the start.
     with pytest.raises(ValueError):
@@ -432,7 +434,7 @@ def test_Model(capsys):
     with pytest.raises(ValueError):
         model1.res_z = 2*model1.res_x
 
-    model1._epsilon_r = 1e100  # Just set to 1 CURRENTLY.
+    model1.epsilon_r = 1  # Just set to 1 CURRENTLY.
     vmodel1b = utils.VolumeModel(grid, model1, sfield)
     assert_allclose(vmodel1b.eta_x, vmodel1.eta_x)
     assert np.iscomplex(vmodel1b.eta_x[0, 0, 0])
@@ -459,6 +461,10 @@ def test_Model(capsys):
     vmodel2d = utils.VolumeModel(grid, model2d, sfield)
     assert_allclose(model2d.res_x, model2d.res_z)
     assert_allclose(vmodel2d.eta_z, vmodel2d.eta_x)
+
+    # Pure air, epsilon_r init with 0 => should be 1!
+    model6 = utils.Model(grid, 2e14)
+    assert_allclose(model6.epsilon_r, 1.0)
 
     # Check wrong shape
     with pytest.raises(ValueError):
@@ -492,10 +498,11 @@ def test_Model(capsys):
     model3.res_y = tres*3.0
     model3.res_z = tres*4.0
     model3.mu_r = tres*5.0
+    model3.epsilon_r = tres*6.0
     assert_allclose(tres*2., model3.res_x)
     assert_allclose(tres*3., model3.res_y)
     assert_allclose(tres*4., model3.res_z)
-    assert_allclose(tres*5., model3.mu_r)
+    assert_allclose(tres*6., model3.epsilon_r)
 
     # Check eta
     iomep = sfield.sval*utils.epsilon_0
@@ -513,9 +520,15 @@ def test_Model(capsys):
     vmodel4 = utils.VolumeModel(grid, model4, sfield)
     assert_allclose(vmodel4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
-    # Check a couple of failures
+    # Check a couple of out-of-range failures
     with pytest.raises(ValueError):
         _ = utils.Model(grid, res_x=res_x*0)
+    Model = utils.Model(grid, res_x=res_x)
+    with pytest.raises(ValueError):
+        Model._check_parameter(res_x*0, 'res_x')
+    Model._check_parameter(res_x*0, 'res_x', True)
+    with pytest.raises(ValueError):
+        Model._check_parameter(-1.0, 'res_x', True)
     with pytest.raises(ValueError):
         _ = utils.Model(grid, res_y=np.inf)
     with pytest.raises(ValueError):

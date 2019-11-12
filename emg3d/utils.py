@@ -802,13 +802,17 @@ def get_h_field(grid, model, field):
 
 # MODEL
 class Model:
-    r"""Create a resistivity model.
+    r"""Create a model instance.
 
-    Class to provide model parameters (x-, y-, and z-directed resistivities) to
-    the solver. Relative magnetic permeability :math:`\mu_r` is by default set
-    to one, but can be provided (isotropically). The multigrid method as
-    implemented in ``emg3d`` only works for the diffusive approximation, the
-    relative electric permittivity :math:`\varepsilon_r` is therefore set to 0.
+    Class to provide model parameters (x-, y-, and z-directed resistivities,
+    electric permittivity and magnetic permeability) to the solver. Relative
+    magnetic permeability :math:`\mu_\mathrm{r}` and electric permittivity
+    :math:`\varepsilon_\mathrm{r}` are by default set to one, but can be
+    provided (isotropically). Keep in mind that the multigrid method as
+    implemented in ``emg3d`` only works for the diffusive approximation. As
+    soon as the displacement-part in the Maxwell's equations becomes too
+    dominant it will fail (high frequencies or very high electric
+    permittivity).
 
 
     Parameters
@@ -820,16 +824,29 @@ class Model:
         Resistivity in x-, y-, and z-directions. If ndarray, they must have the
         shape of grid.vnC (F-ordered) or grid.nC.
 
-    mu_r : float or ndarray
+    mu_r : None, float, or ndarray
        Relative magnetic permeability (isotropic). If ndarray it must have the
        shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
        corresponds to 1., but avoids the calculation of zeta.
 
+    mu_r : None, float, or ndarray
+       Relative magnetic permeability (isotropic). If ndarray it must have the
+       shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
+       corresponds to 1., but avoids the calculation of zeta.
+
+    epsilon_r : None, float, or ndarray
+       Relative electric permittivity (isotropic). If ndarray it must have the
+       shape of grid.vnC (F-ordered) or grid.nC. If None, then the displacement
+       part is completely neglected (diffusive approximation). However, this
+       yields sometimes slower convergence rates because of the air layer. If
+       ``epsilon_r=0`` is provided, then it will be set to 0 everywhere except
+       for air (res>1e10), where it will be set to 1 (experimental feature).
+
     """
 
     def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=None,
-                 mu_r=None):
-        """Initiate a new resistivity model."""
+                 mu_r=None, epsilon_r=0.):
+        """Initiate a new model."""
 
         # Issue warning for backwards compatibility.
         if freq is not None:
@@ -843,37 +860,21 @@ class Model:
 
         # Check case.
         self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
-        if res_y is None and res_z is None:   # Isotropic (0).
+        if res_y is None and res_z is None:  # 0: Isotropic.
             self.case = 0
-        elif res_y is None or res_z is None:  # HTI (1) or VTI (2).
-            if res_z is None:
-                self.case = 1
-            else:
-                self.case = 2
-        else:                                 # Tri-axial anisotropy (3).
+        elif res_z is None:                  # 1: HTI.
+            self.case = 1
+        elif res_y is None:                  # 2: VTI.
+            self.case = 2
+        else:                                # 3: Tri-axial anisotropy.
             self.case = 3
 
-        # Initiate x-directed resistivity.
+        # Initiate all parameters.
         self._res_x = self._check_parameter(res_x, 'res_x')
-
-        # Initiate y-directed resistivity.
-        if self.case in [1, 3]:
-            self._res_y = self._check_parameter(res_y, 'res_y')
-
-        # Initiate z-directed resistivity.
-        if self.case in [2, 3]:
-            self._res_z = self._check_parameter(res_z, 'res_y')
-
-        # Store magnetic permeability.
-        if mu_r is None:
-            self._mu_r = mu_r
-        else:
-            self._mu_r = self._check_parameter(mu_r, 'mu_r')
-
-        # Currently a hidden feature:
-        # _epsilon_r = None => diffusive approximation.
-        # set it to a float > 0 to use full wave equation.
-        self._epsilon_r = None
+        self._res_y = self._check_parameter(res_y, 'res_y')
+        self._res_z = self._check_parameter(res_z, 'res_y')
+        self._mu_r = self._check_parameter(mu_r, 'mu_r')
+        self._epsilon_r = self._check_epsilon(epsilon_r)
 
     # RESISTIVITIES
     @property
@@ -936,13 +937,32 @@ class Model:
         else:
             self._mu_r = self._check_parameter(mu_r, 'mu_r')
 
+    # ELECTRIC PERMITTIVITIES
+    @property
+    def epsilon_r(self):
+        r"""Electric permittivity."""
+        return self._return_parameter(self._epsilon_r)
+
+    @epsilon_r.setter
+    def epsilon_r(self, epsilon_r):
+        r"""Update electric permittivity."""
+        if epsilon_r is None:
+            self._epsilon_r = None
+        else:
+            self._epsilon_r = self._check_epsilon(epsilon_r)
+
     # INTERNAL UTILITIES
-    def _check_parameter(self, var, name):
+    def _check_parameter(self, var, name, allow_0=False):
         """Check parameter.
 
         - Shape must be (), (1,), nC, or vnC.
         - Value(s) must be 0 < var < inf.
+        - If ``allow_0=True``, then it checks 0 <= var < inf.
         """
+
+        # If None, exit.
+        if var is None:
+            return None
 
         # Cast it to floats, ravel.
         var = np.array(var, dtype=float, copy=False).ravel('F')
@@ -953,9 +973,17 @@ class Model:
                   f"{self.nC}.\n             Provided: {var.shape}.")
             raise ValueError("Wrong Shape")
 
-        # Check 0 < val < inf.
-        if not np.all(var > 0) or not np.all(var < np.inf):
-            print(f"* ERROR   :: ``{name}`` must be all `0 < var < inf`.")
+        # Check 0 < val or 0 <= val.
+        if not allow_0 and not np.all(var > 0):
+            print(f"* ERROR   :: ``{name}`` must be all `0 < var`.")
+            raise ValueError("Parameter error")
+        elif allow_0 and not np.all(var >= 0):
+            print(f"* ERROR   :: ``{name}`` must be all `0 <= var`.")
+            raise ValueError("Parameter error")
+
+        # Check val < inf.
+        if not np.all(var < np.inf):
+            print(f"* ERROR   :: ``{name}`` must be all `var < inf`.")
             raise ValueError("Parameter error")
 
         return var
@@ -971,9 +999,58 @@ class Model:
         else:                # Else, has shape vnC.
             return var.reshape(self.vnC, order='F')
 
+    def _check_epsilon(self, epsilon_r):
+        """Diffusive vs full wave-equation check."""
+
+        # First check conventionally.
+        epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r', allow_0=True)
+
+        # If epsilon_r = 0, set it to 1 for air, where air is defined as
+        # res_x > 1e10 Ohm.m.
+        if epsilon_r.size == 1 and epsilon_r == 0:
+
+            # If res_x is a float set epsilon_r to a float too, otherwise vnC.
+            if self.res_x.size == 1 and self.res_x > 1e10:
+                epsilon_r = np.array(1.0)
+            elif self.res_x.size == 1:
+                epsilon_r = np.array(0.0)
+            else:
+                epsilon_r = np.zeros(self.vnC)
+                epsilon_r[self.res_x > 1e10] = 1.0
+
+        return epsilon_r.ravel('F')
+
 
 class VolumeModel:
-    # TODO  DOCUMENT, all parameters too.
+    r"""Return a volume-averaged version of provided model.
+
+    Takes a Model instance and returns the volume averaged values. This is used
+    by the solver internally.
+
+    .. math::
+
+        \eta_{\{x,y,z\}} = -V\mathrm{i}\omega\mu_0
+              \left(\rho^{-1}_{\{x,y,z\}} + \mathrm{i}\omega\varepsilon\right)
+
+    .. math::
+
+        \zeta = V\mu_\mathrm{r}^{-1}
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Grid on which to apply model.
+
+    model : Model
+        Model to transform to volume-averaged values.
+
+    sfield : SourceField
+       A VolumeModel is frequency-dependent. The frequency-information is taken
+       from the provided source filed.
+
+    """
+
     def __init__(self, grid, model, sfield):
         """Initiate a new model with volume-averaged properties."""
 
@@ -1028,21 +1105,24 @@ class VolumeModel:
         # Initiate eta
         eta = field.smu0*grid.vol.reshape(grid.vnC, order='F')
 
-        # TODO : epsilon_r missing
-
-        # If epsilon_r is not None, we use the full wave equation.
-        if getattr(model, '_epsilon_r', None) is not None:
-            eta *= 1./getattr(model, name) + field.sval*epsilon_0
-        else:
+        # Calculate eta depending on epsilon.
+        if model.epsilon_r is None:  # Diffusive approximation.
             eta /= getattr(model, name)
+
+        else:
+            eps_term = field.sval*epsilon_0*model.epsilon_r
+            sig_term = 1./getattr(model, name)
+            eta *= sig_term + eps_term
 
         return eta
 
     @staticmethod
     def calculate_zeta(name, grid, model):
         r"""zeta: volume divided by mu_r."""
+
         if getattr(model, name, None) is None:
             return grid.vol.reshape(grid.vnC, order='F')
+
         else:
             return grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
 
