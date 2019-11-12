@@ -409,7 +409,7 @@ def get_source_field(grid, src, freq, strength=0):
 
     """
     # Cast some parameters.
-    src = np.array(src, dtype=float, copy=False)
+    src = np.asarray(src, dtype=float)
     strength = float(strength)
 
     # Ensure source is a point or a finite dipole.
@@ -874,7 +874,7 @@ class Model:
         self._res_y = self._check_parameter(res_y, 'res_y')
         self._res_z = self._check_parameter(res_z, 'res_y')
         self._mu_r = self._check_parameter(mu_r, 'mu_r')
-        self._epsilon_r = self._check_epsilon(epsilon_r)
+        self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r', True)
 
     # RESISTIVITIES
     @property
@@ -941,7 +941,27 @@ class Model:
     @property
     def epsilon_r(self):
         r"""Electric permittivity."""
-        return self._return_parameter(self._epsilon_r)
+        # Get epsilon.
+        epsilon_r = self._return_parameter(self._epsilon_r)
+
+        # If None, return.
+        if epsilon_r is None:
+            return None
+
+        # If epsilon_r = 0, set it to 1 for air, where air is defined as
+        # res_x > 1e10 Ohm.m.
+        if epsilon_r.size == 1 and epsilon_r == 0:
+
+            # If res_x is a float set epsilon_r to a float too, otherwise vnC.
+            if self.res_x.size == 1 and self.res_x > 1e10:
+                epsilon_r = np.array(1.0)
+            elif self.res_x.size == 1:
+                epsilon_r = np.array(0.0)
+            else:
+                epsilon_r = np.zeros(self.vnC)
+                epsilon_r[self.res_x > 1e10] = 1.0
+
+        return epsilon_r
 
     @epsilon_r.setter
     def epsilon_r(self, epsilon_r):
@@ -949,7 +969,8 @@ class Model:
         if epsilon_r is None:
             self._epsilon_r = None
         else:
-            self._epsilon_r = self._check_epsilon(epsilon_r)
+            self._epsilon_r = self._check_parameter(
+                    epsilon_r, 'epsilon_r', True)
 
     # INTERNAL UTILITIES
     def _check_parameter(self, var, name, allow_0=False):
@@ -965,7 +986,7 @@ class Model:
             return None
 
         # Cast it to floats, ravel.
-        var = np.array(var, dtype=float, copy=False).ravel('F')
+        var = np.asarray(var, dtype=float).ravel('F')
 
         # Check for wrong size.
         if var.size not in [1, self.nC]:
@@ -998,27 +1019,6 @@ class Model:
             return var
         else:                # Else, has shape vnC.
             return var.reshape(self.vnC, order='F')
-
-    def _check_epsilon(self, epsilon_r):
-        """Diffusive vs full wave-equation check."""
-
-        # First check conventionally.
-        epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r', allow_0=True)
-
-        # If epsilon_r = 0, set it to 1 for air, where air is defined as
-        # res_x > 1e10 Ohm.m.
-        if epsilon_r.size == 1 and epsilon_r == 0:
-
-            # If res_x is a float set epsilon_r to a float too, otherwise vnC.
-            if self.res_x.size == 1 and self.res_x > 1e10:
-                epsilon_r = np.array(1.0)
-            elif self.res_x.size == 1:
-                epsilon_r = np.array(0.0)
-            else:
-                epsilon_r = np.zeros(self.vnC)
-                epsilon_r[self.res_x > 1e10] = 1.0
-
-        return epsilon_r.ravel('F')
 
 
 class VolumeModel:
