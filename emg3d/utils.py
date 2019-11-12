@@ -879,7 +879,7 @@ class Model:
     @property
     def res_x(self):
         r"""Resistivity in x-direction."""
-        return self._res_x
+        return self._return_parameter(self._res_x)
 
     @res_x.setter
     def res_x(self, res):
@@ -890,9 +890,9 @@ class Model:
     def res_y(self):
         r"""Resistivity in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self._res_y
+            return self._return_parameter(self._res_y)
         else:                    # Return res_x.
-            return self._res_x
+            return self._return_parameter(self._res_x)
 
     @res_y.setter
     def res_y(self, res):
@@ -908,9 +908,9 @@ class Model:
     def res_z(self):
         r"""Resistivity in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self._res_z
+            return self._return_parameter(self._res_z)
         else:                    # Return res_x.
-            return self._res_x
+            return self._return_parameter(self._res_x)
 
     @res_z.setter
     def res_z(self, res):
@@ -926,7 +926,7 @@ class Model:
     @property
     def mu_r(self):
         r"""Magnetic permeability."""
-        return self._mu_r
+        return self._return_parameter(self._mu_r)
 
     @mu_r.setter
     def mu_r(self, mu_r):
@@ -944,18 +944,11 @@ class Model:
         - Value(s) must be 0 < var < inf.
         """
 
-        # Cast it to floats.
-        var = np.array(var, dtype=float, copy=False)
+        # Cast it to floats, ravel.
+        var = np.array(var, dtype=float, copy=False).ravel('F')
 
-        # Float is good, correct shape is good too.
-        good = (var.size == 1)
-        good = good or (np.all(var.shape == self.vnC) and var.ndim == 3)
-
-        # Correct size but wrong shape => re-arrange.
-        if var.shape == (self.nC, ):
-            var = var.reshape(self.vnC, order='F')
-
-        elif not good:
+        # Check for wrong size.
+        if var.size not in [1, self.nC]:
             print(f"* ERROR   :: Shape of {name} must be (), {self.vnC}, or "
                   f"{self.nC}.\n             Provided: {var.shape}.")
             raise ValueError("Wrong Shape")
@@ -966,6 +959,17 @@ class Model:
             raise ValueError("Parameter error")
 
         return var
+
+    def _return_parameter(self, var):
+        """Return parameter as float or shape vnC."""
+
+        # Return depending on value and size.
+        if var is None:      # Because of mu_r, epsilon_r.
+            return None
+        elif var.size == 1:  # In case of float.
+            return var
+        else:                # Else, has shape vnC.
+            return var.reshape(self.vnC, order='F')
 
 
 class VolumeModel:
