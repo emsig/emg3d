@@ -29,14 +29,6 @@ from emg3d.utils import Report
 
 __all__ = ['solver', 'utils', 'Report']
 
-# Version
-try:
-    # - Released versions just tags:       0.8.0
-    # - GitHub commits add .dev#+hash:     0.8.1.dev4+g2785721
-    # - Uncommitted changes add timestamp: 0.8.1.dev4+g2785721.d20191022
-    from emg3d.version import version as __version__
-except ImportError:
-    # If it was not installed, then we don't know the version. We could throw a
-    # warning here, but this case *should* be rare. emg3d should be installed
-    # properly!
-    __version__ = 'unknown-'+utils.datetime.today().strftime('%Y%m%d')
+# Version is sorted out in utils, so we can easier use it within the package
+# itself.
+__version__ = utils.__version__

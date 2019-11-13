@@ -2,6 +2,36 @@ Changelog
 #########
 
 
+*v0.9.1* : VolumeModel
+----------------------
+
+**2019-11-13**
+
+- New class ``VolumeModel``; changes in ``Model``:
+
+  - ``Model`` now only contains resistivity, magnetic permeability, and
+    electric permittivity.
+  - ``VolumeModel`` contains the volume-averaged values eta and zeta; called
+    from within ``emg3d.solver.solver``.
+    - Full wave equation is enabled again, via ``epsilon_r``; by default it is
+      set to None, hence diffusive approximation.
+    - Model parameters are now internally stored as 1D arrays.
+    - An {isotropic, VTI, HTI} initiated model can be changed by providing the
+      missing resistivities.
+
+- Bugfix: Up and till version 0.8.1 there was a bug. If resistivity was set
+  with slices, e.g., ``model.res[:, :, :5]=1e10``, it DID NOT update the
+  corresponding eta. This bug was unintentionally fixed in 0.9.0, but only
+  realised now.
+
+- Various:
+
+    - The log now lists the version of emg3d.
+    - PEP8: internal imports now use absolute paths instead of relative ones.
+    - Move from conda-channel ``prisae`` to ``conda-forge``.
+    - Automatic deploy for PyPi and conda-forge.
+
+
 *v0.9.0* : Fourier
 ------------------
 

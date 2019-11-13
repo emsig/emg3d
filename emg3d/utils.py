@@ -45,6 +45,20 @@ except ImportError:
             print("\n* WARNING :: `emg3d.Report` requires `scooby`."
                   "\n             Install it via `pip install scooby`.\n")
 
+# Version: We take care of it here instead of in __init__, so we can use it
+# within the package itself (logs).
+try:
+    # - Released versions just tags:       0.8.0
+    # - GitHub commits add .dev#+hash:     0.8.1.dev4+g2785721
+    # - Uncommitted changes add timestamp: 0.8.1.dev4+g2785721.d20191022
+    from emg3d.version import version as __version__
+except ImportError:
+    # If it was not installed, then we don't know the version. We could throw a
+    # warning here, but this case *should* be rare. emg3d should be installed
+    # properly!
+    __version__ = 'unknown-'+datetime.today().strftime('%Y%m%d')
+
+
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'TensorMesh',
            'get_hx_h0', 'get_cell_numbers', 'get_stretched_h', 'get_domain',
