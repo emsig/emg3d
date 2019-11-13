@@ -23,9 +23,9 @@ sped-up through jitted ``numba``-functions.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from . import utils
-from . import solver
-from .utils import Report
+from emg3d import utils
+from emg3d import solver
+from emg3d.utils import Report
 
 __all__ = ['solver', 'utils', 'Report']
 
@@ -34,7 +34,7 @@ try:
     # - Released versions just tags:       0.8.0
     # - GitHub commits add .dev#+hash:     0.8.1.dev4+g2785721
     # - Uncommitted changes add timestamp: 0.8.1.dev4+g2785721.d20191022
-    from .version import version as __version__
+    from emg3d.version import version as __version__
 except ImportError:
     # If it was not installed, then we don't know the version. We could throw a
     # warning here, but this case *should* be rare. emg3d should be installed
