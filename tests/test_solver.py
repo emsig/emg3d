@@ -43,6 +43,11 @@ def test_solver_homogeneous(capsys):
     assert ' Final rel. error ' in out
     assert ' emg3d END   :: ' in out
 
+    # Experimental:
+    # Check if norms are also the same, at least for first two cycles.
+    assert "1.509e-01  after   1 F-cycles   [9.161e-07, 0.151]   0 0" in out
+    assert "1.002e-01  after   2 F-cycles   [6.082e-07, 0.664]   0 0" in out
+
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['Fresult'], efield)
 
