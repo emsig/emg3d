@@ -1084,7 +1084,7 @@ class VolumeModel:
         else:
             eps_term = field.sval*epsilon_0*model.epsilon_r
             sig_term = 1./getattr(model, name)
-            eta *= sig_term + eps_term
+            eta *= sig_term - eps_term
 
         return eta
 
