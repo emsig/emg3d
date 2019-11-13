@@ -416,6 +416,7 @@ def test_Model(capsys):
     # Using defaults; check backwards compatibility for freq.
     sfield = utils.SourceField(grid, freq=1)
     model1 = utils.Model(grid, freq=1)
+    model1e = utils.Model(grid, freq=1)
     model1.mu_r = None
     model1.epsilon_r = None
     vmodel1 = utils.VolumeModel(grid, model1, sfield)
@@ -428,11 +429,19 @@ def test_Model(capsys):
     assert model1.mu_r is None
     assert model1.epsilon_r is None
 
-    # Assert you can not set res_y nor res_z if not provided from the start.
-    with pytest.raises(ValueError):
-        model1.res_y = 2*model1.res_x
-    with pytest.raises(ValueError):
-        model1.res_z = 2*model1.res_x
+    # Assert that the cases changes if we assign y- and z- resistivities (I).
+    model1.res_x = model1.res_x
+    assert model1.case == 0
+    model1.res_y = 2*model1.res_x
+    assert model1.case == 1
+    model1.res_z = 2*model1.res_x
+    assert model1.case == 3
+
+    assert model1e.case == 0
+    model1e.res_z = 2*model1.res_x
+    assert model1e.case == 2
+    model1e.res_y = 2*model1.res_x
+    assert model1e.case == 3
 
     model1.epsilon_r = 1  # Just set to 1 CURRENTLY.
     vmodel1b = utils.VolumeModel(grid, model1, sfield)
@@ -464,7 +473,7 @@ def test_Model(capsys):
 
     # Pure air, epsilon_r init with 0 => should be 1!
     model6 = utils.Model(grid, 2e14)
-    assert_allclose(model6.epsilon_r, 1.0)
+    assert model6.epsilon_r is None
 
     # Check wrong shape
     with pytest.raises(ValueError):
@@ -494,8 +503,9 @@ def test_Model(capsys):
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
-    model3.res_x = tres*2.0
-    model3.res_y = tres*3.0
+    model3.res_x[:, :, :] = tres*2.0
+    model3.res_y[:, :1, :] = tres[:, :1, :]*3.0
+    model3.res_y[:, 1:, :] = tres[:, 1:, :]*3.0
     model3.res_z = tres*4.0
     model3.mu_r = tres*5.0
     model3.epsilon_r = tres*6.0
@@ -526,9 +536,8 @@ def test_Model(capsys):
     Model = utils.Model(grid, res_x=res_x)
     with pytest.raises(ValueError):
         Model._check_parameter(res_x*0, 'res_x')
-    Model._check_parameter(res_x*0, 'res_x', True)
     with pytest.raises(ValueError):
-        Model._check_parameter(-1.0, 'res_x', True)
+        Model._check_parameter(-1.0, 'res_x')
     with pytest.raises(ValueError):
         _ = utils.Model(grid, res_y=np.inf)
     with pytest.raises(ValueError):

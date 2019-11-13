@@ -806,12 +806,12 @@ class Model:
 
     Class to provide model parameters (x-, y-, and z-directed resistivities,
     electric permittivity and magnetic permeability) to the solver. Relative
-    magnetic permeability :math:`\mu_\mathrm{r}` and electric permittivity
-    :math:`\varepsilon_\mathrm{r}` are by default set to one, but can be
-    provided (isotropically). Keep in mind that the multigrid method as
-    implemented in ``emg3d`` only works for the diffusive approximation. As
-    soon as the displacement-part in the Maxwell's equations becomes too
-    dominant it will fail (high frequencies or very high electric
+    magnetic permeability :math:`\mu_\mathrm{r}` is by default set to one and
+    electric permittivity :math:`\varepsilon_\mathrm{r}` is by default set to
+    zero, but they can also be provided (isotropically). Keep in mind that the
+    multigrid method as implemented in ``emg3d`` only works for the diffusive
+    approximation. As soon as the displacement-part in the Maxwell's equations
+    becomes too dominant it will fail (high frequencies or very high electric
     permittivity).
 
 
@@ -822,30 +822,26 @@ class Model:
 
     res_x, res_y, res_z : float or ndarray; default to 1.
         Resistivity in x-, y-, and z-directions. If ndarray, they must have the
-        shape of grid.vnC (F-ordered) or grid.nC.
+        shape of grid.vnC (F-ordered) or grid.nC. Resistivities have to be
+        bigger than zero and smaller than infinity.
 
     mu_r : None, float, or ndarray
-       Relative magnetic permeability (isotropic). If ndarray it must have the
-       shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
-       corresponds to 1., but avoids the calculation of zeta.
-
-    mu_r : None, float, or ndarray
-       Relative magnetic permeability (isotropic). If ndarray it must have the
-       shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
-       corresponds to 1., but avoids the calculation of zeta.
+        Relative magnetic permeability (isotropic). If ndarray it must have the
+        shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
+        corresponds to 1., but avoids the calculation of zeta. Magnetic
+        permeability has to be bigger than zero and smaller than infinity.
 
     epsilon_r : None, float, or ndarray
        Relative electric permittivity (isotropic). If ndarray it must have the
-       shape of grid.vnC (F-ordered) or grid.nC. If None, then the displacement
-       part is completely neglected (diffusive approximation). However, this
-       yields sometimes slower convergence rates because of the air layer. If
-       ``epsilon_r=0`` is provided, then it will be set to 0 everywhere except
-       for air (res>1e10), where it will be set to 1 (experimental feature).
+       shape of grid.vnC (F-ordered) or grid.nC. The displacement part is
+       completely neglected (diffusive approximation) if set to None, which is
+       the default. Electric permittivity has to be bigger than zero and
+       smaller than infinity.
 
     """
 
     def __init__(self, grid, res_x=1., res_y=None, res_z=None, freq=None,
-                 mu_r=None, epsilon_r=0.):
+                 mu_r=None, epsilon_r=None):
         """Initiate a new model."""
 
         # Issue warning for backwards compatibility.
@@ -872,9 +868,9 @@ class Model:
         # Initiate all parameters.
         self._res_x = self._check_parameter(res_x, 'res_x')
         self._res_y = self._check_parameter(res_y, 'res_y')
-        self._res_z = self._check_parameter(res_z, 'res_y')
+        self._res_z = self._check_parameter(res_z, 'res_z')
         self._mu_r = self._check_parameter(mu_r, 'mu_r')
-        self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r', True)
+        self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
 
     # RESISTIVITIES
     @property
@@ -898,12 +894,15 @@ class Model:
     @res_y.setter
     def res_y(self, res):
         r"""Update resistivity in y-direction."""
-        if self.case in [1, 3]:  # HTI or tri-axial.
-            self._res_y = self._check_parameter(res, 'res_y')
-        else:
-            print("Cannot set res_y, as resistivity model is "
-                  f"{self.case_names[self.case]}.")
-            raise ValueError
+
+        # Adjust case in case res_z was not set so far.
+        if self.case == 0:  # If it was isotropic, it is HTI now.
+            self.case = 1
+        elif self.case == 2:  # If it was VTI, it is tri-axial now.
+            self.case = 3
+
+        # Update it.
+        self._res_y = self._check_parameter(res, 'res_y')
 
     @property
     def res_z(self):
@@ -916,12 +915,15 @@ class Model:
     @res_z.setter
     def res_z(self, res):
         r"""Update resistivity in z-direction."""
-        if self.case in [2, 3]:  # VTI or tri-axial.
-            self._res_z = self._check_parameter(res, 'res_z')
-        else:
-            print("Cannot set res_z, as resistivity model is "
-                  f"{self.case_names[self.case]}.")
-            raise ValueError
+
+        # Adjust case in case res_z was not set so far.
+        if self.case == 0:  # If it was isotropic, it is VTI now.
+            self.case = 2
+        elif self.case == 1:  # If it was HTI, it is tri-axial now.
+            self.case = 3
+
+        # Update it.
+        self._res_z = self._check_parameter(res, 'res_z')
 
     # MAGNETIC PERMEABILITIES
     @property
@@ -932,53 +934,26 @@ class Model:
     @mu_r.setter
     def mu_r(self, mu_r):
         r"""Update magnetic permeability."""
-        if mu_r is None:
-            self._mu_r = None
-        else:
-            self._mu_r = self._check_parameter(mu_r, 'mu_r')
+        self._mu_r = self._check_parameter(mu_r, 'mu_r')
 
     # ELECTRIC PERMITTIVITIES
     @property
     def epsilon_r(self):
         r"""Electric permittivity."""
         # Get epsilon.
-        epsilon_r = self._return_parameter(self._epsilon_r)
-
-        # If None, return.
-        if epsilon_r is None:
-            return None
-
-        # If epsilon_r = 0, set it to 1 for air, where air is defined as
-        # res_x > 1e10 Ohm.m.
-        if epsilon_r.size == 1 and epsilon_r == 0:
-
-            # If res_x is a float set epsilon_r to a float too, otherwise vnC.
-            if self.res_x.size == 1 and self.res_x > 1e10:
-                epsilon_r = np.array(1.0)
-            elif self.res_x.size == 1:
-                epsilon_r = np.array(0.0)
-            else:
-                epsilon_r = np.zeros(self.vnC)
-                epsilon_r[self.res_x > 1e10] = 1.0
-
-        return epsilon_r
+        return self._return_parameter(self._epsilon_r)
 
     @epsilon_r.setter
     def epsilon_r(self, epsilon_r):
         r"""Update electric permittivity."""
-        if epsilon_r is None:
-            self._epsilon_r = None
-        else:
-            self._epsilon_r = self._check_parameter(
-                    epsilon_r, 'epsilon_r', True)
+        self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
 
     # INTERNAL UTILITIES
-    def _check_parameter(self, var, name, allow_0=False):
+    def _check_parameter(self, var, name):
         """Check parameter.
 
         - Shape must be (), (1,), nC, or vnC.
         - Value(s) must be 0 < var < inf.
-        - If ``allow_0=True``, then it checks 0 <= var < inf.
         """
 
         # If None, exit.
@@ -995,11 +970,8 @@ class Model:
             raise ValueError("Wrong Shape")
 
         # Check 0 < val or 0 <= val.
-        if not allow_0 and not np.all(var > 0):
+        if not np.all(var > 0):
             print(f"* ERROR   :: ``{name}`` must be all `0 < var`.")
-            raise ValueError("Parameter error")
-        elif allow_0 and not np.all(var >= 0):
-            print(f"* ERROR   :: ``{name}`` must be all `0 <= var`.")
             raise ValueError("Parameter error")
 
         # Check val < inf.
