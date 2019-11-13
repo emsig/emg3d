@@ -29,8 +29,8 @@ import numpy as np
 import scipy.sparse.linalg as ssl
 from dataclasses import dataclass
 
-from . import utils
-from . import njitted
+from emg3d import utils
+from emg3d import njitted
 
 __all__ = ['solver', 'multigrid', 'smoothing', 'restriction', 'prolongation',
            'residual', 'krylov', 'MGParameters', 'RegularGridProlongator']

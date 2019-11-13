@@ -1,80 +1,29 @@
 Maintainers Guide
 =================
 
-Releases of ``emg3d`` are currently done manually. This is the 'recipe'.
-
 
 Making a release
 ----------------
 
 1. Update ``CHANGELOG.rst``.
 
-2. Remove any old stuff (just in case)::
+2. Push it to GitHub, create a release tagging it.
 
-       rm -rf build/ dist/ emg3d.egg-info/
+3. Tagging it on GitHub will automatically deploy it to PyPi, which in turn
+   will create a PR for the conda-forge `feedstock
+   <https://github.com/conda-forge/emg3d-feedstock>`_. Merge that PR.
 
-3. Push it to GitHub, create a release tagging it
-   (ensure correct tag is in local home with ``python setup.py --version``).
-
-4. Get the Zenodo-DOI and add it to release notes; also RTFD, which might have
-   to be triggered first.
-
-5. Create tar and wheel::
-
-       python setup.py sdist
-       python setup.py bdist_wheel
-
-6. Push it to PyPi (requires ~/.pypircs)::
-
-       ~/anaconda3/bin/twine upload dist/*
-
-7. ``conda`` build:
-
-   Has to be done outside of ~/, because conda skeleton cannot handle, at the
-   moment, the encrypted home. Also, ensure you leave any current conda
-   environment with ``conda deactivate``.
-
-
-   1. Install miniconda in /opt::
-
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-          bash miniconda.sh -b -p /opt/miniconda/miniconda
-          export PATH="/opt/miniconda/miniconda/bin:$PATH"
-          conda update conda
-          conda install -y conda-build anaconda-client
-          conda config --set anaconda_upload yes
-          anaconda login
-
-   2. Create the skeleton for conda from PyPi::
-
-          conda skeleton pypi emg3d
-
-      Edit the ``emg3d/meta.yml`` in the following way:
-
-      - under ``build:``, add ``preserve_egg_dir: True``
-      - under ``requirement: host:``, add ``- setuptools_scm``
-
-   3. Now to the conda-build part::
-
-          conda build --python 3.7 emg3d
-
-   4. Convert for all platforms::
-
-          conda convert --platform all /opt/miniconda/miniconda/conda-bld/linux-64/emg3d-[version]-py37_0.tar.bz2
-
-   5. Upload them::
-
-          anaconda upload osx-64/*
-          anaconda upload win-*/*
-          anaconda upload linux-32/*
-
-   6. Logout::
-
-          anaconda logout
+4. Release notes edits: (1) get and add the `Zenodo-DOI
+   <https://doi.org/10.5281/zenodo.3229006>`_; (b) add the readthedocs badge,
+   you might have to trigger a build first.
 
 
 Useful things
 -------------
+
+- If there were changes to README, check it with::
+
+       python setup.py --long-description | rst2html.py --no-raw > index.html
 
 - If unsure, test it first on testpypi (requires ~/.pypirc)::
 
@@ -83,10 +32,6 @@ Useful things
 - If unsure, test the test-pypi for conda if the skeleton builds::
 
        conda skeleton pypi --pypi-url https://test.pypi.io/pypi/ emg3d
-
-- If there were changes to README, check it with::
-
-       python setup.py --long-description | rst2html.py --no-raw > index.html
 
 - If it fails, you might have to install ``python3-setuptools``::
 
@@ -110,11 +55,10 @@ CI
 - DOI minting on `Zenodo <https://doi.org/10.5281/zenodo.3229006>`_
 - Benchmarks with `Airspeed Velocity <https://empymod.github.io/emg3d-asv>`_
   (``asv``) [currently manually]
-- Examples in `emg3d-examples <https://github.com/empymod/emg3d-examples>`_;
-  should move to a sphinx-gallery instance (`#45
-  <https://github.com/empymod/emg3d/issues/45>`_) [currently manually]
-- deploy (`#43 <https://github.com/empymod/emg3d/issues/43>`_)
+- Examples in `emg3d-examples <https://github.com/empymod/emg3d-examples>`_
+  [currently manually] => should move to a sphinx-gallery instance (`#45
+  <https://github.com/empymod/emg3d/issues/45>`_)
+- Automatically deploys if tagged:
 
-  - `PyPi <https://pypi.org/project/emg3d>`_ [currently manually]
-  - `conda -c prisae <https://anaconda.org/prisae/emg3d>`_; should move to
-    conda-forge [currently manually]
+  - `PyPi <https://pypi.org/project/emg3d>`_
+  - `conda -c conda-forge <https://anaconda.org/conda-forge/emg3d>`_

@@ -34,7 +34,7 @@ from scipy import optimize, interpolate, ndimage
 from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
-from . import njitted
+from emg3d import njitted
 
 # scooby is a soft dependency for emg3d
 try:
