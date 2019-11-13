@@ -84,7 +84,7 @@ Required are Python version 3.7 or higher and the modules ``NumPy``, ``SciPy``,
 ``numba``, and ``empymod``; ``discretize`` (from `SimPEG
 <https://simpeg.xyz>`_) is highly recommended. Consult the installation notes
 in the `manual
-<https://empymod.readthedocs.io/en/stable/usage.html#installation>`_ for more
+<https://emg3d.readthedocs.io/en/stable/usage.html#installation>`_ for more
 information regarding installation and requirements.
 
 
