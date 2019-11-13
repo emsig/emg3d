@@ -72,10 +72,10 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     model : Model
         Model; ``emg3d.utils.Model`` instance.
 
-    sfield : Field instance
-        Source field; ``emg3d.utils.Field`` instance.
+    sfield : SourceField
+        Source field; ``emg3d.utils.SourceField`` instance.
 
-    efield : Field instance, optional
+    efield : Field, optional
         Initial electric field; ``emg3d.utils.Field`` instance. It is
         initiated with zeroes if not provided. A provided efield MUST have
         frequency information (initiated with ``emg3d.utils.Field(...,
@@ -334,6 +334,16 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Calculate reference error for tolerance.
     var.l2_refe = njitted.l2norm(sfield)
 
+    # Check sfield and get efield
+    if sfield.freq is None:
+        print("* ERROR   :: Source field is missing frequency information;\n  "
+              "           Create it with ``emg3d.utils.get_source_field``, or"
+              "\n             initiate it with ``emg3d.utils.SourceField``.")
+        raise ValueError('Input data types')
+
+    # Get volume-averaged model values.
+    vmodel = utils.VolumeModel(grid, model, sfield)
+
     # Get efield
     if efield is None:
         # If not provided, initiate an empty one.
@@ -351,18 +361,18 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
                   f"efield: {efield.dtype}.")
             raise ValueError('Input data types')
 
-        # Ensure provided efield has frequency information.
+        # If provided efield is missing frequency information, add it from the
+        # source field.
         if efield.freq is None:
-            print("* ERROR   :: Provided electric field must contain "
-                  "frequency information.;\n             Initiate it with "
-                  f"``emg3d.utils.Field(..., freq)``.")
-            raise ValueError('Input data types')
+            efield._freq = sfield._freq
+            efield._sval = sfield._sval
+            efield._smu0 = sfield._smu0
 
         # Set flag to NOT return the field.
         var.do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
-        var.l2 = residual(grid, model, sfield, efield, True)
+        var.l2 = residual(grid, vmodel, sfield, efield, True)
         if var.l2 < var.tol*var.l2_refe:
 
             # Switch-off both sslsolver and multigrid.
@@ -385,9 +395,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
-        krylov(grid, model, sfield, efield, var)
+        krylov(grid, vmodel, sfield, efield, var)
     elif var.cycle:    # ... multigrid.
-        multigrid(grid, model, sfield, efield, var)
+        multigrid(grid, vmodel, sfield, efield, var)
 
     # Print runtime information.
     if var.sslsolver:  # sslsolver-specific info.
@@ -446,11 +456,12 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     grid : TensorMesh
         Model grid; ``emg3d.utils.TensorMesh`` instance.
 
-    model : Model
-        Model; ``emg3d.utils.Model`` instance.
+    model : VolumeModel
+        Model; ``emg3d.utils.VolumeModel`` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
@@ -612,11 +623,12 @@ def krylov(grid, model, sfield, efield, var):
     grid : TensorMesh
         Model grid; ``emg3d.utils.TensorMesh`` instance.
 
-    model : Model
-        Model; ``emg3d.utils.Model`` instance.
+    model : VolumeModel
+        Model; ``emg3d.utils.VolumeModel`` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
@@ -666,8 +678,7 @@ def krylov(grid, model, sfield, efield, var):
         njitted.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, rfield.smu0, model.zeta, grid.hx, grid.hy,
-                grid.hz)
+                model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz)
 
         # Return Field instance.
         return -rfield
@@ -767,11 +778,12 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     grid : TensorMesh
         Model grid; ``emg3d.utils.TensorMesh`` instance.
 
-    model : Model
-        Model; ``emg3d.utils.Model`` instances.
+    model : VolumeModel
+        Model; ``emg3d.utils.VolumeModel`` instances.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     nu : int
         Number of Gauss-Seidel steps; odd numbers are forward, even numbers are
@@ -785,7 +797,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Collect Gauss-Seidel input (same for all routines)
     inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, sfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz, nu)
+           model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz, nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
@@ -823,11 +835,11 @@ def restriction(grid, model, sfield, residual, sc_dir):
     grid : TensorMesh
         Fine grid; ``emg3d.utils.TensorMesh`` instances.
 
-    model : Model
-        Fine model; ``emg3d.utils.Model`` instances.
+    model : VolumeModel
+        Fine model; ``emg3d.utils.VolumeModel`` instances.
 
-    sfield : Field
-        Fine source field; ``emg3d.utils.Field`` instances.
+    sfield : SourceField
+        Fine source field; ``emg3d.utils.SourceField`` instances.
 
     sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
@@ -838,11 +850,11 @@ def restriction(grid, model, sfield, residual, sc_dir):
     cgrid : TensorMesh
         Coarse grid; ``emg3d.utils.TensorMesh`` instances.
 
-    cmodel : Model
-        Coarse model; ``emg3d.utils.Model`` instances.
+    cmodel : VolumeModel
+        Coarse model; ``emg3d.utils.VolumeModel`` instances.
 
-    csfield : Field
-        Coarse source field; ``emg3d.utils.Field`` instances.
+    csfield : SourceField
+        Coarse source field; ``emg3d.utils.SourceField`` instances.
         Corresponds to the restriction of the fine-grid residual.
 
     cefield : Field
@@ -872,13 +884,13 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     # 2. RESTRICT MODEL
 
-    class Model:
+    class VolumeModel:
         """Dummy class to create coarse-grid model."""
         def __init__(self, case):
             """Initialize with case."""
             self.case = case
 
-    cmodel = Model(model.case)
+    cmodel = VolumeModel(model.case)
     cmodel.eta_x = _restrict_model_parameters(model.eta_x, sc_dir)
     if model.case in [1, 3]:  # HTI or tri-axial.
         cmodel.eta_y = _restrict_model_parameters(model.eta_y, sc_dir)
@@ -1010,11 +1022,12 @@ def residual(grid, model, sfield, efield, norm=False):
     grid : TensorMesh
         Fine grid; ``emg3d.utils.TensorMesh``-instance.
 
-    model : Model
-        Fine model; ``emg3d.utils.Model`` instance.
+    model : VolumeModel
+        Fine model; ``emg3d.utils.VolumeModel`` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.Field`` instances.
+        Source and electric fields; ``emg3d.utils.SourceField`` and
+        ``emg3d.utils.Field`` instances, respectively.
 
     norm : bool
         If True, the error (l2-norm) of the residual is returned, not the
@@ -1035,7 +1048,7 @@ def residual(grid, model, sfield, efield, norm=False):
     rfield = sfield.copy()
     njitted.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                    efield.fz, model.eta_x, model.eta_y, model.eta_z,
-                   rfield.smu0, model.zeta, grid.hx, grid.hy, grid.hz)
+                   model.zeta, grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
         return njitted.l2norm(rfield)

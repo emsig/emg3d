@@ -17,5 +17,4 @@ setuptools_scm
 pytest
 pytest-cov
 pytest-flake8
-empymod
 scooby

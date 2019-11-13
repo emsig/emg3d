@@ -93,6 +93,7 @@ for i in ${PYTHON3VERSION[@]}; do
 
   # Run tests
   pytest --cov=emg3d $PROPS $WARN
+  coverage html
 
   # De-activate venv
   conda deactivate
