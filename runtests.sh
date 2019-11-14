@@ -9,7 +9,7 @@ GitHub/Travis-CI; by default for all supported python versions of emg3d.
 
 where:
     -h : Show this help text.
-    -v : Python 3.x version, e.g. '-v 7' for Python 3.7. Default: '7'.
+    -v : Python 3.x version, e.g. '-v 7' for Python 3.7. Default: '7 8'.
     -n : Disable numba.
     -p : Print output of conda.
     -d : Delete environments after tests.
@@ -18,7 +18,7 @@ where:
 "
 
 # Set default values
-PYTHON3VERSION="7"
+PYTHON3VERSION="7 8"
 PRINT="/dev/null"
 PCKGS="numpy scipy pytest pytest-cov numba"
 PROPS="--flake8"

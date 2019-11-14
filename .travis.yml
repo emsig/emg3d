@@ -1,4 +1,4 @@
-dist: xenial  # Required for Python >= 3.7
+dist: bionic
 
 language: python
 
@@ -9,16 +9,16 @@ matrix:
   include:
     - python: 3.7  # => 3.7 no JIT; scooby
       env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST="scooby"
-    - python: 3.7  # => 3.8 no JIT; no scooby (will become 3.8 soon).
-      env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST=""
+    - python: 3.8  # => 3.8 no JIT; no scooby
+      env: PYTHON=3.8 NUMBA_DISABLE_JIT=1 INST=""
     - python: 3.7  # => 3.7
-      env: PYTHON=3.7 INST="" DEPLOY_PYPI=true
+      env: PYTHON=3.7 DEPLOY_PYPI=true INST=""
     - python: 3.7  # just linkcheck
-      env: PYTHON=3.7 INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" CHCKLNKS=true
+      env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig"
 
 jobs:
   allow_failures:  # env must be EXACTLY as env allowed to fail.
-    - env: PYTHON=3.7 INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" CHCKLNKS=true
+    - env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig"
 
 install:
   - sudo apt-get update
