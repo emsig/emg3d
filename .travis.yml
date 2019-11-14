@@ -1,15 +1,12 @@
-dist: bionic
-
 language: python
 
-# Note: the -python flag in the matrix has no influence, as we use miniconda to
-# install Python, which uses the env-variable PYTHON. Having it here is just
-# bookkeeping, so it prints the same version in the Travis info.
+# Note: the `python: X.Y` is not actually used, as internally conda is used,
+# which follows the `PYTHON=X.Y` var.
 matrix:
   include:
     - python: 3.7  # => 3.7 no JIT; scooby
       env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST="scooby"
-    - python: 3.8  # => 3.8 no JIT; no scooby
+    - python: 3.7  # => 3.8 no JIT; no scooby
       env: PYTHON=3.8 NUMBA_DISABLE_JIT=1 INST=""
     - python: 3.7  # => 3.7
       env: PYTHON=3.7 DEPLOY_PYPI=true INST=""
