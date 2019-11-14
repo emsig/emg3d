@@ -13,6 +13,7 @@ Changelog
     electric permittivity.
   - ``VolumeModel`` contains the volume-averaged values eta and zeta; called
     from within ``emg3d.solver.solver``.
+
     - Full wave equation is enabled again, via ``epsilon_r``; by default it is
       set to None, hence diffusive approximation.
     - Model parameters are now internally stored as 1D arrays.

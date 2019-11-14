@@ -252,72 +252,51 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     Examples
     --------
     >>> import emg3d
-    >>> import discretize
     >>> import numpy as np
-
-    Define the grid (see :class:`discretize.TensorMesh` for more info)
-
-    >>> grid = discretize.TensorMesh(
-    >>>         [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
-    >>>          [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
-    >>>          [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
-    >>>         x0='CCC')
-    >>> print(grid)
-    .
-      TensorMesh: 49,152 cells
-    .
-                          MESH EXTENT             CELL WIDTH      FACTOR
-      dir    nC        min           max         min       max      max
-      ---   ---  ---------------------------  ------------------  ------
-       x     48       -662.16        662.16     25.00     37.01    1.04
-       y     32       -857.96        857.96     50.00     63.34    1.03
-       z     32       -540.80        540.80     30.00     44.32    1.05
-
-    Now we define a very simple fullspace model with ``res_x=1.5`` Ohm.m,
-    ``res_y=1.8`` Ohm.m, and ``res_z=3.3`` Ohm.m. The source is an x-directed
-    dipole at the origin, with a 10 Hz signal of 1 A.
-
-    >>> freq = 10.0  # Hz
-    >>> model = emg3d.utils.Model(
-    >>>     grid, res_x=1.5, res_y=1.8, res_z=3.3, freq=10.)
+    >>> # Create a simple grid, 8 cells of length 1 in each direction,
+    >>> # starting at the origin.
+    >>> grid = emg3d.utils.TensorMesh(
+    >>>         [np.ones(8), np.ones(8), np.ones(8)],
+    >>>         x0=np.array([0, 0, 0]))
+    >>> # The model is a fullspace with tri-axial anisotropy.
+    >>> model = emg3d.utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    >>> # The source is a x-directed, horizontal dipole at (4, 4, 4)
+    >>> # with a frequency of 10 Hz.
     >>> sfield = emg3d.utils.get_source_field(
-    >>>     grid, src=[0, 0, 0, 0, 0], freq=freq)
-
-    Calculate the electric field
-
+    >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
+    >>> # Calculate the electric signal.
     >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
+    >>> # Get the corresponding magnetic signal.
+    >>> hfield = emg3d.utils.get_h_field(grid, model, efield)
     .
-    :: emg3d START :: 15:24:40 ::
+    :: emg3d START :: 10:27:25 :: v0.9.1
     .
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
        linerelaxation : False [0]           maxit     : 50
        nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 3
-       Original grid  :  48 x  32 x  32     => 49,152 cells
-       Coarsest grid  :   3 x   2 x   2     => 12 cells
-       Coarsest level :   4 ;   4 ;   4
+       Original grid  :   8 x   8 x   8     => 512 cells
+       Coarsest grid  :   2 x   2 x   2     => 8 cells
+       Coarsest level :   2 ;   2 ;   2
     .
        [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
     .
            h_
-          2h_ \                  /
-          4h_  \          /\    /
-          8h_   \    /\  /  \  /
-         16h_    \/\/  \/    \/
+          2h_ \    /
+          4h_  \/\/
     .
-       [11:18:17]   2.623e-02  after   1 F-cycles   [1.464e-06, 0.026]   0 0
-       [11:18:17]   2.253e-03  after   2 F-cycles   [1.258e-07, 0.086]   0 0
-       [11:18:17]   3.051e-04  after   3 F-cycles   [1.704e-08, 0.135]   0 0
-       [11:18:17]   5.500e-05  after   4 F-cycles   [3.071e-09, 0.180]   0 0
-       [11:18:18]   1.170e-05  after   5 F-cycles   [6.531e-10, 0.213]   0 0
-       [11:18:18]   2.745e-06  after   6 F-cycles   [1.532e-10, 0.235]   0 0
-       [11:18:18]   6.873e-07  after   7 F-cycles   [3.837e-11, 0.250]   0 0
+       [10:27:25]   2.284e-02  after   1 F-cycles   [1.275e-06, 0.023]   0 0
+       [10:27:25]   1.565e-03  after   2 F-cycles   [8.739e-08, 0.069]   0 0
+       [10:27:25]   1.295e-04  after   3 F-cycles   [7.232e-09, 0.083]   0 0
+       [10:27:25]   1.197e-05  after   4 F-cycles   [6.685e-10, 0.092]   0 0
+       [10:27:25]   1.233e-06  after   5 F-cycles   [6.886e-11, 0.103]   0 0
+       [10:27:25]   1.415e-07  after   6 F-cycles   [7.899e-12, 0.115]   0 0
     .
        > CONVERGED
-       > MG cycles        : 7
-       > Final rel. error : 6.873e-07
+       > MG cycles        : 6
+       > Final rel. error : 1.415e-07
     .
-    :: emg3d END   :: 15:24:42 :: runtime = 0:00:02
+    :: emg3d END   :: 10:27:25 :: runtime = 0:00:00
 
     """
 

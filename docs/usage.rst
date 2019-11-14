@@ -72,7 +72,7 @@ look at the `emg3d-examples <https://github.com/empymod/emg3d-examples>`_-repo
 on GitHub. This particular example is also there, with some further
 explanations and examples to show how to plot the model and the data; see
 `0a_Minimum_working_example.ipynb
-<https://github.com/empymod/emg3d-examples/blob/master/0a_Minimum_working_example.ipynb>`_.
+<https://github.com/empymod/emg3d-examples/blob/master/0a_Minimum_working_example.ipynb>`_. It also contains an example without using ``discretize``.
 
 First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
 ``numpy``:
@@ -116,11 +116,9 @@ origin, with a 10 Hz signal of 1 A.
 
 .. code-block:: python
 
-    >>> freq = 10.0  # Hz
-    >>> model = emg3d.utils.Model(
-    >>>     grid, res_x=1.5, res_y=1.8, res_z=3.3, freq=freq)
+    >>> model = emg3d.utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
     >>> sfield = emg3d.utils.get_source_field(
-    >>>     grid, src=[0, 0, 0, 0, 0], freq=freq)
+    >>>     grid, src=[0, 0, 0, 0, 0], freq=10.0)
 
 Now we can calculate the electric field with ``emg3d``:
 
@@ -128,7 +126,7 @@ Now we can calculate the electric field with ``emg3d``:
 
     >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
 
-    :: emg3d START :: 15:24:40 ::
+    :: emg3d START :: 15:24:40 :: v0.9.1
 
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
