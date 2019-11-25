@@ -2493,13 +2493,15 @@ class Fourier:
     # PRINTING ROUTINES
     def _print_freq_ftarg(self):
         """Print required frequency range."""
-        empymod.utils._prnt_min_max_val(
-                self.freq_req, "   Req. freq  [Hz] : ", self.verb)
+        if self.verb > 2:
+            empymod.utils._prnt_min_max_val(
+                    self.freq_req, "   Req. freq  [Hz] : ", self.verb)
 
     def _print_freq_calc(self):
         """Print actually calculated frequency range."""
-        empymod.utils._prnt_min_max_val(
-                self.freq_calc, "   Calc. freq [Hz] : ", self.verb)
+        if self.verb > 2:
+            empymod.utils._prnt_min_max_val(
+                    self.freq_calc, "   Calc. freq [Hz] : ", self.verb)
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
