@@ -100,8 +100,8 @@ If you publish results for which you used `emg3d`, please give credit by citing
     DOI: `10.21105/joss.01463 <https://doi.org/10.21105/joss.01463>`_.
 
 
-All releases have a Zenodo-DOI, provided on the `release-page
-<https://github.com/empymod/emg3d/releases>`_.
+All releases have a Zenodo-DOI, which can be found on `10.5281/zenodo.3229006
+<https://doi.org/10.5281/zenodo.3229006>`_.
 
 See `CREDITS` for the history of the code.
 

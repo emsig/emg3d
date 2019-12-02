@@ -385,6 +385,10 @@ def get_source_field(grid, src, freq, strength=0):
     field corresponds to a normalized (1 Am) source distributed within the
     cell(s) it resides (can be changed with the ``strength``-parameter).
 
+    The adjoint of the trilinear interpolation is used to distribute the
+    point(s) to the grid edges, which corresponds to the discretization of a
+    Dirac ([PlDM07]_).
+
 
     Parameters
     ----------
@@ -2493,13 +2497,15 @@ class Fourier:
     # PRINTING ROUTINES
     def _print_freq_ftarg(self):
         """Print required frequency range."""
-        empymod.utils._prnt_min_max_val(
-                self.freq_req, "   Req. freq  [Hz] : ", self.verb)
+        if self.verb > 2:
+            empymod.utils._prnt_min_max_val(
+                    self.freq_req, "   Req. freq  [Hz] : ", self.verb)
 
     def _print_freq_calc(self):
         """Print actually calculated frequency range."""
-        empymod.utils._prnt_min_max_val(
-                self.freq_calc, "   Calc. freq [Hz] : ", self.verb)
+        if self.verb > 2:
+            empymod.utils._prnt_min_max_val(
+                    self.freq_calc, "   Calc. freq [Hz] : ", self.verb)
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
