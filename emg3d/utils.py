@@ -1526,8 +1526,10 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
     """
     # Get variables with default lists:
-    alpha = alpha or [1, 1.5, 0.01]
-    possible_nx = possible_nx or get_cell_numbers(500, 5, 3)
+    if alpha is None:
+        alpha = [1, 1.5, 0.01]
+    if possible_nx is None:
+        possible_nx = get_cell_numbers(500, 5, 3)
 
     # Cast resistivity value(s).
     res = np.array(res, ndmin=1)
@@ -2584,7 +2586,8 @@ def data_write(fname, keys, values, path='data', exists=0):
             # None. This saves space, and it will simply be reconstructed if
             # required.
             if type(values[i]).__name__ == 'TensorMesh':
-                delattr(values[i], '_vol')
+                if hasattr(values[i], '_vol'):
+                    delattr(values[i], '_vol')
 
             db[key] = values[i]
 
