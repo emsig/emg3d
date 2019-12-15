@@ -54,13 +54,13 @@ CI
   <https://coveralls.io/github/empymod/emg3d>`_
 - Code-quality on `Codacy
   <https://app.codacy.com/manual/prisae/emg3d/dashboard>`_
-- Manual on `ReadTheDocs <https://emg3d.readthedocs.io/en/latest>`_
+- Manual on `ReadTheDocs <https://emg3d.readthedocs.io/en/latest>`_,
+  including the Gallery (examples run each time)
 - DOI minting on `Zenodo <https://doi.org/10.5281/zenodo.3229006>`_
 - Benchmarks with `Airspeed Velocity <https://empymod.github.io/emg3d-asv>`_
   (``asv``) [currently manually]
-- Examples in `emg3d-examples <https://github.com/empymod/emg3d-examples>`_
-  [currently manually] => should move to a sphinx-gallery instance (`#45
-  <https://github.com/empymod/emg3d/issues/45>`_)
+- Examples to big to include in the Sphinx-Gallery are in `emg3d-examples
+  <https://github.com/empymod/emg3d-examples>`_ [currently manually]
 - Automatically deploys if tagged:
 
   - `PyPi <https://pypi.org/project/emg3d>`_

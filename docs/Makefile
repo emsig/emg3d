@@ -1,5 +1,10 @@
 # Disable numba, so jitted functions are nicely documented.
-export NUMBA_DISABLE_JIT=1
+# export NUMBA_DISABLE_JIT=0
+# Does not seem to be necessary any longer.
+# Also, this does not work fine with sphinx_gallery...
+
+# Try to fix numba issue with sphinx-gallery.
+export NUMBA_CACHE_DIR="$HOME/tmp"
 
 # Command line options.
 SPHINXOPTS    =

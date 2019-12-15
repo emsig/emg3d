@@ -4,6 +4,7 @@ numba >= 0.40.0
 matplotlib
 
 empymod
+discretize
 
 # sphinx fixed below 2.0
 # https://github.com/numpy/numpydoc/issues/215
@@ -11,10 +12,11 @@ sphinx < 2.0
 numpydoc
 sphinx_numfig
 sphinx_rtd_theme
+sphinx_gallery
 
 setuptools_scm
 
 pytest
-pytest-cov
-pytest-flake8
+pytest_cov
+pytest_flake8
 scooby

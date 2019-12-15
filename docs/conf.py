@@ -1,5 +1,7 @@
 import time
+import warnings
 from emg3d import __version__
+from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 
 # ==== 1. Extensions  ====
 
@@ -11,6 +13,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.intersphinx',
     'numpydoc',
+    'sphinx_gallery.gen_gallery',
 ]
 
 # Numpydoc settings
@@ -20,6 +23,26 @@ numfig_format = {'figure': 'Figure %s:'}
 
 # Todo settings
 todo_include_todos = True
+
+# Sphinx gallery configuration
+sphinx_gallery_conf = {
+    'examples_dirs': '../examples',
+    'gallery_dirs': 'examples',
+    'subsection_order': ExplicitOrder([
+        '../examples/tutorials',
+        ]),
+    'capture_repr': ('_repr_html_', '__repr__'),
+    # Patter to search for example files
+    "filename_pattern": r"\.py",
+    # Sort gallery example by file name instead of number of lines (default)
+    "within_subsection_order": FileNameSortKey,
+}
+
+# https://github.com/sphinx-gallery/sphinx-gallery/pull/521/files
+# Remove matplotlib agg warnings from generated doc when using plt.show
+warnings.filterwarnings("ignore", category=UserWarning,
+                        message='Matplotlib is currently using agg, which is a'
+                                ' non-GUI backend, so cannot show the figure.')
 
 # Intersphinx configuration
 intersphinx_mapping = {
@@ -55,7 +78,7 @@ today_fmt = '%d %B %Y'
 exclude_patterns = ['_build', '../tests']
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'friendly'
 
 # ==== 3. HTML settings ====
 html_theme = 'sphinx_rtd_theme'

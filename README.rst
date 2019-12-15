@@ -40,9 +40,9 @@ For more information regarding installation, usage, contributing, roadmap, bug
 reports, and much more, see
 
 - **Website**: https://empymod.github.io,
-- **Documentation**: https://emg3d.readthedocs.io,
+- **Documentation**: https://emg3d.rtfd.io,
 - **Source Code**: https://github.com/empymod/emg3d,
-- **Examples**: https://github.com/empymod/emg3d-examples.
+- **Examples**: https://emg3d.rtfd.io/en/stable/examples.
 
 
 Features
