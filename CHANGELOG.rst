@@ -15,7 +15,6 @@ Changelog
     - New attribute ``Field.is_electric``, so the field knows if it is electric
       or magnetic.
     - Simple ``__repr__`` for ``TensorMesh``, ``Model``, ``Fourier``, ``Time``.
-    - Python 3.8 is now tested.
 
 - Bugfixes:
 

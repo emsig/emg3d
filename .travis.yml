@@ -6,8 +6,8 @@ matrix:
   include:
     - python: 3.7  # => 3.7 no JIT; scooby
       env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST="scooby"
-    - python: 3.8  # => 3.8 no JIT; no scooby
-      env: PYTHON=3.8 NUMBA_DISABLE_JIT=1 INST=""
+    - python: 3.7  # => Will become 3.8 soon; no JIT; no scooby
+      env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST=""
     - python: 3.7  # => 3.7
       env: PYTHON=3.7 DEPLOY_PYPI=true INST=""
     - python: 3.7  # just linkcheck
