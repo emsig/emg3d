@@ -2,6 +2,25 @@ Changelog
 #########
 
 
+*latest*
+--------
+
+- ``get_receiver`` can now take entire ``Field`` instances, and returns in that
+  case (``fx``, ``fy``, ``fz``) at receiver locations.
+
+- Various small things:
+
+    - Strength input for ``get_source_field`` can now be complex; it also
+      stores now the source location and its strength and moment.
+    - New attribute ``Field.is_electric``, so the field knows if it is electric
+      or magnetic.
+    - Simple ``__repr__`` for ``TensorMesh``, ``Model``, ``Fourier``, ``Time``.
+
+- Bugfixes:
+
+  - Related to ``get_hx_h0``, ``data_write``, printing in ``Fourier``.
+
+
 *v0.9.1* : VolumeModel
 ----------------------
 
