@@ -104,7 +104,6 @@ def test_solver_homogeneous(capsys):
     assert ' MAX. ITERATION REACHED' in out
 
     # Just check if it runs without failing for other solvers.
-    _ = solver.solver(grid, model, sfield, verb=3, maxit=1, sslsolver='gmres')
     _ = solver.solver(grid, model, sfield, verb=3, maxit=1,
                       sslsolver='gcrotmk')
 
@@ -464,12 +463,6 @@ def test_mgparameters():
     assert "sslsolver : 'bicgstab'" in var.__repr__()
     assert var.ssl_maxit == 33
     assert var.maxit == 3
-    var = solver.MGParameters(cycle='F', sslsolver='gmres', semicoarsening=0,
-                              linerelaxation=False, vnC=vnC, verb=1, maxit=5)
-    assert "sslsolver : 'gmres'" in var.__repr__()
-    assert var.ssl_maxit == 5
-    assert var.maxit == 1
-    assert_allclose(var.clevel, np.array([4, 4, 3, 4]))
     with pytest.raises(ValueError):
         solver.MGParameters(cycle='F', sslsolver='abcd', semicoarsening=0,
                             linerelaxation=False, vnC=vnC, verb=1)

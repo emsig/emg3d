@@ -120,10 +120,6 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
               :func:`scipy.sparse.linalg.bicgstab`;
             - 'cgs': Conjugate Gradient Squared
               :func:`scipy.sparse.linalg.cgs`;
-            - 'gmres': Generalized Minimal RESidual
-              :func:`scipy.sparse.linalg.gmres`;
-            - 'lgmres': Improvement of GMRES using alternating residual
-              vectors :func:`scipy.sparse.linalg.lgmres`;
             - 'gcrotmk': GCROT: Generalized Conjugate Residual with inner
               Orthogonalization and Outer Truncation
               :func:`scipy.sparse.linalg.gcrotmk`.
@@ -695,27 +691,29 @@ def krylov(grid, model, sfield, efield, var):
         # Calculate and print error (only if verbose).
         if var.verb > 2:
 
-            # 'gmres' returns the error, not the solution, in the callback.
-            if var.sslsolver == 'gmres':
-                var.l2 = x
-            else:
-                var.l2 = residual(
-                        grid, model, sfield, utils.Field(grid, x), True)
+            # Get residual.
+            var.l2 = residual(grid, model, sfield, utils.Field(grid, x), True)
 
             log = f"   [{var.time.now}]   {var.l2/var.l2_refe:.3e} "
             log += f" after {var._ssl_it:3} {var.sslsolver}-cycles"
 
             # For those solvers who run an iteration before the first
-            # preconditioner run ['lgmres', 'gcrotmk'].
+            # preconditioner run ['gcrotmk'].
             if var._ssl_it == 1 and var.it == 0 and var.cycle is not None:
                 log += "\n"
 
             var.cprint(log, 2)
 
     # Solve the system with sslsolver.
-    efield.field, i = getattr(ssl, var.sslsolver)(
-            A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
-            atol=1e-30, M=M, callback=callback)
+    # The ssl solvers do not abort if the norm diverges or is not finite. We
+    # therefore throw an exception in ``_terminate``, and catch it here.
+    try:
+        efield.field, i = getattr(ssl, var.sslsolver)(
+                A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
+                atol=1e-30, M=M, callback=callback)
+    except _ConvergenceError:
+        i = -1  # Mark it as error; returned field is all zero.
+        var.exit_message += " (returned field is zero)"
 
     # Calculate final error, if not done in the callback.
     if var.verb < 3:
@@ -724,7 +722,8 @@ def krylov(grid, model, sfield, efield, var):
     # Convergence-checks for sslsolver.
     pre = "\n   > "
     if i < 0:
-        var.exit_message = f"Error in {var.sslsolver}"
+        if var.exit_message == '':
+            var.exit_message = f"Error in {var.sslsolver}"
         pre = "\n* ERROR   :: "
     elif i > 0:
         var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
@@ -1291,7 +1290,7 @@ class MGParameters:
         """Set everything related to solver and MG-cycle."""
 
         # sslsolver.
-        solvers = ['bicgstab', 'cgs', 'gmres', 'lgmres', 'gcrotmk']
+        solvers = ['bicgstab', 'cgs', 'gcrotmk']
         if self.sslsolver is True:
             self.sslsolver = 'bicgstab'
         elif self.sslsolver is not False and self.sslsolver not in solvers:
@@ -1666,31 +1665,31 @@ def _terminate(var, l2_last, l2_prev, it):
     """
 
     finished = False
+    sslabort = False
 
-    if var.sslsolver:  # If multigrid as preconditioner, exit silently.
-        if it == var.maxit:
-            finished = True
+    if l2_last < var.tol*var.l2_refe:    # Converged.
+        var.exit_message = "CONVERGED"
+        finished = True
 
-    else:
+    elif l2_last > 10*var.l2_refe or not np.isfinite(l2_last):  # Diverged.
+        var.exit_message = "DIVERGED"
+        finished = True
+        sslabort = True  # Force abort if sslsolver.
 
-        if l2_last < var.tol*var.l2_refe:    # Converged.
-            var.exit_message = "CONVERGED"
-            finished = True
+    elif it > 2 and l2_last >= l2_prev:  # Stagnated.
+        var.exit_message = "STAGNATED"
+        finished = True
+        sslabort = True  # Force abort if sslsolver.
 
-        elif l2_last > 10*var.l2_refe or np.isnan(l2_last):  # Diverged.
-            var.exit_message = "DIVERGED"
-            finished = True
+    elif it == var.maxit:                # Maximum iterations reached.
+        var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
+        finished = True
 
-        elif it > 2 and l2_last >= l2_prev:  # Stagnated.
-            var.exit_message = "STAGNATED"
-            finished = True
-
-        elif it == var.maxit:                # Maximum iterations reached.
-            var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
-            finished = True
-
-        # Print info.
-        if finished:
+    # Force abort (ssl solver) or print info.
+    if finished:
+        if var.sslsolver and sslabort:  # Force abortion of SSL solver.
+            raise _ConvergenceError
+        elif not var.sslsolver:  # Print info (if not preconditioner).
             if var.verb < 4:
                 add = "\n"
             else:
@@ -1799,3 +1798,8 @@ def _get_prolongation_coordinates(grid, d1, d2):
     D2, D1 = np.broadcast_arrays(
             getattr(grid, 'vectorN'+d2), getattr(grid, 'vectorN'+d1)[:, None])
     return np.r_[D1.ravel('F'), D2.ravel('F')].reshape(-1, 2, order='F')
+
+
+class _ConvergenceError(Exception):
+    """Custom exception for convergence issues with SSL solvers."""
+    pass

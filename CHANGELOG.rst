@@ -8,6 +8,16 @@ Changelog
 - ``get_receiver`` can now take entire ``Field`` instances, and returns in that
   case (``fx``, ``fy``, ``fz``) at receiver locations.
 
+- Krylov subspace solvers:
+
+  - Solver now finishes in the middle of preconditioning cycles if tolerance is
+    reached.
+  - Solver now aborts if solution diverges or stagnates also for the SSL
+    solvers; it fails and returns a zero field.
+  - Removed ``gmres`` and ``lgmres`` from the supported SSL solvers; they do
+    not work nice for this problem. Supported remain ``bicgstab`` (default),
+    ``cgs``, and ``gcrotmk``.
+
 - Various small things:
 
     - Strength input for ``get_source_field`` can now be complex; it also
