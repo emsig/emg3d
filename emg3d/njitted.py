@@ -2034,22 +2034,22 @@ def volume_average(edges_x, edges_y, edges_z, values,
     """
 
     # Get the weights and indices for each direction.
-    w1, i1_in, i1_out = _volume_avg_weights(edges_x, new_edges_x)
-    w2, i2_in, i2_out = _volume_avg_weights(edges_y, new_edges_y)
-    w3, i3_in, i3_out = _volume_avg_weights(edges_z, new_edges_z)
+    wx, ix_in, ix_out = _volume_avg_weights(edges_x, new_edges_x)
+    wy, iy_in, iy_out = _volume_avg_weights(edges_y, new_edges_y)
+    wz, iz_in, iz_out = _volume_avg_weights(edges_z, new_edges_z)
 
     # Loop over the elements and sum up the contributions.
-    for i3, w_3 in enumerate(w3):
-        i3i = i3_in[i3]
-        i3o = i3_out[i3]
-        for i2, w_2 in enumerate(w2):
-            i2i = i2_in[i2]
-            i2o = i2_out[i2]
-            w_32 = w_3*w_2
-            for i1, w_1 in enumerate(w1):
-                i1i = i1_in[i1]
-                i1o = i1_out[i1]
-                new_values[i1o, i2o, i3o] += w_32*w_1*values[i1i, i2i, i3i]
+    for iz, w_z in enumerate(wz):
+        izi = iz_in[iz]
+        izo = iz_out[iz]
+        for iy, w_y in enumerate(wy):
+            iyi = iy_in[iy]
+            iyo = iy_out[iy]
+            w_zy = w_z*w_y
+            for ix, w_x in enumerate(wx):
+                ixi = ix_in[ix]
+                ixo = ix_out[ix]
+                new_values[ixo, iyo, izo] += w_zy*w_x*values[ixi, iyi, izi]
 
     # Normalize by new volume.
     new_values /= new_vol

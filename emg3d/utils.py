@@ -316,6 +316,11 @@ class Field(np.ndarray):
         self.fz[:, 0, :] = 0.
         self.fz[:, -1, :] = 0.
 
+    @property
+    def is_electric(self):
+        """Returns True if Field is electric, False if it is magnetic."""
+        return self.vnEx[0] < self.vnEy[0]
+
 
 class SourceField(Field):
     r"""Create a Source-Field instance with x-, y-, and z-views of the field.
@@ -410,7 +415,7 @@ def get_source_field(grid, src, freq, strength=0):
         - ``freq`` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
-    strength : float, optional
+    strength : float or complex, optional
         Source strength (A):
 
           - If 0, output is normalized to a source of 1 m length, and source
@@ -428,7 +433,7 @@ def get_source_field(grid, src, freq, strength=0):
     """
     # Cast some parameters.
     src = np.asarray(src, dtype=float)
-    strength = float(strength)
+    strength = np.asarray(strength)
 
     # Ensure source is a point or a finite dipole.
     if len(src) not in [5, 6]:
@@ -483,11 +488,11 @@ def get_source_field(grid, src, freq, strength=0):
 
     # Set source strength.
     if strength == 0:  # 1 A m
-        strength = srcdir
+        moment = srcdir
     else:              # Multiply source length with source strength
-        strength *= srcdir
+        moment = strength*srcdir
 
-    def set_source(grid, strength, finite):
+    def set_source(grid, moment, finite):
         """Set the source-field in idir."""
 
         # Initiate zero source field.
@@ -506,10 +511,10 @@ def get_source_field(grid, src, freq, strength=0):
             point_source(*vec2, src, sfield.fy)
             point_source(*vec3, src, sfield.fz)
 
-        # Multiply by strength*s*mu in per direction.
-        sfield.fx *= strength[0]*sfield.smu0
-        sfield.fy *= strength[1]*sfield.smu0
-        sfield.fz *= strength[2]*sfield.smu0
+        # Multiply by moment*s*mu in per direction.
+        sfield.fx *= moment[0]*sfield.smu0
+        sfield.fy *= moment[1]*sfield.smu0
+        sfield.fz *= moment[2]*sfield.smu0
 
         return sfield
 
@@ -637,8 +642,15 @@ def get_source_field(grid, src, freq, strength=0):
                             s[ix, iy+1, iz] += ex*ry*x_len
                             s[ix+1, iy+1, iz] += rx*ry*x_len
 
-    # Return the source field.
-    return set_source(grid, strength, finite)
+    # Get the source field.
+    sfield = set_source(grid, moment, finite)
+
+    # Add src and moment information.
+    sfield.src = src
+    sfield.strength = strength
+    sfield.moment = moment
+
+    return sfield
 
 
 def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
@@ -654,8 +666,8 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         Model grid; a ``TensorMesh``-instance.
 
     values : ndarray
-        Can be either a particular field, e.g., efield.fx, or a model
-        parameter.
+        Field instance, or a particular field (e.g. field.fx); Model
+        parameters.
 
     coordinates : tuple (x, y, z)
         Coordinates (x, y, z) where to interpolate ``values``; e.g. receiver
@@ -676,10 +688,13 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
 
     Returns
     -------
-    new_values : EMArray
+    new_values : ndarray or EMArray
         Values at ``coordinates``.
 
-        EMArray is a subclassed ndarray with ``.pha`` and ``.amp`` attributes.
+        If input was a field it returns an EMArray, which is a subclassed
+        ndarray with ``.pha`` and ``.amp`` attributes.
+
+        If input was an entire Field instance, output is a tuple (fx, fy, fz).
 
 
     See Also
@@ -687,12 +702,12 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     grid2grid : Interpolation of model parameters or fields to a new grid.
 
     """
-    # Ensure input field is a certain field, not a Field instance.
-    if values.ndim == 1:
-        print("* ERROR   :: Values must be a x-, y-, or z-directed field or")
-        print("             model parameters with ndim=3.")
-        print(f"             Shape of provided field: {values.shape}.")
-        raise ValueError("Values error")
+    # If values is a Field instance, call it recursively for each field.
+    if hasattr(values, 'field') and values.field.ndim == 1:
+        fx = get_receiver(grid, values.fx, coordinates, method, extrapolate)
+        fy = get_receiver(grid, values.fy, coordinates, method, extrapolate)
+        fz = get_receiver(grid, values.fz, coordinates, method, extrapolate)
+        return fx, fy, fz
 
     if len(coordinates) != 3:
         print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
@@ -717,11 +732,18 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         points += pts
 
     if extrapolate:
-        out = _interp3d(points, values, coordinates, method, None, 'nearest')
+        fill_value = None
+        mode = 'nearest'
     else:
-        out = _interp3d(points, values, coordinates, method, 0.0, 'constant')
+        fill_value = 0.0
+        mode = 'constant'
+    out = _interp3d(points, values, coordinates, method, fill_value, mode)
 
-    return empymod.utils.EMArray(out)
+    # Return an EMArray if input is a field, else simply the values.
+    if values.size == grid.nC:
+        return out
+    else:
+        return empymod.utils.EMArray(out)
 
 
 def get_h_field(grid, model, field):
@@ -889,6 +911,12 @@ class Model:
         self._res_z = self._check_parameter(res_z, 'res_z')
         self._mu_r = self._check_parameter(mu_r, 'mu_r')
         self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
+
+    def __repr__(self):
+        """Simple representation."""
+        return (f"Model; {self.case_names[self.case]} resistivities"
+                f"{'' if self.mu_r is None else '; mu_r'}"
+                f"{'' if self.epsilon_r is None else '; epsilon_r'}")
 
     # RESISTIVITIES
     @property
@@ -1218,11 +1246,13 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
 
         # Get values from `_interp3d`.
         if extrapolate:
-            new_values = _interp3d(
-                    points, values, new_points, method, None, 'nearest')
+            fill_value = None
+            mode = 'nearest'
         else:
-            new_values = _interp3d(
-                    points, values, new_points, method, 0.0, 'constant')
+            fill_value = 0.0
+            mode = 'constant'
+        new_values = _interp3d(
+                points, values, new_points, method, fill_value, mode)
 
         new_values = new_values.reshape(shape, order='F')
 
@@ -1389,6 +1419,10 @@ class TensorMesh:
         self.nEz = int(self.vnEz.prod())
         self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
         self.nE = int(self.vnE.sum())
+
+    def __repr__(self):
+        """Simple representation."""
+        return f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} ({self.nC})"
 
     @property
     def vol(self):
@@ -2229,6 +2263,11 @@ class Fourier:
         # Get required frequencies.
         self._check_time()
 
+    def __repr__(self):
+        """Simple representation."""
+        return (f"Fourier: {self._ft}; {self.time.min()}-{self.time.max()} s; "
+                f"{self.fmin}-{self.fmax} Hz")
+
     # PURE PROPERTIES
     @property
     def freq_req(self):
@@ -2655,6 +2694,10 @@ class Time:
     def __init__(self):
         """Initialize time zero (t0) with current time stamp."""
         self._t0 = default_timer()
+
+    def __repr__(self):
+        """Simple representation."""
+        return f"Runtime : {self.runtime}"
 
     @property
     def t0(self):

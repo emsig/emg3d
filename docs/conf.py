@@ -55,7 +55,7 @@ today_fmt = '%d %B %Y'
 exclude_patterns = ['_build', '../tests']
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'friendly'
 
 # ==== 3. HTML settings ====
 html_theme = 'sphinx_rtd_theme'

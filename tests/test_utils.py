@@ -6,7 +6,7 @@ import numpy as np
 from scipy import constants
 from timeit import default_timer
 from os.path import join, dirname
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 
 # Optional import
 try:
@@ -235,7 +235,12 @@ def test_get_source_field(capsys):
     h = np.ones(4)
     grid = utils.TensorMesh([h*200, h*400, h*800], -np.array(src[:3]))
     freq = 1.2458
-    sfield = utils.get_source_field(grid, src, freq)
+
+    sfield = utils.get_source_field(grid, src, freq, strength=1+1j)
+    assert_array_equal(sfield.strength, complex(1+1j))
+
+    sfield = utils.get_source_field(grid, src, freq, strength=0)
+    assert_array_equal(sfield.strength, float(0))
     iomegamu = 2j*np.pi*freq*constants.mu_0
 
     # Check zeros
@@ -412,10 +417,17 @@ def test_Model(capsys):
     res_z = res_x*1.4
     mu_r = res_x*1.11
 
+    # Check representation of TensorMesh.
+    assert 'TensorMesh: 2 x 2 x 2 (8)' in grid.__repr__()
+
     _, _ = capsys.readouterr()  # Clean-up
     # Using defaults; check backwards compatibility for freq.
     sfield = utils.SourceField(grid, freq=1)
-    model1 = utils.Model(grid, freq=1)
+    model1 = utils.Model(grid)
+
+    # Check representation of Model.
+    assert 'Model; isotropic resistivities' in model1.__repr__()
+
     model1e = utils.Model(grid, freq=1)
     model1.mu_r = None
     model1.epsilon_r = None
@@ -563,6 +575,9 @@ def test_field():
     assert_allclose(ee.fy, ey)
     assert_allclose(ee.fz, ez)
 
+    # Check it knows it is electric.
+    assert ee.is_electric is True
+
     # Test amplitude and phase.
     assert_allclose(ee.fx.amp, np.abs(ee.fx))
     assert_allclose(ee.fy.pha, np.rad2deg(np.unwrap(np.angle(ee.fy))))
@@ -622,6 +637,8 @@ def test_get_h_field():
 
     hout = utils.get_h_field(grid, model, efield)
     assert_allclose(hfield, hout)
+    # Check it knows it is magnetic.
+    assert hout.is_electric is False
 
     # Add some mu_r - Just 1, to trigger, and compare.
     dat = REGRES['res'][()]
@@ -647,10 +664,6 @@ def test_get_receiver():
             [0, 0, 0])
     field = utils.Field(grid)
 
-    # Provide Field instance instead of Field.f{x/y/z}:
-    with pytest.raises(ValueError):
-        utils.get_receiver(grid, field, (1, 1, 1))
-
     # Provide wrong rec_loc input:
     with pytest.raises(ValueError):
         utils.get_receiver(grid, field.fx, (1, 1))
@@ -660,6 +673,13 @@ def test_get_receiver():
     field = field.real  # For simplicity
     out1 = utils.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0), 'linear')
     assert_allclose(out1, [1., 1+1/3, 2])
+    out1a, out1b, out1c = utils.get_receiver(  # Check recursion
+            grid, field, ([0.5, 1, 2], 0, 0), 'linear')
+    assert_allclose(out1, out1a)
+    assert_allclose(out1b, out1c)
+    assert_allclose(out1b, [0, 0, 0])
+    assert out1b.__class__ == empymod.utils.EMArray
+
     out2 = utils.get_receiver(
             grid, field.fx, ([0.5, 1, 2], 1/3, 0.25), 'linear')
     assert_allclose(out2, [2+2/3., 3, 3+2/3])
@@ -700,6 +720,13 @@ def test_get_receiver():
 
     assert_allclose(out8, 1.+1j)
     assert_allclose(out9, 1.+1j)
+
+    # Check it works with model parameters.
+    model = utils.Model(grid, np.ones(grid.vnC))
+    out10 = utils.get_receiver(
+            grid, model.res_x, (-10, -10, -10), 'linear', True)
+    assert_allclose(out10, 1.)
+    assert out10.__class__ != empymod.utils.EMArray
 
 
 def test_grid2grid_volume():
@@ -894,6 +921,11 @@ class TestFourier:
         Fourier = utils.Fourier(time, fmin, fmax)
         out, _ = capsys.readouterr()
 
+        # Check representation of Fourier.
+        assert 'ffht' in Fourier.__repr__()
+        assert '0.01-100.0 s' in Fourier.__repr__()
+        assert '0.01-100 Hz' in Fourier.__repr__()
+
         assert Fourier.every_x_freq is None
         assert Fourier.fmin == fmin
         assert Fourier.fmax == fmax
@@ -1053,6 +1085,9 @@ def test_Time():
     # This should have taken less then 1s.
     out = time.runtime
     assert "0:00:00" == str(out)
+
+    # Check representation of Time.
+    assert 'Runtime : 0:00:0' in time.__repr__()
 
 
 # FUNCTIONS RELATED TO DATA MANAGEMENT
