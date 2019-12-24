@@ -25,6 +25,8 @@ Changelog
     - New attribute ``Field.is_electric``, so the field knows if it is electric
       or magnetic.
     - Simple ``__repr__`` for ``TensorMesh``, ``Model``, ``Fourier``, ``Time``.
+    - The returned ``info`` dictionary contains now a key ``runtime_at_cycle``,
+      which lists the accumulated total runtime at each cycle.
 
 - Bugfixes:
 

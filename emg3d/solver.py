@@ -243,6 +243,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - ``it_mg``: Number of multigrid iterations;
         - ``it_ssl``: Number of SSL iterations;
         - ``time``: Runtime (s).
+        - ``runtime_at_cycle``: Runtime after each cycle (s).
 
 
     Examples
@@ -384,8 +385,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         info = f"   > MG cycles        : {var.it}\n"
     info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"  # Error.
     info += f":: emg3d END   :: {var.time.now} :: "  # END and time.
-    time = var.time.runtime
-    info += f"runtime = {time}\n"                    # Total runtime.
+    info += f"runtime = {var.time.runtime}\n"        # Total runtime.
     var.cprint(info, 1)
 
     # Assemble the info_dict if return_info
@@ -400,7 +400,8 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             'tol': var.tol,              # Tolerance (abs_error<ref_error*tol).
             'it_mg': var.it,             # Multigrid iterations.
             'it_ssl': var._ssl_it,       # SSL iterations.
-            'time': time.seconds,        # Runtime (s).
+            'time': var.runtime_at_cycle[-1],          # Runtime (s).
+            'runtime_at_cycle': var.runtime_at_cycle,  # Runtime at cycle (s).
         }
 
     # Return depending on input arguments; or nothing.
@@ -687,6 +688,9 @@ def krylov(grid, model, sfield, efield, var):
         """Solver iteration count and error (l2-norm)."""
         # Update iteration count.
         var._ssl_it += 1
+
+        # Add current runtime to var.
+        var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
 
         # Calculate and print error (only if verbose).
         if var.verb > 2:
@@ -1091,6 +1095,7 @@ class MGParameters:
         self.exit_message = ''     # For convergence status.
 
         self.time = utils.Time()   # Timer.
+        self.runtime_at_cycle = np.array([0.])  # Store runtime per cycle.
         self.do_return = True      # Whether or not to return the efield.
 
         # 1. Set everything related to semicoarsening and line relaxation.
@@ -1549,6 +1554,8 @@ def _print_cycle_info(var, l2_last, l2_prev):
         Last and previous errors (l2-norms).
 
     """
+    # Add current runtime to var.
+    var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
 
     # Start info string, return if not enough verbose.
     if var.verb < 3:
