@@ -5,9 +5,6 @@ Changelog
 *latest*
 --------
 
-- ``get_receiver`` can now take entire ``Field`` instances, and returns in that
-  case (``fx``, ``fy``, ``fz``) at receiver locations.
-
 - Krylov subspace solvers:
 
   - Solver now finishes in the middle of preconditioning cycles if tolerance is
@@ -20,11 +17,20 @@ Changelog
 
 - Various small things:
 
-    - Strength input for ``get_source_field`` can now be complex; it also
-      stores now the source location and its strength and moment.
-    - New attribute ``Field.is_electric``, so the field knows if it is electric
-      or magnetic.
-    - Simple ``__repr__`` for ``TensorMesh``, ``Model``, ``Fourier``, ``Time``.
+  - ``get_receiver`` can now take entire ``Field`` instances, and returns in
+    that case (``fx``, ``fy``, ``fz``) at receiver locations.
+  - Strength input for ``get_source_field`` can now be complex; it also
+    stores now the source location and its strength and moment.
+  - New attribute ``Field.is_electric``, so the field knows if it is electric
+    or magnetic.
+  - New ``verb``-possibility: ``verb=-1`` is a continuously updated one-liner,
+    ideal to monitor large sets of calculations or in inversions.
+  - The returned ``info`` dictionary contains new keys:
+
+    - ``runtime_at_cycle``: accumulated total runtime at each cycle;
+    - ``error_at_cycle``: absolute error at each cycle.
+
+  - Simple ``__repr__`` for ``TensorMesh``, ``Model``, ``Fourier``, ``Time``.
 
 - Bugfixes:
 
@@ -42,12 +48,11 @@ Changelog
     electric permittivity.
   - ``VolumeModel`` contains the volume-averaged values eta and zeta; called
     from within ``emg3d.solver.solver``.
-
-    - Full wave equation is enabled again, via ``epsilon_r``; by default it is
-      set to None, hence diffusive approximation.
-    - Model parameters are now internally stored as 1D arrays.
-    - An {isotropic, VTI, HTI} initiated model can be changed by providing the
-      missing resistivities.
+  - Full wave equation is enabled again, via ``epsilon_r``; by default it is
+    set to None, hence diffusive approximation.
+  - Model parameters are now internally stored as 1D arrays.
+  - An {isotropic, VTI, HTI} initiated model can be changed by providing the
+    missing resistivities.
 
 - Bugfix: Up and till version 0.8.1 there was a bug. If resistivity was set
   with slices, e.g., ``model.res[:, :, :5]=1e10``, it DID NOT update the
@@ -56,10 +61,10 @@ Changelog
 
 - Various:
 
-    - The log now lists the version of emg3d.
-    - PEP8: internal imports now use absolute paths instead of relative ones.
-    - Move from conda-channel ``prisae`` to ``conda-forge``.
-    - Automatic deploy for PyPi and conda-forge.
+  - The log now lists the version of emg3d.
+  - PEP8: internal imports now use absolute paths instead of relative ones.
+  - Move from conda-channel ``prisae`` to ``conda-forge``.
+  - Automatic deploy for PyPi and conda-forge.
 
 
 *v0.9.0* : Fourier

@@ -198,6 +198,25 @@ def test_solver_heterogeneous(capsys):
     assert "DIVERGED" in out
 
 
+def test_one_liner(capsys):
+    grid = utils.TensorMesh(
+            [np.ones(8), np.ones(8), np.ones(8)], x0=np.array([0, 0, 0]))
+    model = utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    sfield = utils.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
+
+    out, _ = capsys.readouterr()
+    _ = solver.solver(grid, model, sfield, verb=-1)
+    out, _ = capsys.readouterr()
+    assert '6; 0:00:' in out
+    assert '; CONVERGED' in out
+
+    out, _ = capsys.readouterr()
+    _ = solver.solver(grid, model, sfield, sslsolver=True, verb=-1)
+    out, _ = capsys.readouterr()
+    assert '3(5); 0:00:' in out
+    assert '; CONVERGED' in out
+
+
 def test_solver_homogeneous_laplace():
     # Regression test for homogeneous halfspace in Laplace domain.
     # Not very sophisticated; replace/extend by more detailed tests.

@@ -2712,8 +2712,12 @@ class Time:
     @property
     def runtime(self):
         """Return string of runtime since time zero."""
-        t1 = default_timer() - self._t0
-        return timedelta(seconds=np.round(t1))
+        return str(timedelta(seconds=np.round(self.elapsed)))
+
+    @property
+    def elapsed(self):
+        """Return runtime in seconds since time zero."""
+        return default_timer() - self._t0
 
 
 class Report(ScoobyReport):
