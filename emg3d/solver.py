@@ -171,6 +171,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 2: Print runtime and information about the method.
         - 3: Print additional information for each MG-cycle.
         - 4: Print everything (slower due to additional error calculations).
+        - -1: Print one-liner (dynamically updated).
 
     **kwargs : Optional solver options:
 
@@ -377,16 +378,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         multigrid(grid, vmodel, sfield, efield, var)
 
     # Print runtime information.
-    if var.sslsolver:  # sslsolver-specific info.
-        info = f"   > Solver steps     : {var._ssl_it}\n"
-        if var.cycle:
-            info += f"   > MG prec. steps   : {var.it}\n"
-    elif var.cycle:    # multigrid-specific info.
-        info = f"   > MG cycles        : {var.it}\n"
-    info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"  # Error.
-    info += f":: emg3d END   :: {var.time.now} :: "  # END and time.
-    info += f"runtime = {var.time.runtime}\n"        # Total runtime.
-    var.cprint(info, 1)
+    if var.verb < 0:
+        var.one_liner(var.l2, True)
+    elif var.verb > 1:
+        if var.sslsolver:  # sslsolver-specific info.
+            info = f"   > Solver steps     : {var._ssl_it}\n"
+            if var.cycle:
+                info += f"   > MG prec. steps   : {var.it}\n"
+        elif var.cycle:    # multigrid-specific info.
+            info = f"   > MG cycles        : {var.it}\n"
+        info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"
+        info += f":: emg3d END   :: {var.time.now} :: "
+        info += f"runtime = {var.time.runtime}\n"
+        var.cprint(info, 1)
 
     # Assemble the info_dict if return_info
     if var.return_info:
@@ -470,7 +474,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     l2_last = residual(grid, model, sfield, efield, True)
 
     # Keep track on the levels during the first cycle, for QC.
-    if var._first_cycle:
+    if var._first_cycle and var.verb > 2:
         var._level_all.append(level)
 
     # Print initial call info.
@@ -537,7 +541,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             prolongation(grid, efield, cgrid, cefield, sc_dir)
 
             # Append current prolongation level for QC.
-            if var._first_cycle:
+            if var._first_cycle and var.verb > 2:
                 var._level_all.append(level)
 
             # (B.5) Post-smoothing (nu_post).
@@ -692,11 +696,12 @@ def krylov(grid, model, sfield, efield, var):
         # Add current runtime to var.
         var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
 
-        # Calculate and print error (only if verbose).
-        if var.verb > 2:
+        # Calculate final error (only if verbose).
+        if (var.verb > 2) or (var.verb < 0):
+            var.l2 = residual(grid, model, sfield, efield, True)
 
-            # Get residual.
-            var.l2 = residual(grid, model, sfield, utils.Field(grid, x), True)
+        # Print error (only if verbose).
+        if var.verb > 2:
 
             log = f"   [{var.time.now}]   {var.l2/var.l2_refe:.3e} "
             log += f" after {var._ssl_it:3} {var.sslsolver}-cycles"
@@ -707,6 +712,10 @@ def krylov(grid, model, sfield, efield, var):
                 log += "\n"
 
             var.cprint(log, 2)
+
+        elif var.verb < 0:
+
+            var.one_liner(var.l2)
 
     # Solve the system with sslsolver.
     # The ssl solvers do not abort if the norm diverges or is not finite. We
@@ -720,7 +729,7 @@ def krylov(grid, model, sfield, efield, var):
         var.exit_message += " (returned field is zero)"
 
     # Calculate final error, if not done in the callback.
-    if var.verb < 3:
+    if (var.verb < 3) or (var.verb > -1):
         var.l2 = residual(grid, model, sfield, efield, True)
 
     # Convergence-checks for sslsolver.
@@ -1221,6 +1230,32 @@ class MGParameters:
         if self.verb > verbosity:
             print(info, **kwargs)
 
+    def one_liner(self, l2_last, exit=False):
+        """Print continuously updated one-liner.
+
+        Parameters
+        ----------
+        l2_last : float
+            Current error.
+
+        exit : bool
+            If True, adds ``exit_message`` and finishes line.
+
+        """
+        # Collect info.
+        info = f":: emg3d :: {l2_last/self.l2_refe:.1e}; "  # Absolute error.
+        if self.sslsolver:  # For multigrid as preconditioner.
+            info += f"{self._ssl_it}({self.it}); "
+        else:               # Stand-alone multigrid.
+            info += f"{self.it}; "
+        info += f"{self.time.runtime}"  # Runtime
+
+        # Print depending on `exit`.
+        if exit:
+            print(info+f"; {self.exit_message}")
+        else:
+            print(info, end='\r')
+
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
 
@@ -1558,9 +1593,11 @@ def _print_cycle_info(var, l2_last, l2_prev):
     var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
 
     # Start info string, return if not enough verbose.
-    if var.verb < 3:
+    if var.verb < 0:  # One-liner
+        var.one_liner(l2_last)
+        return
+    elif var.verb < 3:
         # Set first_cycle to False, to stop logging.
-        var._first_cycle = False
         return
     elif var.verb > 3:
         info = "\n"

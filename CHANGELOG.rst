@@ -5,9 +5,6 @@ Changelog
 *latest*
 --------
 
-- ``get_receiver`` can now take entire ``Field`` instances, and returns in that
-  case (``fx``, ``fy``, ``fz``) at receiver locations.
-
 - Krylov subspace solvers:
 
   - Solver now finishes in the middle of preconditioning cycles if tolerance is
@@ -20,13 +17,17 @@ Changelog
 
 - Various small things:
 
+    - ``get_receiver`` can now take entire ``Field`` instances, and returns in
+      that case (``fx``, ``fy``, ``fz``) at receiver locations.
     - Strength input for ``get_source_field`` can now be complex; it also
       stores now the source location and its strength and moment.
     - New attribute ``Field.is_electric``, so the field knows if it is electric
       or magnetic.
-    - Simple ``__repr__`` for ``TensorMesh``, ``Model``, ``Fourier``, ``Time``.
+    - New ``verb``-possibility: ``verb=-1`` is a continuously updated one-liner,
+      ideal to monitor large sets of calculations or in inversions.
     - The returned ``info`` dictionary contains now a key ``runtime_at_cycle``,
       which lists the accumulated total runtime at each cycle.
+    - Simple ``__repr__`` for ``TensorMesh``, ``Model``, ``Fourier``, ``Time``.
 
 - Bugfixes:
 
