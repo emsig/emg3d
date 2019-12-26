@@ -245,6 +245,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - ``it_ssl``: Number of SSL iterations;
         - ``time``: Runtime (s).
         - ``runtime_at_cycle``: Runtime after each cycle (s).
+        - ``error_at_cycle``: Absolute error after each cycle.
 
 
     Examples
@@ -311,6 +312,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Calculate reference error for tolerance.
     var.l2_refe = njitted.l2norm(sfield)
+    var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield and get efield
     if sfield.freq is None:
@@ -406,6 +408,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             'it_ssl': var._ssl_it,       # SSL iterations.
             'time': var.runtime_at_cycle[-1],          # Runtime (s).
             'runtime_at_cycle': var.runtime_at_cycle,  # Runtime at cycle (s).
+            'error_at_cycle': var.error_at_cycle,      # Abs. error at cycle.
         }
 
     # Return depending on input arguments; or nothing.
@@ -693,12 +696,10 @@ def krylov(grid, model, sfield, efield, var):
         # Update iteration count.
         var._ssl_it += 1
 
-        # Add current runtime to var.
+        # Add current runtime and error to var.
         var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
-
-        # Calculate final error (only if verbose).
-        if (var.verb > 2) or (var.verb < 0):
-            var.l2 = residual(grid, model, sfield, efield, True)
+        var.l2 = residual(grid, model, sfield, utils.Field(grid, x), True)
+        var.error_at_cycle = np.r_[var.error_at_cycle, var.l2]
 
         # Print error (only if verbose).
         if var.verb > 2:
@@ -727,10 +728,6 @@ def krylov(grid, model, sfield, efield, var):
     except _ConvergenceError:
         i = -1  # Mark it as error; returned field is all zero.
         var.exit_message += " (returned field is zero)"
-
-    # Calculate final error, if not done in the callback.
-    if (var.verb < 3) or (var.verb > -1):
-        var.l2 = residual(grid, model, sfield, efield, True)
 
     # Convergence-checks for sslsolver.
     pre = "\n   > "
@@ -1105,6 +1102,7 @@ class MGParameters:
 
         self.time = utils.Time()   # Timer.
         self.runtime_at_cycle = np.array([0.])  # Store runtime per cycle.
+        self.error_at_cycle = np.array([0.])    # Store error per cycle.
         self.do_return = True      # Whether or not to return the efield.
 
         # 1. Set everything related to semicoarsening and line relaxation.
@@ -1591,6 +1589,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
     """
     # Add current runtime to var.
     var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
+    var.error_at_cycle = np.r_[var.error_at_cycle, l2_last]
 
     # Start info string, return if not enough verbose.
     if var.verb < 0:  # One-liner
