@@ -1228,7 +1228,7 @@ class MGParameters:
         if self.verb > verbosity:
             print(info, **kwargs)
 
-    def one_liner(self, l2_last, exit=False):
+    def one_liner(self, l2_last, last=False):
         """Print continuously updated one-liner.
 
         Parameters
@@ -1236,7 +1236,7 @@ class MGParameters:
         l2_last : float
             Current error.
 
-        exit : bool
+        last : bool
             If True, adds ``exit_message`` and finishes line.
 
         """
@@ -1249,7 +1249,7 @@ class MGParameters:
         info += f"{self.time.runtime}"  # Runtime
 
         # Print depending on `exit`.
-        if exit:
+        if last:
             print(info+f"; {self.exit_message}")
         else:
             print(info, end='\r')
