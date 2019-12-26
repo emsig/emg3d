@@ -2,9 +2,15 @@ Changelog
 #########
 
 
-*latest*
---------
+*v0.9.2* : Complex sources
+--------------------------
 
+**2019-12-26**
+
+- Strength input for ``get_source_field`` can now be complex; it also stores
+  now the source location and its strength and moment.
+- ``get_receiver`` can now take entire ``Field`` instances, and returns in that
+  case (``fx``, ``fy``, ``fz``) at receiver locations.
 - Krylov subspace solvers:
 
   - Solver now finishes in the middle of preconditioning cycles if tolerance is
@@ -17,10 +23,6 @@ Changelog
 
 - Various small things:
 
-  - ``get_receiver`` can now take entire ``Field`` instances, and returns in
-    that case (``fx``, ``fy``, ``fz``) at receiver locations.
-  - Strength input for ``get_source_field`` can now be complex; it also
-    stores now the source location and its strength and moment.
   - New attribute ``Field.is_electric``, so the field knows if it is electric
     or magnetic.
   - New ``verb``-possibility: ``verb=-1`` is a continuously updated one-liner,
