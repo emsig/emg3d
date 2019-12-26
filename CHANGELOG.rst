@@ -2,6 +2,13 @@ Changelog
 #########
 
 
+*latest*
+--------
+
+- Rename ``solver.solver`` to ``solver.solve``; load ``solve`` also into the
+  main namespace as ``emg3d.solve``.
+
+
 *v0.9.2* : Complex sources
 --------------------------
 

@@ -32,13 +32,13 @@ from dataclasses import dataclass
 from emg3d import utils
 from emg3d import njitted
 
-__all__ = ['solver', 'multigrid', 'smoothing', 'restriction', 'prolongation',
+__all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
            'residual', 'krylov', 'MGParameters', 'RegularGridProlongator']
 
 
 # MAIN USER-FACING FUNCTION
-def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
-           semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
+def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
+          semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
     r"""Solver for 3D CSEM data with tri-axial electrical anisotropy.
 
     The principal solver of `emg3d` is using the multigrid method as presented
@@ -264,7 +264,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>> sfield = emg3d.utils.get_source_field(
     >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
     >>> # Calculate the electric signal.
-    >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
+    >>> efield = emg3d.solve(grid, model, sfield, verb=3)
     >>> # Get the corresponding magnetic signal.
     >>> hfield = emg3d.utils.get_h_field(grid, model, efield)
     .
@@ -418,6 +418,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         return efield
     elif var.return_info:                  # info.
         return info_dict
+
+
+def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
+           semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
+    """Alias to solve(), for backwards compatibility."""
+
+    # Issue warning for backwards compatibility.
+    print("\n    ``emg3d.solver.solver()`` is renamed to ``emg3d.solve()``."
+          "\n    Use the new ``emg3d.solve()``, as ``solver()`` will be "
+          "removed in the future.")
+
+    return solve(grid, model, sfield, efield, cycle, sslsolver, semicoarsening,
+                 linerelaxation, verb, **kwargs)
 
 
 # SOLVERS
