@@ -54,7 +54,7 @@ def test_get_hx_h0(capsys):
     info = (
         "   Skin depth          [m] : 2251\n"
         "   Survey domain       [m] : -2000 - 2000\n"
-        "   Calculation domain  [m] : -15505 - 15505\n"
+        "   Calculation domain  [m] : -14692 - 15592\n"
         "   Final extent        [m] : -15698 - 15998\n"
         f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3382\n"
         "   Alpha survey/calc       : "
@@ -146,7 +146,7 @@ def test_get_hx_h0(capsys):
     assert out7[1] < -10000
     assert out7[1]+np.sum(out7[0]) > 10000
 
-    out8 = utils.get_hx_h0(1, [0.3, 1, 100], [-1000, 1000], alpha=[1, 1, 1])
+    out8 = utils.get_hx_h0(1, [0.3, 1, 90], [-1000, 1000], alpha=[1, 1, 1])
     assert out8[1] > -5000                  # Left buffer much smaller than
     assert out8[1]+np.sum(out8[0]) > 30000  # right buffer.
 
