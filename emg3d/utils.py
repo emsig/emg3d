@@ -886,8 +886,9 @@ class Model:
 
         # Issue warning for backwards compatibility.
         if freq is not None:
-            print("\n    ``Model`` does not take frequency ``freq`` any "
-                  "longer;\n    providing it will break in the future.")
+            print("\n* WARNING :: ``Model`` is independent of frequency and "
+                  "does not take\n             ``freq`` any longer; providing "
+                  "it will break in the future.")
 
         # Store required info from grid.
         self.nC = grid.nC

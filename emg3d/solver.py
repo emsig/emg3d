@@ -425,9 +425,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     """Alias to solve(), for backwards compatibility."""
 
     # Issue warning for backwards compatibility.
-    print("\n    ``emg3d.solver.solver()`` is renamed to ``emg3d.solve()``."
-          "\n    Use the new ``emg3d.solve()``, as ``solver()`` will be "
-          "removed in the future.")
+    print("\n* WARNING :: ``emg3d.solver.solver()`` is renamed to "
+          "``emg3d.solve()``.\n             Use the new ``emg3d.solve()``, as "
+          "``solver()`` will be\n             removed in the future.")
 
     return solve(grid, model, sfield, efield, cycle, sslsolver, semicoarsening,
                  linerelaxation, verb, **kwargs)

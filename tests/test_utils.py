@@ -433,7 +433,7 @@ def test_Model(capsys):
     model1.epsilon_r = None
     vmodel1 = utils.VolumeModel(grid, model1, sfield)
     out, _ = capsys.readouterr()
-    assert '``Model`` does not take frequency' in out
+    assert '* WARNING :: ``Model`` is independent of frequency' in out
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
