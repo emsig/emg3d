@@ -2,6 +2,18 @@ Changelog
 #########
 
 
+*latest*
+--------
+
+- Rename ``solver.solver`` to ``solver.solve``; load ``solve`` also into the
+  main namespace as ``emg3d.solve``.
+- Adjustment to ``utils.get_hx_h0`` (this might change your boundaries): The
+  calculation domain is now calculated so that the distance for the signal
+  travelling from the source to the boundary and back to the most remote
+  receiver is at least two wavelengths away. If this is within the provided
+  domain, then now extra buffer is added around the domain.
+
+
 *v0.9.2* : Complex sources
 --------------------------
 

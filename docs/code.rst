@@ -5,7 +5,7 @@ Code
 
 .. automodule:: emg3d.solver
     :members:
-    :exclude-members: solver
+    :exclude-members: solve, solver
 
 .. automodule:: emg3d.njitted
     :members:

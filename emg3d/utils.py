@@ -886,8 +886,9 @@ class Model:
 
         # Issue warning for backwards compatibility.
         if freq is not None:
-            print("\n    ``Model`` does not take frequency ``freq`` any "
-                  "longer;\n    providing it will break in the future.")
+            print("\n* WARNING :: ``Model`` is independent of frequency and "
+                  "does not take\n             ``freq`` any longer; providing "
+                  "it will break in the future.")
 
         # Store required info from grid.
         self.nC = grid.nC
@@ -1608,13 +1609,20 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         else:
             dmin = np.clip(dmin, *min_width)
 
-    # Survey domain.
+    # Survey domain; contains all sources and receivers.
     domain = np.array(domain, dtype=float)
 
-    # Calculation domain.
-    calc_domain = skind[1:]*np.array([6., 6.])  # 6 x sd => buffer zone.
-    calc_domain[0] = domain[0] - calc_domain[0]
-    calc_domain[1] = domain[1] + calc_domain[1]
+    # Calculation domain; big enough to avoid boundary effects.
+    # To avoid boundary effects we want the signal to travel two wavelengths
+    # from the source to the boundary and back to the receiver.
+    # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
+    # Two wavelengths we can savely assume it is zero.
+    dist_in_domain = abs(domain - fixed[0])  # Source to edges of domain.
+    dist_buff = skind[1:]*4*np.pi            # 2 wavelengths
+    dist_buff = np.max([np.zeros(2), (dist_buff - dist_in_domain)/2], axis=0)
+    calc_domain = np.array([domain[0]-dist_buff[0], domain[1]+dist_buff[1]])
+    # print(f"New :: {calc_domain[0]}, {calc_domain[1]}")
+    # print(f"Old :: {domain[0] - skind[1]*6}, {domain[1] + skind[2]*6}")
 
     # Initiate flag if terminated.
     finished = False
