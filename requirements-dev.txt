@@ -4,7 +4,6 @@ numba >= 0.40.0
 matplotlib
 
 empymod
-discretize
 
 # sphinx fixed below 2.0
 # https://github.com/numpy/numpydoc/issues/215
