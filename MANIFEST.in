@@ -7,3 +7,5 @@ exclude requirements-dev.txt
 exclude runtests.sh
 exclude .gitignore
 exclude .travis.yml
+exclude .readthedocs.yml
+exclude .rtfd.yml
