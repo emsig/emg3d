@@ -77,7 +77,7 @@ model = emg3d.utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
 
 ###############################################################################
 # We can plot the model using ``discretize``; in this case it is obviously
-# rather a boring plot, as it shows a homogenous fullspace.
+# rather a boring plot, as it shows a homogeneous fullspace.
 
 grid.plot_3d_slicer(np.ones(grid.vnC)*model.res_x)  # x-resistivity
 
