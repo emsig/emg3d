@@ -11,9 +11,10 @@ dependencies:
   - scooby
   - discretize
   - setuptools_scm
-  - sphinx<2.0
-  - numpydoc
-  - sphinx_rtd_theme
-  - sphinx_gallery
+  - pip
   - pip:
+    - sphinx<2.0
+    - numpydoc
+    - sphinx_rtd_theme
+    - sphinx_gallery
     - sphinx_numfig
