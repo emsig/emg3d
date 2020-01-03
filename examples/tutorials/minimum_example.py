@@ -40,9 +40,6 @@ First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
 ``numpy`` and ``matplotlib``:
 
 """
-!pip install discretize
-###############################################################################
-
 import emg3d
 import discretize
 import numpy as np
