@@ -41,7 +41,6 @@ First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
 
 """
 import emg3d
-import discretize
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
@@ -58,11 +57,13 @@ plt.style.use('ggplot')
 # dissipate, yet fine enough around source and receiver to accurately model
 # them. This grid is too small, but serves as a minimal example.
 
-grid = discretize.TensorMesh(
-        [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
-         [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
-         [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
-        x0='CCC')
+# grid = discretize.TensorMesh(
+#         [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
+#          [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
+#          [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
+#         x0='CCC')
+grid = emg3d.utils.TensorMesh(
+        [np.ones(64)*25, np.ones(32)*50, np.ones(32)*30], x0=[0, 0, 0])
 grid
 
 ###############################################################################
@@ -79,7 +80,7 @@ model = emg3d.utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
 # We can plot the model using ``discretize``; in this case it is obviously
 # rather a boring plot, as it shows a homogeneous fullspace.
 
-grid.plot_3d_slicer(np.ones(grid.vnC)*model.res_x)  # x-resistivity
+# grid.plot_3d_slicer(np.ones(grid.vnC)*model.res_x)  # x-resistivity
 
 ###############################################################################
 # 3. Source field
@@ -110,11 +111,11 @@ efield = emg3d.solver.solver(grid, model, sfield, verb=3)
 # We can again utilize the in-built functions of a ``discretize``-grid to plot,
 # e.g., the x-directed electric field.
 
-grid.plot_3d_slicer(
-        efield.fx.ravel('F'), view='abs', vType='Ex',
-        pcolorOpts={'norm': LogNorm()}
-)
+# grid.plot_3d_slicer(
+#         efield.fx.ravel('F'), view='abs', vType='Ex',
+#         pcolorOpts={'norm': LogNorm()}
+# )
 
 ###############################################################################
 
-emg3d.Report(discretize)
+emg3d.Report()
