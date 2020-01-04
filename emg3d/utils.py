@@ -6,7 +6,7 @@
 Utility functions for the multigrid solver.
 
 """
-# Copyright 2018-2019 The emg3d Developers.
+# Copyright 2018-2020 The emg3d Developers.
 #
 # This file is part of emg3d.
 #

@@ -7,7 +7,7 @@ discretized on a staggered Yee grid. The code is written completely in Python
 using the ``numpy``/``scipy``-stack, where the most time-consuming parts are
 sped-up through jitted ``numba``-functions.
 """
-# Copyright 2018-2019 The emg3d Developers.
+# Copyright 2018-2020 The emg3d Developers.
 #
 # This file is part of emg3d.
 #

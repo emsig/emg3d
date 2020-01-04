@@ -109,6 +109,6 @@ See `CREDITS` for the history of the code.
 License information
 ===================
 
-Copyright 2018-2019 The emg3d Developers.
+Copyright 2018-2020 The emg3d Developers.
 
 Licensed under the Apache License, Version 2.0, see the ``LICENSE``-file.

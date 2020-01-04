@@ -7,7 +7,7 @@ The actual solver routines. The most computationally intensive parts, however,
 are in the :mod:`emg3d.njitted` as numba-jitted functions.
 
 """
-# Copyright 2018-2019 The emg3d Developers.
+# Copyright 2018-2020 The emg3d Developers.
 #
 # This file is part of emg3d.
 #
