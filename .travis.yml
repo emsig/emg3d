@@ -11,11 +11,11 @@ matrix:
     - python: 3.7  # => 3.7
       env: PYTHON=3.7 DEPLOY_PYPI=true INST=""
     - python: 3.7  # just linkcheck
-      env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig sphinx_gallery discretize matplotlib"
+      env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig sphinx_gallery matplotlib"
 
 jobs:
   allow_failures:  # env must be EXACTLY as env allowed to fail.
-    - env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig sphinx_gallery discretize matplotlib"
+    - env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig sphinx_gallery matplotlib"
 
 install:
   - sudo apt-get update
@@ -35,7 +35,8 @@ install:
   - source activate tenv
   - conda install -c conda-forge empymod
   - pip install setuptools_scm coveralls pytest-flake8 $INST
-  - pip install .
+  - pip install .  # Used to be python setup.py install;
+  #                # changed because of numba/sphinx
 
 script:  # No pytest for linkcheck-run.
   - if [ "$CHCKLNKS" = true ]; then
