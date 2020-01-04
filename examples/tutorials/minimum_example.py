@@ -43,7 +43,7 @@ First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
 import emg3d
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+# from matplotlib.colors import LogNorm
 plt.style.use('ggplot')
 # sphinx_gallery_thumbnail_number = 2
 
