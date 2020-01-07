@@ -6,7 +6,7 @@
 Utility functions for the multigrid solver.
 
 """
-# Copyright 2018-2019 The emg3d Developers.
+# Copyright 2018-2020 The emg3d Developers.
 #
 # This file is part of emg3d.
 #
@@ -2468,7 +2468,7 @@ class Fourier:
         # - same real part as lowest calculated frequency and
         # - zero imaginary part.
         freq_ext = np.r_[1e-100, self.freq_calc]
-        data_ext = np.r_[fdata[0].real+0.0j, fdata]
+        data_ext = np.r_[fdata[0].real-1e-100j, fdata]
 
         # 2.b Actual 'extrapolation' (now an interpolation).
         ext_real = Pchip(freq_ext, data_ext.real)(self.freq_extrapolate)
