@@ -135,8 +135,8 @@ def test_solver_homogeneous(capsys):
             grid, model, sfield, efield, sslsolver=True, semicoarsening=True,
             linerelaxation=True, maxit=2, verb=3)
     out, _ = capsys.readouterr()
-    assert "after                       1 F-cycles    0 0" in out
-    assert "after                       2 F-cycles    4 1" in out
+    assert "after                       1 F-cycles    4 1" in out
+    assert "after                       2 F-cycles    5 2" in out
 
     # Provide an initial source-field without frequency information.
     wrong_sfield = utils.Field(grid)
