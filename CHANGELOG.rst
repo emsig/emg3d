@@ -7,6 +7,10 @@ Changelog
 
 - Rename ``solver.solver`` to ``solver.solve``; load ``solve`` also into the
   main namespace as ``emg3d.solve``.
+- Adjustment to termination criterion for *STAGNATION*: The current error is
+  now compared to the last error of the same cycle type. Together with this the
+  workaround for sslsolver when called with an initial efield introduced in
+  v0.8.0 was removed.
 - Adjustment to ``utils.get_hx_h0`` (this might change your boundaries): The
   calculation domain is now calculated so that the distance for the signal
   travelling from the source to the boundary and back to the most remote

@@ -489,6 +489,9 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     # Calculate current error (l2-norms).
     l2_last = residual(grid, model, sfield, efield, True)
 
+    # Initiate the error-array to check for stagnation.
+    l2_stag = np.ones(var._maxcycle)*l2_last
+
     # Keep track on the levels during the first cycle, for QC.
     if var._first_cycle and var.verb > 2:
         var._level_all.append(level)
@@ -513,8 +516,9 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     # Start the actual (recursive) multigrid cycle.
     while level == 0 or (level > 0 and it < cycmax):
 
-        # Store previous error for comparisons.
+        # Store errors for comparisons (previous and previous of same cycle).
         l2_prev = l2_last
+        l2_stag[(it-1) % var._maxcycle] = l2_last
 
         if level == var.clevel[var.sc_dir]:  # (A) Coarsest grid, solve system.
             # Note that coarsest grid depends on semicoarsening (sc_dir). If
@@ -594,7 +598,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 var.lr_dir = next(var.lr_cycle)
 
             # Check if any termination criteria is fulfilled.
-            if _terminate(var, l2_last, l2_prev, it):
+            if _terminate(var, l2_last, l2_stag[(it-1) % var._maxcycle], it):
                 break
 
     # Store final error (l2-norm).
@@ -633,35 +637,6 @@ def krylov(grid, model, sfield, efield, var):
     """
     # Get frequency
     freq = sfield._freq
-
-    # If an initial efield was provided, we run first one multigrid cycle
-    # without semicoarsening nor line relaxation; this helps to stabilize the
-    # sslsolver later on.
-    if not var.do_return:
-        # Store variables.
-        tmp_maxit = var.maxit
-        tmp_sc_cycle = var.sc_cycle
-        tmp_lr_cycle = var.lr_cycle
-        tmp_sc_dir = var.sc_dir
-        tmp_lr_dir = var.lr_dir
-
-        # Re-define maxit and the cycles.
-        var.maxit = 1
-        var.sc_cycle = False
-        var.lr_cycle = False
-        var.sc_dir = 0
-        var.lr_dir = 0
-
-        # Run one multigrid cycle.
-        multigrid(grid, model, sfield, efield, var)
-        var.cprint("", 2)  # Enter an empty line to distinguish it.
-
-        # Re-set the variables.
-        var.maxit = tmp_maxit
-        var.sc_cycle = tmp_sc_cycle
-        var.lr_cycle = tmp_lr_cycle
-        var.sc_dir = tmp_sc_dir
-        var.lr_dir = tmp_lr_dir
 
     # Define matrix operation A x as LinearOperator.
     def amatvec(efield):
@@ -1369,13 +1344,13 @@ class MGParameters:
             raise ValueError('cycle/sslsolver')
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
-        self.ssl_maxit = 0              # Maximum iteration
+        self.ssl_maxit = 0             # Maximum iteration
         self._maxit = f"{self.maxit}"  # For printing
+        self._maxcycle = max(len(self._raw_sc_cycle), len(self._raw_lr_cycle))
         if self.sslsolver:
             self.ssl_maxit = self.maxit
             if self.cycle is not None:  # Only if MG is used
-                self.maxit = max(len(self._raw_sc_cycle),
-                                 len(self._raw_lr_cycle))
+                self.maxit = self._maxcycle
                 self._maxit += f" ({self.maxit})"  # For printing
 
 
@@ -1694,7 +1669,7 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
     print(info)
 
 
-def _terminate(var, l2_last, l2_prev, it):
+def _terminate(var, l2_last, l2_stag, it):
     """Return multigrid termination flag.
 
     Checks all termination criteria and returns True if at least one is
@@ -1706,8 +1681,8 @@ def _terminate(var, l2_last, l2_prev, it):
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
 
-    l2_last, l2_prev : float
-        Last and previous erros (l2-norms).
+    l2_last, l2_stag : float
+        Last error and error for stagnation comparison (l2-norms).
 
     it : int
         Iteration number.
@@ -1732,10 +1707,13 @@ def _terminate(var, l2_last, l2_prev, it):
         finished = True
         sslabort = True  # Force abort if sslsolver.
 
-    elif it > 2 and l2_last >= l2_prev:  # Stagnated.
+    elif it > 2 and l2_last >= l2_stag:  # Stagnated.
         var.exit_message = "STAGNATED"
         finished = True
         sslabort = True  # Force abort if sslsolver.
+        # Note: SSL will not fall into this, as it compares to the last value
+        #       of the same cycle type. However, if used as preconditioner each
+        #       cycle-type is only run once, before returning to the SSL.
 
     elif it == var.maxit:                # Maximum iterations reached.
         var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
