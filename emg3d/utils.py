@@ -1150,9 +1150,17 @@ class VolumeModel:
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
-    The linear method is the fastest, and the volume-averaging method is the
-    slowest. For big grids (millions of cells), the difference in runtime can
-    be substantial.
+    **Note 1:**
+    The default method is 'linear', because it works with fields and model
+    parameters. However, recommended are 'volume' for model parameters and
+    'cubic' for fields.
+
+    **Note 2:**
+    For model parameters with `method='volume'` the result is quite different
+    if you provide resistivity, conductivity, or the logarithm of any of the
+    two. The recommended way is to provide the logarithm of resistivity or
+    conductivity, in which case the output of one is indeed the inverse of the
+    output of the other.
 
 
     Parameters
@@ -1164,13 +1172,16 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
         Model parameters; Field instance, or a particular field (e.g.
         field.fx). For fields the method cannot be 'volume'.
 
-    method : {<'volume'>, 'linear', 'cubic'}, optional
+    method : {<'linear'>, 'volume', 'cubic'}, optional
         The method of interpolation to perform. The volume averaging method
-        ensures that the total sum of the property stays constant. Default is
-        'volume'. The method 'cubic' requires at least three points in any
-        direction, otherwise it will fall back to 'linear'.
+        ensures that the total sum of the property stays constant.
 
         Volume averaging is only implemented for model parameters, not for
+        fields. The method 'cubic' requires at least three points in any
+        direction, otherwise it will fall back to 'linear'.
+
+        Default is 'linear', because it works with fields and model parameters.
+        However, recommended are 'volume' for model parameters and 'cubic' for
         fields.
 
     extrapolate : bool
