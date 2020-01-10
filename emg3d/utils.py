@@ -1446,7 +1446,8 @@ class TensorMesh:
 
 
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
-              pps=3, alpha=None, raise_error=True, verb=1, return_info=False):
+              pps=3, alpha=None, max_domain=100000., raise_error=True, verb=1,
+              return_info=False):
     r"""Return cell widths and origin for given parameters.
 
     Returns cell widths for the provided frequency, resistivity, domain extent,
@@ -1538,6 +1539,10 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         Default = [1, 1.5, .01], hence no stretching within the survey domain
         and a maximum stretching of 1.5 in the buffer zone; step size is 0.01.
 
+    max_domain : float, optional
+        Maximum calculation domain from fixed[0] (usually source position).
+        Default is 100,000.
+
     raise_error : bool, optional
         If True, an error is raised if no suitable grid is found. Otherwise it
         just prints a message and returns None's.
@@ -1627,13 +1632,27 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     # To avoid boundary effects we want the signal to travel two wavelengths
     # from the source to the boundary and back to the receiver.
     # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
-    # Two wavelengths we can savely assume it is zero.
-    dist_in_domain = abs(domain - fixed[0])  # Source to edges of domain.
-    dist_buff = skind[1:]*4*np.pi            # 2 wavelengths
-    dist_buff = np.max([np.zeros(2), (dist_buff - dist_in_domain)/2], axis=0)
+    # Two wavelengths we can safely assume it is zero.
+    #
+    # The air does not follow the concept of skin depth, as it is a wave rather
+    # than diffusion. For this is the factor ``max_domain``, which restricts
+    # the domain in each direction to this value from the center.
+
+    # (a) Source to edges of domain.
+    dist_in_domain = abs(domain - fixed[0])
+
+    # (b) Two wavelengths.
+    two_lambda = skind[1:]*4*np.pi
+
+    # (c) Required buffer, additional to domain.
+    dist_buff = np.max([np.zeros(2), (two_lambda - dist_in_domain)/2], axis=0)
+
+    # (d) Add buffer to domain.
     calc_domain = np.array([domain[0]-dist_buff[0], domain[1]+dist_buff[1]])
-    # print(f"New :: {calc_domain[0]}, {calc_domain[1]}")
-    # print(f"Old :: {domain[0] - skind[1]*6}, {domain[1] + skind[2]*6}")
+
+    # (e) Restrict total domain to max_domain.
+    calc_domain[0] = max(calc_domain[0], fixed[0]-max_domain)
+    calc_domain[1] = min(calc_domain[1], fixed[0]+max_domain)
 
     # Initiate flag if terminated.
     finished = False

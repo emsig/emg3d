@@ -69,7 +69,7 @@ def test_get_hx_h0(capsys):
     # == B == Laplace and verb=0, parameter positions and defaults.
     out2 = utils.get_hx_h0(
             -.5/np.pi/2, 10, [-2000, 2000], 900, [20, 32], None, 3,
-            [1.05, 1.5, 0.01], False, 0, True)
+            [1.05, 1.5, 0.01], 100000., False, 0, True)
     outstr2, _ = capsys.readouterr()
 
     # Assert they are the same.
