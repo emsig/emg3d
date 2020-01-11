@@ -1150,9 +1150,17 @@ class VolumeModel:
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
     """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
-    The linear method is the fastest, and the volume-averaging method is the
-    slowest. For big grids (millions of cells), the difference in runtime can
-    be substantial.
+    **Note 1:**
+    The default method is 'linear', because it works with fields and model
+    parameters. However, recommended are 'volume' for model parameters and
+    'cubic' for fields.
+
+    **Note 2:**
+    For model parameters with `method='volume'` the result is quite different
+    if you provide resistivity, conductivity, or the logarithm of any of the
+    two. The recommended way is to provide the logarithm of resistivity or
+    conductivity, in which case the output of one is indeed the inverse of the
+    output of the other.
 
 
     Parameters
@@ -1164,13 +1172,16 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
         Model parameters; Field instance, or a particular field (e.g.
         field.fx). For fields the method cannot be 'volume'.
 
-    method : {<'volume'>, 'linear', 'cubic'}, optional
+    method : {<'linear'>, 'volume', 'cubic'}, optional
         The method of interpolation to perform. The volume averaging method
-        ensures that the total sum of the property stays constant. Default is
-        'volume'. The method 'cubic' requires at least three points in any
-        direction, otherwise it will fall back to 'linear'.
+        ensures that the total sum of the property stays constant.
 
         Volume averaging is only implemented for model parameters, not for
+        fields. The method 'cubic' requires at least three points in any
+        direction, otherwise it will fall back to 'linear'.
+
+        Default is 'linear', because it works with fields and model parameters.
+        However, recommended are 'volume' for model parameters and 'cubic' for
         fields.
 
     extrapolate : bool
@@ -1435,7 +1446,8 @@ class TensorMesh:
 
 
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
-              pps=3, alpha=None, raise_error=True, verb=1, return_info=False):
+              pps=3, alpha=None, max_domain=100000., raise_error=True, verb=1,
+              return_info=False):
     r"""Return cell widths and origin for given parameters.
 
     Returns cell widths for the provided frequency, resistivity, domain extent,
@@ -1527,6 +1539,10 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         Default = [1, 1.5, .01], hence no stretching within the survey domain
         and a maximum stretching of 1.5 in the buffer zone; step size is 0.01.
 
+    max_domain : float, optional
+        Maximum calculation domain from fixed[0] (usually source position).
+        Default is 100,000.
+
     raise_error : bool, optional
         If True, an error is raised if no suitable grid is found. Otherwise it
         just prints a message and returns None's.
@@ -1616,13 +1632,27 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     # To avoid boundary effects we want the signal to travel two wavelengths
     # from the source to the boundary and back to the receiver.
     # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
-    # Two wavelengths we can savely assume it is zero.
-    dist_in_domain = abs(domain - fixed[0])  # Source to edges of domain.
-    dist_buff = skind[1:]*4*np.pi            # 2 wavelengths
-    dist_buff = np.max([np.zeros(2), (dist_buff - dist_in_domain)/2], axis=0)
+    # Two wavelengths we can safely assume it is zero.
+    #
+    # The air does not follow the concept of skin depth, as it is a wave rather
+    # than diffusion. For this is the factor ``max_domain``, which restricts
+    # the domain in each direction to this value from the center.
+
+    # (a) Source to edges of domain.
+    dist_in_domain = abs(domain - fixed[0])
+
+    # (b) Two wavelengths.
+    two_lambda = skind[1:]*4*np.pi
+
+    # (c) Required buffer, additional to domain.
+    dist_buff = np.max([np.zeros(2), (two_lambda - dist_in_domain)/2], axis=0)
+
+    # (d) Add buffer to domain.
     calc_domain = np.array([domain[0]-dist_buff[0], domain[1]+dist_buff[1]])
-    # print(f"New :: {calc_domain[0]}, {calc_domain[1]}")
-    # print(f"Old :: {domain[0] - skind[1]*6}, {domain[1] + skind[2]*6}")
+
+    # (e) Restrict total domain to max_domain.
+    calc_domain[0] = max(calc_domain[0], fixed[0]-max_domain)
+    calc_domain[1] = min(calc_domain[1], fixed[0]+max_domain)
 
     # Initiate flag if terminated.
     finished = False

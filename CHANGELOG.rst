@@ -15,7 +15,9 @@ Changelog
   calculation domain is now calculated so that the distance for the signal
   travelling from the source to the boundary and back to the most remote
   receiver is at least two wavelengths away. If this is within the provided
-  domain, then now extra buffer is added around the domain.
+  domain, then now extra buffer is added around the domain. Additionally, the
+  function has a new parameter ``max_domain``, which is the maximum distance
+  from the center to the boundary; defaults to 100 km.
 
 
 *v0.9.2* : Complex sources
