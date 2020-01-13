@@ -1147,7 +1147,8 @@ class VolumeModel:
 
 
 # INTERPOLATION
-def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
+def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
+              log=False):
     """Interpolate ``values`` located on ``grid`` to ``new_grid``.
 
     **Note 1:**
@@ -1194,6 +1195,11 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
 
         Default is True.
 
+    log : bool
+        If True, the interpolation is carried out on a log10-scale; hence the
+        same as ``10**grid2grid(grid, np.log10(values), ...)``.
+        Default is False.
+
 
     Returns
     -------
@@ -1209,9 +1215,12 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
 
     # If values is a Field instance, call it recursively for each field.
     if hasattr(values, 'field') and values.field.ndim == 1:
-        fx = grid2grid(grid, np.asarray(values.fx), new_grid, method)
-        fy = grid2grid(grid, np.asarray(values.fy), new_grid, method)
-        fz = grid2grid(grid, np.asarray(values.fz), new_grid, method)
+        fx = grid2grid(grid, np.asarray(values.fx), new_grid, method,
+                       extrapolate, log)
+        fy = grid2grid(grid, np.asarray(values.fy), new_grid, method,
+                       extrapolate, log)
+        fz = grid2grid(grid, np.asarray(values.fz), new_grid, method,
+                       extrapolate, log)
 
         # Return a field instance.
         return Field(fx, fy, fz)
@@ -1228,7 +1237,12 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
         vol = new_grid.vol.reshape(new_grid.vnC, order='F')
 
         # Get values from `volume_average`.
-        njitted.volume_average(*points, values, *new_points, new_values, vol)
+        if log:
+            njitted.volume_average(*points, np.log10(values), *new_points,
+                                   new_values, vol)
+        else:
+            njitted.volume_average(*points, values, *new_points, new_values,
+                                   vol)
 
     else:
         # Get the vectors corresponding to input data.
@@ -1263,12 +1277,20 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True):
         else:
             fill_value = 0.0
             mode = 'constant'
-        new_values = _interp3d(
-                points, values, new_points, method, fill_value, mode)
+
+        if log:
+            new_values = _interp3d(points, np.log10(values), new_points,
+                                   method, fill_value, mode)
+        else:
+            new_values = _interp3d(points, values, new_points, method,
+                                   fill_value, mode)
 
         new_values = new_values.reshape(shape, order='F')
 
-    return new_values
+    if log:
+        return 10**new_values
+    else:
+        return new_values
 
 
 def _interp3d(points, values, new_points, method, fill_value, mode):

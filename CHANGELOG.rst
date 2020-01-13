@@ -18,6 +18,8 @@ Changelog
   domain, then now extra buffer is added around the domain. Additionally, the
   function has a new parameter ``max_domain``, which is the maximum distance
   from the center to the boundary; defaults to 100 km.
+- New parameter ``log`` for ``utils.grid2grid``; if ``True``, then the
+  interpolation is carried out on a log10-scale.
 
 
 *v0.9.2* : Complex sources
