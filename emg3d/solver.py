@@ -7,7 +7,7 @@ The actual solver routines. The most computationally intensive parts, however,
 are in the :mod:`emg3d.njitted` as numba-jitted functions.
 
 """
-# Copyright 2018-2019 The emg3d Developers.
+# Copyright 2018-2020 The emg3d Developers.
 #
 # This file is part of emg3d.
 #
@@ -32,13 +32,13 @@ from dataclasses import dataclass
 from emg3d import utils
 from emg3d import njitted
 
-__all__ = ['solver', 'multigrid', 'smoothing', 'restriction', 'prolongation',
+__all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
            'residual', 'krylov', 'MGParameters', 'RegularGridProlongator']
 
 
 # MAIN USER-FACING FUNCTION
-def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
-           semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
+def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
+          semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
     r"""Solver for 3D CSEM data with tri-axial electrical anisotropy.
 
     The principal solver of `emg3d` is using the multigrid method as presented
@@ -171,6 +171,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 2: Print runtime and information about the method.
         - 3: Print additional information for each MG-cycle.
         - 4: Print everything (slower due to additional error calculations).
+        - -1: Print one-liner (dynamically updated).
 
     **kwargs : Optional solver options:
 
@@ -243,6 +244,8 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - ``it_mg``: Number of multigrid iterations;
         - ``it_ssl``: Number of SSL iterations;
         - ``time``: Runtime (s).
+        - ``runtime_at_cycle``: Runtime after each cycle (s).
+        - ``error_at_cycle``: Absolute error after each cycle.
 
 
     Examples
@@ -261,7 +264,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>> sfield = emg3d.utils.get_source_field(
     >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
     >>> # Calculate the electric signal.
-    >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
+    >>> efield = emg3d.solve(grid, model, sfield, verb=3)
     >>> # Get the corresponding magnetic signal.
     >>> hfield = emg3d.utils.get_h_field(grid, model, efield)
     .
@@ -309,6 +312,7 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Calculate reference error for tolerance.
     var.l2_refe = njitted.l2norm(sfield)
+    var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield and get efield
     if sfield.freq is None:
@@ -376,17 +380,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         multigrid(grid, vmodel, sfield, efield, var)
 
     # Print runtime information.
-    if var.sslsolver:  # sslsolver-specific info.
-        info = f"   > Solver steps     : {var._ssl_it}\n"
-        if var.cycle:
-            info += f"   > MG prec. steps   : {var.it}\n"
-    elif var.cycle:    # multigrid-specific info.
-        info = f"   > MG cycles        : {var.it}\n"
-    info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"  # Error.
-    info += f":: emg3d END   :: {var.time.now} :: "  # END and time.
-    time = var.time.runtime
-    info += f"runtime = {time}\n"                    # Total runtime.
-    var.cprint(info, 1)
+    if var.verb < 0:
+        var.one_liner(var.l2, True)
+    elif var.verb > 1:
+        if var.sslsolver:  # sslsolver-specific info.
+            info = f"   > Solver steps     : {var._ssl_it}\n"
+            if var.cycle:
+                info += f"   > MG prec. steps   : {var.it}\n"
+        elif var.cycle:    # multigrid-specific info.
+            info = f"   > MG cycles        : {var.it}\n"
+        info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"
+        info += f":: emg3d END   :: {var.time.now} :: "
+        info += f"runtime = {var.time.runtime}\n"
+        var.cprint(info, 1)
 
     # Assemble the info_dict if return_info
     if var.return_info:
@@ -400,7 +406,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             'tol': var.tol,              # Tolerance (abs_error<ref_error*tol).
             'it_mg': var.it,             # Multigrid iterations.
             'it_ssl': var._ssl_it,       # SSL iterations.
-            'time': time.seconds,        # Runtime (s).
+            'time': var.runtime_at_cycle[-1],          # Runtime (s).
+            'runtime_at_cycle': var.runtime_at_cycle,  # Runtime at cycle (s).
+            'error_at_cycle': var.error_at_cycle,      # Abs. error at cycle.
         }
 
     # Return depending on input arguments; or nothing.
@@ -410,6 +418,19 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         return efield
     elif var.return_info:                  # info.
         return info_dict
+
+
+def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
+           semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
+    """Alias to solve(), for backwards compatibility."""
+
+    # Issue warning for backwards compatibility.
+    print("\n* WARNING :: ``emg3d.solver.solver()`` is renamed to "
+          "``emg3d.solve()``.\n             Use the new ``emg3d.solve()``, as "
+          "``solver()`` will be\n             removed in the future.")
+
+    return solve(grid, model, sfield, efield, cycle, sslsolver, semicoarsening,
+                 linerelaxation, verb, **kwargs)
 
 
 # SOLVERS
@@ -468,8 +489,11 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     # Calculate current error (l2-norms).
     l2_last = residual(grid, model, sfield, efield, True)
 
+    # Initiate the error-array to check for stagnation.
+    l2_stag = np.ones(var._maxcycle)*l2_last
+
     # Keep track on the levels during the first cycle, for QC.
-    if var._first_cycle:
+    if var._first_cycle and var.verb > 2:
         var._level_all.append(level)
 
     # Print initial call info.
@@ -492,8 +516,9 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     # Start the actual (recursive) multigrid cycle.
     while level == 0 or (level > 0 and it < cycmax):
 
-        # Store previous error for comparisons.
+        # Store errors for comparisons (previous and previous of same cycle).
         l2_prev = l2_last
+        l2_stag[(it-1) % var._maxcycle] = l2_last
 
         if level == var.clevel[var.sc_dir]:  # (A) Coarsest grid, solve system.
             # Note that coarsest grid depends on semicoarsening (sc_dir). If
@@ -536,7 +561,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             prolongation(grid, efield, cgrid, cefield, sc_dir)
 
             # Append current prolongation level for QC.
-            if var._first_cycle:
+            if var._first_cycle and var.verb > 2:
                 var._level_all.append(level)
 
             # (B.5) Post-smoothing (nu_post).
@@ -573,7 +598,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 var.lr_dir = next(var.lr_cycle)
 
             # Check if any termination criteria is fulfilled.
-            if _terminate(var, l2_last, l2_prev, it):
+            if _terminate(var, l2_last, l2_stag[(it-1) % var._maxcycle], it):
                 break
 
     # Store final error (l2-norm).
@@ -612,35 +637,6 @@ def krylov(grid, model, sfield, efield, var):
     """
     # Get frequency
     freq = sfield._freq
-
-    # If an initial efield was provided, we run first one multigrid cycle
-    # without semicoarsening nor line relaxation; this helps to stabilize the
-    # sslsolver later on.
-    if not var.do_return:
-        # Store variables.
-        tmp_maxit = var.maxit
-        tmp_sc_cycle = var.sc_cycle
-        tmp_lr_cycle = var.lr_cycle
-        tmp_sc_dir = var.sc_dir
-        tmp_lr_dir = var.lr_dir
-
-        # Re-define maxit and the cycles.
-        var.maxit = 1
-        var.sc_cycle = False
-        var.lr_cycle = False
-        var.sc_dir = 0
-        var.lr_dir = 0
-
-        # Run one multigrid cycle.
-        multigrid(grid, model, sfield, efield, var)
-        var.cprint("", 2)  # Enter an empty line to distinguish it.
-
-        # Re-set the variables.
-        var.maxit = tmp_maxit
-        var.sc_cycle = tmp_sc_cycle
-        var.lr_cycle = tmp_lr_cycle
-        var.sc_dir = tmp_sc_dir
-        var.lr_dir = tmp_lr_dir
 
     # Define matrix operation A x as LinearOperator.
     def amatvec(efield):
@@ -688,11 +684,13 @@ def krylov(grid, model, sfield, efield, var):
         # Update iteration count.
         var._ssl_it += 1
 
-        # Calculate and print error (only if verbose).
-        if var.verb > 2:
+        # Add current runtime and error to var.
+        var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
+        var.l2 = residual(grid, model, sfield, utils.Field(grid, x), True)
+        var.error_at_cycle = np.r_[var.error_at_cycle, var.l2]
 
-            # Get residual.
-            var.l2 = residual(grid, model, sfield, utils.Field(grid, x), True)
+        # Print error (only if verbose).
+        if var.verb > 2:
 
             log = f"   [{var.time.now}]   {var.l2/var.l2_refe:.3e} "
             log += f" after {var._ssl_it:3} {var.sslsolver}-cycles"
@@ -704,6 +702,10 @@ def krylov(grid, model, sfield, efield, var):
 
             var.cprint(log, 2)
 
+        elif var.verb < 0:
+
+            var.one_liner(var.l2)
+
     # Solve the system with sslsolver.
     # The ssl solvers do not abort if the norm diverges or is not finite. We
     # therefore throw an exception in ``_terminate``, and catch it here.
@@ -714,10 +716,6 @@ def krylov(grid, model, sfield, efield, var):
     except _ConvergenceError:
         i = -1  # Mark it as error; returned field is all zero.
         var.exit_message += " (returned field is zero)"
-
-    # Calculate final error, if not done in the callback.
-    if var.verb < 3:
-        var.l2 = residual(grid, model, sfield, efield, True)
 
     # Convergence-checks for sslsolver.
     pre = "\n   > "
@@ -1091,6 +1089,8 @@ class MGParameters:
         self.exit_message = ''     # For convergence status.
 
         self.time = utils.Time()   # Timer.
+        self.runtime_at_cycle = np.array([0.])  # Store runtime per cycle.
+        self.error_at_cycle = np.array([0.])    # Store error per cycle.
         self.do_return = True      # Whether or not to return the efield.
 
         # 1. Set everything related to semicoarsening and line relaxation.
@@ -1216,6 +1216,32 @@ class MGParameters:
         if self.verb > verbosity:
             print(info, **kwargs)
 
+    def one_liner(self, l2_last, last=False):
+        """Print continuously updated one-liner.
+
+        Parameters
+        ----------
+        l2_last : float
+            Current error.
+
+        last : bool
+            If True, adds ``exit_message`` and finishes line.
+
+        """
+        # Collect info.
+        info = f":: emg3d :: {l2_last/self.l2_refe:.1e}; "  # Absolute error.
+        if self.sslsolver:  # For multigrid as preconditioner.
+            info += f"{self._ssl_it}({self.it}); "
+        else:               # Stand-alone multigrid.
+            info += f"{self.it}; "
+        info += f"{self.time.runtime}"  # Runtime
+
+        # Print depending on `exit`.
+        if last:
+            print(info+f"; {self.exit_message}")
+        else:
+            print(info, end='\r')
+
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
 
@@ -1318,13 +1344,13 @@ class MGParameters:
             raise ValueError('cycle/sslsolver')
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
-        self.ssl_maxit = 0              # Maximum iteration
+        self.ssl_maxit = 0             # Maximum iteration
         self._maxit = f"{self.maxit}"  # For printing
+        self._maxcycle = max(len(self._raw_sc_cycle), len(self._raw_lr_cycle))
         if self.sslsolver:
             self.ssl_maxit = self.maxit
             if self.cycle is not None:  # Only if MG is used
-                self.maxit = max(len(self._raw_sc_cycle),
-                                 len(self._raw_lr_cycle))
+                self.maxit = self._maxcycle
                 self._maxit += f" ({self.maxit})"  # For printing
 
 
@@ -1549,11 +1575,16 @@ def _print_cycle_info(var, l2_last, l2_prev):
         Last and previous errors (l2-norms).
 
     """
+    # Add current runtime to var.
+    var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
+    var.error_at_cycle = np.r_[var.error_at_cycle, l2_last]
 
     # Start info string, return if not enough verbose.
-    if var.verb < 3:
+    if var.verb < 0:  # One-liner
+        var.one_liner(l2_last)
+        return
+    elif var.verb < 3:
         # Set first_cycle to False, to stop logging.
-        var._first_cycle = False
         return
     elif var.verb > 3:
         info = "\n"
@@ -1638,7 +1669,7 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
     print(info)
 
 
-def _terminate(var, l2_last, l2_prev, it):
+def _terminate(var, l2_last, l2_stag, it):
     """Return multigrid termination flag.
 
     Checks all termination criteria and returns True if at least one is
@@ -1650,8 +1681,8 @@ def _terminate(var, l2_last, l2_prev, it):
     var : `MGParameters`-instance
         As returned by :func:`multigrid`.
 
-    l2_last, l2_prev : float
-        Last and previous erros (l2-norms).
+    l2_last, l2_stag : float
+        Last error and error for stagnation comparison (l2-norms).
 
     it : int
         Iteration number.
@@ -1676,10 +1707,13 @@ def _terminate(var, l2_last, l2_prev, it):
         finished = True
         sslabort = True  # Force abort if sslsolver.
 
-    elif it > 2 and l2_last >= l2_prev:  # Stagnated.
+    elif it > 2 and l2_last >= l2_stag:  # Stagnated.
         var.exit_message = "STAGNATED"
         finished = True
         sslabort = True  # Force abort if sslsolver.
+        # Note: SSL will not fall into this, as it compares to the last value
+        #       of the same cycle type. However, if used as preconditioner each
+        #       cycle-type is only run once, before returning to the SSL.
 
     elif it == var.maxit:                # Maximum iterations reached.
         var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"

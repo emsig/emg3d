@@ -56,9 +56,8 @@ contain references to ``blas``, ``lapack``, ``openblas``, or similar.
 
 The structure of emg3d is:
 
-- **solver.py**: The main multigrid solver routine, where
-  ``emg3d.solver.solver`` is the principal user-facing routine
-  (see :doc:`solver`).
+- **solver.py**: The main multigrid solver routine, where ``emg3d.solve`` is
+  the principal user-facing routine (see :doc:`solver`).
 - **utils.py**: Utilities such as helper functions to create meshes, models,
   and source fields.
 - **njitted.py**: The heavy calculations, all ``numba``-jitted functions.
@@ -124,7 +123,7 @@ Now we can calculate the electric field with ``emg3d``:
 
 .. code-block:: python
 
-    >>> efield = emg3d.solver.solver(grid, model, sfield, verb=3)
+    >>> efield = emg3d.solve(grid, model, sfield, verb=3)
 
     :: emg3d START :: 15:24:40 :: v0.9.1
 
@@ -191,11 +190,11 @@ use emg3d together with the mentioned projects and more!
 Tipps and Tricks
 ----------------
 
-The function :func:`emg3d.solver.solver` is the main entry point, and it takes
-care whether multigrid is used as a solver or as a preconditioner (or not at
-all), while the actual multigrid solver is :func:`emg3d.solver.multigrid`.
-Most input parameters for :func:`emg3d.solver.solver` are sufficiently
-described in its docstring. Here a few additional information.
+The function :func:`emg3d.solve` is the main entry point, and it takes care
+whether multigrid is used as a solver or as a preconditioner (or not at all),
+while the actual multigrid solver is :func:`emg3d.solver.multigrid`. Most input
+parameters for :func:`emg3d.solve` are sufficiently described in its docstring.
+Here a few additional information.
 
 - You can input any three-dimensional grid into `emg3d`. However, the
   implemented multigrid technique works with the existing nodes, meaning there
@@ -287,7 +286,7 @@ results of my machine can be found in the `empymod/emg3d-bench
 License
 -------
 
-Copyright 2018-2019 The emg3d Developers.
+Copyright 2018-2020 The emg3d Developers.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
