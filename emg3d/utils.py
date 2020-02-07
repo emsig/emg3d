@@ -43,7 +43,8 @@ except ImportError:
     class ScoobyReport:
         def __init__(self, additional, core, optional, ncol, text_width, sort):
             print("\n* WARNING :: `emg3d.Report` requires `scooby`."
-                  "\n             Install it via `pip install scooby`.\n")
+                  "\n             Install it via `pip install scooby` or"
+                  "\n             `conda install -c conda-forge scooby`.\n")
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
