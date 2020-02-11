@@ -10,11 +10,10 @@ been tried and what still could be tried in order to improve the current code.
 Runtime
 -------
 
-The `examples-gallery <https://github.com/empymod/emg3d-examples>`_ contains a
-notebook to do some testing with regards to runtime, see
-`4b_Runtime.ipynb
-<https://github.com/empymod/emg3d-examples/blob/master/4b_Runtime.ipynb>`_.
-An example output of that notebook is shown in :numref:`Figure %s <runtime>`.
+The `gallery <https://empymod.github.io/emg3d-gallery>`_ contains a script to
+do some testing with regards to runtime, see the `Tools Section
+<https://empymod.github.io/emg3d-gallery/gallery/index.html#tools>`_. An
+example output of that script is shown in :numref:`Figure %s <runtime>`.
 
 .. figure:: _static/runtime.svg
    :scale: 80 %
@@ -90,11 +89,10 @@ fields (source field, electric field, and residual field) and the model
 parameters (resistivity, eta, mu). For a big model, they some up; e.g., almost
 3 GB for an isotropic model with 256x256x256 cells.
 
-The `examples-gallery <https://github.com/empymod/emg3d-examples>`_ contains a
-notebook to do some testing with regards to the RAM usage, see
-`4a_RAM-requirements.ipynb
-<https://github.com/empymod/emg3d-examples/blob/master/4a_RAM-requirements.ipynb>`_.
-An example output of that notebook is shown in :numref:`Figure %s <ramusage>`.
+The `gallery <https://empymod.github.io/emg3d-gallery>`_ contains a script to
+do some testing with regards to the RAM usage, see the `Tools Section
+<https://empymod.github.io/emg3d-gallery/gallery/index.html#tools>`_. An
+example output of that script is shown in :numref:`Figure %s <ramusage>`.
 
 .. figure:: _static/RAM-Usage.svg
    :scale: 80 %

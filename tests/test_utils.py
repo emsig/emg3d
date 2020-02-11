@@ -743,6 +743,13 @@ def test_grid2grid_volume():
     # Result 2nd cell: (5*1+10*5+10*3)/25=3.4
     assert_allclose(values_out[:, 0, 0], np.array([1, 3.4, 7, 2, 2]))
 
+    # Check log:
+    vlogparam = utils.grid2grid(
+            grid_in, values_in, grid_out, 'volume', log=True)
+    vlinloginp = utils.grid2grid(
+            grid_in, np.log10(values_in), grid_out, 'volume')
+    assert_allclose(vlogparam, 10**vlinloginp)
+
     # == Y ==  Reverse it
     grid_out = utils.TensorMesh(
             [np.array([1, ]), np.ones(5)*10, np.array([1, ])],
@@ -866,9 +873,19 @@ def test_grid2grid():
     out = utils.grid2grid(tgrid, tmodel, t2grid, 'cubic')
     assert_allclose(out, 2.)
 
+    # Same, but with log.
+    vlog = utils.grid2grid(tgrid, tmodel, t2grid, 'cubic', log=True)
+    vlin = utils.grid2grid(tgrid, np.log10(tmodel), t2grid, 'cubic')
+    assert_allclose(vlog, 10**vlin)
+
     # Extrapolate with linear.
     out = utils.grid2grid(tgrid, tmodel, t2grid, 'linear')
     assert_allclose(out, 3.)
+
+    # Same, but with log.
+    vlog = utils.grid2grid(tgrid, tmodel, t2grid, 'linear', log=True)
+    vlin = utils.grid2grid(tgrid, np.log10(tmodel), t2grid, 'linear')
+    assert_allclose(vlog, 10**vlin)
 
     # Assert it is 0 if points are outside.
     out = utils.grid2grid(tgrid, tmodel, t2grid, 'cubic', False)

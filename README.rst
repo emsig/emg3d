@@ -42,7 +42,7 @@ reports, and much more, see
 - **Website**: https://empymod.github.io,
 - **Documentation**: https://emg3d.readthedocs.io,
 - **Source Code**: https://github.com/empymod/emg3d,
-- **Examples**: https://github.com/empymod/emg3d-examples.
+- **Examples**: https://empymod.github.io/emg3d-gallery.
 
 
 Features
