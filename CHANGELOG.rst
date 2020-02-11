@@ -2,8 +2,8 @@ Changelog
 #########
 
 
-*latest*
---------
+*v0.9.3* : Sphinx gallery
+-------------------------
 
 - Rename ``solver.solver`` to ``solver.solve``; load ``solve`` also into the
   main namespace as ``emg3d.solve``.
