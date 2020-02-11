@@ -20,6 +20,8 @@ Changelog
   from the center to the boundary; defaults to 100 km.
 - New parameter ``log`` for ``utils.grid2grid``; if ``True``, then the
   interpolation is carried out on a log10-scale.
+- Change from the notebook-based ``emg3d-examples``-repo to the
+  ``sphinx``-based ``emg3d-gallery``-repo.
 
 
 *v0.9.2* : Complex sources
