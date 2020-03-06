@@ -1030,6 +1030,36 @@ class Model:
 
         return equal
 
+    def copy(self):
+        """Return a copy of the model."""
+
+        # resistivities.
+        res_x = self.res_x.copy()
+        if self.case in [1, 3]:
+            res_y = self.res_y.copy()
+        else:
+            res_y = None
+        if self.case in [2, 3]:
+            res_z = self.res_z.copy()
+        else:
+            res_z = None
+
+        # mu_r.
+        if self.mu_r is not None:
+            mu_r = self.mu_r.copy()
+        else:
+            mu_r = None
+
+        # epsilon_r.
+        if self.epsilon_r is not None:
+            epsilon_r = self.epsilon_r.copy()
+        else:
+            epsilon_r = None
+
+        # Return new Model instance.
+        return Model(grid=self._vol, res_x=res_x, res_y=res_y, res_z=res_z,
+                     mu_r=mu_r, epsilon_r=epsilon_r)
+
     @property
     def size(self):
         """Return model size."""

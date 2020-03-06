@@ -558,80 +558,141 @@ def test_Model(capsys):
         _ = utils.Model(grid, mu_r=-1)
 
 
-def test_model_operators():
-    # Test overload operators
+class TestModelOperators:
+
+    # Define two different sized meshes.
     mesh_base = utils.TensorMesh(
             [np.ones(3), np.ones(4), np.ones(5)], x0=np.array([0, 0, 0]))
     mesh_diff = utils.TensorMesh(
             [np.ones(3), np.ones(4), np.ones(6)], x0=np.array([0, 0, 0]))
 
+    # Define a couple of models.
     model_int = utils.Model(mesh_base, 1.)
-    model_1 = utils.Model(mesh_base, 1., 2.)
-    model_2 = utils.Model(mesh_base, 1., res_z=3.)
-    model_3 = utils.Model(mesh_base, 1., 2., 3.)
-    model_mu = utils.Model(mesh_base, 1., mu_r=1.)
-    model_epsilon = utils.Model(mesh_base, 1., epsilon_r=1.)
+    model_1_a = utils.Model(mesh_base, 1., 2.)
+    model_1_b = utils.Model(mesh_base, 2., 4.)
+    model_2_a = utils.Model(mesh_base, 1., res_z=3.)
+    model_2_b = utils.Model(mesh_base, 2., res_z=6.)
+    model_3_a = utils.Model(mesh_base, 1., 2., 3.)
+    model_3_b = utils.Model(mesh_base, 2., 4., 6.)
+    model_mu_a = utils.Model(mesh_base, 1., mu_r=1.)
+    model_mu_b = utils.Model(mesh_base, 2., mu_r=2.)
+    model_epsilon_a = utils.Model(mesh_base, 1., epsilon_r=1.)
+    model_epsilon_b = utils.Model(mesh_base, 2., epsilon_r=2.)
 
     model_int_diff = utils.Model(mesh_diff, 1.)
     model_nC = utils.Model(mesh_base, np.ones(mesh_base.nC)*2.)
     model_vnC = utils.Model(mesh_base, np.ones(mesh_base.vnC))
 
-    a = model_int + model_nC
-    b = model_nC + model_vnC
-    c = model_int + model_vnC
-    d = model_nC - model_vnC
+    def test_operator_test(self):
+        with pytest.raises(ValueError):
+            self.model_int + self.model_1_a
+        with pytest.raises(ValueError):
+            self.model_int - self.model_2_a
+        with pytest.raises(ValueError):
+            self.model_int + self.model_3_a
+        with pytest.raises(ValueError):
+            self.model_int - self.model_mu_a
+        with pytest.raises(ValueError):
+            self.model_int + self.model_epsilon_a
+        with pytest.raises(ValueError):
+            self.model_int - self.model_int_diff
 
-    assert a == b
-    assert d == model_int
-    assert a != c
-    assert a.res_x[0, 0, 0] == 3.0
-    assert b.res_x[0, 0, 0] == 3.0
-    assert c.res_x[0, 0, 0] == 2.0
+    def test_add(self):
+        a = self.model_int + self.model_nC
+        b = self.model_nC + self.model_vnC
+        c = self.model_int + self.model_vnC
+        assert a == b
+        assert a != c
+        assert a.res_x[0, 0, 0] == 3.0
+        assert b.res_x[0, 0, 0] == 3.0
+        assert c.res_x[0, 0, 0] == 2.0
 
-    # Check different shapes
-    with pytest.raises(ValueError):
-        model_int + model_int_diff
+        # Addition with something else than a model
+        with pytest.raises(TypeError):
+            self.model_int + self.mesh_base
 
-    with pytest.raises(TypeError):
-        model_int + mesh_base
+        # All different cases
+        a = self.model_1_a + self.model_1_a
+        assert a.res_x == self.model_1_b.res_x
+        assert a.res_y == self.model_1_b.res_y
+        assert a.res_z.base is a.res_x.base
 
-    with pytest.raises(TypeError):
-        model_int - mesh_base
+        a = self.model_2_a + self.model_2_a
+        assert a.res_x == self.model_2_b.res_x
+        assert a.res_y.base is a.res_x.base
+        assert a.res_z == self.model_2_b.res_z
 
-    assert (model_int == mesh_base) is False
-    out = model_int == model_int_diff
-    assert not out
+        a = self.model_3_a + self.model_3_a
+        assert a.res_x == self.model_3_b.res_x
+        assert a.res_y == self.model_3_b.res_y
+        assert a.res_z == self.model_3_b.res_z
 
-    # Check shape and size
-    assert_allclose(model_int.shape, mesh_base.vnC)
-    assert model_int.size == mesh_base.nC
+        # mu_r and epsilon_r
+        a = self.model_mu_a + self.model_mu_a
+        b = self.model_epsilon_a + self.model_epsilon_a
+        assert a.mu_r == self.model_mu_b.mu_r
+        assert b.epsilon_r == self.model_epsilon_b.epsilon_r
 
-    # Check operator failures
-    with pytest.raises(ValueError):
-        model_int + model_1
-    with pytest.raises(ValueError):
-        model_int + model_2
-    with pytest.raises(ValueError):
-        model_int + model_3
-    with pytest.raises(ValueError):
-        model_int + model_mu
-    with pytest.raises(ValueError):
-        model_int + model_epsilon
+    def test_sub(self):
+        # Addition with something else than a model
+        with pytest.raises(TypeError):
+            self.model_int - self.mesh_base
 
-    a = model_1 + model_1
-    assert a.res_x == model_1.res_x*2
-    assert a.res_y == model_1.res_y*2
-    assert a.res_z.base is a.res_x.base
+        # All different cases
+        a = self.model_1_b - self.model_1_a
+        assert a.res_x == self.model_1_a.res_x
+        assert a.res_y == self.model_1_a.res_y
+        assert a.res_z.base is a.res_x.base
 
-    a = model_2 + model_2
-    assert a.res_x == model_2.res_x*2
-    assert a.res_y.base is a.res_x.base
-    assert a.res_z == model_2.res_z*2
+        a = self.model_2_b - self.model_2_a
+        assert a.res_x == self.model_2_a.res_x
+        assert a.res_y.base is a.res_x.base
+        assert a.res_z == self.model_2_a.res_z
 
-    a = model_3 + model_3
-    assert a.res_x == model_3.res_x*2
-    assert a.res_y == model_3.res_y*2
-    assert a.res_z == model_3.res_z*2
+        a = self.model_3_b - self.model_3_a
+        assert a.res_x == self.model_3_a.res_x
+        assert a.res_y == self.model_3_a.res_y
+        assert a.res_z == self.model_3_a.res_z
+
+        # mu_r and epsilon_r
+        a = self.model_mu_b - self.model_mu_a
+        b = self.model_epsilon_b - self.model_epsilon_a
+        assert a.mu_r == self.model_mu_a.mu_r
+        assert b.epsilon_r == self.model_epsilon_a.epsilon_r
+
+    def test_eq(self):
+
+        assert (self.model_int == self.mesh_base) is False
+
+        out = self.model_int == self.model_int_diff
+        assert not out
+
+        out = self.model_int == self.model_int
+        assert out
+
+    def test_general(self):
+
+        # Check shape and size
+        assert_allclose(self.model_int.shape, self.mesh_base.vnC)
+        assert self.model_int.size == self.mesh_base.nC
+
+    def test_copy(self):
+        model_new1 = self.model_vnC.copy()
+        model_new2 = self.model_3_a.copy()
+        model_new3 = self.model_mu_a.copy()
+        model_new4 = self.model_epsilon_a.copy()
+
+        assert model_new1 == self.model_vnC
+        assert model_new2 == self.model_3_a
+        assert model_new3 == self.model_mu_a
+        assert model_new4 == self.model_epsilon_a
+
+        assert model_new1.res_x.base is not self.model_vnC.res_x.base
+        assert model_new2.res_y.base is not self.model_3_a.res_y.base
+        assert model_new2.res_z.base is not self.model_3_a.res_z.base
+        assert model_new3.mu_r.base is not self.model_mu_a.mu_r.base
+        assert (model_new4.epsilon_r.base is not
+                self.model_epsilon_a.epsilon_r.base)
 
 
 def test_field():

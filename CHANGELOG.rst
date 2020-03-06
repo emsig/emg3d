@@ -7,6 +7,7 @@ Changelog
 
 - ``emg3d.utils.Model``: Possible to create new models by adding or subtracting
   existing models, and comparing two models (``+``, ``-``, ``==`` and ``!=``).
+  New attributes ``shape``, ``size``, and ``copy``.
 
 
 *v0.9.3* : Sphinx gallery
