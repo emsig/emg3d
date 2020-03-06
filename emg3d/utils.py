@@ -904,6 +904,11 @@ class Model:
             self.vnC = grid.vnC
             self._vol = grid.vol.reshape(self.vnC, order='F')
 
+        # Copies of vnC and nC, but more widely used/known
+        # (vnC and nC are the discretize attributes).
+        self.shape = tuple(self.vnC)
+        self.size = self.nC
+
         # Check case.
         self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
         if res_y is None and res_z is None:  # 0: Isotropic.
@@ -1059,16 +1064,6 @@ class Model:
         # Return new Model instance.
         return Model(grid=self._vol, res_x=res_x, res_y=res_y, res_z=res_z,
                      mu_r=mu_r, epsilon_r=epsilon_r)
-
-    @property
-    def size(self):
-        """Return model size."""
-        return self.nC
-
-    @property
-    def shape(self):
-        """Return model shape."""
-        return tuple(self.vnC)
 
     # RESISTIVITIES
     @property
