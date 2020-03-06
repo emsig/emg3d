@@ -892,9 +892,17 @@ class Model:
                   "it will break in the future.")
 
         # Store required info from grid.
-        self.nC = grid.nC
-        self.vnC = grid.vnC
-        self._vol = grid.vol.reshape(self.vnC, order='F')
+        if hasattr(grid, 'dtype'):
+            # This is an alternative possibility. Instead of the grid, we only
+            # need the model._vol of shape vnC. Mainly used internally to
+            # construct new models.
+            self.nC = np.prod(grid.shape)
+            self.vnC = grid.shape
+            self._vol = grid
+        else:
+            self.nC = grid.nC
+            self.vnC = grid.vnC
+            self._vol = grid.vol.reshape(self.vnC, order='F')
 
         # Check case.
         self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
@@ -919,6 +927,118 @@ class Model:
         return (f"Model; {self.case_names[self.case]} resistivities"
                 f"{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}")
+
+    def __add__(self, model):
+        """Add two models."""
+
+        # Ensure model is a Model instance.
+        if model.__class__.__name__ != 'Model':
+            return NotImplemented
+
+        # Check input.
+        vol = self._operator_test(model)
+
+        # Add resistivities.
+        res_x = self.res_x + model.res_x
+        if self.case in [1, 3]:
+            res_y = self.res_y + model.res_y
+        else:
+            res_y = None
+        if self.case in [2, 3]:
+            res_z = self.res_z + model.res_z
+        else:
+            res_z = None
+
+        # Add mu_r.
+        if self.mu_r is not None:
+            mu_r = self.mu_r + model.mu_r
+        else:
+            mu_r = None
+
+        # Add epsilon_r.
+        if self.epsilon_r is not None:
+            epsilon_r = self.epsilon_r + model.epsilon_r
+        else:
+            epsilon_r = None
+
+        # Return new Model instance.
+        return Model(grid=vol, res_x=res_x, res_y=res_y, res_z=res_z,
+                     mu_r=mu_r, epsilon_r=epsilon_r)
+
+    def __sub__(self, model):
+        """Subtract two models."""
+
+        # Ensure model is a Model instance.
+        if model.__class__.__name__ != 'Model':
+            return NotImplemented
+
+        # Check input.
+        grid = self._operator_test(model)
+
+        # Subtract resistivities.
+        res_x = self.res_x - model.res_x
+        if self.case in [1, 3]:
+            res_y = self.res_y - model.res_y
+        else:
+            res_y = None
+        if self.case in [2, 3]:
+            res_z = self.res_z - model.res_z
+        else:
+            res_z = None
+
+        # Subtract mu_r.
+        if self.mu_r is not None:
+            mu_r = self.mu_r - model.mu_r
+        else:
+            mu_r = None
+
+        # Subtract epsilon_r.
+        if self.epsilon_r is not None:
+            epsilon_r = self.epsilon_r - model.epsilon_r
+        else:
+            epsilon_r = None
+
+        # Return new Model instance.
+        return Model(grid=grid, res_x=res_x, res_y=res_y, res_z=res_z,
+                     mu_r=mu_r, epsilon_r=epsilon_r)
+
+    def __eq__(self, model):
+        """Compare two models.
+
+        Note: Shape of parameters can be different, e.g. float, nC, or vnC. As
+              long as all values agree it returns True.
+
+        """
+
+        # Ensure model is a Model instance.
+        if model.__class__.__name__ != 'Model':
+            return NotImplemented
+
+        # Check input.
+        try:
+            _ = self._operator_test(model)
+            equal = True
+        except ValueError:
+            equal = False
+
+        # Compare resistivities.
+        equal *= np.all(self.res_x == model.res_x)
+        equal *= np.all(self.res_y == model.res_y)
+        equal *= np.all(self.res_z == model.res_z)
+        equal *= np.all(self.mu_r == model.mu_r)
+        equal *= np.all(self.epsilon_r == model.epsilon_r)
+
+        return equal
+
+    @property
+    def size(self):
+        """Return model size."""
+        return self.nC
+
+    @property
+    def shape(self):
+        """Return model shape."""
+        return tuple(self.vnC)
 
     # RESISTIVITIES
     @property
@@ -1039,6 +1159,45 @@ class Model:
             return var
         else:                # Else, has shape vnC.
             return var.reshape(self.vnC, order='F')
+
+    def _operator_test(self, model):
+        """Check if `self` and `model` are consistent for operations.
+
+        Note: {hx; hy; hz} is not checked. As long as the models have the
+              same shape and resistivity type the operation will be carried
+              out.
+
+        """
+
+        # Ensure the two instances have the same dimension.
+        if np.any(self.shape != model.shape):
+            msg = (f"Models could not be broadcast together with shapes "
+                   f"{self.shape} and {model.shape}.")
+            raise ValueError(msg)
+
+        # Ensure the two instances have the same case.
+        if self.case != model.case:
+            msg = ("Models must be of the same resistivity type but have types"
+                   f" '{self.case_names[self.case]}' and"
+                   f" '{model.case_names[model.case]}'.")
+            raise ValueError(msg)
+
+        # Ensure both or none has mu_r:
+        if hasattr(self.mu_r, 'dtype') != hasattr(model.mu_r, 'dtype'):
+            msg = ("Either both or none of the models must have `mu_r` "
+                   f"defined; provided: '{hasattr(self.mu_r, 'dtype')}' "
+                   f"and '{hasattr(model.mu_r, 'dtype')}'.")
+            raise ValueError(msg)
+
+        # Ensure both or none has epsilon_r:
+        if (hasattr(self.epsilon_r, 'dtype') !=
+                hasattr(model.epsilon_r, 'dtype')):
+            msg = ("Either both or none of the models must have `epsilon_r` "
+                   f"defined; provided: '{hasattr(self.epsilon_r, 'dtype')}' "
+                   f"and '{hasattr(model.epsilon_r, 'dtype')}'.")
+            raise ValueError(msg)
+
+        return self._vol
 
 
 class VolumeModel:

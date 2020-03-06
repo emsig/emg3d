@@ -558,6 +558,82 @@ def test_Model(capsys):
         _ = utils.Model(grid, mu_r=-1)
 
 
+def test_model_operators():
+    # Test overload operators
+    mesh_base = utils.TensorMesh(
+            [np.ones(3), np.ones(4), np.ones(5)], x0=np.array([0, 0, 0]))
+    mesh_diff = utils.TensorMesh(
+            [np.ones(3), np.ones(4), np.ones(6)], x0=np.array([0, 0, 0]))
+
+    model_int = utils.Model(mesh_base, 1.)
+    model_1 = utils.Model(mesh_base, 1., 2.)
+    model_2 = utils.Model(mesh_base, 1., res_z=3.)
+    model_3 = utils.Model(mesh_base, 1., 2., 3.)
+    model_mu = utils.Model(mesh_base, 1., mu_r=1.)
+    model_epsilon = utils.Model(mesh_base, 1., epsilon_r=1.)
+
+    model_int_diff = utils.Model(mesh_diff, 1.)
+    model_nC = utils.Model(mesh_base, np.ones(mesh_base.nC)*2.)
+    model_vnC = utils.Model(mesh_base, np.ones(mesh_base.vnC))
+
+    a = model_int + model_nC
+    b = model_nC + model_vnC
+    c = model_int + model_vnC
+    d = model_nC - model_vnC
+
+    assert a == b
+    assert d == model_int
+    assert a != c
+    assert a.res_x[0, 0, 0] == 3.0
+    assert b.res_x[0, 0, 0] == 3.0
+    assert c.res_x[0, 0, 0] == 2.0
+
+    # Check different shapes
+    with pytest.raises(ValueError):
+        model_int + model_int_diff
+
+    with pytest.raises(TypeError):
+        model_int + mesh_base
+
+    with pytest.raises(TypeError):
+        model_int - mesh_base
+
+    assert (model_int == mesh_base) is False
+    out = model_int == model_int_diff
+    assert not out
+
+    # Check shape and size
+    assert_allclose(model_int.shape, mesh_base.vnC)
+    assert model_int.size == mesh_base.nC
+
+    # Check operator failures
+    with pytest.raises(ValueError):
+        model_int + model_1
+    with pytest.raises(ValueError):
+        model_int + model_2
+    with pytest.raises(ValueError):
+        model_int + model_3
+    with pytest.raises(ValueError):
+        model_int + model_mu
+    with pytest.raises(ValueError):
+        model_int + model_epsilon
+
+    a = model_1 + model_1
+    assert a.res_x == model_1.res_x*2
+    assert a.res_y == model_1.res_y*2
+    assert a.res_z.base is a.res_x.base
+
+    a = model_2 + model_2
+    assert a.res_x == model_2.res_x*2
+    assert a.res_y.base is a.res_x.base
+    assert a.res_z == model_2.res_z*2
+
+    a = model_3 + model_3
+    assert a.res_x == model_3.res_x*2
+    assert a.res_y == model_3.res_y*2
+    assert a.res_z == model_3.res_z*2
+
+
 def test_field():
     # Create some dummy data
     grid = utils.TensorMesh(
