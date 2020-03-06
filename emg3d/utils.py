@@ -943,32 +943,11 @@ class Model:
         # Check input.
         vol = self._operator_test(model)
 
-        # Add resistivities.
-        res_x = self.res_x + model.res_x
-        if self.case in [1, 3]:
-            res_y = self.res_y + model.res_y
-        else:
-            res_y = None
-        if self.case in [2, 3]:
-            res_z = self.res_z + model.res_z
-        else:
-            res_z = None
-
-        # Add mu_r.
-        if self.mu_r is not None:
-            mu_r = self.mu_r + model.mu_r
-        else:
-            mu_r = None
-
-        # Add epsilon_r.
-        if self.epsilon_r is not None:
-            epsilon_r = self.epsilon_r + model.epsilon_r
-        else:
-            epsilon_r = None
+        # Apply operator.
+        kwargs = self._apply_operator(model, np.add)
 
         # Return new Model instance.
-        return Model(grid=vol, res_x=res_x, res_y=res_y, res_z=res_z,
-                     mu_r=mu_r, epsilon_r=epsilon_r)
+        return Model(grid=vol, **kwargs)
 
     def __sub__(self, model):
         """Subtract two models."""
@@ -978,34 +957,13 @@ class Model:
             return NotImplemented
 
         # Check input.
-        grid = self._operator_test(model)
+        vol = self._operator_test(model)
 
-        # Subtract resistivities.
-        res_x = self.res_x - model.res_x
-        if self.case in [1, 3]:
-            res_y = self.res_y - model.res_y
-        else:
-            res_y = None
-        if self.case in [2, 3]:
-            res_z = self.res_z - model.res_z
-        else:
-            res_z = None
-
-        # Subtract mu_r.
-        if self.mu_r is not None:
-            mu_r = self.mu_r - model.mu_r
-        else:
-            mu_r = None
-
-        # Subtract epsilon_r.
-        if self.epsilon_r is not None:
-            epsilon_r = self.epsilon_r - model.epsilon_r
-        else:
-            epsilon_r = None
+        # Apply operator.
+        kwargs = self._apply_operator(model, np.subtract)
 
         # Return new Model instance.
-        return Model(grid=grid, res_x=res_x, res_y=res_y, res_z=res_z,
-                     mu_r=mu_r, epsilon_r=epsilon_r)
+        return Model(grid=vol, **kwargs)
 
     def __eq__(self, model):
         """Compare two models.
@@ -1223,6 +1181,36 @@ class Model:
             raise ValueError(msg)
 
         return self._vol
+
+    def _apply_operator(self, model, operator):
+        """Apply the provided operator to self and model."""
+
+        kwargs = {}
+
+        # Subtract resistivities.
+        kwargs['res_x'] = operator(self.res_x, model.res_x)
+        if self.case in [1, 3]:
+            kwargs['res_y'] = operator(self.res_y, model.res_y)
+        else:
+            kwargs['res_y'] = None
+        if self.case in [2, 3]:
+            kwargs['res_z'] = operator(self.res_z, model.res_z)
+        else:
+            kwargs['res_z'] = None
+
+        # Subtract mu_r.
+        if self.mu_r is not None:
+            kwargs['mu_r'] = operator(self.mu_r, model.mu_r)
+        else:
+            kwargs['mu_r'] = None
+
+        # Subtract epsilon_r.
+        if self.epsilon_r is not None:
+            kwargs['epsilon_r'] = operator(self.epsilon_r, model.epsilon_r)
+        else:
+            kwargs['epsilon_r'] = None
+
+        return kwargs
 
 
 class VolumeModel:
