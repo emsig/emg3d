@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
@@ -6,7 +7,12 @@ from .test_utils import get_h
 from emg3d import solver, njitted, utils
 
 
-def test_amat_x():
+@pytest.mark.parametrize("njit", [True, False])
+def test_amat_x(njit):
+    if njit:
+        amat_x = njitted.amat_x
+    else:
+        amat_x = njitted.amat_x.py_func
 
     # 1. Compare to alternative amat_x
 
@@ -37,10 +43,9 @@ def test_amat_x():
 
     # amat_x
     rr1 = utils.Field(grid)
-    njitted.amat_x(
-            rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
-            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
-            grid.hy, grid.hz)
+    amat_x(rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
+           vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
+           grid.hy, grid.hz)
 
     # amat_x - alternative
     rr2 = utils.Field(grid)
@@ -75,7 +80,17 @@ def test_amat_x():
     #     - Problem3D_e => return C.T*MfMui*C + 1j*omega(freq)*MeSigma
 
 
-def test_gauss_seidel():
+@pytest.mark.parametrize("njit", [True, False])
+def test_gauss_seidel(njit):
+    if njit:
+        gauss_seidel_x = njitted.gauss_seidel_x
+        gauss_seidel_y = njitted.gauss_seidel_y
+        gauss_seidel_z = njitted.gauss_seidel_z
+    else:
+        gauss_seidel_x = njitted.gauss_seidel_x.py_func
+        gauss_seidel_y = njitted.gauss_seidel_y.py_func
+        gauss_seidel_z = njitted.gauss_seidel_z.py_func
+
     # At the moment we only compare `gauss_seidel_x/y/z` to `gauss_seidel`.
     # Better tests should be implemented.
 
@@ -121,21 +136,27 @@ def test_gauss_seidel():
 
         # Get result from `gauss_seidel`.
         cfield = utils.Field(grid, efield.copy())
-        njitted.gauss_seidel_x(cfield.fx, cfield.fy, cfield.fz, *inp)
+        gauss_seidel_x(cfield.fx, cfield.fy, cfield.fz, *inp)
 
         # Get result from `gauss_seidel_x/y/z`.
         if lr_dir == 1:
-            njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+            gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
         elif lr_dir == 2:
-            njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+            gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
         elif lr_dir == 3:
-            njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+            gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
         # Check the resulting field.
         assert_allclose(efield.field, cfield.field)
 
 
-def test_solve():
+@pytest.mark.parametrize("njit", [True, False])
+def test_solve(njit):
+    if njit:
+        solve = njitted.solve
+    else:
+        solve = njitted.solve.py_func
+
     # Create real and complex symmetric matrix A in the form as required by
     # njitted.solve, hence only main diagonal and five lower diagonals in a
     # vector.
@@ -181,7 +202,7 @@ def test_solve():
         # main diagonal and first five lower off-diagonals, arranged in a
         # vector one after the other. Convert matrix A into required vector A.
         res1 = b.copy()
-        njitted.solve(avec.copy(), res1)               # Solve A x = b
+        solve(avec.copy(), res1)               # Solve A x = b
         assert_allclose(x, res1)                       # Check
 
         # 3. Compare to alternative solver
@@ -198,7 +219,15 @@ def test_solve():
         assert_allclose(x, res2)                       # Check
 
 
-def test_restrict():
+@pytest.mark.parametrize("njit", [True, False])
+def test_restrict(njit):
+    if njit:
+        restrict = njitted.restrict
+        restrict_weights = njitted.restrict_weights
+    else:
+        restrict = njitted.restrict.py_func
+        restrict_weights = njitted.restrict_weights.py_func
+
     # Simple comparison using the most basic mesh.
     h = np.array([1, 1, 1, 1])
 
@@ -210,7 +239,7 @@ def test_restrict():
                              fgrid.x0)
 
     # Regular grid, so all weights (wx, wy, wz) are the same...
-    w = njitted.restrict_weights(
+    w = restrict_weights(
         fgrid.vectorNx, fgrid.vectorCCx, fgrid.hx, cgrid.vectorNx,
         cgrid.vectorCCx, cgrid.hx)
 
@@ -225,9 +254,8 @@ def test_restrict():
 
     # Ensure PEC and restrict them.
     ffield.ensure_pec
-    njitted.restrict(cfield.fx, cfield.fy, cfield.fz,
-                     ffield.fx, ffield.fy, ffield.fz,
-                     w, w, w, 0)
+    restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
+             w, w, w, 0)
 
     # Check sum of fine and coarse fields.
     assert cfield.fx.sum() == ffield.fx.sum()
@@ -239,7 +267,13 @@ def test_restrict():
     np.allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
 
 
-def test_restrict_weights():
+@pytest.mark.parametrize("njit", [True, False])
+def test_restrict_weights(njit):
+    if njit:
+        restrict_weights = njitted.restrict_weights
+    else:
+        restrict_weights = njitted.restrict_weights.py_func
+
     # 1. Simple example following equation 9, [Muld06]_.
     edges = np.array([0., 500, 1200, 2000, 3000])
     width = (edges[1:]-edges[:-1])
@@ -254,7 +288,7 @@ def test_restrict_weights():
     wtr = np.array([350/600, 500/900, 400/500])
 
     # Result from implemented function
-    wl, w0, wr = njitted.restrict_weights(
+    wl, w0, wr = restrict_weights(
             edges, centr, width, c_edges, c_centr, c_width)
 
     assert_allclose(wtl, wl)
@@ -281,7 +315,7 @@ def test_restrict_weights():
             cgrid.vectorCCx, cgrid.hx)
 
     # Get the implemented numba-result
-    wxl, wx0, wxr = njitted.restrict_weights(
+    wxl, wx0, wxr = restrict_weights(
             grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
             cgrid.vectorCCx, cgrid.hx)
 
@@ -291,7 +325,13 @@ def test_restrict_weights():
     assert_allclose(wxr, wr)
 
 
-def test_blocks_to_amat():
+@pytest.mark.parametrize("njit", [True, False])
+def test_blocks_to_amat(njit):
+    if njit:
+        blocks_to_amat = njitted.blocks_to_amat
+    else:
+        blocks_to_amat = njitted.blocks_to_amat.py_func
+
     # Create some dummy data
 
     # Main matrix amat and RHS bvec
@@ -320,9 +360,9 @@ def test_blocks_to_amat():
     rhs3 = np.arange(11, 16)
 
     # Call blocks_to_amat three times to fill in all blocks
-    njitted.blocks_to_amat(amat, bvec, middle1, left1, rhs1, 0, 3)
-    njitted.blocks_to_amat(amat, bvec, middle2, left2, rhs2, 1, 3)
-    njitted.blocks_to_amat(amat, bvec, middle3, left3, rhs3, 2, 3)
+    blocks_to_amat(amat, bvec, middle1, left1, rhs1, 0, 3)
+    blocks_to_amat(amat, bvec, middle2, left2, rhs2, 1, 3)
+    blocks_to_amat(amat, bvec, middle3, left3, rhs3, 2, 3)
 
     # The result should look like this
     amat_res = np.arange(1., 91)
@@ -339,7 +379,13 @@ def test_blocks_to_amat():
     assert_allclose(bvec_res, bvec)
 
 
-def test_volume_average():
+@pytest.mark.parametrize("njit", [True, False])
+def test_volume_average(njit):
+    if njit:
+        volume_average = njitted.volume_average
+    else:
+        volume_average = njitted.volume_average.py_func
+
     # Comparison to alt_version.
     grid_in = utils.TensorMesh(
             [np.ones(30), np.ones(20)*5, np.ones(10)*10],
@@ -359,7 +405,7 @@ def test_volume_average():
 
     # New solution.
     new_values = np.zeros(grid_out.vnC, dtype=values.dtype)
-    njitted.volume_average(*points, values, *new_points, new_values, vol)
+    volume_average(*points, values, *new_points, new_values, vol)
 
     # Old solution.
     new_values_alt = np.zeros(grid_out.vnC, dtype=values.dtype)

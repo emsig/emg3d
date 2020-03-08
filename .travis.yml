@@ -4,12 +4,10 @@ language: python
 # which follows the `PYTHON=X.Y` var.
 matrix:
   include:
-    - python: 3.7  # => 3.7 no JIT; scooby
-      env: PYTHON=3.7 NUMBA_DISABLE_JIT=1 INST="scooby"
-    - python: 3.8  # => 3.8 no JIT
-      env: PYTHON=3.8 NUMBA_DISABLE_JIT=1 INST=""
-    - python: 3.7  # => 3.7
+    - python: 3.7  # => 3.7;deplay
       env: PYTHON=3.7 DEPLOY_PYPI=true INST=""
+    - python: 3.8  # => 3.8; scooby
+      env: PYTHON=3.8 INST="scooby"
     - python: 3.7  # just linkcheck
       env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig"
 
@@ -45,7 +43,7 @@ script:  # No pytest for linkcheck-run.
     fi
 
 after_success:
-  - if [ "$NUMBA_DISABLE_JIT" == "1" ]; then coveralls; fi
+  - if [ "$CHCKLNKS" == "" ]; then coveralls; fi
 
 deploy:
   provider: pypi
