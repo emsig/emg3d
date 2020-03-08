@@ -600,6 +600,12 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 iym = iy-1
                 iyp = iy+1
 
+                # Reset vectors
+                middle[:] = 0.
+                left[:] = 0.
+                bvec[:] = 0.
+                amat[:] = 0.
+
                 for ixh in range(1, nCx+1):
 
                     # Index and minus index
@@ -879,6 +885,12 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 ixm = ix-1
                 ixp = ix+1
 
+                # Reset vectors
+                middle[:] = 0.
+                left[:] = 0.
+                bvec[:] = 0.
+                amat[:] = 0.
+
                 for iyh in range(1, nCy+1):
 
                     # Index and minus index
@@ -1152,6 +1164,12 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 # Minus/plus indices
                 ixm = ix-1
                 ixp = ix+1
+
+                # Reset vectors
+                middle[:] = 0.
+                left[:] = 0.
+                bvec[:] = 0.
+                amat[:] = 0.
 
                 for izh in range(1, nCz+1):
 

@@ -83,10 +83,12 @@ def test_amat_x(njit):
 @pytest.mark.parametrize("njit", [True, False])
 def test_gauss_seidel(njit):
     if njit:
+        gauss_seidel = njitted.gauss_seidel
         gauss_seidel_x = njitted.gauss_seidel_x
         gauss_seidel_y = njitted.gauss_seidel_y
         gauss_seidel_z = njitted.gauss_seidel_z
     else:
+        gauss_seidel = njitted.gauss_seidel.py_func
         gauss_seidel_x = njitted.gauss_seidel_x.py_func
         gauss_seidel_y = njitted.gauss_seidel_y.py_func
         gauss_seidel_z = njitted.gauss_seidel_z.py_func
@@ -104,8 +106,8 @@ def test_gauss_seidel(njit):
         # `gauss_seidel`/`_x/y/z` loop over z, then y, then x. Together with
         # `lr_dir`, we have to keep the dimension at 2 in order that they
         # agree.
-        nx = [4, 1, 1][lr_dir-1]
-        ny = [4, 1, 1][lr_dir-1]
+        nx = [1, 4, 4][lr_dir-1]
+        ny = [4, 1, 4][lr_dir-1]
         nz = [4, 4, 1][lr_dir-1]
 
         # Get this grid.
@@ -136,7 +138,7 @@ def test_gauss_seidel(njit):
 
         # Get result from `gauss_seidel`.
         cfield = utils.Field(grid, efield.copy())
-        gauss_seidel_x(cfield.fx, cfield.fy, cfield.fz, *inp)
+        gauss_seidel(cfield.fx, cfield.fy, cfield.fz, *inp)
 
         # Get result from `gauss_seidel_x/y/z`.
         if lr_dir == 1:
