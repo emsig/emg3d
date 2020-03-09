@@ -8,6 +8,9 @@ Changelog
 - ``emg3d.utils.Model``: Possible to create new models by adding or subtracting
   existing models, and comparing two models (``+``, ``-``, ``==`` and ``!=``).
   New attributes ``shape``, ``size``, and ``copy``.
+- Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and coverage.
+- Bugfix: ``emg3d.njitted.restrict`` did not store the {x;y;z}-field if
+  ``sc_dir`` was {4;5;6}, respectively.
 
 
 *v0.9.3* : Sphinx gallery

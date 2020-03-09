@@ -10,7 +10,6 @@ GitHub/Travis-CI; by default for all supported python versions of emg3d.
 where:
     -h : Show this help text.
     -v : Python 3.x version, e.g. '-v 7' for Python 3.7. Default: '7 8'.
-    -n : Disable numba.
     -p : Print output of conda.
     -d : Delete environments after tests.
     -w : Disable pytest warnings.
@@ -24,7 +23,6 @@ PCKGS="numpy scipy pytest pytest-cov numba"
 PROPS="--flake8"
 INST="pytest-flake8 scooby"
 WARN=""
-DISABLENUMBA=false
 
 # Get Optional Input
 while getopts "hv:npdw" opt; do
@@ -34,8 +32,6 @@ while getopts "hv:npdw" opt; do
        exit
        ;;
     v) PYTHON3VERSION=$OPTARG
-       ;;
-    n) DISABLENUMBA=true
        ;;
     p) PRINT="/dev/tty"
        ;;
@@ -81,9 +77,6 @@ for i in ${PYTHON3VERSION[@]}; do
 
   # Activate venv
   source activate $NAME
-  if [ "$DISABLENUMBA" = true ] ; then
-    export NUMBA_DISABLE_JIT=1
-  fi
 
   # Install flake8
   if [ ! -d "$HOME/anaconda3/envs"+$NAME ]; then

@@ -600,6 +600,12 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 iym = iy-1
                 iyp = iy+1
 
+                # Reset vectors
+                middle[:] = 0.
+                left[:] = 0.
+                bvec[:] = 0.
+                amat[:] = 0.
+
                 for ixh in range(1, nCx+1):
 
                     # Index and minus index
@@ -879,6 +885,12 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 ixm = ix-1
                 ixp = ix+1
 
+                # Reset vectors
+                middle[:] = 0.
+                left[:] = 0.
+                bvec[:] = 0.
+                amat[:] = 0.
+
                 for iyh in range(1, nCy+1):
 
                     # Index and minus index
@@ -1152,6 +1164,12 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 # Minus/plus indices
                 ixm = ix-1
                 ixp = ix+1
+
+                # Reset vectors
+                middle[:] = 0.
+                left[:] = 0.
+                bvec[:] = 0.
+                amat[:] = 0.
 
                 for izh in range(1, nCz+1):
 
@@ -1864,7 +1882,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 4:  # Restrict in x-direction
 
         # Sum the terms for x-field.
-        crx = rx[::2, :, :] + rx[1::2, :, :]
+        crx[:, :, :] = rx[::2, :, :] + rx[1::2, :, :]
 
         # Loop over coarse x-edges.
         for cix in range(cnNx):
@@ -1885,7 +1903,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 5:  # Restrict in y-direction
 
         # Sum the terms for y-field.
-        cry = ry[:, ::2, :] + ry[:, 1::2, :]
+        cry[:, :, :] = ry[:, ::2, :] + ry[:, 1::2, :]
 
         # Loop over coarse y-edges.
         for ciy in range(cnNy):
@@ -1906,7 +1924,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 6:  # Restrict in z-direction
 
         # Sum the terms for z-field.
-        crz = rz[:, :, ::2] + rz[:, :, 1::2]
+        crz[:, :, :] = rz[:, :, ::2] + rz[:, :, 1::2]
 
         # Loop over coarse z-edges.
         for ciz in range(cnNz):
