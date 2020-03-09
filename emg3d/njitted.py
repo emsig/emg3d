@@ -1882,7 +1882,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 4:  # Restrict in x-direction
 
         # Sum the terms for x-field.
-        crx = rx[::2, :, :] + rx[1::2, :, :]
+        crx[:, :, :] = rx[::2, :, :] + rx[1::2, :, :]
 
         # Loop over coarse x-edges.
         for cix in range(cnNx):
@@ -1903,7 +1903,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 5:  # Restrict in y-direction
 
         # Sum the terms for y-field.
-        cry = ry[:, ::2, :] + ry[:, 1::2, :]
+        cry[:, :, :] = ry[:, ::2, :] + ry[:, 1::2, :]
 
         # Loop over coarse y-edges.
         for ciy in range(cnNy):
@@ -1924,7 +1924,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 6:  # Restrict in z-direction
 
         # Sum the terms for z-field.
-        crz = rz[:, :, ::2] + rz[:, :, 1::2]
+        crz[:, :, :] = rz[:, :, ::2] + rz[:, :, 1::2]
 
         # Loop over coarse z-edges.
         for ciz in range(cnNz):

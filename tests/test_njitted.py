@@ -231,22 +231,12 @@ def test_restrict(njit):
         restrict_weights = njitted.restrict_weights.py_func
 
     # Simple comparison using the most basic mesh.
-    h = np.array([1, 1, 1, 1])
+    h = np.array([1, 1, 1, 1, 1, 1])
 
-    # Fine and coarse grid.
-    fgrid = utils.TensorMesh([h, h, h], x0=np.array([-2, -2, -2]))
-    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]),
-                              np.diff(fgrid.vectorNy[::2]),
-                              np.diff(fgrid.vectorNz[::2])],
-                             fgrid.x0)
+    # Fine grid.
+    fgrid = utils.TensorMesh([h, h, h], x0=np.array([-3, -3, -3]))
 
-    # Regular grid, so all weights (wx, wy, wz) are the same...
-    w = restrict_weights(
-        fgrid.vectorNx, fgrid.vectorCCx, fgrid.hx, cgrid.vectorNx,
-        cgrid.vectorCCx, cgrid.hx)
-
-    # Create fields.
-    cfield = utils.Field(cgrid)
+    # Create fine field.
     ffield = utils.Field(fgrid)
 
     # Put in values.
@@ -254,8 +244,30 @@ def test_restrict(njit):
     ffield.fy[:, :, :] = 2
     ffield.fz[:, :, :] = 4
 
-    # Ensure PEC and restrict them.
+    # Ensure PEC.
     ffield.ensure_pec
+
+    # Get weigths
+    wlr = np.zeros(fgrid.nNx, dtype=float)
+    w0 = np.ones(fgrid.nNx, dtype=float)
+    fw = (wlr, w0, wlr)
+
+    # # CASE 0 -- regular # #
+
+    # Coarse grid.
+    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]),
+                              np.diff(fgrid.vectorNy[::2]),
+                              np.diff(fgrid.vectorNz[::2])],
+                             fgrid.x0)
+
+    # Regular grid, so all weights (wx, wy, wz) are the same...
+    w = restrict_weights(fgrid.vectorNx, fgrid.vectorCCx, fgrid.hx,
+                         cgrid.vectorNx, cgrid.vectorCCx, cgrid.hx)
+
+    # Create coarse field.
+    cfield = utils.Field(cgrid)
+
+    # Restrict it.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
              w, w, w, 0)
 
@@ -267,6 +279,133 @@ def test_restrict(njit):
     # Assert fields are multiples from each other.
     np.allclose(cfield.fx[0, :, :]*2, cfield.fy[:, 0, :])
     np.allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
+
+    # # CASE 1 -- y & z # #
+
+    # Coarse grid.
+    cgrid = utils.TensorMesh([fgrid.hx, np.diff(fgrid.vectorNy[::2]),
+                              np.diff(fgrid.vectorNz[::2])], fgrid.x0)
+
+    # Create coarse field.
+    cfield = utils.Field(cgrid)
+
+    # Restrict field.
+    restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
+             fw, w, w, 1)
+
+    # Check sum of fine and coarse fields.
+    assert cfield.fx.sum() == ffield.fx.sum()
+    assert cfield.fy.sum() == ffield.fy.sum()
+    assert cfield.fz.sum() == ffield.fz.sum()
+
+    # Assert fields are multiples from each other.
+    np.allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
+
+    # # CASE 2 -- x & z # #
+
+    # Coarse grid.
+    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]), fgrid.hy,
+                              np.diff(fgrid.vectorNz[::2])], fgrid.x0)
+
+    # Create coarse field.
+    cfield = utils.Field(cgrid)
+
+    # Restrict field.
+    restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
+             w, fw, w, 2)
+
+    # Check sum of fine and coarse fields.
+    assert cfield.fx.sum() == ffield.fx.sum()
+    assert cfield.fy.sum() == ffield.fy.sum()
+    assert cfield.fz.sum() == ffield.fz.sum()
+
+    # Assert fields are multiples from each other.
+    np.allclose(cfield.fx[0, :, :].T*2, cfield.fz[:, :, 0])
+
+    # # CASE 3 -- x & y # #
+
+    # Coarse grid.
+    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]),
+                              np.diff(fgrid.vectorNy[::2]), fgrid.hz],
+                             fgrid.x0)
+
+    # Create coarse field.
+    cfield = utils.Field(cgrid)
+
+    # Restrict field.
+    restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
+             w, w, fw, 3)
+
+    # Check sum of fine and coarse fields.
+    assert cfield.fx.sum() == ffield.fx.sum()
+    assert cfield.fy.sum() == ffield.fy.sum()
+    assert cfield.fz.sum() == ffield.fz.sum()
+
+    # Assert fields are multiples from each other.
+    np.allclose(cfield.fx[0, :, :]*2, cfield.fy[:, 0, :])
+
+    # # CASE 4 -- x # #
+
+    # Coarse grid.
+    cgrid = utils.TensorMesh(
+            [np.diff(fgrid.vectorNx[::2]), fgrid.hy, fgrid.hz], fgrid.x0)
+
+    # Create coarse field.
+    cfield = utils.Field(cgrid)
+
+    # Restrict field.
+    restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
+             w, fw, fw, 4)
+
+    # Check sum of fine and coarse fields.
+    assert cfield.fx.sum() == ffield.fx.sum()
+    assert cfield.fy.sum() == ffield.fy.sum()
+    assert cfield.fz.sum() == ffield.fz.sum()
+
+    # Assert fields are multiples from each other.
+    np.allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
+
+    # # CASE 5 -- y # #
+
+    # Coarse grid.
+    cgrid = utils.TensorMesh(
+            [fgrid.hx, np.diff(fgrid.vectorNy[::2]), fgrid.hz], fgrid.x0)
+
+    # Create coarse field.
+    cfield = utils.Field(cgrid)
+
+    # Restrict field.
+    restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
+             fw, w, fw, 5)
+
+    # Check sum of fine and coarse fields.
+    assert cfield.fx.sum() == ffield.fx.sum()
+    assert cfield.fy.sum() == ffield.fy.sum()
+    assert cfield.fz.sum() == ffield.fz.sum()
+
+    # Assert fields are multiples from each other.
+    np.allclose(cfield.fx[0, :, :].T*4, cfield.fz[:, :, 0])
+
+    # # CASE 6 -- z # #
+
+    # Coarse grid.
+    cgrid = utils.TensorMesh(
+            [fgrid.hx, fgrid.hy, np.diff(fgrid.vectorNz[::2])], fgrid.x0)
+
+    # Create coarse field.
+    cfield = utils.Field(cgrid)
+
+    # Restrict field.
+    restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
+             fw, fw, w, 6)
+
+    # Check sum of fine and coarse fields.
+    assert cfield.fx.sum() == ffield.fx.sum()
+    assert cfield.fy.sum() == ffield.fy.sum()
+    assert cfield.fz.sum() == ffield.fz.sum()
+
+    # Assert fields are multiples from each other.
+    np.allclose(cfield.fx[0, :, :]*4, cfield.fy[:, 0, :])
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -415,6 +554,44 @@ def test_volume_average(njit):
             *points, values, *new_points, new_values_alt)
 
     assert_allclose(new_values, new_values_alt)
+
+
+@pytest.mark.parametrize("njit", [True, False])
+def test_volume_avg_weights(njit):
+    if njit:
+        volume_avg_weights = njitted._volume_avg_weights
+    else:
+        volume_avg_weights = njitted._volume_avg_weights.py_func
+
+    grid_in = utils.TensorMesh(
+            [np.ones(11), np.ones(10)*2, np.ones(3)*10],
+            x0=np.array([0, 0, 0]))
+    grid_out = utils.TensorMesh(
+            [np.arange(4)+1, np.arange(5)+1, np.arange(6)+1],
+            x0=np.array([0.5, 3.33, 5]))
+
+    wx, ix_in, ix_out = volume_avg_weights(grid_in.vectorNx, grid_out.vectorNx)
+    assert_allclose(wx, [0, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 0.5, 0.5, 1, 1,
+                         1, 0.5, 0])
+    assert_allclose(ix_in, [0, 0, 1, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 10, 10])
+    assert_allclose(ix_out, [0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3])
+
+    wy, iy_in, iy_out = volume_avg_weights(grid_in.vectorNy, grid_out.vectorNy)
+    assert_allclose(wy, [0, 0, 0.67, 0.33, 1.67, 0.33, 1.67, 1.33, 0.67, 2.,
+                         1.33, 0.67, 2, 2, 0.33, 0.])
+    assert_allclose(iy_in, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9])
+    assert_allclose(iy_out, [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4])
+
+    wz, iz_in, iz_out = volume_avg_weights(grid_in.vectorNz, grid_out.vectorNz)
+    assert_allclose(wz, [0, 1, 2, 2, 1, 4, 5, 6, 0])
+    assert_allclose(iz_in, [0, 0, 0, 0, 1, 1, 1, 2, 2])
+    assert_allclose(iz_out, [0, 0, 1, 2, 2, 3, 4, 5, 5])
+
+    w, inp, out = volume_avg_weights(np.array([0., 5, 7, 10]),
+                                     np.array([-1., 1, 4, 6, 7, 11]))
+    assert_allclose(w, [1, 1, 3, 1, 1, 1, 3, 1])
+    assert_allclose(inp, [0, 0, 0, 0, 1, 1, 2, 2])
+    assert_allclose(out, [0, 0, 1, 2, 2, 3, 4, 4])
 
 
 @pytest.mark.parametrize("njit", [True, False])
