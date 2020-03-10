@@ -1657,80 +1657,71 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                 iym = max(0, iy-1)
                 iyp = min(nNy-1, iy+1)
 
-                # Sum the terms for x-field.
-                crx[:, ciy, ciz] = wy0[ciy]*(
-                        wz0[ciz]*(rx[::2, iy, iz] + rx[1::2, iy, iz]) +
-                        wzl[ciz]*(rx[::2, iy, izm] + rx[1::2, iy, izm]) +
-                        wzr[ciz]*(rx[::2, iy, izp] + rx[1::2, iy, izp])
-                )
+                # Loop over coarse x-edges.
+                for cix in range(cnNx):
+                    ix = 2*cix
+                    ixm = max(0, ix-1)
+                    ixp = min(nNx-1, ix+1)
 
-                crx[:, ciy, ciz] += wyl[ciy]*(
-                        wz0[ciz]*(rx[::2, iym, iz] + rx[1::2, iym, iz]) +
-                        wzl[ciz]*(rx[::2, iym, izm] + rx[1::2, iym, izm]) +
-                        wzr[ciz]*(rx[::2, iym, izp] + rx[1::2, iym, izp])
-                )
+                    # Sum the terms for x-field.
+                    if cix < cnNx-1:
+                        crx[cix, ciy, ciz] = wy0[ciy]*(
+                            wz0[ciz]*(rx[ix, iy, iz] + rx[ixp, iy, iz]) +
+                            wzl[ciz]*(rx[ix, iy, izm] + rx[ixp, iy, izm]) +
+                            wzr[ciz]*(rx[ix, iy, izp] + rx[ixp, iy, izp])
+                        )
 
-                crx[:, ciy, ciz] += wyr[ciy]*(
-                        wz0[ciz]*(rx[::2, iyp, iz] + rx[1::2, iyp, iz]) +
-                        wzl[ciz]*(rx[::2, iyp, izm] + rx[1::2, iyp, izm]) +
-                        wzr[ciz]*(rx[::2, iyp, izp] + rx[1::2, iyp, izp])
-                )
+                        crx[cix, ciy, ciz] += wyl[ciy]*(
+                            wz0[ciz]*(rx[ix, iym, iz] + rx[ixp, iym, iz]) +
+                            wzl[ciz]*(rx[ix, iym, izm] + rx[ixp, iym, izm]) +
+                            wzr[ciz]*(rx[ix, iym, izp] + rx[ixp, iym, izp])
+                        )
 
-            # Loop over coarse x-edges.
-            for cix in range(cnNx):
-                ix = 2*cix
-                ixm = max(0, ix-1)
-                ixp = min(nNx-1, ix+1)
+                        crx[cix, ciy, ciz] += wyr[ciy]*(
+                            wz0[ciz]*(rx[ix, iyp, iz] + rx[ixp, iyp, iz]) +
+                            wzl[ciz]*(rx[ix, iyp, izm] + rx[ixp, iyp, izm]) +
+                            wzr[ciz]*(rx[ix, iyp, izp] + rx[ixp, iyp, izp])
+                        )
 
-                # Sum the terms for y-field.
-                cry[cix, :, ciz] = wx0[cix]*(
-                        wz0[ciz]*(ry[ix, ::2, iz] + ry[ix, 1::2, iz]) +
-                        wzl[ciz]*(ry[ix, ::2, izm] + ry[ix, 1::2, izm]) +
-                        wzr[ciz]*(ry[ix, ::2, izp] + ry[ix, 1::2, izp])
-                )
+                    # Sum the terms for y-field.
+                    if ciy < cnNy-1:
+                        cry[cix, ciy, ciz] = wx0[cix]*(
+                            wz0[ciz]*(ry[ix, iy, iz] + ry[ix, iyp, iz]) +
+                            wzl[ciz]*(ry[ix, iy, izm] + ry[ix, iyp, izm]) +
+                            wzr[ciz]*(ry[ix, iy, izp] + ry[ix, iyp, izp])
+                        )
 
-                cry[cix, :, ciz] += wxl[cix]*(
-                        wz0[ciz]*(ry[ixm, ::2, iz] + ry[ixm, 1::2, iz]) +
-                        wzl[ciz]*(ry[ixm, ::2, izm] + ry[ixm, 1::2, izm]) +
-                        wzr[ciz]*(ry[ixm, ::2, izp] + ry[ixm, 1::2, izp])
-                )
+                        cry[cix, ciy, ciz] += wxl[cix]*(
+                            wz0[ciz]*(ry[ixm, iy, iz] + ry[ixm, iyp, iz]) +
+                            wzl[ciz]*(ry[ixm, iy, izm] + ry[ixm, iyp, izm]) +
+                            wzr[ciz]*(ry[ixm, iy, izp] + ry[ixm, iyp, izp])
+                        )
 
-                cry[cix, :, ciz] += wxr[cix]*(
-                        wz0[ciz]*(ry[ixp, ::2, iz] + ry[ixp, 1::2, iz]) +
-                        wzl[ciz]*(ry[ixp, ::2, izm] + ry[ixp, 1::2, izm]) +
-                        wzr[ciz]*(ry[ixp, ::2, izp] + ry[ixp, 1::2, izp])
-                )
+                        cry[cix, ciy, ciz] += wxr[cix]*(
+                            wz0[ciz]*(ry[ixp, iy, iz] + ry[ixp, iyp, iz]) +
+                            wzl[ciz]*(ry[ixp, iy, izm] + ry[ixp, iyp, izm]) +
+                            wzr[ciz]*(ry[ixp, iy, izp] + ry[ixp, iyp, izp])
+                        )
 
-        # Loop over coarse y-edges.
-        for ciy in range(cnNy):
-            iy = 2*ciy
-            iym = max(0, iy-1)
-            iyp = min(nNy-1, iy+1)
+                    # Sum the terms for z-field.
+                    if ciz < cnNz-1:
+                        crz[cix, ciy, ciz] = wx0[cix]*(
+                            wy0[ciy]*(rz[ix, iy, iz] + rz[ix, iy, izp]) +
+                            wyl[ciy]*(rz[ix, iym, iz] + rz[ix, iym, izp]) +
+                            wyr[ciy]*(rz[ix, iyp, iz] + rz[ix, iyp, izp])
+                        )
 
-            # Loop over coarse x-edges.
-            for cix in range(cnNx):
-                ix = 2*cix
-                ixm = max(0, ix-1)
-                ixp = min(nNx-1, ix+1)
+                        crz[cix, ciy, ciz] += wxl[cix]*(
+                            wy0[ciy]*(rz[ixm, iy, iz] + rz[ixm, iy, izp]) +
+                            wyl[ciy]*(rz[ixm, iym, iz] + rz[ixm, iym, izp]) +
+                            wyr[ciy]*(rz[ixm, iyp, iz] + rz[ixm, iyp, izp])
+                        )
 
-                # Sum the terms for z-field.
-                crz[cix, ciy, :] = wx0[cix]*(
-                        wy0[ciy]*(rz[ix, iy, ::2] + rz[ix, iy, 1::2]) +
-                        wyl[ciy]*(rz[ix, iym, ::2] + rz[ix, iym, 1::2]) +
-                        wyr[ciy]*(rz[ix, iyp, ::2] + rz[ix, iyp, 1::2])
-                )
-
-                crz[cix, ciy, :] += wxl[cix]*(
-                        wy0[ciy]*(rz[ixm, iy, ::2] + rz[ixm, iy, 1::2]) +
-                        wyl[ciy]*(rz[ixm, iym, ::2] + rz[ixm, iym, 1::2]) +
-                        wyr[ciy]*(rz[ixm, iyp, ::2] + rz[ixm, iyp, 1::2])
-                )
-
-                crz[cix, ciy, :] += wxr[cix]*(
-                        wy0[ciy]*(rz[ixp, iy, ::2] + rz[ixp, iy, 1::2]) +
-                        wyl[ciy]*(rz[ixp, iym, ::2] + rz[ixp, iym, 1::2]) +
-                        wyr[ciy]*(rz[ixp, iyp, ::2] + rz[ixp, iyp, 1::2])
-                )
+                        crz[cix, ciy, ciz] += wxr[cix]*(
+                            wy0[ciy]*(rz[ixp, iy, iz] + rz[ixp, iy, izp]) +
+                            wyl[ciy]*(rz[ixp, iym, iz] + rz[ixp, iym, izp]) +
+                            wyr[ciy]*(rz[ixp, iyp, iz] + rz[ixp, iyp, izp])
+                        )
 
     elif sc_dir == 1:  # Restrict in y- and z-directions
 
@@ -1740,46 +1731,50 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
             izm = max(0, iz-1)
             izp = min(nNz-1, iz+1)
 
-            # Sum the terms for y-field.
-            cry[:, :, ciz] = wz0[ciz]*(ry[:, ::2, iz] + ry[:, 1::2, iz])
-            cry[:, :, ciz] += wzl[ciz]*(ry[:, ::2, izm] + ry[:, 1::2, izm])
-            cry[:, :, ciz] += wzr[ciz]*(ry[:, ::2, izp] + ry[:, 1::2, izp])
-
             # Loop over coarse y-edges.
             for ciy in range(cnNy):
                 iy = 2*ciy
                 iym = max(0, iy-1)
                 iyp = min(nNy-1, iy+1)
 
-                # Sum the terms for x-field.
-                crx[:, ciy, ciz] = wy0[ciy]*(
-                        wz0[ciz]*rx[:, iy, iz] +
-                        wzl[ciz]*rx[:, iy, izm] +
-                        wzr[ciz]*rx[:, iy, izp]
-                )
+                # Loop over coarse x-edges.
+                for cix in range(cnNx):
 
-                crx[:, ciy, ciz] += wyl[ciy]*(
-                        wz0[ciz]*rx[:, iym, iz] +
-                        wzl[ciz]*rx[:, iym, izm] +
-                        wzr[ciz]*rx[:, iym, izp]
-                )
+                    # Sum the terms for x-field.
+                    if cix < cnNx-1:
+                        crx[cix, ciy, ciz] = wy0[ciy]*(
+                                wz0[ciz]*rx[cix, iy, iz] +
+                                wzl[ciz]*rx[cix, iy, izm] +
+                                wzr[ciz]*rx[cix, iy, izp]
+                        )
 
-                crx[:, ciy, ciz] += wyr[ciy]*(
-                        wz0[ciz]*rx[:, iyp, iz] +
-                        wzl[ciz]*rx[:, iyp, izm] +
-                        wzr[ciz]*rx[:, iyp, izp]
-                )
+                        crx[cix, ciy, ciz] += wyl[ciy]*(
+                                wz0[ciz]*rx[cix, iym, iz] +
+                                wzl[ciz]*rx[cix, iym, izm] +
+                                wzr[ciz]*rx[cix, iym, izp]
+                        )
 
-        # Loop over coarse y-edges.
-        for ciy in range(cnNy):
-            iy = 2*ciy
-            iym = max(0, iy-1)
-            iyp = min(nNy-1, iy+1)
+                        crx[cix, ciy, ciz] += wyr[ciy]*(
+                                wz0[ciz]*rx[cix, iyp, iz] +
+                                wzl[ciz]*rx[cix, iyp, izm] +
+                                wzr[ciz]*rx[cix, iyp, izp]
+                        )
 
-            # Sum the terms
-            crz[:, ciy, :] = wy0[ciy]*(rz[:, iy, ::2] + rz[:, iy, 1::2])
-            crz[:, ciy, :] += wyl[ciy]*(rz[:, iym, ::2] + rz[:, iym, 1::2])
-            crz[:, ciy, :] += wyr[ciy]*(rz[:, iyp, ::2] + rz[:, iyp, 1::2])
+                    # Sum the terms for y-field.
+                    if ciy < cnNy-1:
+                        cry[cix, ciy, ciz] = (
+                            wz0[ciz]*(ry[cix, iy, iz] + ry[cix, iyp, iz]) +
+                            wzl[ciz]*(ry[cix, iy, izm] + ry[cix, iyp, izm]) +
+                            wzr[ciz]*(ry[cix, iy, izp] + ry[cix, iyp, izp])
+                        )
+
+                    # Sum the terms for z-field.
+                    if ciz < cnNz-1:
+                        crz[cix, ciy, ciz] = (
+                            wy0[ciy]*(rz[cix, iy, iz] + rz[cix, iy, izp]) +
+                            wyl[ciy]*(rz[cix, iym, iz] + rz[cix, iym, izp]) +
+                            wyr[ciy]*(rz[cix, iyp, iz] + rz[cix, iyp, izp])
+                        )
 
     elif sc_dir == 2:  # Restrict in x- and z-directions
 
@@ -1789,142 +1784,167 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
             izm = max(0, iz-1)
             izp = min(nNz-1, iz+1)
 
-            # Sum the terms for x-field.
-            crx[:, :, ciz] = wz0[ciz]*(rx[::2, :, iz] + rx[1::2, :, iz])
-            crx[:, :, ciz] += wzl[ciz]*(rx[::2, :, izm] + rx[1::2, :, izm])
-            crx[:, :, ciz] += wzr[ciz]*(rx[::2, :, izp] + rx[1::2, :, izp])
+            # Loop over coarse y-edges.
+            for ciy in range(cnNy):
 
-            # Loop over coarse x-edges.
-            for cix in range(cnNx):
-                ix = 2*cix
-                ixm = max(0, ix-1)
-                ixp = min(nNx-1, ix+1)
+                # Loop over coarse x-edges.
+                for cix in range(cnNx):
+                    ix = 2*cix
+                    ixm = max(0, ix-1)
+                    ixp = min(nNx-1, ix+1)
 
-                # Sum the terms for y-field.
-                cry[cix, :, ciz] = wx0[cix]*(
-                        wz0[ciz]*ry[ix, :, iz] +
-                        wzl[ciz]*ry[ix, :, izm] +
-                        wzr[ciz]*ry[ix, :, izp]
-                )
+                    # Sum the terms for x-field.
+                    if cix < cnNx-1:
+                        crx[cix, ciy, ciz] = (
+                            wz0[ciz]*(rx[ix, ciy, iz] + rx[ixp, ciy, iz]) +
+                            wzl[ciz]*(rx[ix, ciy, izm] + rx[ixp, ciy, izm]) +
+                            wzr[ciz]*(rx[ix, ciy, izp] + rx[ixp, ciy, izp])
+                        )
 
-                cry[cix, :, ciz] += wxl[cix]*(
-                        wz0[ciz]*ry[ixm, :, iz] +
-                        wzl[ciz]*ry[ixm, :, izm] +
-                        wzr[ciz]*ry[ixm, :, izp]
-                )
+                    # Sum the terms for y-field.
+                    if ciy < cnNy-1:
+                        cry[cix, ciy, ciz] = wx0[cix]*(
+                                wz0[ciz]*ry[ix, ciy, iz] +
+                                wzl[ciz]*ry[ix, ciy, izm] +
+                                wzr[ciz]*ry[ix, ciy, izp]
+                        )
 
-                cry[cix, :, ciz] += wxr[cix]*(
-                        wz0[ciz]*ry[ixp, :, iz] +
-                        wzl[ciz]*ry[ixp, :, izm] +
-                        wzr[ciz]*ry[ixp, :, izp]
-                )
+                        cry[cix, ciy, ciz] += wxl[cix]*(
+                                wz0[ciz]*ry[ixm, ciy, iz] +
+                                wzl[ciz]*ry[ixm, ciy, izm] +
+                                wzr[ciz]*ry[ixm, ciy, izp]
+                        )
 
-        # Loop over coarse x-edges.
-        for cix in range(cnNx):
-            ix = 2*cix
-            ixm = max(0, ix-1)
-            ixp = min(nNx-1, ix+1)
+                        cry[cix, ciy, ciz] += wxr[cix]*(
+                                wz0[ciz]*ry[ixp, ciy, iz] +
+                                wzl[ciz]*ry[ixp, ciy, izm] +
+                                wzr[ciz]*ry[ixp, ciy, izp]
+                        )
 
-            # Sum the terms for z-field.
-            crz[cix, :, :] = wx0[cix]*(rz[ix, :, ::2] + rz[ix, :, 1::2])
-            crz[cix, :, :] += wxl[cix]*(rz[ixm, :, ::2] + rz[ixm, :, 1::2])
-            crz[cix, :, :] += wxr[cix]*(rz[ixp, :, ::2] + rz[ixp, :, 1::2])
+                    # Sum the terms for z-field.
+                    if ciz < cnNz-1:
+                        crz[cix, ciy, ciz] = (
+                            wx0[cix]*(rz[ix, ciy, iz] + rz[ix, ciy, izp]) +
+                            wxl[cix]*(rz[ixm, ciy, iz] + rz[ixm, ciy, izp]) +
+                            wxr[cix]*(rz[ixp, ciy, iz] + rz[ixp, ciy, izp])
+                        )
 
     elif sc_dir == 3:  # Restrict in x- and y-directions
 
-        # Loop over coarse y-edges.
-        for ciy in range(cnNy):
-            iy = 2*ciy
-            iym = max(0, iy-1)
-            iyp = min(nNy-1, iy+1)
+        # Loop over coarse z-edges.
+        for ciz in range(cnNz):
 
-            # Sum the term for x-field.
-            crx[:, ciy, :] = wy0[ciy]*(rx[::2, iy, :] + rx[1::2, iy, :])
-            crx[:, ciy, :] += wyl[ciy]*(rx[::2, iym, :] + rx[1::2, iym, :])
-            crx[:, ciy, :] += wyr[ciy]*(rx[::2, iyp, :] + rx[1::2, iyp, :])
+            # Loop over coarse y-edges.
+            for ciy in range(cnNy):
+                iy = 2*ciy
+                iym = max(0, iy-1)
+                iyp = min(nNy-1, iy+1)
 
-            # Loop over coarse x-edges.
-            for cix in range(cnNx):
-                ix = 2*cix
-                ixm = max(0, ix-1)
-                ixp = min(nNx-1, ix+1)
+                # Loop over coarse x-edges.
+                for cix in range(cnNx):
+                    ix = 2*cix
+                    ixm = max(0, ix-1)
+                    ixp = min(nNx-1, ix+1)
 
-                # Sum the terms for z-field.
-                crz[cix, ciy, :] = wx0[cix]*(
-                        wy0[ciy]*rz[ix, iy, :] +
-                        wyl[ciy]*rz[ix, iym, :] +
-                        wyr[ciy]*rz[ix, iyp, :]
-                )
+                    # Sum the term for x-field.
+                    if cix < cnNx-1:
+                        crx[cix, ciy, ciz] = (
+                            wy0[ciy]*(rx[ix, iy, ciz] + rx[ixp, iy, ciz]) +
+                            wyl[ciy]*(rx[ix, iym, ciz] + rx[ixp, iym, ciz]) +
+                            wyr[ciy]*(rx[ix, iyp, ciz] + rx[ixp, iyp, ciz])
+                        )
 
-                crz[cix, ciy, :] += wxl[cix]*(
-                        wy0[ciy]*rz[ixm, iy, :] +
-                        wyl[ciy]*rz[ixm, iym, :] +
-                        wyr[ciy]*rz[ixm, iyp, :]
-                )
+                    # Sum the term for y-field.
+                    if ciy < cnNy-1:
+                        cry[cix, ciy, ciz] = (
+                            wx0[cix]*(ry[ix, iy, ciz] + ry[ix, iyp, ciz]) +
+                            wxl[cix]*(ry[ixm, iy, ciz] + ry[ixm, iyp, ciz]) +
+                            wxr[cix]*(ry[ixp, iy, ciz] + ry[ixp, iyp, ciz])
+                        )
 
-                crz[cix, ciy, :] += wxr[cix]*(
-                        wy0[ciy]*rz[ixp, iy, :] +
-                        wyl[ciy]*rz[ixp, iym, :] +
-                        wyr[ciy]*rz[ixp, iyp, :]
-                )
+                    # Sum the terms for z-field.
+                    if ciz < cnNz-1:
+                        crz[cix, ciy, ciz] = wx0[cix]*(
+                                wy0[ciy]*rz[ix, iy, ciz] +
+                                wyl[ciy]*rz[ix, iym, ciz] +
+                                wyr[ciy]*rz[ix, iyp, ciz]
+                        )
 
-        # Loop over coarse x-edges.
-        for cix in range(cnNx):
-            ix = 2*cix
-            ixm = max(0, ix-1)
-            ixp = min(nNx-1, ix+1)
+                        crz[cix, ciy, ciz] += wxl[cix]*(
+                                wy0[ciy]*rz[ixm, iy, ciz] +
+                                wyl[ciy]*rz[ixm, iym, ciz] +
+                                wyr[ciy]*rz[ixm, iyp, ciz]
+                        )
 
-            # Sum the term for y-field.
-            cry[cix, :, :] = wx0[cix]*(ry[ix, ::2, :] + ry[ix, 1::2, :])
-            cry[cix, :, :] += wxl[cix]*(ry[ixm, ::2, :] + ry[ixm, 1::2, :])
-            cry[cix, :, :] += wxr[cix]*(ry[ixp, ::2, :] + ry[ixp, 1::2, :])
+                        crz[cix, ciy, ciz] += wxr[cix]*(
+                                wy0[ciy]*rz[ixp, iy, ciz] +
+                                wyl[ciy]*rz[ixp, iym, ciz] +
+                                wyr[ciy]*rz[ixp, iyp, ciz]
+                        )
 
     elif sc_dir == 4:  # Restrict in x-direction
 
-        # Sum the terms for x-field.
-        crx[:, :, :] = rx[::2, :, :] + rx[1::2, :, :]
+        # Loop over coarse z-edges.
+        for ciz in range(cnNz):
 
-        # Loop over coarse x-edges.
-        for cix in range(cnNx):
-            ix = 2*cix
-            ixm = max(0, ix-1)
-            ixp = min(nNx-1, ix+1)
+            # Loop over coarse y-edges.
+            for ciy in range(cnNy):
 
-            # Sum the terms for y-field.
-            cry[cix, :, :] = wx0[cix]*ry[ix, :, :]
-            cry[cix, :, :] += wxl[cix]*ry[ixm, :, :]
-            cry[cix, :, :] += wxr[cix]*ry[ixp, :, :]
+                # Loop over coarse x-edges.
+                for cix in range(cnNx):
+                    ix = 2*cix
+                    ixm = max(0, ix-1)
+                    ixp = min(nNx-1, ix+1)
 
-            # Sum the terms for z-field.
-            crz[cix, :, :] = wx0[cix]*rz[ix, :, :]
-            crz[cix, :, :] += wxl[cix]*rz[ixm, :, :]
-            crz[cix, :, :] += wxr[cix]*rz[ixp, :, :]
+                    # Sum the terms for x-field.
+                    if cix < cnNx-1:
+                        crx[cix, ciy, ciz] = rx[ix, ciy, ciz]
+                        crx[cix, ciy, ciz] += rx[ixp, ciy, ciz]
+
+                    # Sum the terms for y-field.
+                    if ciy < cnNy-1:
+                        cry[cix, ciy, ciz] = wx0[cix]*ry[ix, ciy, ciz]
+                        cry[cix, ciy, ciz] += wxl[cix]*ry[ixm, ciy, ciz]
+                        cry[cix, ciy, ciz] += wxr[cix]*ry[ixp, ciy, ciz]
+
+                    # Sum the terms for z-field.
+                    if ciz < cnNz-1:
+                        crz[cix, ciy, ciz] = wx0[cix]*rz[ix, ciy, ciz]
+                        crz[cix, ciy, ciz] += wxl[cix]*rz[ixm, ciy, ciz]
+                        crz[cix, ciy, ciz] += wxr[cix]*rz[ixp, ciy, ciz]
 
     elif sc_dir == 5:  # Restrict in y-direction
 
-        # Sum the terms for y-field.
-        cry[:, :, :] = ry[:, ::2, :] + ry[:, 1::2, :]
+        # Loop over coarse z-edges.
+        for ciz in range(cnNz):
 
-        # Loop over coarse y-edges.
-        for ciy in range(cnNy):
-            iy = 2*ciy
-            iym = max(0, iy-1)
-            iyp = min(nNy-1, iy+1)
+            # Loop over coarse y-edges.
+            for ciy in range(cnNy):
+                iy = 2*ciy
+                iym = max(0, iy-1)
+                iyp = min(nNy-1, iy+1)
 
-            # Sum the terms for x-field.
-            crx[:, ciy, :] = wy0[ciy]*rx[:, iy, :]
-            crx[:, ciy, :] += wyl[ciy]*rx[:, iym, :]
-            crx[:, ciy, :] += wyr[ciy]*rx[:, iyp, :]
+                # Loop over coarse x-edges.
+                for cix in range(cnNx):
 
-            # Sum the terms for z-field.
-            crz[:, ciy, :] = wy0[ciy]*rz[:, iy, :]
-            crz[:, ciy, :] += wyl[ciy]*rz[:, iym, :]
-            crz[:, ciy, :] += wyr[ciy]*rz[:, iyp, :]
+                    # Sum the terms for x-field.
+                    if cix < cnNx-1:
+                        crx[cix, ciy, ciz] = wy0[ciy]*rx[cix, iy, ciz]
+                        crx[cix, ciy, ciz] += wyl[ciy]*rx[cix, iym, ciz]
+                        crx[cix, ciy, ciz] += wyr[ciy]*rx[cix, iyp, ciz]
+
+                    # Sum the terms for y-field.
+                    if ciy < cnNy-1:
+                        cry[cix, ciy, ciz] = ry[cix, iy, ciz]
+                        cry[cix, ciy, ciz] += ry[cix, iyp, ciz]
+
+                    # Sum the terms for z-field.
+                    if ciz < cnNz-1:
+                        crz[cix, ciy, ciz] = wy0[ciy]*rz[cix, iy, ciz]
+                        crz[cix, ciy, ciz] += wyl[ciy]*rz[cix, iym, ciz]
+                        crz[cix, ciy, ciz] += wyr[ciy]*rz[cix, iyp, ciz]
 
     elif sc_dir == 6:  # Restrict in z-direction
-
-        # Sum the terms for z-field.
-        crz[:, :, :] = rz[:, :, ::2] + rz[:, :, 1::2]
 
         # Loop over coarse z-edges.
         for ciz in range(cnNz):
@@ -1932,15 +1952,28 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
             izm = max(0, iz-1)
             izp = min(nNz-1, iz+1)
 
-            # Sum the terms for x-field.
-            crx[:, :, ciz] = wz0[ciz]*rx[:, :, iz]
-            crx[:, :, ciz] += wzl[ciz]*rx[:, :, izm]
-            crx[:, :, ciz] += wzr[ciz]*rx[:, :, izp]
+            # Loop over coarse y-edges.
+            for ciy in range(cnNy):
 
-            # Sum the terms for y-field.
-            cry[:, :, ciz] = wz0[ciz]*ry[:, :, iz]
-            cry[:, :, ciz] += wzl[ciz]*ry[:, :, izm]
-            cry[:, :, ciz] += wzr[ciz]*ry[:, :, izp]
+                # Loop over coarse x-edges.
+                for cix in range(cnNx):
+
+                    # Sum the terms for x-field.
+                    if cix < cnNx-1:
+                        crx[cix, ciy, ciz] = wz0[ciz]*rx[cix, ciy, iz]
+                        crx[cix, ciy, ciz] += wzl[ciz]*rx[cix, ciy, izm]
+                        crx[cix, ciy, ciz] += wzr[ciz]*rx[cix, ciy, izp]
+
+                    # Sum the terms for y-field.
+                    if ciy < cnNy-1:
+                        cry[cix, ciy, ciz] = wz0[ciz]*ry[cix, ciy, iz]
+                        cry[cix, ciy, ciz] += wzl[ciz]*ry[cix, ciy, izm]
+                        cry[cix, ciy, ciz] += wzr[ciz]*ry[cix, ciy, izp]
+
+                    # Sum the terms for z-field.
+                    if ciz < cnNz-1:
+                        crz[cix, ciy, ciz] = rz[cix, ciy, iz]
+                        crz[cix, ciy, ciz] += rz[cix, ciy, izp]
 
 
 @nb.njit(**_numba_setting)
