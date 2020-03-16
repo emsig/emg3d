@@ -11,6 +11,10 @@ Changelog
 - Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and coverage.
 - Bugfix: ``emg3d.njitted.restrict`` did not store the {x;y;z}-field if
   ``sc_dir`` was {4;5;6}, respectively.
+- Adjust ``Fields.pha`` and ``Fields.amp`` in accordance with ``empymod v2``:
+  ``.pha`` and ``.amp`` are now methods; uses directly
+  ``empymod.utils.EMArray``.
+- Adjust tests for ``empymod v2`` (Fields, Fourier).
 
 
 *v0.9.3* : Sphinx gallery

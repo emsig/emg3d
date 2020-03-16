@@ -27,6 +27,7 @@ import os
 import shelve
 import empymod
 import numpy as np
+from empymod import EMArray
 from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy.constants import mu_0, epsilon_0
@@ -268,15 +269,29 @@ class Field(np.ndarray):
         """Update electric field in z-direction."""
         self.view()[-self.nEz:] = fz.ravel('F')
 
-    @property
     def amp(self):
         """Amplitude of the electromagnetic field."""
-        return np.abs(self.view())
+        return EMArray(self.view()).amp()
 
-    @property
-    def pha(self):
-        """Phase of the electromagnetic field, unwrapped and in degrees."""
-        return 180*np.unwrap(np.angle(self.view()))/np.pi
+    def pha(self, deg=False, unwrap=True, lag=True):
+        """Phase of the electromagnetic field.
+
+        Parameters
+        ----------
+        deg : bool
+            If True the returned phase is in degrees, else in radians.
+            Default is False (radians).
+
+        unwrap : bool
+            If True the returned phase is unwrapped.
+            Default is True (unwrapped).
+
+        lag : bool
+            If True the returned phase is lag, else lead defined.
+            Default is True (lag defined).
+
+        """
+        return EMArray(self.view()).pha(deg, unwrap, lag)
 
     @property
     def freq(self):
@@ -744,7 +759,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     if values.size == grid.nC:
         return out
     else:
-        return empymod.utils.EMArray(out)
+        return EMArray(out)
 
 
 def get_h_field(grid, model, field):
