@@ -2,7 +2,7 @@
 
 # Help text
 usage="
-$(basename "$0") [-hpndw] [-v VERSION(S)]
+$(basename "$0") [-hpdw] [-v VERSION(S)]
 
 Run pytest for emg3d locally in an isolated venv before submitting to
 GitHub/Travis-CI; by default for all supported python versions of emg3d.
@@ -25,7 +25,7 @@ INST="pytest-flake8 scooby"
 WARN=""
 
 # Get Optional Input
-while getopts "hv:npdw" opt; do
+while getopts "hv:pdw" opt; do
 
   case $opt in
     h) echo "$usage"
