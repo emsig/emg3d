@@ -1635,8 +1635,8 @@ class TensorMesh:
     def vol(self):
         """Construct cell volumes of the 3D model as 1D array."""
         if getattr(self, '_vol', None) is None:
-            vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
-            self._vol = vol.ravel('F')
+            self._vol = (self.hx[None, None, :]*self.hy[None, :, None] *
+                         self.hz[:, None, None]).ravel()
         return self._vol
 
 
