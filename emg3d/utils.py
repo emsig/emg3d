@@ -27,6 +27,7 @@ import os
 import shelve
 import empymod
 import numpy as np
+from copy import deepcopy
 from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy.constants import mu_0, epsilon_0
@@ -227,6 +228,61 @@ class Field(np.ndarray):
 
         # Call the parent's __setstate__ with the other tuple elements.
         super(Field, self).__setstate__(state[0:-i])
+
+    def copy(self):
+        """Return a copy of the Field."""
+        return Field.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        """Store the necessary information of the Field in a dict."""
+        out = {'field': np.array(self.field), 'freq': self._freq,
+               'vnEx': self.vnEx, 'vnEy': self.vnEy, 'vnEz': self.vnEz}
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert the dictionary into a Field instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`TensorMesh.to_dict`.
+            The dictionary needs the keys `field`, `freq`, `vnEx`, `vnEy`, and
+            `vnEz`.
+
+        Returns
+        -------
+        obj : `Field`-instance
+
+        """
+
+        # Create a dummy with the required attributes for the field instance.
+        class Grid:
+            pass
+
+        grid = Grid()
+
+        # Check and get the required keys from the input.
+        try:
+            field = inp['field']
+            freq = inp['freq']
+            grid.vnEx = inp['vnEx']
+            grid.vnEy = inp['vnEy']
+            grid.vnEz = inp['vnEz']
+        except KeyError as e:
+            raise ValueError(f"* ERROR   :: Variable {e} missing in `inp`.")
+
+        # Calculate missing info.
+        grid.nEx = np.prod(grid.vnEx)
+        grid.nEy = np.prod(grid.vnEy)
+        grid.nEz = np.prod(grid.vnEz)
+        grid.nE = grid.nEx + grid.nEy + grid.nEz
+
+        # Return Field instance.
+        return cls(fx_or_grid=grid, fy_or_field=field, freq=freq)
 
     @property
     def field(self):
@@ -994,34 +1050,67 @@ class Model:
         return equal
 
     def copy(self):
-        """Return a copy of the model."""
+        """Return a copy of the Model."""
+        return Model.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        """Store the necessary information of the Model in a dict."""
+        # Initiate dict.
+        out = {}
 
         # resistivities.
-        res_x = self.res_x.copy()
+        out['res_x'] = self.res_x
         if self.case in [1, 3]:
-            res_y = self.res_y.copy()
+            out['res_y'] = self.res_y
         else:
-            res_y = None
+            out['res_y'] = None
         if self.case in [2, 3]:
-            res_z = self.res_z.copy()
+            out['res_z'] = self.res_z
         else:
-            res_z = None
+            out['res_z'] = None
 
         # mu_r.
         if self.mu_r is not None:
-            mu_r = self.mu_r.copy()
+            out['mu_r'] = self.mu_r
         else:
-            mu_r = None
+            out['mu_r'] = None
 
         # epsilon_r.
         if self.epsilon_r is not None:
-            epsilon_r = self.epsilon_r.copy()
+            out['epsilon_r'] = self.epsilon_r
         else:
-            epsilon_r = None
+            out['epsilon_r'] = None
 
-        # Return new Model instance.
-        return Model(grid=self._vol, res_x=res_x, res_y=res_y, res_z=res_z,
-                     mu_r=mu_r, epsilon_r=epsilon_r)
+        # vol.
+        out['vol'] = self._vol
+
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert the dictionary into a Model instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`Model.to_dict`.
+            The dictionary needs the keys `res_x`, `res_y`, `res_z`, `mu_r`,
+            `epsilon_r`, and `vol`.
+
+        Returns
+        -------
+        obj : `Model`-instance
+
+        """
+        try:
+            return cls(grid=inp['vol'], res_x=inp['res_x'], res_y=inp['res_y'],
+                       res_z=inp['res_z'], mu_r=inp['mu_r'],
+                       epsilon_r=inp['epsilon_r'])
+        except KeyError as e:
+            raise ValueError(f"* ERROR   :: Variable {e} missing in `inp`.")
 
     # RESISTIVITIES
     @property
@@ -1630,6 +1719,38 @@ class TensorMesh:
     def __repr__(self):
         """Simple representation."""
         return f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} ({self.nC})"
+
+    def copy(self):
+        """Return a copy of the TensorMesh."""
+        return TensorMesh.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        """Store the necessary information of the TensorMesh in a dict."""
+        out = {'hx': self.hx, 'hy': self.hy, 'hz': self.hz, 'x0': self.x0}
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert the dictionary into a TensorMesh instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`TensorMesh.to_dict`.
+            The dictionary needs the keys `hx`, `hy`, `hz`, and `x0`.
+
+        Returns
+        -------
+        obj : `TensorMesh`-instance
+
+        """
+        try:
+            return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
+        except KeyError as e:
+            raise ValueError(f"* ERROR   :: Variable {e} missing in `inp`.")
 
     @property
     def vol(self):
