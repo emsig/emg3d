@@ -508,12 +508,13 @@ def test_Model(capsys):
         utils.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
     # Check with all inputs
+    gridvol = grid.vol.reshape(grid.vnC, order='F')
     model3 = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
     vmodel3 = utils.VolumeModel(grid, model3, sfield)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert_allclose(model3._vol/mu_r, vmodel3.zeta)
+    assert_allclose(gridvol/mu_r, vmodel3.zeta)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
                           res_z.ravel('F'), mu_r=mu_r.ravel('F'))
@@ -521,7 +522,7 @@ def test_Model(capsys):
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
-    assert_allclose(model3b._vol/mu_r, vmodel3b.zeta)
+    assert_allclose(gridvol/mu_r, vmodel3b.zeta)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
@@ -538,9 +539,9 @@ def test_Model(capsys):
 
     # Check eta
     iomep = sfield.sval*utils.epsilon_0
-    eta_x = sfield.smu0*(1./model3.res_x + iomep)*model3._vol
-    eta_y = sfield.smu0*(1./model3.res_y + iomep)*model3._vol
-    eta_z = sfield.smu0*(1./model3.res_z + iomep)*model3._vol
+    eta_x = sfield.smu0*(1./model3.res_x + iomep)*gridvol
+    eta_y = sfield.smu0*(1./model3.res_y + iomep)*gridvol
+    eta_z = sfield.smu0*(1./model3.res_z + iomep)*gridvol
     vmodel3 = utils.VolumeModel(grid, model3, sfield)
     assert_allclose(vmodel3.eta_x, eta_x)
     assert_allclose(vmodel3.eta_y, eta_y)
@@ -707,7 +708,7 @@ class TestModelOperators:
     def test_dict(self):
         # dict is already tested via copy. Just the other cases here.
         mdict = self.model_3_b.to_dict()
-        keys = ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vol']
+        keys = ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC']
         for key in keys:
             assert key in mdict.keys()
         for key in keys[:3]:

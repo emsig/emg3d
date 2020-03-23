@@ -948,17 +948,15 @@ class Model:
                   "it will break in the future.")
 
         # Store required info from grid.
-        if hasattr(grid, 'dtype'):
+        if hasattr(grid, 'shape'):
             # This is an alternative possibility. Instead of the grid, we only
-            # need the model._vol of shape vnC. Mainly used internally to
-            # construct new models.
-            self.nC = np.prod(grid.shape)
-            self.vnC = grid.shape
-            self._vol = grid
+            # need the model.vnC. Mainly used internally to construct new
+            # models.
+            self.vnC = grid
+            self.nC = np.prod(grid)
         else:
             self.nC = grid.nC
             self.vnC = grid.vnC
-            self._vol = grid.vol.reshape(self.vnC, order='F')
 
         # Copies of vnC and nC, but more widely used/known
         # (vnC and nC are the discretize attributes).
@@ -997,13 +995,13 @@ class Model:
             return NotImplemented
 
         # Check input.
-        vol = self._operator_test(model)
+        self._operator_test(model)
 
         # Apply operator.
         kwargs = self._apply_operator(model, np.add)
 
         # Return new Model instance.
-        return Model(grid=vol, **kwargs)
+        return Model(grid=self.vnC, **kwargs)
 
     def __sub__(self, model):
         """Subtract two models."""
@@ -1013,13 +1011,13 @@ class Model:
             return NotImplemented
 
         # Check input.
-        vol = self._operator_test(model)
+        self._operator_test(model)
 
         # Apply operator.
         kwargs = self._apply_operator(model, np.subtract)
 
         # Return new Model instance.
-        return Model(grid=vol, **kwargs)
+        return Model(grid=self.vnC, **kwargs)
 
     def __eq__(self, model):
         """Compare two models.
@@ -1081,8 +1079,8 @@ class Model:
         else:
             out['epsilon_r'] = None
 
-        # vol.
-        out['vol'] = self._vol
+        # vnC.
+        out['vnC'] = self.vnC
 
         if copy:
             return deepcopy(out)
@@ -1098,7 +1096,7 @@ class Model:
         inp : dict
             Dictionary as obtained from :func:`Model.to_dict`.
             The dictionary needs the keys `res_x`, `res_y`, `res_z`, `mu_r`,
-            `epsilon_r`, and `vol`.
+            `epsilon_r`, and `vnC`.
 
         Returns
         -------
@@ -1106,7 +1104,7 @@ class Model:
 
         """
         try:
-            return cls(grid=inp['vol'], res_x=inp['res_x'], res_y=inp['res_y'],
+            return cls(grid=inp['vnC'], res_x=inp['res_x'], res_y=inp['res_y'],
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'])
         except KeyError as e:
@@ -1268,8 +1266,6 @@ class Model:
                    f"defined; provided: '{hasattr(self.epsilon_r, 'dtype')}' "
                    f"and '{hasattr(model.epsilon_r, 'dtype')}'.")
             raise ValueError(msg)
-
-        return self._vol
 
     def _apply_operator(self, model, operator):
         """Apply the provided operator to self and model."""
