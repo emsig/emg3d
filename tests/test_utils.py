@@ -402,6 +402,16 @@ def test_TensorMesh():
     for attr in grid['attr']:
         assert_allclose(grid[attr], getattr(emg3dgrid, attr))
 
+    # Copy
+    cgrid = emg3dgrid.copy()
+    assert_allclose(cgrid.vol, emg3dgrid.vol)
+    dgrid = emg3dgrid.to_dict()
+    cdgrid = utils.TensorMesh.from_dict(dgrid)
+    assert_allclose(cdgrid.vol, emg3dgrid.vol)
+    del dgrid['hx']
+    with pytest.raises(ValueError):
+        utils.TensorMesh.from_dict(dgrid)
+
 
 # MODEL AND FIELD CLASSES
 def test_Model(capsys):
@@ -694,6 +704,20 @@ class TestModelOperators:
         assert (model_new4.epsilon_r.base is not
                 self.model_epsilon_a.epsilon_r.base)
 
+    def test_dict(self):
+        # dict is already tested via copy. Just the other cases here.
+        mdict = self.model_3_b.to_dict()
+        keys = ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vol']
+        for key in keys:
+            assert key in mdict.keys()
+        for key in keys[:3]:
+            val = getattr(self.model_3_b, key)
+            assert_allclose(mdict[key], val)
+
+        del mdict['res_x']
+        with pytest.raises(ValueError):
+            utils.Model.from_dict(mdict)
+
 
 def test_field():
     # Create some dummy data
@@ -743,6 +767,19 @@ def test_field():
     assert abs(np.sum(ee.fy[:, :, 0] + ee.fy[:, :, -1])) == 0
     assert abs(np.sum(ee.fz[0, :, :] + ee.fz[-1, :, :])) == 0
     assert abs(np.sum(ee.fz[:, 0, :] + ee.fz[:, -1, :])) == 0
+
+    # Test copy
+    e2 = ee.copy()
+    assert_allclose(ee.field, e2.field)
+    assert_allclose(ee.fx, e2.fx)
+    assert_allclose(ee.fy, e2.fy)
+    assert_allclose(ee.fz, e2.fz)
+    assert ee.field.base is not e2.field.base
+
+    edict = ee.to_dict()
+    del edict['field']
+    with pytest.raises(ValueError):
+        utils.Field.from_dict(edict)
 
 
 def test_source_field():
