@@ -1398,6 +1398,11 @@ def test_save_and_load(tmpdir, capsys):
                models=model, fields=field, other={'what': field.fx},
                path=tmpdir)
 
+    # Ensure not overwritten if said so
+    utils.save('test', overwrite=False, path=tmpdir)
+    outstr, _ = capsys.readouterr()
+    assert "WARNING :: File" in outstr
+
     # Load it.
     out = utils.load('test', path=tmpdir)
     outstr, _ = capsys.readouterr()
@@ -1411,10 +1416,32 @@ def test_save_and_load(tmpdir, capsys):
     assert_allclose(grid.vol, out['mesh']['discretize'].vol)
     assert_allclose(out['other']['what'], field.fx)
 
-    # Save a normal np.saves_compreseed file.
+    # Check errors
     np.savez_compressed(tmpdir+'/test2.npz', meshes=grid)
     with pytest.raises(OSError):
-        _ = utils.load('test2', path=tmpdir)
+        _ = utils.load('test2', allow_pickle=True, path=tmpdir)
+
+    with pytest.raises(TypeError):
+        utils.save('ttt', stupidkeyword='a')
+    with pytest.raises(TypeError):
+        utils.load('ttt', stupidkeyword='a')
+
+    with pytest.raises(NotImplementedError):
+        utils.save('ttt', backend='a')
+    with pytest.raises(NotImplementedError):
+        utils.load('ttt', backend='a')
+
+    # Run the deepdish once. They should work locally and will fail on Travis.
+    utils.save('test-dd', meshes={'emg3d': grid, 'discretize': grid2},
+               models=model, fields=field, other={'what': field.fx},
+               path=tmpdir, backend='deepdish')
+    out_dd = utils.load('test-dd', path=tmpdir, backend='deepdish')
+    if out_dd is not None:
+        assert out_dd['model'] == model
+        assert_allclose(field.fx, out_dd['field'].fx)
+        assert_allclose(grid.vol, out_dd['mesh']['emg3d'].vol)
+        assert_allclose(grid.vol, out_dd['mesh']['discretize'].vol)
+        assert_allclose(out_dd['other']['what'], field.fx)
 
 
 # OTHER

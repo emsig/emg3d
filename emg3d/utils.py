@@ -38,7 +38,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
 from emg3d import njitted
 
-# scooby is a soft dependency for emg3d
+# Check soft dependencies.
 try:
     from scooby import Report as ScoobyReport
 except ImportError:
@@ -47,6 +47,19 @@ except ImportError:
             print("\n* WARNING :: `emg3d.Report` requires `scooby`."
                   "\n             Install it via `pip install scooby` or"
                   "\n             `conda install -c conda-forge scooby`.\n")
+
+try:
+    import deepdish.io as ddio
+except ImportError:
+    class ddio:
+
+        def save(self, kwargs):
+            print("\n* WARNING :: `backend='deepdish'` requires `deepdish`."
+                  "\n             Install it via `pip install deepdish`.\n")
+
+        def load(self):
+            print("\n* WARNING :: `backend='deepdish'` requires `deepdish`."
+                  "\n             Install it via `pip install deepdish`.\n")
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
@@ -65,7 +78,8 @@ except ImportError:
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'TensorMesh',
            'get_hx_h0', 'get_cell_numbers', 'get_stretched_h', 'get_domain',
-           'get_hx', 'Fourier', 'data_write', 'data_read', 'Time', 'Report']
+           'get_hx', 'Fourier', 'data_write', 'data_read', 'save', 'load',
+           'Time', 'Report']
 
 
 # FIELDS
@@ -250,7 +264,7 @@ class Field(np.ndarray):
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`TensorMesh.to_dict`.
+            Dictionary as obtained from :func:`Field.to_dict`.
             The dictionary needs the keys `field`, `freq`, `vnEx`, `vnEy`, and
             `vnEz`.
 
@@ -3049,8 +3063,7 @@ def data_read(fname, keys=None, path="data"):
             return out
 
 
-def save(fname, meshes=None, models=None, fields=None, other=None,
-         path="data"):
+def save(fname, meshes=None, models=None, fields=None, other=None, **kwargs):
     """Save meshes, models, fields, and other data to disk.
 
     This routine is a wrapper around :func:`numpy.savez_compressed`, and stores
@@ -3086,7 +3099,25 @@ def save(fname, meshes=None, models=None, fields=None, other=None,
     path : str, optional
         Absolute or relative path where to store. Default is 'data'.
 
+    overwrite : bool, optional
+        If True (default) overwrites existing files.
+
+    backend : str, optional
+        Backend to use. Implemented are currently:
+
+        - 'numpy' (default): Uses numpy to store to a compressed binary file
+          with the ending '.npz'.
+        - 'deepdish': Uses deepdish to store to an hdf5 file with the ending
+          '.h5'. Requires the module deepdish.
+
     """
+    # Get kwargs.
+    path = kwargs.pop('path', 'data')
+    overwrite = kwargs.pop('overwrite', True)
+    backend = kwargs.pop('backend', 'numpy')
+    # Ensure no kwargs left.
+    if kwargs:
+        raise TypeError('Unexpected **kwargs: %r' % kwargs)
 
     def store_variable(storage, variable, name):
         """Get serialized dicts and save numpy-objects separately."""
@@ -3100,13 +3131,13 @@ def save(fname, meshes=None, models=None, fields=None, other=None,
 
             # Workaround for discretize.TensorMesh instances.
             if name == 'mesh' and not hasattr(v1, 'to_dict'):
-                storage['mesh-'+k1+'-hx'] = v1.hx
-                storage['mesh-'+k1+'-hy'] = v1.hy
-                storage['mesh-'+k1+'-hz'] = v1.hz
-                storage['mesh-'+k1+'-x0'] = v1.x0
+                storage[f"mesh__{k1}__hx"] = v1.hx
+                storage[f"mesh__{k1}__hy"] = v1.hy
+                storage[f"mesh__{k1}__hz"] = v1.hz
+                storage[f"mesh__{k1}__x0"] = v1.x0
 
             elif name == 'other':
-                storage[name+'-'+k1] = v1
+                storage[f"{name}__{k1}"] = v1
 
             else:
                 # Store each object of `to_dict`.
@@ -3116,12 +3147,20 @@ def save(fname, meshes=None, models=None, fields=None, other=None,
                     if v2 is None:
                         v2 = 'none'
 
-                    storage[name+'-'+k1+'-'+k2] = v2
+                    storage[f"{name}__{k1}__{k2}"] = v2
 
     # Get absolute path, create if it doesn't exist.
     path = os.path.abspath(path)
     os.makedirs(path, exist_ok=True)
     full_path = os.path.join(path, fname)
+    if backend == "numpy":
+        full_path += '.npz'
+    elif backend == "deepdish":
+        full_path += '.h5'
+
+    if not overwrite and os.path.isfile(full_path):
+        print(f"\n* WARNING :: File {full_path} exists, not writing data.\n")
+        return
 
     # Start kwargs for np.savez_compressed.
     kwargs = {}
@@ -3146,11 +3185,16 @@ def save(fname, meshes=None, models=None, fields=None, other=None,
     kwargs['date'] = datetime.today().isoformat()
     kwargs['version'] = 'emg3d v'+__version__
 
-    # Save the data as a compressed 'npz'-file.
-    np.savez_compressed(full_path, **kwargs)
+    # Save the data depending on the backend.
+    if backend == "numpy":
+        np.savez_compressed(full_path, **kwargs)
+    elif backend == "deepdish":
+        ddio.save(full_path, kwargs)
+    else:
+        raise NotImplementedError(f"Backend='{backend}' is not implemented.")
 
 
-def load(fname, allow_pickle=False, path="data", verb=1):
+def load(fname, **kwargs):
     """Load meshes, models, fields, and other data from disk.
 
     This routine is a wrapper around :func:`numpy.load`, and loads data stored
@@ -3173,6 +3217,14 @@ def load(fname, allow_pickle=False, path="data", verb=1):
     verb : int
         If 1 (default) verbose, if 0 silent.
 
+    backend : str, optional
+        Backend to use. Implemented are currently:
+
+        - 'numpy' (default): Uses numpy to store to a compressed binary file
+          with the ending '.npz'.
+        - 'deepdish': Uses deepdish to store to an hdf5 file with the ending
+          '.h5'. Requires the module deepdish.
+
 
     Returns
     -------
@@ -3181,21 +3233,30 @@ def load(fname, allow_pickle=False, path="data", verb=1):
         fields are deserialized and returned as instances.
 
     """
+    # Get kwargs.
+    path = kwargs.pop('path', 'data')
+    allow_pickle = kwargs.pop('allow_pickle', False)
+    verb = kwargs.pop('verb', 1)
+    backend = kwargs.pop('backend', 'numpy')
+    # Ensure no kwargs left.
+    if kwargs:
+        raise TypeError('Unexpected **kwargs: %r' % kwargs)
+
     def get_names(data, prefix, out):
         """Return unique names from data.
 
-        Elements are stored as `prefix-name-suffix`; this function returns the
-        set of unique names for the given prefix.
+        Elements are stored as `prefix__name__suffix`; this function returns
+        the set of unique names for the given prefix.
         """
 
-        # Get all keys that start with 'prefix-'.
-        keys = [key for key in data.files if key.startswith(prefix+'-')]
+        # Get all keys that start with 'prefix__'.
+        keys = [key for key in data.keys() if key.startswith(prefix+'__')]
 
         # Extract the actual names of them (excluding prefix and suffix).
         if prefix == 'other':
-            names = set(['-'.join(key.split('-')[1:]) for key in keys])
+            names = set(['__'.join(key.split('__')[1:]) for key in keys])
         else:
-            names = set(['-'.join(key.split('-')[1:-1]) for key in keys])
+            names = set(['__'.join(key.split('__')[1:-1]) for key in keys])
 
         # Initiate dict-entry if there are any names.
         if names or prefix == 'other':
@@ -3210,7 +3271,7 @@ def load(fname, allow_pickle=False, path="data", verb=1):
         for var in suffixes:
 
             # Get the parameter.
-            par = data[prefix+'-'+name+'-'+var]
+            par = data[prefix+'__'+name+'__'+var]
 
             # Check if it is 'none' and convert to None if so.
             if par.dtype == '<U4' and str(par) == 'none':
@@ -3237,42 +3298,56 @@ def load(fname, allow_pickle=False, path="data", verb=1):
 
     # Get absolute path.
     path = os.path.abspath(path)
-    full_path = os.path.join(path, fname+'.npz')
+    full_path = os.path.join(path, fname)
 
-    # Initiate output.
+    # Open file depending on the backend.
+    if backend == "numpy":
+        full_path += '.npz'
+        with np.load(full_path, allow_pickle=allow_pickle) as dat:
+            data = {}
+            for key in dat.files:
+                data[key] = dat[key]
+
+    elif backend == "deepdish":
+        full_path += '.h5'
+        data = ddio.load(full_path)
+        if data is None:
+            return data
+
+    else:
+        raise NotImplementedError(f"Backend='{backend}' is not implemented.")
+
+    # Initialize output
     out = {}
 
-    # Open file.
-    with np.load(full_path, allow_pickle=allow_pickle) as data:
+    # Ensure it is a file created by emg3d by checking date/version.
+    try:
+        meta = {}
+        meta['version'] = str(data['version'])
+        meta['date'] = str(data['date'])
+    except KeyError:
+        print(f"\n* ERROR   :: {full_path} was not created by emg3d.")
+        raise OSError('Not an emg3d file.')
 
-        # Ensure it is a file created by emg3d by checking date/version.
-        try:
-            meta = {}
-            meta['version'] = str(data['version'])
-            meta['date'] = str(data['date'])
-        except KeyError:
-            print(f"\n* ERROR   :: {full_path} was not created with emg3d.")
-            raise OSError('Not an emg3d file.')
+    # Print file info.
+    if verb > 0:
+        print(f"  Loading file {full_path}")
+        print(f"  -> Stored with {meta['version']} on {meta['date']}")
 
-        # Print file info.
-        if verb > 0:
-            print(f"  Loading file {full_path}")
-            print(f"  -> Stored with {meta['version']} on {meta['date']}")
+    # De-serialize TensorMesh, Model, and Field instances.
+    deserialize(data, out, 'mesh', TensorMesh, ['hx', 'hy', 'hz', 'x0'])
+    deserialize(data, out, 'model', Model,
+                ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'])
+    deserialize(data, out, 'field', Field,
+                ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'])
 
-        # De-serialize TensorMesh, Model, and Field instances.
-        deserialize(data, out, 'mesh', TensorMesh, ['hx', 'hy', 'hz', 'x0'])
-        deserialize(data, out, 'model', Model,
-                    ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'])
-        deserialize(data, out, 'field', Field,
-                    ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'])
+    # Add all other stuff.
+    names = get_names(data, 'other', out)
+    for name in names:
+        out['other'][name] = data['other__'+name]
 
-        # Add all other stuff.
-        names = get_names(data, 'other', out)
-        for name in names:
-            out['other'][name] = data['other-'+name]
-
-        # Add meta data.
-        out['meta'] = meta
+    # Add meta data.
+    out['meta'] = meta
 
     return out
 

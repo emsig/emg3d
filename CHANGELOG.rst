@@ -12,7 +12,8 @@ Changelog
   existing models, and comparing two models (``+``, ``-``, ``==`` and ``!=``).
   New attributes ``shape`` and ``size``.
 - New functions ``emg3d.utils.save`` and ``emg3d.utils.load`` to save and load
-  all sort of ``emg3d`` instances.
+  all sort of ``emg3d`` instances. The currently implemented backends are
+  ``numpy`` for ``.npz``-files and ``deepdish`` for ``.h5``-files.
 - Deprecated ``emg3d.utils.data_write`` and ``emg3d.utils.data_read``.
 - ``emg3d.utils.Model`` does not store the volume any longer (just ``vnC``).
 - Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and coverage.
