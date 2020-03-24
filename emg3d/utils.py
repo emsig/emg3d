@@ -55,11 +55,13 @@ except ImportError:
 
         def save(self, kwargs):
             print("\n* WARNING :: `backend='deepdish'` requires `deepdish`."
-                  "\n             Install it via `pip install deepdish`.\n")
+                  "\n             Install it via `pip install deepdish`."
+                  f"\n             Data not saved to {self}.\n")
 
         def load(self):
             print("\n* WARNING :: `backend='deepdish'` requires `deepdish`."
-                  "\n             Install it via `pip install deepdish`.\n")
+                  "\n             Install it via `pip install deepdish`."
+                  f"\n             {self} not loaded.\n")
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
