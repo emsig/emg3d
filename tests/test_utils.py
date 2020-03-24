@@ -1364,6 +1364,59 @@ def test_data_write_read(tmpdir, capsys):
     utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, -1)
 
 
+def test_save_and_load(tmpdir, capsys):
+
+    # Create some dummy data
+    grid = utils.TensorMesh(
+            [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+            np.zeros(3))
+
+    # Dummy grid to 'simulate' discretize TensorMesh without `to_dict`.
+    class Dummy:
+        pass
+
+    grid2 = Dummy()
+    grid2.hx = grid.hx
+    grid2.hy = grid.hy
+    grid2.hz = grid.hz
+    grid2.x0 = grid.x0
+
+    # Some field.
+    field = utils.Field(grid)
+    field.field = np.arange(grid.nE)+1j*np.ones(grid.nE)
+    field.ensure_pec
+
+    # Some model.
+    res_x = create_dummy(*grid.vnC, False)
+    res_y = res_x/2.0
+    res_z = res_x*1.4
+    mu_r = res_x*1.11
+    model = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
+
+    # Save it.
+    utils.save('test', meshes={'emg3d': grid, 'discretize': grid2},
+               models=model, fields=field, other={'what': field.fx},
+               path=tmpdir)
+
+    # Load it.
+    out = utils.load('test', path=tmpdir)
+    outstr, _ = capsys.readouterr()
+    assert 'Loading file' in outstr
+    assert 'test.npz' in outstr
+    assert utils.__version__ in outstr
+
+    assert out['model'] == model
+    assert_allclose(field.fx, out['field'].fx)
+    assert_allclose(grid.vol, out['mesh']['emg3d'].vol)
+    assert_allclose(grid.vol, out['mesh']['discretize'].vol)
+    assert_allclose(out['other']['what'], field.fx)
+
+    # Save a normal np.saves_compreseed file.
+    np.savez_compressed(tmpdir+'/test2.npz', meshes=grid)
+    with pytest.raises(OSError):
+        _ = utils.load('test2', path=tmpdir)
+
+
 # OTHER
 def test_report(capsys):
     out, _ = capsys.readouterr()  # Empty capsys

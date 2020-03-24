@@ -3093,19 +3093,30 @@ def save(fname, meshes=None, models=None, fields=None, other=None,
 
         # Ensure variable is a dict.
         if not isinstance(variable, dict):
-            variable = {'name': variable}
+            variable = {name: variable}
 
         # Loop over dict elements.
         for k1, v1 in variable.items():
 
-            # Store each object of `to_dict`.
-            for k2, v2 in v1.to_dict().items():
+            # Workaround for discretize.TensorMesh instances.
+            if name == 'mesh' and not hasattr(v1, 'to_dict'):
+                storage['mesh-'+k1+'-hx'] = v1.hx
+                storage['mesh-'+k1+'-hy'] = v1.hy
+                storage['mesh-'+k1+'-hz'] = v1.hz
+                storage['mesh-'+k1+'-x0'] = v1.x0
 
-                # To avoid pickles we translate None to 'none'.
-                if v2 is None:
-                    v2 = 'none'
+            elif name == 'other':
+                storage[name+'-'+k1] = v1
 
-                storage[name+'-'+k1+'-'+k2] = v2
+            else:
+                # Store each object of `to_dict`.
+                for k2, v2 in v1.to_dict().items():
+
+                    # To avoid pickles we translate None to 'none'.
+                    if v2 is None:
+                        v2 = 'none'
+
+                    storage[name+'-'+k1+'-'+k2] = v2
 
     # Get absolute path, create if it doesn't exist.
     path = os.path.abspath(path)
@@ -3170,7 +3181,7 @@ def load(fname, allow_pickle=False, path="data", verb=1):
         fields are deserialized and returned as instances.
 
     """
-    def get_variables(data, prefix):
+    def get_names(data, prefix, out):
         """Return unique names from data.
 
         Elements are stored as `prefix-name-suffix`; this function returns the
@@ -3181,7 +3192,16 @@ def load(fname, allow_pickle=False, path="data", verb=1):
         keys = [key for key in data.files if key.startswith(prefix+'-')]
 
         # Extract the actual names of them (excluding prefix and suffix).
-        return set(['-'.join(key.split('-')[1:-1]) for key in keys])
+        if prefix == 'other':
+            names = set(['-'.join(key.split('-')[1:]) for key in keys])
+        else:
+            names = set(['-'.join(key.split('-')[1:-1]) for key in keys])
+
+        # Initiate dict-entry if there are any names.
+        if names or prefix == 'other':
+            out[prefix] = {}
+
+        return names
 
     def create_dict(data, prefix, name, suffixes):
         """Create a dictionary from required suffixes."""
@@ -3201,31 +3221,19 @@ def load(fname, allow_pickle=False, path="data", verb=1):
 
         return out
 
-    def get_meshes(data, out):
-        """Add de-serialized TensorMesh instances to out."""
-        for name in get_variables(data, 'mesh'):
-            dat = create_dict(data, 'mesh', name, ['hx', 'hy', 'hz', 'x0'])
-            out[name] = TensorMesh.from_dict(dat)
+    def deserialize(data, out, prefix, instance, var):
+        """De-serialize `prefix` to `instance` and add to `out`."""
 
-    def get_models(data, out):
-        """Add de-serialized Model instances to out."""
-        for name in get_variables(data, 'model'):
-            dat = create_dict(
-                    data, 'model', name,
-                    ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'])
-            out[name] = Model.from_dict(dat)
+        # Get names.
+        names = get_names(data, prefix, out)
 
-    def get_fields(data, out):
-        """Add de-serialized Field instances to out."""
-        for name in get_variables(data, 'field'):
-            dat = create_dict(data, 'field', name,
-                              ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'])
-            out[name] = Field.from_dict(dat)
-
-    def get_others(data, out):
-        """Add all other parameters to out."""
-        for name in get_variables(data, 'other'):
-            out[name] = data['other-'+name]
+        # Loop over them.
+        for name in names:
+            dat = create_dict(data, prefix, name, var)
+            if len(names) > 1:
+                out[prefix][name] = instance.from_dict(dat)
+            else:
+                out[name] = instance.from_dict(dat)
 
     # Get absolute path.
     path = os.path.abspath(path)
@@ -3239,22 +3247,32 @@ def load(fname, allow_pickle=False, path="data", verb=1):
 
         # Ensure it is a file created by emg3d by checking date/version.
         try:
-            out['version'] = str(data['version'])
-            out['date'] = str(data['date'])
+            meta = {}
+            meta['version'] = str(data['version'])
+            meta['date'] = str(data['date'])
         except KeyError:
             print(f"\n* ERROR   :: {full_path} was not created with emg3d.")
-            return None
+            raise OSError('Not an emg3d file.')
 
         # Print file info.
         if verb > 0:
             print(f"  Loading file {full_path}")
-            print(f"  -> Stored with {out['version']} on {out['date']}")
+            print(f"  -> Stored with {meta['version']} on {meta['date']}")
 
-        # De-serialize variables.
-        get_meshes(data, out)
-        get_models(data, out)
-        get_fields(data, out)
-        get_others(data, out)
+        # De-serialize TensorMesh, Model, and Field instances.
+        deserialize(data, out, 'mesh', TensorMesh, ['hx', 'hy', 'hz', 'x0'])
+        deserialize(data, out, 'model', Model,
+                    ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'])
+        deserialize(data, out, 'field', Field,
+                    ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'])
+
+        # Add all other stuff.
+        names = get_names(data, 'other', out)
+        for name in names:
+            out['other'][name] = data['other-'+name]
+
+        # Add meta data.
+        out['meta'] = meta
 
     return out
 
