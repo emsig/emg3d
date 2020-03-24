@@ -1404,7 +1404,7 @@ def test_save_and_load(tmpdir, capsys):
     assert "WARNING :: File" in outstr
 
     # Load it.
-    out = utils.load('test', path=tmpdir)
+    out = utils.load('test.npz', path=tmpdir)
     outstr, _ = capsys.readouterr()
     assert 'Loading file' in outstr
     assert 'test.npz' in outstr
@@ -1419,29 +1419,29 @@ def test_save_and_load(tmpdir, capsys):
     # Check errors
     np.savez_compressed(tmpdir+'/test2.npz', meshes=grid)
     with pytest.raises(OSError):
-        _ = utils.load('test2', allow_pickle=True, path=tmpdir)
+        _ = utils.load('test2.npz', allow_pickle=True, path=tmpdir)
 
     with pytest.raises(TypeError):
         utils.save('ttt', stupidkeyword='a')
     with pytest.raises(TypeError):
-        utils.load('ttt', stupidkeyword='a')
+        utils.load('ttt.npz', stupidkeyword='a')
 
     with pytest.raises(NotImplementedError):
         utils.save('ttt', backend='a')
     with pytest.raises(NotImplementedError):
-        utils.load('ttt', backend='a')
+        utils.load('ttt')
 
     # Run the deepdish once. They should work locally and will fail on Travis.
-    utils.save('test-dd', meshes={'emg3d': grid, 'discretize': grid2},
-               models=model, fields=field, other={'what': field.fx},
-               path=tmpdir, backend='deepdish')
-    out_dd = utils.load('test-dd', path=tmpdir, backend='deepdish')
-    if out_dd is not None:
-        assert out_dd['model'] == model
-        assert_allclose(field.fx, out_dd['field'].fx)
-        assert_allclose(grid.vol, out_dd['mesh']['emg3d'].vol)
-        assert_allclose(grid.vol, out_dd['mesh']['discretize'].vol)
-        assert_allclose(out_dd['other']['what'], field.fx)
+    # utils.save('test-dd', meshes={'emg3d': grid, 'discretize': grid2},
+    #            models=model, fields=field, other={'what': field.fx},
+    #            path=tmpdir, backend='deepdish')
+    # out_dd = utils.load('test-dd', path=tmpdir, backend='deepdish')
+    # if out_dd is not None:
+    #     assert out_dd['model'] == model
+    #     assert_allclose(field.fx, out_dd['field'].fx)
+    #     assert_allclose(grid.vol, out_dd['mesh']['emg3d'].vol)
+    #     assert_allclose(grid.vol, out_dd['mesh']['discretize'].vol)
+    #     assert_allclose(out_dd['other']['what'], field.fx)
 
 
 # OTHER

@@ -49,19 +49,9 @@ except ImportError:
                   "\n             `conda install -c conda-forge scooby`.\n")
 
 try:
-    import deepdish.io as ddio
+    import h5py
 except ImportError:
-    class ddio:
-
-        def save(self, kwargs):
-            print("\n* WARNING :: `backend='deepdish'` requires `deepdish`."
-                  "\n             Install it via `pip install deepdish`."
-                  f"\n             Data not saved to {self}.\n")
-
-        def load(self):
-            print("\n* WARNING :: `backend='deepdish'` requires `deepdish`."
-                  "\n             Install it via `pip install deepdish`."
-                  f"\n             {self} not loaded.\n")
+    h5py = False
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
@@ -2625,7 +2615,7 @@ class Fourier:
 
         # Ensure no kwargs left.
         if kwargs:
-            raise TypeError('Unexpected **kwargs: %r' % kwargs)
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Ensure freq_inp and every_x_freq are not both set.
         self._check_coarse_inputs(keep_freq_inp=True)
@@ -2970,9 +2960,9 @@ def data_write(fname, keys, values, path='data', exists=0):
             print("appending to it", end='')
         else:
             print("overwriting it.")
-            for ending in ["dat", "bak", "dir"]:
+            for extension in ["dat", "bak", "dir"]:
                 try:
-                    os.remove(full_path+"."+ending)
+                    os.remove(full_path+"."+extension)
                 except FileNotFoundError:
                     pass
 
@@ -3039,9 +3029,9 @@ def data_read(fname, keys=None, path="data"):
     full_path = os.path.join(path, fname)
 
     # Check if shelve exists.
-    for ending in [".dat", ".bak", ".dir"]:
-        if not os.path.isfile(full_path+ending):
-            print(f"   > File <{full_path+ending}> does not exist.")
+    for extension in [".dat", ".bak", ".dir"]:
+        if not os.path.isfile(full_path+extension):
+            print(f"   > File <{full_path+extension}> does not exist.")
             if isinstance(keys, (list, tuple)):
                 return len(keys)*(None, )
             else:
@@ -3069,12 +3059,12 @@ def save(fname, meshes=None, models=None, fields=None, other=None, **kwargs):
     """Save meshes, models, fields, and other data to disk.
 
     This routine is a wrapper around :func:`numpy.savez_compressed`, and stores
-    the provided data in compressed files with the ending `.npz`.
+    the provided data in compressed files with the extension `.npz`.
 
     Parameters
     ----------
     fname : str
-        File name (without ending).
+        File name (without extension).
 
     meshes : TensorMesh or dict, optional
         If a single TensorMesh is provided it is stored with the name 'mesh'.
@@ -3107,41 +3097,63 @@ def save(fname, meshes=None, models=None, fields=None, other=None, **kwargs):
     backend : str, optional
         Backend to use. Implemented are currently:
 
-        - 'numpy' (default): Uses numpy to store to a compressed binary file
-          with the ending '.npz'.
-        - 'deepdish': Uses deepdish to store to an hdf5 file with the ending
-          '.h5'. Requires the module deepdish.
+        - 'numpy' (default): Uses numpy to store inputs to a flat, compressed
+          binary file with the extension '.npz'.
+        - 'h5py': Uses h5py to store inputs to a hierarchical, compressed
+          binary hdf5 file with the extension '.h5'. Requires the module h5py.
+        - 'flat': Return flat dictionary of serialized data.
+        - 'struct': Return hierarchical dictionary of serialized data.
+
+    compression : int or str, optional
+        Passed through to h5py, default is 'gzip'.
 
     """
     # Get kwargs.
     path = kwargs.pop('path', 'data')
     overwrite = kwargs.pop('overwrite', True)
     backend = kwargs.pop('backend', 'numpy')
+    compression = kwargs.pop('compression', 'gzip')
     # Ensure no kwargs left.
     if kwargs:
-        raise TypeError('Unexpected **kwargs: %r' % kwargs)
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
-    def store_variable(storage, variable, name):
+    def store_variable(storage, variable, name, flat):
         """Get serialized dicts and save numpy-objects separately."""
 
         # Ensure variable is a dict.
         if not isinstance(variable, dict):
             variable = {name: variable}
 
+        if not flat:
+            storage[name] = {}
+
         # Loop over dict elements.
         for k1, v1 in variable.items():
 
+            if not flat:
+                storage[name][k1] = {}
+
             # Workaround for discretize.TensorMesh instances.
             if name == 'mesh' and not hasattr(v1, 'to_dict'):
-                storage[f"mesh__{k1}__hx"] = v1.hx
-                storage[f"mesh__{k1}__hy"] = v1.hy
-                storage[f"mesh__{k1}__hz"] = v1.hz
-                storage[f"mesh__{k1}__x0"] = v1.x0
+                if flat:
+                    storage[f"{name}__{k1}__hx"] = v1.hx
+                    storage[f"{name}__{k1}__hy"] = v1.hy
+                    storage[f"{name}__{k1}__hz"] = v1.hz
+                    storage[f"{name}__{k1}__x0"] = v1.x0
+                else:
+                    storage[name][k1]["hx"] = v1.hx
+                    storage[name][k1]["hy"] = v1.hy
+                    storage[name][k1]["hz"] = v1.hz
+                    storage[name][k1]["x0"] = v1.x0
 
-            elif name == 'other':
-                storage[f"{name}__{k1}"] = v1
+            elif name == 'other':  # Just dump it.
+                if flat:
+                    storage[f"{name}__{k1}"] = v1
+                else:
+                    storage[name][k1] = v1
 
             else:
+
                 # Store each object of `to_dict`.
                 for k2, v2 in v1.to_dict().items():
 
@@ -3149,16 +3161,25 @@ def save(fname, meshes=None, models=None, fields=None, other=None, **kwargs):
                     if v2 is None:
                         v2 = 'none'
 
-                    storage[f"{name}__{k1}__{k2}"] = v2
+                    if flat:
+                        storage[f"{name}__{k1}__{k2}"] = v2
+                    else:
+                        storage[name][k1][k2] = v2
 
     # Get absolute path, create if it doesn't exist.
     path = os.path.abspath(path)
     os.makedirs(path, exist_ok=True)
     full_path = os.path.join(path, fname)
-    if backend == "numpy":
-        full_path += '.npz'
-    elif backend == "deepdish":
+    if backend == "h5py":
+        flat = False
         full_path += '.h5'
+    elif backend == 'flat':
+        flat = True
+    elif backend == 'struct':
+        flat = False
+    else:  # Default is numpy
+        flat = True
+        full_path += '.npz'
 
     if not overwrite and os.path.isfile(full_path):
         print(f"\n* WARNING :: File {full_path} exists, not writing data.\n")
@@ -3169,29 +3190,53 @@ def save(fname, meshes=None, models=None, fields=None, other=None, **kwargs):
 
     # Store meshes.
     if meshes is not None:
-        store_variable(kwargs, meshes, 'mesh')
+        store_variable(kwargs, meshes, 'mesh', flat)
 
     # Store fields.
     if fields is not None:
-        store_variable(kwargs, fields, 'field')
+        store_variable(kwargs, fields, 'field', flat)
 
     # Store models.
     if models is not None:
-        store_variable(kwargs, models, 'model')
+        store_variable(kwargs, models, 'model', flat)
 
     # Store other data.
     if other is not None:
-        store_variable(kwargs, other, 'other')
+        store_variable(kwargs, other, 'other', flat)
 
     # Store meta data.
     kwargs['date'] = datetime.today().isoformat()
     kwargs['version'] = 'emg3d v'+__version__
 
     # Save the data depending on the backend.
-    if backend == "numpy":
+    if backend in ["flat", "struct"]:
+        return kwargs
+
+    elif backend == "numpy":
         np.savez_compressed(full_path, **kwargs)
-    elif backend == "deepdish":
-        ddio.save(full_path, kwargs)
+
+    elif backend == "h5py":
+
+        if not h5py:
+            print("* ERROR   :: You need to install `h5py` to use it as a "
+                  "backend.")
+            raise ImportError("backend='h5py'")
+
+        def add_to_hdf5(data, h):
+            """Adds dicts recursively to h5."""
+            for key, item in data.items():
+                if isinstance(item, dict):
+                    if isinstance(key, int):
+                        key = str(key)
+                    add_to_hdf5(item, h.create_group(key))
+                elif np.ndim(item) > 0:
+                    h.create_dataset(key, data=item, compression=compression)
+                else:
+                    h.create_dataset(key, data=item)
+
+        with h5py.File(full_path, "w") as f:
+            add_to_hdf5(kwargs, f)
+
     else:
         raise NotImplementedError(f"Backend='{backend}' is not implemented.")
 
@@ -3206,12 +3251,11 @@ def load(fname, **kwargs):
     Parameters
     ----------
     fname : str
-        File name (without ending).
+        File name including extension. Expected backends depending on the file
+        extensions:
 
-    allow_pickle : bool, optional
-        Passed through to np.load. This should not be necessary, unless
-        something was stored in `other` with `save()` that is not a native
-        numpy object.
+        - '.npz': numpy-binary
+        - '.h5': h5py-binary
 
     path : str, optional
         Absolute or relative path where to store. Default is 'data'.
@@ -3219,13 +3263,11 @@ def load(fname, **kwargs):
     verb : int
         If 1 (default) verbose, if 0 silent.
 
-    backend : str, optional
-        Backend to use. Implemented are currently:
-
-        - 'numpy' (default): Uses numpy to store to a compressed binary file
-          with the ending '.npz'.
-        - 'deepdish': Uses deepdish to store to an hdf5 file with the ending
-          '.h5'. Requires the module deepdish.
+    allow_pickle : bool, optional
+        Passed through to np.load and therefore has only effect if the file
+        ends in '.npz'. This should not be necessary, unless something was
+        stored in `other` with `save()` that cannot be translated to a native
+        numpy object.
 
 
     Returns
@@ -3237,12 +3279,11 @@ def load(fname, **kwargs):
     """
     # Get kwargs.
     path = kwargs.pop('path', 'data')
-    allow_pickle = kwargs.pop('allow_pickle', False)
     verb = kwargs.pop('verb', 1)
-    backend = kwargs.pop('backend', 'numpy')
+    allow_pickle = kwargs.pop('allow_pickle', False)
     # Ensure no kwargs left.
     if kwargs:
-        raise TypeError('Unexpected **kwargs: %r' % kwargs)
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
     def get_names(data, prefix, out):
         """Return unique names from data.
@@ -3276,7 +3317,7 @@ def load(fname, **kwargs):
             par = data[prefix+'__'+name+'__'+var]
 
             # Check if it is 'none' and convert to None if so.
-            if par.dtype == '<U4' and str(par) == 'none':
+            if str(par) == 'none':
                 par = None
 
             # Store it
@@ -3284,7 +3325,7 @@ def load(fname, **kwargs):
 
         return out
 
-    def deserialize(data, out, prefix, instance, var):
+    def deserialize(data, out, prefix, instance, var, flat):
         """De-serialize `prefix` to `instance` and add to `out`."""
 
         # Get names.
@@ -3299,25 +3340,41 @@ def load(fname, **kwargs):
                 out[name] = instance.from_dict(dat)
 
     # Get absolute path.
+    ext = fname.split('.')[-1]
     path = os.path.abspath(path)
     full_path = os.path.join(path, fname)
 
     # Open file depending on the backend.
-    if backend == "numpy":
-        full_path += '.npz'
+    if ext == "npz":
+        flat = True
+
         with np.load(full_path, allow_pickle=allow_pickle) as dat:
             data = {}
             for key in dat.files:
                 data[key] = dat[key]
 
-    elif backend == "deepdish":
-        full_path += '.h5'
-        data = ddio.load(full_path)
-        if data is None:
+    elif ext == "h5":
+        flat = False
+
+        if not h5py:
+            print("* ERROR   :: You need to install `h5py` to use it as a "
+                  "backend.")
+            raise ImportError("backend='h5py'")
+
+        def get_from_hdf5(f):
+            data = {}
+            for key, item in f.items():
+                if isinstance(item, h5py._hl.dataset.Dataset):
+                    data[key] = item[()]
+                elif isinstance(item, h5py._hl.group.Group):
+                    data[key] = get_from_hdf5(item)
             return data
 
+        with h5py.File(full_path, 'r') as f:
+            data = get_from_hdf5(f)
+
     else:
-        raise NotImplementedError(f"Backend='{backend}' is not implemented.")
+        raise NotImplementedError(f"Extension '.{ext}' is not implemented.")
 
     # Initialize output
     out = {}
@@ -3337,11 +3394,11 @@ def load(fname, **kwargs):
         print(f"  -> Stored with {meta['version']} on {meta['date']}")
 
     # De-serialize TensorMesh, Model, and Field instances.
-    deserialize(data, out, 'mesh', TensorMesh, ['hx', 'hy', 'hz', 'x0'])
+    deserialize(data, out, 'mesh', TensorMesh, ['hx', 'hy', 'hz', 'x0'], flat)
     deserialize(data, out, 'model', Model,
-                ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'])
+                ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'], flat)
     deserialize(data, out, 'field', Field,
-                ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'])
+                ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'], flat)
 
     # Add all other stuff.
     names = get_names(data, 'other', out)
