@@ -26,9 +26,9 @@ sped-up through jitted ``numba``-functions.
 from emg3d import utils
 from emg3d import solver
 from emg3d.solver import solve
-from emg3d.utils import Report
+from emg3d.utils import save, load, Report
 
-__all__ = ['solve', 'solver', 'utils', 'Report']
+__all__ = ['solve', 'solver', 'utils', 'Report', 'save', 'load']
 
 # Version is sorted out in utils, so we can easier use it within the package
 # itself.

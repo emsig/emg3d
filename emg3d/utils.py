@@ -26,6 +26,7 @@ Utility functions for the multigrid solver.
 import os
 import shelve
 import empymod
+import warnings
 import numpy as np
 from copy import deepcopy
 from timeit import default_timer
@@ -273,7 +274,8 @@ class Field(np.ndarray):
             grid.vnEy = inp['vnEy']
             grid.vnEz = inp['vnEz']
         except KeyError as e:
-            raise ValueError(f"* ERROR   :: Variable {e} missing in `inp`.")
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
 
         # Calculate missing info.
         grid.nEx = np.prod(grid.vnEx)
@@ -1108,7 +1110,8 @@ class Model:
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'])
         except KeyError as e:
-            raise ValueError(f"* ERROR   :: Variable {e} missing in `inp`.")
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
 
     # RESISTIVITIES
     @property
@@ -1746,7 +1749,8 @@ class TensorMesh:
         try:
             return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
         except KeyError as e:
-            raise ValueError(f"* ERROR   :: Variable {e} missing in `inp`.")
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
 
     @property
     def vol(self):
@@ -2926,12 +2930,16 @@ def data_write(fname, keys, values, path='data', exists=0):
         - > 0: Append to existing shelve.
 
     """
+    # Issue warning
+    mesg = ("\n    The use of `data_write` and `data_read` is deprecated.\n"
+            "    These function will be removed before v1.0.\n"
+            "    Use `save` and `load` instead.")
+    warnings.warn(mesg, DeprecationWarning)
+
     # Get absolute path, create if it doesn't exist.
     path = os.path.abspath(path)
     os.makedirs(path, exist_ok=True)
-
-    # File name full path.
-    full_path = path+"/"+fname
+    full_path = os.path.join(path, fname)
 
     # Check if shelve exists.
     bak_exists = os.path.isfile(full_path+".bak")
@@ -3004,11 +3012,15 @@ def data_read(fname, keys=None, path="data"):
         Requested value(s) or dict containing everything if keys=None.
 
     """
+    # Issue warning
+    mesg = ("\n    The use of `data_write` and `data_read` is deprecated.\n"
+            "    These functions will be removed before v1.0.\n"
+            "    Use `save` and `load` instead.")
+    warnings.warn(mesg, DeprecationWarning)
+
     # Get absolute path.
     path = os.path.abspath(path)
-
-    # File name full path.
-    full_path = path+"/"+fname
+    full_path = os.path.join(path, fname)
 
     # Check if shelve exists.
     for ending in [".dat", ".bak", ".dir"]:
@@ -3035,6 +3047,216 @@ def data_read(fname, keys=None, path="data"):
             for key in keys:
                 out.append(db[key])
             return out
+
+
+def save(fname, meshes=None, models=None, fields=None, other=None,
+         path="data"):
+    """Save meshes, models, fields, and other data to disk.
+
+    This routine is a wrapper around :func:`numpy.savez_compressed`, and stores
+    the provided data in compressed files with the ending `.npz`.
+
+    Parameters
+    ----------
+    fname : str
+        File name (without ending).
+
+    meshes : TensorMesh or dict, optional
+        If a single TensorMesh is provided it is stored with the name 'mesh'.
+        Alternatively a dict can be provided of the format {'name':
+        TensorMesh}, containing several TensorMesh instances. The keys of the
+        dict must be strings.
+
+    models : Model or dict, optional
+        If a single Model is provided it is stored with the name 'model'.
+        Alternatively a dict can be provided of the format {'name': Model},
+        containing several Model instances. The keys of the dict must be
+        strings.
+
+    fields : Field or dict, optional
+        If a single Field is provided it is stored with the name 'field'.
+        Alternatively a dict can be provided of the format {'name': Field},
+        containing several Field instances. The keys of the dict must be
+        strings.
+
+    other : dict, optional
+        Any other information to be stored. The keys of the dict must be
+        strings.
+
+    path : str, optional
+        Absolute or relative path where to store. Default is 'data'.
+
+    """
+
+    def store_variable(storage, variable, name):
+        """Get serialized dicts and save numpy-objects separately."""
+
+        # Ensure variable is a dict.
+        if not isinstance(variable, dict):
+            variable = {'name': variable}
+
+        # Loop over dict elements.
+        for k1, v1 in variable.items():
+
+            # Store each object of `to_dict`.
+            for k2, v2 in v1.to_dict().items():
+
+                # To avoid pickles we translate None to 'none'.
+                if v2 is None:
+                    v2 = 'none'
+
+                storage[name+'-'+k1+'-'+k2] = v2
+
+    # Get absolute path, create if it doesn't exist.
+    path = os.path.abspath(path)
+    os.makedirs(path, exist_ok=True)
+    full_path = os.path.join(path, fname)
+
+    # Start kwargs for np.savez_compressed.
+    kwargs = {}
+
+    # Store meshes.
+    if meshes is not None:
+        store_variable(kwargs, meshes, 'mesh')
+
+    # Store fields.
+    if fields is not None:
+        store_variable(kwargs, fields, 'field')
+
+    # Store models.
+    if models is not None:
+        store_variable(kwargs, models, 'model')
+
+    # Store other data.
+    if other is not None:
+        store_variable(kwargs, other, 'other')
+
+    # Store meta data.
+    kwargs['date'] = datetime.today().isoformat()
+    kwargs['version'] = 'emg3d v'+__version__
+
+    # Save the data as a compressed 'npz'-file.
+    np.savez_compressed(full_path, **kwargs)
+
+
+def load(fname, allow_pickle=False, path="data", verb=1):
+    """Load meshes, models, fields, and other data from disk.
+
+    This routine is a wrapper around :func:`numpy.load`, and loads data stored
+    with :func:`save`.
+
+
+    Parameters
+    ----------
+    fname : str
+        File name (without ending).
+
+    allow_pickle : bool, optional
+        Passed through to np.load. This should not be necessary, unless
+        something was stored in `other` with `save()` that is not a native
+        numpy object.
+
+    path : str, optional
+        Absolute or relative path where to store. Default is 'data'.
+
+    verb : int
+        If 1 (default) verbose, if 0 silent.
+
+
+    Returns
+    -------
+    out : dict
+        A dictionary containing the data stored in fname; meshes, models, and
+        fields are deserialized and returned as instances.
+
+    """
+    def get_variables(data, prefix):
+        """Return unique names from data.
+
+        Elements are stored as `prefix-name-suffix`; this function returns the
+        set of unique names for the given prefix.
+        """
+
+        # Get all keys that start with 'prefix-'.
+        keys = [key for key in data.files if key.startswith(prefix+'-')]
+
+        # Extract the actual names of them (excluding prefix and suffix).
+        return set(['-'.join(key.split('-')[1:-1]) for key in keys])
+
+    def create_dict(data, prefix, name, suffixes):
+        """Create a dictionary from required suffixes."""
+        # Initiate output and loop over suffixes.
+        out = {}
+        for var in suffixes:
+
+            # Get the parameter.
+            par = data[prefix+'-'+name+'-'+var]
+
+            # Check if it is 'none' and convert to None if so.
+            if par.dtype == '<U4' and str(par) == 'none':
+                par = None
+
+            # Store it
+            out[var] = par
+
+        return out
+
+    def get_meshes(data, out):
+        """Add de-serialized TensorMesh instances to out."""
+        for name in get_variables(data, 'mesh'):
+            dat = create_dict(data, 'mesh', name, ['hx', 'hy', 'hz', 'x0'])
+            out[name] = TensorMesh.from_dict(dat)
+
+    def get_models(data, out):
+        """Add de-serialized Model instances to out."""
+        for name in get_variables(data, 'model'):
+            dat = create_dict(
+                    data, 'model', name,
+                    ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'])
+            out[name] = Model.from_dict(dat)
+
+    def get_fields(data, out):
+        """Add de-serialized Field instances to out."""
+        for name in get_variables(data, 'field'):
+            dat = create_dict(data, 'field', name,
+                              ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'])
+            out[name] = Field.from_dict(dat)
+
+    def get_others(data, out):
+        """Add all other parameters to out."""
+        for name in get_variables(data, 'other'):
+            out[name] = data['other-'+name]
+
+    # Get absolute path.
+    path = os.path.abspath(path)
+    full_path = os.path.join(path, fname+'.npz')
+
+    # Initiate output.
+    out = {}
+
+    # Open file.
+    with np.load(full_path, allow_pickle=allow_pickle) as data:
+
+        # Ensure it is a file created by emg3d by checking date/version.
+        try:
+            out['version'] = str(data['version'])
+            out['date'] = str(data['date'])
+        except KeyError:
+            print(f"\n* ERROR   :: {full_path} was not created with emg3d.")
+            return None
+
+        # Print file info.
+        if verb > 0:
+            print(f"  Loading file {full_path}")
+            print(f"  -> Stored with {out['version']} on {out['date']}")
+
+        # De-serialize variables.
+        get_meshes(data, out)
+        get_models(data, out)
+        get_fields(data, out)
+        get_others(data, out)
+
+    return out
 
 
 # TIMING AND REPORTING

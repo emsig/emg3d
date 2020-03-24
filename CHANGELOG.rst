@@ -5,9 +5,16 @@ Changelog
 *latest*
 --------
 
+- Classes ``emg3d.utils.Field``, ``emg3d.utils.Model``, and
+  ``emg3d.utils.TensorMesh`` have new methods ``.copy()``, ``.to_dict()``, and
+  ``.from_dict()``.
 - ``emg3d.utils.Model``: Possible to create new models by adding or subtracting
   existing models, and comparing two models (``+``, ``-``, ``==`` and ``!=``).
-  New attributes ``shape``, ``size``, and ``copy``.
+  New attributes ``shape`` and ``size``.
+- New functions ``emg3d.utils.save`` and ``emg3d.utils.load`` to save and load
+  all sort of ``emg3d`` instances.
+- Deprecated ``emg3d.utils.data_write`` and ``emg3d.utils.data_read``.
+- ``emg3d.utils.Model`` does not store the volume any longer (just ``vnC``).
 - Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and coverage.
 - Bugfix: ``emg3d.njitted.restrict`` did not store the {x;y;z}-field if
   ``sc_dir`` was {4;5;6}, respectively.

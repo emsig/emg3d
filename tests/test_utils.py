@@ -409,7 +409,7 @@ def test_TensorMesh():
     cdgrid = utils.TensorMesh.from_dict(dgrid)
     assert_allclose(cdgrid.vol, emg3dgrid.vol)
     del dgrid['hx']
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError):
         utils.TensorMesh.from_dict(dgrid)
 
 
@@ -716,7 +716,7 @@ class TestModelOperators:
             assert_allclose(mdict[key], val)
 
         del mdict['res_x']
-        with pytest.raises(ValueError):
+        with pytest.raises(KeyError):
             utils.Model.from_dict(mdict)
 
 
@@ -779,7 +779,7 @@ def test_field():
 
     edict = ee.to_dict()
     del edict['field']
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError):
         utils.Field.from_dict(edict)
 
 
