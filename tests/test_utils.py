@@ -1,5 +1,4 @@
 import re
-import os
 import pytest
 import empymod
 import numpy as np
@@ -1262,6 +1261,15 @@ class TestFourier:
         assert_allclose(data_true, tdata, rtol=1e-4)
 
 
+# BACKWARDS COMPATIBILITY
+def test_data_write_read(tmpdir):
+    # These are no in io. Just test that the dummy-links in utils work.
+    a = np.arange(10.)
+    utils.data_write('testthis', 'a', a, tmpdir, -1)
+    a_out = utils.data_read('testthis', 'a', tmpdir)
+    assert_allclose(a, a_out)
+
+
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
     t0 = default_timer()  # Create almost at the same time a
@@ -1280,168 +1288,6 @@ def test_Time():
 
     # Check representation of Time.
     assert 'Runtime : 0:00:0' in time.__repr__()
-
-
-# FUNCTIONS RELATED TO DATA MANAGEMENT
-def test_data_write_read(tmpdir, capsys):
-    # Create test data
-    grid = utils.TensorMesh(
-            [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
-            np.zeros(3))
-
-    freq = np.pi
-
-    model = utils.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
-
-    e1 = create_dummy(*grid.vnEx)
-    e2 = create_dummy(*grid.vnEy)
-    e3 = create_dummy(*grid.vnEz)
-    ee = utils.Field(e1, e2, e3, freq=freq)
-
-    # Write and read data, single arguments
-    utils.data_write('testthis', 'ee', ee, tmpdir, -1)
-    ee_out = utils.data_read('testthis', 'ee', tmpdir)
-
-    # Compare data
-    assert_allclose(ee, ee_out)
-    assert_allclose(ee.smu0, ee_out.smu0)
-    assert_allclose(ee.sval, ee_out.sval)
-    assert_allclose(ee.freq, ee_out.freq)
-
-    # Write and read data, multi arguments
-    args = ('grid', 'ee', 'model')
-    utils.data_write('testthis', args, (grid, ee, model), tmpdir, -1)
-    grid_out, ee_out, model_out = utils.data_read('testthis', args, tmpdir)
-
-    # Compare data
-    assert_allclose(ee, ee_out)
-    for attr in ['nCx', 'nCy', 'nCz']:
-        assert getattr(grid, attr) == getattr(grid_out, attr)
-
-    # Ensure volume averages got deleted or do not exist anyway.
-    assert hasattr(grid_out, '_vol') is False
-    assert hasattr(model_out, '_eta_x') is False
-    assert hasattr(model_out, '_zeta') is False
-
-    # Ensure they can be reconstructed
-    assert_allclose(grid.vol, grid_out.vol)
-
-    # Write and read data, None
-    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)
-    out = utils.data_read('testthis', path=tmpdir)
-
-    # Compare data
-    assert_allclose(ee, ee_out)
-    for attr in ['nCx', 'nCy', 'nCz']:
-        assert getattr(grid, attr) == getattr(out['grid'], attr)
-
-    # Test exists-argument 0
-    _, _ = capsys.readouterr()  # Clean-up
-    utils.data_write('testthis', 'ee', ee*2, tmpdir, 0)
-    out, _ = capsys.readouterr()
-    datout = utils.data_read('testthis', path=tmpdir)
-    assert 'NOT SAVING THE DATA' in out
-    assert_allclose(datout['ee'], ee)
-
-    # Test exists-argument 1
-    utils.data_write('testthis', 'ee2', ee, tmpdir, 1)
-    out, _ = capsys.readouterr()
-    assert 'appending to it' in out
-    utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, 1)
-    out, _ = capsys.readouterr()
-    assert "overwriting existing key(s) 'ee', 'ee2'" in out
-    datout = utils.data_read('testthis', path=tmpdir)
-    assert_allclose(datout['ee'], ee*2)
-    assert_allclose(datout['ee2'], ee)
-
-    # Check if file is missing.
-    os.remove(tmpdir+'/testthis.dat')
-    out = utils.data_read('testthis', path=tmpdir)
-    assert out is None
-    out1, out2 = utils.data_read('testthis', ['ee', 'ee2'], path=tmpdir)
-    assert out1 is None
-    assert out2 is None
-    utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, -1)
-
-
-def test_save_and_load(tmpdir, capsys):
-
-    # Create some dummy data
-    grid = utils.TensorMesh(
-            [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
-            np.zeros(3))
-
-    # Dummy grid to 'simulate' discretize TensorMesh without `to_dict`.
-    class Dummy:
-        pass
-
-    grid2 = Dummy()
-    grid2.hx = grid.hx
-    grid2.hy = grid.hy
-    grid2.hz = grid.hz
-    grid2.x0 = grid.x0
-
-    # Some field.
-    field = utils.Field(grid)
-    field.field = np.arange(grid.nE)+1j*np.ones(grid.nE)
-    field.ensure_pec
-
-    # Some model.
-    res_x = create_dummy(*grid.vnC, False)
-    res_y = res_x/2.0
-    res_z = res_x*1.4
-    mu_r = res_x*1.11
-    model = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
-
-    # Save it.
-    utils.save('test', meshes={'emg3d': grid, 'discretize': grid2},
-               models=model, fields=field, other={'what': field.fx},
-               path=tmpdir)
-
-    # Ensure not overwritten if said so
-    utils.save('test', overwrite=False, path=tmpdir)
-    outstr, _ = capsys.readouterr()
-    assert "WARNING :: File" in outstr
-
-    # Load it.
-    out = utils.load('test.npz', path=tmpdir)
-    outstr, _ = capsys.readouterr()
-    assert 'Loading file' in outstr
-    assert 'test.npz' in outstr
-    assert utils.__version__ in outstr
-
-    assert out['model'] == model
-    assert_allclose(field.fx, out['field'].fx)
-    assert_allclose(grid.vol, out['mesh']['emg3d'].vol)
-    assert_allclose(grid.vol, out['mesh']['discretize'].vol)
-    assert_allclose(out['other']['what'], field.fx)
-
-    # Check errors
-    np.savez_compressed(tmpdir+'/test2.npz', meshes=grid)
-    with pytest.raises(OSError):
-        _ = utils.load('test2.npz', allow_pickle=True, path=tmpdir)
-
-    with pytest.raises(TypeError):
-        utils.save('ttt', stupidkeyword='a')
-    with pytest.raises(TypeError):
-        utils.load('ttt.npz', stupidkeyword='a')
-
-    with pytest.raises(NotImplementedError):
-        utils.save('ttt', backend='a')
-    with pytest.raises(NotImplementedError):
-        utils.load('ttt')
-
-    # Run the deepdish once. They should work locally and will fail on Travis.
-    # utils.save('test-dd', meshes={'emg3d': grid, 'discretize': grid2},
-    #            models=model, fields=field, other={'what': field.fx},
-    #            path=tmpdir, backend='deepdish')
-    # out_dd = utils.load('test-dd', path=tmpdir, backend='deepdish')
-    # if out_dd is not None:
-    #     assert out_dd['model'] == model
-    #     assert_allclose(field.fx, out_dd['field'].fx)
-    #     assert_allclose(grid.vol, out_dd['mesh']['emg3d'].vol)
-    #     assert_allclose(grid.vol, out_dd['mesh']['discretize'].vol)
-    #     assert_allclose(out_dd['other']['what'], field.fx)
 
 
 # OTHER

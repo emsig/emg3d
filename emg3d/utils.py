@@ -23,10 +23,7 @@ Utility functions for the multigrid solver.
 # the License.
 
 
-import os
-import shelve
 import empymod
-import warnings
 import numpy as np
 from copy import deepcopy
 from timeit import default_timer
@@ -48,11 +45,6 @@ except ImportError:
                   "\n             Install it via `pip install scooby` or"
                   "\n             `conda install -c conda-forge scooby`.\n")
 
-try:
-    import h5py
-except ImportError:
-    h5py = False
-
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
 try:
@@ -70,8 +62,7 @@ except ImportError:
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'TensorMesh',
            'get_hx_h0', 'get_cell_numbers', 'get_stretched_h', 'get_domain',
-           'get_hx', 'Fourier', 'data_write', 'data_read', 'save', 'load',
-           'Time', 'Report']
+           'get_hx', 'Fourier', 'data_write', 'data_read', 'Time', 'Report']
 
 
 # FIELDS
@@ -243,7 +234,8 @@ class Field(np.ndarray):
     def to_dict(self, copy=False):
         """Store the necessary information of the Field in a dict."""
         out = {'field': np.array(self.field), 'freq': self._freq,
-               'vnEx': self.vnEx, 'vnEy': self.vnEy, 'vnEz': self.vnEz}
+               'vnEx': self.vnEx, 'vnEy': self.vnEy, 'vnEz': self.vnEz,
+               '__class__': self.__class__.__name__}
         if copy:
             return deepcopy(out)
         else:
@@ -993,7 +985,9 @@ class Model:
         """Simple representation."""
         return (f"Model; {self.case_names[self.case]} resistivities"
                 f"{'' if self.mu_r is None else '; mu_r'}"
-                f"{'' if self.epsilon_r is None else '; epsilon_r'}")
+                f"{'' if self.epsilon_r is None else '; epsilon_r'}"
+                f"; {self.vnC[0]} x {self.vnC[1]} x {self.vnC[2]} "
+                f"({self.nC:,})")
 
     def __add__(self, model):
         """Add two models."""
@@ -1089,6 +1083,9 @@ class Model:
 
         # vnC.
         out['vnC'] = self.vnC
+
+        # Name
+        out['__class__'] = self.__class__.__name__
 
         if copy:
             return deepcopy(out)
@@ -1723,7 +1720,8 @@ class TensorMesh:
 
     def __repr__(self):
         """Simple representation."""
-        return f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} ({self.nC})"
+        return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
+                f"({self.nC:,})")
 
     def copy(self):
         """Return a copy of the TensorMesh."""
@@ -1731,7 +1729,8 @@ class TensorMesh:
 
     def to_dict(self, copy=False):
         """Store the necessary information of the TensorMesh in a dict."""
-        out = {'hx': self.hx, 'hy': self.hy, 'hz': self.hz, 'x0': self.x0}
+        out = {'hx': self.hx, 'hy': self.hy, 'hz': self.hz, 'x0': self.x0,
+               '__class__': self.__class__.__name__}
         if copy:
             return deepcopy(out)
         else:
@@ -2909,506 +2908,17 @@ class Fourier:
                     self.freq_calc, "   Calc. freq [Hz] : ", self.verb)
 
 
-# FUNCTIONS RELATED TO DATA MANAGEMENT
+# BACKWARDS COMPATIBILITY
 def data_write(fname, keys, values, path='data', exists=0):
-    """Write all values with their corresponding key to file path/fname.
-
-
-    Parameters
-    ----------
-    fname : str
-        File name.
-
-    keys : str or list of str
-        Name(s) of the values to store in file.
-
-    values : anything
-        Values to store with keys in file.
-
-    path : str, optional
-        Absolute or relative path where to store. Default is 'data'.
-
-    exists : int, optional
-        Flag how to act if a shelve with the given name already exists:
-
-        - < 0: Delete existing shelve.
-        - 0 (default): Do nothing (print that it exists).
-        - > 0: Append to existing shelve.
-
-    """
-    # Issue warning
-    mesg = ("\n    The use of `data_write` and `data_read` is deprecated.\n"
-            "    These function will be removed before v1.0.\n"
-            "    Use `save` and `load` instead.")
-    warnings.warn(mesg, DeprecationWarning)
-
-    # Get absolute path, create if it doesn't exist.
-    path = os.path.abspath(path)
-    os.makedirs(path, exist_ok=True)
-    full_path = os.path.join(path, fname)
-
-    # Check if shelve exists.
-    bak_exists = os.path.isfile(full_path+".bak")
-    dat_exists = os.path.isfile(full_path+".dat")
-    dir_exists = os.path.isfile(full_path+".dir")
-    if any([bak_exists, dat_exists, dir_exists]):
-        print("   > File exists, ", end="")
-        if exists == 0:
-            print("NOT SAVING THE DATA.")
-            return
-        elif exists > 0:
-            print("appending to it", end='')
-        else:
-            print("overwriting it.")
-            for extension in ["dat", "bak", "dir"]:
-                try:
-                    os.remove(full_path+"."+extension)
-                except FileNotFoundError:
-                    pass
-
-    # Cast into list.
-    if not isinstance(keys, (list, tuple)):
-        keys = [keys, ]
-        values = [values, ]
-
-    # Shelve it.
-    with shelve.open(full_path) as db:
-
-        # If appending, print the keys which will be overwritten.
-        if exists > 0:
-            over = [j for j in keys if any(i == j for i in list(db.keys()))]
-            if len(over) > 0:
-                print(" (overwriting existing key(s) "+f"{over}"[1:-1]+").")
-            else:
-                print(".")
-
-        # Writing it to the shelve.
-        for i, key in enumerate(keys):
-
-            # If the parameter is a TensorMesh-instance, we set the volume
-            # None. This saves space, and it will simply be reconstructed if
-            # required.
-            if type(values[i]).__name__ == 'TensorMesh':
-                if hasattr(values[i], '_vol'):
-                    delattr(values[i], '_vol')
-
-            db[key] = values[i]
+    """Moved to `emg3d.io.data_write; however, DEPRECATED."""
+    from emg3d.io import data_write
+    data_write(fname, keys, values, path, exists)
 
 
 def data_read(fname, keys=None, path="data"):
-    """Read and return keys from file path/fname.
-
-
-    Parameters
-    ----------
-    fname : str
-        File name.
-
-    keys : str, list of str, or None; optional
-        Name(s) of the values to get from file. If None, returns everything as
-        a dict. Default is None.
-
-    path : str, optional
-        Absolute or relative path where fname is stored. Default is 'data'.
-
-
-    Returns
-    -------
-    out : values or dict
-        Requested value(s) or dict containing everything if keys=None.
-
-    """
-    # Issue warning
-    mesg = ("\n    The use of `data_write` and `data_read` is deprecated.\n"
-            "    These functions will be removed before v1.0.\n"
-            "    Use `save` and `load` instead.")
-    warnings.warn(mesg, DeprecationWarning)
-
-    # Get absolute path.
-    path = os.path.abspath(path)
-    full_path = os.path.join(path, fname)
-
-    # Check if shelve exists.
-    for extension in [".dat", ".bak", ".dir"]:
-        if not os.path.isfile(full_path+extension):
-            print(f"   > File <{full_path+extension}> does not exist.")
-            if isinstance(keys, (list, tuple)):
-                return len(keys)*(None, )
-            else:
-                return None
-
-    # Get it from shelve.
-    with shelve.open(path+"/"+fname) as db:
-        if keys is None:                           # None
-            out = dict()
-            for key, item in db.items():
-                out[key] = item
-            return out
-
-        elif not isinstance(keys, (list, tuple)):  # single parameter
-            return db[keys]
-
-        else:                                      # lists/tuples of parameters
-            out = []
-            for key in keys:
-                out.append(db[key])
-            return out
-
-
-def save(fname, meshes=None, models=None, fields=None, other=None, **kwargs):
-    """Save meshes, models, fields, and other data to disk.
-
-    This routine is a wrapper around :func:`numpy.savez_compressed`, and stores
-    the provided data in compressed files with the extension `.npz`.
-
-    Parameters
-    ----------
-    fname : str
-        File name (without extension).
-
-    meshes : TensorMesh or dict, optional
-        If a single TensorMesh is provided it is stored with the name 'mesh'.
-        Alternatively a dict can be provided of the format {'name':
-        TensorMesh}, containing several TensorMesh instances. The keys of the
-        dict must be strings.
-
-    models : Model or dict, optional
-        If a single Model is provided it is stored with the name 'model'.
-        Alternatively a dict can be provided of the format {'name': Model},
-        containing several Model instances. The keys of the dict must be
-        strings.
-
-    fields : Field or dict, optional
-        If a single Field is provided it is stored with the name 'field'.
-        Alternatively a dict can be provided of the format {'name': Field},
-        containing several Field instances. The keys of the dict must be
-        strings.
-
-    other : dict, optional
-        Any other information to be stored. The keys of the dict must be
-        strings.
-
-    path : str, optional
-        Absolute or relative path where to store. Default is 'data'.
-
-    overwrite : bool, optional
-        If True (default) overwrites existing files.
-
-    backend : str, optional
-        Backend to use. Implemented are currently:
-
-        - 'numpy' (default): Uses numpy to store inputs to a flat, compressed
-          binary file with the extension '.npz'.
-        - 'h5py': Uses h5py to store inputs to a hierarchical, compressed
-          binary hdf5 file with the extension '.h5'. Requires the module h5py.
-        - 'flat': Return flat dictionary of serialized data.
-        - 'struct': Return hierarchical dictionary of serialized data.
-
-    compression : int or str, optional
-        Passed through to h5py, default is 'gzip'.
-
-    """
-    # Get kwargs.
-    path = kwargs.pop('path', 'data')
-    overwrite = kwargs.pop('overwrite', True)
-    backend = kwargs.pop('backend', 'numpy')
-    compression = kwargs.pop('compression', 'gzip')
-    # Ensure no kwargs left.
-    if kwargs:
-        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
-
-    def store_variable(storage, variable, name, flat):
-        """Get serialized dicts and save numpy-objects separately."""
-
-        # Ensure variable is a dict.
-        if not isinstance(variable, dict):
-            variable = {name: variable}
-
-        if not flat:
-            storage[name] = {}
-
-        # Loop over dict elements.
-        for k1, v1 in variable.items():
-
-            if not flat:
-                storage[name][k1] = {}
-
-            # Workaround for discretize.TensorMesh instances.
-            if name == 'mesh' and not hasattr(v1, 'to_dict'):
-                if flat:
-                    storage[f"{name}__{k1}__hx"] = v1.hx
-                    storage[f"{name}__{k1}__hy"] = v1.hy
-                    storage[f"{name}__{k1}__hz"] = v1.hz
-                    storage[f"{name}__{k1}__x0"] = v1.x0
-                else:
-                    storage[name][k1]["hx"] = v1.hx
-                    storage[name][k1]["hy"] = v1.hy
-                    storage[name][k1]["hz"] = v1.hz
-                    storage[name][k1]["x0"] = v1.x0
-
-            elif name == 'other':  # Just dump it.
-                if flat:
-                    storage[f"{name}__{k1}"] = v1
-                else:
-                    storage[name][k1] = v1
-
-            else:
-
-                # Store each object of `to_dict`.
-                for k2, v2 in v1.to_dict().items():
-
-                    # To avoid pickles we translate None to 'none'.
-                    if v2 is None:
-                        v2 = 'none'
-
-                    if flat:
-                        storage[f"{name}__{k1}__{k2}"] = v2
-                    else:
-                        storage[name][k1][k2] = v2
-
-    # Get absolute path, create if it doesn't exist.
-    path = os.path.abspath(path)
-    os.makedirs(path, exist_ok=True)
-    full_path = os.path.join(path, fname)
-    if backend == "h5py":
-        flat = False
-        full_path += '.h5'
-    elif backend == 'flat':
-        flat = True
-    elif backend == 'struct':
-        flat = False
-    else:  # Default is numpy
-        flat = True
-        full_path += '.npz'
-
-    if not overwrite and os.path.isfile(full_path):
-        print(f"\n* WARNING :: File {full_path} exists, not writing data.\n")
-        return
-
-    # Start kwargs for np.savez_compressed.
-    kwargs = {}
-
-    # Store meshes.
-    if meshes is not None:
-        store_variable(kwargs, meshes, 'mesh', flat)
-
-    # Store fields.
-    if fields is not None:
-        store_variable(kwargs, fields, 'field', flat)
-
-    # Store models.
-    if models is not None:
-        store_variable(kwargs, models, 'model', flat)
-
-    # Store other data.
-    if other is not None:
-        store_variable(kwargs, other, 'other', flat)
-
-    # Store meta data.
-    kwargs['date'] = datetime.today().isoformat()
-    kwargs['version'] = 'emg3d v'+__version__
-
-    # Save the data depending on the backend.
-    if backend in ["flat", "struct"]:
-        return kwargs
-
-    elif backend == "numpy":
-        np.savez_compressed(full_path, **kwargs)
-
-    elif backend == "h5py":
-
-        if not h5py:
-            print("* ERROR   :: You need to install `h5py` to use it as a "
-                  "backend.")
-            raise ImportError("backend='h5py'")
-
-        def add_to_hdf5(data, h):
-            """Adds dicts recursively to h5."""
-            for key, item in data.items():
-                if isinstance(item, dict):
-                    if isinstance(key, int):
-                        key = str(key)
-                    add_to_hdf5(item, h.create_group(key))
-                elif np.ndim(item) > 0:
-                    h.create_dataset(key, data=item, compression=compression)
-                else:
-                    h.create_dataset(key, data=item)
-
-        with h5py.File(full_path, "w") as f:
-            add_to_hdf5(kwargs, f)
-
-    else:
-        raise NotImplementedError(f"Backend='{backend}' is not implemented.")
-
-
-def load(fname, **kwargs):
-    """Load meshes, models, fields, and other data from disk.
-
-    This routine is a wrapper around :func:`numpy.load`, and loads data stored
-    with :func:`save`.
-
-
-    Parameters
-    ----------
-    fname : str
-        File name including extension. Expected backends depending on the file
-        extensions:
-
-        - '.npz': numpy-binary
-        - '.h5': h5py-binary
-
-    path : str, optional
-        Absolute or relative path where to store. Default is 'data'.
-
-    verb : int
-        If 1 (default) verbose, if 0 silent.
-
-    allow_pickle : bool, optional
-        Passed through to np.load and therefore has only effect if the file
-        ends in '.npz'. This should not be necessary, unless something was
-        stored in `other` with `save()` that cannot be translated to a native
-        numpy object.
-
-
-    Returns
-    -------
-    out : dict
-        A dictionary containing the data stored in fname; meshes, models, and
-        fields are deserialized and returned as instances.
-
-    """
-    # Get kwargs.
-    path = kwargs.pop('path', 'data')
-    verb = kwargs.pop('verb', 1)
-    allow_pickle = kwargs.pop('allow_pickle', False)
-    # Ensure no kwargs left.
-    if kwargs:
-        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
-
-    def get_names(data, prefix, out):
-        """Return unique names from data.
-
-        Elements are stored as `prefix__name__suffix`; this function returns
-        the set of unique names for the given prefix.
-        """
-
-        # Get all keys that start with 'prefix__'.
-        keys = [key for key in data.keys() if key.startswith(prefix+'__')]
-
-        # Extract the actual names of them (excluding prefix and suffix).
-        if prefix == 'other':
-            names = set(['__'.join(key.split('__')[1:]) for key in keys])
-        else:
-            names = set(['__'.join(key.split('__')[1:-1]) for key in keys])
-
-        # Initiate dict-entry if there are any names.
-        if names or prefix == 'other':
-            out[prefix] = {}
-
-        return names
-
-    def create_dict(data, prefix, name, suffixes):
-        """Create a dictionary from required suffixes."""
-        # Initiate output and loop over suffixes.
-        out = {}
-        for var in suffixes:
-
-            # Get the parameter.
-            par = data[prefix+'__'+name+'__'+var]
-
-            # Check if it is 'none' and convert to None if so.
-            if str(par) == 'none':
-                par = None
-
-            # Store it
-            out[var] = par
-
-        return out
-
-    def deserialize(data, out, prefix, instance, var, flat):
-        """De-serialize `prefix` to `instance` and add to `out`."""
-
-        # Get names.
-        names = get_names(data, prefix, out)
-
-        # Loop over them.
-        for name in names:
-            dat = create_dict(data, prefix, name, var)
-            if len(names) > 1:
-                out[prefix][name] = instance.from_dict(dat)
-            else:
-                out[name] = instance.from_dict(dat)
-
-    # Get absolute path.
-    ext = fname.split('.')[-1]
-    path = os.path.abspath(path)
-    full_path = os.path.join(path, fname)
-
-    # Open file depending on the backend.
-    if ext == "npz":
-        flat = True
-
-        with np.load(full_path, allow_pickle=allow_pickle) as dat:
-            data = {}
-            for key in dat.files:
-                data[key] = dat[key]
-
-    elif ext == "h5":
-        flat = False
-
-        if not h5py:
-            print("* ERROR   :: You need to install `h5py` to use it as a "
-                  "backend.")
-            raise ImportError("backend='h5py'")
-
-        def get_from_hdf5(f):
-            data = {}
-            for key, item in f.items():
-                if isinstance(item, h5py._hl.dataset.Dataset):
-                    data[key] = item[()]
-                elif isinstance(item, h5py._hl.group.Group):
-                    data[key] = get_from_hdf5(item)
-            return data
-
-        with h5py.File(full_path, 'r') as f:
-            data = get_from_hdf5(f)
-
-    else:
-        raise NotImplementedError(f"Extension '.{ext}' is not implemented.")
-
-    # Initialize output
-    out = {}
-
-    # Ensure it is a file created by emg3d by checking date/version.
-    try:
-        meta = {}
-        meta['version'] = str(data['version'])
-        meta['date'] = str(data['date'])
-    except KeyError:
-        print(f"\n* ERROR   :: {full_path} was not created by emg3d.")
-        raise OSError('Not an emg3d file.')
-
-    # Print file info.
-    if verb > 0:
-        print(f"  Loading file {full_path}")
-        print(f"  -> Stored with {meta['version']} on {meta['date']}")
-
-    # De-serialize TensorMesh, Model, and Field instances.
-    deserialize(data, out, 'mesh', TensorMesh, ['hx', 'hy', 'hz', 'x0'], flat)
-    deserialize(data, out, 'model', Model,
-                ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC'], flat)
-    deserialize(data, out, 'field', Field,
-                ['field', 'freq', 'vnEx', 'vnEy', 'vnEz'], flat)
-
-    # Add all other stuff.
-    names = get_names(data, 'other', out)
-    for name in names:
-        out['other'][name] = data['other__'+name]
-
-    # Add meta data.
-    out['meta'] = meta
-
-    return out
+    """Moved to `emg3d.io.data_read; however, DEPRECATED."""
+    from emg3d.io import data_read
+    return data_read(fname, keys, path)
 
 
 # TIMING AND REPORTING

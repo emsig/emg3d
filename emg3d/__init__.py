@@ -23,12 +23,14 @@ sped-up through jitted ``numba``-functions.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+from emg3d import io
 from emg3d import utils
 from emg3d import solver
 from emg3d.solver import solve
-from emg3d.utils import save, load, Report
+from emg3d.utils import Report
+from emg3d.io import save, load
 
-__all__ = ['solve', 'solver', 'utils', 'Report', 'save', 'load']
+__all__ = ['solve', 'solver', 'utils', 'io', 'Report', 'save', 'load']
 
 # Version is sorted out in utils, so we can easier use it within the package
 # itself.

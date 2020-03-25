@@ -12,3 +12,6 @@ Code
 
 .. automodule:: emg3d.utils
     :members:
+
+.. automodule:: emg3d.io
+    :members:
