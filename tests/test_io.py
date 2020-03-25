@@ -196,4 +196,4 @@ def test_save_and_load(tmpdir, capsys):
         with pytest.raises(ImportError):
             io.save(tmpdir+'/test-h5', grid=grid)
         with pytest.raises(ImportError):
-            io.load(tmpdir+'/test-h5.h5')
+            io.load(str(tmpdir+'/test-h5.h5'))
