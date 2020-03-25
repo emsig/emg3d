@@ -29,9 +29,9 @@ install:
   - conda info -a
 
   # Install and activate environment, install packages
-  - conda create -q -n tenv python=$PYTHON numpy scipy pytest pytest-cov numba $PCKG
+  - conda create -q -n tenv python=$PYTHON numpy scipy pytest pytest-cov numba
   - source activate tenv
-  - conda install -c conda-forge empymod
+  - conda install -c conda-forge empymod $PCKG
   - pip install setuptools_scm coveralls pytest-flake8 $INST
   - python setup.py install
 
