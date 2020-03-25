@@ -493,7 +493,6 @@ def _dict_deserialize(inp):
 
                 except (AttributeError, KeyError):  # Gracefully fail.
                     print(f"* WARNING :: Could not de-serialize <{key}>")
-                    pass
 
             # In no __class__-key or de-serialization fails, use recursion.
             _dict_deserialize(value)
