@@ -307,7 +307,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Start logging and print all parameters.
     var.cprint(f"\n:: emg3d START :: {var.time.now} :: "
-               f"v{utils.__version__.split('+')[0]}\n", 1)
+               f"v{utils.__version__}\n", 1)
     var.cprint(var, 1)
 
     # Calculate reference error for tolerance.

@@ -23,10 +23,9 @@ Utility functions for the multigrid solver.
 # the License.
 
 
-import os
-import shelve
 import empymod
 import numpy as np
+from copy import deepcopy
 from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy.constants import mu_0, epsilon_0
@@ -36,7 +35,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
 from emg3d import njitted
 
-# scooby is a soft dependency for emg3d
+# Check soft dependencies.
 try:
     from scooby import Report as ScoobyReport
 except ImportError:
@@ -227,6 +226,63 @@ class Field(np.ndarray):
 
         # Call the parent's __setstate__ with the other tuple elements.
         super(Field, self).__setstate__(state[0:-i])
+
+    def copy(self):
+        """Return a copy of the Field."""
+        return Field.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        """Store the necessary information of the Field in a dict."""
+        out = {'field': np.array(self.field), 'freq': self._freq,
+               'vnEx': self.vnEx, 'vnEy': self.vnEy, 'vnEz': self.vnEz,
+               '__class__': self.__class__.__name__}
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert the dictionary into a Field instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`Field.to_dict`.
+            The dictionary needs the keys `field`, `freq`, `vnEx`, `vnEy`, and
+            `vnEz`.
+
+        Returns
+        -------
+        obj : `Field`-instance
+
+        """
+
+        # Create a dummy with the required attributes for the field instance.
+        class Grid:
+            pass
+
+        grid = Grid()
+
+        # Check and get the required keys from the input.
+        try:
+            field = inp['field']
+            freq = inp['freq']
+            grid.vnEx = inp['vnEx']
+            grid.vnEy = inp['vnEy']
+            grid.vnEz = inp['vnEz']
+        except KeyError as e:
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
+
+        # Calculate missing info.
+        grid.nEx = np.prod(grid.vnEx)
+        grid.nEy = np.prod(grid.vnEy)
+        grid.nEz = np.prod(grid.vnEz)
+        grid.nE = grid.nEx + grid.nEy + grid.nEz
+
+        # Return Field instance.
+        return cls(fx_or_grid=grid, fy_or_field=field, freq=freq)
 
     @property
     def field(self):
@@ -892,17 +948,15 @@ class Model:
                   "it will break in the future.")
 
         # Store required info from grid.
-        if hasattr(grid, 'dtype'):
+        if hasattr(grid, 'shape'):
             # This is an alternative possibility. Instead of the grid, we only
-            # need the model._vol of shape vnC. Mainly used internally to
-            # construct new models.
-            self.nC = np.prod(grid.shape)
-            self.vnC = grid.shape
-            self._vol = grid
+            # need the model.vnC. Mainly used internally to construct new
+            # models.
+            self.vnC = grid
+            self.nC = np.prod(grid)
         else:
             self.nC = grid.nC
             self.vnC = grid.vnC
-            self._vol = grid.vol.reshape(self.vnC, order='F')
 
         # Copies of vnC and nC, but more widely used/known
         # (vnC and nC are the discretize attributes).
@@ -931,7 +985,9 @@ class Model:
         """Simple representation."""
         return (f"Model; {self.case_names[self.case]} resistivities"
                 f"{'' if self.mu_r is None else '; mu_r'}"
-                f"{'' if self.epsilon_r is None else '; epsilon_r'}")
+                f"{'' if self.epsilon_r is None else '; epsilon_r'}"
+                f"; {self.vnC[0]} x {self.vnC[1]} x {self.vnC[2]} "
+                f"({self.nC:,})")
 
     def __add__(self, model):
         """Add two models."""
@@ -941,13 +997,13 @@ class Model:
             return NotImplemented
 
         # Check input.
-        vol = self._operator_test(model)
+        self._operator_test(model)
 
         # Apply operator.
         kwargs = self._apply_operator(model, np.add)
 
         # Return new Model instance.
-        return Model(grid=vol, **kwargs)
+        return Model(grid=self.vnC, **kwargs)
 
     def __sub__(self, model):
         """Subtract two models."""
@@ -957,13 +1013,13 @@ class Model:
             return NotImplemented
 
         # Check input.
-        vol = self._operator_test(model)
+        self._operator_test(model)
 
         # Apply operator.
         kwargs = self._apply_operator(model, np.subtract)
 
         # Return new Model instance.
-        return Model(grid=vol, **kwargs)
+        return Model(grid=self.vnC, **kwargs)
 
     def __eq__(self, model):
         """Compare two models.
@@ -994,34 +1050,71 @@ class Model:
         return equal
 
     def copy(self):
-        """Return a copy of the model."""
+        """Return a copy of the Model."""
+        return Model.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        """Store the necessary information of the Model in a dict."""
+        # Initiate dict.
+        out = {}
 
         # resistivities.
-        res_x = self.res_x.copy()
+        out['res_x'] = self.res_x
         if self.case in [1, 3]:
-            res_y = self.res_y.copy()
+            out['res_y'] = self.res_y
         else:
-            res_y = None
+            out['res_y'] = None
         if self.case in [2, 3]:
-            res_z = self.res_z.copy()
+            out['res_z'] = self.res_z
         else:
-            res_z = None
+            out['res_z'] = None
 
         # mu_r.
         if self.mu_r is not None:
-            mu_r = self.mu_r.copy()
+            out['mu_r'] = self.mu_r
         else:
-            mu_r = None
+            out['mu_r'] = None
 
         # epsilon_r.
         if self.epsilon_r is not None:
-            epsilon_r = self.epsilon_r.copy()
+            out['epsilon_r'] = self.epsilon_r
         else:
-            epsilon_r = None
+            out['epsilon_r'] = None
 
-        # Return new Model instance.
-        return Model(grid=self._vol, res_x=res_x, res_y=res_y, res_z=res_z,
-                     mu_r=mu_r, epsilon_r=epsilon_r)
+        # vnC.
+        out['vnC'] = self.vnC
+
+        # Name
+        out['__class__'] = self.__class__.__name__
+
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert the dictionary into a Model instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`Model.to_dict`.
+            The dictionary needs the keys `res_x`, `res_y`, `res_z`, `mu_r`,
+            `epsilon_r`, and `vnC`.
+
+        Returns
+        -------
+        obj : `Model`-instance
+
+        """
+        try:
+            return cls(grid=inp['vnC'], res_x=inp['res_x'], res_y=inp['res_y'],
+                       res_z=inp['res_z'], mu_r=inp['mu_r'],
+                       epsilon_r=inp['epsilon_r'])
+        except KeyError as e:
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
 
     # RESISTIVITIES
     @property
@@ -1179,8 +1272,6 @@ class Model:
                    f"defined; provided: '{hasattr(self.epsilon_r, 'dtype')}' "
                    f"and '{hasattr(model.epsilon_r, 'dtype')}'.")
             raise ValueError(msg)
-
-        return self._vol
 
     def _apply_operator(self, model, operator):
         """Apply the provided operator to self and model."""
@@ -1629,14 +1720,49 @@ class TensorMesh:
 
     def __repr__(self):
         """Simple representation."""
-        return f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} ({self.nC})"
+        return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
+                f"({self.nC:,})")
+
+    def copy(self):
+        """Return a copy of the TensorMesh."""
+        return TensorMesh.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        """Store the necessary information of the TensorMesh in a dict."""
+        out = {'hx': self.hx, 'hy': self.hy, 'hz': self.hz, 'x0': self.x0,
+               '__class__': self.__class__.__name__}
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert the dictionary into a TensorMesh instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`TensorMesh.to_dict`.
+            The dictionary needs the keys `hx`, `hy`, `hz`, and `x0`.
+
+        Returns
+        -------
+        obj : `TensorMesh`-instance
+
+        """
+        try:
+            return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
+        except KeyError as e:
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
 
     @property
     def vol(self):
         """Construct cell volumes of the 3D model as 1D array."""
         if getattr(self, '_vol', None) is None:
-            vol = np.outer(np.outer(self.hx, self.hy).ravel('F'), self.hz)
-            self._vol = vol.ravel('F')
+            self._vol = (self.hx[None, None, :]*self.hy[None, :, None] *
+                         self.hz[:, None, None]).ravel()
         return self._vol
 
 
@@ -2488,7 +2614,7 @@ class Fourier:
 
         # Ensure no kwargs left.
         if kwargs:
-            raise TypeError('Unexpected **kwargs: %r' % kwargs)
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Ensure freq_inp and every_x_freq are not both set.
         self._check_coarse_inputs(keep_freq_inp=True)
@@ -2782,142 +2908,17 @@ class Fourier:
                     self.freq_calc, "   Calc. freq [Hz] : ", self.verb)
 
 
-# FUNCTIONS RELATED TO DATA MANAGEMENT
+# BACKWARDS COMPATIBILITY
 def data_write(fname, keys, values, path='data', exists=0):
-    """Write all values with their corresponding key to file path/fname.
-
-
-    Parameters
-    ----------
-    fname : str
-        File name.
-
-    keys : str or list of str
-        Name(s) of the values to store in file.
-
-    values : anything
-        Values to store with keys in file.
-
-    path : str, optional
-        Absolute or relative path where to store. Default is 'data'.
-
-    exists : int, optional
-        Flag how to act if a shelve with the given name already exists:
-
-        - < 0: Delete existing shelve.
-        - 0 (default): Do nothing (print that it exists).
-        - > 0: Append to existing shelve.
-
-    """
-    # Get absolute path, create if it doesn't exist.
-    path = os.path.abspath(path)
-    os.makedirs(path, exist_ok=True)
-
-    # File name full path.
-    full_path = path+"/"+fname
-
-    # Check if shelve exists.
-    bak_exists = os.path.isfile(full_path+".bak")
-    dat_exists = os.path.isfile(full_path+".dat")
-    dir_exists = os.path.isfile(full_path+".dir")
-    if any([bak_exists, dat_exists, dir_exists]):
-        print("   > File exists, ", end="")
-        if exists == 0:
-            print("NOT SAVING THE DATA.")
-            return
-        elif exists > 0:
-            print("appending to it", end='')
-        else:
-            print("overwriting it.")
-            for ending in ["dat", "bak", "dir"]:
-                try:
-                    os.remove(full_path+"."+ending)
-                except FileNotFoundError:
-                    pass
-
-    # Cast into list.
-    if not isinstance(keys, (list, tuple)):
-        keys = [keys, ]
-        values = [values, ]
-
-    # Shelve it.
-    with shelve.open(full_path) as db:
-
-        # If appending, print the keys which will be overwritten.
-        if exists > 0:
-            over = [j for j in keys if any(i == j for i in list(db.keys()))]
-            if len(over) > 0:
-                print(" (overwriting existing key(s) "+f"{over}"[1:-1]+").")
-            else:
-                print(".")
-
-        # Writing it to the shelve.
-        for i, key in enumerate(keys):
-
-            # If the parameter is a TensorMesh-instance, we set the volume
-            # None. This saves space, and it will simply be reconstructed if
-            # required.
-            if type(values[i]).__name__ == 'TensorMesh':
-                if hasattr(values[i], '_vol'):
-                    delattr(values[i], '_vol')
-
-            db[key] = values[i]
+    """DEPRECATED; USE :func:`emg3d.io.save`."""
+    from emg3d.io import data_write
+    data_write(fname, keys, values, path, exists)
 
 
 def data_read(fname, keys=None, path="data"):
-    """Read and return keys from file path/fname.
-
-
-    Parameters
-    ----------
-    fname : str
-        File name.
-
-    keys : str, list of str, or None; optional
-        Name(s) of the values to get from file. If None, returns everything as
-        a dict. Default is None.
-
-    path : str, optional
-        Absolute or relative path where fname is stored. Default is 'data'.
-
-
-    Returns
-    -------
-    out : values or dict
-        Requested value(s) or dict containing everything if keys=None.
-
-    """
-    # Get absolute path.
-    path = os.path.abspath(path)
-
-    # File name full path.
-    full_path = path+"/"+fname
-
-    # Check if shelve exists.
-    for ending in [".dat", ".bak", ".dir"]:
-        if not os.path.isfile(full_path+ending):
-            print(f"   > File <{full_path+ending}> does not exist.")
-            if isinstance(keys, (list, tuple)):
-                return len(keys)*(None, )
-            else:
-                return None
-
-    # Get it from shelve.
-    with shelve.open(path+"/"+fname) as db:
-        if keys is None:                           # None
-            out = dict()
-            for key, item in db.items():
-                out[key] = item
-            return out
-
-        elif not isinstance(keys, (list, tuple)):  # single parameter
-            return db[keys]
-
-        else:                                      # lists/tuples of parameters
-            out = []
-            for key in keys:
-                out.append(db[key])
-            return out
+    """DEPRECATED; USE :func:`emg3d.io.load`."""
+    from emg3d.io import data_read
+    return data_read(fname, keys, path)
 
 
 # TIMING AND REPORTING

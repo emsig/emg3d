@@ -23,7 +23,7 @@ todo_include_todos = True
 
 # Intersphinx configuration
 intersphinx_mapping = {
-    "numpy": ("https://numpy.org", None),
+    "numpy": ("https://docs.scipy.org/doc/numpy", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
     "discretize": ("https://discretize.simpeg.xyz/en/master", None),
     "empymod": ("https://empymod.readthedocs.io/en/stable", None),
