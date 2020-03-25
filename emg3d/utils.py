@@ -2910,13 +2910,13 @@ class Fourier:
 
 # BACKWARDS COMPATIBILITY
 def data_write(fname, keys, values, path='data', exists=0):
-    """Moved to `emg3d.io.data_write; however, DEPRECATED."""
+    """DEPRECATED; USE :func:`emg3d.io.save`."""
     from emg3d.io import data_write
     data_write(fname, keys, values, path, exists)
 
 
 def data_read(fname, keys=None, path="data"):
-    """Moved to `emg3d.io.data_read; however, DEPRECATED."""
+    """DEPRECATED; USE :func:`emg3d.io.load`."""
     from emg3d.io import data_read
     return data_read(fname, keys, path)
 

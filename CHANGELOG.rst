@@ -2,13 +2,15 @@ Changelog
 #########
 
 
-*latest*
---------
+*v0.10.0* : Data persistence
+----------------------------
+
+**2020-03-25**
 
 - New:
 
-  - New functions ``emg3d.io.save`` and ``emg3d.io.load`` to save and load all
-    sort of ``emg3d`` instances. The currently implemented backends are
+  - New functions ``emg3d.save`` and ``emg3d.load`` to save and load all sort
+    of ``emg3d`` instances. The currently implemented backends are
     ``h5py`` for ``.h5``-files (default, but requires ``h5py`` to be installed)
     and ``numpy`` for ``.npz``-files.
   - Classes ``emg3d.utils.Field``, ``emg3d.utils.Model``, and
@@ -21,11 +23,11 @@ Changelog
 
 - Deprecations:
 
-  - Deprecated ``data_write`` and ``data_read``. They also moved from
-    ``emg3d.utils`` to ``emg3d.io``.
+  - Deprecated ``data_write`` and ``data_read``.
 
 - Internal and bug fixes:
 
+  - All I/O-related stuff moved to its own file `io.py`.
   - Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and
     coverage.
   - Bugfix: ``emg3d.njitted.restrict`` did not store the {x;y;z}-field if
@@ -34,6 +36,8 @@ Changelog
 
 *v0.9.3* : Sphinx gallery
 -------------------------
+
+**2020-02-11**
 
 - Rename ``solver.solver`` to ``solver.solve``; load ``solve`` also into the
   main namespace as ``emg3d.solve``.

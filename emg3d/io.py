@@ -43,7 +43,7 @@ __all__ = ['save', 'load']
 
 
 def data_write(fname, keys, values, path='data', exists=0):
-    """Write all values with their corresponding key to file path/fname.
+    """DEPRECATED; USE :func:`save`.
 
 
     Parameters
@@ -128,7 +128,7 @@ def data_write(fname, keys, values, path='data', exists=0):
 
 
 def data_read(fname, keys=None, path="data"):
-    """Read and return keys from file path/fname.
+    """DEPRECATED; USE :func:`load`.
 
 
     Parameters
@@ -229,7 +229,7 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
     kwargs['_version'] = 'emg3d v'+utils.__version__
-    kwargs['_format'] = '0.9.4'  # File format; version of emg3d when changed.
+    kwargs['_format'] = '0.10.0'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
