@@ -194,4 +194,6 @@ def test_save_and_load(tmpdir, capsys):
         assert_allclose(out_h5['Data']['what']['f'], field.fx)
     else:
         with pytest.raises(ImportError):
-            io.save(tmpdir+'/test-dd', grid=grid)
+            io.save(tmpdir+'/test-h5', grid=grid)
+        with pytest.raises(ImportError):
+            io.load(tmpdir+'/test-h5.h5')
