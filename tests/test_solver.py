@@ -207,7 +207,7 @@ def test_solver_backwards(capsys):
     out, _ = capsys.readouterr()
     _ = solver.solver(grid, model, sfield, verb=0)
     out, _ = capsys.readouterr()
-    assert "* WARNING :: ``emg3d.solver.solver()`` is renamed to " in out
+    assert "* WARNING :: `emg3d.solver.solver()` is renamed to " in out
 
 
 def test_one_liner(capsys):

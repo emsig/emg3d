@@ -60,37 +60,38 @@ except ImportError:
 
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
-           'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'TensorMesh',
-           'get_hx_h0', 'get_cell_numbers', 'get_stretched_h', 'get_domain',
-           'get_hx', 'Fourier', 'data_write', 'data_read', 'Time', 'Report']
+           'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'interp3d',
+           'TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
+           'get_domain', 'get_hx', 'Fourier', 'data_write', 'data_read',
+           'Time', 'Report']
 
 
 # FIELDS
 class Field(np.ndarray):
     r"""Create a Field instance with x-, y-, and z-views of the field.
 
-    A ``Field`` is an ``ndarray`` with additional views of the x-, y-, and
-    z-directed fields as attributes, stored as ``fx``, ``fy``, and ``fz``. The
+    A `Field` is an `ndarray` with additional views of the x-, y-, and
+    z-directed fields as attributes, stored as `fx`, `fy`, and `fz`. The
     default array contains the whole field, which can be the electric field,
-    the source field, or the residual field, in a 1D array. A ``Field``
-    instance has additionally the property ``ensure_pec`` which, if called,
-    ensures Perfect Electric Conductor (PEC) boundary condition. It also has
-    the two attributes ``amp`` and ``pha`` for the amplitude and phase, as
-    common in frequency-domain CSEM.
+    the source field, or the residual field, in a 1D array. A `Field` instance
+    has additionally the property `ensure_pec` which, if called, ensures
+    Perfect Electric Conductor (PEC) boundary condition. It also has the two
+    attributes `amp` and `pha` for the amplitude and phase, as common in
+    frequency-domain CSEM.
 
-    A ``Field`` can be initiated in three ways:
+    A `Field` can be initiated in three ways:
 
     1. ``Field(grid, dtype=complex)``:
-       Calling it with a :class:`TensorMesh`-instance returns a
-       ``Field``-instance of correct dimensions initiated with zeroes of data
-       type ``dtype``.
+       Calling it with a :class:`TensorMesh` instance returns a
+       `Field` instance of correct dimensions initiated with zeroes of data
+       type `dtype`.
     2. ``Field(grid, field)``:
-       Calling it with a :class:`TensorMesh`-instance and an ``ndarray``
-       returns a ``Field``-instance of the provided ``ndarray``, of same data
-       type.
+       Calling it with a :class:`TensorMesh` instance and an
+       `ndarray` returns a `Field` instance of the provided `ndarray`, of same
+       data type.
     3. ``Field(fx, fy, fz)``:
-       Calling it with three ``ndarray``'s which represent the field in x-, y-,
-       and z-direction returns a ``Field``-instance with these views, of same
+       Calling it with three `ndarray`'s which represent the field in x-, y-,
+       and z-direction returns a `Field` instance with these views, of same
        data type.
 
     Sort-order is 'F'.
@@ -99,12 +100,12 @@ class Field(np.ndarray):
     Parameters
     ----------
 
-    fx_or_grid : TensorMesh or ndarray
+    fx_or_grid : :class:`TensorMesh` or ndarray
         Either a TensorMesh instance or an ndarray of shape grid.nEx or
         grid.vnEx. See explanations above. Only mandatory parameter; if the
-        only one provided, it will initiate a zero-field of ``dtype``.
+        only one provided, it will initiate a zero-field of `dtype`.
 
-    fy_or_field : Field or ndarray
+    fy_or_field : :class:`Field` or ndarray
         Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
         See explanations above.
 
@@ -113,16 +114,16 @@ class Field(np.ndarray):
 
     dtype : dtype,
         Only used if ``fy_or_field=None`` and ``fz=None``; the initiated
-        zero-field for the provided TensorMesh has data type ``dtype``.
+        zero-field for the provided TensorMesh has data type `dtype`.
         Default: complex.
 
     freq : float, optional
-        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Source frequency (Hz), used to calculate the Laplace parameter `s`.
         Either positive or negative:
 
-        - ``freq`` > 0: Frequency domain, hence
+        - `freq` > 0: Frequency domain, hence
           :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - ``freq`` < 0: Laplace domain, hence
+        - `freq` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
         Just added as info if provided.
@@ -131,7 +132,7 @@ class Field(np.ndarray):
 
     def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
                 freq=None):
-        """Initiate a new Field-instance."""
+        """Initiate a new Field instance."""
 
         # Collect field
         if fy_or_field is None and fz is None:          # Empty Field with
@@ -170,7 +171,7 @@ class Field(np.ndarray):
                 obj._sval = np.array(freq)
                 obj._smu0 = np.array(freq*mu_0)
             else:
-                print("* ERROR   :: ``freq`` must be >0 (frequency domain) "
+                print("* ERROR   :: `freq` must be >0 (frequency domain) "
                       "or <0 (Laplace domain)."
                       f"             Provided frequency: {freq} Hz.")
                 raise ValueError("Source error")
@@ -243,7 +244,7 @@ class Field(np.ndarray):
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert the dictionary into a Field instance.
+        """Convert dictionary into :class:`Field` instance.
 
         Parameters
         ----------
@@ -254,7 +255,7 @@ class Field(np.ndarray):
 
         Returns
         -------
-        obj : `Field`-instance
+        obj : :class:`Field` instance
 
         """
 
@@ -383,23 +384,23 @@ class SourceField(Field):
     r"""Create a Source-Field instance with x-, y-, and z-views of the field.
 
     A subclass of :class:`Field`. Additional properties are the real-valued
-    source vector (``vector``, ``vx``, ``vy``, ``vz``), which sum is always
-    one. For a ``SourceField`` frequency is a mandatory  parameter, unlike
-    for a ``Field`` (recommended also for ``Field`` though),
+    source vector (`vector`, `vx`, `vy`, `vz`), which sum is always one. For a
+    `SourceField` frequency is a mandatory  parameter, unlike for a `Field`
+    (recommended also for `Field` though),
 
     Parameters
     ----------
 
     grid : TensorMesh
-        A TensorMesh instance.
+        A :class:`TensorMesh` instance.
 
     freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Source frequency (Hz), used to calculate the Laplace parameter `s`.
         Either positive or negative:
 
-        - ``freq`` > 0: Frequency domain, hence
+        - `freq` > 0: Frequency domain, hence
           :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - ``freq`` < 0: Laplace domain, hence
+        - `freq` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
     """
@@ -445,7 +446,7 @@ def get_source_field(grid, src, freq, strength=0):
     where :math:`s = \mathrm{i} \omega`. Either finite length dipoles or
     infinitesimal small point dipoles can be defined, whereas the return source
     field corresponds to a normalized (1 Am) source distributed within the
-    cell(s) it resides (can be changed with the ``strength``-parameter).
+    cell(s) it resides (can be changed with the `strength`-parameter).
 
     The adjoint of the trilinear interpolation is used to distribute the
     point(s) to the grid edges, which corresponds to the discretization of a
@@ -455,7 +456,7 @@ def get_source_field(grid, src, freq, strength=0):
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; a ``TensorMesh``-instance.
+        Model grid; a :class:`TensorMesh` instance.
 
     src : list of floats
         Source coordinates (m). There are two formats:
@@ -464,12 +465,12 @@ def get_source_field(grid, src, freq, strength=0):
           - Point dipole: ``[x, y, z, azimuth, dip]``.
 
     freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter ``s``.
+        Source frequency (Hz), used to calculate the Laplace parameter `s`.
         Either positive or negative:
 
-        - ``freq`` > 0: Frequency domain, hence
+        - `freq` > 0: Frequency domain, hence
           :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - ``freq`` < 0: Laplace domain, hence
+        - `freq` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
     strength : float or complex, optional
@@ -484,7 +485,7 @@ def get_source_field(grid, src, freq, strength=0):
 
     Returns
     -------
-    sfield : :func:`SourceField`-instance
+    sfield : :func:`SourceField` instance
         Source field, normalized to 1 A m.
 
     """
@@ -720,14 +721,14 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; a ``TensorMesh``-instance.
+        Model grid; a :class:`TensorMesh` instance.
 
     values : ndarray
         Field instance, or a particular field (e.g. field.fx); Model
         parameters.
 
     coordinates : tuple (x, y, z)
-        Coordinates (x, y, z) where to interpolate ``values``; e.g. receiver
+        Coordinates (x, y, z) where to interpolate `values`; e.g. receiver
         locations.
 
     method : str, optional
@@ -736,7 +737,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         in any direction).
 
     extrapolate : bool
-        If True, points on ``new_grid`` which are outside of ``grid`` are
+        If True, points on `new_grid` which are outside of `grid` are
         filled by the nearest value (if ``method='cubic'``) or by extrapolation
         (if ``method='linear'``). If False, points outside are set to zero.
 
@@ -745,8 +746,8 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
 
     Returns
     -------
-    new_values : ndarray or EMArray
-        Values at ``coordinates``.
+    new_values : ndarray or :class:`empymod.utils.EMArray`
+        Values at `coordinates`.
 
         If input was a field it returns an EMArray, which is a subclassed
         ndarray with ``.pha`` and ``.amp`` attributes.
@@ -794,7 +795,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     else:
         fill_value = 0.0
         mode = 'constant'
-    out = _interp3d(points, values, coordinates, method, fill_value, mode)
+    out = interp3d(points, values, coordinates, method, fill_value, mode)
 
     # Return an EMArray if input is a field, else simply the values.
     if values.size == grid.nC:
@@ -830,19 +831,19 @@ def get_h_field(grid, model, field):
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
+        Model grid; :class:`TensorMesh` instance.
 
     model : Model
-        Model; ``emg3d.utils.Model`` instance.
+        Model; :class:`Model` instance.
 
     field : Field
-        Electric field; ``emg3d.utils.Field`` instance.
+        Electric field; :class:`Field` instance.
 
 
     Returns
     -------
     hfield : Field
-        Magnetic field; ``emg3d.utils.Field`` instance.
+        Magnetic field; :class:`Field` instance.
 
     """
 
@@ -893,7 +894,7 @@ def get_h_field(grid, model, field):
         e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
         e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
 
-    # Create a Field-instance and divide by s*mu_0 and return.
+    # Create a Field instance and divide by s*mu_0 and return.
     return -Field(e3d_hx, e3d_hy, e3d_hz)/field.smu0
 
 
@@ -906,7 +907,7 @@ class Model:
     magnetic permeability :math:`\mu_\mathrm{r}` is by default set to one and
     electric permittivity :math:`\varepsilon_\mathrm{r}` is by default set to
     zero, but they can also be provided (isotropically). Keep in mind that the
-    multigrid method as implemented in ``emg3d`` only works for the diffusive
+    multigrid method as implemented in `emg3d` only works for the diffusive
     approximation. As soon as the displacement-part in the Maxwell's equations
     becomes too dominant it will fail (high frequencies or very high electric
     permittivity).
@@ -943,8 +944,8 @@ class Model:
 
         # Issue warning for backwards compatibility.
         if freq is not None:
-            print("\n* WARNING :: ``Model`` is independent of frequency and "
-                  "does not take\n             ``freq`` any longer; providing "
+            print("\n* WARNING :: `Model` is independent of frequency and "
+                  "does not take\n             `freq` any longer; providing "
                   "it will break in the future.")
 
         # Store required info from grid.
@@ -1105,7 +1106,7 @@ class Model:
 
         Returns
         -------
-        obj : `Model`-instance
+        obj : :class:`Model` instance
 
         """
         try:
@@ -1215,12 +1216,12 @@ class Model:
 
         # Check 0 < val or 0 <= val.
         if not np.all(var > 0):
-            print(f"* ERROR   :: ``{name}`` must be all `0 < var`.")
+            print(f"* ERROR   :: `{name}` must be all `0 < var`.")
             raise ValueError("Parameter error")
 
         # Check val < inf.
         if not np.all(var < np.inf):
-            print(f"* ERROR   :: ``{name}`` must be all `var < inf`.")
+            print(f"* ERROR   :: `{name}` must be all `var < inf`.")
             raise ValueError("Parameter error")
 
         return var
@@ -1413,7 +1414,7 @@ class VolumeModel:
 # INTERPOLATION
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
               log=False):
-    """Interpolate ``values`` located on ``grid`` to ``new_grid``.
+    """Interpolate `values` located on `grid` to `new_grid`.
 
     **Note 1:**
     The default method is 'linear', because it works with fields and model
@@ -1431,10 +1432,11 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
     Parameters
     ----------
     grid, new_grid : TensorMesh
-        Input and output model grids; ``TensorMesh``-instances.
+        Input and output model grids;
+        :class:`TensorMesh` instances.
 
     values : ndarray
-        Model parameters; Field instance, or a particular field (e.g.
+        Model parameters; :class:`Field` instance, or a particular field (e.g.
         field.fx). For fields the method cannot be 'volume'.
 
     method : {<'linear'>, 'volume', 'cubic'}, optional
@@ -1450,12 +1452,12 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         fields.
 
     extrapolate : bool
-        If True, points on ``new_grid`` which are outside of ``grid`` are
-        filled by the nearest value (if ``method='cubic'``) or by extrapolation
-        (if ``method='linear'``). If False, points outside are set to zero.
+        If True, points on `new_grid` which are outside of `grid` are filled by
+        the nearest value (if ``method='cubic'``) or by extrapolation (if
+        ``method='linear'``). If False, points outside are set to zero.
 
         For ``method='volume'`` it always uses the nearest value for points
-        outside of ``grid``.
+        outside of `grid`.
 
         Default is True.
 
@@ -1468,7 +1470,7 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
     Returns
     -------
     new_values : ndarray
-        Values corresponding to ``new_grid``.
+        Values corresponding to `new_grid`.
 
 
     See Also
@@ -1534,7 +1536,7 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         new_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
         new_points = new_points.reshape(-1, 3, order='F')
 
-        # Get values from `_interp3d`.
+        # Get values from `interp3d`.
         if extrapolate:
             fill_value = None
             mode = 'nearest'
@@ -1543,11 +1545,11 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
             mode = 'constant'
 
         if log:
-            new_values = _interp3d(points, np.log10(values), new_points,
-                                   method, fill_value, mode)
+            new_values = interp3d(points, np.log10(values), new_points,
+                                  method, fill_value, mode)
         else:
-            new_values = _interp3d(points, values, new_points, method,
-                                   fill_value, mode)
+            new_values = interp3d(points, values, new_points, method,
+                                  fill_value, mode)
 
         new_values = new_values.reshape(shape, order='F')
 
@@ -1557,11 +1559,11 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         return new_values
 
 
-def _interp3d(points, values, new_points, method, fill_value, mode):
+def interp3d(points, values, new_points, method, fill_value, mode):
     """Interpolate values in 3D either linearly or with a cubic spline.
 
-    Return ``values`` corresponding to a regular 3D grid defined by ``points``
-    on ``new_points``.
+    Return `values` corresponding to a regular 3D grid defined by `points` on
+    `new_points`.
 
     This is a modified version of :func:`scipy.interpolate.interpn`, using
     :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
@@ -1587,20 +1589,20 @@ def _interp3d(points, values, new_points, method, fill_value, mode):
         direction).
 
     fill_value : float or None
-        Passed to ``interpolate.RegularGridInterpolator`` if
+        Passed to :class:`scipy.interpolate.RegularGridInterpolator` if
         ``method='linear'``: The value to use for points outside of the
         interpolation domain. If None, values outside the domain are
         extrapolated.
 
     mode : {'constant', 'nearest', 'mirror', 'reflect', 'wrap'}
-        Passed to ``ndimage.map_coordinates`` if ``method='cubic'``: Determines
-        how the input array is extended beyond its boundaries.
+        Passed to :func:`scipy.ndimage.map_coordinates` if ``method='cubic'``:
+        Determines how the input array is extended beyond its boundaries.
 
 
     Returns
     -------
     new_values : ndarray
-        Values corresponding to ``new_points``.
+        Values corresponding to `new_points`.
 
     """
 
@@ -1666,7 +1668,7 @@ class TensorMesh:
         principally for internal use by the multigrid modeller. It is highly
         recommended to use :class:`discretize.TensorMesh` to create the input
         meshes instead of this class. There are no input-checks carried out
-        here, and there is only one accepted input format for ``h`` and ``x0``.
+        here, and there is only one accepted input format for `h` and `x0`.
 
 
     Parameters
@@ -1738,7 +1740,7 @@ class TensorMesh:
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert the dictionary into a TensorMesh instance.
+        """Convert dictionary into :class:`TensorMesh` instance.
 
         Parameters
         ----------
@@ -1748,7 +1750,7 @@ class TensorMesh:
 
         Returns
         -------
-        obj : `TensorMesh`-instance
+        obj : :class:`TensorMesh` instance
 
         """
         try:
@@ -1777,9 +1779,9 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     (one of which is the grid center).
 
     The minimum cell width is calculated through :math:`\delta/\rm{pps}`, where
-    the skin depth is given by :math:`\delta = 503.3 \sqrt{\rho/f}`, and
-    the parameter ``pps`` stands for 'points-per-skindepth'. The minimum cell
-    width can be restricted with the parameter ``min_width``.
+    the skin depth is given by :math:`\delta = 503.3 \sqrt{\rho/f}`, and the
+    parameter `pps` stands for 'points-per-skindepth'. The minimum cell width
+    can be restricted with the parameter `min_width`.
 
     The actual calculation domain adds a buffer zone around the (survey)
     domain. The thickness of the buffer is six times the skin depth. The field
@@ -1787,7 +1789,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     :math:`2\pi\delta`, hence roughly 6 times the skin depth. Taking a factor 6
     gives therefore almost two wavelengths, as the field travels to the
     boundary and back. The actual buffer thickness can be steered with the
-    ``res`` parameter.
+    `res` parameter.
 
     One has to take into account that the air is very resistive, which has to
     be considered not just in the vertical direction, but also in the
@@ -1798,7 +1800,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
     See Also
     --------
-    get_stretched_h : Get ``hx`` for a fixed number ``nx`` and within a fixed
+    get_stretched_h : Get `hx` for a fixed number `nx` and within a fixed
                       domain.
 
 
@@ -1809,7 +1811,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         Frequency (Hz) to calculate the skin depth. The skin depth is a concept
         defined in the frequency domain. If a negative frequency is provided,
         it is assumed that the calculation is carried out in the Laplace
-        domain. To calculate the skin depth, the value of ``freq`` is then
+        domain. To calculate the skin depth, the value of `freq` is then
         multiplied by :math:`-2\pi`, to simulate the closest
         frequency-equivalent.
 
@@ -1843,7 +1845,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         Minimum cell width restriction:
 
         - None : No restriction;
-        - float : Fixed to this value, ignoring skin depth and ``pps``.
+        - float : Fixed to this value, ignoring skin depth and `pps`.
         - list [min, max] : Lower and upper bounds.
 
         Default is None.
@@ -1891,10 +1893,10 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
         Keys:
 
-        - ``dmin``: Minimum cell width;
-        - ``dmax``: Maximum cell width;
-        - ``amin``: Minimum alpha;
-        - ``amax``: Maximum alpha.
+        - `dmin`: Minimum cell width;
+        - `dmax`: Maximum cell width;
+        - `amin`: Minimum alpha;
+        - `amax`: Maximum alpha.
 
     """
     # Get variables with default lists:
@@ -1956,7 +1958,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     # Two wavelengths we can safely assume it is zero.
     #
     # The air does not follow the concept of skin depth, as it is a wave rather
-    # than diffusion. For this is the factor ``max_domain``, which restricts
+    # than diffusion. For this is the factor `max_domain`, which restricts
     # the domain in each direction to this value from the center.
 
     # (a) Source to edges of domain.
@@ -2125,8 +2127,8 @@ def get_cell_numbers(max_nr, max_prime=5, min_div=3):
 
     The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
     p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
-    :math:`M, p_\text{max}, n_\text{min}` correspond to ``max_nr``,
-    ``max_prime``, and ``min_div``, respectively.
+    :math:`M, p_\text{max}, n_\text{min}` correspond to `max_nr`, `max_prime`,
+    and `min_div`, respectively.
 
 
     Parameters
@@ -2176,26 +2178,25 @@ def get_cell_numbers(max_nr, max_prime=5, min_div=3):
 def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
     """Return cell widths for a stretched grid within the domain.
 
-    Returns ``nx`` cell widths within ``domain``, where the minimum cell width
-    is ``min_width``. The cells are not stretched within ``x0`` and ``x1``, and
-    outside uses a power-law stretching. The actual stretching factor and the
-    number of cells left and right of ``x0`` and ``x1`` are find in a
-    minimization process.
+    Returns `nx` cell widths within `domain`, where the minimum cell width is
+    `min_width`. The cells are not stretched within `x0` and `x1`, and outside
+    uses a power-law stretching. The actual stretching factor and the number of
+    cells left and right of `x0` and `x1` are find in a minimization process.
 
     The domain is not completely respected. The starting point of the domain
     is, but the endpoint of the domain might slightly shift (this is more
-    likely the case for small ``nx``, for big ``nx`` the shift should be
-    small). The new endpoint can be obtained with ``domain[0]+np.sum(hx)``. If
-    you want the domain to be respected absolutely, set ``resp_domain=True``.
-    However, be aware that this will introduce one stretch-factor which is
-    different from the other stretch factors, to accommodate the restriction.
-    This one-off factor is between the left- and right-side of ``x0``, or, if
-    ``x1`` is provided, just after ``x1``.
+    likely the case for small `nx`, for big `nx` the shift should be small).
+    The new endpoint can be obtained with ``domain[0]+np.sum(hx)``. If you want
+    the domain to be respected absolutely, set ``resp_domain=True``. However,
+    be aware that this will introduce one stretch-factor which is different
+    from the other stretch factors, to accommodate the restriction. This
+    one-off factor is between the left- and right-side of `x0`, or, if `x1` is
+    provided, just after `x1`.
 
 
     See Also
     --------
-    get_hx_x0 : Get ``hx`` and ``x0`` for a flexible number of ``nx`` with
+    get_hx_x0 : Get `hx` and `x0` for a flexible number of `nx` with
                 given bounds.
 
 
@@ -2213,14 +2214,14 @@ def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
         Number of cells.
 
     x0 : float
-        Center of the grid. ``x0`` is restricted to ``domain``.
+        Center of the grid. `x0` is restricted to `domain`.
         Default is 0.
 
     x1 : float
-        If provided, then no stretching is applied between ``x0`` and ``x1``.
-        The non-stretched part starts at ``x0`` and stops at the first possible
-        location at or after ``x1``. ``x1`` is restricted to ``domain``. This
-        will min_width so that an integer number of cells fit within x0 and x1.
+        If provided, then no stretching is applied between `x0` and `x1`. The
+        non-stretched part starts at `x0` and stops at the first possible
+        location at or after `x1`. `x1` is restricted to `domain`. This will
+        min_width so that an integer number of cells fit within x0 and x1.
 
     resp_domain : bool
         If False (default), then the domain-end might shift slightly to assure
@@ -2228,7 +2229,7 @@ def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
         however, the domain is respected absolutely. This will introduce one
         stretch-factor which is different from the other stretch factors, to
         accommodate the restriction. This one-off factor is between the left-
-        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
+        and right-side of `x0`, or, if `x1` is provided, just after `x1`.
 
 
     Returns
@@ -2347,7 +2348,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         Frequency (Hz) to calculate the skin depth. The skin depth is a concept
         defined in the frequency domain. If a negative frequency is provided,
         it is assumed that the calculation is carried out in the Laplace
-        domain. To calculate the skin depth, the value of ``freq`` is then
+        domain. To calculate the skin depth, the value of `freq` is then
         multiplied by :math:`-2\pi`, to simulate the closest
         frequency-equivalent.
 
@@ -2365,16 +2366,16 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
 
     min_width : None, float, or list of two floats
         Minimum cell width is calculated as a function of skin depth:
-        fact_min*sd. If ``min_width`` is a float, this is used. If a list of
+        fact_min*sd. If `min_width` is a float, this is used. If a list of
         two values [min, max] are provided, they are used to restrain
         min_width. Default is None.
 
     fact_min, fact_neg, fact_pos : floats
         The skin depth is multiplied with these factors to estimate:
 
-            - Minimum cell width (``fact_min``, default 0.2)
-            - Domain-start (``fact_neg``, default 5), and
-            - Domain-end (``fact_pos``, defaults to ``fact_neg``).
+            - Minimum cell width (`fact_min`, default 0.2)
+            - Domain-start (`fact_neg`, default 5), and
+            - Domain-end (`fact_pos`, defaults to `fact_neg`).
 
 
     Returns
@@ -2416,7 +2417,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
 def get_hx(alpha, domain, nx, x0, resp_domain=True):
     r"""Return cell widths for given input.
 
-    Find the number of cells left and right of ``x0``, ``nl`` and ``nr``
+    Find the number of cells left and right of `x0`, `nl` and `nr`
     respectively, for the provided alpha. For this, we solve
 
     .. math::   \frac{x_\text{max}-x_0}{x_0-x_\text{min}} =
@@ -2429,7 +2430,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
     ----------
 
     alpha : float
-        Stretching factor ``a`` is given by ``a=1+alpha``.
+        Stretching factor `a` is given by ``a=1+alpha``.
 
     domain : list
         [start, end] of model domain.
@@ -2438,7 +2439,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
         Number of cells.
 
     x0 : float
-        Center of the grid. ``x0`` is restricted to ``domain``.
+        Center of the grid. `x0` is restricted to `domain`.
 
     resp_domain : bool
         If False (default), then the domain-end might shift slightly to assure
@@ -2446,7 +2447,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
         however, the domain is respected absolutely. This will introduce one
         stretch-factor which is different from the other stretch factors, to
         accommodate the restriction. This one-off factor is between the left-
-        and right-side of ``x0``, or, if ``x1`` is provided, just after ``x1``.
+        and right-side of `x0`, or, if `x1` is provided, just after `x1`.
 
 
     Returns
@@ -2509,18 +2510,18 @@ class Fourier:
     r"""Time-domain CSEM calculation.
 
     Class to carry out time-domain modelling with the frequency-domain code
-    ``emg3d``. Instances of the class take care of calculating the required
+    `emg3d`. Instances of the class take care of calculating the required
     frequencies, the interpolation from coarse, limited-band frequencies to the
     required frequencies, and carrying out the actual transform.
 
     Everything related to the Fourier transform is done by utilising the
     capabilities of the 1D modeller :mod:`empymod`. The input parameters
-    ``time``, ``signal``, ``ft``, and ``ftarg`` are passed to the function
+    `time`, `signal`, `ft`, and `ftarg` are passed to the function
     :func:`empymod.utils.check_time` to obtain the required frequencies. The
     actual transform is subsequently carried out by calling
     :func:`empymod.model.tem`. See these functions for more details about the
     exact implementations of the Fourier transforms and its parameters.
-    Note that also the ``verb``-argument follows the definition in ``empymod``.
+    Note that also the `verb`-argument follows the definition in `empymod`.
 
     The mapping from calculated frequencies to the frequencies required for the
     Fourier transform is done in three steps:
@@ -2535,7 +2536,7 @@ class Fourier:
       with cubic spline interpolation (on a log-scale)
       :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
 
-    Note that ``fmin`` and ``fmax`` should be chosen wide enough such that the
+    Note that `fmin` and `fmax` should be chosen wide enough such that the
     mapping for :math:`f>f_\mathrm{max}` :math:`f<f_\mathrm{min}` does not
     matter that much.
 
@@ -2567,18 +2568,19 @@ class Fourier:
         Defaults to 'sin'.
 
     ftarg : dict, optional
-        Depends on the value for ``ft``:
-            - If ``ft`` = 'sin' or 'cos':
+        Depends on the value for `ft`:
+            - If `ft` = 'sin' or 'cos':
 
-                - fftfilt: string of filter name in ``empymod.filters`` or
+                - fftfilt: string of filter name in :mod:`empymod.filters` or
                            the filter method itself.
-                           (Default: ``empymod.filters.key_201_CosSin_2012()``)
+                           (Default:
+                           :func:`empymod.filters.key_201_CosSin_2012()`)
                 - pts_per_dec: points per decade; (default: -1)
                     - If 0: Standard DLF.
                     - If < 0: Lagged Convolution DLF.
                     - If > 0: Splined DLF
 
-            - If ``ft`` = 'fftlog':
+            - If `ft` = 'fftlog':
 
                 - pts_per_dec: sampels per decade (default: 10)
                 - add_dec: additional decades [left, right] (default: [-2, 1])
@@ -2635,7 +2637,7 @@ class Fourier:
 
     @property
     def freq_coarse(self):
-        """Coarse frequency range, can be different from ``freq_req``."""
+        """Coarse frequency range, can be different from `freq_req`."""
         if self.every_x_freq is None and self.freq_inp is None:
             # If none of {every_x_freq, freq_inp} given, then
             # freq_coarse = freq_req.
@@ -2651,7 +2653,7 @@ class Fourier:
 
     @property
     def freq_calc_i(self):
-        """Indices of ``freq_coarse`` which have to be calculated."""
+        """Indices of `freq_coarse` which have to be calculated."""
         ind = (self.freq_coarse >= self.fmin) & (self.freq_coarse <= self.fmax)
         return ind
 
@@ -2957,21 +2959,21 @@ class Time:
 class Report(ScoobyReport):
     r"""Print date, time, and version information.
 
-    Use ``scooby`` to print date, time, and package version information in any
+    Use `scooby` to print date, time, and package version information in any
     environment (Jupyter notebook, IPython console, Python console, QT
     console), either as html-table (notebook) or as plain text (anywhere).
 
-    Always shown are the OS, number of CPU(s), ``numpy``, ``scipy``, ``emg3d``,
-    ``numba``, ``sys.version``, and time/date.
+    Always shown are the OS, number of CPU(s), `numpy`, `scipy`, `emg3d`,
+    `numba`, `sys.version`, and time/date.
 
-    Additionally shown are, if they can be imported, ``IPython`` and
-    ``matplotlib``. It also shows MKL information, if available.
+    Additionally shown are, if they can be imported, `IPython` and
+    `matplotlib`. It also shows MKL information, if available.
 
-    All modules provided in ``add_pckg`` are also shown.
+    All modules provided in `add_pckg` are also shown.
 
     .. note::
 
-        The package ``scooby`` has to be installed in order to use ``Report``:
+        The package `scooby` has to be installed in order to use `Report`:
         ``pip install scooby``.
 
 

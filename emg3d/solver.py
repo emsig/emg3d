@@ -46,18 +46,18 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     preconditioner for an iterative solver from the
     :mod:`scipy.sparse.linalg`-library, e.g.,
     :func:`scipy.sparse.linalg.bicgstab`. Alternatively, these Krylov subspace
-    solvers can also be used without multigrid at all. See the ``cycle`` and
-    ``sslsolver`` parameters.
+    solvers can also be used without multigrid at all. See the `cycle` and
+    `sslsolver` parameters.
 
     Implemented are the `F`-, `V`-, and `W`-cycle schemes for multigrid
-    (``cycle`` parameter), and the amount of smoothing steps (initial
-    smoothing, pre-smoothing, coarsest-grid smoothing, and post-smoothing) can
-    be set individually (``nu_init``, ``nu_pre``, ``nu_coarse``, and
-    ``nu_post``, respectively). The maximum level of coarsening can be
-    restricted with the ``clevel`` parameter.
+    (`cycle` parameter), and the amount of smoothing steps (initial smoothing,
+    pre-smoothing, coarsest-grid smoothing, and post-smoothing) can be set
+    individually (`nu_init`, `nu_pre`, `nu_coarse`, and `nu_post`,
+    respectively). The maximum level of coarsening can be restricted with the
+    `clevel` parameter.
 
     Semicoarsening and line relaxation, as presented in [Muld07]_, are
-    implemented, see the ``semicoarsening`` and ``linerelaxation`` parameters.
+    implemented, see the `semicoarsening` and `linerelaxation` parameters.
     Using the BiCGSTAB solver together with multigrid preconditioning with
     semicoarsening and line relaxation is slow but generally the most robust.
     Not using BiCGSTAB nor semicoarsening nor line relaxation is fast but may
@@ -67,16 +67,16 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
+        Model grid; :class:`emg3d.utils.TensorMesh` instance.
 
     model : Model
-        Model; ``emg3d.utils.Model`` instance.
+        Model; :class:`emg3d.utils.Model` instance.
 
     sfield : SourceField
-        Source field; ``emg3d.utils.SourceField`` instance.
+        Source field; :class:`emg3d.utils.SourceField` instance.
 
     efield : Field, optional
-        Initial electric field; ``emg3d.utils.Field`` instance. It is
+        Initial electric field; :class:`emg3d.utils.Field` instance. It is
         initiated with zeroes if not provided. A provided efield MUST have
         frequency information (initiated with ``emg3d.utils.Field(...,
         freq)``).
@@ -96,10 +96,10 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 'V': V-cycle, simplest version;
         - 'W': W-cycle, most expensive version;
         - 'F': F-cycle, sort of a compromise between 'V' and 'W';
-        - None: Does not use multigrid, only ``sslsolver``.
+        - None: Does not use multigrid, only `sslsolver`.
 
-        If None, ``sslsolver`` must be provided, and the ``sslsolver`` will be
-        used without multigrid pre-conditioning.
+        If None, `sslsolver` must be provided, and the `sslsolver` will be used
+        without multigrid pre-conditioning.
 
         Comparison of V (left), F (middle), and W (right) cycles for the case
         of four grids (three relaxation and prolongation steps)::
@@ -125,8 +125,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
               :func:`scipy.sparse.linalg.gcrotmk`.
 
         It does currently not work with 'cg', 'bicg', 'qmr', and 'minres' for
-        various reasons (e.g., some require ``rmatvec`` in addition to
-        ``matvec``).
+        various reasons (e.g., some require `rmatvec` in addition to `matvec`).
 
     semicoarsening : int; optional
         Semicoarsening. Default is False.
@@ -175,7 +174,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     **kwargs : Optional solver options:
 
-        - ``tol`` : float
+        - `tol` : float
 
           Convergence tolerance. Default is 1e-6.
 
@@ -183,42 +182,41 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
           this factor, relative to the residual norm obtained for a zero
           electric field.
 
-        - ``maxit`` : int
+        - `maxit` : int
 
           Maximum number of multigrid iterations. Default is 50.
 
-          If ``sslsolver`` is used, this applies to the ``sslsolver``.
+          If `sslsolver` is used, this applies to the `sslsolver`.
 
           In the case that multigrid is used as a pre-conditioner for the
-          ``sslsolver``, the maximum iteration for multigrid is defined by the
-          maximum length of the ``linerelaxation`` and
-          ``semicoarsening``-cycles.
+          `sslsolver`, the maximum iteration for multigrid is defined by the
+          maximum length of the `linerelaxation` and `semicoarsening`-cycles.
 
-        - ``nu_init`` : int
+        - `nu_init` : int
 
           Number of initial smoothing steps, before MG cycle. Default is 0.
 
-        - ``nu_pre`` : int
+        - `nu_pre` : int
 
           Number of pre-smoothing steps. Default is 2.
 
-        - ``nu_coarse`` : int
+        - `nu_coarse` : int
 
           Number of smoothing steps on coarsest grid. Default is 1.
 
-        - ``nu_post`` : int
+        - `nu_post` : int
 
           Number of post-smoothing steps. Default is 2.
 
-        - ``clevel`` : int
+        - `clevel` : int
 
           The maximum coarsening level can be different for each dimension and
           is, by default, automatically determined (``clevel=-1``). The
-          parameter ``clevel`` can be used to restrict the maximum coarsening
+          parameter `clevel` can be used to restrict the maximum coarsening
           level in any direction by its value.
           Default is -1.
 
-        - ``return_info`` : bool
+        - `return_info` : bool
 
           If True, a dictionary is returned with runtime info (final norm and
           number of iterations of MG and the sslsolver).
@@ -226,7 +224,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     Returns
     -------
-    efield : Field instance
+    efield : :class:`emg3d.utils.Field` instance
         Resulting electric field. Is not returned but replaced in-place if an
         initial efield was provided.
 
@@ -235,17 +233,17 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
         Keys:
 
-        - ``exit``: Exit status, 0=Success, 1=Failure;
-        - ``exit_message``: Exit message, check this if ``exit=1``;
-        - ``abs_error``: Absolute error;
-        - ``rel_error``: Relative error;
-        - ``ref_error``: Reference error [norm(sfield)];
-        - ``tol``: Tolerance (abs_error<ref_error*tol);
-        - ``it_mg``: Number of multigrid iterations;
-        - ``it_ssl``: Number of SSL iterations;
-        - ``time``: Runtime (s).
-        - ``runtime_at_cycle``: Runtime after each cycle (s).
-        - ``error_at_cycle``: Absolute error after each cycle.
+        - `exit`: Exit status, 0=Success, 1=Failure;
+        - `exit_message`: Exit message, check this if ``exit=1``;
+        - `abs_error`: Absolute error;
+        - `rel_error`: Relative error;
+        - `ref_error`: Reference error [norm(sfield)];
+        - `tol`: Tolerance (abs_error<ref_error*tol);
+        - `it_mg`: Number of multigrid iterations;
+        - `it_ssl`: Number of SSL iterations;
+        - `time`: Runtime (s).
+        - `runtime_at_cycle`: Runtime after each cycle (s).
+        - `error_at_cycle`: Absolute error after each cycle.
 
 
     Examples
@@ -316,9 +314,9 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Check sfield and get efield
     if sfield.freq is None:
-        print("* ERROR   :: Source field is missing frequency information;\n  "
-              "           Create it with ``emg3d.utils.get_source_field``, or"
-              "\n             initiate it with ``emg3d.utils.SourceField``.")
+        print("* ERROR   :: Source field is missing frequency information;\n"
+              "             Create it with `emg3d.utils.get_source_field`, or"
+              "\n             initiate it with `emg3d.utils.SourceField`.")
         raise ValueError('Input data types')
 
     # Get volume-averaged model values.
@@ -425,9 +423,9 @@ def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     """Alias to solve(), for backwards compatibility."""
 
     # Issue warning for backwards compatibility.
-    print("\n* WARNING :: ``emg3d.solver.solver()`` is renamed to "
-          "``emg3d.solve()``.\n             Use the new ``emg3d.solve()``, as "
-          "``solver()`` will be\n             removed in the future.")
+    print("\n* WARNING :: `emg3d.solver.solver()` is renamed to "
+          "`emg3d.solve()`.\n             Use the new `emg3d.solve()`, as "
+          "`solver()` will be\n             removed in the future.")
 
     return solve(grid, model, sfield, efield, cycle, sslsolver, semicoarsening,
                  linerelaxation, verb, **kwargs)
@@ -440,32 +438,32 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     Multigrid solver as presented in [Muld06]_, including semicoarsening and
     line relaxation as presented in and [Muld07]_.
 
-    - The electric field is stored in-place in ``efield``.
-    - The number of multigrid cycles is stored in ``var.it``.
-    - The current error (l2-norm) is stored in ``var.l2``.
-    - The reference error (l2-norm of sfield) is stored in ``var.l2_refe``.
+    - The electric field is stored in-place in `efield`.
+    - The number of multigrid cycles is stored in `var.it`.
+    - The current error (l2-norm) is stored in `var.l2`.
+    - The reference error (l2-norm of sfield) is stored in `var.l2_refe`.
 
-    This function is called by :func:`solver`.
+    This function is called by :func:`solve`.
 
 
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
+        Model grid; :class:`emg3d.utils.TensorMesh` instance.
 
     model : VolumeModel
-        Model; ``emg3d.utils.VolumeModel`` instance.
+        Model; :class:`emg3d.utils.VolumeModel` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.SourceField`` and
-        ``emg3d.utils.Field`` instances, respectively.
+        Source and electric fields; :class:`emg3d.utils.SourceField` and
+        :class:`emg3d.utils.Field` instances, respectively.
 
-    var : `MGParameters`-instance
+    var : :class:`MGParameters` instance
         As returned by :func:`multigrid`.
 
     **kwargs : Recursion parameters.
-        Do not use; only used internally by recursion; ``level`` (current
-        coarsening level) and ``new_cycmax`` (new maximum of MG cycles, takes
+        Do not use; only used internally by recursion; `level` (current
+        coarsening level) and `new_cycmax` (new maximum of MG cycles, takes
         care of V/W/F-cycling).
 
     """
@@ -612,26 +610,26 @@ def krylov(grid, model, sfield, efield, var):
     implemented in SciPy with or without multigrid as a pre-conditioner
     ([Muld06]_).
 
-    - The electric field is stored in-place in ``efield``.
-    - The current error (l2-norm) is stored in ``var.l2``.
-    - The reference error (l2-norm of sfield) is stored in ``var.l2_refe``.
+    - The electric field is stored in-place in `efield`.
+    - The current error (l2-norm) is stored in `var.l2`.
+    - The reference error (l2-norm of sfield) is stored in `var.l2_refe`.
 
-    This function is called by :func:`solver`.
+    This function is called by :func:`solve`.
 
 
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
+        Model grid; :class:`emg3d.utils.TensorMesh` instance.
 
     model : VolumeModel
-        Model; ``emg3d.utils.VolumeModel`` instance.
+        Model; :class:`emg3d.utils.VolumeModel` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.SourceField`` and
-        ``emg3d.utils.Field`` instances, respectively.
+        Source and electric fields; :class:`emg3d.utils.SourceField` and
+        :class:`emg3d.utils.Field` instances, respectively.
 
-    var : `MGParameters`-instance
+    var : :class:`MGParameters` instance
         As returned by :func:`multigrid`.
 
     """
@@ -708,7 +706,7 @@ def krylov(grid, model, sfield, efield, var):
 
     # Solve the system with sslsolver.
     # The ssl solvers do not abort if the norm diverges or is not finite. We
-    # therefore throw an exception in ``_terminate``, and catch it here.
+    # therefore throw an exception in `_terminate`, and catch it here.
     try:
         efield.field, i = getattr(ssl, var.sslsolver)(
                 A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
@@ -742,7 +740,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     This is a simple wrapper for the jitted calculation in
     :func:`emg3d.njitted.gauss_seidel`, :func:`emg3d.njitted.gauss_seidel_x`,
     :func:`emg3d.njitted.gauss_seidel_y`, and
-    :func:`emg3d.njitted.gauss_seidel_z` (``@njit`` can not [yet] access class
+    :func:`emg3d.njitted.gauss_seidel_z` (`@njit` can not [yet] access class
     attributes). See these functions for more details and corresponding theory.
 
     The electric fields are updated in-place.
@@ -753,14 +751,14 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
+        Model grid; :class:`emg3d.utils.TensorMesh` instance.
 
     model : VolumeModel
-        Model; ``emg3d.utils.VolumeModel`` instances.
+        Model; :class:`emg3d.utils.VolumeModel` instances.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.SourceField`` and
-        ``emg3d.utils.Field`` instances, respectively.
+        Source and electric fields; :class:`emg3d.utils.SourceField` and
+        :class:`emg3d.utils.Field` instances, respectively.
 
     nu : int
         Number of Gauss-Seidel steps; odd numbers are forward, even numbers are
@@ -801,7 +799,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     Corresponds to Equations 8 and 9 in [Muld06]_ and surrounding text. In the
     case of the restriction of the residual, this function is a wrapper for the
     jitted functions :func:`emg3d.njitted.restrict_weights` and
-    :func:`emg3d.njitted.restrict` (``@njit`` can not [yet] access class
+    :func:`emg3d.njitted.restrict` (`@njit` can not [yet] access class
     attributes). See these functions for more details and corresponding theory.
 
     This function is called by :func:`multigrid`.
@@ -810,13 +808,13 @@ def restriction(grid, model, sfield, residual, sc_dir):
     Parameters
     ----------
     grid : TensorMesh
-        Fine grid; ``emg3d.utils.TensorMesh`` instances.
+        Fine grid; :class:`emg3d.utils.TensorMesh` instances.
 
     model : VolumeModel
-        Fine model; ``emg3d.utils.VolumeModel`` instances.
+        Fine model; :class:`emg3d.utils.VolumeModel` instances.
 
     sfield : SourceField
-        Fine source field; ``emg3d.utils.SourceField`` instances.
+        Fine source field; :class:`emg3d.utils.SourceField` instances.
 
     sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
@@ -825,17 +823,17 @@ def restriction(grid, model, sfield, residual, sc_dir):
     Returns
     -------
     cgrid : TensorMesh
-        Coarse grid; ``emg3d.utils.TensorMesh`` instances.
+        Coarse grid; :class:`emg3d.utils.TensorMesh` instances.
 
     cmodel : VolumeModel
-        Coarse model; ``emg3d.utils.VolumeModel`` instances.
+        Coarse model; :class:`emg3d.utils.VolumeModel` instances.
 
     csfield : SourceField
-        Coarse source field; ``emg3d.utils.SourceField`` instances.
+        Coarse source field; :class:`emg3d.utils.SourceField` instances.
         Corresponds to the restriction of the fine-grid residual.
 
     cefield : Field
-        Coarse electric field, complex zeroes; ``emg3d.utils.Field``
+        Coarse electric field, complex zeroes; :class:`emg3d.utils.Field`
         instances.
 
     """
@@ -856,7 +854,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
           np.diff(grid.vectorNy[::ry]),
           np.diff(grid.vectorNz[::rz])]
 
-    # Create new ``TensorMesh``-instance for coarse grid
+    # Create new `TensorMesh` instance for coarse grid
     cgrid = utils.TensorMesh(ch, grid.x0)
 
     # 2. RESTRICT MODEL
@@ -915,10 +913,11 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     Parameters
     ----------
     grid, cgrid : TensorMesh
-        Fine and coarse grids; ``emg3d.utils.TensorMesh`` instances.
+        Fine and coarse grids; :class:`emg3d.utils.TensorMesh` instances.
 
     efield, cefield : Fields
-        Fine and coarse grid electric fields; ``emg3d.utils.Field`` instances.
+        Fine and coarse grid electric fields; :class:`emg3d.utils.Field`
+        instances.
 
     sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
@@ -987,7 +986,7 @@ def residual(grid, model, sfield, efield, norm=False):
                        \mathbf{E} \right) .
 
     This is a simple wrapper for the jitted calculation in
-    :func:`emg3d.njitted.amat_x` (``@njit`` can not [yet] access class
+    :func:`emg3d.njitted.amat_x` (`@njit` can not [yet] access class
     attributes). See :func:`emg3d.njitted.amat_x` for more details and
     corresponding theory.
 
@@ -997,14 +996,14 @@ def residual(grid, model, sfield, efield, norm=False):
     Parameters
     ----------
     grid : TensorMesh
-        Fine grid; ``emg3d.utils.TensorMesh``-instance.
+        Fine grid; :class:`emg3d.utils.TensorMesh` instance.
 
     model : VolumeModel
-        Fine model; ``emg3d.utils.VolumeModel`` instance.
+        Fine model; :class:`emg3d.utils.VolumeModel` instance.
 
     sfield, efield : Field
-        Source and electric fields; ``emg3d.utils.SourceField`` and
-        ``emg3d.utils.Field`` instances, respectively.
+        Source and electric fields; :class:`emg3d.utils.SourceField` and
+        :class:`emg3d.utils.Field` instances, respectively.
 
     norm : bool
         If True, the error (l2-norm) of the residual is returned, not the
@@ -1014,8 +1013,8 @@ def residual(grid, model, sfield, efield, norm=False):
     Returns
     -------
     residual : Field
-        Returned if ``norm=False``. The residual field; ``emg3d.utils.Field``
-        instance.
+        Returned if ``norm=False``. The residual field;
+        :class:`emg3d.utils.Field` instance.
 
     norm : float
         Returned if ``norm=True``. The error (l2-norm) of the residual
@@ -1038,13 +1037,13 @@ def residual(grid, model, sfield, efield, norm=False):
 class MGParameters:
     """Collect multigrid solver settings.
 
-    This dataclass is used by the main :func:`solver`-routine. See
-    :func:`solver` for a description of the mandatory and optional input
+    This dataclass is used by the main :func:`solve`-routine. See
+    :func:`solve` for a description of the mandatory and optional input
     parameters and more information .
 
     Returns
     -------
-    var : `MGParameters`-instance
+    var : class:`MGParameters`
         As required by :func:`multigrid`.
 
     """
@@ -1132,10 +1131,10 @@ class MGParameters:
 
     @property
     def max_level(self):
-        r"""Sets dimension-dependent level variable ``clevel``.
+        r"""Sets dimension-dependent level variable `clevel`.
 
-        Requires at least two cells in each direction (for ``nCx``, ``nCy``,
-        and ``nCz``).
+        Requires at least two cells in each direction (for `nCx`, `nCy`, and
+        `nCz`).
         """
 
         # Store maximum division-by-two level for each dimension.
@@ -1225,7 +1224,7 @@ class MGParameters:
             Current error.
 
         last : bool
-            If True, adds ``exit_message`` and finishes line.
+            If True, adds `exit_message` and finishes line.
 
         """
         # Collect info.
@@ -1457,16 +1456,15 @@ class RegularGridProlongator:
 def _current_sc_dir(sc_dir, grid):
     """Return current direction(s) for semicoarsening.
 
-    Semicoarsening is defined in ``self.sc_dir``. Here ``self.sc_dir`` is
-    checked with which directions can actually still be halved, and
-    depending on that, an adjusted ``sc_dir`` is returned for this
-    particular grid.
+    Semicoarsening is defined in `self.sc_dir`. Here `self.sc_dir` is checked
+    with which directions can actually still be halved, and depending on that,
+    an adjusted `sc_dir` is returned for this particular grid.
 
 
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
+        Model grid; :class:`emg3d.utils.TensorMesh` instance.
 
     sc_dir : int
         Direction of semicoarsening.
@@ -1508,15 +1506,15 @@ def _current_sc_dir(sc_dir, grid):
 def _current_lr_dir(lr_dir, grid):
     """Return current direction(s) for line relaxation.
 
-    Line relaxation is defined in ``self.lr_dir``. Here ``self.lr_dir`` is
-    checked with the dimension of the grid, to avoid line relaxation in a
-    direction where there are only two cells.
+    Line relaxation is defined in `self.lr_dir`. Here `self.lr_dir` is checked
+    with the dimension of the grid, to avoid line relaxation in a direction
+    where there are only two cells.
 
 
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; ``emg3d.utils.TensorMesh`` instance.
+        Model grid; :class:`emg3d.utils.TensorMesh` instance.
 
     lr_dir : int
         Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
@@ -1568,7 +1566,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
 
     Parameters
     ----------
-    var : `MGParameters`-instance
+    var : `MGParameters` instance
         As returned by :func:`multigrid`.
 
     l2_last, l2_prev : float
@@ -1654,7 +1652,7 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
         Maximum MG cycles.
 
     grid : TensorMesh
-        Current grid; ``emg3d.utils.TensorMesh`` instance.
+        Current grid; :class:`emg3d.utils.TensorMesh` instance.
 
     norm : float
         Current error (l2-norm).
@@ -1678,7 +1676,7 @@ def _terminate(var, l2_last, l2_stag, it):
 
     Parameters
     ----------
-    var : `MGParameters`-instance
+    var : `MGParameters` instance
         As returned by :func:`multigrid`.
 
     l2_last, l2_stag : float
@@ -1785,7 +1783,7 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
     Parameters
     ----------
     grid, cgrid : TensorMesh
-        Fine and coarse grids; ``emg3d.utils.TensorMesh`` instances.
+        Fine and coarse grids; :class:`emg3d.utils.TensorMesh` instances.
 
     sc_dir : int
         Direction of semicoarsening.
