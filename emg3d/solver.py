@@ -66,20 +66,19 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        The grid. See :class:`emg3d.utils.TensorMesh`.
 
-    model : Model
-        Model; :class:`emg3d.utils.Model` instance.
+    model : :class:`emg3d.utils.Model`
+        The model. See :class:`emg3d.utils.Model`.
 
-    sfield : SourceField
-        Source field; :class:`emg3d.utils.SourceField` instance.
+    sfield : :class:`emg3d.utils.SourceField`
+        The source field. See :func:`emg3d.utils.get_source_field`.
 
-    efield : Field, optional
-        Initial electric field; :class:`emg3d.utils.Field` instance. It is
-        initiated with zeroes if not provided. A provided efield MUST have
-        frequency information (initiated with ``emg3d.utils.Field(...,
-        freq)``).
+    efield : :class:`emg3d.utils.Field`, optional
+        Initial electric field. It is initiated with zeroes if not provided. A
+        provided efield MUST have frequency information (initiated with
+        ``emg3d.utils.Field(..., freq)``).
 
         If an initial efield is provided nothing is returned, but the final
         efield is directly put into the provided efield.
@@ -224,7 +223,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     Returns
     -------
-    efield : :class:`emg3d.utils.Field` instance
+    efield : :class:`emg3d.utils.Field`
         Resulting electric field. Is not returned but replaced in-place if an
         initial efield was provided.
 
@@ -448,15 +447,17 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        The grid. See :class:`emg3d.utils.TensorMesh`.
 
-    model : VolumeModel
-        Model; :class:`emg3d.utils.VolumeModel` instance.
+    model : :class:`emg3d.utils.VolumeModel`
+        The Model. See :class:`emg3d.utils.VolumeModel`.
 
-    sfield, efield : Field
-        Source and electric fields; :class:`emg3d.utils.SourceField` and
-        :class:`emg3d.utils.Field` instances, respectively.
+    sfield : :class:`emg3d.utils.SourceField`
+        The source field. See :func:`emg3d.utils.get_source_field`.
+
+    efield : :class:`emg3d.utils.Field`
+        The electric field. See :class:`emg3d.utils.Field`.
 
     var : :class:`MGParameters` instance
         As returned by :func:`multigrid`.
@@ -619,15 +620,17 @@ def krylov(grid, model, sfield, efield, var):
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        The grid. See :class:`emg3d.utils.TensorMesh`.
 
-    model : VolumeModel
-        Model; :class:`emg3d.utils.VolumeModel` instance.
+    model : :class:`emg3d.utils.VolumeModel`
+        The Model. See :class:`emg3d.utils.VolumeModel`.
 
-    sfield, efield : Field
-        Source and electric fields; :class:`emg3d.utils.SourceField` and
-        :class:`emg3d.utils.Field` instances, respectively.
+    sfield : :class:`emg3d.utils.SourceField`
+        The source field. See :func:`emg3d.utils.get_source_field`.
+
+    efield : :class:`emg3d.utils.Field`
+        The electric field. See :class:`emg3d.utils.Field`.
 
     var : :class:`MGParameters` instance
         As returned by :func:`multigrid`.
@@ -750,15 +753,17 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        Input grid.
 
-    model : VolumeModel
-        Model; :class:`emg3d.utils.VolumeModel` instances.
+    model : :class:`emg3d.utils.VolumeModel`
+        Input model.
 
-    sfield, efield : Field
-        Source and electric fields; :class:`emg3d.utils.SourceField` and
-        :class:`emg3d.utils.Field` instances, respectively.
+    sfield : :class:`emg3d.utils.SourceField`
+        Input source field.
+
+    efield : :class:`emg3d.utils.Field`
+        Input electric field.
 
     nu : int
         Number of Gauss-Seidel steps; odd numbers are forward, even numbers are
@@ -807,14 +812,14 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     Parameters
     ----------
-    grid : TensorMesh
-        Fine grid; :class:`emg3d.utils.TensorMesh` instances.
+    grid : :class:`emg3d.utils.TensorMesh`
+        Input grid.
 
-    model : VolumeModel
-        Fine model; :class:`emg3d.utils.VolumeModel` instances.
+    model : :class:`emg3d.utils.VolumeModel`
+        Input model.
 
-    sfield : SourceField
-        Fine source field; :class:`emg3d.utils.SourceField` instances.
+    sfield : :class:`emg3d.utils.SourceField`
+        Input source field.
 
     sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
@@ -822,19 +827,17 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     Returns
     -------
-    cgrid : TensorMesh
-        Coarse grid; :class:`emg3d.utils.TensorMesh` instances.
+    cgrid : :class:`emg3d.utils.TensorMesh`
+        Coarse grid.
 
-    cmodel : VolumeModel
-        Coarse model; :class:`emg3d.utils.VolumeModel` instances.
+    cmodel : :class:`emg3d.utils.VolumeModel`
+        Coarse model.
 
-    csfield : SourceField
-        Coarse source field; :class:`emg3d.utils.SourceField` instances.
-        Corresponds to the restriction of the fine-grid residual.
+    csfield : :class:`emg3d.utils.SourceField`
+        Coarse source field. Corresponds to restriction of fine-grid residual.
 
-    cefield : Field
-        Coarse electric field, complex zeroes; :class:`emg3d.utils.Field`
-        instances.
+    cefield : :class:`emg3d.utils.Field`
+        Coarse electric field, complex zeroes.
 
     """
 
@@ -912,12 +915,11 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
     Parameters
     ----------
-    grid, cgrid : TensorMesh
-        Fine and coarse grids; :class:`emg3d.utils.TensorMesh` instances.
+    grid, cgrid : :class:`emg3d.utils.TensorMesh`
+        Fine and coarse grids.
 
-    efield, cefield : Fields
-        Fine and coarse grid electric fields; :class:`emg3d.utils.Field`
-        instances.
+    efield, cefield : :class:`emg3d.utils.Field`
+        Fine and coarse grid electric fields.
 
     sc_dir : int
         Direction of semicoarsening (0, 1, 2, or 3).
@@ -995,15 +997,17 @@ def residual(grid, model, sfield, efield, norm=False):
 
     Parameters
     ----------
-    grid : TensorMesh
-        Fine grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        Input grid.
 
-    model : VolumeModel
-        Fine model; :class:`emg3d.utils.VolumeModel` instance.
+    model : :class:`emg3d.utils.VolumeModel`
+        Input model.
 
-    sfield, efield : Field
-        Source and electric fields; :class:`emg3d.utils.SourceField` and
-        :class:`emg3d.utils.Field` instances, respectively.
+    sfield : :class:`emg3d.utils.SourceField`
+        Input source field.
+
+    efield : :class:`emg3d.utils.Field`
+        Input electric field.
 
     norm : bool
         If True, the error (l2-norm) of the residual is returned, not the
@@ -1463,8 +1467,8 @@ def _current_sc_dir(sc_dir, grid):
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        Input grid.
 
     sc_dir : int
         Direction of semicoarsening.
@@ -1513,8 +1517,8 @@ def _current_lr_dir(lr_dir, grid):
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        Input grid.
 
     lr_dir : int
         Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
@@ -1651,8 +1655,8 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
     cycmax : int
         Maximum MG cycles.
 
-    grid : TensorMesh
-        Current grid; :class:`emg3d.utils.TensorMesh` instance.
+    grid : :class:`emg3d.utils.TensorMesh`
+        Input grid.
 
     norm : float
         Current error (l2-norm).
@@ -1782,8 +1786,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
 
     Parameters
     ----------
-    grid, cgrid : TensorMesh
-        Fine and coarse grids; :class:`emg3d.utils.TensorMesh` instances.
+    grid, cgrid : :class:`emg3d.utils.TensorMesh`
+        Fine and coarse grids.
 
     sc_dir : int
         Direction of semicoarsening.
