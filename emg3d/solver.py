@@ -376,6 +376,9 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     elif var.cycle:    # ... multigrid.
         multigrid(grid, vmodel, sfield, efield, var)
 
+    # Get exit status.
+    exit_status = int(var.exit_message != 'CONVERGED')
+
     # Print runtime information.
     if var.verb < 0:
         var.one_liner(var.l2, True)
@@ -390,10 +393,11 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         info += f":: emg3d END   :: {var.time.now} :: "
         info += f"runtime = {var.time.runtime}\n"
         var.cprint(info, 1)
+    elif var.verb == 1 and exit_status == 1:
+        var.cprint(f"* WARNING :: {var.exit_message}", 0)
 
     # Assemble the info_dict if return_info
     if var.return_info:
-        exit_status = int(var.exit_message != 'CONVERGED')  # Get exit status.
         info_dict = {
             'exit': exit_status,               # Exit status.
             'exit_message': var.exit_message,  # Exit message.

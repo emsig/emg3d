@@ -2,6 +2,14 @@ Changelog
 #########
 
 
+latest
+------
+
+- Warnings: If ``verb=1`` it prints a warning in case it did not converge (it
+  finished silently until now).
+- Improvements to docs (figures-scaling; intersphinx).
+
+
 *v0.10.0* : Data persistence
 ----------------------------
 

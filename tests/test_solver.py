@@ -165,14 +165,18 @@ def test_solver_heterogeneous(capsys):
 
     assert_allclose(dat['result'], efield.field)
 
+    _, _ = capsys.readouterr()  # Clean up
+
     # Check with provided e-field; 2x2 iter should yield the same as 4 iter.
     efield2 = solver.solve(grid, model, sfield, maxit=4, verb=1)
+    out, _ = capsys.readouterr()  # Clean up
+    assert "* WARNING :: MAX. ITERATION REACHED, NOT CONVERGED" in out
     efield3 = solver.solve(grid, model, sfield, maxit=2, verb=1)
     solver.solve(grid, model, sfield, efield3, maxit=2, verb=1)
 
     assert_allclose(efield2, efield3)
 
-    out, _ = capsys.readouterr()  # Clean up
+    _, _ = capsys.readouterr()  # Clean up
 
     # One test without post-smoothing to check if it runs.
     efield4 = solver.solve(
