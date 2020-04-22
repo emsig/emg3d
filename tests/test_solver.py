@@ -151,6 +151,12 @@ def test_solver_homogeneous(capsys):
     out, _ = capsys.readouterr()
     assert "STAGNATED" in out
 
+    # Check a zero field is returned for a zero source field.
+    efield = solver.solve(grid, model, sfield*0, maxit=100)
+    out, _ = capsys.readouterr()
+    assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
+    assert np.linalg.norm(efield) == 0.0
+
 
 def test_solver_heterogeneous(capsys):
     # Regression test for heterogeneous case.

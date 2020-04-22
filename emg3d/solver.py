@@ -311,7 +311,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     var.l2_refe = njitted.l2norm(sfield)
     var.error_at_cycle[0] = var.l2_refe
 
-    # Check sfield and get efield
+    # Check sfield.
     if sfield.freq is None:
         print("* ERROR   :: Source field is missing frequency information;\n"
               "             Create it with `emg3d.utils.get_source_field`, or"
@@ -321,7 +321,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Get volume-averaged model values.
     vmodel = utils.VolumeModel(grid, model, sfield)
 
-    # Get efield
+    # Get efield.
     if efield is None:
         # If not provided, initiate an empty one.
         efield = utils.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
@@ -359,6 +359,23 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             # Start final info.
             var.exit_message = "CONVERGED"
             info = f"   > NOTHING DONE (provided efield already good enough)\n"
+
+    # Check if sfield is zero.
+    if var.l2_refe < 100*np.finfo(float).tiny:
+
+        # To avoid division by zero for the log.
+        var.l2_refe = np.nan
+
+        # Switch-off both sslsolver and multigrid.
+        var.sslsolver = None
+        var.cycle = None
+
+        # Start final info.
+        var.exit_message = "CONVERGED"
+        info = f"   > RETURN ZERO E-FIELD (provided sfield is zero)\n"
+
+        # Zero-source means zero e-field.
+        efield = utils.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]  {'rel. error':<22}"
