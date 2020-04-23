@@ -16,7 +16,7 @@ do some testing with regards to runtime, see the `Tools Section
 example output of that script is shown in :numref:`Figure %s <runtime>`.
 
 .. figure:: _static/runtime.svg
-   :scale: 80 %
+   :width: 80 %
    :align: center
    :alt: Runtime
    :name: runtime
@@ -95,7 +95,7 @@ do some testing with regards to the RAM usage, see the `Tools Section
 example output of that script is shown in :numref:`Figure %s <ramusage>`.
 
 .. figure:: _static/RAM-Usage.svg
-   :scale: 80 %
+   :width: 80 %
    :align: center
    :alt: RAM Usage
    :name: ramusage

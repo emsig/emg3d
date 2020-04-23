@@ -32,6 +32,5 @@ from emg3d.io import save, load
 
 __all__ = ['solve', 'solver', 'utils', 'io', 'Report', 'save', 'load']
 
-# Version is sorted out in utils, so we can easier use it within the package
-# itself.
+# Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__

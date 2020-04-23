@@ -2,6 +2,22 @@ Changelog
 #########
 
 
+latest
+------
+
+- Bug fixes:
+
+    - Checks now if provided source-field is zero, and exists gracefully if so,
+      returning a zero electric field. Until now it failed with a
+      division-by-zero error.
+
+- Improvements:
+
+  - Warnings: If ``verb=1`` it prints a warning in case it did not converge (it
+    finished silently until now).
+  - Improvements to docs (figures-scaling; intersphinx).
+
+
 *v0.10.0* : Data persistence
 ----------------------------
 

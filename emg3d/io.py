@@ -117,7 +117,7 @@ def data_write(fname, keys, values, path='data', exists=0):
         # Writing it to the shelve.
         for i, key in enumerate(keys):
 
-            # If the parameter is a TensorMesh-instance, we set the volume
+            # If the parameter is a TensorMesh instance, we set the volume
             # None. This saves space, and it will simply be reconstructed if
             # required.
             if type(values[i]).__name__ == 'TensorMesh':
@@ -190,9 +190,10 @@ def data_read(fname, keys=None, path="data"):
 def save(fname, backend="h5py", compression="gzip", **kwargs):
     """Save meshes, models, fields, and other data to disk.
 
-    Serialize and save :class:`utils.TensorMesh`, :class:`utils.Field`, and
-    :class:`utils.Model` instances and add arbitrary other data, where
-    instances of the same type are grouped together.
+    Serialize and save :class:`emg3d.utils.TensorMesh`,
+    :class:`emg3d.utils.Field`, and :class:`emg3d.utils.Model` instances and
+    add arbitrary other data, where instances of the same type are grouped
+    together.
 
     The serialized instances will be de-serialized if loaded with :func:`load`.
 
@@ -217,10 +218,10 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
 
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
-        properly serialized: :class:`utils.TensorMesh`, :class:`utils.Field`,
-        and :class:`utils.Model` and serialized again if loaded with
-        :func:`load`. These instances are collected in their own group if h5py
-        is used.
+        properly serialized: :class:`emg3d.utils.TensorMesh`,
+        :class:`emg3d.utils.Field`, and :class:`emg3d.utils.Model` and
+        serialized again if loaded with :func:`load`. These instances are
+        collected in their own group if h5py is used.
 
     """
     # Get absolute path.
@@ -267,9 +268,9 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
 def load(fname, **kwargs):
     """Load meshes, models, fields, and other data from disk.
 
-    Load and de-serialize :class:`utils.TensorMesh`, :class:`utils.Field`, and
-    :class:`utils.Model` instances and add arbitrary other data that were saved
-    with :func:`save`.
+    Load and de-serialize :class:`emg3d.utils.TensorMesh`,
+    :class:`emg3d.utils.Field`, and :class:`emg3d.utils.Model` instances and
+    add arbitrary other data that were saved with :func:`save`.
 
 
     Parameters
@@ -289,8 +290,8 @@ def load(fname, **kwargs):
     -------
     out : dict
         A dictionary containing the data stored in fname;
-        :class:`utils.TensorMesh`, :class:`utils.Field`, and
-        :class:`utils.Model` instances are de-serialized and returned as
+        :class:`emg3d.utils.TensorMesh`, :class:`emg3d.utils.Field`, and
+        :class:`emg3d.utils.Model` instances are de-serialized and returned as
         instances.
 
     """
@@ -355,8 +356,8 @@ def _dict_serialize(inp, out=None, top=True):
     """Serialize TensorMesh, Field, and Model instances in dict.
 
     Returns a serialized dictionary <out> of <inp>, where all
-    :class:`utils.TensorMesh`, :class:`utils.Field`, and :class:`utils.Model`
-    instances have been serialized.
+    :class:`emg3d.utils.TensorMesh`, :class:`emg3d.utils.Field`, and
+    :class:`emg3d.utils.Model` instances have been serialized.
 
     These instances are additionally grouped together in dictionaries, and all
     other stuff is put into 'Data'.
@@ -460,9 +461,9 @@ def _dict_deserialize(inp):
     """De-serialize TensorMesh, Field, and Model instances in dict.
 
     De-serializes in-place dictionary <inp>, where all
-    :class:`utils.TensorMesh`, :class:`utils.Field`, and :class:`utils.Model`
-    instances have been de-serialized. It also converts back 'NoneType'-strings
-    to None.
+    :class:`emg3d.utils.TensorMesh`, :class:`emg3d.utils.Field`, and
+    :class:`emg3d.utils.Model` instances have been de-serialized. It also
+    converts back 'NoneType'-strings to None.
 
 
     Parameters
