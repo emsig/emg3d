@@ -1,10 +1,9 @@
 """
 
-:mod:`meshes` -- TODO
-========================================
+:mod:`meshes` -- TensorMesh and mesh-creation utilities
+=======================================================
 
-Everything related to the multigrid solver that is or lives on a grid: Meshes,
-Models, and Fields. Named in honour of [Yee66]_.
+Everything related to meshes appropriate for the multigrid solver.
 
 """
 # Copyright 2018-2020 The emg3d Developers.

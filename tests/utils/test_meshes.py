@@ -30,7 +30,6 @@ def create_dummy(nx, ny, nz, imag=True):
     return out.reshape(nx, ny, nz)
 
 
-# HELPER FUNCTIONS TO CREATE MESH
 def test_get_hx_h0(capsys):
 
     # == A == Just the defaults, no big thing (regression).
