@@ -17,16 +17,17 @@ setup(
     author_email='dieter@werthmuller.org',
     url='https://empymod.github.io',
     license='Apache License V2.0',
-    packages=['emg3d'],
+    packages=['emg3d', 'emg3d.multigrid', 'emg3d.utils', 'emg3d.optimize',
+              'emg3d.cli'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3.7',
     ],
     install_requires=[
-        'numpy>=1.15.0',
-        'scipy>=1.1.0',
-        'numba>=0.40.0',
+        'numpy>=1.17.0',
+        'scipy>=1.4.0',
+        'numba>=0.46.0',
         'empymod>=2.0.0',
     ],
     use_scm_version={

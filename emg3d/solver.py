@@ -4,7 +4,7 @@
 =================================
 
 The actual solver routines. The most computationally intensive parts, however,
-are in the :mod:`emg3d.njitted` as numba-jitted functions.
+are in the :mod:`emg3d.core` as numba-jitted functions.
 
 """
 # Copyright 2018-2020 The emg3d Developers.
@@ -26,11 +26,12 @@ are in the :mod:`emg3d.njitted` as numba-jitted functions.
 
 import itertools
 import numpy as np
+import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
 from dataclasses import dataclass
 
 from emg3d import utils
-from emg3d import njitted
+from emg3d import core
 
 __all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
            'residual', 'krylov', 'MGParameters', 'RegularGridProlongator']
@@ -308,7 +309,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     var.cprint(var, 1)
 
     # Calculate reference error for tolerance.
-    var.l2_refe = njitted.l2norm(sfield)
+    var.l2_refe = sl.norm(sfield, check_finite=False)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
@@ -436,19 +437,6 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         return efield
     elif var.return_info:                  # info.
         return info_dict
-
-
-def solver(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
-           semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
-    """Alias to solve(), for backwards compatibility."""
-
-    # Issue warning for backwards compatibility.
-    print("\n* WARNING :: `emg3d.solver.solver()` is renamed to "
-          "`emg3d.solve()`.\n             Use the new `emg3d.solve()`, as "
-          "`solver()` will be\n             removed in the future.")
-
-    return solve(grid, model, sfield, efield, cycle, sslsolver, semicoarsening,
-                 linerelaxation, verb, **kwargs)
 
 
 # SOLVERS
@@ -669,7 +657,7 @@ def krylov(grid, model, sfield, efield, var):
 
         # Calculate A x.
         rfield = utils.Field(grid, dtype=efield.dtype, freq=freq)
-        njitted.amat_x(
+        core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
                 model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz)
@@ -762,9 +750,9 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
 
     This is a simple wrapper for the jitted calculation in
-    :func:`emg3d.njitted.gauss_seidel`, :func:`emg3d.njitted.gauss_seidel_x`,
-    :func:`emg3d.njitted.gauss_seidel_y`, and
-    :func:`emg3d.njitted.gauss_seidel_z` (`@njit` can not [yet] access class
+    :func:`emg3d.core.gauss_seidel`, :func:`emg3d.core.gauss_seidel_x`,
+    :func:`emg3d.core.gauss_seidel_y`, and
+    :func:`emg3d.core.gauss_seidel_z` (`@njit` can not [yet] access class
     attributes). See these functions for more details and corresponding theory.
 
     The electric fields are updated in-place.
@@ -805,16 +793,16 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Calculate and store fields (in-place)
     if lr_dir == 0:             # Standard MG
-        njitted.gauss_seidel(efield.fx, efield.fy, efield.fz, *inp)
+        core.gauss_seidel(efield.fx, efield.fy, efield.fz, *inp)
 
     if lr_dir in [1, 5, 6, 7]:  # Line relaxation in x-direction
-        njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+        core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
 
     if lr_dir in [2, 4, 6, 7]:  # Line relaxation in y-direction
-        njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+        core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
 
     if lr_dir in [3, 4, 5, 7]:  # Line relaxation in z-direction
-        njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+        core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
 
 def restriction(grid, model, sfield, residual, sc_dir):
@@ -824,8 +812,8 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     Corresponds to Equations 8 and 9 in [Muld06]_ and surrounding text. In the
     case of the restriction of the residual, this function is a wrapper for the
-    jitted functions :func:`emg3d.njitted.restrict_weights` and
-    :func:`emg3d.njitted.restrict` (`@njit` can not [yet] access class
+    jitted functions :func:`emg3d.core.restrict_weights` and
+    :func:`emg3d.core.restrict` (`@njit` can not [yet] access class
     attributes). See these functions for more details and corresponding theory.
 
     This function is called by :func:`multigrid`.
@@ -909,8 +897,8 @@ def restriction(grid, model, sfield, residual, sc_dir):
     # Calculate the source terms (Equation 8 in [Muld06]_).
     # Initiate zero field.
     csfield = utils.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
-    njitted.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
-                     residual.fy, residual.fz, wx, wy, wz, sc_dir)
+    core.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
+                  residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Ensure PEC and initiate empty e-field.
     csfield.ensure_pec
@@ -1009,8 +997,8 @@ def residual(grid, model, sfield, efield, norm=False):
                        \mathbf{E} \right) .
 
     This is a simple wrapper for the jitted calculation in
-    :func:`emg3d.njitted.amat_x` (`@njit` can not [yet] access class
-    attributes). See :func:`emg3d.njitted.amat_x` for more details and
+    :func:`emg3d.core.amat_x` (`@njit` can not [yet] access class
+    attributes). See :func:`emg3d.core.amat_x` for more details and
     corresponding theory.
 
     This function is called by :func:`multigrid`.
@@ -1047,12 +1035,12 @@ def residual(grid, model, sfield, efield, norm=False):
     """
     # Get residual.
     rfield = sfield.copy()
-    njitted.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
-                   efield.fz, model.eta_x, model.eta_y, model.eta_z,
-                   model.zeta, grid.hx, grid.hy, grid.hz)
+    core.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
+                efield.fz, model.eta_x, model.eta_y, model.eta_z, model.zeta,
+                grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
-        return njitted.l2norm(rfield)
+        return sl.norm(rfield, check_finite=False)
     else:     # Return residual.
         return rfield
 
@@ -1821,7 +1809,7 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
 
     """
     if sc_dir not in [1, 5, 6]:
-        wx = njitted.restrict_weights(
+        wx = core.restrict_weights(
                 grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
                 cgrid.vectorCCx, cgrid.hx)
     else:
@@ -1830,7 +1818,7 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
         wx = (wxlr, wx0, wxlr)
 
     if sc_dir not in [2, 4, 6]:
-        wy = njitted.restrict_weights(
+        wy = core.restrict_weights(
                 grid.vectorNy, grid.vectorCCy, grid.hy, cgrid.vectorNy,
                 cgrid.vectorCCy, cgrid.hy)
     else:
@@ -1839,7 +1827,7 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
         wy = (wylr, wy0, wylr)
 
     if sc_dir not in [3, 4, 5]:
-        wz = njitted.restrict_weights(
+        wz = core.restrict_weights(
                 grid.vectorNz, grid.vectorCCz, grid.hz, cgrid.vectorNz,
                 cgrid.vectorCCz, cgrid.hz)
     else:

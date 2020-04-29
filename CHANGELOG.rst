@@ -2,6 +2,25 @@ Changelog
 #########
 
 
+latest (will become v0.11.0)
+----------------------------
+
+**Backwards incompatible. Removed all deprecated functionalities. Complete
+refactor and new layout.** I expect at most one further refactor before moving
+to a stable API towards v1.0.0.
+
+- Changes:
+
+  - New layout TODO
+  - Adjust top namespace TODO
+  - Increased minimum required versions of dependencies to
+
+    - `numpy>=1.17.0`
+    - `scipy>=1.4.0`
+    - `numba>=0.46.0`
+    - `empymod>=2.0.0`
+
+
 *v0.10.1* : Zero Source
 -----------------------
 
