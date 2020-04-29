@@ -2,23 +2,62 @@ Changelog
 #########
 
 
-*latest*
---------
+latest
+------
 
-- ``emg3d.utils.Model``: Possible to create new models by adding or subtracting
-  existing models, and comparing two models (``+``, ``-``, ``==`` and ``!=``).
-  New attributes ``shape``, ``size``, and ``copy``.
-- Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and coverage.
-- Bugfix: ``emg3d.njitted.restrict`` did not store the {x;y;z}-field if
-  ``sc_dir`` was {4;5;6}, respectively.
-- Adjust ``Fields.pha`` and ``Fields.amp`` in accordance with ``empymod v2``:
-  ``.pha`` and ``.amp`` are now methods; uses directly
-  ``empymod.utils.EMArray``.
-- Adjust tests for ``empymod v2`` (Fields, Fourier).
+- Bug fixes:
+
+    - Checks now if provided source-field is zero, and exists gracefully if so,
+      returning a zero electric field. Until now it failed with a
+      division-by-zero error.
+
+- Improvements:
+
+  - Warnings: If ``verb=1`` it prints a warning in case it did not converge (it
+    finished silently until now).
+  - Improvements to docs (figures-scaling; intersphinx).
+  - Adjust ``Fields.pha`` and ``Fields.amp`` in accordance with ``empymod v2``:
+    ``.pha`` and ``.amp`` are now methods; uses directly
+    ``empymod.utils.EMArray``.
+  - Adjust tests for ``empymod v2`` (Fields, Fourier).
+
+
+*v0.10.0* : Data persistence
+----------------------------
+
+**2020-03-25**
+
+- New:
+
+  - New functions ``emg3d.save`` and ``emg3d.load`` to save and load all sort
+    of ``emg3d`` instances. The currently implemented backends are
+    ``h5py`` for ``.h5``-files (default, but requires ``h5py`` to be installed)
+    and ``numpy`` for ``.npz``-files.
+  - Classes ``emg3d.utils.Field``, ``emg3d.utils.Model``, and
+    ``emg3d.utils.TensorMesh`` have new methods ``.copy()``, ``.to_dict()``,
+    and ``.from_dict()``.
+  - ``emg3d.utils.Model``: Possible to create new models by adding or
+    subtracting existing models, and comparing two models (``+``, ``-``, ``==``
+    and ``!=``). New attributes ``shape`` and ``size``.
+  - ``emg3d.utils.Model`` does not store the volume any longer (just ``vnC``).
+
+- Deprecations:
+
+  - Deprecated ``data_write`` and ``data_read``.
+
+- Internal and bug fixes:
+
+  - All I/O-related stuff moved to its own file `io.py`.
+  - Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and
+    coverage.
+  - Bugfix: ``emg3d.njitted.restrict`` did not store the {x;y;z}-field if
+    ``sc_dir`` was {4;5;6}, respectively.
 
 
 *v0.9.3* : Sphinx gallery
 -------------------------
+
+**2020-02-11**
 
 - Rename ``solver.solver`` to ``solver.solve``; load ``solve`` also into the
   main namespace as ``emg3d.solve``.

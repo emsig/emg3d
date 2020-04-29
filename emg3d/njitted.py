@@ -57,16 +57,16 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
         - \nabla \times \zeta^{-1} \nabla \times \mathrm{E}
         = - \mathrm{i} \omega \mu_0 \mathrm{J_s} .
 
-    It can therefore be used as ``matvec`` to create a ``LinearOperator``,
-    which can be passed to a solver.
+    It can therefore be used as `matvec` to create a `LinearOperator`, which
+    can be passed to a solver.
 
     It is assumed that ex, ey, and ez have PEC boundaries; otherwise the output
     will not have PEC boundaries.
 
-    The residuals are subtracted in-place from ``rx``, ``ry``, and ``rz``.
-    That means that if ``rx``, ``ry``, and ``rz`` contain the source field,
-    they will contain the total residual afterwards; if they are empty fields,
-    they will contain the negative partial residual afterwards.
+    The residuals are subtracted in-place from `rx`, `ry`, and `rz`. That means
+    that if `rx`, `ry`, and `rz` contain the source field, they will contain
+    the total residual afterwards; if they are empty fields, they will contain
+    the negative partial residual afterwards.
 
 
     Parameters
@@ -214,11 +214,10 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
             \end{array} \right] \ .
 
     On the coarsest grid it acts as direct solver, whereas on the fine grid it
-    acts as a smoother with only few iterations, defined by :math:`\nu`
-    (``nu``). Odd numbers of ``nu`` use forward ordering, even numbers use
-    backwards ordering. ``nu=2`` is therefore one symmetric Gauss-Seidel
-    iteration, one forward ordered iteration followed by one backward ordered
-    iteration.
+    acts as a smoother with only few iterations, defined by :math:`\nu` (`nu`).
+    Odd numbers of `nu` use forward ordering, even numbers use backwards
+    ordering. ``nu=2`` is therefore one symmetric Gauss-Seidel iteration, one
+    forward ordered iteration followed by one backward ordered iteration.
 
     From [Muld06]_: The method proposed by [ArFW00]_ is chosen as a smoother.
     It selects one node of the grid and simultaneously solves for the six
@@ -238,8 +237,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
     Tangential components at the boundaries are assumed to be zero (PEC
     boundaries).
 
-    The result is stored in the provided electric fields ``ex``, ``ey``, and
-    ``ez``.
+    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
 
 
     Parameters
@@ -519,8 +517,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     Tangential components at the boundaries are assumed to be 0 (PEC
     boundaries).
 
-    The result is stored in the provided electric fields ``ex``, ``ey``, and
-    ``ez``.
+    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
 
 
     Parameters
@@ -804,8 +801,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     Tangential components at the boundaries are assumed to be 0 (PEC
     boundaries).
 
-    The result is stored in the provided electric fields ``ex``, ``ey``, and
-    ``ez``.
+    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
 
 
     Parameters
@@ -1084,8 +1080,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     Tangential components at the boundaries are assumed to be 0 (PEC
     boundaries).
 
-    The result is stored in the provided electric fields ``ex``, ``ey``, and
-    ``ez``.
+    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
 
 
     Parameters
@@ -1335,7 +1330,7 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
 
     .. highlight:: none
 
-    The complete main matrix ``amat`` and the ``middle`` and ``left`` blocks
+    The complete main matrix `amat` and the `middle` and `left` blocks
     are given by::
 
        .-0
@@ -1351,9 +1346,9 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
        . 1*1, - 4*1, | 1*4, X 4*4, \ 4*4 upper or lower
 
 
-    Both, ``middle`` and ``left``, are 5x5 matrices. The corresponding
-    right-hand-side ``rhs`` is filled into ``bvec``. The matrices ``left`` and
-    ``middle`` provided in a single call are horizontally aligned (not
+    Both, `middle` and `left`, are 5x5 matrices. The corresponding
+    right-hand-side `rhs` is filled into `bvec`. The matrices `left` and
+    `middle` provided in a single call are horizontally aligned (not
     vertically). The sorting of amat (banded matrix) and bvec are given by::
 
         amat (66,)             example: n = 11                   bvec (11,)
@@ -1613,8 +1608,8 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     fine grid. The weights :math:`w` are obtained from
     :func:`restrict_weights`.
 
-    The restrictions of ``rx``, ``ry``, and ``rz`` are stored directly in
-    ``crx``, ``cry``, and ``crz``.
+    The restrictions of `rx`, `ry`, and `rz` are stored directly in `crx`,
+    `cry`, and `crz`.
 
     Parameters
     ----------
@@ -2060,8 +2055,8 @@ def volume_average(edges_x, edges_y, edges_z, values,
 
     The original implementation (see ``emg3d v0.7.1``) followed [PlDM07]_. Joe
     Capriot took that algorithm and made it much faster for implementation in
-    ``discretize``. The current implementation is a simplified Numba-version of
-    his Cython version (the ``discretize`` version works for 1D, 2D, and 3D
+    `discretize`. The current implementation is a simplified Numba-version of
+    his Cython version (the `discretize` version works for 1D, 2D, and 3D
     meshes and can also return a sparse matrix representing the operation).
 
 
@@ -2071,16 +2066,16 @@ def volume_average(edges_x, edges_y, edges_z, values,
         The edges in x-, y-, and z-directions for the original grid.
 
     values : ndarray
-        Values corresponding to ``grid``.
+        Values corresponding to `grid`.
 
     new_edges_[x, y, z] : ndarray
         The edges in x-, y-, and z-directions for the new grid.
 
     new_values : ndarray
-        Array where values corresponding to ``new_grid`` will be added.
+        Array where values corresponding to `new_grid` will be added.
 
     new_vol : ndarray
-        The volumes of the ``new_grid``-cells.
+        The volumes of the `new_grid`-cells.
 
     """
 
@@ -2183,11 +2178,11 @@ def _volume_avg_weights(x1, x2):
 def l2norm(x):
     """Jitted version of np.linalg.norm(x, ord=None); l2-norm.
 
-    Similar speed could be achieved with
+    Similar speed could be achieved with :func:`scipy.linalg.get_blas_funcs`,
 
     ``sp.linalg.get_blas_funcs('nrm2', dtype=x.dtype)(x)``
 
-    or with
+    or with :func:`scipy.linalg.norm`,
 
     ``sp.linalg.norm(x, check_finite=False)``
 

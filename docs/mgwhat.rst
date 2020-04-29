@@ -30,7 +30,7 @@ simultaneously per step (the fields on the boundaries are never calculated, as
 they are assumed to be 0).
 
 .. figure:: _static/schematics2.svg
-   :scale: 80 %
+   :width: 60 %
    :align: center
    :alt: Explanation of smoother
    :name: smoother
@@ -65,7 +65,7 @@ finer to coarser grids, see :numref:`Figure %s <fine2coarse>` for an example
 coarsening starting with a 16 cells by 16 cells grid.
 
 .. figure:: _static/schematics1.svg
-   :scale: 80 %
+   :width: 60 %
    :align: center
    :alt: Fine to coarse grid schematic
    :name: fine2coarse
@@ -90,7 +90,7 @@ higher RAM per grid than the standard multigrid, but they can improve the
 convergence rate, which then in turn improves the overall CPU time.
 
 .. figure:: _static/schematics4.svg
-   :scale: 80 %
+   :width: 60 %
    :align: center
    :alt: Schematic of semicoarsening
    :name: semicoarsening
@@ -99,7 +99,7 @@ convergence rate, which then in turn improves the overall CPU time.
    The direction can be alternated between iterations.
 
 .. figure:: _static/schematics3.svg
-   :scale: 80 %
+   :width: 60 %
    :align: center
    :alt: Schematic of line relaxation
    :name: linerelaxation

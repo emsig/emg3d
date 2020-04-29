@@ -151,6 +151,12 @@ def test_solver_homogeneous(capsys):
     out, _ = capsys.readouterr()
     assert "STAGNATED" in out
 
+    # Check a zero field is returned for a zero source field.
+    efield = solver.solve(grid, model, sfield*0, maxit=100)
+    out, _ = capsys.readouterr()
+    assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
+    assert np.linalg.norm(efield) == 0.0
+
 
 def test_solver_heterogeneous(capsys):
     # Regression test for heterogeneous case.
@@ -165,14 +171,18 @@ def test_solver_heterogeneous(capsys):
 
     assert_allclose(dat['result'], efield.field)
 
+    _, _ = capsys.readouterr()  # Clean up
+
     # Check with provided e-field; 2x2 iter should yield the same as 4 iter.
     efield2 = solver.solve(grid, model, sfield, maxit=4, verb=1)
+    out, _ = capsys.readouterr()  # Clean up
+    assert "* WARNING :: MAX. ITERATION REACHED, NOT CONVERGED" in out
     efield3 = solver.solve(grid, model, sfield, maxit=2, verb=1)
     solver.solve(grid, model, sfield, efield3, maxit=2, verb=1)
 
     assert_allclose(efield2, efield3)
 
-    out, _ = capsys.readouterr()  # Clean up
+    _, _ = capsys.readouterr()  # Clean up
 
     # One test without post-smoothing to check if it runs.
     efield4 = solver.solve(
@@ -207,7 +217,7 @@ def test_solver_backwards(capsys):
     out, _ = capsys.readouterr()
     _ = solver.solver(grid, model, sfield, verb=0)
     out, _ = capsys.readouterr()
-    assert "* WARNING :: ``emg3d.solver.solver()`` is renamed to " in out
+    assert "* WARNING :: `emg3d.solver.solver()` is renamed to " in out
 
 
 def test_one_liner(capsys):

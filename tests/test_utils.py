@@ -1,5 +1,4 @@
 import re
-import os
 import pytest
 import empymod
 import numpy as np
@@ -402,6 +401,16 @@ def test_TensorMesh():
     for attr in grid['attr']:
         assert_allclose(grid[attr], getattr(emg3dgrid, attr))
 
+    # Copy
+    cgrid = emg3dgrid.copy()
+    assert_allclose(cgrid.vol, emg3dgrid.vol)
+    dgrid = emg3dgrid.to_dict()
+    cdgrid = utils.TensorMesh.from_dict(dgrid)
+    assert_allclose(cdgrid.vol, emg3dgrid.vol)
+    del dgrid['hx']
+    with pytest.raises(KeyError):
+        utils.TensorMesh.from_dict(dgrid)
+
 
 # MODEL AND FIELD CLASSES
 def test_Model(capsys):
@@ -433,7 +442,7 @@ def test_Model(capsys):
     model1.epsilon_r = None
     vmodel1 = utils.VolumeModel(grid, model1, sfield)
     out, _ = capsys.readouterr()
-    assert '* WARNING :: ``Model`` is independent of frequency' in out
+    assert '* WARNING :: `Model` is independent of frequency' in out
     assert_allclose(model1.res_x, model1.res_y)
     assert_allclose(model1.nC, grid.nC)
     assert_allclose(model1.vnC, grid.vnC)
@@ -498,12 +507,13 @@ def test_Model(capsys):
         utils.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
     # Check with all inputs
+    gridvol = grid.vol.reshape(grid.vnC, order='F')
     model3 = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
     vmodel3 = utils.VolumeModel(grid, model3, sfield)
     assert_allclose(model3.res_x, model3.res_y*2)
     assert_allclose(model3.res_x.shape, grid.vnC)
     assert_allclose(model3.res_x, model3.res_z/1.4)
-    assert_allclose(model3._vol/mu_r, vmodel3.zeta)
+    assert_allclose(gridvol/mu_r, vmodel3.zeta)
     # Check with all inputs
     model3b = utils.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
                           res_z.ravel('F'), mu_r=mu_r.ravel('F'))
@@ -511,7 +521,7 @@ def test_Model(capsys):
     assert_allclose(model3b.res_x, model3b.res_y*2)
     assert_allclose(model3b.res_x.shape, grid.vnC)
     assert_allclose(model3b.res_x, model3b.res_z/1.4)
-    assert_allclose(model3b._vol/mu_r, vmodel3b.zeta)
+    assert_allclose(gridvol/mu_r, vmodel3b.zeta)
 
     # Check setters vnC
     tres = np.ones(grid.vnC)
@@ -528,9 +538,9 @@ def test_Model(capsys):
 
     # Check eta
     iomep = sfield.sval*utils.epsilon_0
-    eta_x = sfield.smu0*(1./model3.res_x + iomep)*model3._vol
-    eta_y = sfield.smu0*(1./model3.res_y + iomep)*model3._vol
-    eta_z = sfield.smu0*(1./model3.res_z + iomep)*model3._vol
+    eta_x = sfield.smu0*(1./model3.res_x + iomep)*gridvol
+    eta_y = sfield.smu0*(1./model3.res_y + iomep)*gridvol
+    eta_z = sfield.smu0*(1./model3.res_z + iomep)*gridvol
     vmodel3 = utils.VolumeModel(grid, model3, sfield)
     assert_allclose(vmodel3.eta_x, eta_x)
     assert_allclose(vmodel3.eta_y, eta_y)
@@ -694,6 +704,20 @@ class TestModelOperators:
         assert (model_new4.epsilon_r.base is not
                 self.model_epsilon_a.epsilon_r.base)
 
+    def test_dict(self):
+        # dict is already tested via copy. Just the other cases here.
+        mdict = self.model_3_b.to_dict()
+        keys = ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC']
+        for key in keys:
+            assert key in mdict.keys()
+        for key in keys[:3]:
+            val = getattr(self.model_3_b, key)
+            assert_allclose(mdict[key], val)
+
+        del mdict['res_x']
+        with pytest.raises(KeyError):
+            utils.Model.from_dict(mdict)
+
 
 def test_field():
     # Create some dummy data
@@ -743,6 +767,19 @@ def test_field():
     assert abs(np.sum(ee.fy[:, :, 0] + ee.fy[:, :, -1])) == 0
     assert abs(np.sum(ee.fz[0, :, :] + ee.fz[-1, :, :])) == 0
     assert abs(np.sum(ee.fz[:, 0, :] + ee.fz[:, -1, :])) == 0
+
+    # Test copy
+    e2 = ee.copy()
+    assert_allclose(ee.field, e2.field)
+    assert_allclose(ee.fx, e2.fx)
+    assert_allclose(ee.fy, e2.fy)
+    assert_allclose(ee.fz, e2.fz)
+    assert ee.field.base is not e2.field.base
+
+    edict = ee.to_dict()
+    del edict['field']
+    with pytest.raises(KeyError):
+        utils.Field.from_dict(edict)
 
 
 def test_source_field():
@@ -1223,6 +1260,15 @@ class TestFourier:
         assert_allclose(data_true, tdata, rtol=1e-4)
 
 
+# BACKWARDS COMPATIBILITY
+def test_data_write_read(tmpdir):
+    # These are no in io. Just test that the dummy-links in utils work.
+    a = np.arange(10.)
+    utils.data_write('testthis', 'a', a, tmpdir, -1)
+    a_out = utils.data_read('testthis', 'a', tmpdir)
+    assert_allclose(a, a_out)
+
+
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
     t0 = default_timer()  # Create almost at the same time a
@@ -1241,88 +1287,6 @@ def test_Time():
 
     # Check representation of Time.
     assert 'Runtime : 0:00:0' in time.__repr__()
-
-
-# FUNCTIONS RELATED TO DATA MANAGEMENT
-def test_data_write_read(tmpdir, capsys):
-    # Create test data
-    grid = utils.TensorMesh(
-            [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
-            np.zeros(3))
-
-    freq = np.pi
-
-    model = utils.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
-
-    e1 = create_dummy(*grid.vnEx)
-    e2 = create_dummy(*grid.vnEy)
-    e3 = create_dummy(*grid.vnEz)
-    ee = utils.Field(e1, e2, e3, freq=freq)
-
-    # Write and read data, single arguments
-    utils.data_write('testthis', 'ee', ee, tmpdir, -1)
-    ee_out = utils.data_read('testthis', 'ee', tmpdir)
-
-    # Compare data
-    assert_allclose(ee, ee_out)
-    assert_allclose(ee.smu0, ee_out.smu0)
-    assert_allclose(ee.sval, ee_out.sval)
-    assert_allclose(ee.freq, ee_out.freq)
-
-    # Write and read data, multi arguments
-    args = ('grid', 'ee', 'model')
-    utils.data_write('testthis', args, (grid, ee, model), tmpdir, -1)
-    grid_out, ee_out, model_out = utils.data_read('testthis', args, tmpdir)
-
-    # Compare data
-    assert_allclose(ee, ee_out)
-    for attr in ['nCx', 'nCy', 'nCz']:
-        assert getattr(grid, attr) == getattr(grid_out, attr)
-
-    # Ensure volume averages got deleted or do not exist anyway.
-    assert hasattr(grid_out, '_vol') is False
-    assert hasattr(model_out, '_eta_x') is False
-    assert hasattr(model_out, '_zeta') is False
-
-    # Ensure they can be reconstructed
-    assert_allclose(grid.vol, grid_out.vol)
-
-    # Write and read data, None
-    utils.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)
-    out = utils.data_read('testthis', path=tmpdir)
-
-    # Compare data
-    assert_allclose(ee, ee_out)
-    for attr in ['nCx', 'nCy', 'nCz']:
-        assert getattr(grid, attr) == getattr(out['grid'], attr)
-
-    # Test exists-argument 0
-    _, _ = capsys.readouterr()  # Clean-up
-    utils.data_write('testthis', 'ee', ee*2, tmpdir, 0)
-    out, _ = capsys.readouterr()
-    datout = utils.data_read('testthis', path=tmpdir)
-    assert 'NOT SAVING THE DATA' in out
-    assert_allclose(datout['ee'], ee)
-
-    # Test exists-argument 1
-    utils.data_write('testthis', 'ee2', ee, tmpdir, 1)
-    out, _ = capsys.readouterr()
-    assert 'appending to it' in out
-    utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, 1)
-    out, _ = capsys.readouterr()
-    assert "overwriting existing key(s) 'ee', 'ee2'" in out
-    datout = utils.data_read('testthis', path=tmpdir)
-    assert_allclose(datout['ee'], ee*2)
-    assert_allclose(datout['ee2'], ee)
-
-    # Check if file is missing.
-    os.remove(tmpdir+'/testthis.dat')
-    out = utils.data_read('testthis', path=tmpdir)
-    assert out is None
-    out1, out2 = utils.data_read('testthis', ['ee', 'ee2'], path=tmpdir)
-    assert out1 is None
-    assert out2 is None
-    utils.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, -1)
 
 
 # OTHER
