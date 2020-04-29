@@ -2,14 +2,17 @@ Changelog
 #########
 
 
-latest
-------
+*v0.10.1* : Zero Source
+-----------------------
+
+**2020-04-29**
+
 
 - Bug fixes:
 
-    - Checks now if provided source-field is zero, and exists gracefully if so,
-      returning a zero electric field. Until now it failed with a
-      division-by-zero error.
+  - Checks now if provided source-field is zero, and exists gracefully if so,
+    returning a zero electric field. Until now it failed with a
+    division-by-zero error.
 
 - Improvements:
 
