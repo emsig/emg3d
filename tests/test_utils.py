@@ -740,8 +740,8 @@ def test_field():
     assert ee.is_electric is True
 
     # Test amplitude and phase.
-    assert_allclose(ee.fx.amp, np.abs(ee.fx))
-    assert_allclose(ee.fy.pha, np.rad2deg(np.unwrap(np.angle(ee.fy))))
+    assert_allclose(ee.fx.amp(), np.abs(ee.fx))
+    assert_allclose(ee.fy.pha(unwrap=False), np.angle(ee.fy))
 
     # Test the other possibilities to initiate a Field-instance.
     ee2 = utils.Field(grid, ee.field)
@@ -878,8 +878,8 @@ def test_get_receiver():
     assert_allclose(out5real, out4.real)
 
     # Check amplitude and phase
-    assert_allclose(out5.amp, np.abs(out5))
-    assert_allclose(out5.pha, np.rad2deg(np.unwrap(np.angle(out5))))
+    assert_allclose(out5.amp(), np.abs(out5))
+    assert_allclose(out5.pha(unwrap=False), np.angle(out5))
 
     # Check it returns 0 if outside.
     out6 = utils.get_receiver(grid, field.fx, (-10, -10, -10), 'linear')
@@ -1113,16 +1113,15 @@ class TestFourier:
         out, _ = capsys.readouterr()
 
         # Check representation of Fourier.
-        assert 'ffht' in Fourier.__repr__()
         assert '0.01-100.0 s' in Fourier.__repr__()
         assert '0.01-100 Hz' in Fourier.__repr__()
-
         assert Fourier.every_x_freq is None
         assert Fourier.fmin == fmin
         assert Fourier.fmax == fmax
-        assert Fourier.ft == 'ffht'
-        assert Fourier.ftarg[1] == -1.0   # Convolution DLF
-        assert Fourier.ftarg[2] == 'sin'  # Sine-DLF is default
+        assert 'dlf' in Fourier.__repr__()
+        assert Fourier.ft == 'dlf'
+        assert Fourier.ftarg['pts_per_dec'] == -1.0   # Convolution DLF
+        assert Fourier.ftarg['kind'] == 'sin'  # Sine-DLF is default
         assert Fourier.signal == 0        # Impulse respons
         assert_allclose(time, Fourier.time, 0, 0)
         assert Fourier.verb == 3          # Verbose by default
@@ -1203,8 +1202,8 @@ class TestFourier:
         Fourier1.signal = -1
         Fourier1.fourier_arguments('fftlog', {'pts_per_dec': 5})
         assert Fourier1.ft == 'fftlog'
-        assert Fourier1.ftarg[0] == 5
-        assert Fourier1.ftarg[3] == -0.5  # cosine, as signal == -1
+        assert Fourier1.ftarg['pts_per_dec'] == 5
+        assert Fourier1.ftarg['mu'] == -0.5  # cosine, as signal == -1
 
     def test_interpolation(self, capsys):
         time = np.logspace(-2, 1, 201)

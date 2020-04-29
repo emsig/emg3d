@@ -2,20 +2,27 @@ Changelog
 #########
 
 
-latest
-------
+*v0.10.1* : Zero Source
+-----------------------
+
+**2020-04-29**
+
 
 - Bug fixes:
 
-    - Checks now if provided source-field is zero, and exists gracefully if so,
-      returning a zero electric field. Until now it failed with a
-      division-by-zero error.
+  - Checks now if provided source-field is zero, and exists gracefully if so,
+    returning a zero electric field. Until now it failed with a
+    division-by-zero error.
 
 - Improvements:
 
   - Warnings: If ``verb=1`` it prints a warning in case it did not converge (it
     finished silently until now).
   - Improvements to docs (figures-scaling; intersphinx).
+  - Adjust ``Fields.pha`` and ``Fields.amp`` in accordance with ``empymod v2``:
+    ``.pha`` and ``.amp`` are now methods; uses directly
+    ``empymod.utils.EMArray``.
+  - Adjust tests for ``empymod v2`` (Fields, Fourier).
 
 
 *v0.10.0* : Data persistence

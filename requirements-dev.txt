@@ -4,7 +4,7 @@ numba >= 0.40.0
 h5py
 matplotlib
 
-empymod
+empymod >= 2.0.0
 
 # sphinx fixed below 2.0
 # https://github.com/numpy/numpydoc/issues/215

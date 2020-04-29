@@ -27,7 +27,7 @@ setup(
         'numpy>=1.15.0',
         'scipy>=1.1.0',
         'numba>=0.40.0',
-        'empymod',
+        'empymod>=2.0.0',
     ],
     use_scm_version={
         'root': '.',
