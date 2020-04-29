@@ -15,7 +15,7 @@ Models, and Fields. Named in honour of [Yee66]_.
 # use this file except in compliance with the License.  You may obtain a copy
 # of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -28,7 +28,7 @@ import numba as nb
 import numpy as np
 from scipy import interpolate, ndimage
 
-from emg3d import fields
+from emg3d.utils import fields
 
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}

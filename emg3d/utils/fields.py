@@ -15,7 +15,7 @@ Models, and Fields. Named in honour of [Yee66]_.
 # use this file except in compliance with the License.  You may obtain a copy
 # of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -30,7 +30,7 @@ from copy import deepcopy
 from empymod import EMArray
 from scipy.constants import mu_0
 
-from emg3d import maps, models
+from emg3d.utils import maps, models
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_h_field']

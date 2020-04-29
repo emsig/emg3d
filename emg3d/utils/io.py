@@ -14,7 +14,7 @@ Utility functions for writing and reading data.
 # use this file except in compliance with the License.  You may obtain a copy
 # of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -27,7 +27,7 @@ import os
 import numpy as np
 from datetime import datetime
 
-from emg3d import utils
+from emg3d.utils import misc
 
 try:
     import h5py
