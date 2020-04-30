@@ -29,8 +29,5 @@ Version: |version| ~ Date: |today|
    :hidden:
    :caption: API
 
-   api_solver
-   api_utils
-   api_multigrid
-   api_cli
-   api_optimize
+   solver
+   code
