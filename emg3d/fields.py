@@ -385,6 +385,10 @@ class SourceField(Field):
         - `freq` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
+    field : :class:`Field` or ndarray
+        Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
+        If not provided initiated with zeros.
+
     """
 
     def __new__(cls, grid, freq, field=None):
