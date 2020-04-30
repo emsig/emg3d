@@ -85,8 +85,8 @@ model = models.Model(grid, res_x, res_y, res_z)
 # Initialize source field
 sfield = fields.get_source_field(grid, src, freq)
 
-semicoarsening = True  # Loop 1, 2, 3
-linerelaxation = 456   # Loop over 4, 5, 5
+semicoarsening = 123  # Loop 1, 2, 3
+linerelaxation = 456  # Loop over 4, 5, 5
 verb = 4    # high verbosity
 tol = 1e-4  # low tolerance
 maxit = 4   # Restrict
@@ -121,8 +121,8 @@ reg_2 = {
         'nu_post': nu_post,
         'clevel': clevel,
         },
-    'result': efield.field,
-    'hresult': hfield.field,
+    'result': efield,
+    'hresult': hfield,
 }
 
 # # # # # # # # # # 3. TensorMesh check # # # # # # # # # #

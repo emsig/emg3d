@@ -395,6 +395,10 @@ class SourceField(Field):
             dtype = float
         return super().__new__(cls, grid, dtype=dtype, freq=freq)
 
+    def copy(self):
+        """Return a copy of the SourceField."""
+        return SourceField.from_dict(self.to_dict(True))
+
     @classmethod
     def from_dict(cls, inp):
         """Convert dictionary into :class:`Field` instance.

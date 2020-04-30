@@ -25,8 +25,5 @@ Code
 .. automodule:: emg3d.fields
     :members:
 
-.. automodule:: emg3d.multigrid
-    :members:
-
 .. automodule:: emg3d.io
     :members:
