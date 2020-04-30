@@ -1,10 +1,9 @@
 """
 
-:mod:`models` -- TODO
-========================================
+:mod:`models` -- Earth properties
+=================================
 
-Everything related to the multigrid solver that is or lives on a grid: Meshes,
-Models, and Fields. Named in honour of [Yee66]_.
+Everything to create model-properties for the multigrid solver.
 
 """
 # Copyright 2018-2020 The emg3d Developers.

@@ -1,7 +1,7 @@
 """
 
-:mod:`core` -- Functions jitted with ``njit``
-=============================================
+:mod:`core` -- Number crunching
+===============================
 
 The core functionalities, the most computationally demanding parts, of the
 :mod:`emg3d.solver` as just-in-time (jit) compiled functions using ``numba``.
@@ -27,7 +27,7 @@ The core functionalities, the most computationally demanding parts, of the
 import numba as nb
 import numpy as np
 
-# Backwards compatibility
+# Backwards compatibility; deprecated to use through `core`.
 from emg3d.maps import volume_average, _volume_avg_weights  # noqa
 
 # Numba-settings
@@ -80,11 +80,11 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
 
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta : ndarray
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -247,15 +247,15 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -527,15 +527,15 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -811,15 +811,15 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -1090,15 +1090,15 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.

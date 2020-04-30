@@ -8,7 +8,8 @@ from numpy.testing import assert_allclose, assert_array_equal
 from emg3d import io, meshes, models, fields
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.h5'))
+REGRES = io.load(join(dirname(__file__), 'data/regression.npz'),
+                 allow_pickle=True)
 
 
 def get_h(ncore, npad, width, factor):

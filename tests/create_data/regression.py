@@ -135,13 +135,13 @@ grid = TensorMesh(
         x0='CN0')
 
 # List of all attributes in emg3d-grid.
-all_attr = [
+all_attr = np.array([
     'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx', 'nE',
     'vectorCCy', 'vectorCCz', 'nEx', 'nEy', 'nEz', 'nCx', 'nCy', 'nCz', 'vnC',
     'nNx', 'nNy', 'nNz', 'vnN', 'vnEx', 'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'x0'
-]
+])
 
-mesh = {'attr': np.string_(all_attr)}
+mesh = {'attr': np.array(all_attr, dtype=object)}
 
 for attr in all_attr:
     mesh[attr] = getattr(grid, attr)
@@ -195,4 +195,5 @@ out_l = {
     }
 
 
-io.save('../data/regression', res=out, reg_2=reg_2, grid=mesh, lap=out_l)
+io.save('../data/regression', res=out, reg_2=reg_2, grid=mesh, lap=out_l,
+        backend='numpy')

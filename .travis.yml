@@ -6,8 +6,8 @@ matrix:
   include:
     - python: 3.7  # => 3.7;deplay
       env: PYTHON=3.7 DEPLOY_PYPI=true
-    - python: 3.8  # => 3.8; scooby
-      env: PYTHON=3.8 PCKG="scooby"
+    - python: 3.8  # => 3.8; scooby, h5py
+      env: PYTHON=3.8 PCKG="scooby h5py"
     - python: 3.7  # just linkcheck
       env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig"
 
@@ -31,7 +31,7 @@ install:
   # Install and activate environment, install packages
   - conda create -q -n tenv python=$PYTHON numpy scipy pytest pytest-cov numba
   - source activate tenv
-  - conda install -c conda-forge empymod h5py $PCKG
+  - conda install -c conda-forge empymod $PCKG
   - pip install setuptools_scm coveralls pytest-flake8 $INST
   - python setup.py install
 

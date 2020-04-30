@@ -35,23 +35,23 @@ from emg3d import models
 # Import most important functions and classes
 from emg3d.solver import solve
 from emg3d.utils import Report
-from emg3d.fields import Field
-from emg3d.models import Model
 from emg3d.io import save, load
-from emg3d.meshes import TensorMesh
 
 # # For top-namespace
 from emg3d import core  # noqa
+from emg3d.fields import Field  # noqa
+from emg3d.models import Model  # noqa
 from emg3d.utils import Fourier  # noqa
 from emg3d.maps import grid2grid  # noqa
 from emg3d.meshes import get_hx_h0  # noqa
+from emg3d.meshes import TensorMesh  # noqa
 from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
 
 # # Backwards compatibility; deprecated.
 from emg3d import core as njitted  # noqa
 
 __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
-           'models', 'Field', 'Model', 'TensorMesh', 'Report', 'save', 'load']
+           'models', 'Report', 'save', 'load']
 
 # Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__

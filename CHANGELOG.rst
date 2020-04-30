@@ -5,26 +5,39 @@ Changelog
 latest (will become v0.11.0)
 ----------------------------
 
-**Complete refactor and new layout.**
-
-Most functionalities (old names) are currently retained and it should be mostly
-be backwards compatible for now. Some previously deprecated functions were
-removed, however.
+Grand refactor with new internal layout. Mainly splitting-up `utils` into
+smaller bits. Most functionalities (old names) are currently retained in
+`utils` and it should be mostly backwards compatible for now, but they are
+deprecated and will eventually be removed. Some previously deprecated functions
+were removed, however.
 
 - Removed deprecated functions:
 
-  - `io.data_write`; `io.data_read`.
+  - `emg3d.io.data_write`; `emg3d.io.data_read`.
+  - `emg3d.solver.solver`.
 
 - Changes:
 
-  - New layout TODO
   - Adjust top namespace TODO
+  - Replaced `core.l2norm` with `scipy.linalg.norm`, as SciPy 1.4 got the
+    following PR: https://github.com/scipy/scipy/pull/10397 (reason to raise
+    minimum SciPy to 1.4).
   - Increased minimum required versions of dependencies to
 
-    - `numpy>=1.17.0`
-    - `scipy>=1.4.0`
-    - `numba>=0.46.0`
-    - `empymod>=2.0.0`
+    - `numpy>=1.17.0` (raised from 1.15)
+    - `scipy>=1.4.0` (raised from 1.1, see note above)
+    - `numba>=0.46.0` (raised from 0.40)
+    - `empymod>=2.0.0`)
+
+- New layout
+
+  - `njitted` -> `core`
+  - `utils` split in `fields`, `meshes`, `models`, `maps`, and `utils`.
+
+- Bugfixes:
+
+  - Fixed `to_dict`, `from_dict`, and `copy` for the `SourceField`.
+  - Fixed `io` for `SourceField`, that was not implemented properly.
 
 
 *v0.10.1* : Zero Source

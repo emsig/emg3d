@@ -1,10 +1,10 @@
 """
 
-:mod:`maps` -- TODO
-========================================
+:mod:`maps` -- Interpolation routines
+=====================================
 
-Everything related to the multigrid solver that is or lives on a grid: Meshes,
-Models, and Fields. Named in honour of [Yee66]_.
+Interpolation routines mapping grids to grids, grids to fields, and fields to
+grids.
 
 """
 # Copyright 2018-2020 The emg3d Developers.

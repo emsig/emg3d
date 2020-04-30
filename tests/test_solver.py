@@ -10,7 +10,8 @@ from emg3d import solver, core, meshes, models, fields, io
 from .test_meshes import get_h
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.h5'))
+REGRES = io.load(join(dirname(__file__), 'data/regression.npz'),
+                 allow_pickle=True)
 
 
 def create_dummy(nx, ny, nz):
@@ -165,6 +166,8 @@ def test_solver_heterogeneous(capsys):
     model = dat['model']
     sfield = dat['sfield']
     inp = dat['inp']
+    for n in ['nu_init', 'nu_pre', 'nu_coarse', 'nu_post']:
+        inp[n] = int(inp[n])
     inp['verb'] = 4
 
     efield = solver.solve(grid, model, sfield, **inp)

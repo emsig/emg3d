@@ -1,7 +1,7 @@
 """
 
-:mod:`meshes` -- TensorMesh and mesh-creation utilities
-=======================================================
+:mod:`meshes` -- Discretization
+===============================
 
 Everything related to meshes appropriate for the multigrid solver.
 
