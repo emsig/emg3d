@@ -11,7 +11,7 @@ try:
 except ImportError:
     scooby = False
 
-from emg3d.utils import misc
+from emg3d import utils
 
 
 # TIME DOMAIN
@@ -21,7 +21,7 @@ class TestFourier:
         fmin = 0.01
         fmax = 100
 
-        Fourier = misc.Fourier(time, fmin, fmax)
+        Fourier = utils.Fourier(time, fmin, fmax)
         out, _ = capsys.readouterr()
 
         # Check representation of Fourier.
@@ -66,14 +66,14 @@ class TestFourier:
 
         # freq_inp; verb=0
         _, _ = capsys.readouterr()
-        Fourier1 = misc.Fourier(time, fmin, fmax, freq_inp=freq_inp, verb=0)
+        Fourier1 = utils.Fourier(time, fmin, fmax, freq_inp=freq_inp, verb=0)
         out, _ = capsys.readouterr()
         assert '' == out
         assert_allclose(freq_inp, Fourier1.freq_calc, 0, 0)
 
         # freq_inp AND every_x_freq => re-sets every_x_freq.
-        Fourier2 = misc.Fourier(time, fmin, fmax, every_x_freq=xfreq,
-                                freq_inp=freq_inp, verb=1)
+        Fourier2 = utils.Fourier(time, fmin, fmax, every_x_freq=xfreq,
+                                 freq_inp=freq_inp, verb=1)
         out, _ = capsys.readouterr()
         assert 'Re-setting `every_x_freq=None`' in out
         assert_allclose(freq_inp, Fourier2.freq_calc, 0, 0)
@@ -99,7 +99,7 @@ class TestFourier:
 
         # Unknown argument, must fail with TypeError.
         with pytest.raises(TypeError):
-            misc.Fourier(time, fmin, fmax, does_not_exist=0)
+            utils.Fourier(time, fmin, fmax, does_not_exist=0)
 
     def test_setters(self, capsys):
         time = np.logspace(-1.4, 1.4)
@@ -108,7 +108,7 @@ class TestFourier:
 
         # freq_inp; verb=0
         _, _ = capsys.readouterr()
-        Fourier1 = misc.Fourier(time, fmin=np.pi/10, fmax=np.pi*10)
+        Fourier1 = utils.Fourier(time, fmin=np.pi/10, fmax=np.pi*10)
         Fourier1.fmin = fmin
         Fourier1.fmax = fmax
         Fourier1.signal = -1
@@ -121,7 +121,7 @@ class TestFourier:
         time = np.logspace(-2, 1, 201)
         model = {'src': [0, 0, 0], 'rec': [900, 0, 0], 'res': 1,
                  'depth': [], 'verb': 1}
-        Fourier = misc.Fourier(time, 0.005, 10)
+        Fourier = utils.Fourier(time, 0.005, 10)
 
         # Calculate data.
         data_true = empymod.dipole(freqtime=Fourier.freq_req, **model)
@@ -157,7 +157,7 @@ class TestFourier:
                  'depth': [], 'verb': 1}
 
         # Initiate Fourier instance.
-        Fourier = misc.Fourier(time, 0.001, 100)
+        Fourier = utils.Fourier(time, 0.001, 100)
 
         # Calculate required frequencies.
         data = empymod.dipole(freqtime=Fourier.freq_calc, **model)
@@ -175,7 +175,7 @@ class TestFourier:
 # FUNCTIONS RELATED TO TIMING
 def test_Time():
     t0 = default_timer()  # Create almost at the same time a
-    time = misc.Time()   # t0-stamp and a Time-instance.
+    time = utils.Time()   # t0-stamp and a Time-instance.
 
     # Ensure they are the same.
     assert_allclose(t0, time.t0, atol=1e-3)
@@ -199,7 +199,7 @@ def test_report(capsys):
     # Reporting is now done by the external package scooby.
     # We just ensure the shown packages do not change (core and optional).
     if scooby:
-        out1 = misc.Report()
+        out1 = utils.Report()
         out2 = scooby.Report(
                 core=['numpy', 'scipy', 'numba', 'emg3d'],
                 optional=['IPython', 'matplotlib'],
@@ -209,6 +209,6 @@ def test_report(capsys):
         assert out1.__repr__()[115:] == out2.__repr__()[115:]
 
     else:  # soft dependency
-        _ = misc.Report()
+        _ = utils.Report()
         out, _ = capsys.readouterr()  # Empty capsys
         assert 'WARNING :: `emg3d.Report` requires `scooby`' in out

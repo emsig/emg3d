@@ -29,7 +29,7 @@ from copy import deepcopy
 from empymod import EMArray
 from scipy.constants import mu_0
 
-from emg3d.utils import maps, models
+from emg3d import maps, models
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_h_field']
@@ -394,6 +394,51 @@ class SourceField(Field):
         else:
             dtype = float
         return super().__new__(cls, grid, dtype=dtype, freq=freq)
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert dictionary into :class:`Field` instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`Field.to_dict`.
+            The dictionary needs the keys `field`, `freq`, `vnEx`, `vnEy`, and
+            `vnEz`.
+
+        Returns
+        -------
+        obj : :class:`Field` instance
+
+        """
+
+        # Create a dummy with the required attributes for the field instance.
+        class Grid:
+            pass
+
+        grid = Grid()
+
+        # Check and get the required keys from the input.
+        try:
+            field = inp['field']
+            freq = inp['freq']
+            grid.vnEx = inp['vnEx']
+            grid.vnEy = inp['vnEy']
+            grid.vnEz = inp['vnEz']
+        except KeyError as e:
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
+
+        # Calculate missing info.
+        grid.nEx = np.prod(grid.vnEx)
+        grid.nEy = np.prod(grid.vnEy)
+        grid.nEz = np.prod(grid.vnEz)
+        grid.nE = grid.nEx + grid.nEy + grid.nEz
+
+        sfield = cls(grid=grid, freq=freq)
+        sfield.field = field
+
+        return sfield
 
     @property
     def vector(self):

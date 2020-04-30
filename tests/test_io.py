@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from emg3d import meshes, models, fields, misc, io
+from emg3d import meshes, models, fields, utils, io
 
 try:
     import h5py
@@ -69,7 +69,7 @@ def test_save_and_load(tmpdir, capsys):
     outstr, _ = capsys.readouterr()
     assert 'Loaded file' in outstr
     assert 'test.npz' in outstr
-    assert misc.__version__ in outstr
+    assert utils.__version__ in outstr
 
     assert out['Model']['model'] == model
     assert_allclose(field.fx, out['Field']['field'].fx)

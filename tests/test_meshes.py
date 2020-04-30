@@ -3,10 +3,10 @@ import numpy as np
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
-from emg3d.utils import meshes, io
+from emg3d import meshes, io
 
 # Data generated with create_data/regression.py
-REGRES = io.load(join(dirname(__file__), '../data/regression.h5'))
+REGRES = io.load(join(dirname(__file__), 'data/regression.h5'))
 
 
 def get_h(ncore, npad, width, factor):

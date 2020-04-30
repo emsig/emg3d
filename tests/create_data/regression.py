@@ -2,8 +2,7 @@ r"""Some models to catch regression with status quo while developing."""
 import numpy as np
 from discretize import TensorMesh
 
-from emg3d import solver
-from emg3d.utils import meshes, models, fields, io
+from emg3d import solver, meshes, models, fields, io
 
 
 # # # # # # # # # # 1. Homogeneous VTI fullspace # # # # # # # # # #

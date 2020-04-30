@@ -24,31 +24,30 @@ sped-up through jitted ``numba``-functions.
 # the License.
 
 # Import modules
-from emg3d.utils import io
-from emg3d.utils import maps
-from emg3d.utils import misc
-from emg3d.utils import fields
-from emg3d.utils import meshes
-from emg3d.utils import models
-from emg3d.multigrid import core
+from emg3d import io
+from emg3d import maps
+from emg3d import utils
+from emg3d import fields
+from emg3d import meshes
+from emg3d import models
 
 # Import most important functions and classes
 from emg3d.solver import solve
-from emg3d.utils.misc import Report
-from emg3d.utils.fields import Field
-from emg3d.utils.models import Model
-from emg3d.utils.io import save, load
-from emg3d.utils.meshes import TensorMesh
+from emg3d.utils import Report
+from emg3d.fields import Field
+from emg3d.models import Model
+from emg3d.io import save, load
+from emg3d.meshes import TensorMesh
 
 # # For top-namespace
-from emg3d.utils.misc import Fourier  # noqa
-from emg3d.utils.maps import grid2grid  # noqa
-from emg3d.utils.meshes import get_hx_h0  # noqa
-from emg3d.utils.fields import (
-        get_source_field, get_receiver, get_h_field)  # noqa
+from emg3d import core  # noqa
+from emg3d.utils import Fourier  # noqa
+from emg3d.maps import grid2grid  # noqa
+from emg3d.meshes import get_hx_h0  # noqa
+from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
 
 __all__ = ['solve', 'fields', 'io', 'maps', 'meshes', 'models', 'utils',
            'Field', 'Model', 'TensorMesh', 'Report', 'save', 'load']
 
-# Version defined in misc, so we can easier use it within the package itself.
-__version__ = misc.__version__
+# Version defined in utils, so we can easier use it within the package itself.
+__version__ = utils.__version__

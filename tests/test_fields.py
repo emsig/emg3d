@@ -5,10 +5,10 @@ from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose, assert_array_equal
 
-from emg3d.utils import io, meshes, models, fields
+from emg3d import io, meshes, models, fields
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), '../data/regression.h5'))
+REGRES = io.load(join(dirname(__file__), 'data/regression.h5'))
 
 
 def get_h(ncore, npad, width, factor):

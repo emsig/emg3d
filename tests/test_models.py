@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from emg3d.utils import fields, meshes, models
+from emg3d import fields, meshes, models
 
 
 def create_dummy(nx, ny, nz, imag=True):

@@ -5,11 +5,9 @@ import scipy.interpolate as si
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
-from emg3d import solver
-from emg3d.multigrid import core
-from emg3d.utils import meshes, models, fields, io
+from emg3d import solver, core, meshes, models, fields, io
 
-from .utils.test_meshes import get_h
+from .test_meshes import get_h
 
 # Data generated with tests/create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.h5'))

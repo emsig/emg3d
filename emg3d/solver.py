@@ -26,12 +26,10 @@ are in the :mod:`emg3d.core` as numba-jitted functions.
 
 import itertools
 import numpy as np
-import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
 from dataclasses import dataclass
 
-from emg3d.multigrid import core
-from emg3d.utils import meshes, models, fields, misc
+from emg3d import core, meshes, models, fields, utils
 
 __all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
            'residual', 'krylov', 'MGParameters', 'RegularGridProlongator']
@@ -305,11 +303,11 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Start logging and print all parameters.
     var.cprint(f"\n:: emg3d START :: {var.time.now} :: "
-               f"v{misc.__version__}\n", 1)
+               f"v{utils.__version__}\n", 1)
     var.cprint(var, 1)
 
     # Calculate reference error for tolerance.
-    var.l2_refe = sl.norm(sfield, check_finite=False)
+    var.l2_refe = core.l2norm(sfield)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
@@ -1040,7 +1038,7 @@ def residual(grid, model, sfield, efield, norm=False):
                 grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
-        return sl.norm(rfield, check_finite=False)
+        return core.l2norm(rfield)
     else:     # Return residual.
         return rfield
 
@@ -1100,7 +1098,7 @@ class MGParameters:
         self.l2_refe = 1.0         # To store reference error.
         self.exit_message = ''     # For convergence status.
 
-        self.time = misc.Time()   # Timer.
+        self.time = utils.Time()   # Timer.
         self.runtime_at_cycle = np.array([0.])  # Store runtime per cycle.
         self.error_at_cycle = np.array([0.])    # Store error per cycle.
         self.do_return = True      # Whether or not to return the efield.

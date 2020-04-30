@@ -27,7 +27,7 @@ import os
 import numpy as np
 from datetime import datetime
 
-from emg3d.utils import fields, models, misc, meshes
+from emg3d import fields, models, utils, meshes
 
 try:
     import h5py
@@ -90,7 +90,7 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
 
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
-    kwargs['_version'] = 'emg3d v' + misc.__version__
+    kwargs['_version'] = 'emg3d v' + utils.__version__
     kwargs['_format'] = '0.10.0'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and

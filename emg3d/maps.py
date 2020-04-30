@@ -28,7 +28,7 @@ import numba as nb
 import numpy as np
 from scipy import interpolate, ndimage
 
-from emg3d.utils import fields
+from emg3d import fields
 
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
