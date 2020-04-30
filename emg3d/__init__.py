@@ -30,6 +30,7 @@ from emg3d.utils import misc
 from emg3d.utils import fields
 from emg3d.utils import meshes
 from emg3d.utils import models
+from emg3d.multigrid import core
 from emg3d.optimize import gradient
 
 # Import most important functions and classes

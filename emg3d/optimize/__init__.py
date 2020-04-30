@@ -16,4 +16,4 @@
 
 from emg3d.optimize import gradient
 
-__all__ = ['optimize', ]
+__all__ = ['gradient', ]

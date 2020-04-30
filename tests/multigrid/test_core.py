@@ -2,17 +2,19 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from . import alternatives
-from .test_utils import get_h
-from emg3d import solver, njitted, utils
+from .. import alternatives
+from ..utils.test_meshes import get_h
+
+from emg3d import solver, core
+from emg3d.utils import models, meshes, fields
 
 
 @pytest.mark.parametrize("njit", [True, False])
 def test_amat_x(njit):
     if njit:
-        amat_x = njitted.amat_x
+        amat_x = core.amat_x
     else:
-        amat_x = njitted.amat_x.py_func
+        amat_x = core.amat_x.py_func
 
     # 1. Compare to alternative amat_x
 
@@ -21,7 +23,7 @@ def test_amat_x(njit):
     hx = get_h(8, 4, 100, 1.2)
     hy = np.ones(8)*800
     hz = np.ones(4)*500
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
     # Create some resistivity model
@@ -30,25 +32,25 @@ def test_amat_x(njit):
     z = np.arange(1, grid.nCz+1)[::-1]/10
     res_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x)
+    model = models.Model(grid, res_x, 0.8*res_x, 2*res_x)
 
     # Create a source field
-    sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
+    sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
     # Get volume-averaged model parameters.
-    vmodel = utils.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(grid, model, sfield)
 
     # Run two iterations to get a e-field
     efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
 
     # amat_x
-    rr1 = utils.Field(grid)
+    rr1 = fields.Field(grid)
     amat_x(rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
            grid.hy, grid.hz)
 
     # amat_x - alternative
-    rr2 = utils.Field(grid)
+    rr2 = fields.Field(grid)
     alternatives.alt_amat_x(
             rr2.fx, rr2.fy, rr2.fz, efield.fx, efield.fy, efield.fz,
             vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
@@ -83,15 +85,15 @@ def test_amat_x(njit):
 @pytest.mark.parametrize("njit", [True, False])
 def test_gauss_seidel(njit):
     if njit:
-        gauss_seidel = njitted.gauss_seidel
-        gauss_seidel_x = njitted.gauss_seidel_x
-        gauss_seidel_y = njitted.gauss_seidel_y
-        gauss_seidel_z = njitted.gauss_seidel_z
+        gauss_seidel = core.gauss_seidel
+        gauss_seidel_x = core.gauss_seidel_x
+        gauss_seidel_y = core.gauss_seidel_y
+        gauss_seidel_z = core.gauss_seidel_z
     else:
-        gauss_seidel = njitted.gauss_seidel.py_func
-        gauss_seidel_x = njitted.gauss_seidel_x.py_func
-        gauss_seidel_y = njitted.gauss_seidel_y.py_func
-        gauss_seidel_z = njitted.gauss_seidel_z.py_func
+        gauss_seidel = core.gauss_seidel.py_func
+        gauss_seidel_x = core.gauss_seidel_x.py_func
+        gauss_seidel_y = core.gauss_seidel_y.py_func
+        gauss_seidel_z = core.gauss_seidel_z.py_func
 
     # At the moment we only compare `gauss_seidel_x/y/z` to `gauss_seidel`.
     # Better tests should be implemented.
@@ -114,7 +116,7 @@ def test_gauss_seidel(njit):
         hx = get_h(0, nx, 80, 1.1)
         hy = get_h(0, ny, 100, 1.3)
         hz = get_h(0, nz, 200, 1.2)
-        grid = utils.TensorMesh(
+        grid = meshes.TensorMesh(
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
         # Initialize model with some resistivities.
@@ -122,13 +124,13 @@ def test_gauss_seidel(njit):
         res_y = 0.5*np.arange(grid.nC)+1
         res_z = 2*np.arange(grid.nC)+1
 
-        model = utils.Model(grid, res_x, res_y, res_z)
+        model = models.Model(grid, res_x, res_y, res_z)
 
         # Initialize source field.
-        sfield = utils.get_source_field(grid, src, freq)
+        sfield = fields.get_source_field(grid, src, freq)
 
         # Get volume-averaged model parameters.
-        vmodel = utils.VolumeModel(grid, model, sfield)
+        vmodel = models.VolumeModel(grid, model, sfield)
 
         # Run two iterations to get some e-field.
         efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
@@ -137,7 +139,7 @@ def test_gauss_seidel(njit):
                vmodel.eta_z, vmodel.zeta, grid.hx, grid.hy, grid.hz, nu)
 
         # Get result from `gauss_seidel`.
-        cfield = utils.Field(grid, efield.copy())
+        cfield = fields.Field(grid, efield.copy())
         gauss_seidel(cfield.fx, cfield.fy, cfield.fz, *inp)
 
         # Get result from `gauss_seidel_x/y/z`.
@@ -155,12 +157,12 @@ def test_gauss_seidel(njit):
 @pytest.mark.parametrize("njit", [True, False])
 def test_solve(njit):
     if njit:
-        solve = njitted.solve
+        solve = core.solve
     else:
-        solve = njitted.solve.py_func
+        solve = core.solve.py_func
 
     # Create real and complex symmetric matrix A in the form as required by
-    # njitted.solve, hence only main diagonal and five lower diagonals in a
+    # core.solve, hence only main diagonal and five lower diagonals in a
     # vector.
 
     # Create real symmetric matrix A.
@@ -224,20 +226,20 @@ def test_solve(njit):
 @pytest.mark.parametrize("njit", [True, False])
 def test_restrict(njit):
     if njit:
-        restrict = njitted.restrict
-        restrict_weights = njitted.restrict_weights
+        restrict = core.restrict
+        restrict_weights = core.restrict_weights
     else:
-        restrict = njitted.restrict.py_func
-        restrict_weights = njitted.restrict_weights.py_func
+        restrict = core.restrict.py_func
+        restrict_weights = core.restrict_weights.py_func
 
     # Simple comparison using the most basic mesh.
     h = np.array([1, 1, 1, 1, 1, 1])
 
     # Fine grid.
-    fgrid = utils.TensorMesh([h, h, h], x0=np.array([-3, -3, -3]))
+    fgrid = meshes.TensorMesh([h, h, h], x0=np.array([-3, -3, -3]))
 
     # Create fine field.
-    ffield = utils.Field(fgrid)
+    ffield = fields.Field(fgrid)
 
     # Put in values.
     ffield.fx[:, :, :] = 1
@@ -255,17 +257,17 @@ def test_restrict(njit):
     # # CASE 0 -- regular # #
 
     # Coarse grid.
-    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]),
-                              np.diff(fgrid.vectorNy[::2]),
-                              np.diff(fgrid.vectorNz[::2])],
-                             fgrid.x0)
+    cgrid = meshes.TensorMesh([np.diff(fgrid.vectorNx[::2]),
+                               np.diff(fgrid.vectorNy[::2]),
+                               np.diff(fgrid.vectorNz[::2])],
+                              fgrid.x0)
 
     # Regular grid, so all weights (wx, wy, wz) are the same...
     w = restrict_weights(fgrid.vectorNx, fgrid.vectorCCx, fgrid.hx,
                          cgrid.vectorNx, cgrid.vectorCCx, cgrid.hx)
 
     # Create coarse field.
-    cfield = utils.Field(cgrid)
+    cfield = fields.Field(cgrid)
 
     # Restrict it.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -283,11 +285,11 @@ def test_restrict(njit):
     # # CASE 1 -- y & z # #
 
     # Coarse grid.
-    cgrid = utils.TensorMesh([fgrid.hx, np.diff(fgrid.vectorNy[::2]),
+    cgrid = meshes.TensorMesh([fgrid.hx, np.diff(fgrid.vectorNy[::2]),
                               np.diff(fgrid.vectorNz[::2])], fgrid.x0)
 
     # Create coarse field.
-    cfield = utils.Field(cgrid)
+    cfield = fields.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -304,11 +306,11 @@ def test_restrict(njit):
     # # CASE 2 -- x & z # #
 
     # Coarse grid.
-    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]), fgrid.hy,
+    cgrid = meshes.TensorMesh([np.diff(fgrid.vectorNx[::2]), fgrid.hy,
                               np.diff(fgrid.vectorNz[::2])], fgrid.x0)
 
     # Create coarse field.
-    cfield = utils.Field(cgrid)
+    cfield = fields.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -325,12 +327,12 @@ def test_restrict(njit):
     # # CASE 3 -- x & y # #
 
     # Coarse grid.
-    cgrid = utils.TensorMesh([np.diff(fgrid.vectorNx[::2]),
-                              np.diff(fgrid.vectorNy[::2]), fgrid.hz],
-                             fgrid.x0)
+    cgrid = meshes.TensorMesh([np.diff(fgrid.vectorNx[::2]),
+                               np.diff(fgrid.vectorNy[::2]), fgrid.hz],
+                              fgrid.x0)
 
     # Create coarse field.
-    cfield = utils.Field(cgrid)
+    cfield = fields.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -347,11 +349,11 @@ def test_restrict(njit):
     # # CASE 4 -- x # #
 
     # Coarse grid.
-    cgrid = utils.TensorMesh(
+    cgrid = meshes.TensorMesh(
             [np.diff(fgrid.vectorNx[::2]), fgrid.hy, fgrid.hz], fgrid.x0)
 
     # Create coarse field.
-    cfield = utils.Field(cgrid)
+    cfield = fields.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -368,11 +370,11 @@ def test_restrict(njit):
     # # CASE 5 -- y # #
 
     # Coarse grid.
-    cgrid = utils.TensorMesh(
+    cgrid = meshes.TensorMesh(
             [fgrid.hx, np.diff(fgrid.vectorNy[::2]), fgrid.hz], fgrid.x0)
 
     # Create coarse field.
-    cfield = utils.Field(cgrid)
+    cfield = fields.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -389,11 +391,11 @@ def test_restrict(njit):
     # # CASE 6 -- z # #
 
     # Coarse grid.
-    cgrid = utils.TensorMesh(
+    cgrid = meshes.TensorMesh(
             [fgrid.hx, fgrid.hy, np.diff(fgrid.vectorNz[::2])], fgrid.x0)
 
     # Create coarse field.
-    cfield = utils.Field(cgrid)
+    cfield = fields.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -411,9 +413,9 @@ def test_restrict(njit):
 @pytest.mark.parametrize("njit", [True, False])
 def test_restrict_weights(njit):
     if njit:
-        restrict_weights = njitted.restrict_weights
+        restrict_weights = core.restrict_weights
     else:
-        restrict_weights = njitted.restrict_weights.py_func
+        restrict_weights = core.restrict_weights.py_func
 
     # 1. Simple example following equation 9, [Muld06]_.
     edges = np.array([0., 500, 1200, 2000, 3000])
@@ -442,13 +444,13 @@ def test_restrict_weights(njit):
     hx = get_h(2, 2, 200, 1.8)
     hy = get_h(0, 8, 800, 1.2)
     hz = get_h(0, 4, 400, 1.4)
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
             [hx, hy, hz], np.array([-100000, 3000, 100]))
 
     # Create coarse grid thereof
     ch = [np.diff(grid.vectorNx[::2]), np.diff(grid.vectorNy[::2]),
           np.diff(grid.vectorNz[::2])]
-    cgrid = utils.TensorMesh(ch, x0=grid.x0)
+    cgrid = meshes.TensorMesh(ch, x0=grid.x0)
 
     # Calculate the weights in a numpy-way, instead of numba-way
     wl, w0, wr = alternatives.alt_restrict_weights(
@@ -469,9 +471,9 @@ def test_restrict_weights(njit):
 @pytest.mark.parametrize("njit", [True, False])
 def test_blocks_to_amat(njit):
     if njit:
-        blocks_to_amat = njitted.blocks_to_amat
+        blocks_to_amat = core.blocks_to_amat
     else:
-        blocks_to_amat = njitted.blocks_to_amat.py_func
+        blocks_to_amat = core.blocks_to_amat.py_func
 
     # Create some dummy data
 
@@ -518,90 +520,3 @@ def test_blocks_to_amat(njit):
     # Check it
     assert_allclose(amat_res, amat)
     assert_allclose(bvec_res, bvec)
-
-
-@pytest.mark.parametrize("njit", [True, False])
-def test_volume_average(njit):
-    if njit:
-        volume_average = njitted.volume_average
-    else:
-        volume_average = njitted.volume_average.py_func
-
-    # Comparison to alt_version.
-    grid_in = utils.TensorMesh(
-            [np.ones(30), np.ones(20)*5, np.ones(10)*10],
-            x0=np.array([0, 0, 0]))
-    grid_out = utils.TensorMesh(
-            [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
-            x0=np.array([0.5, 3.33, 5]))
-
-    values = np.arange(grid_in.nC, dtype=float).reshape(grid_in.vnC, order='F')
-
-    points = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
-    new_points = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
-
-    # Calculate volume.
-    vol = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'), grid_out.hz)
-    vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
-
-    # New solution.
-    new_values = np.zeros(grid_out.vnC, dtype=values.dtype)
-    volume_average(*points, values, *new_points, new_values, vol)
-
-    # Old solution.
-    new_values_alt = np.zeros(grid_out.vnC, dtype=values.dtype)
-    alternatives.alt_volume_average(
-            *points, values, *new_points, new_values_alt)
-
-    assert_allclose(new_values, new_values_alt)
-
-
-@pytest.mark.parametrize("njit", [True, False])
-def test_volume_avg_weights(njit):
-    if njit:
-        volume_avg_weights = njitted._volume_avg_weights
-    else:
-        volume_avg_weights = njitted._volume_avg_weights.py_func
-
-    grid_in = utils.TensorMesh(
-            [np.ones(11), np.ones(10)*2, np.ones(3)*10],
-            x0=np.array([0, 0, 0]))
-    grid_out = utils.TensorMesh(
-            [np.arange(4)+1, np.arange(5)+1, np.arange(6)+1],
-            x0=np.array([0.5, 3.33, 5]))
-
-    wx, ix_in, ix_out = volume_avg_weights(grid_in.vectorNx, grid_out.vectorNx)
-    assert_allclose(wx, [0, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 0.5, 0.5, 1, 1,
-                         1, 0.5, 0])
-    assert_allclose(ix_in, [0, 0, 1, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 10, 10])
-    assert_allclose(ix_out, [0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3])
-
-    wy, iy_in, iy_out = volume_avg_weights(grid_in.vectorNy, grid_out.vectorNy)
-    assert_allclose(wy, [0, 0, 0.67, 0.33, 1.67, 0.33, 1.67, 1.33, 0.67, 2.,
-                         1.33, 0.67, 2, 2, 0.33, 0.])
-    assert_allclose(iy_in, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9])
-    assert_allclose(iy_out, [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4])
-
-    wz, iz_in, iz_out = volume_avg_weights(grid_in.vectorNz, grid_out.vectorNz)
-    assert_allclose(wz, [0, 1, 2, 2, 1, 4, 5, 6, 0])
-    assert_allclose(iz_in, [0, 0, 0, 0, 1, 1, 1, 2, 2])
-    assert_allclose(iz_out, [0, 0, 1, 2, 2, 3, 4, 5, 5])
-
-    w, inp, out = volume_avg_weights(np.array([0., 5, 7, 10]),
-                                     np.array([-1., 1, 4, 6, 7, 11]))
-    assert_allclose(w, [1, 1, 3, 1, 1, 1, 3, 1])
-    assert_allclose(inp, [0, 0, 0, 0, 1, 1, 2, 2])
-    assert_allclose(out, [0, 0, 1, 2, 2, 3, 4, 4])
-
-
-@pytest.mark.parametrize("njit", [True, False])
-def test_l2norm(njit):
-    if njit:
-        l2norm = njitted.l2norm
-    else:
-        l2norm = njitted.l2norm.py_func
-
-    x = 1e-15*(np.arange(101.)-50)
-    compare = np.linalg.norm(x)
-    test = l2norm(x)
-    assert test == compare

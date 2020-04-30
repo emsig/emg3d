@@ -24,7 +24,6 @@ Models, and Fields. Named in honour of [Yee66]_.
 # the License.
 
 
-import empymod
 import numpy as np
 from copy import deepcopy
 from empymod import EMArray

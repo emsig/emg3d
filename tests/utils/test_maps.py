@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
+from .. import alternatives
 from emg3d.utils import fields, maps, meshes
 
 
@@ -202,3 +203,77 @@ def test_grid2grid():
     # Ensure Field fails with 'volume'.
     with pytest.raises(ValueError):
         maps.grid2grid(grid, field, cgrid, method='volume')
+
+
+@pytest.mark.parametrize("njit", [True, False])
+def test_volume_average(njit):
+    if njit:
+        volume_average = maps.volume_average
+    else:
+        volume_average = maps.volume_average.py_func
+
+    # Comparison to alt_version.
+    grid_in = meshes.TensorMesh(
+            [np.ones(30), np.ones(20)*5, np.ones(10)*10],
+            x0=np.array([0, 0, 0]))
+    grid_out = meshes.TensorMesh(
+            [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
+            x0=np.array([0.5, 3.33, 5]))
+
+    values = np.arange(grid_in.nC, dtype=float).reshape(grid_in.vnC, order='F')
+
+    points = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
+    new_points = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
+
+    # Calculate volume.
+    vol = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'), grid_out.hz)
+    vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
+
+    # New solution.
+    new_values = np.zeros(grid_out.vnC, dtype=values.dtype)
+    volume_average(*points, values, *new_points, new_values, vol)
+
+    # Old solution.
+    new_values_alt = np.zeros(grid_out.vnC, dtype=values.dtype)
+    alternatives.alt_volume_average(
+            *points, values, *new_points, new_values_alt)
+
+    assert_allclose(new_values, new_values_alt)
+
+
+@pytest.mark.parametrize("njit", [True, False])
+def test_volume_avg_weights(njit):
+    if njit:
+        volume_avg_weights = maps._volume_avg_weights
+    else:
+        volume_avg_weights = maps._volume_avg_weights.py_func
+
+    grid_in = meshes.TensorMesh(
+            [np.ones(11), np.ones(10)*2, np.ones(3)*10],
+            x0=np.array([0, 0, 0]))
+    grid_out = meshes.TensorMesh(
+            [np.arange(4)+1, np.arange(5)+1, np.arange(6)+1],
+            x0=np.array([0.5, 3.33, 5]))
+
+    wx, ix_in, ix_out = volume_avg_weights(grid_in.vectorNx, grid_out.vectorNx)
+    assert_allclose(wx, [0, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 0.5, 0.5, 1, 1,
+                         1, 0.5, 0])
+    assert_allclose(ix_in, [0, 0, 1, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 10, 10])
+    assert_allclose(ix_out, [0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3])
+
+    wy, iy_in, iy_out = volume_avg_weights(grid_in.vectorNy, grid_out.vectorNy)
+    assert_allclose(wy, [0, 0, 0.67, 0.33, 1.67, 0.33, 1.67, 1.33, 0.67, 2.,
+                         1.33, 0.67, 2, 2, 0.33, 0.])
+    assert_allclose(iy_in, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9])
+    assert_allclose(iy_out, [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4])
+
+    wz, iz_in, iz_out = volume_avg_weights(grid_in.vectorNz, grid_out.vectorNz)
+    assert_allclose(wz, [0, 1, 2, 2, 1, 4, 5, 6, 0])
+    assert_allclose(iz_in, [0, 0, 0, 0, 1, 1, 1, 2, 2])
+    assert_allclose(iz_out, [0, 0, 1, 2, 2, 3, 4, 5, 5])
+
+    w, inp, out = volume_avg_weights(np.array([0., 5, 7, 10]),
+                                     np.array([-1., 1, 4, 6, 7, 11]))
+    assert_allclose(w, [1, 1, 3, 1, 1, 1, 3, 1])
+    assert_allclose(inp, [0, 0, 0, 0, 1, 1, 2, 2])
+    assert_allclose(out, [0, 0, 1, 2, 2, 3, 4, 4])

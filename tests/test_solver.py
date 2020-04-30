@@ -1,12 +1,15 @@
 import pytest
 import numpy as np
+import scipy.linalg as sl
 import scipy.interpolate as si
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
-from emg3d import solver, utils, njitted
+from emg3d import solver
+from emg3d.multigrid import core
+from emg3d.utils import meshes, models, fields
 
-from .test_utils import get_h
+from .utils.test_meshes import get_h
 
 # Data generated with create_data/regression.py
 REGRES = np.load(join(dirname(__file__), 'data/regression.npz'),
@@ -29,9 +32,9 @@ def test_solver_homogeneous(capsys):
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res'][()]
 
-    grid = utils.TensorMesh(**dat['input_grid'])
-    model = utils.Model(**dat['input_model'])
-    sfield = utils.get_source_field(**dat['input_source'])
+    grid = meshes.TensorMesh(**dat['input_grid'])
+    model = models.Model(**dat['input_model'])
+    sfield = fields.get_source_field(**dat['input_source'])
 
     # F-cycle
     efield = solver.solve(grid, model, sfield, verb=4)
@@ -130,7 +133,7 @@ def test_solver_homogeneous(capsys):
     # Provide initial field, ensure one initial multigrid is carried out
     # without linerelaxation nor semicoarsening.
     _, _ = capsys.readouterr()  # empty
-    efield = utils.Field(grid)
+    efield = fields.Field(grid)
     outarray = solver.solve(
             grid, model, sfield, efield, sslsolver=True, semicoarsening=True,
             linerelaxation=True, maxit=2, verb=3)
@@ -139,7 +142,7 @@ def test_solver_homogeneous(capsys):
     assert "after                       2 F-cycles    5 2" in out
 
     # Provide an initial source-field without frequency information.
-    wrong_sfield = utils.Field(grid)
+    wrong_sfield = fields.Field(grid)
     wrong_sfield.field = sfield.field
     with pytest.raises(ValueError):
         solver.solve(grid, model, wrong_sfield, efield=efield, verb=2)
@@ -197,11 +200,11 @@ def test_solver_heterogeneous(capsys):
     # Check the QC plot if it is too long.
     # Coincidently, this one also diverges if nu_pre=0!
     # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
-    mesh = utils.TensorMesh(
+    mesh = meshes.TensorMesh(
             [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
             x0=np.array([-0.5, -1, -1]))
-    sfield = utils.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
-    model = utils.Model(mesh)
+    sfield = fields.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
+    model = models.Model(mesh)
     _ = solver.solve(mesh, model, sfield, verb=3, nu_pre=0)
     out, _ = capsys.readouterr()
     assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
@@ -209,10 +212,10 @@ def test_solver_heterogeneous(capsys):
 
 
 def test_solver_backwards(capsys):
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
             [np.ones(8), np.ones(8), np.ones(8)], x0=np.array([0, 0, 0]))
-    model = utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
-    sfield = utils.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
+    model = models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
 
     out, _ = capsys.readouterr()
     _ = solver.solver(grid, model, sfield, verb=0)
@@ -221,10 +224,10 @@ def test_solver_backwards(capsys):
 
 
 def test_one_liner(capsys):
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
             [np.ones(8), np.ones(8), np.ones(8)], x0=np.array([0, 0, 0]))
-    model = utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
-    sfield = utils.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
+    model = models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
 
     out, _ = capsys.readouterr()
     _ = solver.solve(grid, model, sfield, verb=-1)
@@ -244,9 +247,9 @@ def test_solver_homogeneous_laplace():
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['lap'][()]
 
-    grid = utils.TensorMesh(**dat['input_grid'])
-    model = utils.Model(**dat['input_model'])
-    sfield = utils.get_source_field(**dat['input_source'])
+    grid = meshes.TensorMesh(**dat['input_grid'])
+    model = models.Model(**dat['input_model'])
+    sfield = fields.get_source_field(**dat['input_source'])
 
     # F-cycle
     efield = solver.solve(grid, model, sfield, verb=1)
@@ -261,7 +264,7 @@ def test_solver_homogeneous_laplace():
     assert_allclose(dat['bicresult'], efield)
 
     # If efield is complex, assert it fails.
-    efield = utils.Field(grid, dtype=complex)
+    efield = fields.Field(grid, dtype=complex)
 
     with pytest.raises(ValueError):
         efield = solver.solve(grid, model, sfield, efield=efield, verb=1)
@@ -287,7 +290,7 @@ def test_smoothing():
     for xyz in range(3):
 
         # Create a grid
-        grid = utils.TensorMesh(
+        grid = meshes.TensorMesh(
             [widths[xyz % 3],
              widths[(xyz+1) % 3],
              widths[(xyz+2) % 3]],
@@ -300,13 +303,13 @@ def test_smoothing():
         z = np.arange(1, grid.nCz+1)[::-1]/10
         res_x = np.outer(np.outer(x, y), z).ravel()
         freq = 0.319
-        model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x)
+        model = models.Model(grid, res_x, 0.8*res_x, 2*res_x)
 
         # Create a source field
-        sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
+        sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
         # Get volume-averaged model parameters.
-        vmodel = utils.VolumeModel(grid, model, sfield)
+        vmodel = models.VolumeModel(grid, model, sfield)
 
         # Run two iterations to get an e-field
         field = solver.solve(grid, model, sfield, maxit=2, verb=1)
@@ -317,27 +320,27 @@ def test_smoothing():
 
         func = ['', '_x', '_y', '_z']
         for lr_dir in range(8):
-            # Get it directly from njitted
-            efield = utils.Field(grid, field)
+            # Get it directly from core
+            efield = fields.Field(grid, field)
             if lr_dir < 4:
-                getattr(njitted, 'gauss_seidel'+func[lr_dir])(
+                getattr(core, 'gauss_seidel'+func[lr_dir])(
                         efield.fx, efield.fy, efield.fz, *inp)
             elif lr_dir == 4:
-                njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
-                njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
             elif lr_dir == 5:
-                njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
-                njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
             elif lr_dir == 6:
-                njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
-                njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
             elif lr_dir == 7:
-                njitted.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
-                njitted.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
-                njitted.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+                core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
             # Use solver.smoothing
-            ofield = utils.Field(grid, field)
+            ofield = fields.Field(grid, field)
             solver.smoothing(grid, vmodel, sfield, ofield, nu, lr_dir)
 
             # Compare
@@ -348,20 +351,20 @@ def test_restriction():
 
     # Simple test with restriction followed by prolongation.
     src = [0, 0, 0, 0, 45]
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
             [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100], x0=np.zeros(3))
 
     # Create dummy model and fields, parameters don't matter.
-    model = utils.Model(grid, 1, 1, 1, 1)
-    sfield = utils.get_source_field(grid, src, 1)
+    model = models.Model(grid, 1, 1, 1, 1)
+    sfield = fields.get_source_field(grid, src, 1)
 
     # Get volume-averaged model parameters.
-    vmodel = utils.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(grid, model, sfield)
 
     rx = np.arange(sfield.fx.size, dtype=complex).reshape(sfield.fx.shape)
     ry = np.arange(sfield.fy.size, dtype=complex).reshape(sfield.fy.shape)
     rz = np.arange(sfield.fz.size, dtype=complex).reshape(sfield.fz.shape)
-    rr = utils.Field(rx, ry, rz)
+    rr = fields.Field(rx, ry, rz)
 
     # Restrict it
     cgrid, cmodel, csfield, cefield = solver.restriction(
@@ -378,7 +381,7 @@ def test_restriction():
     assert np.sum(grid.hz) == np.sum(cgrid.hz)
 
     # Add pi to the coarse e-field
-    efield = utils.Field(grid)
+    efield = fields.Field(grid)
     cefield += np.pi
 
     # Prolong it
@@ -400,7 +403,7 @@ def test_residual():
 
     # Create a grid
     src = [90, 1600, 25., 45, 45]
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
         [get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25], x0=np.zeros(3))
 
     # Create some resistivity model
@@ -409,20 +412,20 @@ def test_residual():
     z = np.arange(1, grid.nCz+1)[::-1]/10
     res_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = utils.Model(grid, res_x, 0.8*res_x, 2*res_x)
+    model = models.Model(grid, res_x, 0.8*res_x, 2*res_x)
 
     # Create a source field
-    sfield = utils.get_source_field(grid=grid, src=src, freq=freq)
+    sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
     # Get volume-averaged model parameters.
-    vmodel = utils.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(grid, model, sfield)
 
     # Run two iterations to get an e-field
     efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
 
     # Use directly amat_x
     rfield = sfield.copy()
-    njitted.amat_x(
+    core.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
             vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
             grid.hy, grid.hz)
@@ -443,11 +446,11 @@ def test_krylov(capsys):
 
     # Load any case.
     dat = REGRES['res'][()]
-    grid = utils.TensorMesh(**dat['input_grid'])
-    model = utils.Model(**dat['input_model'])
-    sfield = utils.get_source_field(**dat['input_source'])
-    vmodel = utils.VolumeModel(grid, model, sfield)
-    efield = utils.Field(grid)  # Initiate e-field.
+    grid = meshes.TensorMesh(**dat['input_grid'])
+    model = models.Model(**dat['input_model'])
+    sfield = fields.get_source_field(**dat['input_source'])
+    vmodel = models.VolumeModel(grid, model, sfield)
+    efield = fields.Field(grid)  # Initiate e-field.
 
     # Get var-instance
     var = solver.MGParameters(
@@ -455,7 +458,7 @@ def test_krylov(capsys):
             linerelaxation=False, vnC=grid.vnC, verb=3,
             maxit=-1,  # Set stupid input to make bicgstab fail.
     )
-    var.l2_refe = njitted.l2norm(sfield)
+    var.l2_refe = sl.norm(sfield, check_finite=False)
 
     # Call krylov and ensure it fails properly.
     solver.krylov(grid, vmodel, sfield, efield, var)
@@ -558,18 +561,18 @@ def test_RegularGridProlongator():
     hx = np.array([4, 1.1, 2, 3])
     hy = np.array([2, 0.1, 20, np.pi])
     hz = np.array([1, 2, 5, 1])
-    grid = utils.TensorMesh([hx, hy, hz], x0=np.array([0, 0, 0]))
+    grid = meshes.TensorMesh([hx, hy, hz], x0=np.array([0, 0, 0]))
 
     # Create coarse grid.
     chx = np.diff(grid.vectorNx[::2])
-    cgrid = utils.TensorMesh([chx, chx, chx], x0=np.array([0, 0, 0]))
+    cgrid = meshes.TensorMesh([chx, chx, chx], x0=np.array([0, 0, 0]))
 
     # Create empty fine grid fields.
-    efield1 = utils.Field(grid)
-    efield2 = utils.Field(grid)
+    efield1 = fields.Field(grid)
+    efield2 = fields.Field(grid)
 
     # Create coarse grid field with some values.
-    cefield = utils.Field(cgrid)
+    cefield = fields.Field(cgrid)
     cefield.fx = np.arange(cefield.fx.size)
     cefield.fx = 1j*np.arange(cefield.fx.size)/10
 
