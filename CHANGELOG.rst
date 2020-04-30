@@ -5,9 +5,15 @@ Changelog
 latest (will become v0.11.0)
 ----------------------------
 
-**Backwards incompatible. Removed all deprecated functionalities. Complete
-refactor and new layout.** I expect at most one further refactor before moving
-to a stable API towards v1.0.0.
+**Complete refactor and new layout.**
+
+Most functionalities (old names) are currently retained and it should be mostly
+be backwards compatible for now. Some previously deprecated functions were
+removed, however.
+
+- Removed deprecated functions:
+
+  - `io.data_write`; `io.data_read`.
 
 - Changes:
 

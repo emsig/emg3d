@@ -27,6 +27,7 @@ sped-up through jitted ``numba``-functions.
 from emg3d import io
 from emg3d import maps
 from emg3d import utils
+from emg3d import solver
 from emg3d import fields
 from emg3d import meshes
 from emg3d import models
@@ -46,8 +47,11 @@ from emg3d.maps import grid2grid  # noqa
 from emg3d.meshes import get_hx_h0  # noqa
 from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
 
-__all__ = ['solve', 'fields', 'io', 'maps', 'meshes', 'models', 'utils',
-           'Field', 'Model', 'TensorMesh', 'Report', 'save', 'load']
+# # Backwards compatibility; deprecated.
+from emg3d import core as njitted  # noqa
+
+__all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
+           'models', 'Field', 'Model', 'TensorMesh', 'Report', 'save', 'load']
 
 # Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__

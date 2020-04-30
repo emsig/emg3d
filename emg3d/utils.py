@@ -53,8 +53,19 @@ except ImportError:
     # properly!
     __version__ = 'unknown-'+datetime.today().strftime('%Y%m%d')
 
+# # Backwards compatibility; Deprecated to use them through utils.
+from emg3d.maps import grid2grid, interp3d
+from emg3d.models import Model, VolumeModel
+from emg3d.meshes import (TensorMesh, get_hx_h0, get_cell_numbers,
+                          get_stretched_h, get_domain, get_hx)
+from emg3d.fields import (
+        Field, SourceField, get_source_field, get_receiver, get_h_field)
 
-__all__ = ['Fourier', 'Time', 'Report']
+__all__ = ['Fourier', 'Time', 'Report',  # The ones actually here
+           'Field', 'SourceField', 'get_source_field', 'get_receiver',
+           'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'interp3d',
+           'TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
+           'get_domain', 'get_hx']
 
 
 # TIME DOMAIN
