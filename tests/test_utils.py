@@ -66,7 +66,8 @@ class TestFourier:
 
         # freq_inp; verb=0
         _, _ = capsys.readouterr()
-        Fourier1 = utils.Fourier(time, fmin, fmax, freq_inp=freq_inp, verb=0)
+        Fourier1 = utils.Fourier(time, fmin, fmax, freq_inp=freq_inp, verb=0,
+                                 ftarg={'kind': 'sin'})
         out, _ = capsys.readouterr()
         assert '' == out
         assert_allclose(freq_inp, Fourier1.freq_calc, 0, 0)

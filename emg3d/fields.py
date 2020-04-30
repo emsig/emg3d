@@ -164,38 +164,6 @@ class Field(np.ndarray):
         self._sval = getattr(obj, '_sval', None)
         self._smu0 = getattr(obj, '_smu0', None)
 
-    def __reduce__(self):
-        """Customize __reduce__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Get the parent's __reduce__ tuple.
-        pickled_state = super(Field, self).__reduce__()
-
-        # Create our own tuple to pass to __setstate__.
-        new_state = pickled_state[2]
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
-                     '_sval', '_smu0']
-        for attr in attr_list:
-            new_state += (getattr(self, attr),)
-
-        # Return tuple that replaces parent's __setstate__ tuple with our own.
-        return (pickled_state[0], pickled_state[1], new_state)
-
-    def __setstate__(self, state):
-        """Customize __setstate__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Set the necessary attributes (in reverse order).
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
-                     '_sval', '_smu0']
-        attr_list.reverse()
-        for i, name in enumerate(attr_list):
-            i += 1  # We need it 1..#attr instead of 0..#attr-1.
-            setattr(self, name, state[-i])
-
-        # Call the parent's __setstate__ with the other tuple elements.
-        super(Field, self).__setstate__(state[0:-i])
-
     def copy(self):
         """Return a copy of the Field."""
         return Field.from_dict(self.to_dict(True))

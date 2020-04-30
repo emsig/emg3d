@@ -192,7 +192,7 @@ def test_get_source_field_point_vs_finite(capsys):
     assert_allclose(fsf.fz.sum(), dsf.fz.sum())
 
 
-def test_field():
+def test_field(tmpdir):
     # Create some dummy data
     grid = meshes.TensorMesh(
             [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
@@ -270,6 +270,11 @@ def test_source_field():
     # Check 0 Hz frequency.
     with pytest.raises(ValueError):
         ss = fields.SourceField(grid, freq=0)
+
+    sdict = ss.to_dict()
+    del sdict['field']
+    with pytest.raises(KeyError):
+        fields.SourceField.from_dict(sdict)
 
 
 def test_get_h_field():

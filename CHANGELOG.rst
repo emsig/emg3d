@@ -15,6 +15,9 @@ were removed, however.
 
   - `emg3d.io.data_write`; `emg3d.io.data_read`.
   - `emg3d.solver.solver`.
+  - Removed `Field.__reduce__` and `Field.__setstate__`, which were made to
+    pickle with the old `data_write` and `data_read` routines. The preferred
+    way is no with `to_dict` and `from_dict`.
 
 - Changes:
 
