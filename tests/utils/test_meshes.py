@@ -3,11 +3,10 @@ import numpy as np
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
-from emg3d.utils import meshes
+from emg3d.utils import meshes, io
 
 # Data generated with create_data/regression.py
-REGRES = np.load(join(dirname(__file__), '../data/regression.npz'),
-                 allow_pickle=True)
+REGRES = io.load(join(dirname(__file__), '../data/regression.h5'))
 
 
 def get_h(ncore, npad, width, factor):
@@ -220,7 +219,7 @@ def test_get_hx():
 
 def test_TensorMesh():
     # Load mesh created with discretize.TensorMesh.
-    grid = REGRES['grid'][()]
+    grid = REGRES['Data']['grid']
 
     # Use this grid instance to create emg3d equivalent.
     emg3dgrid = meshes.TensorMesh(
@@ -228,7 +227,8 @@ def test_TensorMesh():
 
     # Ensure they are the same.
     for attr in grid['attr']:
-        assert_allclose(grid[attr], getattr(emg3dgrid, attr))
+        att = attr.decode("utf-8")
+        assert_allclose(grid[att], getattr(emg3dgrid, att))
 
     # Copy
     cgrid = emg3dgrid.copy()

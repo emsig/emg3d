@@ -43,6 +43,7 @@ __all__ = ['save', 'load']
 KNOWN_CLASSES = {
     'Model': models.Model,
     'Field': fields.Field,
+    'SourceField': fields.SourceField,
     'TensorMesh': meshes.TensorMesh,
 }
 
@@ -348,6 +349,7 @@ def _dict_deserialize(inp):
 
                 # De-serialize, overwriting all the existing entries.
                 try:
+                    print(f"\n\n\n CLASS {value['__class__']}")
                     inst = KNOWN_CLASSES[value['__class__']]
                     inp[key] = inst.from_dict(value)
                     continue
@@ -466,14 +468,7 @@ def _hdf5_add_to(data, h5file, compression):
             _hdf5_add_to(value, h5file.create_group(key), compression)
 
         elif np.ndim(value) > 0:  # Use compression where possible...
-
-            # There are issues with lists of strings.
-            # This should be handled better.
-            try:
-                h5file.create_dataset(key, data=value, compression=compression)
-            except:
-                h5file.create_dataset(key, data=np.string_(value),
-                                      compression=compression)
+            h5file.create_dataset(key, data=value, compression=compression)
 
         else:                    # else store without compression.
             h5file.create_dataset(key, data=value)

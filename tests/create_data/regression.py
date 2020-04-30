@@ -2,21 +2,22 @@ r"""Some models to catch regression with status quo while developing."""
 import numpy as np
 from discretize import TensorMesh
 
-from emg3d import utils, solver, io
+from emg3d import solver
+from emg3d.utils import meshes, models, fields, io
 
 
 # # # # # # # # # # 1. Homogeneous VTI fullspace # # # # # # # # # #
 
 freq = 1.
-hx_min, xdomain = utils.get_domain(x0=0, freq=freq)
-hy_min, ydomain = utils.get_domain(x0=0, freq=freq)
-hz_min, zdomain = utils.get_domain(x0=250, freq=freq)
+hx_min, xdomain = meshes.get_domain(x0=0, freq=freq)
+hy_min, ydomain = meshes.get_domain(x0=0, freq=freq)
+hz_min, zdomain = meshes.get_domain(x0=250, freq=freq)
 nx = 2**3
-hx = utils.get_stretched_h(hx_min, xdomain, nx, 0)
-hy = utils.get_stretched_h(hy_min, ydomain, nx, 0)
-hz = utils.get_stretched_h(hz_min, zdomain, nx, 250)
+hx = meshes.get_stretched_h(hx_min, xdomain, nx, 0)
+hy = meshes.get_stretched_h(hy_min, ydomain, nx, 0)
+hz = meshes.get_stretched_h(hz_min, zdomain, nx, 250)
 input_grid = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
-grid = utils.TensorMesh(**input_grid)
+grid = meshes.TensorMesh(**input_grid)
 
 input_model = {
     'grid': grid,
@@ -24,7 +25,7 @@ input_model = {
     'res_y': 2.0,
     'res_z': 3.3,
     }
-model = utils.Model(**input_model)
+model = models.Model(**input_model)
 
 input_source = {
     'grid': grid,
@@ -33,7 +34,7 @@ input_source = {
     }
 
 # Fields
-sfield = utils.get_source_field(**input_source)
+sfield = fields.get_source_field(**input_source)
 
 # F-cycle
 fefield = solver.solve(grid, model, sfield)
@@ -66,13 +67,13 @@ out = {
 src = [50., 110., 250., 25, 15]
 freq = 0.375
 
-hx_min, xdomain = utils.get_domain(x0=0, freq=.1)
-hy_min, ydomain = utils.get_domain(x0=0, freq=.1)
-hz_min, zdomain = utils.get_domain(x0=250, freq=.1)
-hx = utils.get_stretched_h(hx_min, xdomain, 8, 0)
-hy = utils.get_stretched_h(hy_min, ydomain, 4, 0)
-hz = utils.get_stretched_h(hz_min, zdomain, 16, 250)
-grid = utils.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
+hx_min, xdomain = meshes.get_domain(x0=0, freq=.1)
+hy_min, ydomain = meshes.get_domain(x0=0, freq=.1)
+hz_min, zdomain = meshes.get_domain(x0=250, freq=.1)
+hx = meshes.get_stretched_h(hx_min, xdomain, 8, 0)
+hy = meshes.get_stretched_h(hy_min, ydomain, 4, 0)
+hz = meshes.get_stretched_h(hz_min, zdomain, 16, 250)
+grid = meshes.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
 
 
 # Initialize model
@@ -80,10 +81,10 @@ grid = utils.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
 res_x = np.random.random(grid.nC)*50
 res_y = np.random.random(grid.nC)*50
 res_z = np.random.random(grid.nC)*50
-model = utils.Model(grid, res_x, res_y, res_z)
+model = models.Model(grid, res_x, res_y, res_z)
 
 # Initialize source field
-sfield = utils.get_source_field(grid, src, freq)
+sfield = fields.get_source_field(grid, src, freq)
 
 semicoarsening = True  # Loop 1, 2, 3
 linerelaxation = 456   # Loop over 4, 5, 5
@@ -102,7 +103,7 @@ efield = solver.solve(
         verb=verb, tol=tol, maxit=maxit, nu_init=nu_init, nu_pre=nu_pre,
         nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
-hfield = utils.get_h_field(grid, model, efield)
+hfield = fields.get_h_field(grid, model, efield)
 
 # Store input and result
 reg_2 = {
@@ -141,7 +142,7 @@ all_attr = [
     'nNx', 'nNy', 'nNz', 'vnN', 'vnEx', 'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'x0'
 ]
 
-mesh = {'attr': all_attr}
+mesh = {'attr': np.string_(all_attr)}
 
 for attr in all_attr:
     mesh[attr] = getattr(grid, attr)
@@ -150,15 +151,15 @@ for attr in all_attr:
 # # # # # # # # # # 4. Homogeneous VTI fullspace LAPLACE # # # # # # # # # #
 
 freq = -2*np.pi
-hx_min, xdomain = utils.get_domain(x0=0, freq=freq)
-hy_min, ydomain = utils.get_domain(x0=0, freq=freq)
-hz_min, zdomain = utils.get_domain(x0=250, freq=freq)
+hx_min, xdomain = meshes.get_domain(x0=0, freq=freq)
+hy_min, ydomain = meshes.get_domain(x0=0, freq=freq)
+hz_min, zdomain = meshes.get_domain(x0=250, freq=freq)
 nx = 2**3
-hx = utils.get_stretched_h(hx_min, xdomain, nx, 0)
-hy = utils.get_stretched_h(hy_min, ydomain, nx, 0)
-hz = utils.get_stretched_h(hz_min, zdomain, nx, 250)
+hx = meshes.get_stretched_h(hx_min, xdomain, nx, 0)
+hy = meshes.get_stretched_h(hy_min, ydomain, nx, 0)
+hz = meshes.get_stretched_h(hz_min, zdomain, nx, 250)
 input_grid_l = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
-grid_l = utils.TensorMesh(**input_grid_l)
+grid_l = meshes.TensorMesh(**input_grid_l)
 
 input_model_l = {
     'grid': grid_l,
@@ -166,7 +167,7 @@ input_model_l = {
     'res_y': 2.0,
     'res_z': 3.3,
     }
-model_l = utils.Model(**input_model_l)
+model_l = models.Model(**input_model_l)
 
 input_source_l = {
     'grid': grid_l,
@@ -175,7 +176,7 @@ input_source_l = {
     }
 
 # Fields
-sfield_l = utils.get_source_field(**input_source_l)
+sfield_l = fields.get_source_field(**input_source_l)
 
 # F-cycle
 fefield_l = solver.solve(grid_l, model_l, sfield_l)

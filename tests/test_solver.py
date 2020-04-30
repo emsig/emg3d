@@ -7,13 +7,12 @@ from numpy.testing import assert_allclose
 
 from emg3d import solver
 from emg3d.multigrid import core
-from emg3d.utils import meshes, models, fields
+from emg3d.utils import meshes, models, fields, io
 
 from .utils.test_meshes import get_h
 
-# Data generated with create_data/regression.py
-REGRES = np.load(join(dirname(__file__), 'data/regression.npz'),
-                 allow_pickle=True)
+# Data generated with tests/create_data/regression.py
+REGRES = io.load(join(dirname(__file__), 'data/regression.h5'))
 
 
 def create_dummy(nx, ny, nz):
@@ -30,7 +29,7 @@ def create_dummy(nx, ny, nz):
 def test_solver_homogeneous(capsys):
     # Regression test for homogeneous halfspace.
     # Not very sophisticated; replace/extend by more detailed tests.
-    dat = REGRES['res'][()]
+    dat = REGRES['Data']['res']
 
     grid = meshes.TensorMesh(**dat['input_grid'])
     model = models.Model(**dat['input_model'])
@@ -163,7 +162,7 @@ def test_solver_homogeneous(capsys):
 
 def test_solver_heterogeneous(capsys):
     # Regression test for heterogeneous case.
-    dat = REGRES['reg_2'][()]
+    dat = REGRES['Data']['reg_2']
     grid = dat['grid']
     model = dat['model']
     sfield = dat['sfield']
@@ -211,18 +210,6 @@ def test_solver_heterogeneous(capsys):
     assert "DIVERGED" in out
 
 
-def test_solver_backwards(capsys):
-    grid = meshes.TensorMesh(
-            [np.ones(8), np.ones(8), np.ones(8)], x0=np.array([0, 0, 0]))
-    model = models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
-    sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
-
-    out, _ = capsys.readouterr()
-    _ = solver.solver(grid, model, sfield, verb=0)
-    out, _ = capsys.readouterr()
-    assert "* WARNING :: `emg3d.solver.solver()` is renamed to " in out
-
-
 def test_one_liner(capsys):
     grid = meshes.TensorMesh(
             [np.ones(8), np.ones(8), np.ones(8)], x0=np.array([0, 0, 0]))
@@ -245,7 +232,7 @@ def test_one_liner(capsys):
 def test_solver_homogeneous_laplace():
     # Regression test for homogeneous halfspace in Laplace domain.
     # Not very sophisticated; replace/extend by more detailed tests.
-    dat = REGRES['lap'][()]
+    dat = REGRES['Data']['lap']
 
     grid = meshes.TensorMesh(**dat['input_grid'])
     model = models.Model(**dat['input_model'])
@@ -445,7 +432,7 @@ def test_krylov(capsys):
     # Just check here for bicgstab-error.
 
     # Load any case.
-    dat = REGRES['res'][()]
+    dat = REGRES['Data']['res']
     grid = meshes.TensorMesh(**dat['input_grid'])
     model = models.Model(**dat['input_model'])
     sfield = fields.get_source_field(**dat['input_source'])
