@@ -27,7 +27,7 @@ import os
 import numpy as np
 from datetime import datetime
 
-from emg3d.utils import misc
+from emg3d.utils import fields, models, misc, meshes
 
 try:
     import h5py
@@ -40,11 +40,18 @@ except ImportError:
 __all__ = ['save', 'load']
 
 
+# Known classes to serialize and de-serialize.
+KNOWN_CLASSES = {
+    'Model': models.Model,
+    'Field': fields.Field,
+    'TensorMesh': meshes.TensorMesh,
+}
+
 def save(fname, backend="h5py", compression="gzip", **kwargs):
     """Save meshes, models, fields, and other data to disk.
 
-    Serialize and save :class:`emg3d.utils.TensorMesh`,
-    :class:`emg3d.utils.Field`, and :class:`emg3d.utils.Model` instances and
+    Serialize and save :class:`emg3d.meshes.TensorMesh`,
+    :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` instances and
     add arbitrary other data, where instances of the same type are grouped
     together.
 
@@ -71,8 +78,8 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
 
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
-        properly serialized: :class:`emg3d.utils.TensorMesh`,
-        :class:`emg3d.utils.Field`, and :class:`emg3d.utils.Model` and
+        properly serialized: :class:`emg3d.meshes.TensorMesh`,
+        :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` and
         serialized again if loaded with :func:`load`. These instances are
         collected in their own group if h5py is used.
 
@@ -82,7 +89,7 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
 
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
-    kwargs['_version'] = 'emg3d v'+utils.__version__
+    kwargs['_version'] = 'emg3d v' + misc.__version__
     kwargs['_format'] = '0.10.0'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
@@ -121,8 +128,8 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
 def load(fname, **kwargs):
     """Load meshes, models, fields, and other data from disk.
 
-    Load and de-serialize :class:`emg3d.utils.TensorMesh`,
-    :class:`emg3d.utils.Field`, and :class:`emg3d.utils.Model` instances and
+    Load and de-serialize :class:`emg3d.meshes.TensorMesh`,
+    :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` instances and
     add arbitrary other data that were saved with :func:`save`.
 
 
@@ -143,8 +150,8 @@ def load(fname, **kwargs):
     -------
     out : dict
         A dictionary containing the data stored in fname;
-        :class:`emg3d.utils.TensorMesh`, :class:`emg3d.utils.Field`, and
-        :class:`emg3d.utils.Model` instances are de-serialized and returned as
+        :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
+        :class:`emg3d.models.Model` instances are de-serialized and returned as
         instances.
 
     """
@@ -209,8 +216,8 @@ def _dict_serialize(inp, out=None, top=True):
     """Serialize TensorMesh, Field, and Model instances in dict.
 
     Returns a serialized dictionary <out> of <inp>, where all
-    :class:`emg3d.utils.TensorMesh`, :class:`emg3d.utils.Field`, and
-    :class:`emg3d.utils.Model` instances have been serialized.
+    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
+    :class:`emg3d.models.Model` instances have been serialized.
 
     These instances are additionally grouped together in dictionaries, and all
     other stuff is put into 'Data'.
@@ -258,7 +265,7 @@ def _dict_serialize(inp, out=None, top=True):
 
         # Take care of the following instances (if we are in the
         # top-directory they get their own category):
-        if (isinstance(value, (utils.TensorMesh, utils.Field, utils.Model)) or
+        if (isinstance(value, tuple(KNOWN_CLASSES.values())) or
                 hasattr(value, 'x0')):
 
             # Name of the instance
@@ -314,8 +321,8 @@ def _dict_deserialize(inp):
     """De-serialize TensorMesh, Field, and Model instances in dict.
 
     De-serializes in-place dictionary <inp>, where all
-    :class:`emg3d.utils.TensorMesh`, :class:`emg3d.utils.Field`, and
-    :class:`emg3d.utils.Model` instances have been de-serialized. It also
+    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
+    :class:`emg3d.models.Model` instances have been de-serialized. It also
     converts back 'NoneType'-strings to None.
 
 
@@ -341,8 +348,8 @@ def _dict_deserialize(inp):
 
                 # De-serialize, overwriting all the existing entries.
                 try:
-                    inst = getattr(utils, value['__class__']).from_dict(value)
-                    inp[key] = inst
+                    inst = KNOWN_CLASSES[value['__class__']]
+                    inp[key] = inst.from_dict(value)
                     continue
 
                 except (AttributeError, KeyError):  # Gracefully fail.
@@ -459,7 +466,14 @@ def _hdf5_add_to(data, h5file, compression):
             _hdf5_add_to(value, h5file.create_group(key), compression)
 
         elif np.ndim(value) > 0:  # Use compression where possible...
-            h5file.create_dataset(key, data=value, compression=compression)
+
+            # There are issues with lists of strings.
+            # This should be handled better.
+            try:
+                h5file.create_dataset(key, data=value, compression=compression)
+            except:
+                h5file.create_dataset(key, data=np.string_(value),
+                                      compression=compression)
 
         else:                    # else store without compression.
             h5file.create_dataset(key, data=value)

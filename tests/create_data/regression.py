@@ -2,7 +2,7 @@ r"""Some models to catch regression with status quo while developing."""
 import numpy as np
 from discretize import TensorMesh
 
-from emg3d import utils, solver
+from emg3d import utils, solver, io
 
 
 # # # # # # # # # # 1. Homogeneous VTI fullspace # # # # # # # # # #
@@ -195,5 +195,4 @@ out_l = {
     }
 
 
-np.savez_compressed(
-        '../data/regression.npz', res=out, reg_2=reg_2, grid=mesh, lap=out_l)
+io.save('../data/regression', res=out, reg_2=reg_2, grid=mesh, lap=out_l)

@@ -5,11 +5,10 @@ from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose, assert_array_equal
 
-from emg3d.utils import meshes, models, fields
+from emg3d.utils import io, meshes, models, fields
 
-# Data generated with create_data/regression.py
-REGRES = np.load(join(dirname(__file__), '../data/regression.npz'),
-                 allow_pickle=True)
+# Data generated with tests/create_data/regression.py
+REGRES = io.load(join(dirname(__file__), '../data/regression.h5'))
 
 
 def get_h(ncore, npad, width, factor):
@@ -276,7 +275,7 @@ def test_get_h_field():
     # Mainly regression tests, not ideal.
 
     # Check it does still the same (pure regression).
-    dat = REGRES['reg_2'][()]
+    dat = REGRES['Data']['reg_2']
     grid = dat['grid']
     model = dat['model']
     efield = dat['result']
@@ -288,7 +287,7 @@ def test_get_h_field():
     assert hout.is_electric is False
 
     # Add some mu_r - Just 1, to trigger, and compare.
-    dat = REGRES['res'][()]
+    dat = REGRES['Data']['res']
     grid = dat['grid']
     efield = dat['Fresult']
     model1 = models.Model(**dat['input_model'])

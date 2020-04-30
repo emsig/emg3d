@@ -294,12 +294,10 @@ class Field(np.ndarray):
         """Update electric field in z-direction."""
         self.view()[-self.nEz:] = fz.ravel('F')
 
-    @property
     def amp(self):
         """Amplitude of the electromagnetic field."""
         return EMArray(self.view()).amp()
 
-    @property
     def pha(self, deg=False, unwrap=True, lag=True):
         """Phase of the electromagnetic field.
 
