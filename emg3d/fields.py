@@ -387,13 +387,14 @@ class SourceField(Field):
 
     """
 
-    def __new__(cls, grid, freq):
+    def __new__(cls, grid, freq, field=None):
         """Initiate a new Source Field."""
         if freq > 0:
             dtype = complex
         else:
             dtype = float
-        return super().__new__(cls, grid, dtype=dtype, freq=freq)
+        return super().__new__(cls, grid, fy_or_field=field, dtype=dtype,
+                               freq=freq)
 
     def copy(self):
         """Return a copy of the SourceField."""
@@ -401,21 +402,20 @@ class SourceField(Field):
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert dictionary into :class:`Field` instance.
+        """Convert dictionary into :class:`SourceField` instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Field.to_dict`.
+            Dictionary as obtained from :func:`SourceField.to_dict`.
             The dictionary needs the keys `field`, `freq`, `vnEx`, `vnEy`, and
             `vnEz`.
 
         Returns
         -------
-        obj : :class:`Field` instance
+        obj : :class:`SourceField` instance
 
         """
-
         # Create a dummy with the required attributes for the field instance.
         class Grid:
             pass
@@ -439,10 +439,8 @@ class SourceField(Field):
         grid.nEz = np.prod(grid.vnEz)
         grid.nE = grid.nEx + grid.nEy + grid.nEz
 
-        sfield = cls(grid=grid, freq=freq)
-        sfield.field = field
-
-        return sfield
+        # Return Field instance.
+        return cls(grid=grid, field=field, freq=freq)
 
     @property
     def vector(self):
