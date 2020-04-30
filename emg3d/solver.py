@@ -26,6 +26,7 @@ are in the :mod:`emg3d.core` as numba-jitted functions.
 
 import itertools
 import numpy as np
+import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
 from dataclasses import dataclass
 
@@ -307,7 +308,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     var.cprint(var, 1)
 
     # Calculate reference error for tolerance.
-    var.l2_refe = core.l2norm(sfield)
+    var.l2_refe = sl.norm(sfield)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
@@ -1038,7 +1039,7 @@ def residual(grid, model, sfield, efield, norm=False):
                 grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
-        return core.l2norm(rfield)
+        return sl.norm(rfield)
     else:     # Return residual.
         return rfield
 

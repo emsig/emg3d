@@ -519,16 +519,3 @@ def test_blocks_to_amat(njit):
     # Check it
     assert_allclose(amat_res, amat)
     assert_allclose(bvec_res, bvec)
-
-
-@pytest.mark.parametrize("njit", [True, False])
-def test_l2norm(njit):
-    if njit:
-        l2norm = core.l2norm
-    else:
-        l2norm = core.l2norm.py_func
-
-    x = 1e-15*(np.arange(101.)-50)
-    compare = np.linalg.norm(x)
-    test = l2norm(x)
-    assert test == compare
