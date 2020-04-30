@@ -31,7 +31,6 @@ from emg3d.utils import fields
 from emg3d.utils import meshes
 from emg3d.utils import models
 from emg3d.multigrid import core
-from emg3d.optimize import gradient
 
 # Import most important functions and classes
 from emg3d.solver import solve
@@ -49,8 +48,7 @@ from emg3d.utils.fields import (
         get_source_field, get_receiver, get_h_field)  # noqa
 
 __all__ = ['solve', 'fields', 'io', 'maps', 'meshes', 'models', 'utils',
-           'optimize', 'Field', 'Model', 'TensorMesh', 'Report', 'save',
-           'load']
+           'Field', 'Model', 'TensorMesh', 'Report', 'save', 'load']
 
 # Version defined in misc, so we can easier use it within the package itself.
 __version__ = misc.__version__

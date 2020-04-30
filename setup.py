@@ -17,8 +17,7 @@ setup(
     author_email='dieter@werthmuller.org',
     url='https://empymod.github.io',
     license='Apache License V2.0',
-    packages=['emg3d', 'emg3d.multigrid', 'emg3d.utils', 'emg3d.optimize',
-              'emg3d.cli'],
+    packages=['emg3d', 'emg3d.multigrid', 'emg3d.utils'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',

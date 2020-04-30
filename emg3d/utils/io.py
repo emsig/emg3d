@@ -349,7 +349,6 @@ def _dict_deserialize(inp):
 
                 # De-serialize, overwriting all the existing entries.
                 try:
-                    print(f"\n\n\n CLASS {value['__class__']}")
                     inst = KNOWN_CLASSES[value['__class__']]
                     inp[key] = inst.from_dict(value)
                     continue
