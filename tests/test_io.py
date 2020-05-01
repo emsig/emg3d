@@ -1,3 +1,4 @@
+import os
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
@@ -22,6 +23,87 @@ def create_dummy(nx, ny, nz, imag=True):
     else:
         out = np.arange(1, nx*ny*nz+1)
     return out.reshape(nx, ny, nz)
+
+
+def test_data_write_read(tmpdir, capsys):
+    # Create test data
+    grid = utils.TensorMesh(
+            [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
+            np.zeros(3))
+
+    freq = np.pi
+
+    model = utils.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
+
+    e1 = create_dummy(*grid.vnEx)
+    e2 = create_dummy(*grid.vnEy)
+    e3 = create_dummy(*grid.vnEz)
+    ee = utils.Field(e1, e2, e3, freq=freq)
+
+    # Write and read data, single arguments
+    io.data_write('testthis', 'ee', ee, tmpdir, -1)
+    ee_out = io.data_read('testthis', 'ee', tmpdir)
+
+    # Compare data
+    assert_allclose(ee, ee_out)
+    assert_allclose(ee.smu0, ee_out.smu0)
+    assert_allclose(ee.sval, ee_out.sval)
+    assert_allclose(ee.freq, ee_out.freq)
+
+    # Write and read data, multi arguments
+    args = ('grid', 'ee', 'model')
+    io.data_write('testthis', args, (grid, ee, model), tmpdir, -1)
+    grid_out, ee_out, model_out = io.data_read('testthis', args, tmpdir)
+
+    # Compare data
+    assert_allclose(ee, ee_out)
+    for attr in ['nCx', 'nCy', 'nCz']:
+        assert getattr(grid, attr) == getattr(grid_out, attr)
+
+    # Ensure volume averages got deleted or do not exist anyway.
+    assert hasattr(grid_out, '_vol') is False
+    assert hasattr(model_out, '_eta_x') is False
+    assert hasattr(model_out, '_zeta') is False
+
+    # Ensure they can be reconstructed
+    assert_allclose(grid.vol, grid_out.vol)
+
+    # Write and read data, None
+    io.data_write('testthis', ('grid', 'ee'), (grid, ee), tmpdir, -1)
+    out = io.data_read('testthis', path=tmpdir)
+
+    # Compare data
+    assert_allclose(ee, ee_out)
+    for attr in ['nCx', 'nCy', 'nCz']:
+        assert getattr(grid, attr) == getattr(out['grid'], attr)
+
+    # Test exists-argument 0
+    _, _ = capsys.readouterr()  # Clean-up
+    io.data_write('testthis', 'ee', ee*2, tmpdir, 0)
+    out, _ = capsys.readouterr()
+    datout = io.data_read('testthis', path=tmpdir)
+    assert 'NOT SAVING THE DATA' in out
+    assert_allclose(datout['ee'], ee)
+
+    # Test exists-argument 1
+    io.data_write('testthis', 'ee2', ee, tmpdir, 1)
+    out, _ = capsys.readouterr()
+    assert 'appending to it' in out
+    io.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, 1)
+    out, _ = capsys.readouterr()
+    assert "overwriting existing key(s) 'ee', 'ee2'" in out
+    datout = io.data_read('testthis', path=tmpdir)
+    assert_allclose(datout['ee'], ee*2)
+    assert_allclose(datout['ee2'], ee)
+
+    # Check if file is missing.
+    os.remove(tmpdir+'/testthis.dat')
+    out = io.data_read('testthis', path=tmpdir)
+    assert out is None
+    out1, out2 = io.data_read('testthis', ['ee', 'ee2'], path=tmpdir)
+    assert out1 is None
+    assert out2 is None
+    io.data_write('testthis', ['ee', 'ee2'], [ee*2, ee], tmpdir, -1)
 
 
 def test_save_and_load(tmpdir, capsys):

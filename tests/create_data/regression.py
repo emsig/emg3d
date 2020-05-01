@@ -135,13 +135,13 @@ grid = TensorMesh(
         x0='CN0')
 
 # List of all attributes in emg3d-grid.
-all_attr = np.array([
+all_attr = [
     'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx', 'nE',
     'vectorCCy', 'vectorCCz', 'nEx', 'nEy', 'nEz', 'nCx', 'nCy', 'nCz', 'vnC',
     'nNx', 'nNy', 'nNz', 'vnN', 'vnEx', 'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'x0'
-])
+]
 
-mesh = {'attr': np.array(all_attr, dtype=object)}
+mesh = {}
 
 for attr in all_attr:
     mesh[attr] = getattr(grid, attr)

@@ -2,8 +2,8 @@ Changelog
 #########
 
 
-latest (will become v0.11.0)
-----------------------------
+*latest* (will become v0.11.0)
+------------------------------
 
 Grand refactor with new internal layout. Mainly splitting-up `utils` into
 smaller bits. Most functionalities (old names) are currently retained in
@@ -13,15 +13,15 @@ were removed, however.
 
 - Removed deprecated functions:
 
-  - `emg3d.io.data_write`; `emg3d.io.data_read`.
-  - `emg3d.solver.solver`.
-  - Removed `Field.__reduce__` and `Field.__setstate__`, which were made to
-    pickle with the old `data_write` and `data_read` routines. The preferred
-    way is no with `to_dict` and `from_dict`.
+  - `emg3d.solver.solver` (use `emg3d.solver.solve` instead).
+  - Aliases of `emg3d.io.data_write` and `emg3d.io.data_read` in `emg3d.utils`.
 
 - Changes:
 
-  - Adjust top namespace TODO
+  - `SourceField` has now the same signature as `Field` (this might break your
+    code if you called `SourceField` directly, with positional arguments, and
+    not through `get_source_field`).
+  - More functions and classes in the top namespace.
   - Replaced `core.l2norm` with `scipy.linalg.norm`, as SciPy 1.4 got the
     following PR: https://github.com/scipy/scipy/pull/10397 (reason to raise
     minimum SciPy to 1.4).
@@ -30,11 +30,11 @@ were removed, however.
     - `numpy>=1.17.0` (raised from 1.15)
     - `scipy>=1.4.0` (raised from 1.1, see note above)
     - `numba>=0.46.0` (raised from 0.40)
-    - `empymod>=2.0.0`)
+    - `empymod>=2.0.0`
 
 - New layout
 
-  - `njitted` -> `core`
+  - `njitted` -> `core`.
   - `utils` split in `fields`, `meshes`, `models`, `maps`, and `utils`.
 
 - Bugfixes:

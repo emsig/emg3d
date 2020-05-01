@@ -73,14 +73,14 @@ class Field(np.ndarray):
         grid.vnEx. See explanations above. Only mandatory parameter; if the
         only one provided, it will initiate a zero-field of `dtype`.
 
-    fy_or_field : :class:`Field` or ndarray
+    fy_or_field : :class:`Field` or ndarray, optional
         Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
         See explanations above.
 
-    fz : ndarray
+    fz : ndarray, optional
         An ndarray of shape grid.nEz or grid.vnEz. See explanations above.
 
-    dtype : dtype,
+    dtype : dtype, optional
         Only used if ``fy_or_field=None`` and ``fz=None``; the initiated
         zero-field for the provided TensorMesh has data type `dtype`.
         Default: complex.
@@ -163,6 +163,38 @@ class Field(np.ndarray):
         self._freq = getattr(obj, '_freq', None)
         self._sval = getattr(obj, '_sval', None)
         self._smu0 = getattr(obj, '_smu0', None)
+
+    def __reduce__(self):
+        """Customize __reduce__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Get the parent's __reduce__ tuple.
+        pickled_state = super(Field, self).__reduce__()
+
+        # Create our own tuple to pass to __setstate__.
+        new_state = pickled_state[2]
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
+                     '_sval', '_smu0']
+        for attr in attr_list:
+            new_state += (getattr(self, attr),)
+
+        # Return tuple that replaces parent's __setstate__ tuple with our own.
+        return (pickled_state[0], pickled_state[1], new_state)
+
+    def __setstate__(self, state):
+        """Customize __setstate__ to make `Field` work with pickle.
+        => https://stackoverflow.com/a/26599346
+        """
+        # Set the necessary attributes (in reverse order).
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
+                     '_sval', '_smu0']
+        attr_list.reverse()
+        for i, name in enumerate(attr_list):
+            i += 1  # We need it 1..#attr instead of 0..#attr-1.
+            setattr(self, name, state[-i])
+
+        # Call the parent's __setstate__ with the other tuple elements.
+        super(Field, self).__setstate__(state[0:-i])
 
     def copy(self):
         """Return a copy of the Field."""
@@ -341,8 +373,22 @@ class SourceField(Field):
     Parameters
     ----------
 
-    grid : TensorMesh
-        A :class:`TensorMesh` instance.
+    fx_or_grid : :class:`TensorMesh` or ndarray
+        Either a TensorMesh instance or an ndarray of shape grid.nEx or
+        grid.vnEx. See explanations above. Only mandatory parameter; if the
+        only one provided, it will initiate a zero-field of `dtype`.
+
+    fy_or_field : :class:`Field` or ndarray, optional
+        Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
+        See explanations above.
+
+    fz : ndarray, optional
+        An ndarray of shape grid.nEz or grid.vnEz. See explanations above.
+
+    dtype : dtype, optional
+        Only used if ``fy_or_field=None`` and ``fz=None``; the initiated
+        zero-field for the provided TensorMesh has data type `dtype`.
+        Default: complex.
 
     freq : float
         Source frequency (Hz), used to calculate the Laplace parameter `s`.
@@ -353,20 +399,25 @@ class SourceField(Field):
         - `freq` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
-    field : :class:`Field` or ndarray
-        Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
-        If not provided initiated with zeros.
+        In difference to `Field`, the frequency has to be provided for
+        a `SourceField`.
 
     """
 
-    def __new__(cls, grid, freq, field=None):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
+                freq=None):
         """Initiate a new Source Field."""
+        # Ensure frequency is provided.
+        if freq is None:
+            print(f"* ERROR   :: SourceField requires the frequency.")
+            raise ValueError("SourceField needs `freq`.")
+
         if freq > 0:
             dtype = complex
         else:
             dtype = float
-        return super().__new__(cls, grid, fy_or_field=field, dtype=dtype,
-                               freq=freq)
+
+        return super().__new__(cls, fx_or_grid, fy_or_field, fz, dtype, freq)
 
     def copy(self):
         """Return a copy of the SourceField."""
@@ -388,6 +439,7 @@ class SourceField(Field):
         obj : :class:`SourceField` instance
 
         """
+
         # Create a dummy with the required attributes for the field instance.
         class Grid:
             pass
@@ -412,7 +464,7 @@ class SourceField(Field):
         grid.nE = grid.nEx + grid.nEy + grid.nEz
 
         # Return Field instance.
-        return cls(grid=grid, field=field, freq=freq)
+        return cls(grid, field, freq=freq)
 
     @property
     def vector(self):
@@ -555,7 +607,7 @@ def get_source_field(grid, src, freq, strength=0):
         """Set the source-field in idir."""
 
         # Initiate zero source field.
-        sfield = SourceField(grid, freq)
+        sfield = SourceField(grid, freq=freq)
 
         # Return source-field depending if point or finite dipole.
         vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)

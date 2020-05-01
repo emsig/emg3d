@@ -10,8 +10,7 @@ from emg3d import solver, core, meshes, models, fields, io
 from .test_meshes import get_h
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.npz'),
-                 allow_pickle=True)
+REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
 
 
 def create_dummy(nx, ny, nz):

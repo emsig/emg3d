@@ -6,8 +6,7 @@ from numpy.testing import assert_allclose
 from emg3d import meshes, io
 
 # Data generated with create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.npz'),
-                 allow_pickle=True)
+REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
 
 
 def get_h(ncore, npad, width, factor):
@@ -227,8 +226,8 @@ def test_TensorMesh():
             [grid['hx'], grid['hy'], grid['hz']], grid['x0'])
 
     # Ensure they are the same.
-    for attr in [n.strip() for n in grid['attr']]:
-        assert_allclose(grid[attr], getattr(emg3dgrid, attr))
+    for key, value in grid.items():
+        assert_allclose(value, getattr(emg3dgrid, key))
 
     # Copy
     cgrid = emg3dgrid.copy()

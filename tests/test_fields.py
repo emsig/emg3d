@@ -8,8 +8,7 @@ from numpy.testing import assert_allclose, assert_array_equal
 from emg3d import io, meshes, models, fields
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.npz'),
-                 allow_pickle=True)
+REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
 
 
 def get_h(ncore, npad, width, factor):
@@ -270,6 +269,10 @@ def test_source_field():
     # Check 0 Hz frequency.
     with pytest.raises(ValueError):
         ss = fields.SourceField(grid, freq=0)
+
+    # Check no frequency.
+    with pytest.raises(ValueError):
+        ss = fields.SourceField(grid)
 
     sdict = ss.to_dict()
     del sdict['field']

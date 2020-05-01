@@ -27,9 +27,6 @@ The core functionalities, the most computationally demanding parts, of the
 import numba as nb
 import numpy as np
 
-# Backwards compatibility; deprecated to use through `core`.
-from emg3d.maps import volume_average, _volume_avg_weights  # noqa
-
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 

@@ -42,13 +42,8 @@ from emg3d import core  # noqa
 from emg3d.fields import Field  # noqa
 from emg3d.models import Model  # noqa
 from emg3d.utils import Fourier  # noqa
-from emg3d.maps import grid2grid  # noqa
-from emg3d.meshes import get_hx_h0  # noqa
 from emg3d.meshes import TensorMesh  # noqa
 from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
-
-# # Backwards compatibility; deprecated.
-from emg3d import core as njitted  # noqa
 
 __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
            'models', 'Report', 'save', 'load']
