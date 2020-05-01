@@ -15,7 +15,7 @@ sped-up through jitted ``numba``-functions.
 # use this file except in compliance with the License.  You may obtain a copy
 # of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -23,14 +23,30 @@ sped-up through jitted ``numba``-functions.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+# Import modules
 from emg3d import io
+from emg3d import maps
 from emg3d import utils
 from emg3d import solver
+from emg3d import fields
+from emg3d import meshes
+from emg3d import models
+
+# Import most important functions and classes
 from emg3d.solver import solve
 from emg3d.utils import Report
 from emg3d.io import save, load
 
-__all__ = ['solve', 'solver', 'utils', 'io', 'Report', 'save', 'load']
+# # For top-namespace
+from emg3d import core  # noqa
+from emg3d.fields import Field  # noqa
+from emg3d.models import Model  # noqa
+from emg3d.utils import Fourier  # noqa
+from emg3d.meshes import TensorMesh  # noqa
+from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
+
+__all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
+           'models', 'Report', 'save', 'load']
 
 # Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__

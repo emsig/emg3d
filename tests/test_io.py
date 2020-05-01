@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from emg3d import utils, io
+from emg3d import meshes, models, fields, utils, io
 
 try:
     import h5py
@@ -25,7 +25,6 @@ def create_dummy(nx, ny, nz, imag=True):
     return out.reshape(nx, ny, nz)
 
 
-# FUNCTIONS RELATED TO DATA MANAGEMENT
 def test_data_write_read(tmpdir, capsys):
     # Create test data
     grid = utils.TensorMesh(
@@ -110,7 +109,7 @@ def test_data_write_read(tmpdir, capsys):
 def test_save_and_load(tmpdir, capsys):
 
     # Create some dummy data
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
             [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
             np.zeros(3))
 
@@ -129,7 +128,7 @@ def test_save_and_load(tmpdir, capsys):
     grid3.x0 = grid.x0
 
     # Some field.
-    field = utils.Field(grid)
+    field = fields.Field(grid)
     field.field = np.arange(grid.nE)+1j*np.ones(grid.nE)
     field.ensure_pec
 
@@ -138,7 +137,7 @@ def test_save_and_load(tmpdir, capsys):
     res_y = res_x/2.0
     res_z = res_x*1.4
     mu_r = res_x*1.11
-    model = utils.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
+    model = models.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
 
     # Save it.
     io.save(tmpdir+'/test', emg3d=grid, discretize=grid2, model=model,

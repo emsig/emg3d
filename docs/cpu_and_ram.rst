@@ -26,12 +26,12 @@ example output of that script is shown in :numref:`Figure %s <runtime>`.
 
 The costliest functions (for big models) are:
 
-   - >90 %: :func:`emg3d.solver.smoothing` (:func:`emg3d.njitted.gauss_seidel`)
+   - >90 %: :func:`emg3d.solver.smoothing` (:func:`emg3d.core.gauss_seidel`)
    - <5 % each, in decreasing importance:
 
       - :func:`emg3d.solver.prolongation`
         (:class:`emg3d.solver.RegularGridProlongator`)
-      - :func:`emg3d.solver.residual` (:func:`emg3d.njitted.amat_x`)
+      - :func:`emg3d.solver.residual` (:func:`emg3d.core.amat_x`)
       - :func:`emg3d.solver.restriction`
 
 Example with 262,144 / 2,097,152 cells (``nu_{i,1,c,2}=0,2,1,2``;
@@ -46,7 +46,7 @@ The rest can be ignored. For small models, the percentage of ``smoothing`` goes
 down and of ``prolongation`` and ``restriction`` go up. But then the modeller
 is fast anyway.
 
-:func:`emg3d.njitted.gauss_seidel` and :func:`emg3d.njitted.amat_x` are written
+:func:`emg3d.core.gauss_seidel` and :func:`emg3d.core.amat_x` are written
 in ``numba``; jitting :class:`emg3d.solver.RegularGridProlongator` turned out
 to not improve things, and many functions used in the restriction are jitted
 too. The costliest functions (RAM- and CPU-wise) are therefore already written
@@ -60,20 +60,20 @@ itself.**
 
 - Not much has been tested with the ``numba``-options ``parallel``; ``prange``;
   and ``nogil``.
-- There might be an additional gain by making :class:`emg3d.utils.TensorMesh`,
-  :class:`emg3d.utils.Model`, and :class:`emg3d.utils.Field` instances jitted
+- There might be an additional gain by making :class:`emg3d.meshes.TensorMesh`,
+  :class:`emg3d.models.Model`, and :class:`emg3d.fields.Field` instances jitted
   classes.
 
 **Things which have been tried**
 
 - One important aspect of the smoothing part is the memory layout.
-  :func:`emg3d.njitted.gauss_seidel` and :func:`emg3d.njitted.gauss_seidel_x`
+  :func:`emg3d.core.gauss_seidel` and :func:`emg3d.core.gauss_seidel_x`
   are ideal for F-arrays (loop z-y-x, hence slowest to fastest axis).
-  :func:`emg3d.njitted.gauss_seidel_y` and
-  :func:`emg3d.njitted.gauss_seidel_z`, however, would be optimal for C-arrays.
+  :func:`emg3d.core.gauss_seidel_y` and
+  :func:`emg3d.core.gauss_seidel_z`, however, would be optimal for C-arrays.
   But copying the arrays to C-order and afterwards back is costlier in most
   cases for both CPU and RAM. The one possible and therefore implemented
-  solution was to swap the loop-order in :func:`emg3d.njitted.gauss_seidel_y`.
+  solution was to swap the loop-order in :func:`emg3d.core.gauss_seidel_y`.
 - Restriction and prolongation information could be saved in a dictionary
   instead of recalculating it every time. Turns out to be not worth the
   trouble.

@@ -5,7 +5,7 @@
 ----
 
 .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
-   :target: http://emg3d.readthedocs.io/en/latest
+   :target: https://emg3d.readthedocs.io/en/latest
    :alt: Documentation Status
 .. image:: https://travis-ci.org/empymod/emg3d.svg?branch=master
    :target: https://travis-ci.org/empymod/emg3d

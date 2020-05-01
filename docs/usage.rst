@@ -54,15 +54,6 @@ The output should contain a lot of references to ``mkl``, and it should NOT
 contain references to ``blas``, ``lapack``, ``openblas``, or similar.
 
 
-The structure of emg3d is:
-
-- **solver.py**: The main multigrid solver routine, where ``emg3d.solve`` is
-  the principal user-facing routine (see :doc:`solver`).
-- **utils.py**: Utilities such as helper functions to create meshes, models,
-  and source fields.
-- **njitted.py**: The heavy calculations, all ``numba``-jitted functions.
-
-
 Basic Example
 -------------
 
@@ -115,8 +106,8 @@ origin, with a 10 Hz signal of 1 A.
 
 .. code-block:: python
 
-    >>> model = emg3d.utils.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
-    >>> sfield = emg3d.utils.get_source_field(
+    >>> model = emg3d.models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    >>> sfield = emg3d.fields.get_source_field(
     >>>     grid, src=[0, 0, 0, 0, 0], freq=10.0)
 
 Now we can calculate the electric field with ``emg3d``:
@@ -292,7 +283,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+    https://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,

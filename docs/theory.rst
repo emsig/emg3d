@@ -153,7 +153,7 @@ improves the convergence rate, as the solution is a smoother function. The
 solver :func:`emg3d.solve` is agnostic to the data type of the provided source
 field, and can solve for real and complex problems, hence frequency and Laplace
 domain. See the documentation of the functions
-:func:`emg3d.utils.get_source_field` and :func:`emg3d.utils.Model` to see how
+:func:`emg3d.fields.get_source_field` and :func:`emg3d.models.Model` to see how
 you can use `emg3d` for Laplace-domain calculations.
 
 
@@ -547,7 +547,7 @@ coarser grids with spacings of :math:`2h`, :math:`4h`, etc. Let the problem on
 the finest grid be defined by :math:`A^h \mathbf{x}^h = \mathbf{b}^h`. The
 residual is :math:`\mathbf{r}^h = \mathbf{b}^h - A^h \mathbf{x}^h` (see the
 corresponding function :func:`emg3d.solver.residual`, and for more details
-also the function :func:`emg3d.njitted.amat_x`). To find the oscillatory
+also the function :func:`emg3d.core.amat_x`). To find the oscillatory
 components for this problem, a smoother or relaxation scheme is applied. Such a
 scheme is usually based on an approximation of :math:`A^h` that is easy to
 invert. After one or more smoothing steps (see the corresponding function
@@ -556,8 +556,8 @@ slow down because it is generally difficult to find the smooth, long-range
 components of the solution. At this point, the problem is mapped to a coarser
 grid, using a restriction operator :math:`\tilde{I}^{2h}_h` (see the
 corresponding function :func:`emg3d.solver.restriction`, and for more details,
-the functions :func:`emg3d.njitted.restrict_weights` and
-:func:`emg3d.njitted.restrict`. On the coarse-grid, :math:`\mathbf{b}^{2h} =
+the functions :func:`emg3d.core.restrict_weights` and
+:func:`emg3d.core.restrict`. On the coarse-grid, :math:`\mathbf{b}^{2h} =
 \tilde{I}^{2h}_h\mathbf{r}^h`. The problem :math:`\mathbf{r}^{2h} =
 \mathbf{b}^{2h} - A^{2h} \mathbf{x}^{2h} = 0` is now solved for
 :math:`\mathbf{x}^{2h}`, either by a direct method if the number of points is
@@ -658,10 +658,10 @@ as direct solver, whereas on the finer grid it acts as a smoother with only few
 iterations.
 
 See the function :func:`emg3d.solver.smoothing`, and for more details, the
-functions :func:`emg3d.njitted.gauss_seidel`,
-:func:`emg3d.njitted.gauss_seidel_x`, :func:`emg3d.njitted.gauss_seidel_y`,
-:func:`emg3d.njitted.gauss_seidel_z`, and also
-:func:`emg3d.njitted.blocks_to_amat`.
+functions :func:`emg3d.core.gauss_seidel`,
+:func:`emg3d.core.gauss_seidel_x`, :func:`emg3d.core.gauss_seidel_y`,
+:func:`emg3d.core.gauss_seidel_z`, and also
+:func:`emg3d.core.blocks_to_amat`.
 
 
 Choleski factorisation
@@ -674,4 +674,4 @@ the main diagonal and five lower off-diagonals of the banded matrix :math:`A`.
 The result is the same as simply using, e.g., :func:`numpy.linalg.solve`, but
 faster for the particular use-case of this code.
 
-See :func:`emg3d.njitted.solve` for more details.
+See :func:`emg3d.core.solve` for more details.

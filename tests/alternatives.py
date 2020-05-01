@@ -21,7 +21,7 @@ not) be easier to understand.
 # use this file except in compliance with the License.  You may obtain a copy
 # of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -42,7 +42,7 @@ def alt_amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
 
     Corresponds more or less to page 636 of [Muld06]_.
 
-    Alternative of ``njitted.amat_x``.
+    Alternative of ``core.amat_x``.
     """
 
     # Get dimensions
@@ -115,7 +115,7 @@ def alt_solve(amat, bvec):
     Does in a way the same as ``np.linalg.solve``, but a tad faster (for the
     particular use-case of this code).
 
-    Alternative of ``njitted.solve``, which uses a non-standard Cholesky
+    Alternative of ``core.solve``, which uses a non-standard Cholesky
     factorisation and is faster.
 
     Note that this requires the full matrix amat, not only the lower triangle.
@@ -191,7 +191,7 @@ def alt_restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     Corresponds to Equation 9 in [Muld06]_.
 
-    Alternative of ``njitted.restrict_weights``.
+    Alternative of ``core.restrict_weights``.
 
     """
     # Dual grid cell widths

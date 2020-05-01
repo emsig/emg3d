@@ -1,7 +1,7 @@
 """
 
-:mod:`njitted` -- Functions jitted with ``njit``
-================================================
+:mod:`core` -- Number crunching
+===============================
 
 The core functionalities, the most computationally demanding parts, of the
 :mod:`emg3d.solver` as just-in-time (jit) compiled functions using ``numba``.
@@ -15,7 +15,7 @@ The core functionalities, the most computationally demanding parts, of the
 # use this file except in compliance with the License.  You may obtain a copy
 # of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -77,11 +77,11 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
 
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta : ndarray
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -244,15 +244,15 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -524,15 +524,15 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -808,15 +808,15 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -1087,15 +1087,15 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     ----------
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     sx, sy, sz :
         Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.utils.Field`.
+        :class:`emg3d.fields.Field`.
 
     eta_x, eta_y, eta_z, zeta :
         VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.utils.VolumeModel`.
+        :func:`emg3d.models.VolumeModel`.
 
     hx, hy, hz : ndarray
         Cell widths in x-, y-, and z-directions.
@@ -2043,150 +2043,3 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
         wr[i] *= cvectorCC[i]-vectorCC[2*i]
 
     return wl, w0, wr
-
-
-# Volume averaging
-@nb.njit(**_numba_setting)
-def volume_average(edges_x, edges_y, edges_z, values,
-                   new_edges_x, new_edges_y, new_edges_z, new_values, new_vol):
-    """Interpolation using the volume averaging technique.
-
-    The result is added to new_values.
-
-    The original implementation (see ``emg3d v0.7.1``) followed [PlDM07]_. Joe
-    Capriot took that algorithm and made it much faster for implementation in
-    `discretize`. The current implementation is a simplified Numba-version of
-    his Cython version (the `discretize` version works for 1D, 2D, and 3D
-    meshes and can also return a sparse matrix representing the operation).
-
-
-    Parameters
-    ----------
-    edges_[x, y, z] : ndarray
-        The edges in x-, y-, and z-directions for the original grid.
-
-    values : ndarray
-        Values corresponding to `grid`.
-
-    new_edges_[x, y, z] : ndarray
-        The edges in x-, y-, and z-directions for the new grid.
-
-    new_values : ndarray
-        Array where values corresponding to `new_grid` will be added.
-
-    new_vol : ndarray
-        The volumes of the `new_grid`-cells.
-
-    """
-
-    # Get the weights and indices for each direction.
-    wx, ix_in, ix_out = _volume_avg_weights(edges_x, new_edges_x)
-    wy, iy_in, iy_out = _volume_avg_weights(edges_y, new_edges_y)
-    wz, iz_in, iz_out = _volume_avg_weights(edges_z, new_edges_z)
-
-    # Loop over the elements and sum up the contributions.
-    for iz, w_z in enumerate(wz):
-        izi = iz_in[iz]
-        izo = iz_out[iz]
-        for iy, w_y in enumerate(wy):
-            iyi = iy_in[iy]
-            iyo = iy_out[iy]
-            w_zy = w_z*w_y
-            for ix, w_x in enumerate(wx):
-                ixi = ix_in[ix]
-                ixo = ix_out[ix]
-                new_values[ixo, iyo, izo] += w_zy*w_x*values[ixi, iyi, izi]
-
-    # Normalize by new volume.
-    new_values /= new_vol
-
-
-@nb.njit(**_numba_setting)
-def _volume_avg_weights(x1, x2):
-    """Returns the weights for the volume averaging technique.
-
-
-    Parameters
-    ----------
-    x1, x2 : ndarray
-        The edges in x-, y-, or z-directions for the original (x1) and the new
-        (x2) grids.
-
-
-    Returns
-    -------
-    hs : ndarray
-        Weights for the mapping of x1 to x2.
-
-    ix1, ix2 : ndarray
-        Indices to map x1 to x2.
-
-    """
-    # Fill xs with uniques and truncate.
-    # Corresponds to np.unique(np.concatenate([x1, x2])).
-    n1, n2 = len(x1), len(x2)
-    xs = np.empty(n1 + n2)  # Pre-allocate array containing all edges.
-    i1, i2, i = 0, 0, 0
-    while i1 < n1 or i2 < n2:
-        if i1 < n1 and i2 < n2:
-            if x1[i1] < x2[i2]:
-                xs[i] = x1[i1]
-                i1 += 1
-            elif x1[i1] > x2[i2]:
-                xs[i] = x2[i2]
-                i2 += 1
-            else:
-                xs[i] = x1[i1]
-                i1 += 1
-                i2 += 1
-        elif i1 < n1 and i2 == n2:
-            xs[i] = x1[i1]
-            i1 += 1
-        elif i2 < n2 and i1 == n1:
-            xs[i] = x2[i2]
-            i2 += 1
-        i += 1
-
-    # Get weights and indices for the two arrays.
-    # - hs corresponds to np.diff(xs) where x1 and x2 overlap; zero outside.
-    # - x1[ix1] can be mapped to x2[ix2] with the corresponding weight.
-    nh = i-1
-    hs = np.empty(nh)                   # Pre-allocate weights.
-    ix1 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x1.
-    ix2 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x2.
-    center = 0.0
-    i1, i2, i = 0, 0, 0
-    for i in range(nh):
-        hs[i] = xs[i+1]-xs[i]
-        center = xs[i]+0.5*hs[i]
-        if center < x2[0]:
-            hs[i] = 0.0
-        elif center > x2[n2-1]:
-            hs[i] = 0.0
-        while i1 < n1-1 and center >= x1[i1]:
-            i1 += 1
-        while i2 < n2-1 and center >= x2[i2]:
-            i2 += 1
-        ix1[i] = min(max(i1-1, 0), n1-1)
-        ix2[i] = min(max(i2-1, 0), n2-1)
-
-    return hs, ix1, ix2
-
-
-# Simple wrapped functions
-@nb.njit(**_numba_setting)
-def l2norm(x):
-    """Jitted version of np.linalg.norm(x, ord=None); l2-norm.
-
-    Similar speed could be achieved with :func:`scipy.linalg.get_blas_funcs`,
-
-    ``sp.linalg.get_blas_funcs('nrm2', dtype=x.dtype)(x)``
-
-    or with :func:`scipy.linalg.norm`,
-
-    ``sp.linalg.norm(x, check_finite=False)``
-
-    if this PR gets merged: https://github.com/scipy/scipy/pull/10397
-
-    """
-    return np.linalg.norm(x)
