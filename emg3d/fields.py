@@ -417,7 +417,8 @@ class SourceField(Field):
         else:
             dtype = float
 
-        return super().__new__(cls, fx_or_grid, fy_or_field, fz, dtype, freq)
+        return super().__new__(cls, fx_or_grid, fy_or_field=fy_or_field,
+                               fz=fz, dtype=dtype, freq=freq)
 
     def copy(self):
         """Return a copy of the SourceField."""
