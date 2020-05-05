@@ -5,17 +5,17 @@ language: python
 matrix:
   include:
     - python: 3.7  # => 3.7; minimum requirement
-      env: PYTHON=3.7 DEPLOY_PYPI=true DFLTS="scipy=1.4, numba=0.45"
+      env: PYTHON=3.7 DEPLOY_PYPI=true DFLTS="scipy=1.4 numba=0.45"
     - python: 3.7  # => 3.7; deploy
-      env: PYTHON=3.7 DEPLOY_PYPI=true DFLTS="scipy, numba"
+      env: PYTHON=3.7 DEPLOY_PYPI=true DFLTS="scipy numba"
     - python: 3.8  # => 3.8; scooby, h5py
-      env: PYTHON=3.8 PCKG="scooby h5py" DFLTS="scipy, numba"
+      env: PYTHON=3.8 PCKG="scooby h5py" DFLTS="scipy numba"
     - python: 3.7  # just linkcheck
-      env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" DFLTS="scipy, numba"
+      env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" DFLTS="scipy numba"
 
 jobs:
   allow_failures:  # env must be EXACTLY as env allowed to fail.
-    - env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" DFLTS="scipy, numba"
+    - env: PYTHON=3.7 CHCKLNKS=true INST="sphinx numpydoc sphinx_rtd_theme sphinx_numfig" DFLTS="scipy numba"
 
 install:
   - sudo apt-get update
@@ -31,7 +31,7 @@ install:
   - conda info -a
 
   # Install and activate environment, install packages
-  - conda create -q -n tenv python=$PYTHON numpy pytest pytest-cov
+  - conda create -q -n tenv python=$PYTHON $DFLTS numpy pytest pytest-cov
   - source activate tenv
   - conda install -c conda-forge empymod>=2.0 $PCKG
   - pip install setuptools_scm coveralls pytest-flake8 $INST
