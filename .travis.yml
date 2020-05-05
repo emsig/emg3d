@@ -5,7 +5,7 @@ language: python
 matrix:
   include:
     - python: 3.7  # => 3.7; minimum requirement
-      env: PYTHON=3.7 DEPLOY_PYPI=true DFLTS="scipy=1.4 numba=0.45"
+      env: PYTHON=3.7 DFLTS="scipy=1.4 numba=0.45"
     - python: 3.7  # => 3.7; deploy
       env: PYTHON=3.7 DEPLOY_PYPI=true DFLTS="scipy numba"
     - python: 3.8  # => 3.8; scooby, h5py
