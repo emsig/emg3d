@@ -2,8 +2,10 @@ Changelog
 #########
 
 
-*latest* (will become v0.11.0)
-------------------------------
+*v0.11.0* : Refactor
+--------------------
+
+**2020-05-05**
 
 Grand refactor with new internal layout. Mainly splitting-up `utils` into
 smaller bits. Most functionalities (old names) are currently retained in
@@ -27,10 +29,9 @@ were removed, however.
     minimum SciPy to 1.4).
   - Increased minimum required versions of dependencies to
 
-    - `numpy>=1.17.0` (raised from 1.15)
     - `scipy>=1.4.0` (raised from 1.1, see note above)
-    - `numba>=0.46.0` (raised from 0.40)
-    - `empymod>=2.0.0`
+    - `empymod>=2.0.0` (no min requirement before)
+    - `numba>=0.45.0` (raised from 0.40)
 
 - New layout
 

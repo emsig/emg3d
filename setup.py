@@ -24,9 +24,9 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     install_requires=[
-        'numpy>=1.17.0',
+        'numpy',
         'scipy>=1.4.0',
-        'numba>=0.46.0',
+        'numba>=0.45.0',
         'empymod>=2.0.0',
     ],
     use_scm_version={
