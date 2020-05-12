@@ -227,6 +227,9 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
     compression : int or str, optional
         Passed through to h5py, default is 'gzip'.
 
+    json_indent : int or None
+        Passed through to json, default is 2.
+
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
         properly serialized: :class:`emg3d.meshes.TensorMesh`,
@@ -234,7 +237,13 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
         serialized again if loaded with :func:`load`. These instances are
         collected in their own group if h5py is used.
 
+        Note that the provided data cannot contain the before described
+        parameters as keys.
+
     """
+    # Get and remove optional kwargs.
+    json_indent = kwargs.pop('json_indent', 2)
+
     # Get absolute path.
     full_path = os.path.abspath(fname)
 
@@ -290,7 +299,7 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
 
         # Store hierarchical data.
         with open(full_path, "w") as f:
-            json.dump(data, f, sort_keys=True, indent=4)
+            json.dump(data, f, indent=json_indent)
 
     else:
         raise NotImplementedError(f"Backend '{backend}' is not implemented.")
