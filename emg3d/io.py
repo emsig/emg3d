@@ -567,7 +567,6 @@ def _dict_flatten(data):
         if isinstance(value, dict):
             return [(key+'>'+k, v) for k, v in _dict_flatten(value).items()]
         else:
-
             return [(key, value)]
 
     return dict([item for k, v in data.items() for item in expand(k, v)])
