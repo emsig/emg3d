@@ -142,7 +142,7 @@ def test_save_and_load(tmpdir, capsys):
     # Save it.
     io.save(tmpdir+'/test', emg3d=grid, discretize=grid2, model=model,
             broken=grid3, a=None,
-            field=field, what={'f': field.fx, 12: 12}, backend="numpy")
+            field=field, what={'f': field.fx, 12: 12}, backend="npz")
     outstr, _ = capsys.readouterr()
     assert 'WARNING :: Could not serialize <broken>' in outstr
 
@@ -181,12 +181,19 @@ def test_save_and_load(tmpdir, capsys):
     with pytest.raises(NotImplementedError):
         io.load('ttt.abc')
 
+    # Ensure deprecated backend/extension still work.
+    io.save('ttt', backend='numpy')
+    io.save('ttt', backend='h5py')
+
     # Test h5py.
     if h5py:
         io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
+                a=1.0, b=1+1j,
                 model=model, field=field, what={'f': field.fx})
         out_h5 = io.load(str(tmpdir+'/test.h5'))
         assert out_h5['Model']['model'] == model
+        assert out_h5['Data']['a'] == 1.0
+        assert out_h5['Data']['b'] == 1+1j
         assert_allclose(field.fx, out_h5['Field']['field'].fx)
         assert_allclose(grid.vol, out_h5['TensorMesh']['emg3d'].vol)
         assert_allclose(grid.vol, out_h5['TensorMesh']['discretize'].vol)
@@ -196,3 +203,16 @@ def test_save_and_load(tmpdir, capsys):
             io.save(tmpdir+'/test-h5', grid=grid)
         with pytest.raises(ImportError):
             io.load(str(tmpdir+'/test-h5.h5'))
+
+    # Test json.
+    io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
+            a=1.0, b=1+1j,
+            model=model, field=field, what={'f': field.fx}, backend='json')
+    out_json = io.load(str(tmpdir+'/test.json'))
+    assert out_json['Model']['model'] == model
+    assert out_json['Data']['a'] == 1.0
+    assert out_json['Data']['b'] == 1+1j
+    assert_allclose(field.fx, out_json['Field']['field'].fx)
+    assert_allclose(grid.vol, out_json['TensorMesh']['emg3d'].vol)
+    assert_allclose(grid.vol, out_json['TensorMesh']['discretize'].vol)
+    assert_allclose(out_json['Data']['what']['f'], field.fx)
