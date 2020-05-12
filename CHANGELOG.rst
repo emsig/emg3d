@@ -5,9 +5,10 @@ Changelog
 *latest*
 --------
 
-- `io`: New `backend='json'`, writes to a plain json file. Changed backend
-  name to actual file extension: `npz` (instead of `numpy`); `h5` (instead of
-  `h5py`), and new `json`. (`numpy` and `h5py` are deprecated.)
+- `io`: New `backend='json'`, writes to a hierarchical, plain json file.
+  Changed backend name to actual file extension: `npz` (instead of `numpy`);
+  `h5` (instead of `h5py`), and new `json`. (`numpy` and `h5py` are
+  deprecated.)
 
 
 *v0.11.0* : Refactor

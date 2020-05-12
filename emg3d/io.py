@@ -221,7 +221,8 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
           if you don't want to install `h5py`.
         - `npz`: Uses `numpy` to store inputs to a flat, compressed binary
           file with the extension '.npz'.
-        - `json`: Uses `json` to store inputs to a plain '.json' file.
+        - `json`: Uses `json` to store inputs to a hierarchical, plain '.json'
+          file with the extension '.json'.
 
     compression : int or str, optional
         Passed through to h5py, default is 'gzip'.
@@ -265,8 +266,11 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
     # Save data depending on the backend.
     if backend == "npz":
 
+        # Convert hierarchical dict to a flat dict.
+        data = _dict_flatten(data)
+
         # Store flattened data.
-        np.savez_compressed(full_path, **_dict_flatten(data))
+        np.savez_compressed(full_path, **data)
 
     elif backend == "h5":
 
@@ -281,10 +285,12 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
 
     elif backend == "json":
 
-        # Store flattened data.
+        # Move arrays to lists and decompose complex data.
+        data = _dict_dearray_decomp(data)
+
+        # Store hierarchical data.
         with open(full_path, "w") as f:
-            json.dump(_dict_flatten(data, False, True), f,
-                      sort_keys=True, indent=4)
+            json.dump(data, f, sort_keys=True, indent=4)
 
     else:
         raise NotImplementedError(f"Backend '{backend}' is not implemented.")
@@ -358,8 +364,8 @@ def load(fname, **kwargs):
         with open(full_path, 'r') as f:
             data = json.load(f)
 
-        # Un-flatten data.
-        data = _dict_unflatten(data)
+        # Move lists back to arrays and compose complex data.
+        data = _dict_array_comp(data)
 
     else:
         ext = fname.split('.')[-1]
@@ -536,7 +542,7 @@ def _dict_deserialize(inp):
             inp[key] = None
 
 
-def _dict_flatten(data, numpy_arrays=True, decomp=False):
+def _dict_flatten(data):
     """Return flattened dict of input dict <data>.
 
     After https://codereview.stackexchange.com/revisions/21035/3
@@ -545,15 +551,8 @@ def _dict_flatten(data, numpy_arrays=True, decomp=False):
     Parameters
     ----------
     data : dict
-        Input dict to flatten
+        Input dict to flatten.
 
-    numpy_arrays : bool
-        If True (default), stores numpy arrays, otherwise stores lists.
-        Adds '__array-`dtype`' to key-name.
-
-    decomp : bool
-        If False (default), stores complex values. Otherwise it splits them
-        into [Real, Imag]. Adds '__complex' to key-name.
 
     Returns
     -------
@@ -566,20 +565,8 @@ def _dict_flatten(data, numpy_arrays=True, decomp=False):
         """Expand list."""
 
         if isinstance(value, dict):
-            return [(key+'>'+k, v) for k, v in
-                    _dict_flatten(value, numpy_arrays, decomp).items()]
+            return [(key+'>'+k, v) for k, v in _dict_flatten(value).items()]
         else:
-
-            # Test if complex.
-            if decomp and np.iscomplexobj(value):
-                value = np.stack([np.asarray(value).real,
-                                  np.asarray(value).imag])
-                key += '__complex'
-
-            # Convert to lists if no arrays wanted.
-            if not numpy_arrays and isinstance(value, np.ndarray):
-                key += '__array-'+value.dtype.name
-                value = value.tolist()
 
             return [(key, value)]
 
@@ -595,7 +582,7 @@ def _dict_unflatten(data):
     Parameters
     ----------
     data : dict
-        Input dict to un-flatten
+        Input dict to un-flatten.
 
     Returns
     -------
@@ -626,16 +613,6 @@ def _dict_unflatten(data):
             # Add value to subdict.
             tmp = tmp[part]
 
-        if '__array' in parts[-1]:
-            arraytype = parts[-1].split('__')[-1]
-            dtype = getattr(np, arraytype[6:])
-            value = np.asarray(value, dtype=dtype, order='F')
-            parts[-1] = parts[-1].replace(parts[-1][-len(arraytype)-2:], '')
-
-        if '__complex' in parts[-1]:
-            value = np.asarray(value)[0, ...] + 1j*np.asarray(value)[1, ...]
-            parts[-1] = parts[-1].replace('__complex', '')
-
         # Convert numpy strings to str.
         if '<U' in str(np.asarray(value).dtype):
             value = str(value)
@@ -644,6 +621,96 @@ def _dict_unflatten(data):
         tmp[parts[-1]] = value
 
     return out
+
+
+def _dict_dearray_decomp(data):
+    """Return dict where arrays are replaced by lists, complex by real numbers.
+
+
+    Parameters
+    ----------
+    data : dict
+        Input dict to decompose.
+
+
+    Returns
+    -------
+    ddata : dict
+        As input, but arrays are moved to lists, and complex number to real
+        numbers like [real, imag].
+
+    """
+
+    # Output dict.
+    ddata = {}
+
+    # Loop over keys.
+    for key, value in data.items():
+
+        # Recursion.
+        if isinstance(value, dict):
+            value = _dict_dearray_decomp(value)
+
+        # Test if complex.
+        if np.iscomplexobj(value):
+            key += '__complex'
+            value = np.stack([np.asarray(value).real, np.asarray(value).imag])
+
+        # Convert to lists if no arrays wanted.
+        if isinstance(value, np.ndarray):
+            key += '__array-'+value.dtype.name
+            value = value.tolist()
+
+        # Store this key-value-pair.
+        ddata[key] = value
+
+    return ddata
+
+
+def _dict_array_comp(data):
+    """Return dict where lists/complex are moved back to arrays.
+
+
+    Parameters
+    ----------
+    data : dict
+        Input dict to compose.
+
+
+    Returns
+    -------
+    ddata : dict
+        As input, but lists are again arrays and complex data are complex
+        again.
+
+    """
+
+    # Output dict.
+    ddata = {}
+
+    # Loop over keys.
+    for key, value in data.items():
+
+        # Recursion.
+        if isinstance(value, dict):
+            value = _dict_array_comp(value)
+
+        # Get arrays back.
+        if '__array' in key:
+            arraytype = key.split('__')[-1]
+            dtype = getattr(np, arraytype[6:])
+            value = np.asarray(value, dtype=dtype, order='F')
+            key = key.replace(key[-len(arraytype)-2:], '')
+
+        # Compose complex numbers.
+        if '__complex' in key:
+            value = np.asarray(value)[0, ...] + 1j*np.asarray(value)[1, ...]
+            key = key.replace('__complex', '')
+
+        # Store this key-value-pair.
+        ddata[key] = value
+
+    return ddata
 
 
 def _hdf5_add_to(data, h5file, compression):
