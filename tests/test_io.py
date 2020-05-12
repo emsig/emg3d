@@ -182,8 +182,8 @@ def test_save_and_load(tmpdir, capsys):
         io.load('ttt.abc')
 
     # Ensure deprecated backend/extension still work.
-    io.save('ttt', backend='numpy')
-    io.save('ttt', backend='h5py')
+    io.save(tmpdir+'/ttt', backend='numpy')
+    io.save(tmpdir+'/ttt', backend='h5py')
 
     # Test h5py.
     if h5py:
