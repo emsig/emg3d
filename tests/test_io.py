@@ -184,7 +184,6 @@ def test_save_and_load(tmpdir, capsys):
 
     # Ensure deprecated backend/extension still work.
     io.save(tmpdir+'/ttt', backend='numpy')
-    io.save(tmpdir+'/ttt', backend='h5py')
 
     # Test h5py.
     if h5py:
@@ -202,6 +201,9 @@ def test_save_and_load(tmpdir, capsys):
 
         assert io._compare_dicts(out_h5, out_npz) is True
     else:
+        with pytest.raises(ImportError):
+            # Ensure deprecated backend/extension still work.
+            io.save(tmpdir+'/ttt', backend='h5py')
         with pytest.raises(ImportError):
             io.save(tmpdir+'/test-h5', grid=grid)
         with pytest.raises(ImportError):

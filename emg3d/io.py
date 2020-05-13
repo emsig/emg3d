@@ -362,7 +362,7 @@ def load(fname, **kwargs):
         # Check if h5py is installed.
         if isinstance(h5py, str):
             print(h5py)
-            raise ImportError("backend='h5py'")
+            raise ImportError("backend='h5'")
 
         # Load data.
         with h5py.File(full_path, 'r') as h5file:
