@@ -24,6 +24,7 @@ Utility functions for writing and reading data.
 
 
 import os
+import json
 import shelve
 import warnings
 import numpy as np
@@ -195,7 +196,7 @@ def data_read(fname, keys=None, path="data"):
             return out
 
 
-def save(fname, backend="h5py", compression="gzip", **kwargs):
+def save(fname, backend="h5", compression="gzip", **kwargs):
     """Save meshes, models, fields, and other data to disk.
 
     Serialize and save :class:`emg3d.meshes.TensorMesh`,
@@ -214,15 +215,20 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
     backend : str, optional
         Backend to use. Implemented are currently:
 
-        - `h5py` (default): Uses `h5py` to store inputs to a hierarchical,
+        - `h5` (default): Uses `h5py` to store inputs to a hierarchical,
           compressed binary hdf5 file with the extension '.h5'. Recommended and
-          default backend, but requires the module `h5py`. Use `numpy` if you
-          don't want to install `h5py`.
-        - `numpy`: Uses `numpy` to store inputs to a flat, compressed binary
+          default backend, but requires the module `h5py`. Use `npz` or `json`
+          if you don't want to install `h5py`.
+        - `npz`: Uses `numpy` to store inputs to a flat, compressed binary
           file with the extension '.npz'.
+        - `json`: Uses `json` to store inputs to a hierarchical, plain '.json'
+          file with the extension '.json'.
 
     compression : int or str, optional
         Passed through to h5py, default is 'gzip'.
+
+    json_indent : int or None
+        Passed through to json, default is 2.
 
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
@@ -231,43 +237,69 @@ def save(fname, backend="h5py", compression="gzip", **kwargs):
         serialized again if loaded with :func:`load`. These instances are
         collected in their own group if h5py is used.
 
+        Note that the provided data cannot contain the before described
+        parameters as keys.
+
     """
+    # Get and remove optional kwargs.
+    json_indent = kwargs.pop('json_indent', 2)
+
     # Get absolute path.
     full_path = os.path.abspath(fname)
 
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
     kwargs['_version'] = 'emg3d v' + utils.__version__
-    kwargs['_format'] = '0.10.0'  # File format; version of emg3d when changed.
+    kwargs['_format'] = '0.11.1'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
     data = _dict_serialize(kwargs)
 
-    # Save data depending on the backend.
-    if backend == "numpy":
+    # Deprecated backends.
+    if backend == 'numpy':
+        mesg = ("\n    The use of `backend='numpy'` is deprecated and will\n"
+                "    be removed. Use `backend='npz'` instead.")
+        warnings.warn(mesg, DeprecationWarning)
+        backend = 'npz'
+    elif backend == 'h5py':
+        mesg = ("\n    The use of `backend='h5py'` is deprecated and will\n"
+                "    be removed. Use `backend='h5'` instead.")
+        warnings.warn(mesg, DeprecationWarning)
+        backend = 'h5'
 
-        # Add .npz if necessary.
-        if not full_path.endswith('.npz'):
-            full_path += '.npz'
+    # Add file-ending if necessary.
+    if not full_path.endswith('.'+backend):
+        full_path += '.'+backend
+
+    # Save data depending on the backend.
+    if backend == "npz":
+
+        # Convert hierarchical dict to a flat dict.
+        data = _dict_flatten(data)
 
         # Store flattened data.
-        np.savez_compressed(full_path, **_dict_flatten(data))
+        np.savez_compressed(full_path, **data)
 
-    elif backend == "h5py":
-
-        # Add .h5 if necessary.
-        if not full_path.endswith('.h5'):
-            full_path += '.h5'
+    elif backend == "h5":
 
         # Check if h5py is installed.
         if isinstance(h5py, str):
             print(h5py)
-            raise ImportError("backend='h5py'")
+            raise ImportError("backend='h5'")
 
         # Store data.
         with h5py.File(full_path, "w") as h5file:
             _hdf5_add_to(data, h5file, compression)
+
+    elif backend == "json":
+
+        # Move arrays to lists and decompose complex data.
+        data = _dict_dearray_decomp(data)
+
+        # Store hierarchical data.
+        with open(full_path, "w") as f:
+            json.dump(data, f, indent=json_indent)
 
     else:
         raise NotImplementedError(f"Backend '{backend}' is not implemented.")
@@ -289,6 +321,7 @@ def load(fname, **kwargs):
 
         - '.npz': numpy-binary
         - '.h5': h5py-binary (needs `h5py`)
+        - '.json': json
 
     verb : int
         If 1 (default) verbose, if 0 silent.
@@ -315,7 +348,7 @@ def load(fname, **kwargs):
     full_path = os.path.abspath(fname)
 
     # Load data depending on the file extension.
-    if fname.endswith('npz'):
+    if fname.endswith('.npz'):
 
         # Load .npz into a flat dict.
         with np.load(full_path, allow_pickle=allow_pickle) as dat:
@@ -324,16 +357,24 @@ def load(fname, **kwargs):
         # Un-flatten data.
         data = _dict_unflatten(data)
 
-    elif fname.endswith('h5'):
+    elif fname.endswith('.h5'):
 
         # Check if h5py is installed.
         if isinstance(h5py, str):
             print(h5py)
-            raise ImportError("backend='h5py'")
+            raise ImportError("backend='h5'")
 
         # Load data.
         with h5py.File(full_path, 'r') as h5file:
             data = _hdf5_get_from(h5file)
+
+    elif fname.endswith('.json'):
+
+        with open(full_path, 'r') as f:
+            data = json.load(f)
+
+        # Move lists back to arrays and compose complex data.
+        data = _dict_array_comp(data)
 
     else:
         ext = fname.split('.')[-1]
@@ -519,7 +560,8 @@ def _dict_flatten(data):
     Parameters
     ----------
     data : dict
-        Input dict to flatten
+        Input dict to flatten.
+
 
     Returns
     -------
@@ -548,7 +590,7 @@ def _dict_unflatten(data):
     Parameters
     ----------
     data : dict
-        Input dict to un-flatten
+        Input dict to un-flatten.
 
     Returns
     -------
@@ -580,13 +622,103 @@ def _dict_unflatten(data):
             tmp = tmp[part]
 
         # Convert numpy strings to str.
-        if '<U' in str(value.dtype):
+        if '<U' in str(np.asarray(value).dtype):
             value = str(value)
 
         # Store actual value of this key.
         tmp[parts[-1]] = value
 
     return out
+
+
+def _dict_dearray_decomp(data):
+    """Return dict where arrays are replaced by lists, complex by real numbers.
+
+
+    Parameters
+    ----------
+    data : dict
+        Input dict to decompose.
+
+
+    Returns
+    -------
+    ddata : dict
+        As input, but arrays are moved to lists, and complex number to real
+        numbers like [real, imag].
+
+    """
+
+    # Output dict.
+    ddata = {}
+
+    # Loop over keys.
+    for key, value in data.items():
+
+        # Recursion.
+        if isinstance(value, dict):
+            value = _dict_dearray_decomp(value)
+
+        # Test if complex.
+        if np.iscomplexobj(value):
+            key += '__complex'
+            value = np.stack([np.asarray(value).real, np.asarray(value).imag])
+
+        # Convert to lists if no arrays wanted.
+        if isinstance(value, np.ndarray):
+            key += '__array-'+value.dtype.name
+            value = value.tolist()
+
+        # Store this key-value-pair.
+        ddata[key] = value
+
+    return ddata
+
+
+def _dict_array_comp(data):
+    """Return dict where lists/complex are moved back to arrays.
+
+
+    Parameters
+    ----------
+    data : dict
+        Input dict to compose.
+
+
+    Returns
+    -------
+    ddata : dict
+        As input, but lists are again arrays and complex data are complex
+        again.
+
+    """
+
+    # Output dict.
+    ddata = {}
+
+    # Loop over keys.
+    for key, value in data.items():
+
+        # Recursion.
+        if isinstance(value, dict):
+            value = _dict_array_comp(value)
+
+        # Get arrays back.
+        if '__array' in key:
+            arraytype = key.split('__')[-1]
+            dtype = getattr(np, arraytype[6:])
+            value = np.asarray(value, dtype=dtype, order='F')
+            key = key.replace(key[-len(arraytype)-2:], '')
+
+        # Compose complex numbers.
+        if '__complex' in key:
+            value = np.asarray(value)[0, ...] + 1j*np.asarray(value)[1, ...]
+            key = key.replace('__complex', '')
+
+        # Store this key-value-pair.
+        ddata[key] = value
+
+    return ddata
 
 
 def _hdf5_add_to(data, h5file, compression):
@@ -650,3 +782,97 @@ def _hdf5_get_from(h5file):
             data[key] = _hdf5_get_from(value)
 
     return data
+
+
+def _compare_dicts(dict1, dict2, verb=False, **kwargs):
+    """Return True if the two dicts `dict1` and `dict2` are the same.
+
+    Private method, not foolproof. Useful for developing new backends.
+
+    If `verb=True`, it prints it key starting with the following legend:
+
+      - True : Values are the same.
+      - False : Values are not the same.
+      - {1} : Key is only in dict1 present.
+      - {2} : Key is only in dict2 present.
+
+    Private keys (starting with an underscore) are ignored.
+
+
+    Parameters
+    ----------
+    dict1, dict2 : dicts
+        Dictionaries to compare.
+
+    verb : bool
+        If True, prints all keys and if they are the  same for that key.
+
+    kwargs : dict
+        For recursion.
+
+
+    Returns
+    -------
+    same : bool
+        True if dicts are the same, False otherwise.
+
+    """
+    # Get recursion kwargs.
+    s = kwargs.pop('s', '')
+    reverse = kwargs.pop('reverse', False)
+    gsame = kwargs.pop('gsame', True)
+
+    # Check if we are at the base level and in reverse mode or not.
+    do_reverse = len(s) == 0 and reverse is False
+
+    # Loop over key-value pairs.
+    for key, value in dict1.items():
+
+        # Recursion if value is dict and present in both dicts.
+        if isinstance(value, dict) and key in dict2.keys():
+
+            # Add current key to string.
+            s += f"{key[:10]:11}> "
+
+            # Recursion.
+            _compare_dicts(dict1[key], dict2[key], verb=verb, s=s,
+                           reverse=reverse, gsame=gsame)
+
+            # Remove current key.
+            s = s[:-13]
+
+        elif key.startswith('_'):  # Ignoring private keys.
+            pass
+
+        else:  # Do actual comparison.
+
+            # Check if key in both dicts.
+            if key in dict2.keys():
+
+                # If reverse, the key has already been checked.
+                if reverse is False:
+
+                    # Compare.
+                    same = np.all(value == dict2[key])
+
+                    # Update global bool.
+                    gsame *= same
+
+                    if verb:
+                        print(f"{bool(same)!s:^7}:: {s}{key}")
+
+                    # Clean string.
+                    s = len(s)*' '
+
+            else:  # If only in one dict -> False.
+
+                gsame = False
+
+                if verb:
+                    print(f"  {{{2 if reverse else 1}}}  :: {s}{key}")
+
+    # Do the same reverse, do check for keys in dict2 which are not in dict1.
+    if do_reverse:
+        gsame = _compare_dicts(dict2, dict1, verb, reverse=True, gsame=gsame)
+
+    return gsame

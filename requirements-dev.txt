@@ -1,11 +1,15 @@
-numpy
-scipy >= 1.4.0
-numba >= 0.45.0
+# GLOBAL REQUIREMENTS.
+-r requirements.txt
+
+# SOFT DEPENDENCIES
 h5py
+scooby
 matplotlib
 
-empymod >= 2.0.0
+# SETUP RELATED
+setuptools_scm
 
+# FOR DOCUMENTATION
 # sphinx fixed below 2.0
 # https://github.com/numpy/numpydoc/issues/215
 sphinx < 2.0
@@ -13,9 +17,7 @@ numpydoc
 sphinx_numfig
 sphinx_rtd_theme
 
-setuptools_scm
-
+# FOR TESTING
 pytest
 pytest-cov
 pytest-flake8
-scooby

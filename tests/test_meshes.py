@@ -238,3 +238,14 @@ def test_TensorMesh():
     del dgrid['hx']
     with pytest.raises(KeyError):
         meshes.TensorMesh.from_dict(dgrid)
+
+    # Check __eq__.
+    assert emg3dgrid == cgrid
+    # Dummies to check __eq__.
+    cgrid.vnC = cgrid.vnC[:2]
+    cgrid = emg3dgrid.copy()
+    cgrid.hx = cgrid.hx*2
+    assert emg3dgrid != cgrid
+    cgrid = emg3dgrid.copy()
+    cgrid.vnC = np.array([99, 1, 1])
+    assert emg3dgrid != cgrid

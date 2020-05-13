@@ -22,9 +22,9 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
     install_requires=[
-        'numpy',
         'scipy>=1.4.0',
         'numba>=0.45.0',
         'empymod>=2.0.0',

@@ -358,7 +358,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
             # Start final info.
             var.exit_message = "CONVERGED"
-            info = f"   > NOTHING DONE (provided efield already good enough)\n"
+            info = "   > NOTHING DONE (provided efield already good enough)\n"
 
     # Check if sfield is zero.
     if var.l2_refe < 100*np.finfo(float).tiny:
@@ -372,7 +372,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
         # Start final info.
         var.exit_message = "CONVERGED"
-        info = f"   > RETURN ZERO E-FIELD (provided sfield is zero)\n"
+        info = "   > RETURN ZERO E-FIELD (provided sfield is zero)\n"
 
         # Zero-source means zero e-field.
         efield = fields.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
@@ -579,7 +579,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 if var.verb > 3:
                     norm = residual(grid, model, sfield, efield, True)
                     _print_gs_info(
-                            it, level, cycmax, grid, norm, f"post-smoothing")
+                            it, level, cycmax, grid, norm, "post-smoothing")
 
         # Update iterator counts.
         it += 1         # Local iterator.
@@ -1331,7 +1331,7 @@ class MGParameters:
         if self.sslsolver is True:
             self.sslsolver = 'bicgstab'
         elif self.sslsolver is not False and self.sslsolver not in solvers:
-            print(f"* ERROR   :: `sslsolver` must be True, False, or one of")
+            print("* ERROR   :: `sslsolver` must be True, False, or one of")
             print(f"             {solvers}.")
             print(f"             Provided: sslsolver={self.sslsolver!r}.")
             raise ValueError('sslsolver!r')
@@ -1613,7 +1613,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
         lvl *= _lvl_all[1:] - _lvl_all[:-1]
 
         # Create info string.
-        out = [f"       h_\n"]
+        out = ["       h_\n"]
         slen = min(len(lvl), 70)
         for cl in range(lvl_max):
             out += f"   {2**(cl+1):4}h_ "
