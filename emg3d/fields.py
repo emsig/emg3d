@@ -124,8 +124,15 @@ class Field(np.ndarray):
             obj.vnEz = fz.shape
         else:                                     # If grid is provided
             attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
+
             for attr in attr_list:
                 setattr(obj, attr, getattr(fx_or_grid, attr))
+
+            # Ensure the grid has three dimensions.
+            # (Can happend with a 1D or 2D discretize mesh.)
+            if None in [obj.nEx, obj.nEy, obj.nEz]:
+                print("* ERROR   :: Provided grid must be a 3D grid.")
+                raise ValueError
 
         # Get Laplace parameter.
         if freq is None and hasattr(fy_or_field, 'freq'):

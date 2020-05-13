@@ -104,6 +104,34 @@ class TensorMesh:
         return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
                 f"({self.nC:,})")
 
+    def __eq__(self, mesh):
+        """Compare two meshes.
+
+        The provided `mesh` can be either a `emg3d` or a `discretize`
+        TensorMesh.
+
+        """
+
+        # Check if mesh is of the same instance.
+        equal = mesh.__class__.__name__ == self.__class__.__name__
+
+        # Check dimensions.
+        if equal:
+            equal *= mesh.vnC.size == self.vnC.size
+
+        # Check shape.
+        if equal:
+            equal *= np.all(self.vnC == mesh.vnC)
+
+        # Check distances and origin.
+        if equal:
+            equal *= np.allclose(self.hx, mesh.hx, atol=0)
+            equal *= np.allclose(self.hy, mesh.hy, atol=0)
+            equal *= np.allclose(self.hz, mesh.hz, atol=0)
+            equal *= np.allclose(self.x0, mesh.x0, atol=0)
+
+        return bool(equal)
+
     def copy(self):
         """Return a copy of the TensorMesh."""
         return TensorMesh.from_dict(self.to_dict(True))

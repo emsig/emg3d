@@ -156,23 +156,23 @@ class Model:
 
         """
 
-        # Ensure model is a Model instance.
-        if model.__class__.__name__ != 'Model':
-            return NotImplemented
+        # Check if model is a Model instance.
+        equal = model.__class__.__name__ == 'Model'
 
         # Check input.
-        try:
-            _ = self._operator_test(model)
-            equal = True
-        except ValueError:
-            equal = False
+        if equal:
+            try:
+                _ = self._operator_test(model)
+            except ValueError:
+                equal = False
 
         # Compare resistivities.
-        equal *= np.all(self.res_x == model.res_x)
-        equal *= np.all(self.res_y == model.res_y)
-        equal *= np.all(self.res_z == model.res_z)
-        equal *= np.all(self.mu_r == model.mu_r)
-        equal *= np.all(self.epsilon_r == model.epsilon_r)
+        if equal:
+            equal *= np.all(self.res_x == model.res_x)
+            equal *= np.all(self.res_y == model.res_y)
+            equal *= np.all(self.res_z == model.res_z)
+            equal *= np.all(self.mu_r == model.mu_r)
+            equal *= np.all(self.epsilon_r == model.epsilon_r)
 
         return equal
 

@@ -9,6 +9,7 @@ Changelog
   Changed backend name to actual file extension: `npz` (instead of `numpy`);
   `h5` (instead of `h5py`), and new `json`. (`numpy` and `h5py` are
   deprecated.)
+- Added `__eq__` to `models.TensorMesh` to compare meshes.
 
 
 *v0.11.0* : Refactor

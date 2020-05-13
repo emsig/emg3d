@@ -253,6 +253,11 @@ def test_field(tmpdir):
     with pytest.raises(KeyError):
         fields.Field.from_dict(edict)
 
+    # Set a dimension from the mesh to None, ensure field fails.
+    grid.nEx = None
+    with pytest.raises(ValueError):
+        fields.Field(grid)
+
 
 def test_source_field():
     # Create some dummy data
