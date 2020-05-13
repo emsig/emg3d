@@ -1416,8 +1416,8 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
 
         # Middle block
         for k in range(5):
-            for l in range(k+1):
-                amat[k+5*l] = middle[k+5*l]
+            for m in range(k+1):
+                amat[k+5*m] = middle[k+5*m]
 
     elif im <= nC-2 and nC > 2:  # Normal case; full middle and left
 
@@ -1426,14 +1426,14 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
             bvec[k+fam] = rhs[k]
 
         # Left block
-        for l in range(1, 5):
-            for k in range(l+1):
-                amat[k+fam+5*(l+mam)] = left[k+5*l]
+        for m in range(1, 5):
+            for k in range(m+1):
+                amat[k+fam+5*(m+mam)] = left[k+5*m]
 
         # Middle block
         for k in range(5):
-            for l in range(k+1):
-                amat[k+fam+5*(l+fam)] = middle[k+5*l]
+            for m in range(k+1):
+                amat[k+fam+5*(m+fam)] = middle[k+5*m]
 
     elif im == nC-1:             # The last point
 
@@ -1441,8 +1441,8 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
         bvec[fam] = rhs[0]
 
         # First row from left block
-        for l in range(1, 5):
-            amat[fam+5*(l+mam)] = left[5*l]
+        for m in range(1, 5):
+            amat[fam+5*(m+mam)] = left[5*m]
 
         # First element from middle block
         amat[6*fam] = middle[0]

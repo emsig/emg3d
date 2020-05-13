@@ -416,7 +416,7 @@ class SourceField(Field):
         """Initiate a new Source Field."""
         # Ensure frequency is provided.
         if freq is None:
-            print(f"* ERROR   :: SourceField requires the frequency.")
+            print("* ERROR   :: SourceField requires the frequency.")
             raise ValueError("SourceField needs `freq`.")
 
         if freq > 0:

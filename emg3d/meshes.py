@@ -486,7 +486,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
             hx, x0 = None, None
 
     elif verb > 0:
-        print(f"   Skin depth ", end="")
+        print("   Skin depth ", end="")
         if res.size == 1:
             print(f"         [m] : {skind[0]:.0f}")
         elif res.size == 2:
@@ -501,7 +501,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         print(f"   Final extent        [m] : {x0:.0f} - "
               f"{x0+np.sum(hx):.0f}")
         extstr = f"   Min/max cell width  [m] : {min(hx):.0f} / "
-        alstr = f"   Alpha survey"
+        alstr = "   Alpha survey"
         nrstr = "   Number of cells "
         if not np.isclose(sa, sa_adj):
             sastr = f"{sa:.3f} ({sa_adj:.3f})"
