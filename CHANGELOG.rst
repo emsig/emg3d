@@ -5,6 +5,8 @@ Changelog
 *latest*
 --------
 
+- `fields`: `get_receiver` changed its signature; can now handle arbitrary
+  receiver rotation. **TODO write in more detail**.
 - `io`: New `backend='json'`, writes to a hierarchical, plain json file.
   Changed backend name to actual file extension: `npz` (instead of `numpy`);
   `h5` (instead of `h5py`), and new `json`. (`numpy` and `h5py` are
