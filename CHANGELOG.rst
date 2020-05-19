@@ -12,6 +12,11 @@ Changelog
   `h5` (instead of `h5py`), and new `json`. (`numpy` and `h5py` are
   deprecated.)
 - Added `__eq__` to `models.TensorMesh` to compare meshes.
+- Improvements to `Field` and `SourceField`:
+
+  - `_sval` and `_smu0` not stored any longer, derived from `_freq`.
+  - `SourceField` is now using the `copy()` and `from_dict()` from its parents
+    class `Field`.
 
 
 *v0.11.0* : Refactor
