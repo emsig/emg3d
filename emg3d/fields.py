@@ -24,7 +24,6 @@ electric and magnetic fields, and fields at receivers.
 # the License.
 
 
-import warnings
 import numpy as np
 from copy import deepcopy
 from empymod import EMArray
@@ -33,7 +32,7 @@ from scipy.constants import mu_0
 from emg3d import maps, models
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
-           'get_h_field']
+           'get_receiver_response', 'get_h_field']
 
 
 class Field(np.ndarray):
@@ -51,11 +50,11 @@ class Field(np.ndarray):
     A `Field` can be initiated in three ways:
 
     1. ``Field(grid, dtype=complex)``:
-       Calling it with a :class:`meshes.TensorMesh` instance returns a
+       Calling it with a :class:`emg3d.meshes.TensorMesh` instance returns a
        `Field` instance of correct dimensions initiated with zeroes of data
        type `dtype`.
     2. ``Field(grid, field)``:
-       Calling it with a :class:`meshes.TensorMesh` instance and an
+       Calling it with a :class:`emg3d.meshes.TensorMesh` instance and an
        `ndarray` returns a `Field` instance of the provided `ndarray`, of same
        data type.
     3. ``Field(fx, fy, fz)``:
@@ -69,7 +68,7 @@ class Field(np.ndarray):
     Parameters
     ----------
 
-    fx_or_grid : :class:`meshes.TensorMesh` or ndarray
+    fx_or_grid : :class:`emg3d.meshes.TensorMesh` or ndarray
         Either a TensorMesh instance or an ndarray of shape grid.nEx or
         grid.vnEx. See explanations above. Only mandatory parameter; if the
         only one provided, it will initiate a zero-field of `dtype`.
@@ -381,7 +380,7 @@ class SourceField(Field):
     Parameters
     ----------
 
-    fx_or_grid : :class:`meshes.TensorMesh` or ndarray
+    fx_or_grid : :class:`emg3d.meshes.TensorMesh` or ndarray
         Either a TensorMesh instance or an ndarray of shape grid.nEx or
         grid.vnEx. See explanations above. Only mandatory parameter; if the
         only one provided, it will initiate a zero-field of `dtype`.
@@ -518,7 +517,7 @@ def get_source_field(grid, src, freq, strength=0):
     Parameters
     ----------
     grid : TensorMesh
-        Model grid; a :class:`meshes.TensorMesh` instance.
+        Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     src : list of floats
         Source coordinates (m). There are two formats:
@@ -773,93 +772,61 @@ def get_source_field(grid, src, freq, strength=0):
     return sfield
 
 
-def get_receiver(grid, field, rec, **kwargs):
-    """Return field (response) at receiver coordinates.
+def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
+    """Return values corresponding to grid at coordinates.
+
+    Works for electric fields as well as magnetic fields obtained with
+    :func:`get_h_field`, and for model parameters.
 
 
     Parameters
     ----------
-    grid : :class:`meshes.TensorMesh`
+    grid : :class:`emg3d.meshes.TensorMesh`
         The model grid.
 
-    field : :class:`Field`
-        The electric or magnetic field.
+    values : ndarray
+        Field instance, or a particular field (e.g. field.fx); Model
+        parameters.
 
-    rec : tuple (x, y, z, azimuth, dip)
-        Receiver coordinates, azimuths, and dips.
+    coordinates : tuple (x, y, z)
+        Coordinates (x, y, z) where to interpolate `values`; e.g. receiver
+        locations.
 
-    kwargs : dict
-        Just for backwards compatibility with old `get_receiver`, will ev. get
-        removed.
+    method : str, optional
+        The method of interpolation to perform, 'linear' or 'cubic'.
+        Default is 'cubic' (forced to 'linear' if there are less than 3 points
+        in any direction).
+
+    extrapolate : bool
+        If True, points on `new_grid` which are outside of `grid` are
+        filled by the nearest value (if ``method='cubic'``) or by extrapolation
+        (if ``method='linear'``). If False, points outside are set to zero.
+
+        Default is False.
 
 
     Returns
     -------
-    responses : :class:`empymod.utils.EMArray`
-        Responses at receiver.
+    new_values : ndarray or :class:`empymod.utils.EMArray`
+        Values at `coordinates`.
+
+        If input was a field it returns an EMArray, which is a subclassed
+        ndarray with ``.pha`` and ``.amp`` attributes.
+
+        If input was an entire Field instance, output is a tuple (fx, fy, fz).
+
+
+    See Also
+    --------
+    grid2grid : Interpolation of model parameters or fields to a new grid.
+    get_receiver_response : Get response for arbitrarily rotated receivers.
 
     """
-
-    # Check receiver dimension.
-    if len(rec) == 3:
-        # Issue warning
-        mesg = ("\n    The use of `get_receiver` with the old signature\n\n"
-                "    `get_receiver(grid, values, coordinates, method, "
-                "extrapolate)`\n\n"
-                "    is deprecated. Use the new signature\n\n"
-                "      `get_receiver(grid, field, rec)`,\n\n"
-                "    where `rec=(x, y, z, azimuth, dip)`, and\n"
-                "    field is a Field instance.")
-        warnings.warn(mesg, DeprecationWarning)
-        return _get_rec_old(grid, field, rec, **kwargs)
-
-    elif len(rec) != 5:
-        print("* ERROR   :: `rec`  needs to be in the form "
-              "(x, y, z, azimuth, dip).\n             "
-              f"Length of provided `rec`: {len(rec)}.")
-        raise ValueError("Receiver error")
-
-    # Get the vectors corresponding to input data.
-    if field.is_electric:
-        points = ((grid.vectorCCx, grid.vectorNy, grid.vectorNz),
-                  (grid.vectorNx, grid.vectorCCy, grid.vectorNz),
-                  (grid.vectorNx, grid.vectorNy, grid.vectorCCz))
-    else:
-        points = ((grid.vectorNx, grid.vectorCCy, grid.vectorCCz),
-                  (grid.vectorCCx, grid.vectorNy, grid.vectorCCz),
-                  (grid.vectorCCx, grid.vectorCCy, grid.vectorNz))
-
-    # Get azimuth and dip in radians.
-    azm = np.deg2rad(rec[3])
-    dip = np.deg2rad(rec[4])
-
-    # Get factors in the different directions.
-    factors = (np.cos(azm)*np.cos(dip),  # x
-               np.sin(azm)*np.cos(dip),  # y
-               np.sin(dip))  # z
-
-    # Pre-allocate the response.
-    resp = np.zeros(max([np.atleast_1d(x).size for x in rec]),
-                    dtype=field.dtype)
-
-    # Add the required responses.
-    inp = {'method': 'cubic', 'fill_value': 0.0, 'mode': 'constant'}
-    for i, ff in enumerate((field.fx, field.fy, field.fz)):
-        if np.any(abs(factors[i]) > 1e-10):
-            resp += factors[i]*maps.interp3d(points[i], ff, rec[:3], **inp)
-
-    # Return response.
-    return EMArray(resp)
-
-
-def _get_rec_old(grid, values, coordinates, method='cubic', extrapolate=False):
-    """DEPRECATED."""
-
     # If values is a Field instance, call it recursively for each field.
     if hasattr(values, 'field') and values.field.ndim == 1:
-        fx = _get_rec_old(grid, values.fx, coordinates, method, extrapolate)
-        fy = _get_rec_old(grid, values.fy, coordinates, method, extrapolate)
-        fz = _get_rec_old(grid, values.fz, coordinates, method, extrapolate)
+        fx = get_receiver(grid, values.fx, coordinates, method, extrapolate)
+        fy = get_receiver(grid, values.fy, coordinates, method, extrapolate)
+        fz = get_receiver(grid, values.fz, coordinates, method, extrapolate)
         return fx, fy, fz
 
     if len(coordinates) != 3:
@@ -897,6 +864,93 @@ def _get_rec_old(grid, values, coordinates, method='cubic', extrapolate=False):
         return out
     else:
         return EMArray(out)
+
+
+def get_receiver_response(grid, field, rec):
+    """Return the field (response) at receiver coordinates.
+
+    Parameters
+    ----------
+    grid : :class:`emg3d.meshes.TensorMesh`
+        The model grid.
+
+    field : :class:`Field`
+        The electric or magnetic field.
+
+    rec : tuple (x, y, z, azimuth, dip)
+        Receiver coordinates and angles (m, °).
+
+        All values can either be a scalar or having the same length as number
+        of receivers.
+
+        Angles:
+
+        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
+        - dip (°): vertical deviation from xy-plane up-wards.
+
+
+    Returns
+    -------
+    responses : :class:`empymod.utils.EMArray`
+        Responses at receiver.
+
+
+    .. note::
+
+        Currently only implemented for point receivers, not for finite length
+        dipoles.
+
+
+    See Also
+    --------
+    get_receiver : Get values at coordinates (fields and models).
+
+    """
+
+    # Check receiver dimension.
+    if len(rec) != 5:
+        print("* ERROR   :: `rec` needs to be in the form "
+              "(x, y, z, azimuth, dip).\n             "
+              f"Length of provided `rec`: {len(rec)}.")
+        raise ValueError("Receiver error")
+
+    # Check field dimension to ensure it is not a particular field.
+    if field.field.ndim == 3:
+        print("* ERROR   :: `field` must be a `Field`-instance, not a\n"
+              "             particular field such as `field.fx`.")
+        raise ValueError("Field error")
+
+    # Get the vectors corresponding to input data.
+    if field.is_electric:
+        points = ((grid.vectorCCx, grid.vectorNy, grid.vectorNz),
+                  (grid.vectorNx, grid.vectorCCy, grid.vectorNz),
+                  (grid.vectorNx, grid.vectorNy, grid.vectorCCz))
+    else:
+        points = ((grid.vectorNx, grid.vectorCCy, grid.vectorCCz),
+                  (grid.vectorCCx, grid.vectorNy, grid.vectorCCz),
+                  (grid.vectorCCx, grid.vectorCCy, grid.vectorNz))
+
+    # Get azimuth and dip in radians.
+    azm = np.deg2rad(rec[3])
+    dip = np.deg2rad(rec[4])
+
+    # Get factors in the different directions.
+    factors = (np.cos(azm)*np.cos(dip),  # x
+               np.sin(azm)*np.cos(dip),  # y
+               np.sin(dip))  # z
+
+    # Pre-allocate the response.
+    resp = np.zeros(max([np.atleast_1d(x).size for x in rec]),
+                    dtype=field.dtype)
+
+    # Add the required responses.
+    inp = {'method': 'cubic', 'fill_value': 0.0, 'mode': 'constant'}
+    for i, ff in enumerate((field.fx, field.fy, field.fz)):
+        if np.any(abs(factors[i]) > 1e-10):
+            resp += factors[i]*maps.interp3d(points[i], ff, rec[:3], **inp)
+
+    # Return response.
+    return EMArray(resp)
 
 
 def get_h_field(grid, model, field):

@@ -5,7 +5,7 @@ from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose, assert_array_equal
 
-from emg3d import io, meshes, models, fields
+from emg3d import io, meshes, models, fields, solver
 
 # Data generated with tests/create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
@@ -387,3 +387,79 @@ def test_get_receiver():
             grid, model.res_x, (-10, -10, -10), 'linear', True)
     assert_allclose(out10, 1.)
     assert out10.__class__ != empymod.utils.EMArray
+
+
+def test_get_receiver_response():
+    grid = meshes.TensorMesh(
+            [np.ones(4), np.array([1, 2, 3]), np.array([2, 1, 1])],
+            [0, 0, 0])
+    efield = fields.Field(grid, freq=1)
+    efield.field = np.ones(efield.size) + 1j*np.ones(efield.size)
+
+    # Provide wrong rec_loc input:
+    with pytest.raises(ValueError):
+        fields.get_receiver_response(grid, efield, (1, 1, 1))
+
+    # Provide particular field instead of field instance:
+    with pytest.raises(ValueError):
+        fields.get_receiver_response(grid, efield.fx, (1, 1, 1, 0, 0))
+
+    # Comparison to `get_receiver`.
+    rec = ([0.5, 1, 2], [0.5, 2, 3], 2)
+    out1a = fields.get_receiver(grid, efield.fx, rec)
+    out1b = fields.get_receiver(grid, efield.fy, rec)
+    out1c = fields.get_receiver(grid, efield.fz, rec)
+    out2a = fields.get_receiver_response(
+                grid, efield, (rec[0], rec[1], rec[2], 0, 0))
+    out2b = fields.get_receiver_response(
+                grid, efield, (rec[0], rec[1], rec[2], 90, 0))
+    out2c = fields.get_receiver_response(
+                grid, efield, (rec[0], rec[1], rec[2], 0, 90))
+    assert_allclose(out1a, out2a)
+    assert_allclose(out1b, out2b)
+    assert_allclose(out1c, out2c)
+
+    # Check it returns 0 if outside.
+    out3 = fields.get_receiver_response(grid, efield, (-10, -10, -10, 0, 0))
+    assert_allclose(out3, 0.+0j)
+
+    # Same for magnetic field.
+    model = models.Model(grid)
+    hfield = fields.get_h_field(grid, model, efield)
+
+    # Comparison to `get_receiver`.
+    rec = ([0.5, 1, 2], [0.5, 2, 3], 2)
+    out4a = fields.get_receiver(grid, hfield.fx, rec)
+    out4b = fields.get_receiver(grid, hfield.fy, rec)
+    out4c = fields.get_receiver(grid, hfield.fz, rec)
+    out5a = fields.get_receiver_response(
+                grid, hfield, (rec[0], rec[1], rec[2], 0, 0))
+    out5b = fields.get_receiver_response(
+                grid, hfield, (rec[0], rec[1], rec[2], 90, 0))
+    out5c = fields.get_receiver_response(
+                grid, hfield, (rec[0], rec[1], rec[2], 0, 90))
+    assert_allclose(out4a, out5a)
+    assert_allclose(out4b, out5b)
+    assert_allclose(out4c, out5c)
+
+    # Coarse check with emg3d.solve and empymod.
+    x = np.array([400, 450, 500, 550])
+    rec = (x, x*0, 0, 20, 70)
+    res = 0.3
+    src = (0, 0, 0, 0, 0)
+    freq = 10
+
+    hx, x0 = meshes.get_hx_h0(freq, res, [0, 1000], min_width=20, verb=0)
+    hyz, yz0 = meshes.get_hx_h0(freq, res, [-25, 25], min_width=20, verb=0)
+    grid = meshes.TensorMesh([hx, hyz, hyz], x0=np.array([x0, yz0, yz0]))
+
+    model = models.Model(grid, res)
+    sfield = fields.get_source_field(grid, src, freq)
+    efield = solver.solve(grid, model, sfield, semicoarsening=True,
+                          sslsolver=True, linerelaxation=True, verb=1)
+
+    epm = empymod.bipole(src, rec, [], res, freq, verb=1)
+    e3d = fields.get_receiver_response(grid, efield, rec)
+
+    # 10 % is still OK, grid is very coarse for fast comp (2s)
+    assert_allclose(epm, e3d, rtol=0.1)
