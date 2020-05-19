@@ -134,25 +134,15 @@ class Field(np.ndarray):
                 print("* ERROR   :: Provided grid must be a 3D grid.")
                 raise ValueError
 
-        # Get Laplace parameter.
+        # Store frequency
         if freq is None and hasattr(fy_or_field, 'freq'):
             freq = fy_or_field._freq
         obj._freq = freq
-        if freq is not None:
-            if freq > 0:  # Frequency domain; s = iw = 2i*pi*f.
-                obj._sval = np.array(-2j*np.pi*freq)
-                obj._smu0 = np.array(-2j*np.pi*freq*mu_0)
-            elif freq < 0:  # Laplace domain; s.
-                obj._sval = np.array(freq)
-                obj._smu0 = np.array(freq*mu_0)
-            else:
-                print("* ERROR   :: `freq` must be >0 (frequency domain) "
-                      "or <0 (Laplace domain)."
-                      f"             Provided frequency: {freq} Hz.")
-                raise ValueError("Source error")
-        else:
-            obj._sval = None
-            obj._smu0 = None
+        if freq == 0.0:
+            print("* ERROR   :: `freq` must be >0 (frequency domain) "
+                  "or <0 (Laplace domain).\n"
+                  f"             Provided frequency: {freq} Hz.")
+            raise ValueError("Frequency error")
 
         return obj
 
@@ -168,8 +158,6 @@ class Field(np.ndarray):
         self.vnEy = getattr(obj, 'vnEy', None)
         self.vnEz = getattr(obj, 'vnEz', None)
         self._freq = getattr(obj, '_freq', None)
-        self._sval = getattr(obj, '_sval', None)
-        self._smu0 = getattr(obj, '_smu0', None)
 
     def __reduce__(self):
         """Customize __reduce__ to make `Field` work with pickle.
@@ -180,8 +168,7 @@ class Field(np.ndarray):
 
         # Create our own tuple to pass to __setstate__.
         new_state = pickled_state[2]
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
-                     '_sval', '_smu0']
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq']
         for attr in attr_list:
             new_state += (getattr(self, attr),)
 
@@ -193,8 +180,7 @@ class Field(np.ndarray):
         => https://stackoverflow.com/a/26599346
         """
         # Set the necessary attributes (in reverse order).
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq',
-                     '_sval', '_smu0']
+        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq']
         attr_list.reverse()
         for i, name in enumerate(attr_list):
             i += 1  # We need it 1..#attr instead of 0..#attr-1.
@@ -205,7 +191,7 @@ class Field(np.ndarray):
 
     def copy(self):
         """Return a copy of the Field."""
-        return Field.from_dict(self.to_dict(True))
+        return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
         """Store the necessary information of the Field in a dict."""
@@ -335,11 +321,27 @@ class Field(np.ndarray):
     @property
     def smu0(self):
         """Return s*mu_0; mu_0 = Magn. permeability of free space [H/m]."""
+        if getattr(self, '_smu0', None) is None:
+            if self.sval is not None:
+                self._smu0 = self.sval*mu_0
+            else:
+                self._smu0 = None
+
         return self._smu0
 
     @property
     def sval(self):
         """Return s; s=iw in frequency domain; s=freq in Laplace domain."""
+
+        if getattr(self, '_sval', None) is None:
+            if self._freq is not None:
+                if self._freq < 0:  # Laplace domain; s.
+                    self._sval = np.array(self._freq)
+                else:  # Frequency domain; s = iw = 2i*pi*f.
+                    self._sval = np.array(-2j*np.pi*self._freq)
+            else:
+                self._sval = None
+
         return self._sval
 
     @property
@@ -426,53 +428,6 @@ class SourceField(Field):
 
         return super().__new__(cls, fx_or_grid, fy_or_field=fy_or_field,
                                fz=fz, dtype=dtype, freq=freq)
-
-    def copy(self):
-        """Return a copy of the SourceField."""
-        return SourceField.from_dict(self.to_dict(True))
-
-    @classmethod
-    def from_dict(cls, inp):
-        """Convert dictionary into :class:`SourceField` instance.
-
-        Parameters
-        ----------
-        inp : dict
-            Dictionary as obtained from :func:`SourceField.to_dict`.
-            The dictionary needs the keys `field`, `freq`, `vnEx`, `vnEy`, and
-            `vnEz`.
-
-        Returns
-        -------
-        obj : :class:`SourceField` instance
-
-        """
-
-        # Create a dummy with the required attributes for the field instance.
-        class Grid:
-            pass
-
-        grid = Grid()
-
-        # Check and get the required keys from the input.
-        try:
-            field = inp['field']
-            freq = inp['freq']
-            grid.vnEx = inp['vnEx']
-            grid.vnEy = inp['vnEy']
-            grid.vnEz = inp['vnEz']
-        except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
-
-        # Calculate missing info.
-        grid.nEx = np.prod(grid.vnEx)
-        grid.nEy = np.prod(grid.vnEy)
-        grid.nEz = np.prod(grid.vnEz)
-        grid.nE = grid.nEx + grid.nEy + grid.nEz
-
-        # Return Field instance.
-        return cls(grid, field, freq=freq)
 
     @property
     def vector(self):

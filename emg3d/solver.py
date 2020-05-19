@@ -342,8 +342,6 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         # source field.
         if efield.freq is None:
             efield._freq = sfield._freq
-            efield._sval = sfield._sval
-            efield._smu0 = sfield._smu0
 
         # Set flag to NOT return the field.
         var.do_return = False

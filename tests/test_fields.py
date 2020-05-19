@@ -207,6 +207,8 @@ def test_field(tmpdir):
     assert_allclose(ee.fx, ex)
     assert_allclose(ee.fy, ey)
     assert_allclose(ee.fz, ez)
+    assert ee.smu0 is None
+    assert ee.sval is None
 
     # Check it knows it is electric.
     assert ee.is_electric is True
