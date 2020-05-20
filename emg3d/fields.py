@@ -601,35 +601,21 @@ def get_source_field(grid, src, freq, strength=0):
         iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
         iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
 
-        # Indices and field strength in x-direction
-        if ix == nx-1:
-            rx = 1.0
-            ex = 1.0
-            ix1 = ix
-        else:
-            ix1 = ix+1
-            rx = (src[0]-xx[ix])/(xx[ix1]-xx[ix])
-            ex = 1.0-rx
+        def get_index_and_strength(ic, nc, csrc, cc):
+            """Return index and field strength in c-direction."""
+            if ic == nc-1:
+                ic1 = ic
+                rc = 1.0
+                ec = 1.0
+            else:
+                ic1 = ic+1
+                rc = (csrc-cc[ic])/(cc[ic1]-cc[ic])
+                ec = 1.0-rc
+            return rc, ec, ic1
 
-        # Indices and field strength in y-direction
-        if iy == ny-1:
-            ry = 1.0
-            ey = 1.0
-            iy1 = iy
-        else:
-            iy1 = iy+1
-            ry = (src[1]-yy[iy])/(yy[iy1]-yy[iy])
-            ey = 1.0-ry
-
-        # Indices and field strength in z-direction
-        if iz == nz-1:
-            rz = 1.0
-            ez = 1.0
-            iz1 = iz
-        else:
-            iz1 = iz+1
-            rz = (src[2]-zz[iz])/(zz[iz1]-zz[iz])
-            ez = 1.0-rz
+        rx, ex, ix1 = get_index_and_strength(ix, nx, src[0], xx)
+        ry, ey, iy1 = get_index_and_strength(iy, ny, src[1], yy)
+        rz, ez, iz1 = get_index_and_strength(iz, nz, src[2], zz)
 
         s[ix, iy, iz] = ex*ey*ez
         s[ix1, iy, iz] = rx*ey*ez
