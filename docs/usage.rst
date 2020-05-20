@@ -30,9 +30,9 @@ or via ``pip``:
 
    pip install emg3d
 
-Required are Python version 3.7 or higher and the modules ``NumPy`` and
-``SciPy``, ``Numba``, and ``empymod``; ``discretize`` (from `SimPEG
-<https://simpeg.xyz>`_) is highly recommended.
+Required are Python version 3.7 or higher and the modules `SciPy`, `Numba`, and
+`empymod`; `discretize` (from `SimPEG <https://simpeg.xyz>`_) is highly
+recommended.
 
 If you are new to Python we recommend using a Python distribution, which will
 ensure that all dependencies are met, specifically properly compiled versions
@@ -151,10 +151,10 @@ input grid had 49,152 cells, and the coarsest grid had 12 cells.
 Related ecosystem
 -----------------
 
-The hard dependencies for emg3d are with ``numpy``, ``scipy``, ``numba``, and
-``empymod`` comparably low. However, emg3d is, as such, "only" a solver. It
-does not contain fancy grid- nor model-creation routines or plotting functions.
-There exist other packages which do that much better.
+The hard dependencies for emg3d are with `SciPy`, `Numba`, and `empymod`
+comparably low. However, emg3d is, as such, "only" a solver. It does not
+contain fancy grid- nor model-creation routines or plotting functions. There
+exist other packages which do that much better.
 
 To create advanced meshes it is recommended to use `discretize
 <https://discretize.simpeg.xyz>`_ from the SimPEG framework. It also comes with
