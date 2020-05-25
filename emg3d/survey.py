@@ -23,7 +23,7 @@ A survey combines a set of sources and receivers.
 # the License.
 
 
-# import numpy as np
+import numpy as np
 # from typing import Tuple
 # from dataclasses import dataclass
 
@@ -32,8 +32,14 @@ A survey combines a set of sources and receivers.
 # __all__ = []
 
 
-class Survey():
-    r"""Create a survey with sources and receivers.
+class Survey:
+    """Create a survey with sources and receivers.
+
+    Survey takes care to join same receivers
+    Survey should check for
+    - source-receiver combinations,
+    - report missing sources
+    - list nfreq per source and all the rest
 
 
     Parameters
@@ -41,9 +47,10 @@ class Survey():
 
     """
 
-    def __init__(self, sources, receivers):
+    def __init__(self):
         """Initiate a new Survey instance."""
-        pass
+        self.names = {}
+
 
     def copy(self):
         """Return a copy of the Survey."""
@@ -70,43 +77,65 @@ class Survey():
         """
         raise NotImplementedError
 
-    # sources
-    #
+    def add_receivers(self, name, coordinates, frequency, source, data=None):
 
-    # Add/remove source
+        # Only name should be required
+        # coordinates are optionally, name is enough if once defined
+        # frequency and source are optionally
+        # data only if frequency and source provided
 
-    # receivers
-    #
+        # # Move to add
+        # self._names = dict()
+        # for name in names:
+        #     self._names[name] = dict()
 
-    # Add/remove receiver
+        self.names[name] = DipoleReceiver(
+            name=name,
+            coordinates=coordinates,
+            frequency=frequency,
+            source=source,
+            data=data,
+        )
 
-    # frequencies
-    # => collects all possible frequencies
-
-    # shape: nsrc x nrec x nfreq
-    # nrec, nsrc, nfreq
-    # size: actual data, which can be less than nsrc*nrec*nfreq
-
-    # data
-
-    # verify sources and receivers, that all exist, and that there are no
-    # unused sources or receivers.
+    def remove_receivers(self):
+        pass
 
 
-class Dipole():
+    def add_sources(self):
+        pass
 
-    def __init__(self, names, coordinates=None, **kwargs):
-        # Make it possible for either names and coordinates, or names as dict
-        # with name as keys and coordinates as values
+    def remove_sources(self):
+        pass
+
+    # Todo
+    def validate(self):
+        # verify sources and receivers, that all exist, and that there are no
+        # unused sources or receivers.
+        pass
+
+
+    def shape(self):
+        # Return nsrc x nrec x nfreq
+        pass
+
+    def size(self):
+        # Return actual data size (NOT equals nsrc x nrec x nfreq)
+        pass
+
+    def data(self):
+        # Store the actual data in an array
+        pass
+
+
+class Dipole:
+    """
+    Base dipole (source or receiver).
+    """
+
+    def __init__(self, name, coordinates, **kwargs):
 
         # expand coordinates
 
-        # Move to add
-        self._names = dict()
-        for name in names:
-            self._names[name] = dict()
-
-        # Move to add
         if len(coordinates) == 5:
             print("point dipole")
             self.is_finite = False
@@ -121,25 +150,61 @@ class Dipole():
                   f"            Provided coordinates: {coordinates}.")
             raise ValueError("coordinates")
 
-    def names(self):
-        return self._names
+        self.name = name
+        self.coordinates = coordinates
+
+        if kwargs:
+            print(f"¡ Error ! Remaining kwargs: {kwargs}")
+
+    @property
+    def length(self):
+        if not hasattr(self, '_length'):
+            if self.is_finite:
+                self._length = np.linalg.norm(
+                        np.diff(np.array(self.coordinates).reshape(-1, 2)))
+            else:
+                self._length = 1.0
+
+        return self._length
+
+    @property
+    def center(self):
+        """Center of the dipole."""
+        pass
+
+    @property
+    def dip(self):
+        """Implement that there is always a dip, not only for point dipoles."""
+        if not hasattr(self, '_dip'):
+            if self.is_finite:
+                print('TODO calculate dip')
+                raise NotImplementedError
+            else:
+                self._dip = self.coordinates[4]
+
+        return self._dip
+
+    @property
+    def azimuth(self):
+        """Implement that there is always a azimuth, not only for point
+        dipoles."""
+        if not hasattr(self, '_azimuth'):
+            if self.is_finite:
+                print('TODO calculate azimuth')
+                raise NotImplementedError
+            else:
+                self._azimuth = self.coordinates[3]
+
+        return self._azimuth
 
 
 class DipoleSource(Dipole):
+    """
+    """
 
-    def __init__(self, names, coordinates=None, **kwargs):
-        # location
+    def __init__(self, name, coordinates, **kwargs):
 
-        # Connect receivers
-        # Only name is required
-
-        super().__init__(names, coordinates, **kwargs)
-
-    # what frequencies
-    # nfreq
-    # nrec
-
-    # Method verify, to check that all connected receivers exist
+        super().__init__(name, coordinates, **kwargs)
 
     # __repr__ method to print info
 
@@ -147,9 +212,22 @@ class DipoleSource(Dipole):
 
 
 class DipoleReceiver(Dipole):
+    """
+    Maybe this shouldn't be a dataclass, and only data should be a dataclass.
 
-    def __init__(self, names=None, coordinates=None, **kwargs):
-        # location
+    - Frequencies could be a list, matching the data size.
+    - Source names could be a list, matching the data size.
+    - If frequencies and source names are lists, then data should have dimension
+      (nsrc, nfreq).
+
+    - names/coords should be able to be a list too (nrec, nsrc, nfreq)
+
+    Todos:
+    - Add frequencies
+    - Add sources
+
+    """
+    def __init__(self, name, coordinates, **kwargs):
 
         # `Dipole` permits len in [5, 6].
         # However, receivers are only implemented as points so far.
@@ -162,33 +240,30 @@ class DipoleReceiver(Dipole):
             # TODO don't fail with an error, convert to point dipoles!
             raise ValueError("coordinates")
 
-        # Connect sources and frequencies
-        # Only name is required
+        # Cast frequencies
+        self._frequency = kwargs.pop('frequency')
+        self._source = kwargs.pop('source')
+        self.data = kwargs.pop('data')
 
-        super().__init__(names, coordinates, **kwargs)
+        super().__init__(name, coordinates, **kwargs)
 
-    # what frequencies
+
+    def source(self):
+        return self._source
+
+    def n_src(self):
+        return len(self.source)
+
+    def frequency(self):
+        return self._frequency
+
+    def n_freq(self):
+        return self.frequency.size
+
     # measured data
-    # nsrc
-    # nfreq
     # get e-field => needs survey
     # get h-field => needs survey
-
-    # Method verify, to check that all connected sources exist with the
-    # appropriate frequencies.
 
     # __repr__ method to print info
 
     # to_dict/from_dict
-
-
-# @dataclass
-# class NewReceiver:
-#     name: str
-#     coordinates: Tuple[float, float, float]
-#     azimuth: float
-#     dip: float
-
-# @dataclass
-# class NewSource:
-#     receivers: List[NewReceiver]
