@@ -27,3 +27,9 @@ Code
 
 .. automodule:: emg3d.io
     :members:
+
+.. automodule:: emg3d.survey
+    :members:
+
+.. automodule:: emg3d.simulation
+    :members:

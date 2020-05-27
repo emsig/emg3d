@@ -1,7 +1,10 @@
 """
 
-:mod:`simulation` -- Compute EM responses for a survey
-======================================================
+:mod:`simulation` -- Model a survey
+===================================
+
+A simulation is the computation (modelling) of electromagnetic responses of a
+resistivity model for a given survey.
 
 In its heart, `emg3d` is a multigrid solver for 3D electromagnetic diffusion
 with tri-axial electrical anisotropy. However, it contains most functionalities

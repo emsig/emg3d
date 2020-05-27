@@ -1,7 +1,7 @@
 """
 
-:mod:`survey` -- Survey, sources, and receivers
-===============================================
+:mod:`survey` -- Surveys
+========================
 
 A survey combines a set of sources and receivers.
 
@@ -25,11 +25,11 @@ A survey combines a set of sources and receivers.
 
 import numpy as np
 # from typing import Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass  # , field
 
 # from emg3d import maps, models
 
-# __all__ = []
+__all__ = ['Survey', 'DipoleSource', 'DipoleReceiver']
 
 
 class Survey:
@@ -221,168 +221,216 @@ class Survey:
     # get h-field => needs survey
 
 
-@dataclass(eq=False)
-class Dipole:
-    """Electric dipole, source or receiver, finite or point.
+# # Sources and Receivers # #
+
+@dataclass(order=True, unsafe_hash=True)
+class PointDipole:
+    """Infinitesimal small point dipole.
+
+    Defined by its coordinates (xco, yco, zco), its azimuth (azm), and its dip.
+
+    Not meant to be used directly. Use :class:`DipoleSource` and
+    :class:`DipoleReceiver` instead.
+
+    """
+    __slots__ = ['name', 'xco', 'yco', 'zco', 'azm', 'dip']
+    name: str
+    xco: float
+    yco: float
+    zco: float
+    azm: float
+    dip: float
+
+
+class Dipole(PointDipole):
+    """Finite length dipole or point dipole.
+
+    Expansion of the basic :class:`PointDipole` to allow for finite length
+    dipoles, and to provide coordinate inputs in the form of
+    (x, y, z, azimuth, dip) or (x0, x1, y0, y1, z0, z1).
+
+    Adds attributes `is_finite`, `electrode1`, `electrode2`, `length`, and
+    `coordinates` to the class.
+
+    The length of a point dipole is set to unity (and the electrode positions
+    computed accordingly).
+
+    Not meant to be used directly. Use :class:`DipoleSource` and
+    :class:`DipoleReceiver` instead.
+
+    """
+
+    def __init__(self, name, coordinates):
+        """Check coordinates and kwargs."""
+
+        # Check coordinates.
+        try:
+            # Conversion to float-array fails if there are lists and tuples
+            # within the tuple, or similar.
+            # This should catch many wrong inputs, hopefully.
+            coords = np.array(coordinates, dtype=float)
+
+            # Check size => finite or point dipole?
+            if coords.size == 5:
+                self.is_finite = False
+
+            elif coords.size == 6:
+                self.is_finite = True
+
+                # Ensure the two poles are distinct.
+                if np.allclose(coords[::2], coords[1::2]):
+                    raise ValueError
+
+            else:
+                raise ValueError
+
+        except ValueError:
+            print("* ERROR   :: Dipole coordinates are wrong defined.\n"
+                  "             They must be defined either as a point,\n"
+                  "             (x, y, z, azimuth, dip), or as two poles,\n"
+                  "             (x0, x1, y0, y1, z0, z1), all floats.\n"
+                  "             In the latter, pole0 != pole1.\n"
+                  f"             Provided coordinates: {coordinates}.")
+            raise ValueError("Dipole coordinates")
+
+        # Get xco, yco, zco, azm, and dip.
+        if self.is_finite:
+
+            # Get the two separate electrodes.
+            self.electrode1 = tuple(coords[::2])
+            self.electrode2 = tuple(coords[1::2])
+
+            # Compute center.
+            xco, yco, zco = np.sum(coords.reshape(3, -1), 1)/2
+
+            # Get lengths in each direction.
+            dx, dy, dz = np.diff(coords.reshape(3, -1)).ravel()
+
+            # Length of bipole.
+            self.length = np.linalg.norm([dx, dy, dz], axis=0)
+
+            # Horizontal deviation from x-axis.
+            azm = np.round(np.rad2deg(np.arctan2(dy, dx)), 5)
+
+            # Vertical deviation from xy-plane down.
+            dip = np.round(np.rad2deg(np.pi/2-np.arccos(dz/self.length)), 5)
+
+            # (Very small angles set to zero, as, e.g., sin(pi/2) != exact 0)
+
+        else:
+            # Get coordinates, angles, and set length.
+            xco, yco, zco, azm, dip = tuple(coords)
+            self.length = 1.0
+
+            # Get lengths in each direction (total length is 1).
+            # (Set very small angles to zero, as, e.g., sin(pi/2) != exact 0)
+            dx = np.round(np.cos(np.deg2rad(azm))*np.cos(np.deg2rad(dip)), 5)
+            dy = np.round(np.sin(np.deg2rad(azm))*np.cos(np.deg2rad(dip)), 5)
+            dz = np.round(np.sin(np.deg2rad(dip)), 5)
+
+            # Get the two separate electrodes.
+            self.electrode1 = (xco-dx/2, yco-dy/2, zco-dz/2)
+            self.electrode2 = (xco+dx/2, yco+dy/2, zco+dz/2)
+
+        super().__init__(name, xco, yco, zco, azm, dip)
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}({self.name}, "
+                f"{{{self.xco}m; {self.yco}m; {self.zco}m}}, θ={self.azm}°, "
+                f"φ={self.dip}°, l={self.length}m)")
+
+    @property
+    def coordinates(self):
+        """Return coordinates.
+
+        In the format (x, y, z, azimuth, dip) or (x0, x1, y0, y1, z0, z1).
+
+        This format is used in many other routines.
+        """
+        if self.is_finite:
+            return (self.electrode1[0], self.electrode2[0],
+                    self.electrode1[1], self.electrode2[1],
+                    self.electrode1[2], self.electrode2[2])
+        else:
+            return (self.xco, self.yco, self.zco, self.azm, self.dip)
+
+
+class DipoleSource(Dipole):
+    """Dipole source.
+
 
     Parameters
     ----------
     name : str
         Dipole name.
 
-    x, y, z : float
-        Coordinates of the center of the dipole (m).
+    coordinates : tuple of floats
+        Source coordinates, one of the following:
 
-    azimuth, dip : float
-        Angles (coordinate system is either left-handed with positive z down or
-        right-handed with positive z up; East-North-Depth):
+        - (x0, x1, y0, y1, z0, z1): finite length dipole,
+        - (x, y, z, azimuth, dip): point dipole.
+
+        The coordinates x, y, and z are in meters (m), the azimuth and dip in
+        degree (°).
+
+        Angles (coordinate system is right-handed with positive z up;
+        East-North-Depth):
 
         - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
         - +/-dip (°): vertical deviation from xy-plane down/up-wards.
 
-    length : float
-        Length of (finite or point) dipole (m)
-
-    is_finite : bool
-        If True, dipole is a finite length dipole; if False, dipole is a point
-        dipole.
-
-    TODO to self: Use validators as soon as dataclasses have them.
+    strength : float
+        Source strength. If `strength=0` (default), the source is normalized to
+        a moment (hence source length and source strength) of 1 A m.
 
     """
-    name: str
-    xco: float = field(default=0.0, metadata={'units': 'm'})
-    yco: float = field(default=0.0, metadata={'units': 'm'})
-    zco: float = field(default=0.0, metadata={'units': 'm'})
-    azm: float = field(default=0.0, metadata={'units': '°'})
-    dip: float = field(default=0.0, metadata={'units': '°'})
-    length: float = field(default=1.0, metadata={'units': 'm'})
-    is_finite: bool = field(default=False, repr=False)
-
-
-# TODO:
-# - Combine PointDipole and FiniteDipole again
-#   - Convert to dataclass; very simple, NO @property
-#   - No kwargs
-# NO, BETTER: Make `Dipole`-> `PointDipole`
-#             Dipole(PointDipole)
-# - Write simple DipoleSource and DipoleReceiver wrappers.
-#   - Move docstrings to this one
-
-class PointDipole(Dipole):
-    """Electric infinitesimal small dipole, source or receiver."""
 
     def __init__(self, name, coordinates, **kwargs):
-        """Check coordinates and kwargs."""
+
+        # Get source strength.
+        self.strength = kwargs.pop('strength', 0.0)
 
         # Warn if any kwargs left; TODO: respect verbosity.
         if kwargs:
             print(f"* WARNING :: Remaining kwargs: {kwargs}")
 
-        # Check coordinates.
-        try:
-            # Conversion to float-array fails if there are lists and tuples
-            # within the tuple, or similar.
-            # This should catch many wrong inputs, hopefully.
-            coords = np.array(coordinates, dtype=float)
+        super().__init__(name, coordinates)
 
-            # Check size:
-            if coords.size != 5:
-                raise ValueError
-
-        except ValueError:
-            print("* ERROR   :: Point-dipole coordinates are wrong defined.\n"
-                  "             They must be defined in the following way:\n"
-                  "             (x, y, z, azimuth, dip), all floats.\n"
-                  f"             Provided coordinates: {coordinates}.")
-            raise ValueError("Point-dipole coordinates")
-
-        super().__init__(name, *coordinates, length=1.0, is_finite=False)
-
-    @property
-    def coordinates(self):
-        """In the format (x, y, z, azimuth, dip)."""
-        return (self.xco, self.yco, self.zco, self.azm, self.dip)
+    def __repr__(self):
+        """Add strength to repr."""
+        return (f"{super().__repr__()[:-1]}, I={self.strength}A)")
 
 
-class FiniteDipole(Dipole):
-    """Electric finite length dipole, source or receiver."""
-
-    def __init__(self, name, coordinates, **kwargs):
-        """Check coordinates and kwargs."""
-
-        # Check coordinates.
-        try:
-            # Conversion to float-array fails if there are lists and tuples
-            # within the tuple, or similar.
-            # This should catch many wrong inputs, hopefully.
-            coords = np.array(coordinates, dtype=float)
-
-            # Check size:
-            if coords.size != 6:
-                raise ValueError
-
-        except ValueError:
-            print("* ERROR   :: Finite-dipole coordinates are wrong defined.\n"
-                  "             They must be defined in the following way:\n"
-                  "             (x0, x1, y0, y1, z0, z1), all floats.\n"
-                  f"             Provided coordinates: {coordinates}.")
-            raise ValueError("Finite-dipole coordinates")
-
-        # Add electrodes.
-        self.electrode1 = tuple(coords[::2])
-        self.electrode2 = tuple(coords[1::2])
-
-        # Compute center.
-        center = tuple(np.sum(coords.reshape(3, -1), 1)/2)
-
-        # Get lengths in each direction
-        dx, dy, dz = np.diff(coords.reshape(3, -1)).ravel()
-
-        # Length of bipole
-        length = np.linalg.norm([dx, dy, dz], axis=0)
-
-        # Horizontal deviation from x-axis
-        azm = np.arctan2(dy, dx)
-
-        # Vertical deviation from xy-plane down
-        dip = np.pi/2-np.arccos(dz/length)
-
-        super().__init__(name, *center, azm, dip, length, True)
-
-    @property
-    def coordinates(self):
-        """In the format (x0, x1, y0, y1, z0, z1)."""
-        return (self.electrode1[0], self.electrode2[0],
-                self.electrode1[1], self.electrode2[1],
-                self.electrode1[2], self.electrode2[2])
+class DipoleReceiver(Dipole):
+    """Dipole receiver.
 
 
-class DipoleSource(Dipole):
-    """
-    Maybe this should be a dataclass.
+    Parameters
+    ----------
+    name : str
+        Dipole name.
+
+    coordinates : tuple of floats
+        Receiver coordinates, one of the following:
+
+        - (x0, x1, y0, y1, z0, z1): finite length dipole,
+        - (x, y, z, azimuth, dip): point dipole.
+
+        The coordinates x, y, and z are in meters (m), the azimuth and dip in
+        degree (°).
+
+        Angles (coordinate system is right-handed with positive z up;
+        East-North-Depth):
+
+        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
+        - +/-dip (°): vertical deviation from xy-plane down/up-wards.
+
     """
 
     def __init__(self, name, coordinates, **kwargs):
 
-        super().__init__(name, coordinates, **kwargs)
+        # Warn if any kwargs left; TODO: respect verbosity.
+        if kwargs:
+            print(f"* WARNING :: Remaining kwargs: {kwargs}")
 
-
-class DipoleReceiver(PointDipole):
-    """
-    Maybe this should be a dataclass, and only data should be a dataclass.
-    """
-    def __init__(self, name, coordinates, **kwargs):
-
-        # `Dipole` permits len in [5, 6].
-        # However, receivers are only implemented as points so far.
-
-        if len(coordinates) == 6:
-            print("* ERROR   :: Receivers are only implemented for point "
-                  "dipoles\n"
-                  "             at the moment, but finite length coordinates\n"
-                  "             (x1, x2, y1, y2, z1, z2) were provided.")
-            # TODO don't fail with an error, convert to point dipoles!
-            raise ValueError("coordinates")
-
-        super().__init__(name, coordinates, **kwargs)
+        super().__init__(name, coordinates)
