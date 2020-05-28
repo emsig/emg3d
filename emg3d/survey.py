@@ -24,6 +24,7 @@ A survey combines a set of sources and receivers.
 
 
 import numpy as np
+from copy import deepcopy
 # from typing import Tuple
 from dataclasses import dataclass  # , field
 
@@ -295,6 +296,10 @@ class Dipole(PointDipole):
         remembering me of that.
 
     """
+    # These are the only kwargs, that do not raise a Warning.
+    # These are also the only ones which are (de-)serialized.
+    # This is subject to change, and holds during development.
+    accepted_keys = ['strength', ]
 
     def __init__(self, name, coordinates, **kwargs):
         """Check coordinates and kwargs."""
@@ -302,7 +307,7 @@ class Dipole(PointDipole):
         # Add additional info to the dipole.
         for key, value in kwargs.items():
             # TODO: respect verbosity
-            if key not in ['strength', ]:
+            if key not in self.accepted_keys:
                 print(f"* WARNING :: Unknown kwargs {{{key}: {value}}}")
             setattr(self, key, value)
 
@@ -396,3 +401,46 @@ class Dipole(PointDipole):
                     self.electrode1[2], self.electrode2[2])
         else:
             return (self.xco, self.yco, self.zco, self.azm, self.dip)
+
+    def copy(self):
+        """Return a copy of the Dipole."""
+        return self.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        """Store the necessary information of the Dipole in a dict."""
+        out = {'name': self.name, 'coordinates': self.coordinates,
+               '__class__': self.__class__.__name__}
+
+        # Add accepted kwargs.
+        for key in self.accepted_keys:
+            if hasattr(self, key):
+                out[key] = getattr(self, key)
+
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert dictionary into :class:`Dipole` instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`Dipole.to_dict`.
+            The dictionary needs the keys `name` and `coordinates`.
+
+        Returns
+        -------
+        obj : :class:`Dipole` instance
+
+        """
+        try:
+            _ = inp.pop('__class__', '')
+            name = inp.pop('name')
+            coordinates = inp.pop('coordinates')
+            return cls(name=name, coordinates=coordinates, **inp)
+        except KeyError as e:
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise

@@ -87,3 +87,13 @@ def test_Dipole(capsys):
 
     reprstr = "Dipole(dip, {0.0m; 1000.0m; -950.0m}, θ=0.0°, φ=0.0°, l=1.0m)"
     assert reprstr in source.__repr__()
+
+    # Copy, to_dict, from_dict
+    source2 = source.copy()
+    source3 = source.to_dict()
+    source4 = source2.to_dict()
+    assert source2 == source
+    assert source3 == source4
+    del source4['coordinates']
+    with pytest.raises(KeyError):
+        survey.Dipole.from_dict(source4)
