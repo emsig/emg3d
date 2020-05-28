@@ -75,28 +75,15 @@ def test_Dipole(capsys):
     with pytest.raises(ValueError):
         survey.Dipole('dip', (0, 0, 0, 0, 0, 0))
 
-
-def test_DipoleSource(capsys):
-    dipole = survey.Dipole('dip', (0.0, 1000.0, -950.0, 0.0, 0.0))
-    source = survey.DipoleSource(
-            'dip', (0.0, 1000.0, -950.0, 0.0, 0.0), strength=75)
+    # Check adding various attributs.
+    _, _ = capsys.readouterr()
+    source = survey.Dipole(
+            'dip', (0.0, 1000.0, -950.0, 0.0, 0.0), strength=75, foo='bar')
+    out, _ = capsys.readouterr()
 
     assert source.strength == 75
+    assert source.foo == 'bar'
+    assert out == "* WARNING :: Unknown kwargs {foo: bar}\n"
 
-    assert dipole.__repr__()[-55:-1] in source.__repr__()
-
-    _ = survey.DipoleSource('dip', (0, 0, 0, 0, 0), bla='foo')
-    out, _ = capsys.readouterr()
-    assert "* WARNING :: Remaining kwargs: {'bla': 'foo'}" in out
-
-
-def test_DipoleReceiver(capsys):
-    # Nothing else than a Dipole
-    dipole = survey.Dipole('dip', (0.0, 1000.0, -950.0, 0.0, 0.0))
-    receiver = survey.DipoleReceiver('dip', (0.0, 1000.0, -950.0, 0.0, 0.0))
-
-    assert dipole.__repr__()[-55:] == receiver.__repr__()[-55:]
-
-    _ = survey.DipoleReceiver('dip', (0, 0, 0, 0, 0), bla='foo')
-    out, _ = capsys.readouterr()
-    assert "* WARNING :: Remaining kwargs: {'bla': 'foo'}" in out
+    reprstr = "Dipole(dip, {0.0m; 1000.0m; -950.0m}, θ=0.0°, φ=0.0°, l=1.0m)"
+    assert reprstr in source.__repr__()

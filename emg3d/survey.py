@@ -29,7 +29,7 @@ from dataclasses import dataclass  # , field
 
 # from emg3d import maps, models
 
-__all__ = ['Survey', 'DipoleSource', 'DipoleReceiver']
+__all__ = ['Survey', 'Dipole']
 
 
 class Survey:
@@ -111,7 +111,7 @@ class Survey:
                   f"             - New: {coordinates}")
 
         # Create a receiver dipole.
-        self._receivers[name] = DipoleReceiver(name, coordinates)
+        self._receivers[name] = Dipole(name, coordinates)
 
     def remove_receivers(self, names):
         # TODO
@@ -121,6 +121,11 @@ class Survey:
 
     def add_sources(self, names, coordinates):
         """Add source(s) to the survey.
+
+        # strength : float
+        #     Source strength. If `strength=0` (default), the source is
+        #     normalized to a moment (hence source length and source strength)
+        #     of 1 A m.
 
         Parameters
         ----------
@@ -151,7 +156,7 @@ class Survey:
                       f"             - New: {coordinates}")
 
             # Create a receiver dipole.
-            self._sources[names] = DipoleSource(names, coordinates)
+            self._sources[names] = Dipole(names, coordinates)
 
     def remove_sources(self):
         pass
@@ -182,7 +187,7 @@ class Survey:
         #
         # else:
         #     # Create a receiver dipole.
-        #     self._receivers[name] = DipoleReceiver(name, coordinates)
+        #     self._receivers[name] = Dipole(name, coordinates)
         #     # (nsrc, nfreq)
         #     # frequencies=frequencies,
         #     # sources=sources,
@@ -229,8 +234,7 @@ class PointDipole:
 
     Defined by its coordinates (xco, yco, zco), its azimuth (azm), and its dip.
 
-    Not meant to be used directly. Use :class:`DipoleSource` and
-    :class:`DipoleReceiver` instead.
+    Not meant to be used directly. Use :class:`Dipole` instead.
 
     """
     __slots__ = ['name', 'xco', 'yco', 'zco', 'azm', 'dip']
@@ -252,16 +256,55 @@ class Dipole(PointDipole):
     Adds attributes `is_finite`, `electrode1`, `electrode2`, `length`, and
     `coordinates` to the class.
 
-    The length of a point dipole is set to unity (and the electrode positions
-    computed accordingly).
+    For *point dipoles*, this gives it a length of unity (1 m), takes its
+    coordinates as center, and computes the two electrode positions.
 
-    Not meant to be used directly. Use :class:`DipoleSource` and
-    :class:`DipoleReceiver` instead.
+    For *finite length dipoles* it sets the coordinates to its center and
+    computes its length, azimuth, and dip.
+
+    So in the end finite length dipoles and point dipoles have the exactly
+    same signature. They can only be distinguished by the attribute
+    `is_finite`.
+
+
+    Parameters
+    ----------
+    name : str
+        Dipole name.
+
+    coordinates : tuple of floats
+        Source coordinates, one of the following:
+
+        - (x0, x1, y0, y1, z0, z1): finite length dipole,
+        - (x, y, z, azimuth, dip): point dipole.
+
+        The coordinates x, y, and z are in meters (m), the azimuth and dip in
+        degree (°).
+
+        Angles (coordinate system is right-handed with positive z up;
+        East-North-Depth):
+
+        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
+        - +/-dip (°): vertical deviation from xy-plane down/up-wards.
+
+    **kwargs : Optional solver options:
+        Currently, any other key will be added as attributes to the dipole.
+
+        This is for early development and will change in the future to avoid
+        abuse. It also raises a warning if it is an unknown key to keep
+        remembering me of that.
 
     """
 
-    def __init__(self, name, coordinates):
+    def __init__(self, name, coordinates, **kwargs):
         """Check coordinates and kwargs."""
+
+        # Add additional info to the dipole.
+        for key, value in kwargs.items():
+            # TODO: respect verbosity
+            if key not in ['strength', ]:
+                print(f"* WARNING :: Unknown kwargs {{{key}: {value}}}")
+            setattr(self, key, value)
 
         # Check coordinates.
         try:
@@ -353,84 +396,3 @@ class Dipole(PointDipole):
                     self.electrode1[2], self.electrode2[2])
         else:
             return (self.xco, self.yco, self.zco, self.azm, self.dip)
-
-
-class DipoleSource(Dipole):
-    """Dipole source.
-
-
-    Parameters
-    ----------
-    name : str
-        Dipole name.
-
-    coordinates : tuple of floats
-        Source coordinates, one of the following:
-
-        - (x0, x1, y0, y1, z0, z1): finite length dipole,
-        - (x, y, z, azimuth, dip): point dipole.
-
-        The coordinates x, y, and z are in meters (m), the azimuth and dip in
-        degree (°).
-
-        Angles (coordinate system is right-handed with positive z up;
-        East-North-Depth):
-
-        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-        - +/-dip (°): vertical deviation from xy-plane down/up-wards.
-
-    strength : float
-        Source strength. If `strength=0` (default), the source is normalized to
-        a moment (hence source length and source strength) of 1 A m.
-
-    """
-
-    def __init__(self, name, coordinates, **kwargs):
-
-        # Get source strength.
-        self.strength = kwargs.pop('strength', 0.0)
-
-        # Warn if any kwargs left; TODO: respect verbosity.
-        if kwargs:
-            print(f"* WARNING :: Remaining kwargs: {kwargs}")
-
-        super().__init__(name, coordinates)
-
-    def __repr__(self):
-        """Add strength to repr."""
-        return (f"{super().__repr__()[:-1]}, I={self.strength}A)")
-
-
-class DipoleReceiver(Dipole):
-    """Dipole receiver.
-
-
-    Parameters
-    ----------
-    name : str
-        Dipole name.
-
-    coordinates : tuple of floats
-        Receiver coordinates, one of the following:
-
-        - (x0, x1, y0, y1, z0, z1): finite length dipole,
-        - (x, y, z, azimuth, dip): point dipole.
-
-        The coordinates x, y, and z are in meters (m), the azimuth and dip in
-        degree (°).
-
-        Angles (coordinate system is right-handed with positive z up;
-        East-North-Depth):
-
-        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-        - +/-dip (°): vertical deviation from xy-plane down/up-wards.
-
-    """
-
-    def __init__(self, name, coordinates, **kwargs):
-
-        # Warn if any kwargs left; TODO: respect verbosity.
-        if kwargs:
-            print(f"* WARNING :: Remaining kwargs: {kwargs}")
-
-        super().__init__(name, coordinates)
