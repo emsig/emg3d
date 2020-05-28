@@ -85,7 +85,7 @@ def test_Dipole(capsys):
     assert source.foo == 'bar'
     assert out == "* WARNING :: Unknown kwargs {foo: bar}\n"
 
-    reprstr = "Dipole(dip, {0.0m; 1000.0m; -950.0m}, θ=0.0°, φ=0.0°, l=1.0m)"
+    reprstr = "Dipole(dip, {0.0m; 1,000.0m; -950.0m}, θ=0.0°, φ=0.0°, l=1.0m)"
     assert reprstr in source.__repr__()
 
     # Copy, to_dict, from_dict

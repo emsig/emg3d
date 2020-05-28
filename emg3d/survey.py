@@ -36,6 +36,13 @@ __all__ = ['Survey', 'Dipole']
 class Survey:
     """Create a survey with sources and receivers.
 
+    A survey contains sources and receivers, which, on their own, do not say
+    anything about data. The data added must then be provided with the info
+    at which receiver it was measured, from which source comes the signal, and
+    what is the source frequency.
+
+
+
     Survey takes care to join same receivers
     Survey should check for
     - source-receiver combinations,
@@ -59,9 +66,16 @@ class Survey:
         #      to the survey, I think.
 
         # Initiate dictionaries.
-        self._receivers = {}
-        self._sources = {}
-        self._frequencies = {}
+        # Maybe these should be _dicts, with @property getters.
+        self.receivers = {}
+        self.sources = {}
+        self.frequencies = {}
+
+        # Data - Create a class
+        # stored as an array
+        # provides different dicts (views) (basically any combination):
+        # - by src-rec-freq
+        # - by src-freq-rec
         self._data = {}
 
     def copy(self):
@@ -89,8 +103,12 @@ class Survey:
         """
         raise NotImplementedError
 
-    def add_receivers(self, name, coordinates):
+    def add_receivers(self, names, coordinates):
         """Add receiver(s) to the survey.
+
+        It accepts point dipoles and finite length dipoles. However, obtaining
+        receiver responses is currently only implemented for point dipoles, so
+        that representation is used. TODO: Throw a warning when that happens.
 
         Parameters
         ----------
@@ -103,16 +121,27 @@ class Survey:
 
         """
 
-        # TODO: Add recursion for receiver list.
+        # Recursion for multiple receivers.
+        if isinstance(names, list):
 
-        # Warn about duplicate names.
-        if name in self._receivers:
-            print(f"* WARNING :: Overwriting existing receiver <{name}>:\n"
-                  f"             - Old: {self._receivers[name].coordinates}\n"
-                  f"             - New: {coordinates}")
+            nl = len(names)
+            coords = np.array([nl*[val, ] if np.array(val).size == 1 else
+                              val for val in coordinates], dtype=float)
 
-        # Create a receiver dipole.
-        self._receivers[name] = Dipole(name, coordinates)
+            # Loop over names.
+            for i, name in enumerate(names):
+                self.add_receivers(name, coords[:, i])
+
+        else:
+            # Warn about duplicate names.
+            if names in self.receivers:
+                old_coords = self.receivers[names].coordinates
+                print(f"* WARNING :: Overwriting existing receiver <{names}>:"
+                      f"\n             - Old: {old_coords}\n"
+                      f"             - New: {coordinates}")
+
+            # Create a receiver dipole.
+            self.receivers[names] = Dipole(names, coordinates)
 
     def remove_receivers(self, names):
         # TODO
@@ -143,21 +172,27 @@ class Survey:
 
         """
 
+        # Recursion for multiple sources.
         if isinstance(names, list):
-            # TODO: Add recursion for source list.
-            for name in names:
-                self.add_sources(name, coordinates)
+
+            nl = len(names)
+            coords = np.array([nl*[val, ] if np.array(val).size == 1 else
+                              val for val in coordinates], dtype=float)
+
+            # Loop over names.
+            for i, name in enumerate(names):
+                self.add_sources(name, coords[:, i])
 
         else:
             # Warn about duplicate names.
-            if names in self._sources:
-                old_coords = self._sources[names].coordinates
+            if names in self.sources:
+                old_coords = self.sources[names].coordinates
                 print(f"* WARNING :: Overwriting existing source <{names}>:\n"
                       f"             - Old: {old_coords}\n"
                       f"             - New: {coordinates}")
 
             # Create a receiver dipole.
-            self._sources[names] = Dipole(names, coordinates)
+            self.sources[names] = Dipole(names, coordinates)
 
     def remove_sources(self):
         pass
@@ -178,17 +213,16 @@ class Survey:
 
         """
 
-        # TODO: Add recursion for receiver list.
         pass
 
         # # Warn about duplicate names.
-        # print(self._receivers)
-        # if name in self._receivers:
+        # print(self.receivers)
+        # if name in self.receivers:
         #     print(f"* WARNING :: Overwriting existing receiver <{name}>.")
         #
         # else:
         #     # Create a receiver dipole.
-        #     self._receivers[name] = Dipole(name, coordinates)
+        #     self.receivers[name] = Dipole(name, coordinates)
         #     # (nsrc, nfreq)
         #     # frequencies=frequencies,
         #     # sources=sources,
@@ -384,8 +418,9 @@ class Dipole(PointDipole):
 
     def __repr__(self):
         return (f"{self.__class__.__name__}({self.name}, "
-                f"{{{self.xco}m; {self.yco}m; {self.zco}m}}, θ={self.azm}°, "
-                f"φ={self.dip}°, l={self.length}m)")
+                f"{{{self.xco:,.1f}m; {self.yco:,.1f}m; {self.zco:,.1f}m}}, "
+                f"θ={self.azm:.1f}°, φ={self.dip:.1f}°, "
+                f"l={self.length:,.1f}m)")
 
     @property
     def coordinates(self):
