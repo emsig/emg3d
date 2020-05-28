@@ -59,8 +59,10 @@ class Survey:
 
     """
 
-    def __init__(self):
+    def __init__(self, name):
         """Initiate a new Survey instance."""
+
+        self.name = name
 
         # TODO We should be able to provide source and receiver list straight
         #      to the survey, I think.
@@ -77,6 +79,11 @@ class Survey:
         # - by src-rec-freq
         # - by src-freq-rec
         self._data = {}
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}: {self.name}\n"
+                "> n_rec: bla; n_rec: bla; n_freq: bla \n"
+                "> n_data: bla; what else?")
 
     def copy(self):
         """Return a copy of the Survey."""
@@ -136,9 +143,10 @@ class Survey:
             # Warn about duplicate names.
             if names in self.receivers:
                 old_coords = self.receivers[names].coordinates
+                new_coords = tuple(np.array(coordinates, dtype=float))
                 print(f"* WARNING :: Overwriting existing receiver <{names}>:"
                       f"\n             - Old: {old_coords}\n"
-                      f"             - New: {coordinates}")
+                      f"             - New: {new_coords}")
 
             # Create a receiver dipole.
             self.receivers[names] = Dipole(names, coordinates)
@@ -187,9 +195,10 @@ class Survey:
             # Warn about duplicate names.
             if names in self.sources:
                 old_coords = self.sources[names].coordinates
+                new_coords = tuple(np.array(coordinates, dtype=float))
                 print(f"* WARNING :: Overwriting existing source <{names}>:\n"
                       f"             - Old: {old_coords}\n"
-                      f"             - New: {coordinates}")
+                      f"             - New: {new_coords}")
 
             # Create a receiver dipole.
             self.sources[names] = Dipole(names, coordinates)
