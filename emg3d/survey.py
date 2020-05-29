@@ -39,6 +39,9 @@ class Survey:
     what is the source frequency.
 
 
+    Think about it: Reprocity flag?
+
+
     Parameters
     ----------
     ?
@@ -71,6 +74,9 @@ class Survey:
         # Data
         # TODO: Create its own class; store actual data as a 1D array.
         #       The dicts should only contain indexes as int16.
+        # => This way we can also keep many data's: data, syn1, syn2, syn2, etc
+        # -> noise
+        # -> std
         self._data = {}
 
     def __repr__(self):

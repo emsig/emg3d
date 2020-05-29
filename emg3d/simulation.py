@@ -84,8 +84,9 @@ class Simulation():
 
     # resulting meshes
 
-    # compute E-Source (H-source)  [forward]
+    # compute E-Source (H-source)  [forward] => synthetic
     # get E-field (H-field)        [interpolation]
+    # gradient, residual, misfit
 
 
 def model_marine_csem():
