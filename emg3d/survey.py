@@ -25,10 +25,7 @@ A survey combines a set of sources and receivers.
 
 import numpy as np
 from copy import deepcopy
-# from typing import Tuple
-from dataclasses import dataclass  # , field
-
-# from emg3d import maps, models
+from dataclasses import dataclass
 
 __all__ = ['Survey', 'Dipole']
 
@@ -42,48 +39,44 @@ class Survey:
     what is the source frequency.
 
 
-
-    Survey takes care to join same receivers
-    Survey should check for
-    - source-receiver combinations,
-    - report missing sources
-    - list nfreq per source and all the rest
-
-
-    - Need to get frequencies by receivers and by source v
-    - Need to get sources and receivers by frequency     ^
-
     Parameters
     ----------
     ?
 
     """
 
-    def __init__(self, name):
+    def __init__(self, name, sources=None, receivers=None, frequencies=None):
         """Initiate a new Survey instance."""
 
+        # Survey name.
         self.name = name
 
-        # TODO We should be able to provide source and receiver list straight
-        #      to the survey, I think.
+        # Initiate sources.
+        if sources is None:
+            self.sources = {}
+        else:
+            self.sources = {
+                    k: Dipole.from_dict(v) for k, v in sources.items()}
 
-        # Initiate dictionaries.
-        # Maybe these should be _dicts, with @property getters.
-        self.receivers = {}
-        self.sources = {}
+        # Initiate receivers.
+        if receivers is None:
+            self.receivers = {}
+        else:
+            self.receivers = {
+                    k: Dipole.from_dict(v) for k, v in receivers.items()}
+
+        # Initiate frequencies. (TODO: dict or list?)
         self.frequencies = {}
 
-        # Data - Create a class
-        # stored as an array
-        # provides different dicts (views) (basically any combination):
-        # - by src-rec-freq
-        # - by src-freq-rec
+        # Data
+        # TODO: Create its own class; store actual data as a 1D array.
+        #       The dicts should only contain indexes as int16.
         self._data = {}
 
     def __repr__(self):
         return (f"{self.__class__.__name__}: {self.name}\n"
-                "> n_rec: bla; n_rec: bla; n_freq: bla \n"
-                "> n_data: bla; what else?")
+                f"> {self.shape[0]} sources; {self.shape[1]} receivers; "
+                f"{self.shape[2]} frequencies; {self.size} data points.")
 
     def copy(self):
         """Return a copy of the Survey."""
@@ -91,7 +84,23 @@ class Survey:
 
     def to_dict(self, copy=False):
         """Store the necessary information of the Survey in a dict."""
-        raise NotImplementedError
+
+        out = {'name': self.name, '__class__': self.__class__.__name__}
+
+        # Add sources.
+        out['sources'] = {}
+        for key, value in self.sources.items():
+            out['sources'][key] = value.to_dict()
+
+        # Add receivers.
+        out['receivers'] = {}
+        for key, value in self.receivers.items():
+            out['receivers'][key] = value.to_dict()
+
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
 
     @classmethod
     def from_dict(cls, inp):
@@ -101,14 +110,21 @@ class Survey:
         ----------
         inp : dict
             Dictionary as obtained from :func:`Survey.to_dict`.
-            The dictionary needs the keys TODO.
+            The dictionary needs the keys `name`, `sources`, `receivers`.
 
         Returns
         -------
         obj : :class:`Survey` instance
 
         """
-        raise NotImplementedError
+        try:
+            name = inp.pop('name')
+            sources = inp.pop('sources')
+            receivers = inp.pop('receivers')
+            return cls(name=name, sources=sources, receivers=receivers)
+        except KeyError as e:
+            print(f"* ERROR   :: Variable {e} missing in `inp`.")
+            raise
 
     def add_receivers(self, names, coordinates):
         """Add receiver(s) to the survey.
@@ -222,30 +238,34 @@ class Survey:
 
         """
 
-        pass
-
-        # # Warn about duplicate names.
-        # print(self.receivers)
-        # if name in self.receivers:
-        #     print(f"* WARNING :: Overwriting existing receiver <{name}>.")
+        # TODO : expand dims for source, receiver, frequency
         #
-        # else:
-        #     # Create a receiver dipole.
-        #     self.receivers[name] = Dipole(name, coordinates)
-        #     # (nsrc, nfreq)
-        #     # frequencies=frequencies,
-        #     # sources=sources,
-        #     # data=data,
+        # TODO : different inputs; (nsrc, nrec, nfreq), (nsrc, nfreq), etc
 
-        # Only name should be required
-        # coordinates are optionally, name is enough if once defined
-        # frequency and source are optionally
-        # data only if frequency and source provided
+        if source not in self._data:
+            self._data[source] = {}
 
-        # # Move to add
-        # self._names = dict()
-        # for name in names:
-        #     self._names[name] = dict()
+        if receiver not in self._data[source]:
+            self._data[source][receiver] = {}
+
+        # Warn about overwriting
+        if float(frequency) in self._data[source][receiver]:
+            old_data = self._data[source][receiver][frequency]
+            if data is None:
+                new_data = 'None'
+            else:
+                new_data = float(data)  # TODO change to complex
+            print(f"* WARNING :: {source}-{receiver}-{frequency}: Overwriting "
+                  f"{old_data} with {new_data}.")
+
+        if data is None:
+            self._data[source][receiver][float(frequency)] = data
+        else:  # TODO change to complex
+            self._data[source][receiver][float(frequency)] = float(data)
+
+        # Add frequency.
+        if float(frequency) not in self.frequencies:
+            self.frequencies[float(frequency)] = {}
 
     # Todo
     def validate(self):
@@ -253,21 +273,98 @@ class Survey:
         # unused sources or receivers.
         pass
 
+    @property
     def shape(self):
-        # Return nsrc x nrec x nfreq
-        pass
+        """Return nsrc x nrec x nfreq.
 
+        Note that not all source-receiver-frequency pairs do actually have
+        data. Check `size` to see how many data points there are.
+        """
+        return (len(self.sources), len(self.receivers), len(self.frequencies))
+
+    @property
     def size(self):
-        # Return actual data size (NOT equals nsrc x nrec x nfreq)
-        pass
+        """Return actual data size (does NOT equal nsrc x nrec x nfreq)."""
+        # TODO: Again, data should move to a 1D array, and then we can simply
+        #       return self.data.size.
+        return sum([1 for k1 in self.data for k2 in self.data[k1]
+                    for k3 in self.data[k1][k2]])
 
+    @property
     def data(self):
-        # Store the actual data in an array
-        pass
+        """Data in the default format, [source][receiver][frequency]."""
+        # TODO (see also `sdata()`).
+        # - Currently, it is the actual, complex data.
+        #   Change to index with unsigned int16 (0-65,535)
+        # Currently probably both slow and heavy on RAM.
 
-    # TODO: Get measured data
-    # get e-field => needs survey
-    # get h-field => needs survey
+        return self._data
+
+    def sdata(self, sort='srf'):
+        """Return data in arbitrarily nested dictionaries.
+
+        Parameters
+        ----------
+        sort : str
+            String consists of three characters for [s]ource, [r]eceiver, and
+            [f]requency.
+
+        Returns
+        -------
+        data : dict
+            Data in a nested dict following the three letters of the
+            sort-string: data[character1][character2][character3].
+
+            E.g., if `sort='sfr'`, the returned data is of the form
+            `data[source][frequency][receiver]`.
+
+        """
+        # TODO (see also `data()`).
+        # - store them at first use, delete them if anything changes in the
+        #   data or survey.
+        # Currently probably both slow and heavy on RAM.
+
+        if sort == 'srf':  # Default: source-receiver-frequency.
+            return self._data
+
+        elif sort == 'rsf':  # receiver-source-frequency.
+            return self._reorder_dict_abc(self.data, self.receivers, 'ab')
+
+        elif sort == 'sfr':  # source-frequency-receiver.
+            return self._reorder_dict_abc(self.data, self.frequencies, 'bc')
+
+        elif sort == 'rfs':  # receiver-frequency-source.
+            out = self._reorder_dict_abc(self.data, self.receivers, 'ab')
+            return self._reorder_dict_abc(out, self.frequencies, 'bc')
+
+        elif sort == 'fsr':  # frequency-source-receiver.
+            out = self._reorder_dict_abc(self.data, self.frequencies, 'bc')
+            return self._reorder_dict_abc(out, self.frequencies, 'ab')
+
+        elif sort == 'frs':  # frequency-receiver-source.
+            out = self._reorder_dict_abc(self.data, self.receivers, 'ab')
+            out = self._reorder_dict_abc(out, self.frequencies, 'bc')
+            return self._reorder_dict_abc(out, self.frequencies, 'ab')
+
+        else:
+            return NotImplemented
+
+    def _reorder_dict_abc(self, data, keys, swap_type):
+        """Re-arrange the levels of a nested dict."""
+
+        if swap_type == 'ab':
+            # Swaps out first and second level of ordered dict.
+            out = {k2:  # 2nd level keys are new 1st level keys.
+                   {k1: data[k1][k2] for k1 in data if k2 in data[k1]}
+                   for k2 in keys if np.any([k2 in data[k1] for k1 in data])}
+
+        elif swap_type == 'bc':
+            # 'bc' is the same as a 'ab' for each key on the top level.
+            out = {}
+            for ka in data.keys():
+                out[ka] = self._reorder_dict_abc(data[ka], keys, 'ab')
+
+        return out
 
 
 # # Sources and Receivers # #
