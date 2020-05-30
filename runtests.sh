@@ -19,7 +19,7 @@ where:
 # Set default values
 PYTHON3VERSION="7 8"
 PRINT="/dev/null"
-PCKGS="numpy scipy pytest pytest-cov numba h5py"
+PCKGS="numpy scipy pytest pytest-cov numba h5py xarray"
 PROPS="--flake8"
 INST="pytest-flake8 scooby"
 WARN=""

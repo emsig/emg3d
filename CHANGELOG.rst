@@ -5,6 +5,8 @@ Changelog
 *latest*
 --------
 
+- New dependency `xarray` for data management.
+
 - `fields`: New function `get_receiver_response`, which returns the response
   for arbitrarily rotated receivers.
 - `io`: New `backend='json'`, writes to a hierarchical, plain json file.
