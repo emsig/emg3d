@@ -282,10 +282,10 @@ def save(fname, backend=None, compression="gzip", **kwargs):
         if full_path.split('.')[-1] in ['npz', 'h5', 'json']:
             backend = full_path.split('.')[-1]
         else:  # Fallback to default.
-            if h5py:
-                backend = 'h5'
-            else:
+            if isinstance(h5py, str):
                 backend = 'npz'
+            else:
+                backend = 'h5'
             full_path += '.'+backend
 
     # Save data depending on the backend.

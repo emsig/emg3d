@@ -185,10 +185,11 @@ def test_save_and_load(tmpdir, capsys):
     if h5py:
         io.load(tmpdir+'/testwrongbackend.abc.h5')
     else:
-        io.load('testwrongbackend.abc.npz')
+        io.load(tmpdir+'/testwrongbackend.abc.npz')
 
     # Ensure deprecated backend/extension still work.
-    io.save(tmpdir+'/ttt', backend='h5py')
+    if h5py:
+        io.save(tmpdir+'/ttt', backend='h5py')
     io.save(tmpdir+'/ttt', backend='numpy')
 
     # Test h5py.
@@ -211,7 +212,7 @@ def test_save_and_load(tmpdir, capsys):
             # Ensure deprecated backend/extension still work.
             io.save(tmpdir+'/ttt', backend='h5py')
         with pytest.raises(ImportError):
-            io.save(tmpdir+'/test-h5', grid=grid)
+            io.save(tmpdir+'/test.h5', grid=grid)
         with pytest.raises(ImportError):
             io.load(str(tmpdir+'/test-h5.h5'))
 
