@@ -27,6 +27,7 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
     "discretize": ("https://discretize.simpeg.xyz/en/master", None),
     "empymod": ("https://empymod.readthedocs.io/en/stable", None),
+    "xarray": ("https://xarray.pydata.org/en/stable", None),
 }
 
 # ==== 2. General Settings ====

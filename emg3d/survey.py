@@ -28,44 +28,73 @@ import xarray as xr
 from copy import deepcopy
 from dataclasses import dataclass
 
-__all__ = ['Survey', 'Dipole']
+__all__ = ['Survey', 'Dipole', 'PointDipole']
 
 
 class Survey:
     """Create a survey with sources and receivers.
 
-    A survey contains sources and receivers, which, on their own, do not say
-    anything about data. The data added must then be provided with the info at
-    which receiver it was measured, from which source comes the signal, and
-    what is the source frequency.
+    A survey contains all the sources with their frequencies, receivers, and
+    corresponding data.
 
-    This survey is optimised for a node-based, marine CSEM survey. It stores
-    the date in an array of size (nsrc, nrec, nfreq), it is therefore most
-    compact if each receiver has measurements for each source and each
-    frequency. NaN's are placed where there is no data. The survey is therefore
-    not good for a survey-type like a streamer-based CSEM survey, as there
-    would be a huge matrix required with mostly NaN's. If this is required
-    either a new survey-class has to be created, or this one has to be
-    adjusted. Probably with a `DataSet` where each source is a new `DataArray`.
 
-    Currently, it has only one `DataArray`, the data, but we should add
-    'noise', and maybe 'active' and others.
+    .. todo::
 
-    There might be better ways to incorporate `xarray`. To be improved...
+        - Implement source strength (if `strength=0` (default), the source is
+          normalized to a moment of 1 A m).
+        - Reciprocity flag.
+        - Add more data than just `data`: `noise`, `active`, etc.
 
-    TODO: Think about a reciprocity flag?
+    .. note::
+
+        This survey is optimised for a node-based, marine CSEM survey. It
+        stores the date in an array of size (nsrc, nrec, nfreq), it is
+        therefore most compact if each receiver has measurements for each
+        source and each frequency. NaN's are placed where there is no data. The
+        survey is therefore not good for a survey-type like a streamer-based
+        CSEM survey, as there would be a huge matrix required with mostly
+        NaN's. If this is required either a new survey-class has to be created,
+        or this one has to be adjusted. Probably with a :class:`Dataset` where
+        each source is a new :class:`DataArray`.
 
 
     Parameters
     ----------
-    ?
-    # - either dict, containing Dipoles
-    # - or 6-element tuples (name, x, y, z, azimuth, dip)
-    # - or 7-element tuples (name, x0, x1, y0, y1, z0, z1)
+    name : str
+        Name of the survey
 
-    # TODO, change. data: ndarray or None
+    sources, receivers : tuple, list, or dict
+        Sources and receivers.
+
+        - Tuples: Coordinates in one of the two following formats:
+
+          - `(name, x, y, z, azimuth, dip)` [str, m, m, m, °, °];
+          - `(name, x0, x1, y0, y1, z0, z1)` [str, m, m, m, m, m, m].
+
+          Dimensions will be expanded (hence, if `n` dipoles, each parameters
+          must have length 1 or `n`; only `name` must be of length `n`).
+        - List: A list of :class:`Dipole`-instances.
+        - Dict: A dict of de-serialized :class:`Dipole`-instances; mainly used
+          for loading from file.
+
+        Warning: names are not checked for uniqueness. Hence, if the same name
+        is provided more than once it will be overwritten.
+
+    frequencies : ndarray
+        Source frequencies (Hz).
+
+    data : ndarray or None
+        The observed data (dtype=complex); must have shape (nsrc, nrec, nfreq).
+        If None, it will be initiated with NaN's.
+
 
     """
+    # Currently, `survey.ds` contains an :class:`xarray.Dataset`, where
+    # `survey.data` is a shortcut to the :class:`xarray.DataArray`
+    # `survey.ds.data`. As such, the `Survey`-Class has an xarray-dataset as
+    # one of its attributes. Probably there would be a cleaner way to simply
+    # use xarray instead of a dedicated `Survey`-Class by utilizing, e.g.,
+    # :func:`xarray.register_dataset_accessor`.
 
     def __init__(self, name, sources, receivers, frequencies, data=None):
         """Initiate a new Survey instance."""
@@ -74,53 +103,40 @@ class Survey:
         self.name = name
 
         # Initiate sources.
-        if isinstance(sources, tuple):
-            self._sources = {}
-            self._add_sources(sources[0], sources[1:])
-        elif isinstance(sources, dict):
-            self._sources = {
-                    k: Dipole.from_dict(v) for k, v in sources.items()}
-        else:
-            raise ValueError
+        self._sources = self._dipole_info_to_dict(sources, 'sources')
 
         # Initiate receivers.
-        if isinstance(receivers, tuple):
-            self._receivers = {}
-            self._add_receivers(receivers[0], receivers[1:])
-        elif isinstance(receivers, dict):
-            self._receivers = {
-                    k: Dipole.from_dict(v) for k, v in receivers.items()}
-        else:
-            raise ValueError
+        self._receivers = self._dipole_info_to_dict(receivers, 'receivers')
 
         # Initiate frequencies.
-        self._frequencies = np.array(frequencies, dtype=float)
+        self._frequencies = np.asarray(frequencies, dtype=float)
 
-        # TODO:  add back the dict-possibility.
-        #
-        # TODO check to_dict/from_dict; save
-
-        # Initialize xarray.
+        # Initialize NaN-data if not provided.
         if data is None:
             data = np.ones((len(self._sources), len(self._receivers),
-                            len(self.frequencies)), dtype=complex)*np.nan
+                            self._frequencies.size), dtype=complex)*np.nan
 
+        # Initialize xarray dataset.
         self._ds = xr.Dataset(
-                {'data': xr.DataArray(
-                    data,
-                    dims=('sources', 'receivers', 'frequencies'))},
-                coords={
-                    'sources': list(self.sources.keys()),
-                    'receivers': list(self.receivers.keys()),
-                    'frequencies': list(self.frequencies)
-                    },
-                )
-
+            {'data': xr.DataArray(data, dims=('src', 'rec', 'freq'))},
+            coords={'src': list(self.sources.keys()),
+                    'rec': list(self.receivers.keys()),
+                    'freq': list(self.frequencies)},
+        )
+        self._ds.src.attrs['long_name'] = 'Source dipole'
+        self._ds.src.attrs['dipoles'] = self.sources
+        self._ds.rec.attrs['long_name'] = 'Receiver dipole'
+        self._ds.rec.attrs['dipoles'] = self.receivers
+        self._ds.freq.attrs['long_name'] = 'Source frequency'
+        self._ds.freq.attrs['units'] = 'Hz'
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}: {self.name}\n"
-                f"> {self.shape[0]} sources; {self.shape[1]} receivers; "
-                f"{self.shape[2]} frequencies; {self.size} data points.")
+        return (f"{self.__class__.__name__}: {self.name}\n\n"
+                f"{self.ds.__repr__()}")
+
+    def _repr_html_(self):
+        return (f"<h4>{self.__class__.__name__}: {self.name}</h4><br>"
+                f"{self.ds._repr_html_()}")
 
     def copy(self):
         """Return a copy of the Survey."""
@@ -142,49 +158,10 @@ class Survey:
             out['receivers'][key] = value.to_dict()
 
         # Add frequencies.
-        out['frequencies'] = {}
-        for key, value in self.frequencies.items():
-            out['frequencies'][key] = {}
+        out['frequencies'] = self.frequencies
 
         # Add data.
-        if self._data is not None:
-
-            # Initiate data dict.
-            ddict = {}
-
-            # Find the sources which actually have data.
-            isrc = np.sum(np.isfinite(self.data.data.loc[:, :, :].values),
-                          (1, 2), dtype=bool)
-
-            # Loop over sources.
-            for src in self.data.data.sources.values[isrc]:
-
-                # Initiate source dict.
-                ddict[src] = {}
-
-                # Find the receivers which actually have data.
-                irec = np.sum(np.isfinite(
-                    self.data.data.loc[src, :, :].values), 1, dtype=bool)
-
-                # Loop over receivers.
-                for rec in self.data.data.receivers.values[irec]:
-
-                    # Initiate receiver dict.
-                    ddict[src][rec] = {}
-
-                    # Find the frequencies which actually have data.
-                    ifreq = np.isfinite(
-                            self.data.data.loc[src, rec, :].values)
-
-                    # Loop over frequencies.
-                    for freq in self.data.data.frequencies.values[ifreq]:
-
-                        # Store the result for this src-rec-freq.
-                        ddict[src][rec][freq] = self.data.data.loc[
-                                src, rec, freq].values
-
-            # Add data to out-dict.
-            out['data'] = ddict
+        out['data'] = self.data.values
 
         if copy:
             return deepcopy(out)
@@ -216,94 +193,6 @@ class Survey:
             print(f"* ERROR   :: Variable {e} missing in `inp`.")
             raise
 
-    def _add_receivers(self, names, coordinates):
-        """Add receiver(s) to the survey.
-
-        It accepts point dipoles and finite length dipoles. However, obtaining
-        receiver responses is currently only implemented for point dipoles, so
-        that representation is used. TODO: Throw a warning when that happens.
-
-        Parameters
-        ----------
-        name : str or list
-            Receiver name(s).
-
-        coordinates : tuple
-            `(x, y, z, azimuth, dip)` [m, m, m, °, °]; dimensions must be
-            compatible (also with `name`).
-
-        """
-
-        # Recursion for multiple receivers.
-        if isinstance(names, list):
-
-            nl = len(names)
-            coords = np.array([nl*[val, ] if np.array(val).size == 1 else
-                              val for val in coordinates], dtype=float)
-
-            # Loop over names.
-            for i, name in enumerate(names):
-                self._add_receivers(name, coords[:, i])
-
-        else:
-            # Warn about duplicate names.
-            if names in self._receivers:
-                old_coords = self._receivers[names].coordinates
-                new_coords = tuple(np.array(coordinates, dtype=float))
-                print(f"* WARNING :: Overwriting existing receiver <{names}>:"
-                      f"\n             - Old: {old_coords}\n"
-                      f"             - New: {new_coords}")
-
-            # Create a receiver dipole.
-            self._receivers[names] = Dipole(names, coordinates)
-
-    def _add_sources(self, names, coordinates):
-        """Add source(s) to the survey.
-
-        # strength : float
-        #     Source strength. If `strength=0` (default), the source is
-        #     normalized to a moment (hence source length and source strength)
-        #     of 1 A m.
-
-        Parameters
-        ----------
-        names : str or list
-            Source name(s).
-
-        coordinates : tuple
-            Coordinates in one of the two following formats:
-
-            - `(x, y, z, azimuth, dip)` [m, m, m, °, °];
-            - `(x0, x1, y0, y1, z0, z1)` [m, m, m, m, m, m].
-
-            Dimensions must be compatible (also with `name`).
-
-        """
-
-        # Recursion for multiple sources.
-        if isinstance(names, list):
-
-            nl = len(names)
-            coords = np.array([nl*[val, ] if np.array(val).size == 1 else
-                              val for val in coordinates], dtype=float)
-
-            # Loop over names.
-            for i, name in enumerate(names):
-                self._add_sources(name, coords[:, i])
-
-        else:
-            # Warn about duplicate names.
-            if names in self._sources:
-                old_coords = self._sources[names].coordinates
-                new_coords = tuple(np.array(coordinates, dtype=float))
-                print(f"* WARNING :: Overwriting existing source <{names}>:\n"
-                      f"             - Old: {old_coords}\n"
-                      f"             - New: {new_coords}")
-
-            # Create a receiver dipole.
-            self._sources[names] = Dipole(names, coordinates)
-
-
     @property
     def shape(self):
         """Return nsrc x nrec x nfreq.
@@ -311,34 +200,65 @@ class Survey:
         Note that not all source-receiver-frequency pairs do actually have
         data. Check `size` to see how many data points there are.
         """
-        return self.data.shape
+        return self.ds.data.shape
 
     @property
     def size(self):
         """Return actual data size (does NOT equal nsrc x nrec x nfreq)."""
-        return int(self.data.count())
+        return int(self.ds.data.count())
+
+    @property
+    def ds(self):
+        """Dataset, an :class:`xarray.Dataset` instance.."""
+        return self._ds
 
     @property
     def data(self):
-        """Data in the default format, [source][receiver][frequency]."""
-        # TODO (see also `sdata()`).
-        # - Currently, it is the actual, complex data.
-        #   Change to index with unsigned int16 (0-65,535)
-        # Currently probably both slow and heavy on RAM.
-
-        return self._ds.data
+        """Observed data, an :class:`xarray.DataArray` instance.."""
+        return self.ds.data
 
     @property
     def sources(self):
+        """Source dict containing all source dipoles."""
         return self._sources
 
     @property
     def receivers(self):
+        """Receiver dict containing all receiver dipoles."""
         return self._receivers
 
     @property
     def frequencies(self):
+        """Frequency array."""
         return self._frequencies
+
+    def _dipole_info_to_dict(self, inp, name):
+        """Create dict with provided source/receiver information."""
+        # Create dict depending if `inp` is list, tuple, or dict.
+        if isinstance(inp, list):  # List of Dipoles
+            out = {d.name: d for d in inp}
+
+        elif isinstance(inp, tuple):  # Tuple with names, coordinates
+
+            # Get names.
+            names = inp[0]
+            nl = len(names)
+
+            # Expand coordinates.
+            coo = np.array([nl*[val, ] if np.array(val).size == 1 else
+                           val for val in inp[1:]], dtype=float)
+
+            # Create Dipole-dict.
+            out = {names[i]: Dipole(names[i], coo[:, i]) for i in range(nl)}
+
+        elif isinstance(inp, dict):  # Dict of de-serialized Dipoles.
+            out = {k: Dipole.from_dict(v) for k, v in inp.items()}
+
+        else:
+            print("* ERROR   :: Input format of <name> not recognized.")
+            raise ValueError("Dipoles")
+
+        return out
 
 
 # # Sources and Receivers # #
