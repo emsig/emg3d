@@ -46,11 +46,19 @@ class Simulation():
 
     """
 
-    def __init__(self, sources, receivers, **kwargs):
+    def __init__(self, survey, model, mesh, **kwargs):
         """Initiate a new Simulation instance."""
+        #
+        # TODO - Start with the JIF workflow, see what is missing.
+        #
+        # Mesh: - freq-dependent or not
+        #       - source-dependent or not
+        #       - use input or not
         # solver options
+        # gridding options
         # min_amp to consider
         # min_offset, max_offset
+        # NOTHING with inversion
         pass
 
     def copy(self):
@@ -83,6 +91,12 @@ class Simulation():
     # connected model(s)
 
     # resulting meshes
+
+    # solver_opts parameters
+
+    # make synthetic data
+    # dpred
+    # dobs
 
     # compute E-Source (H-source)  [forward] => synthetic
     # get E-field (H-field)        [interpolation]
