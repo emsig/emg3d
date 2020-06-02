@@ -109,7 +109,7 @@ class Survey:
         self._receivers = self._dipole_info_to_dict(receivers, 'receivers')
 
         # Initiate frequencies.
-        self._frequencies = np.asarray(frequencies, dtype=float)
+        self._frequencies = np.array(frequencies, dtype=float, ndmin=1)
 
         # Initialize NaN-data if not provided.
         if data is None:
@@ -234,6 +234,7 @@ class Survey:
 
     def _dipole_info_to_dict(self, inp, name):
         """Create dict with provided source/receiver information."""
+
         # Create dict depending if `inp` is list, tuple, or dict.
         if isinstance(inp, list):  # List of Dipoles
             out = {d.name: d for d in inp}
@@ -242,6 +243,8 @@ class Survey:
 
             # Get names.
             names = inp[0]
+            if not isinstance(names, list):
+                names = [names]
             nl = len(names)
 
             # Expand coordinates.
@@ -255,14 +258,14 @@ class Survey:
             out = {k: Dipole.from_dict(v) for k, v in inp.items()}
 
         else:
-            print("* ERROR   :: Input format of <name> not recognized.")
+            print(f"* ERROR   :: Input format of <{name}> not recognized: "
+                  f"{type(inp)}.")
             raise ValueError("Dipoles")
 
         return out
 
 
 # # Sources and Receivers # #
-
 @dataclass(order=True, unsafe_hash=True)
 class PointDipole:
     """Infinitesimal small point dipole.

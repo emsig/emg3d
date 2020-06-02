@@ -5,13 +5,19 @@ Changelog
 *latest*
 --------
 
-- New modules: `survey`, `simulation`. etc etc TODO
+- New module `survey`:
+  - New class `survey.Survey`, which combines sources, receivers, and data.
+  - New class `survey.Dipole`, which defines electric point and finite length
+    dipoles.
+
+- New module `simulation`:
+  - TODO
 
 - New dependency `xarray` for data management.
 
 - `fields`: New function `get_receiver_response`, which returns the response
   for arbitrarily rotated receivers.
-- `io`:
+- Module `io`:
   - New file-format `json`, writes to a hierarchical, plain json file.
   - Deprecated the use of `backend`, it uses the file extension of `fname`
     instead.
