@@ -25,35 +25,83 @@ class TestSurvey():
 
     def test_dipole_info_to_dict(self):
         # == 1. List ==
-        sinp1 = [survey.Dipole('Tx0', (0, 0, 0, 0, 0)),
-                 survey.Dipole('Tx1', (0, 0, 0, 0, 0))]
-        rinp1 = [survey.Dipole('Rx0', (0, 0, 0, 0, 0)),
-                 survey.Dipole('Rx1', (0, 0, 0, 0, 0))]
-        srvy1 = survey.Survey('Test', sinp1, rinp1, 1)
-        assert srvy1.sources['Tx0'] == sinp1[0]
-        assert srvy1.receivers['Rx1'] == rinp1[1]
+        s_list = [survey.Dipole('Tx0', (0, 0, 0, 0, 0)),
+                  survey.Dipole('Tx1', (0, 0, 0, 0, 0))]
+        r_list = [survey.Dipole('Rx0', (0, 0, 0, 0, 0)),
+                  survey.Dipole('Rx1', (0, 0, 0, 0, 0))]
+        sur_list = survey.Survey('Test', s_list, r_list, 1)
+        assert sur_list.sources['Tx0'] == s_list[0]
+        assert sur_list.receivers['Rx1'] == r_list[1]
+        # fixed
+        fsur_list = survey.Survey('Test', s_list, r_list, 1, fixed=1)
+        assert fsur_list.sources['Tx0'] == s_list[0]
+        assert fsur_list.receivers['Off0']['Tx1'] == r_list[1]
 
         # == 2. Tuple ==
-        sinp2 = ([0, 0], 0, 0, 0, 0)
-        rinp2 = (0, 0, 0, (0, 0), 0)
-        srvy2 = survey.Survey('Test', sinp2, rinp2, 1)
-        assert srvy2.sources['Tx0'] == sinp1[0]
-        assert srvy2.receivers['Rx1'] == rinp1[1]
+        s_tupl = ([0, 0], 0, 0, 0, 0)
+        r_tupl = (0, 0, 0, (0, 0), 0)
+        sur_tupl = survey.Survey('Test', s_tupl, r_tupl, 1)
+        assert sur_tupl.sources['Tx0'] == s_list[0]
+        assert sur_tupl.receivers['Rx1'] == r_list[1]
+        # fixed
+        fsur_tupl = survey.Survey('Test', s_tupl, r_tupl, 1, fixed=1)
+        assert fsur_tupl.sources['Tx0'] == s_list[0]
+        assert fsur_tupl.receivers['Off0']['Tx1'] == r_list[1]
 
         # == 3. Dict ==
-        sinp3 = {k.name: k.to_dict() for k in sinp1}
-        rinp3 = {k.name: k.to_dict() for k in rinp1}
-        srvy3 = survey.Survey('Test', sinp3, rinp3, 1)
-        assert srvy3.sources['Tx0'] == sinp1[0]
-        assert srvy3.receivers['Rx1'] == rinp1[1]
+        s_dict = {k.name: k.to_dict() for k in s_list}
+        r_dict = {k.name: k.to_dict() for k in r_list}
+        sur_dict = survey.Survey('Test', s_dict, r_dict, 1)
+        assert sur_dict.sources['Tx0'] == s_list[0]
+        assert sur_dict.receivers['Rx1'] == r_list[1]
+        # fixed
+        fr_dict = {'Off0': {'Tx0': r_dict['Rx0'], 'Tx1':  r_dict['Rx1']}}
+        fsur_dict = survey.Survey('Test', s_dict, fr_dict, 1, fixed=1)
+        assert fsur_dict.sources['Tx0'] == s_list[0]
+        assert fsur_dict.receivers['Off0']['Tx1'] == r_list[1]
 
-        # == 4. Other ==
+        # == 4. Mix and match ==
+        # list-tuple
+        list_tupl = survey.Survey('Test', s_list, r_tupl, 1)
+        assert list_tupl.sources['Tx0'] == s_list[0]
+        assert list_tupl.receivers['Rx1'] == r_list[1]
+        # list-dict
+        list_dict = survey.Survey('Test', s_list, r_dict, 1)
+        assert list_dict.sources['Tx0'] == s_list[0]
+        assert list_dict.receivers['Rx1'] == r_list[1]
+        # tuple-dict
+        tupl_dict = survey.Survey('Test', s_tupl, r_dict, 1)
+        assert tupl_dict.sources['Tx0'] == s_list[0]
+        assert tupl_dict.receivers['Rx1'] == r_list[1]
+        # tuple-list
+        tupl_list = survey.Survey('Test', s_tupl, r_list, 1)
+        assert tupl_list.sources['Tx0'] == s_list[0]
+        assert tupl_list.receivers['Rx1'] == r_list[1]
+        # dict-list
+        dict_list = survey.Survey('Test', s_dict, r_list, 1)
+        assert dict_list.sources['Tx0'] == s_list[0]
+        assert dict_list.receivers['Rx1'] == r_list[1]
+        # dict-tuple
+        dict_tuple = survey.Survey('Test', s_dict, r_tupl, 1)
+        assert dict_tuple.sources['Tx0'] == s_list[0]
+        assert dict_tuple.receivers['Rx1'] == r_list[1]
+
+        # == 5. Other ==
         sources = survey.Dipole('Tx1', (0, 0, 0, 0, 0))
         # As Dipole it should fail.
         with pytest.raises(ValueError):
             survey.Survey('T', sources, (1, 0, 0, 0, 0), 1)
         # Cast as list it should work.
         survey.Survey('T', [sources], (1, 0, 0, 0, 0), 1)
+        # Fixed with different sizes have to fail.
+        with pytest.raises(ValueError):
+            survey.Survey('Test', s_list, [r_list[0]], 1, fixed=1)
+        with pytest.raises(ValueError):
+            survey.Survey('Test', s_tupl,
+                          (r_tupl[0], r_tupl[0], r_tupl[0]), 1, fixed=1)
+        # Duplicate names should fail.
+        with pytest.raises(ValueError):
+            survey.Survey('Test', s_list, [r_list[0], r_list[0]], 1)
 
     def test_copy(self):
         # This also checks to_dict()/from_dict().

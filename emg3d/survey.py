@@ -44,18 +44,23 @@ class Survey:
           normalized to a moment of 1 A m).
         - Reciprocity flag.
         - Add more data than just `data`: `noise`, `active`, etc.
+        - Add an example of the different usages to the gallery.
 
     .. note::
 
-        This survey is optimised for a node-based, marine CSEM survey. It
-        stores the date in an array of size (nsrc, nrec, nfreq), it is
-        therefore most compact if each receiver has measurements for each
-        source and each frequency. NaN's are placed where there is no data. The
-        survey is therefore not good for a survey-type like a streamer-based
-        CSEM survey, as there would be a huge matrix required with mostly
-        NaN's. If this is required either a new survey-class has to be created,
-        or this one has to be adjusted. Probably with a :class:`Dataset` where
-        each source is a new :class:`DataArray`.
+        - This class was developed for a node-based, marine CSEM survey layout.
+          It is therefore optimised for that setup, and mostly tested with that
+          setup. This means for a number of receivers which measure for all
+          source positions. The data can then be described in a matrix of size
+          (nsrc, nrec, nfreq).
+        - It can also be used for a CSEM streamer-style survey layout, where
+          there is a moving source with one or several receivers at a fixed
+          offset. The data can then be described in a matrix of size (nsrc,
+          noff, nfreq). See the parameter `fixed` to use this possibility.
+        - This layout can be adapted for other, even irregular layouts
+          (different number of receivers per source), where non-existing
+          receivers would simply be given no data (NaN). However, it could
+          probably be improved in this respect.
 
 
     Parameters
@@ -76,8 +81,8 @@ class Survey:
           with `Tx###` and `Rx###`.
         - List: A list of :class:`Dipole`-instances. The names of all dipoles
           in the list must be unique.
-        - Dict: A dict of de-serialized :class:`Dipole`-instances; mainly used
-          for loading from file.
+        - (Dict: A dict of de-serialized :class:`Dipole`-instances; mainly used
+          for loading from file.)
 
     frequencies : ndarray
         Source frequencies (Hz).
@@ -87,7 +92,10 @@ class Survey:
         If None, it will be initiated with NaN's.
 
     fixed : bool
-        if True: one single source.
+        Node-based CSEM survey (`fixed=False`; default) or streamer-type CSEM
+        survey (`fixed=True`). In the streamer-type survey, the number of
+        `receivers` supplied must be a multiple of the source positions.
+        In this case, the receivers are grouped into offsets.
 
 
     """
@@ -273,13 +281,6 @@ class Survey:
                 for i, key in enumerate(out.keys()):
                     for ii, src_name in enumerate(src_names):
                         out[key][src_name] = inp[ii + i*ns]
-
-                    # Ensure that all names were unique:
-                    if len(out[key]) != ns:
-                        print(f"* ERROR   :: There are duplicate {name} names."
-                              f"\n             Provided {name}s: {ns}; "
-                              f"unique names: {len(out[key])}.")
-                        raise ValueError(f"{name}-names")
 
             else:
 
@@ -563,10 +564,9 @@ class Dipole(PointDipole):
 
         """
         try:
-            _ = inp.pop('__class__', '')
-            name = inp.pop('name')
-            coordinates = inp.pop('coordinates')
-            return cls(name=name, coordinates=coordinates, **inp)
+            kwargs = {k: v for k, v in inp.items() if k in cls.accepted_keys}
+            return cls(name=inp['name'], coordinates=inp['coordinates'],
+                       **kwargs)
         except KeyError as e:
             print(f"* ERROR   :: Variable {e} missing in `inp`.")
             raise

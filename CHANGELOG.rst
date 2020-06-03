@@ -6,6 +6,7 @@ Changelog
 --------
 
 - New module `survey`:
+
   - New class `survey.Survey`, which combines sources, receivers, and data.
   - New class `survey.Dipole`, which defines electric point and finite length
     dipoles.
@@ -17,13 +18,17 @@ Changelog
 
 - `fields`: New function `get_receiver_response`, which returns the response
   for arbitrarily rotated receivers.
+
 - Module `io`:
+
   - New file-format `json`, writes to a hierarchical, plain json file.
   - Deprecated the use of `backend`, it uses the file extension of `fname`
     instead.
   - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and new
     `.json`.
+
 - Added `__eq__` to `models.TensorMesh` to compare meshes.
+
 - Improvements to `Field` and `SourceField`:
 
   - `_sval` and `_smu0` not stored any longer, derived from `_freq`.
