@@ -8,18 +8,14 @@ from emg3d import survey
 
 class TestSurvey():
     def test_general(self):
-        sources = (['Tx001', 'Tx002', 'Tx003', 'Tx004', 'Tx005'],
-                   0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0)
-        receivers = (['Rx001', 'Rx002', 'Rx003', 'Rx004'],
-                     [1000, 2000, 3000, 4000], 2000, -1000, 0, 0)
+        sources = (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0)
+        receivers = ([1000, 2000, 3000, 4000], 2000, -1000, 0, 0)
         frequencies = (1, 0.1, 2, 3)
         srvy = survey.Survey('Test', sources, receivers, frequencies)
 
         assert_allclose(frequencies, srvy.frequencies)
-        assert sources[0] == [k for k in srvy.sources.keys()]
-        assert receivers[0] == [k for k in srvy.receivers.keys()]
         assert isinstance(srvy.sources, dict)
-        assert srvy.sources['Tx001'].xco == 0
+        assert srvy.sources['Tx1'].xco == 0
         assert srvy.size == 0
         assert srvy.shape == (5, 4, 4)
 
@@ -29,40 +25,40 @@ class TestSurvey():
 
     def test_dipole_info_to_dict(self):
         # == 1. List ==
-        sinp1 = [survey.Dipole('Tx001', (0, 0, 0, 0, 0)),
-                 survey.Dipole('Tx002', (0, 0, 0, 0, 0))]
-        rinp1 = [survey.Dipole('Rx001', (0, 0, 0, 0, 0)),
-                 survey.Dipole('Rx002', (0, 0, 0, 0, 0))]
+        sinp1 = [survey.Dipole('Tx0', (0, 0, 0, 0, 0)),
+                 survey.Dipole('Tx1', (0, 0, 0, 0, 0))]
+        rinp1 = [survey.Dipole('Rx0', (0, 0, 0, 0, 0)),
+                 survey.Dipole('Rx1', (0, 0, 0, 0, 0))]
         srvy1 = survey.Survey('Test', sinp1, rinp1, 1)
-        assert srvy1.sources['Tx001'] == sinp1[0]
-        assert srvy1.receivers['Rx002'] == rinp1[1]
+        assert srvy1.sources['Tx0'] == sinp1[0]
+        assert srvy1.receivers['Rx1'] == rinp1[1]
 
         # == 2. Tuple ==
-        sinp2 = (['Tx001', 'Tx002'], 0, 0, 0, 0, 0)
-        rinp2 = (['Rx001', 'Rx002'], 0, 0, 0, 0, 0)
+        sinp2 = ([0, 0], 0, 0, 0, 0)
+        rinp2 = (0, 0, 0, (0, 0), 0)
         srvy2 = survey.Survey('Test', sinp2, rinp2, 1)
-        assert srvy2.sources['Tx001'] == sinp1[0]
-        assert srvy2.receivers['Rx002'] == rinp1[1]
+        assert srvy2.sources['Tx0'] == sinp1[0]
+        assert srvy2.receivers['Rx1'] == rinp1[1]
 
         # == 3. Dict ==
         sinp3 = {k.name: k.to_dict() for k in sinp1}
         rinp3 = {k.name: k.to_dict() for k in rinp1}
         srvy3 = survey.Survey('Test', sinp3, rinp3, 1)
-        assert srvy3.sources['Tx001'] == sinp1[0]
-        assert srvy3.receivers['Rx002'] == rinp1[1]
+        assert srvy3.sources['Tx0'] == sinp1[0]
+        assert srvy3.receivers['Rx1'] == rinp1[1]
 
         # == 4. Other ==
-        sources = survey.Dipole('Tx001', (0, 0, 0, 0, 0))
+        sources = survey.Dipole('Tx1', (0, 0, 0, 0, 0))
         # As Dipole it should fail.
         with pytest.raises(ValueError):
-            survey.Survey('T', sources, ('R', 1, 0, 0, 0, 0), 1)
+            survey.Survey('T', sources, (1, 0, 0, 0, 0), 1)
         # Cast as list it should work.
-        survey.Survey('T', [sources], ('R', 1, 0, 0, 0, 0), 1)
+        survey.Survey('T', [sources], (1, 0, 0, 0, 0), 1)
 
     def test_copy(self):
-        # This also checks test_dict().
-        srvy1 = survey.Survey('Test', ('Tx1', 0, 0, 0, 0, 0),
-                              ('Rx1', 1000, 0, 0, 0, 0), 1.0, [[[3+3j]]])
+        # This also checks to_dict()/from_dict().
+        srvy1 = survey.Survey('Test', (0, 0, 0, 0, 0),
+                              (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]])
         srvy2 = srvy1.copy()
         assert srvy1.sources == srvy2.sources
 
@@ -70,6 +66,12 @@ class TestSurvey():
         del cpy['sources']
         with pytest.raises(KeyError):
             survey.Survey.from_dict(cpy)
+
+        srvy3 = survey.Survey('Test', (0, 0, 0, 0, 0),
+                              (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]],
+                              fixed=1)
+        srvy4 = srvy3.copy()
+        assert srvy3.sources == srvy4.sources
 
 
 def test_PointDipole():

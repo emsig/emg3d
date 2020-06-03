@@ -68,17 +68,16 @@ class Survey:
 
         - Tuples: Coordinates in one of the two following formats:
 
-          - `(name, x, y, z, azimuth, dip)` [str, m, m, m, °, °];
-          - `(name, x0, x1, y0, y1, z0, z1)` [str, m, m, m, m, m, m].
+          - `(x, y, z, azimuth, dip)` [str, m, m, m, °, °];
+          - `(x0, x1, y0, y1, z0, z1)` [str, m, m, m, m, m, m].
 
-          Dimensions will be expanded (hence, if `n` dipoles, each parameters
-          must have length 1 or `n`; only `name` must be of length `n`).
-        - List: A list of :class:`Dipole`-instances.
+          Dimensions will be expanded (hence, if `n` dipoles, each parameter
+          must have length 1 or `n`). These dipoles will be named sequential
+          with `Tx###` and `Rx###`.
+        - List: A list of :class:`Dipole`-instances. The names of all dipoles
+          in the list must be unique.
         - Dict: A dict of de-serialized :class:`Dipole`-instances; mainly used
           for loading from file.
-
-        Warning: names are not checked for uniqueness. Hence, if the same name
-        is provided more than once it will be overwritten.
 
     frequencies : ndarray
         Source frequencies (Hz).
@@ -86,6 +85,9 @@ class Survey:
     data : ndarray or None
         The observed data (dtype=complex); must have shape (nsrc, nrec, nfreq).
         If None, it will be initiated with NaN's.
+
+    fixed : bool
+        if True: one single source.
 
 
     """
@@ -96,17 +98,19 @@ class Survey:
     # use xarray instead of a dedicated `Survey`-Class by utilizing, e.g.,
     # :func:`xarray.register_dataset_accessor`.
 
-    def __init__(self, name, sources, receivers, frequencies, data=None):
+    def __init__(self, name, sources, receivers, frequencies, data=None,
+                 fixed=0):
         """Initiate a new Survey instance."""
 
-        # Survey name.
+        # Store survey name and fixed.
         self.name = name
+        self.fixed = fixed
 
         # Initiate sources.
-        self._sources = self._dipole_info_to_dict(sources, 'sources')
+        self._sources = self._dipole_info_to_dict(sources, 'source')
 
         # Initiate receivers.
-        self._receivers = self._dipole_info_to_dict(receivers, 'receivers')
+        self._receivers = self._dipole_info_to_dict(receivers, 'receiver')
 
         # Initiate frequencies.
         self._frequencies = np.array(frequencies, dtype=float, ndmin=1)
@@ -124,9 +128,9 @@ class Survey:
                     'freq': list(self.frequencies)},
         )
         self._ds.src.attrs['long_name'] = 'Source dipole'
-        self._ds.src.attrs['dipoles'] = self.sources
+        self._ds.src.attrs['src-dipoles'] = self.sources
         self._ds.rec.attrs['long_name'] = 'Receiver dipole'
-        self._ds.rec.attrs['dipoles'] = self.receivers
+        self._ds.rec.attrs['rec-dipoles'] = self.receivers
         self._ds.freq.attrs['long_name'] = 'Source frequency'
         self._ds.freq.attrs['units'] = 'Hz'
 
@@ -148,20 +152,25 @@ class Survey:
         out = {'name': self.name, '__class__': self.__class__.__name__}
 
         # Add sources.
-        out['sources'] = {}
-        for key, value in self.sources.items():
-            out['sources'][key] = value.to_dict()
+        out['sources'] = {k: v.to_dict() for k, v in self.sources.items()}
 
         # Add receivers.
-        out['receivers'] = {}
-        for key, value in self.receivers.items():
-            out['receivers'][key] = value.to_dict()
+        if self.fixed:
+            rec = {}
+            for key, value in self.receivers.items():
+                rec[key] = {k: v.to_dict() for k, v in value.items()}
+        else:
+            rec = {k: v.to_dict() for k, v in self.receivers.items()}
+        out['receivers'] = rec
 
         # Add frequencies.
         out['frequencies'] = self.frequencies
 
         # Add data.
         out['data'] = self.data.values
+
+        # Fixed.
+        out['fixed'] = int(self.fixed)
 
         if copy:
             return deepcopy(out)
@@ -177,7 +186,7 @@ class Survey:
         inp : dict
             Dictionary as obtained from :func:`Survey.to_dict`.
             The dictionary needs the keys `name`, `sources`, `receivers`
-            `frequencies`, and `data`.
+            `frequencies`, `data`, and `fixed`.
 
         Returns
         -------
@@ -187,7 +196,8 @@ class Survey:
         try:
             return cls(name=inp['name'], sources=inp['sources'],
                        receivers=inp['receivers'],
-                       frequencies=inp['frequencies'], data=inp['data'])
+                       frequencies=inp['frequencies'], data=inp['data'],
+                       fixed=bool(inp['fixed']))
 
         except KeyError as e:
             print(f"* ERROR   :: Variable {e} missing in `inp`.")
@@ -237,28 +247,106 @@ class Survey:
 
         # Create dict depending if `inp` is list, tuple, or dict.
         if isinstance(inp, list):  # List of Dipoles
-            out = {d.name: d for d in inp}
 
-        elif isinstance(inp, tuple):  # Tuple with names, coordinates
+            if self.fixed and name == 'receiver':  # Streamer-type receivers.
 
-            # Get names.
-            names = inp[0]
-            if not isinstance(names, list):
-                names = [names]
-            nl = len(names)
+                # Get dimensions.
+                nd = len(inp)
+                ns = len(self.sources)  # Number of source position.
+                nr = nd//ns             # Number of receivers / source.
+                dnr = len(str(nr-1))    # Max number of digits; rec.
+
+                # Create name lists.
+                rec_names = [f"{i:0{dnr}d}" for i in range(nr)]
+                src_names = list(self.sources.keys())
+
+                # Ensure receivers are multiples of source positions.
+                if nd % ns != 0:
+                    print("* ERROR   :: For for fixed surveys, the number of "
+                          "receivers\n             must be a "
+                          "multiple of number of sources.\n             "
+                          f"Provided: #src: {ns}; #rec: {nd}.")
+                    raise ValueError("Dipoles")
+
+                # Assemble dict.
+                out = {'Off'+name: {} for name in rec_names}
+                for i, key in enumerate(out.keys()):
+                    for ii, src_name in enumerate(src_names):
+                        out[key][src_name] = inp[ii + i*ns]
+
+                    # Ensure that all names were unique:
+                    if len(out[key]) != ns:
+                        print(f"* ERROR   :: There are duplicate {name} names."
+                              f"\n             Provided {name}s: {ns}; "
+                              f"unique names: {len(out[key])}.")
+                        raise ValueError(f"{name}-names")
+
+            else:
+
+                out = {d.name: d for d in inp}
+
+                # Ensure that all names were unique:
+                if len(out) != len(inp):
+                    print(f"* ERROR   :: There are duplicate {name} names.\n"
+                          f"             Provided {name}s: {len(inp)}; "
+                          f"unique names: {len(out)}.")
+                    raise ValueError(f"{name}-names")
+
+        elif isinstance(inp, tuple):  # Tuple with coordinates
+
+            # Get max dimension.
+            nd = max([np.array(n, ndmin=1).size for n in inp])
 
             # Expand coordinates.
-            coo = np.array([nl*[val, ] if np.array(val).size == 1 else
-                           val for val in inp[1:]], dtype=float)
+            coo = np.array([nd*[val, ] if np.array(val).size == 1 else
+                           val for val in inp], dtype=float)
+
+            # Create dipole names (number-strings).
+            prefix = 'Tx' if name == 'source' else 'Rx'
+            dnd = len(str(nd-1))  # Max number of digits.
+            names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
 
             # Create Dipole-dict.
-            out = {names[i]: Dipole(names[i], coo[:, i]) for i in range(nl)}
+            if self.fixed and name == 'receiver':  # Streamer-type receivers.
+
+                # Get dimensions.
+                ns = len(self.sources)  # Number of source position.
+                nr = nd//ns             # Number of receivers / source.
+                dnr = len(str(nr-1))    # Max number of digits; rec.
+
+                # Create name lists.
+                rec_names = [f"{i:0{dnr}d}" for i in range(nr)]
+                src_names = list(self.sources.keys())
+
+                # Ensure receivers are multiples of source positions.
+                if nd % ns != 0:
+                    print("* ERROR   :: For for fixed surveys, the number of "
+                          "receivers\n             must be a "
+                          "multiple of number of sources.\n             "
+                          f"Provided: #src: {ns}; #rec: {nd}.")
+                    raise ValueError("Dipoles")
+
+                # Assemble dict.
+                out = {'Off'+rec_name: {} for rec_name in rec_names}
+                for i, key in enumerate(out.keys()):
+                    for ii, src_name in enumerate(src_names):
+                        iii = ii + i*ns
+                        out[key][src_name] = Dipole(names[iii], coo[:, iii])
+
+            else:  # Default node-type src-rec comb. and src for streamer-type.
+                out = {names[i]:
+                       Dipole(names[i], coo[:, i]) for i in range(nd)}
 
         elif isinstance(inp, dict):  # Dict of de-serialized Dipoles.
-            out = {k: Dipole.from_dict(v) for k, v in inp.items()}
+            if self.fixed and name == 'receiver':
+                out = {}
+                for k, v in inp.items():
+                    out[k] = {k2: Dipole.from_dict(v2) for k2, v2 in v.items()}
+            else:
+                out = {k: Dipole.from_dict(v) for k, v in inp.items()}
 
         else:
-            print(f"* ERROR   :: Input format of <{name}> not recognized: "
+            print(f"* ERROR   :: Input format of <{name}s> not recognized: "
                   f"{type(inp)}.")
             raise ValueError("Dipoles")
 
