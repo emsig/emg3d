@@ -30,7 +30,7 @@ import warnings
 import numpy as np
 from datetime import datetime
 
-from emg3d import fields, models, utils, meshes
+from emg3d import fields, models, utils, meshes, surveys
 
 try:
     import h5py
@@ -46,6 +46,8 @@ __all__ = ['save', 'load']
 KNOWN_CLASSES = {
     'Model': models.Model,
     'Field': fields.Field,
+    'Survey': surveys.Survey,
+    'Dipole': surveys.Dipole,
     'SourceField': fields.SourceField,
     'TensorMesh': meshes.TensorMesh,
 }
@@ -196,7 +198,7 @@ def data_read(fname, keys=None, path="data"):
             return out
 
 
-def save(fname, backend="h5", compression="gzip", **kwargs):
+def save(fname, backend=None, compression="gzip", **kwargs):
     """Save meshes, models, fields, and other data to disk.
 
     Serialize and save :class:`emg3d.meshes.TensorMesh`,
@@ -210,19 +212,20 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
     Parameters
     ----------
     fname : str
-        File name.
+        File name inclusive ending, which defines the used data format.
+        Implemented are currently:
 
-    backend : str, optional
-        Backend to use. Implemented are currently:
+        - `.h5` (default): Uses `h5py` to store inputs to a hierarchical,
+          compressed binary hdf5 file. Recommended file format, but requires
+          the module `h5py`. Default format if ending is not provided or not
+          recognized.
+        - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
+          file. Default format if `h5py` is not installed.
+        - `.json`: Uses `json` to store inputs to a hierarchical, plain text
+          file.
 
-        - `h5` (default): Uses `h5py` to store inputs to a hierarchical,
-          compressed binary hdf5 file with the extension '.h5'. Recommended and
-          default backend, but requires the module `h5py`. Use `npz` or `json`
-          if you don't want to install `h5py`.
-        - `npz`: Uses `numpy` to store inputs to a flat, compressed binary
-          file with the extension '.npz'.
-        - `json`: Uses `json` to store inputs to a hierarchical, plain '.json'
-          file with the extension '.json'.
+    backend : deprecated
+        Set the appropriate file-ending in `fname` instead.
 
     compression : int or str, optional
         Passed through to h5py, default is 'gzip'.
@@ -257,20 +260,33 @@ def save(fname, backend="h5", compression="gzip", **kwargs):
     data = _dict_serialize(kwargs)
 
     # Deprecated backends.
-    if backend == 'numpy':
-        mesg = ("\n    The use of `backend='numpy'` is deprecated and will\n"
-                "    be removed. Use `backend='npz'` instead.")
+    if backend is not None:
+        mesg = ("\n    The use of `backend` is deprecated and will be removed."
+                "\n    Use the file-endings [`.h5`, `.npz`, `.json`] instead.")
         warnings.warn(mesg, DeprecationWarning)
-        backend = 'npz'
-    elif backend == 'h5py':
-        mesg = ("\n    The use of `backend='h5py'` is deprecated and will\n"
-                "    be removed. Use `backend='h5'` instead.")
-        warnings.warn(mesg, DeprecationWarning)
-        backend = 'h5'
 
-    # Add file-ending if necessary.
-    if not full_path.endswith('.'+backend):
-        full_path += '.'+backend
+        if backend == 'numpy':
+            backend = 'npz'
+        elif backend == 'h5py':
+            backend = 'h5'
+        else:
+            backend = backend
+
+        # Add file-ending if necessary.
+        if not full_path.endswith('.'+backend):
+            full_path += '.'+backend
+
+    else:
+
+        # Get backend from `fname`.
+        if full_path.split('.')[-1] in ['npz', 'h5', 'json']:
+            backend = full_path.split('.')[-1]
+        else:  # Fallback to default.
+            if isinstance(h5py, str):
+                backend = 'npz'
+            else:
+                backend = 'h5'
+            full_path += '.'+backend
 
     # Save data depending on the backend.
     if backend == "npz":
@@ -348,7 +364,7 @@ def load(fname, **kwargs):
     full_path = os.path.abspath(fname)
 
     # Load data depending on the file extension.
-    if fname.endswith('.npz'):
+    if full_path.endswith('.npz'):
 
         # Load .npz into a flat dict.
         with np.load(full_path, allow_pickle=allow_pickle) as dat:
@@ -357,7 +373,7 @@ def load(fname, **kwargs):
         # Un-flatten data.
         data = _dict_unflatten(data)
 
-    elif fname.endswith('.h5'):
+    elif full_path.endswith('.h5'):
 
         # Check if h5py is installed.
         if isinstance(h5py, str):
@@ -368,7 +384,7 @@ def load(fname, **kwargs):
         with h5py.File(full_path, 'r') as h5file:
             data = _hdf5_get_from(h5file)
 
-    elif fname.endswith('.json'):
+    elif full_path.endswith('.json'):
 
         with open(full_path, 'r') as f:
             data = json.load(f)
@@ -377,7 +393,7 @@ def load(fname, **kwargs):
         data = _dict_array_comp(data)
 
     else:
-        ext = fname.split('.')[-1]
+        ext = full_path.split('.')[-1]
         raise NotImplementedError(f"Extension '.{ext}' is not implemented.")
 
     # De-serialize data.
