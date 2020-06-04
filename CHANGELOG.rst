@@ -2,38 +2,43 @@ Changelog
 #########
 
 
+v0.11.0 - stable
+""""""""""""""""
+
 *latest*
 --------
 
-- New module `survey`:
+- Modules:
 
-  - New class `survey.Survey`, which combines sources, receivers, and data.
-  - New class `survey.Dipole`, which defines electric point and finite length
-    dipoles.
+  - `fields`:
 
-- New module `simulation`:
-  - TODO
+    - Function `get_receiver_response` (**new**), which returns the response
+      for arbitrarily rotated receivers.
+    - Improvements to `Field` and `SourceField`:
 
-- New dependency `xarray` for data management.
+      - `_sval` and `_smu0` not stored any longer, derived from `_freq`.
+      - `SourceField` is now using the `copy()` and `from_dict()` from its
+        parents class `Field`.
 
-- `fields`: New function `get_receiver_response`, which returns the response
-  for arbitrarily rotated receivers.
+  - `io`:
 
-- Module `io`:
+    - File-format `json` (**new**), writes to a hierarchical, plain json file.
+    - *Deprecated* the use of `backend`, it uses the file extension of `fname`
+      instead.
+    - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and
+      new `.json`.
 
-  - New file-format `json`, writes to a hierarchical, plain json file.
-  - Deprecated the use of `backend`, it uses the file extension of `fname`
-    instead.
-  - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and new
-    `.json`.
+  - `meshes`:
 
-- Added `__eq__` to `models.TensorMesh` to compare meshes.
+    - Added `__eq__` to `models.TensorMesh` to compare meshes.
 
-- Improvements to `Field` and `SourceField`:
+  - `surveys` (**new**):
 
-  - `_sval` and `_smu0` not stored any longer, derived from `_freq`.
-  - `SourceField` is now using the `copy()` and `from_dict()` from its parents
-    class `Field`.
+    - Class `surveys.Survey`, which combines sources, receivers, and data.
+    - Class `surveys.Dipole`, which defines electric point and finite length
+      dipoles.
+
+- Additional dependency `xarray` for data management.
 
 
 *v0.11.0* : Refactor
@@ -77,6 +82,9 @@ were removed, however.
   - Fixed `to_dict`, `from_dict`, and `copy` for the `SourceField`.
   - Fixed `io` for `SourceField`, that was not implemented properly.
 
+
+v0.8.0 - v0.10.x
+""""""""""""""""
 
 *v0.10.1* : Zero Source
 -----------------------
@@ -312,6 +320,9 @@ were removed, however.
   - Changed parameter ``h_min`` to ``min_width`` for consistency reasons in
     ``utils.get_stretched_h``.
 
+
+v0.1.0 - v0.7.x
+"""""""""""""""
 
 *v0.7.1* : JOSS article
 -----------------------

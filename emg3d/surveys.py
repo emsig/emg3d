@@ -99,9 +99,9 @@ class Survey:
 
 
     """
-    # Currently, `survey.ds` contains an :class:`xarray.Dataset`, where
-    # `survey.data` is a shortcut to the :class:`xarray.DataArray`
-    # `survey.ds.data`. As such, the `Survey`-Class has an xarray-dataset as
+    # Currently, `surveys.ds` contains an :class:`xarray.Dataset`, where
+    # `surveys.data` is a shortcut to the :class:`xarray.DataArray`
+    # `surveys.ds.data`. As such, the `Survey`-Class has an xarray-dataset as
     # one of its attributes. Probably there would be a cleaner way to simply
     # use xarray instead of a dedicated `Survey`-Class by utilizing, e.g.,
     # :func:`xarray.register_dataset_accessor`.

@@ -3,7 +3,7 @@ import dataclasses
 # import numpy as np
 from numpy.testing import assert_allclose
 
-from emg3d import survey
+from emg3d import surveys
 
 
 class TestSurvey():
@@ -11,7 +11,7 @@ class TestSurvey():
         sources = (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0)
         receivers = ([1000, 2000, 3000, 4000], 2000, -1000, 0, 0)
         frequencies = (1, 0.1, 2, 3)
-        srvy = survey.Survey('Test', sources, receivers, frequencies)
+        srvy = surveys.Survey('Test', sources, receivers, frequencies)
 
         assert_allclose(frequencies, srvy.frequencies)
         assert isinstance(srvy.sources, dict)
@@ -25,109 +25,109 @@ class TestSurvey():
 
     def test_dipole_info_to_dict(self):
         # == 1. List ==
-        s_list = [survey.Dipole('Tx0', (0, 0, 0, 0, 0)),
-                  survey.Dipole('Tx1', (0, 0, 0, 0, 0))]
-        r_list = [survey.Dipole('Rx0', (0, 0, 0, 0, 0)),
-                  survey.Dipole('Rx1', (0, 0, 0, 0, 0))]
-        sur_list = survey.Survey('Test', s_list, r_list, 1)
+        s_list = [surveys.Dipole('Tx0', (0, 0, 0, 0, 0)),
+                  surveys.Dipole('Tx1', (0, 0, 0, 0, 0))]
+        r_list = [surveys.Dipole('Rx0', (0, 0, 0, 0, 0)),
+                  surveys.Dipole('Rx1', (0, 0, 0, 0, 0))]
+        sur_list = surveys.Survey('Test', s_list, r_list, 1)
         assert sur_list.sources['Tx0'] == s_list[0]
         assert sur_list.receivers['Rx1'] == r_list[1]
         # fixed
-        fsur_list = survey.Survey('Test', s_list, r_list, 1, fixed=1)
+        fsur_list = surveys.Survey('Test', s_list, r_list, 1, fixed=1)
         assert fsur_list.sources['Tx0'] == s_list[0]
         assert fsur_list.receivers['Off0']['Tx1'] == r_list[1]
 
         # == 2. Tuple ==
         s_tupl = ([0, 0], 0, 0, 0, 0)
         r_tupl = (0, 0, 0, (0, 0), 0)
-        sur_tupl = survey.Survey('Test', s_tupl, r_tupl, 1)
+        sur_tupl = surveys.Survey('Test', s_tupl, r_tupl, 1)
         assert sur_tupl.sources['Tx0'] == s_list[0]
         assert sur_tupl.receivers['Rx1'] == r_list[1]
         # fixed
-        fsur_tupl = survey.Survey('Test', s_tupl, r_tupl, 1, fixed=1)
+        fsur_tupl = surveys.Survey('Test', s_tupl, r_tupl, 1, fixed=1)
         assert fsur_tupl.sources['Tx0'] == s_list[0]
         assert fsur_tupl.receivers['Off0']['Tx1'] == r_list[1]
 
         # == 3. Dict ==
         s_dict = {k.name: k.to_dict() for k in s_list}
         r_dict = {k.name: k.to_dict() for k in r_list}
-        sur_dict = survey.Survey('Test', s_dict, r_dict, 1)
+        sur_dict = surveys.Survey('Test', s_dict, r_dict, 1)
         assert sur_dict.sources['Tx0'] == s_list[0]
         assert sur_dict.receivers['Rx1'] == r_list[1]
         # fixed
         fr_dict = {'Off0': {'Tx0': r_dict['Rx0'], 'Tx1':  r_dict['Rx1']}}
-        fsur_dict = survey.Survey('Test', s_dict, fr_dict, 1, fixed=1)
+        fsur_dict = surveys.Survey('Test', s_dict, fr_dict, 1, fixed=1)
         assert fsur_dict.sources['Tx0'] == s_list[0]
         assert fsur_dict.receivers['Off0']['Tx1'] == r_list[1]
 
         # == 4. Mix and match ==
         # list-tuple
-        list_tupl = survey.Survey('Test', s_list, r_tupl, 1)
+        list_tupl = surveys.Survey('Test', s_list, r_tupl, 1)
         assert list_tupl.sources['Tx0'] == s_list[0]
         assert list_tupl.receivers['Rx1'] == r_list[1]
         # list-dict
-        list_dict = survey.Survey('Test', s_list, r_dict, 1)
+        list_dict = surveys.Survey('Test', s_list, r_dict, 1)
         assert list_dict.sources['Tx0'] == s_list[0]
         assert list_dict.receivers['Rx1'] == r_list[1]
         # tuple-dict
-        tupl_dict = survey.Survey('Test', s_tupl, r_dict, 1)
+        tupl_dict = surveys.Survey('Test', s_tupl, r_dict, 1)
         assert tupl_dict.sources['Tx0'] == s_list[0]
         assert tupl_dict.receivers['Rx1'] == r_list[1]
         # tuple-list
-        tupl_list = survey.Survey('Test', s_tupl, r_list, 1)
+        tupl_list = surveys.Survey('Test', s_tupl, r_list, 1)
         assert tupl_list.sources['Tx0'] == s_list[0]
         assert tupl_list.receivers['Rx1'] == r_list[1]
         # dict-list
-        dict_list = survey.Survey('Test', s_dict, r_list, 1)
+        dict_list = surveys.Survey('Test', s_dict, r_list, 1)
         assert dict_list.sources['Tx0'] == s_list[0]
         assert dict_list.receivers['Rx1'] == r_list[1]
         # dict-tuple
-        dict_tuple = survey.Survey('Test', s_dict, r_tupl, 1)
+        dict_tuple = surveys.Survey('Test', s_dict, r_tupl, 1)
         assert dict_tuple.sources['Tx0'] == s_list[0]
         assert dict_tuple.receivers['Rx1'] == r_list[1]
 
         # == 5. Other ==
-        sources = survey.Dipole('Tx1', (0, 0, 0, 0, 0))
+        sources = surveys.Dipole('Tx1', (0, 0, 0, 0, 0))
         # As Dipole it should fail.
         with pytest.raises(ValueError):
-            survey.Survey('T', sources, (1, 0, 0, 0, 0), 1)
+            surveys.Survey('T', sources, (1, 0, 0, 0, 0), 1)
         # Cast as list it should work.
-        survey.Survey('T', [sources], (1, 0, 0, 0, 0), 1)
+        surveys.Survey('T', [sources], (1, 0, 0, 0, 0), 1)
         # Fixed with different sizes have to fail.
         with pytest.raises(ValueError):
-            survey.Survey('Test', s_list, [r_list[0]], 1, fixed=1)
+            surveys.Survey('Test', s_list, [r_list[0]], 1, fixed=1)
         with pytest.raises(ValueError):
-            survey.Survey('Test', s_tupl,
-                          (r_tupl[0], r_tupl[0], r_tupl[0]), 1, fixed=1)
+            surveys.Survey('Test', s_tupl,
+                           (r_tupl[0], r_tupl[0], r_tupl[0]), 1, fixed=1)
         # Duplicate names should fail.
         with pytest.raises(ValueError):
-            survey.Survey('Test', s_list, [r_list[0], r_list[0]], 1)
+            surveys.Survey('Test', s_list, [r_list[0], r_list[0]], 1)
 
     def test_copy(self):
         # This also checks to_dict()/from_dict().
-        srvy1 = survey.Survey('Test', (0, 0, 0, 0, 0),
-                              (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]])
+        srvy1 = surveys.Survey('Test', (0, 0, 0, 0, 0),
+                               (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]])
         srvy2 = srvy1.copy()
         assert srvy1.sources == srvy2.sources
 
         cpy = srvy1.to_dict()
         del cpy['sources']
         with pytest.raises(KeyError):
-            survey.Survey.from_dict(cpy)
+            surveys.Survey.from_dict(cpy)
 
-        srvy3 = survey.Survey('Test', (0, 0, 0, 0, 0),
-                              (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]],
-                              fixed=1)
+        srvy3 = surveys.Survey('Test', (0, 0, 0, 0, 0),
+                               (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]],
+                               fixed=1)
         srvy4 = srvy3.copy()
         assert srvy3.sources == srvy4.sources
 
 
 def test_PointDipole():
     # Define a few point dipoles
-    dip1 = survey.PointDipole('Tx001', 0, 100, 0, 12, 69)
-    dip2 = survey.PointDipole('Tx932', 0, 1000, 0, 12, 69)
-    dip3 = survey.PointDipole('Tx001', 0, 0, -950.0, 12, 0)
-    dip4 = survey.PointDipole('Tx004', 0, 0, 0, 12, 69)
+    dip1 = surveys.PointDipole('Tx001', 0, 100, 0, 12, 69)
+    dip2 = surveys.PointDipole('Tx932', 0, 1000, 0, 12, 69)
+    dip3 = surveys.PointDipole('Tx001', 0, 0, -950.0, 12, 0)
+    dip4 = surveys.PointDipole('Tx004', 0, 0, 0, 12, 69)
     dip1copy = dataclasses.copy.deepcopy(dip1)
 
     # Some checks
@@ -155,8 +155,8 @@ def test_PointDipole():
 def test_Dipole(capsys):
     dipcoord = (0.0, 1000.0, -950.0, 0.0, 0.0)
     bipcoord = (-0.5, 0.5, 1000.0, 1000.0, -950.0, -950.0)
-    pointdip = survey.Dipole('dip', dipcoord)
-    finitdip = survey.Dipole('dip', bipcoord)
+    pointdip = surveys.Dipole('dip', dipcoord)
+    finitdip = surveys.Dipole('dip', bipcoord)
 
     # Some checks
     assert pointdip.name == 'dip'
@@ -175,8 +175,8 @@ def test_Dipole(capsys):
     assert pointdip == finitdip
 
     # More general case
-    pointdip2 = survey.Dipole('1', (0.0, 1000.0, -950.0, 30.0, 70.0))
-    finitdip2 = survey.Dipole(
+    pointdip2 = surveys.Dipole('1', (0.0, 1000.0, -950.0, 30.0, 70.0))
+    finitdip2 = surveys.Dipole(
             '1', (-0.14809906635, 0.14809906635, 999.91449496415,
                   1000.08550503585, -950.4698463104, -949.5301536896))
 
@@ -184,17 +184,17 @@ def test_Dipole(capsys):
 
     # Check wrong number of points fails.
     with pytest.raises(ValueError):
-        survey.Dipole('dip', (0, 0, 0, 0))
+        surveys.Dipole('dip', (0, 0, 0, 0))
     out, _ = capsys.readouterr()
     assert "* ERROR   :: Dipole coordinates are wrong defined." in out
 
     # Check that two identical poles fails.
     with pytest.raises(ValueError):
-        survey.Dipole('dip', (0, 0, 0, 0, 0, 0))
+        surveys.Dipole('dip', (0, 0, 0, 0, 0, 0))
 
     # Check adding various attributs.
     _, _ = capsys.readouterr()
-    source = survey.Dipole(
+    source = surveys.Dipole(
             'dip', (0.0, 1000.0, -950.0, 0.0, 0.0), strength=75, foo='bar')
     out, _ = capsys.readouterr()
 
@@ -213,4 +213,4 @@ def test_Dipole(capsys):
     assert source3 == source4
     del source4['coordinates']
     with pytest.raises(KeyError):
-        survey.Dipole.from_dict(source4)
+        surveys.Dipole.from_dict(source4)
