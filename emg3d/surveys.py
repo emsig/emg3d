@@ -73,8 +73,8 @@ class Survey:
 
         - Tuples: Coordinates in one of the two following formats:
 
-          - `(x, y, z, azimuth, dip)` [str, m, m, m, °, °];
-          - `(x0, x1, y0, y1, z0, z1)` [str, m, m, m, m, m, m].
+          - `(x, y, z, azimuth, dip)` [m, m, m, °, °];
+          - `(x0, x1, y0, y1, z0, z1)` [m, m, m, m, m, m].
 
           Dimensions will be expanded (hence, if `n` dipoles, each parameter
           must have length 1 or `n`). These dipoles will be named sequential

@@ -32,7 +32,7 @@ high-level, specialised modelling routines.
 
 # import numpy as np
 
-# from emg3d import maps, models
+from emg3d import fields, solver
 
 __all__ = ['Simulation']
 
@@ -101,35 +101,59 @@ class Simulation():
           'single', but the provided grid is used instead of the adaptive
           gridding routine.
 
+        Default is 'same', hence the modelling grid is used for computation.
+
     """
 
     def __init__(self, survey, grid, model, solver_opts=None,
-                 comp_grids='single', **kwargs):
+                 comp_grids='same', **kwargs):
         """Initiate a new Simulation instance."""
 
         # Store inputs (should these be copied?).
         self.survey = survey
         self.grid = grid
         self.model = model
+
+        if solver_opts is None:
+            solver_opts = {
+                    'sslsolver': True,
+                    'semicoarsening': True,
+                    'linerelaxation': True,
+                    'verb': -1,
+                    }
         self.solver_opts = solver_opts
 
         # Ensure no kwargs left (currently kwargs is not used).
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
+        # Initiate comp_grids-, model-, sfield-, and efield-dicts.
+        self._comp_grids = {src: {freq: None for freq in survey.frequencies}
+                            for src in survey.sources.keys()}
+        self._comp_models = {src: {freq: None for freq in survey.frequencies}
+                             for src in survey.sources.keys()}
+        self._sfields = {src: {freq: None for freq in survey.frequencies}
+                         for src in survey.sources.keys()}
+        self._efields = {src: {freq: None for freq in survey.frequencies}
+                         for src in survey.sources.keys()}
+
         # Take care of `comp_grids`; for consistency, it is always a dict with
         # the structure dict[source][freq]; no copies are made of same meshes,
         # just pointers.
         if isinstance(comp_grids, str):
-            if comp_grids == 'same':
-                self._comp_grids_type = comp_grids
-                self.comp_grids = {}
-                for source in survey.sources:
-                    self.comp_grids[source] = {}
-                    for freq in survey.frequencies:
-                        self.comp_grids[source][freq] = self.grid
+
+            # Store comp-type.
+            self._comp_grids_type = comp_grids
+
+            # Act depending on string.
+            if comp_grids == 'same':  # Store same grid for all cases.
+                for src, val in self._comp_grids.items():
+                    for freq in self._comp_grids[src].keys():
+                        self._comp_grids[src][freq] = self.grid
+
             else:
-                # Need to implement: 'single', 'frequency', 'source', 'both'
+                # Need to implement adaptive gridding for:
+                # 'single', 'frequency', 'source', 'both'
                 raise NotImplementedError(f"`comp_dicts` {comp_grids}")
         else:
             # Need to implement: dict, TensorMesh
@@ -159,6 +183,63 @@ class Simulation():
 
         """
         raise NotImplementedError
+
+    def comp_grids(self, source, frequency):
+        """Return computational grid of the given source and frequency."""
+        return self._comp_grids[source][float(frequency)]
+
+    def comp_models(self, source, frequency):
+        """Return model on the grid of the given source and frequency."""
+
+        # If model is not stored yet, get it.
+        if self._comp_models[source][float(frequency)] is None:
+            if self._comp_grids_type == 'same':
+                self._comp_models[source][float(frequency)] = self.model
+            else:
+                raise NotImplementedError
+
+        return self._comp_models[source][float(frequency)]
+
+    def sfields(self, source, frequency):
+        """Return source field for given source and frequency."""
+
+        # If source field is not stored yet, get it.
+        if self._sfields[source][float(frequency)] is None:
+            sfield = fields.get_source_field(
+                    self.comp_grids(source, frequency),
+                    self.survey.sources[source].coordinates,
+                    frequency, strength=0)
+            self._sfields[source][float(frequency)] = sfield
+
+        return self._sfields[source][float(frequency)]
+
+    def efields(self, source, frequency, **kwargs):
+        """Return electric field for given source and frequency.
+
+        The efield is computed if it is not stored already, except if
+        `recalc=True` is in `kwargs`. All other `kwargs` are passed to solver,
+        overwriting `self.solver_opts`.
+
+        """
+        recalc = kwargs.pop('recalc', False)
+
+        # If electric field not computed yet compute it.
+        if self._efields[source][float(frequency)] is None or recalc:
+
+            # Get solver options and update with kwargs.
+            solver_opts = {**self.solver_opts, **kwargs}
+
+            # Compute electric field.
+            efield = solver.solve(
+                    self.comp_grids(source, frequency),
+                    self.comp_models(source, frequency),
+                    self.sfields(source, frequency),
+                    **solver_opts)
+
+            # Store electric field.
+            self._efields[source][float(frequency)] = efield
+
+        return self._efields[source][float(frequency)]
 
 
 def model_marine_csem():
