@@ -34,32 +34,106 @@ high-level, specialised modelling routines.
 
 # from emg3d import maps, models
 
-# __all__ = []
+__all__ = ['Simulation']
 
 
 class Simulation():
-    r"""Create a simulation with survey, meshes, and fields.
+    r"""Create a simulation for a given survey on a given model.
+
+    The computational mesh(es) can be either the same as the model mesh, or
+    they can be provided, or automatic gridding can be applied.
+
+    .. todo::
+
+        - Take care if `'return_info': True` for `solver_opts`.
+        - gridding options
+        - min_amp to consider
+        - min_offset, max_offset
+        - NOTHING with inversion
+        - make synthetic data
+        - dpred
+        - dobs
+        - compute E-Source (H-source)  [forward] => synthetic
+        - get E-field (H-field)        [interpolation]
+        - gradient, residual, misfit
 
 
     Parameters
     ----------
+    survey : :class:`emg3d.survey.Survey`
+        The survey layout, containing sources, receivers, and frequencies.
+
+    grid : :class:`emg3d.meshes.TensorMesh`
+        The grid. See :class:`emg3d.meshes.TensorMesh`.
+
+    model : :class:`emg3d.models.Model`
+        The model. See :class:`emg3d.models.Model`.
+
+    solver_opts : dict
+        Passed through to :func:`emg3d.solver.solve`. The dict can contain any
+        parameter that is accepted by the solver except for `grid`, `model`,
+        `sfield`, and `efield`.
+
+    comp_grids : str, dict, or  :class:`emg3d.meshes.TensorMesh`
+        Computational grids. The possibilities are:
+
+        - A string:
+
+            - 'same': Same grid as for model.
+            - 'single': A single grid for all sources and frequencies.
+            - 'frequency': Frequency-dependent grids.
+            - 'source': Source-dependent grids.
+            - 'both': Frequency- and source-dependent grids.
+
+            Except for 'same', the grids are created using the adaptive
+            gridding routine :func:`emg3d.meshes.csem_model`.
+
+        - A dict: If a dict is provided the keys must be the source names
+          and/or the frequencies, and the values are
+          :class:`emg3d.meshes.TensorMesh` instances. The structure of the
+          dict can be:
+
+            - `dict[freq]`: corresponds to 'frequency'.
+            - `dict[source]`: corresponds to 'source'.
+            - `dict[source][freq]`: corresponds to 'both'.
+
+        - A :class:`emg3d.meshes.TensorMesh` instance. This is the same as
+          'single', but the provided grid is used instead of the adaptive
+          gridding routine.
 
     """
 
-    def __init__(self, survey, model, mesh, **kwargs):
+    def __init__(self, survey, grid, model, solver_opts=None,
+                 comp_grids='single', **kwargs):
         """Initiate a new Simulation instance."""
-        #
-        # TODO - Start with the JIF workflow, see what is missing.
-        #
-        # Mesh: - freq-dependent or not
-        #       - source-dependent or not
-        #       - use input or not
-        # solver options
-        # gridding options
-        # min_amp to consider
-        # min_offset, max_offset
-        # NOTHING with inversion
-        pass
+
+        # Store inputs (should these be copied?).
+        self.survey = survey
+        self.grid = grid
+        self.model = model
+        self.solver_opts = solver_opts
+
+        # Ensure no kwargs left (currently kwargs is not used).
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+
+        # Take care of `comp_grids`; for consistency, it is always a dict with
+        # the structure dict[source][freq]; no copies are made of same meshes,
+        # just pointers.
+        if isinstance(comp_grids, str):
+            if comp_grids == 'same':
+                self._comp_grids_type = comp_grids
+                self.comp_grids = {}
+                for source in survey.sources:
+                    self.comp_grids[source] = {}
+                    for freq in survey.frequencies:
+                        self.comp_grids[source][freq] = self.grid
+            else:
+                # Need to implement: 'single', 'frequency', 'source', 'both'
+                raise NotImplementedError(f"`comp_dicts` {comp_grids}")
+        else:
+            # Need to implement: dict, TensorMesh
+            raise NotImplementedError(f"`comp_dicts` {type(grid)}")
 
     def copy(self):
         """Return a copy of the Simulation."""
@@ -86,24 +160,10 @@ class Simulation():
         """
         raise NotImplementedError
 
-    # connected survey
-
-    # connected model(s)
-
-    # resulting meshes
-
-    # solver_opts parameters
-
-    # make synthetic data
-    # dpred
-    # dobs
-
-    # compute E-Source (H-source)  [forward] => synthetic
-    # get E-field (H-field)        [interpolation]
-    # gradient, residual, misfit
-
 
 def model_marine_csem():
+    # => MOVE TO :mod:`emg3d.meshes`
+    # JUST adaptive gridding, modelling is done by simulation class.
     # takes a model; fills up water if req., adds air
     # takes a survey -> deduces computational domain from that
     # takes gridding parameters
