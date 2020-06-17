@@ -38,6 +38,10 @@ v0.11.0 - stable
     - Class `surveys.Dipole`, which defines electric point and finite length
       dipoles.
 
+  - `simulations` (**new**):
+
+    TODO
+
 - Additional dependency `xarray` for data management.
 
 

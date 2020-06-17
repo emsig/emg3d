@@ -44,7 +44,11 @@ class Survey:
           normalized to a moment of 1 A m).
         - Reciprocity flag.
         - Add more data than just `data`: `noise`, `active`, etc.
+        - For data, add noise floor and error.
         - Add an example of the different usages to the gallery.
+        - Include verbosity checks of regular emg3d.
+        - Dipole should know if it is electric or magnetic.
+        - Return receiver coordinates as list for any source.
 
     .. note::
 
