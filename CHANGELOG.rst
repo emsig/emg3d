@@ -35,8 +35,8 @@ v0.11.0 - stable
   - `surveys` (**new**):
 
     - Class `surveys.Survey`, which combines sources, receivers, and data.
-    - Class `surveys.Dipole`, which defines electric point and finite length
-      dipoles.
+    - Class `surveys.Dipole`, which defines electric or magnetic point dipoles
+      and finite length dipoles.
 
   - `simulations` (**new**):
 

@@ -103,6 +103,33 @@ class TestSurvey():
         with pytest.raises(ValueError):
             surveys.Survey('Test', s_list, [r_list[0], r_list[0]], 1)
 
+    def test_dipole_info_to_dict_elmag(self):
+        # == 1. List ==
+        s_list = [surveys.Dipole('Tx0', (0, 0, 0, 0, 0), True),
+                  surveys.Dipole('Tx1', (0, 0, 0, 0, 0))]
+        r_list = [surveys.Dipole('Rx0', (0, 0, 0, 0, 0), True),
+                  surveys.Dipole('Rx1', (0, 0, 0, 0, 0), False)]
+        sur_list = surveys.Survey('Test', s_list, r_list, 1)
+        assert sur_list.sources['Tx0'].electric is True
+        assert sur_list.sources['Tx1'].electric is True
+        assert sur_list.receivers['Rx0'].electric is True
+        assert sur_list.receivers['Rx1'].electric is False
+        # fixed
+        fsur_list = surveys.Survey('Test', s_list, r_list, 1, fixed=1)
+        assert fsur_list.sources['Tx0'].electric is True
+        assert fsur_list.sources['Tx1'].electric is True
+        assert fsur_list.receivers['Off0']['Tx0'].electric is True
+        assert fsur_list.receivers['Off0']['Tx1'].electric is False
+
+        # == 2. Tuple ==
+        s_tupl = ([0, 0], 0, 0, 0, 0, True)
+        r_tupl = (0, 0, 0, (0, 0), 0, (True, False))
+        sur_tupl = surveys.Survey('Test', s_tupl, r_tupl, 1)
+        assert sur_tupl.sources['Tx0'].electric is True
+        assert sur_tupl.sources['Tx1'].electric is True
+        assert sur_tupl.receivers['Rx0'].electric is True
+        assert sur_tupl.receivers['Rx1'].electric is False
+
     def test_copy(self):
         # This also checks to_dict()/from_dict().
         srvy1 = surveys.Survey('Test', (0, 0, 0, 0, 0),
@@ -124,10 +151,10 @@ class TestSurvey():
 
 def test_PointDipole():
     # Define a few point dipoles
-    dip1 = surveys.PointDipole('Tx001', 0, 100, 0, 12, 69)
-    dip2 = surveys.PointDipole('Tx932', 0, 1000, 0, 12, 69)
-    dip3 = surveys.PointDipole('Tx001', 0, 0, -950.0, 12, 0)
-    dip4 = surveys.PointDipole('Tx004', 0, 0, 0, 12, 69)
+    dip1 = surveys.PointDipole('Tx001', 0, 100, 0, 12, 69, True)
+    dip2 = surveys.PointDipole('Tx932', 0, 1000, 0, 12, 69, True)
+    dip3 = surveys.PointDipole('Tx001', 0, 0, -950.0, 12, 0, True)
+    dip4 = surveys.PointDipole('Tx004', 0, 0, 0, 12, 69, False)
     dip1copy = dataclasses.copy.deepcopy(dip1)
 
     # Some checks
@@ -137,6 +164,8 @@ def test_PointDipole():
     assert dip1.zco == 0.0
     assert dip1.azm == 12.0
     assert dip1.dip == 69.0
+    assert dip1.electric is True
+    assert dip4.electric is False
 
     # Collect dipoles
     dipoles = [dip1, dip2, dip3, dip4, dip1copy]
@@ -202,7 +231,7 @@ def test_Dipole(capsys):
     assert source.foo == 'bar'
     assert out == "* WARNING :: Unknown kwargs {foo: bar}\n"
 
-    reprstr = "Dipole(dip, {0.0m; 1,000.0m; -950.0m}, θ=0.0°, φ=0.0°, l=1.0m)"
+    reprstr = "pole(dip, E, {0.0m; 1,000.0m; -950.0m}, θ=0.0°, φ=0.0°, l=1.0m)"
     assert reprstr in source.__repr__()
 
     # Copy, to_dict, from_dict
@@ -214,3 +243,8 @@ def test_Dipole(capsys):
     del source4['coordinates']
     with pytest.raises(KeyError):
         surveys.Dipole.from_dict(source4)
+
+    # Magnetic dipole
+    mdip = surveys.Dipole('dip', dipcoord, False)
+    mdipcopy = mdip.copy()
+    assert mdipcopy.electric is False
