@@ -53,6 +53,10 @@ class Simulation():
         - make synthetic data; dpred; dobs
         - gradient, residual, misfit
         - Include verbosity checks of regular emg3d.
+        - Check what not implemented:
+
+          - finite length dipoles for psolve.
+          - H-fields for psolve.
 
 
     Parameters
@@ -352,21 +356,19 @@ class Simulation():
                              for f, s in out.items()}
 
         # Extract data at receivers.
-
-        # TODO: improve this, move to survey
-        # TODO: differently for fixed=True/False
-        c = np.r_[[np.array(r.coordinates)
-                   for r in self.survey.receivers.values()]]
-        coords = (c[:, 0], c[:, 1], c[:, 2], c[:, 3], c[:, 4])
-
+        if self.survey.fixed:
+            all_rec_coords = self.survey.rec_coords
+        else:
+            rec_coords = self.survey.rec_coords
         # Loop over sources and frequencies.
-        # TODO: differently for fixed=True/False
         for src in self.survey.sources.keys():
+            if self.survey.fixed:
+                rec_coords = all_rec_coords[src]
             for freq in self.survey.frequencies:
                 resp = fields.get_receiver_response(
-                        self._comp_grids[src][freq],
-                        self._efields[src][freq],
-                        coords
+                        grid=self._comp_grids[src][freq],
+                        field=self._efields[src][freq],
+                        rec=rec_coords
                 )
                 self.survey._ds['synthetic'].loc[src, :, freq] = resp
 

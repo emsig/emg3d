@@ -288,6 +288,33 @@ class Survey:
         return self._receivers
 
     @property
+    def rec_coords(self):
+        """Return receiver coordinates.
+
+        The returned format is `[x, y, z, azm, dip]`, a list of 5 tuples. If
+        `fixed=True` it returns a dict with the offsets as keys, and for each
+        offset it returns the corresponding receiver coordinates as just
+        outlined.
+        """
+
+        # Get receiver coordinates depending if fixed or not.
+        if self.fixed:
+            coords = {}
+            for src in self.sources.keys():
+                coords[src] = tuple(
+                        np.array([[self.receivers[off][src].xco,
+                                   self.receivers[off][src].yco,
+                                   self.receivers[off][src].zco,
+                                   self.receivers[off][src].azm,
+                                   self.receivers[off][src].dip]
+                                  for off in self.receivers.keys()]).T)
+        else:
+            coords = tuple(np.array([[r.xco, r.yco, r.zco, r.azm, r.dip] for r
+                                     in self.receivers.values()]).T)
+
+        return coords
+
+    @property
     def frequencies(self):
         """Frequency array."""
         return self._frequencies
