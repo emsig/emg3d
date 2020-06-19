@@ -68,16 +68,16 @@ class Survey:
     (L, M, N), but here `L` is the number of locations of the only source, `M`
     is the number of receiver-offsets, and `N` is the number of frequencies::
 
-                                       f1
-                Offs1     .  OffsM     /   .
+                                        f1
+                Offs1     .   OffsM    /   .
               ┌─────────┬───┬─────────┐   /   fN
-       TxPos1 │ Rx1-TP1 │ . │ RxM-Tp1 │──┐   /
+       TxPos1 │ Rx1-TP1 │ . │ RxM-TP1 │──┐   /
               ├─────────┼───┼─────────┤  │──┐
-       TxPos2 │ Rx1-TP2 │ . │ RxM-Tp2 │──┤  │
+       TxPos2 │ Rx1-TP2 │ . │ RxM-TP2 │──┤  │
               ├─────────┼───┼─────────┤  │──┤
         .     │ .       │ . │ .       │──┤  │
               ├─────────┼───┼─────────┤  │──┤
-       TxPosL │ Rx1-TpL │ . │ RxM-TpL │──┤  │
+       TxPosL │ Rx1-TPL │ . │ RxM-TPL │──┤  │
               └─────────┴───┴─────────┘  │──┤
                  └─────────┴───┴─────────┘  │
                     └─────────┴───┴─────────┘
