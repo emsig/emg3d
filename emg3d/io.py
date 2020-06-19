@@ -199,12 +199,15 @@ def data_read(fname, keys=None, path="data"):
 
 
 def save(fname, backend=None, compression="gzip", **kwargs):
-    """Save meshes, models, fields, and other data to disk.
+    """Save simulations, surveys, meshes, models, fields, and more to disk.
 
-    Serialize and save :class:`emg3d.meshes.TensorMesh`,
-    :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` instances and
-    add arbitrary other data, where instances of the same type are grouped
-    together.
+    Serialize and save data to disk in different formats (see parameter
+    description of `fname` for the supported file formats). The main
+    emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) are collected
+    in corresponding root-folders (unless `collect_classes=False`).
+
+    Any other (non-emg3d) object can be added too, as long as it knows how to
+    serialize itself.
 
     The serialized instances will be de-serialized if loaded with :func:`load`.
 
@@ -235,8 +238,8 @@ def save(fname, backend=None, compression="gzip", **kwargs):
 
     collect_classes : bool
         If True (default), input data is collected in folders for the principal
-        emg3d-classes (Model, TensorMesh, Field, Survey, Dipole, SourceField),
-        and everything else collected in a `Data`-folder.
+        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
+        everything else collected in a `Data`-folder.
 
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
@@ -259,7 +262,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
     kwargs['_version'] = 'emg3d v' + utils.__version__
-    kwargs['_format'] = '0.11.1'  # File format; version of emg3d when changed.
+    kwargs['_format'] = '0.12.0'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
@@ -424,14 +427,15 @@ def load(fname, **kwargs):
 
 
 def _dict_serialize(inp, out=None, collect_classes=True):
-    """Serialize TensorMesh, Field, and Model instances in dict.
+    """Serialize emg3d-classes and other objects in inp-dict.
 
-    Returns a serialized dictionary <out> of <inp>, where all
-    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
-    :class:`emg3d.models.Model` instances have been serialized.
+    Returns a serialized dictionary <out> of <inp>, where all members of
+    `emg3d.io.KNOWN_CLASSES` are serialized with their respective `to_dict()`
+    methods. These instances are additionally grouped together in dictionaries,
+    and all other stuff is put into 'Data', unless `collect_classes=False`.
 
-    These instances are additionally grouped together in dictionaries, and all
-    other stuff is put into 'Data'.
+    Any other (non-emg3d) object can be added too, as long as it knows how to
+    serialize itself.
 
     There are some limitations:
 
@@ -451,8 +455,8 @@ def _dict_serialize(inp, out=None, collect_classes=True):
 
     collect_classes : bool
         If True (default), input data is collected in folders for the principal
-        emg3d-classes (Model, TensorMesh, Field, Survey, Dipole, SourceField),
-        and everything else collected in a `Data`-folder.
+        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
+        everything else collected in a `Data`-folder.
 
 
     Returns
@@ -535,12 +539,11 @@ def _dict_serialize(inp, out=None, collect_classes=True):
 
 
 def _dict_deserialize(inp):
-    """De-serialize TensorMesh, Field, and Model instances in dict.
+    """De-serialize emg3d-classes and other objects in inp-dict.
 
-    De-serializes in-place dictionary <inp>, where all
-    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
-    :class:`emg3d.models.Model` instances have been de-serialized. It also
-    converts back 'NoneType'-strings to None.
+    De-serializes in-place dictionary <inp>, where all members of
+    `emg3d.io.KNOWN_CLASSES` are de-serialized with their respective
+    `from_dict()` methods. It also converts back 'NoneType'-strings to None.
 
 
     Parameters
