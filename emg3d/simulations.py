@@ -46,17 +46,20 @@ class Simulation():
 
     .. todo::
 
-        - gridding options
-        - min_amp to consider
-        - min_offset, max_offset
-        - NOTHING with inversion
-        - make synthetic data; dpred; dobs
-        - gradient, residual, misfit
-        - Include verbosity checks of regular emg3d.
+        - Adaptive gridding.
+        - Make synthetic data; dpred; dobs.
+        - `to_dict`, `from_dict`.
+        - Properly document and test.
+        - Include logging/verbosity; check with CLI.
         - Check what not implemented:
 
-          - finite length dipoles for psolve.
+          - Finite length dipoles for psolve.
           - H-fields for psolve.
+
+        - NOTHING with inversion.
+
+          - Gradient, residual, misfit.
+          - `min_amp`, `min_offset`, `max_offset`.
 
 
     Parameters
@@ -382,13 +385,6 @@ class Simulation():
         """Returns a dict of the structure `dict[source][freq]=None`."""
         return {src: {freq: None for freq in self.survey.frequencies}
                 for src in self.survey.sources.keys()}
-
-    # TODO
-    # resfield
-    # backfield
-    # gradient
-    # to_dict, from_dict
-    # adaptive gridding
 
 
 def model_marine_csem():

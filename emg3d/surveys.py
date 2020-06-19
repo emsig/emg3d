@@ -94,8 +94,8 @@ class Survey:
         - Reciprocity flag.
         - For data, add noise floor and error.
         - Add an example of the different usages to the gallery.
-        - Include verbosity checks of regular emg3d.
         - Return receiver coordinates as list for any source.
+        - Include logging/verbosity; check with CLI.
 
 
     Parameters
@@ -520,7 +520,6 @@ class Dipole(PointDipole):
 
         # Add additional info to the dipole.
         for key, value in kwargs.items():
-            # TODO: respect verbosity
             if key not in self.accepted_keys:
                 print(f"* WARNING :: Unknown kwargs {{{key}: {value}}}")
             setattr(self, key, value)
