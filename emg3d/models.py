@@ -27,6 +27,8 @@ import numpy as np
 from copy import deepcopy
 from scipy.constants import epsilon_0
 
+from emg3d import maps
+
 __all__ = ['Model', 'VolumeModel']
 
 
@@ -318,6 +320,69 @@ class Model:
     def epsilon_r(self, epsilon_r):
         r"""Update electric permittivity."""
         self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
+
+    def interpolate2grid(self, grid, new_grid, **grid2grid_opts):
+        """Interpolate `Model` located on `grid` to `new_grid`.
+
+
+        Parameters
+        ----------
+        grid, new_grid : TensorMesh
+            Input and output model grids;
+            :class:`emg3d.meshes.TensorMesh` instances.
+
+        grid2grid_opts : dict
+            Passed through to :func:`maps.grid2grid`. Defaults are
+            `method='volume'`, `log=True`, and `extrapolate=True`.
+
+
+        Returns
+        -------
+        NewModel : Model
+            New :class:`Model` instance on `new_grid`.
+
+        """
+
+        # Get solver options, set to defaults if not provided.
+        inp = {
+                'method': 'volume',
+                'extrapolate': True,
+                'log': True,
+                **(grid2grid_opts if grid2grid_opts is not None else {}),
+                'grid': grid,
+                'new_grid': new_grid
+        }
+
+        # res_x (always).
+        res_x = maps.grid2grid(values=self.res_x, **inp)
+
+        # res_y.
+        if self.case in [1, 3]:
+            res_y = maps.grid2grid(values=self.res_y, **inp)
+        else:
+            res_y = None
+
+        # res_z.
+        if self.case in [2, 3]:
+            res_z = maps.grid2grid(values=self.res_z, **inp)
+        else:
+            res_z = None
+
+        # mu_r.
+        if self._mu_r is not None:
+            mu_r = maps.grid2grid(values=self.mu_r, **inp)
+        else:
+            mu_r = None
+
+        # epsilon_r.
+        if self._epsilon_r is not None:
+            epsilon_r = maps.grid2grid(values=self.epsilon_r, **inp)
+        else:
+            epsilon_r = None
+
+        # Assemble coarse model.
+        return Model(new_grid, res_x=res_x, res_y=res_y, res_z=res_z,
+                     mu_r=mu_r, epsilon_r=epsilon_r)
 
     # INTERNAL UTILITIES
     def _check_parameter(self, var, name):

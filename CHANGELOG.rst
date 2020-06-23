@@ -46,6 +46,8 @@ v0.11.0 - stable
 
   - `meshes`:
 
+    - New method `interpolate2mesh` on `models.Model` instances returns the
+      current model on a new mesh.
     - Added `__eq__` to `models.TensorMesh` to compare meshes.
 
 - Additional dependency `xarray` for data management.

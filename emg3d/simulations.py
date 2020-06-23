@@ -77,35 +77,26 @@ class Simulation():
         Passed through to :func:`emg3d.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solve` except for
         `grid`, `model`, `sfield`, and `efield`.
+        If not provided the following defaults are used:
+        `sslsolver = semicoarsening = linerelaxation = True`, `verb = -1`.
 
-    comp_grids : str, dict, or  :class:`emg3d.meshes.TensorMesh`
-        Computational grids. The possibilities are:
+    comp_grids : str
+        Computational grids; default is currently 'same', but will change to
+        'single'.
 
-        - A string:
+        - 'same': Same grid as for model.
+        - 'single': A single grid for all sources and frequencies.
+        - 'frequency': Frequency-dependent grids.
+        - 'source': Source-dependent grids.
+        - 'both': Frequency- and source-dependent grids.
 
-            - 'same': Same grid as for model.
-            - 'single': A single grid for all sources and frequencies.
-            - 'frequency': Frequency-dependent grids.
-            - 'source': Source-dependent grids.
-            - 'both': Frequency- and source-dependent grids.
+        Except for 'same', the grids are created using the adaptive gridding
+        routine :func:`emg3d.meshes.csem_model`.
 
-            Except for 'same', the grids are created using the adaptive
-            gridding routine :func:`emg3d.meshes.csem_model`.
-
-        - A dict: If a dict is provided the keys must be the source names
-          and/or the frequencies, and the values are
-          :class:`emg3d.meshes.TensorMesh` instances. The structure of the
-          dict can be:
-
-            - `dict[freq]`: corresponds to 'frequency'.
-            - `dict[source]`: corresponds to 'source'.
-            - `dict[source][freq]`: corresponds to 'both'.
-
-        - A :class:`emg3d.meshes.TensorMesh` instance. This is the same as
-          'single', but the provided grid is used instead of the adaptive
-          gridding routine.
-
-        Default is 'same', hence the modelling grid is used for computation.
+        Not implemented yet is the possibility to provide a single TensorMesh
+        instance or a dict of TensorMesh instances for user-provided meshes.
+        You can still do this by setting `simulation._comp_meshes` after
+        instantiation.
 
     """
 
@@ -113,25 +104,27 @@ class Simulation():
                  comp_grids='same', **kwargs):
         """Initiate a new Simulation instance."""
 
-        # Store inputs (should these be copied?).
+        # Store inputs (should these be copied to avoid altering them?).
         self.survey = survey
         self.grid = grid
         self.model = model
+        self._grids_type = comp_grids
 
-        if solver_opts is None:
-            solver_opts = {
-                    'sslsolver': True,
-                    'semicoarsening': True,
-                    'linerelaxation': True,
-                    'verb': -1,
-                    }
-        self.solver_opts = solver_opts
+        # Get solver options, set to defaults if not provided.
+        self.solver_opts = {
+                # Defaults; overwritten by inputs v.
+                'sslsolver': True,
+                'semicoarsening': True,
+                'linerelaxation': True,
+                'verb': -1,
+                **(solver_opts if solver_opts is not None else {}),
+                }
 
         # Ensure no kwargs left (currently kwargs is not used).
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
-        # Initiate comp_grids-, model-, sfield-, and efield-dicts.
+        # Initiate comp_{grids;models}-dicts and {s;e;h}fields-dicts.
         self._comp_grids = self._initiate_none_dict()
         self._comp_models = self._initiate_none_dict()
         self._sfields = self._initiate_none_dict()
@@ -141,28 +134,6 @@ class Simulation():
 
         # Initialize synthetic data.
         self.survey._ds['synthetic'] = self.survey.data*np.nan
-
-        # Take care of `comp_grids`; for consistency, it is always a dict with
-        # the structure dict[source][freq]; no copies are made of same meshes,
-        # just pointers.
-        if isinstance(comp_grids, str):
-
-            # Store comp-type.
-            self._comp_grids_type = comp_grids
-
-            # Act depending on string.
-            if comp_grids == 'same':  # Store same grid for all cases.
-                for src, val in self._comp_grids.items():
-                    for freq in self._comp_grids[src].keys():
-                        self._comp_grids[src][freq] = self.grid
-
-            else:
-                # Need to implement adaptive gridding for:
-                # 'single', 'frequency', 'source', 'both'
-                raise NotImplementedError(f"`comp_dicts` {comp_grids}")
-        else:
-            # Need to implement: dict, TensorMesh
-            raise NotImplementedError(f"`comp_dicts` {type(grid)}")
 
     def copy(self):
         """Return a copy of the Simulation."""
@@ -191,18 +162,124 @@ class Simulation():
 
     def comp_grids(self, source, frequency):
         """Return computational grid of the given source and frequency."""
-        return self._comp_grids[source][float(frequency)]
+
+        freq = float(frequency)
+
+        # Get grid if it is not stored already.
+        if self._comp_grids[source][freq] is None:
+
+            # Act depending on grids_type:
+            if self._grids_type == 'same':  # Same grid as for provided model.
+
+                # Store link to grid.
+                self._comp_grids[source][freq] = self.grid
+
+            elif self._grids_type == 'frequency':  # Frequency-dependent grids.
+
+                # Initiate dict.
+                if not hasattr(self, '_frequency_grid'):
+                    self._frequency_grid = {}
+
+                # Get grid for this frequency if not yet computed.
+                if freq not in self._frequency_grid.keys():
+                    self._frequency_grid[freq] = None  # TODO adaptive grid
+                    raise NotImplementedError("Adaptive gridding")
+
+                # Store link to grid.
+                self._comp_grids[source][freq] = self._frequency_grid[freq]
+
+            elif self._grids_type == 'source':  # Source-dependent grids.
+
+                # Initiate dict.
+                if not hasattr(self, '_source_grid'):
+                    self._source_grid = {}
+
+                # Get grid for this source if not yet computed.
+                if source not in self._source_grid.keys():
+                    self._source_grid[source] = None  # TODO adaptive grid
+                    raise NotImplementedError("Adaptive gridding")
+
+                # Store link to grid.
+                self._comp_grids[source][freq] = self._source_grid[source]
+
+            elif self._grids_type == 'both':  # Src- & freq-dependent grids.
+
+                # Get grid and store it.
+                self._comp_grids[source][freq] = None  # TODO adaptive grid
+                raise NotImplementedError("Adaptive gridding")
+
+            else:  # Use a single grid for all sources and receivers.
+                # Default case; catches 'single' but also anything else.
+
+                # Get grid if not yet computed.
+                if not hasattr(self, '_single_grid'):
+                    self._single_grid = None  # TODO adaptive grid
+                    raise NotImplementedError("Adaptive gridding")
+
+                # Store link to grid.
+                self._comp_grids[source][freq] = self._single_grid
+
+        return self._comp_grids[source][freq]
 
     def comp_models(self, source, frequency):
         """Return model on the grid of the given source and frequency."""
-        # If model is not stored yet, get it.
-        if self._comp_models[source][float(frequency)] is None:
-            if self._comp_grids_type == 'same':
-                self._comp_models[source][float(frequency)] = self.model
-            else:
-                raise NotImplementedError
+        freq = float(frequency)
 
-        return self._comp_models[source][float(frequency)]
+        # If model is not stored yet, get it.
+        if self._comp_models[source][freq] is None:
+
+            # Act depending on grids_type:
+            if self._grids_type == 'same':  # Same grid as for provided model.
+
+                # Store link to model.
+                self._comp_models[source][freq] = self.model
+
+            elif self._grids_type == 'frequency':  # Frequency-dependent grids.
+
+                # Initiate dict.
+                if not hasattr(self, '_frequency_model'):
+                    self._frequency_model = {}
+
+                # Get model for this frequency if not yet computed.
+                if freq not in self._frequency_model.keys():
+                    self._frequency_model[freq] = self.model.interpolate2grid(
+                            self.grid, self.comp_grids(source, freq))
+
+                # Store link to model.
+                self._comp_models[source][freq] = self._frequency_model[freq]
+
+            elif self._grids_type == 'source':  # Source-dependent grids.
+
+                # Initiate dict.
+                if not hasattr(self, '_source_model'):
+                    self._source_model = {}
+
+                # Get model for this source if not yet computed.
+                if source not in self._source_model.keys():
+                    self._source_model[freq] = self.model.interpolate2grid(
+                            self.grid, self.comp_grids(source, freq))
+
+                # Store link to model.
+                self._comp_models[source][freq] = self._source_model[source]
+
+            elif self._grids_type == 'both':  # Src- & freq-dependent grids.
+
+                # Get model and store it.
+                self._comp_models[source][freq] = self.model.interpolate2grid(
+                            self.grid, self.comp_grids(source, freq))
+
+            else:  # Use a single grid for all sources and receivers.
+                # Default case; catches 'single' but also anything else.
+
+                # Get model if not yet computed.
+                if not hasattr(self, '_single_model'):
+                    self._single_model = self.model.interpolate2grid(
+                            self.grid, self.comp_grids(source, freq))
+
+                # Store link to model.
+                self._comp_models[source][freq] = self._single_model
+
+        return self._comp_models[source][freq]
 
     def sfields(self, source, frequency):
         """Return source field for given source and frequency."""
