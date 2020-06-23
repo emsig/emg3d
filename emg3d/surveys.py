@@ -37,30 +37,65 @@ class Survey:
     A survey contains all the sources with their frequencies, receivers, and
     corresponding data.
 
+    Underlying the survey-class is an xarray, which as basically a regular
+    ndarray with axis labels and more.
+
+    This class was developed with a node-based, marine CSEM survey layout in
+    mind. It is therefore optimised for that setup, and mostly tested with that
+    setup. This means for a number of receivers which measure for all source
+    positions. The general layout of the data for such a survey is (L, M, N),
+    where `L` is the number of sources, `M` the number of receivers, and `N`
+    the number of frequencies::
+
+                             f1
+            Rx1 Rx2  .  RxM /   f2
+           ┌───┬───┬───┬───┐   /   .
+       Tx1 │   │   │   │   │──┐   /   fN
+           ├───┼───┼───┼───┤  │──┐   /
+       Tx2 │   │   │   │   │──┤  │──┐
+           ├───┼───┼───┼───┤  │──┤  │
+        .  │   │   │   │   │──┤  │──┤
+           ├───┼───┼───┼───┤  │──┤  │
+       TxL │   │   │   │   │──┤  │──┤
+           └───┴───┴───┴───┘  │──┤  │
+              └───┴───┴───┴───┘  │──┤
+                 └───┴───┴───┴───┘  │
+                    └───┴───┴───┴───┘
+
+    However, the class can also be used for a CSEM streamer-style survey
+    layout (by setting `fixed=True`), where there is a moving source with one
+    or several receivers at a fixed offset. The layout of the data is then also
+    (L, M, N), but here `L` is the number of locations of the only source, `M`
+    is the number of receiver-offsets, and `N` is the number of frequencies::
+
+                                        f1
+                Offs1     .   OffsM    /   .
+              ┌─────────┬───┬─────────┐   /   fN
+       TxPos1 │ Rx1-TP1 │ . │ RxM-TP1 │──┐   /
+              ├─────────┼───┼─────────┤  │──┐
+       TxPos2 │ Rx1-TP2 │ . │ RxM-TP2 │──┤  │
+              ├─────────┼───┼─────────┤  │──┤
+        .     │ .       │ . │ .       │──┤  │
+              ├─────────┼───┼─────────┤  │──┤
+       TxPosL │ Rx1-TPL │ . │ RxM-TPL │──┤  │
+              └─────────┴───┴─────────┘  │──┤
+                 └─────────┴───┴─────────┘  │
+                    └─────────┴───┴─────────┘
+
+    This means that even though there is only one source, there are actually
+    `L` source dipoles, as each position is treated as a different dipole. The
+    number of receiver dipoles in this case is `LxM`.
+
 
     .. todo::
 
         - Implement source strength (if `strength=0` (default), the source is
           normalized to a moment of 1 A m).
         - Reciprocity flag.
-        - Add more data than just `data`: `noise`, `active`, etc.
+        - For data, add noise floor and error.
         - Add an example of the different usages to the gallery.
-
-    .. note::
-
-        - This class was developed for a node-based, marine CSEM survey layout.
-          It is therefore optimised for that setup, and mostly tested with that
-          setup. This means for a number of receivers which measure for all
-          source positions. The data can then be described in a matrix of size
-          (nsrc, nrec, nfreq).
-        - It can also be used for a CSEM streamer-style survey layout, where
-          there is a moving source with one or several receivers at a fixed
-          offset. The data can then be described in a matrix of size (nsrc,
-          noff, nfreq). See the parameter `fixed` to use this possibility.
-        - This layout can be adapted for other, even irregular layouts
-          (different number of receivers per source), where non-existing
-          receivers would simply be given no data (NaN). However, it could
-          probably be improved in this respect.
+        - Return receiver coordinates as list for any source.
+        - Include logging/verbosity; check with CLI.
 
 
     Parameters
@@ -73,14 +108,20 @@ class Survey:
 
         - Tuples: Coordinates in one of the two following formats:
 
-          - `(x, y, z, azimuth, dip)` [str, m, m, m, °, °];
-          - `(x0, x1, y0, y1, z0, z1)` [str, m, m, m, m, m, m].
+          - `(x, y, z, azimuth, dip)` [m, m, m, °, °];
+          - `(x0, x1, y0, y1, z0, z1)` [m, m, m, m, m, m].
 
           Dimensions will be expanded (hence, if `n` dipoles, each parameter
           must have length 1 or `n`). These dipoles will be named sequential
           with `Tx###` and `Rx###`.
+
+          The tuple can additionally contain an additional element at the end
+          (after `dip` or `z1`), `electric`, a boolean of length 1 or `n`, that
+          indicates if the dipoles are electric or magnetic.
+
         - List: A list of :class:`Dipole`-instances. The names of all dipoles
           in the list must be unique.
+
         - (Dict: A dict of de-serialized :class:`Dipole`-instances; mainly used
           for loading from file.)
 
@@ -88,7 +129,8 @@ class Survey:
         Source frequencies (Hz).
 
     data : ndarray or None
-        The observed data (dtype=complex); must have shape (nsrc, nrec, nfreq).
+        The observed data (dtype=complex); must have shape (nsrc, nrec, nfreq)
+        or, if `fixed=True`, (nsrc, noff, nfreq).
         If None, it will be initiated with NaN's.
 
     fixed : bool
@@ -246,6 +288,33 @@ class Survey:
         return self._receivers
 
     @property
+    def rec_coords(self):
+        """Return receiver coordinates.
+
+        The returned format is `[x, y, z, azm, dip]`, a list of 5 tuples. If
+        `fixed=True` it returns a dict with the offsets as keys, and for each
+        offset it returns the corresponding receiver coordinates as just
+        outlined.
+        """
+
+        # Get receiver coordinates depending if fixed or not.
+        if self.fixed:
+            coords = {}
+            for src in self.sources.keys():
+                coords[src] = tuple(
+                        np.array([[self.receivers[off][src].xco,
+                                   self.receivers[off][src].yco,
+                                   self.receivers[off][src].zco,
+                                   self.receivers[off][src].azm,
+                                   self.receivers[off][src].dip]
+                                  for off in self.receivers.keys()]).T)
+        else:
+            coords = tuple(np.array([[r.xco, r.yco, r.zco, r.azm, r.dip] for r
+                                     in self.receivers.values()]).T)
+
+        return coords
+
+    @property
     def frequencies(self):
         """Frequency array."""
         return self._frequencies
@@ -295,12 +364,25 @@ class Survey:
 
         elif isinstance(inp, tuple):  # Tuple with coordinates
 
+            # See if last tuple element is boolean, hence el/mag-flag.
+            if isinstance(inp[-1], (list, tuple, np.ndarray)):
+                provided_elmag = isinstance(inp[-1][0], bool)
+            else:
+                provided_elmag = isinstance(inp[-1], bool)
+
             # Get max dimension.
             nd = max([np.array(n, ndmin=1).size for n in inp])
 
             # Expand coordinates.
             coo = np.array([nd*[val, ] if np.array(val).size == 1 else
                            val for val in inp], dtype=float)
+
+            # Extract el/mag flag or set to ones (electric) if not provided.
+            if provided_elmag:
+                elmag = coo[-1, :]
+                coo = coo[:-1, :]
+            else:
+                elmag = np.ones(nd)
 
             # Create dipole names (number-strings).
             prefix = 'Tx' if name == 'source' else 'Rx'
@@ -332,11 +414,12 @@ class Survey:
                 for i, key in enumerate(out.keys()):
                     for ii, src_name in enumerate(src_names):
                         iii = ii + i*ns
-                        out[key][src_name] = Dipole(names[iii], coo[:, iii])
+                        out[key][src_name] = Dipole(
+                                names[iii], coo[:, iii], elmag[iii])
 
             else:  # Default node-type src-rec comb. and src for streamer-type.
-                out = {names[i]:
-                       Dipole(names[i], coo[:, i]) for i in range(nd)}
+                out = {names[i]: Dipole(names[i], coo[:, i], elmag[i])
+                       for i in range(nd)}
 
         elif isinstance(inp, dict):  # Dict of de-serialized Dipoles.
             if self.fixed and name == 'receiver':
@@ -357,20 +440,22 @@ class Survey:
 # # Sources and Receivers # #
 @dataclass(order=True, unsafe_hash=True)
 class PointDipole:
-    """Infinitesimal small point dipole.
+    """Infinitesimal small electric or magnetic point dipole.
 
-    Defined by its coordinates (xco, yco, zco), its azimuth (azm), and its dip.
+    Defined by its coordinates (xco, yco, zco), its azimuth (azm), its dip, and
+    its type (electric).
 
     Not meant to be used directly. Use :class:`Dipole` instead.
 
     """
-    __slots__ = ['name', 'xco', 'yco', 'zco', 'azm', 'dip']
+    __slots__ = ['name', 'xco', 'yco', 'zco', 'azm', 'dip', 'electric']
     name: str
     xco: float
     yco: float
     zco: float
     azm: float
     dip: float
+    electric: bool
 
 
 class Dipole(PointDipole):
@@ -414,6 +499,9 @@ class Dipole(PointDipole):
         - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
         - +/-dip (°): vertical deviation from xy-plane down/up-wards.
 
+    electric : bool
+        Electric dipole if True, magnetic dipole otherwise. Default is True.
+
     **kwargs : Optional solver options:
         Currently, any other key will be added as attributes to the dipole.
 
@@ -427,12 +515,11 @@ class Dipole(PointDipole):
     # This is subject to change, and holds during development.
     accepted_keys = ['strength', ]
 
-    def __init__(self, name, coordinates, **kwargs):
+    def __init__(self, name, coordinates, electric=True, **kwargs):
         """Check coordinates and kwargs."""
 
         # Add additional info to the dipole.
         for key, value in kwargs.items():
-            # TODO: respect verbosity
             if key not in self.accepted_keys:
                 print(f"* WARNING :: Unknown kwargs {{{key}: {value}}}")
             setattr(self, key, value)
@@ -506,10 +593,11 @@ class Dipole(PointDipole):
             self.electrode1 = (xco-dx/2, yco-dy/2, zco-dz/2)
             self.electrode2 = (xco+dx/2, yco+dy/2, zco+dz/2)
 
-        super().__init__(name, xco, yco, zco, azm, dip)
+        super().__init__(name, xco, yco, zco, azm, dip, bool(electric))
 
     def __repr__(self):
         return (f"{self.__class__.__name__}({self.name}, "
+                f"{['H', 'E'][self.electric]}, "
                 f"{{{self.xco:,.1f}m; {self.yco:,.1f}m; {self.zco:,.1f}m}}, "
                 f"θ={self.azm:.1f}°, φ={self.dip:.1f}°, "
                 f"l={self.length:,.1f}m)")
@@ -536,7 +624,7 @@ class Dipole(PointDipole):
     def to_dict(self, copy=False):
         """Store the necessary information of the Dipole in a dict."""
         out = {'name': self.name, 'coordinates': self.coordinates,
-               '__class__': self.__class__.__name__}
+               'electric': self.electric, '__class__': self.__class__.__name__}
 
         # Add accepted kwargs.
         for key in self.accepted_keys:
@@ -555,8 +643,8 @@ class Dipole(PointDipole):
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Dipole.to_dict`.
-            The dictionary needs the keys `name` and `coordinates`.
+            Dictionary as obtained from :func:`Dipole.to_dict`. The dictionary
+            needs the keys `name`, `coordinates`, and `electric`.
 
         Returns
         -------
@@ -566,7 +654,7 @@ class Dipole(PointDipole):
         try:
             kwargs = {k: v for k, v in inp.items() if k in cls.accepted_keys}
             return cls(name=inp['name'], coordinates=inp['coordinates'],
-                       **kwargs)
+                       electric=inp['electric'], **kwargs)
         except KeyError as e:
             print(f"* ERROR   :: Variable {e} missing in `inp`.")
             raise

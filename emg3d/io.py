@@ -199,12 +199,15 @@ def data_read(fname, keys=None, path="data"):
 
 
 def save(fname, backend=None, compression="gzip", **kwargs):
-    """Save meshes, models, fields, and other data to disk.
+    """Save simulations, surveys, meshes, models, fields, and more to disk.
 
-    Serialize and save :class:`emg3d.meshes.TensorMesh`,
-    :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` instances and
-    add arbitrary other data, where instances of the same type are grouped
-    together.
+    Serialize and save data to disk in different formats (see parameter
+    description of `fname` for the supported file formats). The main
+    emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) are collected
+    in corresponding root-folders (unless `collect_classes=False`).
+
+    Any other (non-emg3d) object can be added too, as long as it knows how to
+    serialize itself.
 
     The serialized instances will be de-serialized if loaded with :func:`load`.
 
@@ -233,6 +236,11 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     json_indent : int or None
         Passed through to json, default is 2.
 
+    collect_classes : bool
+        If True (default), input data is collected in folders for the principal
+        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
+        everything else collected in a `Data`-folder.
+
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
         properly serialized: :class:`emg3d.meshes.TensorMesh`,
@@ -246,6 +254,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     """
     # Get and remove optional kwargs.
     json_indent = kwargs.pop('json_indent', 2)
+    collect_classes = kwargs.pop('collect_classes', True)
 
     # Get absolute path.
     full_path = os.path.abspath(fname)
@@ -253,11 +262,11 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
     kwargs['_version'] = 'emg3d v' + utils.__version__
-    kwargs['_format'] = '0.11.1'  # File format; version of emg3d when changed.
+    kwargs['_format'] = '0.12.0'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
-    data = _dict_serialize(kwargs)
+    data = _dict_serialize(kwargs, collect_classes=collect_classes)
 
     # Deprecated backends.
     if backend is not None:
@@ -417,15 +426,16 @@ def load(fname, **kwargs):
     return data
 
 
-def _dict_serialize(inp, out=None, top=True):
-    """Serialize TensorMesh, Field, and Model instances in dict.
+def _dict_serialize(inp, out=None, collect_classes=True):
+    """Serialize emg3d-classes and other objects in inp-dict.
 
-    Returns a serialized dictionary <out> of <inp>, where all
-    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
-    :class:`emg3d.models.Model` instances have been serialized.
+    Returns a serialized dictionary <out> of <inp>, where all members of
+    `emg3d.io.KNOWN_CLASSES` are serialized with their respective `to_dict()`
+    methods. These instances are additionally grouped together in dictionaries,
+    and all other stuff is put into 'Data', unless `collect_classes=False`.
 
-    These instances are additionally grouped together in dictionaries, and all
-    other stuff is put into 'Data'.
+    Any other (non-emg3d) object can be added too, as long as it knows how to
+    serialize itself.
 
     There are some limitations:
 
@@ -443,8 +453,10 @@ def _dict_serialize(inp, out=None, top=True):
     out : dict
         Output dictionary; created if not provided.
 
-    top : bool
-        Used for recursion.
+    collect_classes : bool
+        If True (default), input data is collected in folders for the principal
+        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
+        everything else collected in a `Data`-folder.
 
 
     Returns
@@ -468,8 +480,8 @@ def _dict_serialize(inp, out=None, top=True):
         if not isinstance(key, str):
             key = str(key)
 
-        # Take care of the following instances (if we are in the
-        # top-directory they get their own category):
+        # Take care of the following instances
+        # (if we are in the root-directory they get their own category):
         if (isinstance(value, tuple(KNOWN_CLASSES.values())) or
                 hasattr(value, 'x0')):
 
@@ -488,15 +500,19 @@ def _dict_serialize(inp, out=None, top=True):
                     print(f"* WARNING :: Could not serialize <{key}>")
                     continue
 
-            # If we are in the top-directory put them in their own category.
-            if top:
+            # If we are in the root-directory put them in their own category.
+            # `collect_classes` can only be True in root-directory, as it is
+            # set to False in recursion.
+            if collect_classes:
                 value = {key: to_dict}
                 key = name
             else:
                 value = to_dict
 
-        elif top:
-            if key.startswith('_'):  # Store meta-data in top-level...
+        elif collect_classes:
+            # `collect_classes` can only be True in root-directory, as it is
+            # set to False in recursion.
+            if key.startswith('_'):  # Store meta-data in root-level...
                 out[key] = value
                 continue
             else:                    # ...rest falls into Data/.
@@ -509,7 +525,7 @@ def _dict_serialize(inp, out=None, top=True):
 
         # If value is a dict use recursion, else store.
         if isinstance(value, dict):
-            _dict_serialize(value, out[key], False)
+            _dict_serialize(value, out[key], collect_classes=False)
         else:
             # Limitation 2: None
             if value is None:
@@ -523,12 +539,11 @@ def _dict_serialize(inp, out=None, top=True):
 
 
 def _dict_deserialize(inp):
-    """De-serialize TensorMesh, Field, and Model instances in dict.
+    """De-serialize emg3d-classes and other objects in inp-dict.
 
-    De-serializes in-place dictionary <inp>, where all
-    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
-    :class:`emg3d.models.Model` instances have been de-serialized. It also
-    converts back 'NoneType'-strings to None.
+    De-serializes in-place dictionary <inp>, where all members of
+    `emg3d.io.KNOWN_CLASSES` are de-serialized with their respective
+    `from_dict()` methods. It also converts back 'NoneType'-strings to None.
 
 
     Parameters

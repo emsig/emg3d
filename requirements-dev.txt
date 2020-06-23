@@ -17,5 +17,6 @@ sphinx_rtd_theme
 
 # FOR TESTING
 pytest
+coveralls
 pytest-cov
 pytest-flake8

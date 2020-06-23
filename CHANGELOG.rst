@@ -10,6 +10,20 @@ v0.11.0 - stable
 
 - Modules:
 
+  - `surveys` (**new**):
+
+    - Class `surveys.Survey`, which combines sources, receivers, and data.
+    - Class `surveys.Dipole`, which defines electric or magnetic point dipoles
+      and finite length dipoles.
+
+  - `simulations` (**new**):
+
+    - Class `simulations.Simulation`, which combines a survey with a model.
+      A simulation computes the e-field (and h-field) asynchronously using
+      `concurrent.futures`. To do so it creates the required meshes source and
+      frequency-dependent, interpolates the model accordingly, and computes the
+      source-fields, 
+
   - `fields`:
 
     - Function `get_receiver_response` (**new**), which returns the response
@@ -23,20 +37,18 @@ v0.11.0 - stable
   - `io`:
 
     - File-format `json` (**new**), writes to a hierarchical, plain json file.
-    - *Deprecated* the use of `backend`, it uses the file extension of `fname`
-      instead.
+    - **Deprecated** the use of `backend`, it uses the file extension of
+      `fname` instead.
     - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and
       new `.json`.
+    - New parameter `collect_classes`, which can be used to switch-off the
+      collection of the main classes in root-level dictionaries.
 
   - `meshes`:
 
+    - New method `interpolate2mesh` on `models.Model` instances returns the
+      current model on a new mesh.
     - Added `__eq__` to `models.TensorMesh` to compare meshes.
-
-  - `surveys` (**new**):
-
-    - Class `surveys.Survey`, which combines sources, receivers, and data.
-    - Class `surveys.Dipole`, which defines electric point and finite length
-      dipoles.
 
 - Additional dependency `xarray` for data management.
 
