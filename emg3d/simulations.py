@@ -41,15 +41,15 @@ __all__ = ['Simulation']
 class Simulation():
     r"""Create a simulation for a given survey on a given model.
 
-    The computational mesh(es) can be either the same as the model mesh, or
-    they can be provided, or automatic gridding can be applied.
+    The computational mesh(es) can be either the same as the provided model
+    mesh, or automatic gridding can be used.
 
     .. todo::
 
+        - Properly test.
         - Adaptive gridding.
         - Make synthetic data; dpred; dobs.
         - `to_dict`, `from_dict`.
-        - Properly document and test.
         - Include logging/verbosity; check with CLI.
         - Check what not implemented:
 
@@ -162,7 +162,6 @@ class Simulation():
 
     def comp_grids(self, source, frequency):
         """Return computational grid of the given source and frequency."""
-
         freq = float(frequency)
 
         # Get grid if it is not stored already.
@@ -283,18 +282,19 @@ class Simulation():
 
     def sfields(self, source, frequency):
         """Return source field for given source and frequency."""
+        freq = float(frequency)
 
         # If source field is not stored yet, get it.
-        if self._sfields[source][float(frequency)] is None:
+        if self._sfields[source][freq] is None:
             sfield = fields.get_source_field(
                     self.comp_grids(source, frequency),
                     self.survey.sources[source].coordinates,
                     frequency, strength=0)
-            self._sfields[source][float(frequency)] = sfield
+            self._sfields[source][freq] = sfield
 
-        return self._sfields[source][float(frequency)]
+        return self._sfields[source][freq]
 
-    def efields(self, source, frequency, **kwargs):  # TODO kwargs for dev
+    def efields(self, source, frequency, **kwargs):
         """Return electric field for given source and frequency.
 
         The efield is only computed if it is not stored already, except if
@@ -309,18 +309,26 @@ class Simulation():
         frequency : float
             Frequency
 
+        kwargs : dict
+            Passed to :func:`solver.solve`.
+
 
         Returns
         -------
-        info : bla
-        bla
+        efield : :class:`emg3d.fields.Field`
+            Resulting electric field.
+
+        info_dict : dict
+            Dictionary with runtime info; only if ``return_info=True`` was
+            provided in `kwargs`.
 
         """
+        freq = float(frequency)
         recalc = kwargs.pop('recalc', False)
         return_info = kwargs.get('return_info', False)
 
         # If electric field not computed yet compute it.
-        if self._efields[source][float(frequency)] is None or recalc:
+        if self._efields[source][freq] is None or recalc:
 
             # Get solver options and update with kwargs.
             solver_opts = {**self.solver_opts, **kwargs}
@@ -334,42 +342,69 @@ class Simulation():
 
             # Store electric field.
             if return_info:
-                self._efields[source][float(frequency)] = efield[0]
-                self._solver_info[source][float(frequency)] = efield[1]
+                self._efields[source][freq] = efield[0]
+                self._solver_info[source][freq] = efield[1]
             else:
-                self._efields[source][float(frequency)] = efield
+                self._efields[source][freq] = efield
 
             # Clean corresponding hfield, so it will be recalculated.
-            del self._hfields[source][float(frequency)]
-            self._hfields[source][float(frequency)] = None
+            del self._hfields[source][freq]
+            self._hfields[source][freq] = None
 
         if return_info:
-            return (self._efields[source][float(frequency)],
-                    self._solver_info[source][float(frequency)])
+            return (self._efields[source][freq],
+                    self._solver_info[source][freq])
         else:
-            return self._efields[source][float(frequency)]
+            return self._efields[source][freq]
 
-    def hfields(self, source, frequency, **kwargs):  # TODO kwargs for dev
+    def hfields(self, source, frequency, **kwargs):
         """Return magnetic field for given source and frequency.
 
-        The hfield is computed from the efield, and the efield is computed if
-        it is not stored already. All kwargs are passed to efield.
+        The hfield is only computed from the efield if it is not stored
+        already, and so is the efield, except if `recalc=True` is in `kwargs`.
+        All other `kwargs` are passed to :func:`emg3d.solve`, overwriting
+        `self.solver_opts`.
+
+
+        Parameters
+        ----------
+        source : str
+            Source name.
+
+        frequency : float
+            Frequency
+
+        kwargs : dict
+            Passed to :func:`solver.solve`.
+
+
+        Returns
+        -------
+        hfield : Field
+            Magnetic field; :class:`Field` instance.
 
         """
+        freq = float(frequency)
+        recalc = kwargs.get('recalc', False)
+        return_info = kwargs.get('return_info', False)
 
         # If electric field not computed yet compute it.
-        if self._efields[source][float(frequency)] is None:
-            self.efields(source, frequency, **kwargs)
+        if self._efields[source][freq] is None or recalc:
+            _ = self.efields(source, frequency, **kwargs)
 
         # If magnetic field not computed yet compute it.
-        if self._hfields[source][float(frequency)] is None:
+        if self._hfields[source][freq] is None or recalc:
             hfield = fields.get_h_field(
                     self.comp_grids(source, frequency),
                     self.comp_models(source, frequency),
                     self.efields(source, frequency))
-            self._hfields[source][float(frequency)] = hfield
+            self._hfields[source][freq] = hfield
 
-        return self._hfields[source][float(frequency)]
+        if return_info:
+            return (self._hfields[source][freq],
+                    self._solver_info[source][freq])
+        else:
+            return self._hfields[source][freq]
 
     @property
     def synthetic(self):
@@ -462,12 +497,3 @@ class Simulation():
         """Returns a dict of the structure `dict[source][freq]=None`."""
         return {src: {freq: None for freq in self.survey.frequencies}
                 for src in self.survey.sources.keys()}
-
-
-def model_marine_csem():
-    # => MOVE TO :mod:`emg3d.meshes`
-    # JUST adaptive gridding, modelling is done by simulation class.
-    # takes a model; fills up water if req., adds air
-    # takes a survey -> deduces computational domain from that
-    # takes gridding parameters
-    pass

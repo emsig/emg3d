@@ -910,3 +910,11 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
                 #      (min_width, nr, a)]
 
     return hx
+
+
+# def model_marine_csem():
+#     # JUST adaptive gridding, modelling is done by simulation class.
+#     # takes a model; fills up water if req., adds air
+#     # takes a survey -> deduces computational domain from that
+#     # takes gridding parameters
+#     pass
