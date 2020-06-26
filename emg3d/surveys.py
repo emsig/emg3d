@@ -250,8 +250,7 @@ class Survey:
                        fixed=bool(inp['fixed']))
 
         except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
+            raise KeyError(f"Variable {e} missing in `inp`.")
 
     @property
     def shape(self):
@@ -339,11 +338,10 @@ class Survey:
 
                 # Ensure receivers are multiples of source positions.
                 if nd % ns != 0:
-                    print("* ERROR   :: For for fixed surveys, the number of "
-                          "receivers\n             must be a "
-                          "multiple of number of sources.\n             "
-                          f"Provided: #src: {ns}; #rec: {nd}.")
-                    raise ValueError("Dipoles")
+                    raise ValueError(
+                            "For fixed surveys, the number of receivers\n"
+                            "must be a multiple of number of sources.\n"
+                            f"Provided: #src: {ns}; #rec: {nd}.")
 
                 # Assemble dict.
                 out = {'Off'+name: {} for name in rec_names}
@@ -357,10 +355,10 @@ class Survey:
 
                 # Ensure that all names were unique:
                 if len(out) != len(inp):
-                    print(f"* ERROR   :: There are duplicate {name} names.\n"
-                          f"             Provided {name}s: {len(inp)}; "
-                          f"unique names: {len(out)}.")
-                    raise ValueError(f"{name}-names")
+                    raise ValueError(
+                            f"There are duplicate {name} names.\n"
+                            f"Provided {name}s: {len(inp)}; "
+                            f"unique names: {len(out)}.")
 
         elif isinstance(inp, tuple):  # Tuple with coordinates
 
@@ -403,11 +401,10 @@ class Survey:
 
                 # Ensure receivers are multiples of source positions.
                 if nd % ns != 0:
-                    print("* ERROR   :: For for fixed surveys, the number of "
-                          "receivers\n             must be a "
-                          "multiple of number of sources.\n             "
-                          f"Provided: #src: {ns}; #rec: {nd}.")
-                    raise ValueError("Dipoles")
+                    raise ValueError(
+                            "For fixed surveys, the number of receivers\n"
+                            "must be a multiple of number of sources.\n"
+                            f"Provided: #src: {ns}; #rec: {nd}.")
 
                 # Assemble dict.
                 out = {'Off'+rec_name: {} for rec_name in rec_names}
@@ -430,9 +427,8 @@ class Survey:
                 out = {k: Dipole.from_dict(v) for k, v in inp.items()}
 
         else:
-            print(f"* ERROR   :: Input format of <{name}s> not recognized: "
-                  f"{type(inp)}.")
-            raise ValueError("Dipoles")
+            raise ValueError(
+                    f"Input format of <{name}s> not recognized: {type(inp)}.")
 
         return out
 
@@ -546,13 +542,12 @@ class Dipole(PointDipole):
                 raise ValueError
 
         except ValueError:
-            print("* ERROR   :: Dipole coordinates are wrong defined.\n"
-                  "             They must be defined either as a point,\n"
-                  "             (x, y, z, azimuth, dip), or as two poles,\n"
-                  "             (x0, x1, y0, y1, z0, z1), all floats.\n"
-                  "             In the latter, pole0 != pole1.\n"
-                  f"             Provided coordinates: {coordinates}.")
-            raise ValueError("Dipole coordinates")
+            raise ValueError(
+                    "Dipole coordinates are wrong defined. They must be\n"
+                    "defined either as a point, (x, y, z, azimuth, dip), or\n"
+                    "as two poles, (x0, x1, y0, y1, z0, z1), all floats.\n"
+                    "In the latter, pole0 != pole1.\n"
+                    f"Provided coordinates: {coordinates}.")
 
         # Get xco, yco, zco, azm, and dip.
         if self.is_finite:
@@ -656,5 +651,4 @@ class Dipole(PointDipole):
             return cls(name=inp['name'], coordinates=inp['coordinates'],
                        electric=inp['electric'], **kwargs)
         except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
+            raise KeyError(f"Variable {e} missing in `inp`.")

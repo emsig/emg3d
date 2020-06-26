@@ -313,10 +313,10 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Check sfield.
     if sfield.freq is None:
-        print("* ERROR   :: Source field is missing frequency information;\n"
-              "             Create it with `emg3d.fields.get_source_field`, or"
-              "\n             initiate it with `emg3d.fields.SourceField`.")
-        raise ValueError('Input data types')
+        raise ValueError(
+                "Source field is missing frequency information;\n"
+                "Create it with `emg3d.fields.get_source_field`, or\n"
+                "initiate it with `emg3d.fields.SourceField`.")
 
     # Get volume-averaged model values.
     vmodel = models.VolumeModel(grid, model, sfield)
@@ -332,11 +332,10 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
         # Ensure efield has same data type as sfield.
         if sfield.dtype != efield.dtype:
-            print("* ERROR   :: Source field and electric field must have the "
-                  "same dtype;\n             complex (f-domain) or real (s-"
-                  f"domain). Provided:\n             sfield: {sfield.dtype}; "
-                  f"efield: {efield.dtype}.")
-            raise ValueError('Input data types')
+            raise ValueError(
+                    "Source field and electric field must have the\n same "
+                    "dtype; complex (f-domain) or real (s-domain).\n Provided:"
+                    f"sfield: {sfield.dtype}; efield: {efield.dtype}.")
 
         # If provided efield is missing frequency information, add it from the
         # source field.
@@ -1200,10 +1199,10 @@ class MGParameters:
 
         # Check at least two cells in each direction
         if np.any(np.array(self.vnC) < 2):
-            print("* ERROR   :: Nr. of cells must be at least two in each\n"
-                  "             direction. Provided shape: "
-                  f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
-            raise ValueError('nCx/nCy/nCz')
+            raise ValueError(
+                    "Nr. of cells must be at least two in each direction\n"
+                    "Provided shape: "
+                    f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
 
     def cprint(self, info, verbosity, **kwargs):
         """Conditional printing.
@@ -1268,12 +1267,12 @@ class MGParameters:
 
             # Ensure numbers are within 0 <= sc_dir <= 3
             if np.any(sc_cycle < 0) or np.any(sc_cycle > 3):
-                print("* ERROR   :: `semicoarsening` must be one of  "
-                      f"(False, True, 0, 1, 2, 3).\n"
-                      f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle, "
-                      f"e.g. 1213.\n{'Provided:':>23} "
-                      f"semicoarsening={self.semicoarsening}.")
-                raise ValueError('semicoarsening')
+                raise ValueError(
+                        "`semicoarsening` must be one of "
+                        "(False, True, 0, 1, 2, 3).\n"
+                        f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle,"
+                        f" e.g. 1213.\n{'Provided:':>23} "
+                        f"semicoarsening={self.semicoarsening}.")
 
         # Get first (or only) direction.
         if self.sc_cycle:
@@ -1303,12 +1302,12 @@ class MGParameters:
 
             # Ensure numbers are within 0 <= lr_dir <= 7
             if np.any(lr_cycle < 0) or np.any(lr_cycle > 7):
-                print("* ERROR   :: `linerelaxation` must be one of  "
-                      f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
-                      f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
-                      f"to cycle, e.g. 1213.\n{'Provided:':>23} "
-                      f"linerelaxation={self.linerelaxation}.")
-                raise ValueError('linerelaxation')
+                raise ValueError(
+                        "`linerelaxation` must be one of "
+                        f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
+                        f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
+                        f"to cycle, e.g. 1213.\n{'Provided:':>23} "
+                        f"linerelaxation={self.linerelaxation}.")
 
         # Get first (only) direction
         if self.lr_cycle:
@@ -1329,15 +1328,14 @@ class MGParameters:
         if self.sslsolver is True:
             self.sslsolver = 'bicgstab'
         elif self.sslsolver is not False and self.sslsolver not in solvers:
-            print("* ERROR   :: `sslsolver` must be True, False, or one of")
-            print(f"             {solvers}.")
-            print(f"             Provided: sslsolver={self.sslsolver!r}.")
-            raise ValueError('sslsolver!r')
+            raise ValueError(
+                    f"`sslsolver` must be True, False, or one of {solvers}.\n"
+                    f"Provided: sslsolver={self.sslsolver!r}.")
 
         if self.cycle not in ['F', 'V', 'W', None]:
-            print("* ERROR   :: `cycle` must be one of {'F', 'V', 'W', None}."
-                  f"\n             Provided: cycle={self.cycle}.")
-            raise ValueError('cycle')
+            raise ValueError(
+                    "`cycle` must be one of {'F', 'V', 'W', None}.\n"
+                    f"Provided: cycle={self.cycle}.")
 
         # Add maximum MG cycles depending on cycle
         if self.cycle in ['F', 'W']:
@@ -1347,10 +1345,9 @@ class MGParameters:
 
         # Ensure at least cycle or sslsolver is set
         if not self.sslsolver and not self.cycle:
-            print("* ERROR   :: At least `cycle` or `sslsolver` is "
-                  "required.\n             Provided input: "
-                  f"cycle={self.cycle}; sslsolver={self.sslsolver}.")
-            raise ValueError('cycle/sslsolver')
+            raise ValueError(
+                    "At least `cycle` or `sslsolver` is required.\nProvided"
+                    f"input: cycle={self.cycle}; sslsolver={self.sslsolver}.")
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
         self.ssl_maxit = 0             # Maximum iteration

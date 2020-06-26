@@ -101,7 +101,7 @@ def test_grid2grid():
     values = np.array([1.0, 2.0]).reshape(igrid.vnC)
 
     # Provide wrong dimension:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='There are 2 points and 1 values'):
         maps.grid2grid(igrid, values[1:, :, :], ogrid)
 
     # Simple, linear example.
@@ -201,7 +201,7 @@ def test_grid2grid():
     assert_allclose(fz, new_field.fz)
 
     # Ensure Field fails with 'volume'.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="``method='volume'`` not impl"):
         maps.grid2grid(grid, field, cgrid, method='volume')
 
 

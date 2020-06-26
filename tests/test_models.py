@@ -104,13 +104,13 @@ class TestModel:
         assert model6.epsilon_r is None
 
         # Check wrong shape
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Shape of res_x must be ()'):
             models.Model(grid, np.arange(1, 11))
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Shape of res_y must be ()'):
             models.Model(grid, res_y=np.ones((2, 5, 6)))
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Shape of res_z must be ()'):
             models.Model(grid, res_z=np.array([1, 3]))
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Shape of mu_r must be ()'):
             models.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
         # Check with all inputs
@@ -160,18 +160,18 @@ class TestModel:
         assert_allclose(vmodel4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
         # Check a couple of out-of-range failures
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='`res_x` must be all'):
             _ = models.Model(grid, res_x=res_x*0)
         Model = models.Model(grid, res_x=res_x)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='`res_x` must be all'):
             Model._check_parameter(res_x*0, 'res_x')
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='`res_x` must be all'):
             Model._check_parameter(-1.0, 'res_x')
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='`res_y` must be all'):
             _ = models.Model(grid, res_y=np.inf)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='`res_z` must be all'):
             _ = models.Model(grid, res_z=res_z*np.inf)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='`mu_r` must be all'):
             _ = models.Model(grid, mu_r=-1)
 
     def test_interpolate(self):
@@ -243,17 +243,17 @@ class TestModelOperators:
     model_vnC = models.Model(mesh_base, np.ones(mesh_base.vnC))
 
     def test_operator_test(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Models must be of the'):
             self.model_int + self.model_1_a
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Models must be of the'):
             self.model_int - self.model_2_a
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Models must be of the'):
             self.model_int + self.model_3_a
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Either both or none of'):
             self.model_int - self.model_mu_a
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Either both or none of'):
             self.model_int + self.model_epsilon_a
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Models could not be broadcast'):
             self.model_int - self.model_int_diff
 
     def test_add(self):
@@ -364,5 +364,5 @@ class TestModelOperators:
             assert_allclose(mdict[key], val)
 
         del mdict['res_x']
-        with pytest.raises(KeyError):
+        with pytest.raises(KeyError, match="Variable 'res_x' missing"):
             models.Model.from_dict(mdict)

@@ -141,10 +141,8 @@ def test_solver_homogeneous(capsys):
     # Provide an initial source-field without frequency information.
     wrong_sfield = fields.Field(grid)
     wrong_sfield.field = sfield.field
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Source field is missing frequency"):
         solver.solve(grid, model, wrong_sfield, efield=efield, verb=2)
-    out, _ = capsys.readouterr()
-    assert "ERROR   :: Source field is missing frequency information" in out
 
     # Check stagnation by providing an almost zero source field.
     _ = solver.solve(grid, model, sfield*0+1e-20, maxit=100)
@@ -253,7 +251,7 @@ def test_solver_homogeneous_laplace():
     # If efield is complex, assert it fails.
     efield = fields.Field(grid, dtype=complex)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Source field and electric field'):
         efield = solver.solve(grid, model, sfield, efield=efield, verb=1)
 
 
@@ -466,7 +464,7 @@ def test_mgparameters():
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=2,
                               linerelaxation=False, vnC=vnC, verb=1)
     assert 'semicoarsening : True [2]' in var.__repr__()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`semicoarsening` must be one of'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=5,
                             linerelaxation=False, vnC=vnC, verb=1)
 
@@ -481,12 +479,12 @@ def test_mgparameters():
                               linerelaxation=1, vnC=vnC, verb=1, clevel=1)
     assert 'linerelaxation : True [1]' in var.__repr__()
     assert_allclose(var.clevel, 1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`linerelaxation` must be one of'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
                             linerelaxation=-9, vnC=vnC, verb=1)
 
     # 3. sslsolver and cycle
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='At least `cycle` or `sslsolver`'):
         solver.MGParameters(cycle=None, sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=vnC, verb=1)
     var = solver.MGParameters(cycle='F', sslsolver=True, semicoarsening=True,
@@ -494,18 +492,18 @@ def test_mgparameters():
     assert "sslsolver : 'bicgstab'" in var.__repr__()
     assert var.ssl_maxit == 33
     assert var.maxit == 3
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`sslsolver` must be True'):
         solver.MGParameters(cycle='F', sslsolver='abcd', semicoarsening=0,
                             linerelaxation=False, vnC=vnC, verb=1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`sslsolver` must be True'):
         solver.MGParameters(cycle='F', sslsolver=4, semicoarsening=0,
                             linerelaxation=False, vnC=vnC, verb=1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`cycle` must be one of'):
         solver.MGParameters(cycle='G', sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=vnC, verb=1)
 
     # 4. Wrong grid size
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Nr. of cells must be at least'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=(1, 2, 3), verb=1)
 
