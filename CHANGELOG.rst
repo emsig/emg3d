@@ -52,6 +52,8 @@ v0.11.0 - stable
 
 - Additional dependency `xarray` for data management.
 
+- Removed deprecated functions `data_write` and `data_read`.
+
 
 *v0.11.0* : Refactor
 --------------------

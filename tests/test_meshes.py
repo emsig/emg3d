@@ -41,10 +41,10 @@ def test_get_hx_h0(capsys):
     info = (
         "   Skin depth          [m] : 2251\n"
         "   Survey domain       [m] : -2000 - 2000\n"
-        "   Calculation domain  [m] : -14692 - 15592\n"
+        "   Computation domain  [m] : -14692 - 15592\n"
         "   Final extent        [m] : -15698 - 15998\n"
         f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3382\n"
-        "   Alpha survey/calc       : "
+        "   Alpha survey/comp       : "
         f"{out1[2]['amin']:.3f} / {out1[2]['amax']:.3f}\n"
         "   Number of cells (s/c/r) : 20 (6/14/0)\n"
     )

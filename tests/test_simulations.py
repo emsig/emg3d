@@ -42,9 +42,9 @@ class TestSimulation():
                 )
         assert_allclose(simulation.efields('Tx1', 1.0), efield)
 
-        # Check efield with return_info and recalc
+        # Check efield with return_info and recomp
         s_efield, s_info = simulation.efields(
-                'Tx1', 1.0, recalc=True, return_info=True)
+                'Tx1', 1.0, recomp=True, return_info=True)
         assert_allclose(s_efield, efield)
         assert_allclose(s_info['abs_error'], info['abs_error'])
         assert_allclose(s_info['rel_error'], info['rel_error'])
@@ -54,7 +54,7 @@ class TestSimulation():
         hfield = fields.get_h_field(self.grid, self.model, efield)
         assert_allclose(simulation.hfields('Tx1', 1.0), hfield)
         s_hfield, s_info = simulation.hfields(
-                'Tx1', 1.0, recalc=True, return_info=True)
+                'Tx1', 1.0, recomp=True, return_info=True)
         assert_allclose(s_hfield, hfield)
         assert_allclose(s_info['abs_error'], info['abs_error'])
         assert_allclose(s_info['rel_error'], info['rel_error'])

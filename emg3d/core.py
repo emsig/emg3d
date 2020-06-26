@@ -31,12 +31,12 @@ import numpy as np
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 
-# LinearOperator to calculate A x
+# LinearOperator to compute A x
 @nb.njit(**_numba_setting)
 def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
     r"""Residual without or with source term.
 
-    Calculate the residual as given in [Muld06]_ in middle of the right column
+    Compute the residual as given in [Muld06]_ in middle of the right column
     on page 636, but without the source term:
 
     .. math::
@@ -45,7 +45,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
                      - \nabla \times \mu_\mathrm{r}^{-1} \nabla \times
                        \mathbf{E} \right) .
 
-    The calculation is carried out in a matrix-free manner; on said page 636
+    The computation is carried out in a matrix-free manner; on said page 636
     (or in the :doc:`theory`) are the various steps laid out to discretise the
     different parts, for instance involved curls. This can also be understood
     as the left-hand-side of :math:`A x = b`, as given in Equation 2 in
@@ -161,9 +161,9 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
                             eta_z[ixm, iy, iz] + eta_z[ix, iy, iz])
 
                 # NOTE re zero boundary conditions for tangential E field:
-                # At the moment these elements are calculated but now
+                # At the moment these elements are computed but now
                 # discarded. This function could be adjusted to omit the
-                # calculation of these. But one would have to test if it makes
+                # computation of these. But one would have to test if it makes
                 # it actually faster.
                 if iy == 0 or iz == 0:  # assuming ex = 0
                     rrx = 0
@@ -509,7 +509,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     - The matrix A has length of b and 1+2*5 diagonals; we use for it an array
       of length 6*len(b).
 
-    The values are calculated in rows of 5 lines, with the indicated middle and
+    The values are computed in rows of 5 lines, with the indicated middle and
     left matrices as indicated in the above scheme. These blocks are filled
     into the main matrix A and vector b, and subsequently solved with a
     non-standard Cholesky factorisation, :func:`solve`.
@@ -788,7 +788,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     - The matrix A has length of b and 1+2*5 diagonals; we use for it an array
       of length 6*len(b).
 
-    The values are calculated in rows of 5 lines, with the indicated middle and
+    The values are computed in rows of 5 lines, with the indicated middle and
     left matrices as indicated in the above scheme. These blocks are filled
     into the main matrix A and vector b, and subsequently solved with a
     non-standard Cholesky factorisation, :func:`solve`.
@@ -1072,7 +1072,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     - The matrix A has length of b and 1+2*5 diagonals; we use for it an array
       of length 6*len(b).
 
-    The values are calculated in rows of 5 lines, with the indicated middle and
+    The values are computed in rows of 5 lines, with the indicated middle and
     left matrices as indicated in the above scheme. These blocks are filled
     into the main matrix A and vector b, and subsequently solved with a
     non-standard Cholesky factorisation, :func:`solve`.

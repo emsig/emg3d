@@ -37,7 +37,7 @@ class Survey:
     A survey contains all the sources with their frequencies, receivers, and
     corresponding data.
 
-    Underlying the survey-class is an xarray, which as basically a regular
+    Underlying the survey-class is an xarray, which is basically a regular
     ndarray with axis labels and more.
 
     This class was developed with a node-based, marine CSEM survey layout in

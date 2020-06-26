@@ -168,7 +168,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 1: Print warnings.
         - 2: Print runtime and information about the method.
         - 3: Print additional information for each MG-cycle.
-        - 4: Print everything (slower due to additional error calculations).
+        - 4: Print everything (slower due to additional error computations).
         - -1: Print one-liner (dynamically updated).
 
     **kwargs : Optional solver options:
@@ -260,7 +260,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>> # with a frequency of 10 Hz.
     >>> sfield = emg3d.fields.get_source_field(
     >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
-    >>> # Calculate the electric signal.
+    >>> # Compute the electric signal.
     >>> efield = emg3d.solve(grid, model, sfield, verb=3)
     >>> # Get the corresponding magnetic signal.
     >>> hfield = emg3d.fields.get_h_field(grid, model, efield)
@@ -307,7 +307,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
                f"v{utils.__version__}\n", 1)
     var.cprint(var, 1)
 
-    # Calculate reference error for tolerance.
+    # Compute reference error for tolerance.
     var.l2_refe = sl.norm(sfield)
     var.error_at_cycle[0] = var.l2_refe
 
@@ -490,7 +490,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         cycmax = new_cycmax
     cyc = 0  # Initiate cycle count.
 
-    # Calculate current error (l2-norms).
+    # Compute current error (l2-norms).
     l2_last = residual(grid, model, sfield, efield, True)
 
     # Initiate the error-array to check for stagnation.
@@ -509,7 +509,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
-        # Smooth and re-calculate error.
+        # Smooth and re-compute error.
         smoothing(grid, model, sfield, efield, var.nu_init, var.lr_dir)
 
         # Print initial smoothing info.
@@ -651,7 +651,7 @@ def krylov(grid, model, sfield, efield, var):
         # Cast current efield to Field instance.
         efield = fields.Field(grid, efield)
 
-        # Calculate A x.
+        # Compute A x.
         rfield = fields.Field(grid, dtype=efield.dtype, freq=freq)
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
@@ -745,7 +745,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     direct solver.
 
 
-    This is a simple wrapper for the jitted calculation in
+    This is a simple wrapper for the jitted computation in
     :func:`emg3d.core.gauss_seidel`, :func:`emg3d.core.gauss_seidel_x`,
     :func:`emg3d.core.gauss_seidel_y`, and
     :func:`emg3d.core.gauss_seidel_z` (`@njit` can not [yet] access class
@@ -787,7 +787,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
 
-    # Calculate and store fields (in-place)
+    # Compute and store fields (in-place)
     if lr_dir == 0:             # Standard MG
         core.gauss_seidel(efield.fx, efield.fy, efield.fz, *inp)
 
@@ -857,7 +857,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     if sc_dir in [3, 4, 5]:  # No coarsening in z-direction.
         rz = 1
 
-    # Calculate distances of coarse grid.
+    # Compute distances of coarse grid.
     ch = [np.diff(grid.vectorNx[::rx]),
           np.diff(grid.vectorNy[::ry]),
           np.diff(grid.vectorNz[::rz])]
@@ -890,7 +890,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     # Get the weights (Equation 9 of [Muld06]_).
     wx, wy, wz = _get_restriction_weights(grid, cgrid, sc_dir)
 
-    # Calculate the source terms (Equation 8 in [Muld06]_).
+    # Compute the source terms (Equation 8 in [Muld06]_).
     # Initiate zero field.
     csfield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
     core.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
@@ -980,7 +980,7 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
 
 def residual(grid, model, sfield, efield, norm=False):
-    r"""Calculating the residual.
+    r"""Computing the residual.
 
     Returns the complete residual as given in [Muld06]_, page 636, middle of
     the right column:
@@ -992,7 +992,7 @@ def residual(grid, model, sfield, efield, norm=False):
                      - \nabla \times \mu_\mathrm{r}^{-1} \nabla \times
                        \mathbf{E} \right) .
 
-    This is a simple wrapper for the jitted calculation in
+    This is a simple wrapper for the jitted computation in
     :func:`emg3d.core.amat_x` (`@njit` can not [yet] access class
     attributes). See :func:`emg3d.core.amat_x` for more details and
     corresponding theory.
@@ -1369,7 +1369,7 @@ class RegularGridProlongator:
 
     The main difference (besides the pre-sets) is that this version allows to
     initiate an instance with the coarse and fine grids. This initialize will
-    calculate the required weights, and it has therefore only to be done once.
+    compute the required weights, and it has therefore only to be done once.
 
     After this, interpolating values from the coarse to the fine grid can be
     carried out much faster.
@@ -1426,7 +1426,7 @@ class RegularGridProlongator:
         return result
 
     def _set_edges_and_weights(self, xy, cxy):
-        """Calculate weights to go from xy- to cxy-coordinates."""
+        """Compute weights to go from xy- to cxy-coordinates."""
 
         # Find relevant edges between which cxy are situated.
         indices = []
@@ -1445,7 +1445,7 @@ class RegularGridProlongator:
         # Find relevant values; each i and i+1 represents a edge.
         self.edges = itertools.product(*[[i, i + 1] for i in indices])
 
-        # Calculate weights.
+        # Compute weights.
         self.weight = np.ones((4, self.size))
         for n, edge_indices in enumerate(self._get_edges_copy()):
             partial_weight = 1.
@@ -1833,7 +1833,7 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
 
 
 def _get_prolongation_coordinates(grid, d1, d2):
-    """Calculate required coordinates of finer grid for prolongation."""
+    """Compute required coordinates of finer grid for prolongation."""
     D2, D1 = np.broadcast_arrays(
             getattr(grid, 'vectorN'+d2), getattr(grid, 'vectorN'+d1)[:, None])
     return np.r_[D1.ravel('F'), D2.ravel('F')].reshape(-1, 2, order='F')
