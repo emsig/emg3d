@@ -298,7 +298,7 @@ class Simulation():
         """Return electric field for given source and frequency.
 
         The efield is only computed if it is not stored already, except if
-        `recalc=True` is in `kwargs`. All other `kwargs` are passed to
+        `recomp=True` is in `kwargs`. All other `kwargs` are passed to
         :func:`emg3d.solve`, overwriting `self.solver_opts`.
 
         Parameters
@@ -324,11 +324,11 @@ class Simulation():
 
         """
         freq = float(frequency)
-        recalc = kwargs.pop('recalc', False)
+        recomp = kwargs.pop('recomp', False)
         return_info = kwargs.get('return_info', False)
 
         # If electric field not computed yet compute it.
-        if self._efields[source][freq] is None or recalc:
+        if self._efields[source][freq] is None or recomp:
 
             # Get solver options and update with kwargs.
             solver_opts = {**self.solver_opts, **kwargs}
@@ -347,7 +347,7 @@ class Simulation():
             else:
                 self._efields[source][freq] = efield
 
-            # Clean corresponding hfield, so it will be recalculated.
+            # Clean corresponding hfield, so it will be recomputed.
             del self._hfields[source][freq]
             self._hfields[source][freq] = None
 
@@ -361,7 +361,7 @@ class Simulation():
         """Return magnetic field for given source and frequency.
 
         The hfield is only computed from the efield if it is not stored
-        already, and so is the efield, except if `recalc=True` is in `kwargs`.
+        already, and so is the efield, except if `recomp=True` is in `kwargs`.
         All other `kwargs` are passed to :func:`emg3d.solve`, overwriting
         `self.solver_opts`.
 
@@ -385,15 +385,15 @@ class Simulation():
 
         """
         freq = float(frequency)
-        recalc = kwargs.get('recalc', False)
+        recomp = kwargs.get('recomp', False)
         return_info = kwargs.get('return_info', False)
 
         # If electric field not computed yet compute it.
-        if self._efields[source][freq] is None or recalc:
+        if self._efields[source][freq] is None or recomp:
             _ = self.efields(source, frequency, **kwargs)
 
         # If magnetic field not computed yet compute it.
-        if self._hfields[source][freq] is None or recalc:
+        if self._hfields[source][freq] is None or recomp:
             hfield = fields.get_h_field(
                     self.comp_grids(source, frequency),
                     self.comp_models(source, frequency),
@@ -454,7 +454,7 @@ class Simulation():
                         **kwargs,
                     )
 
-        # Clean hfields, so they will be recalculated.
+        # Clean hfields, so they will be recomputed.
         del self._hfields
         self._hfields = self._initiate_none_dict()
 

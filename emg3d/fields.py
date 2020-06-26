@@ -86,7 +86,7 @@ class Field(np.ndarray):
         Default: complex.
 
     freq : float, optional
-        Source frequency (Hz), used to calculate the Laplace parameter `s`.
+        Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
 
         - `freq` > 0: Frequency domain, hence
@@ -163,7 +163,7 @@ class Field(np.ndarray):
         => https://stackoverflow.com/a/26599346
         """
         # Get the parent's __reduce__ tuple.
-        pickled_state = super(Field, self).__reduce__()
+        pickled_state = super().__reduce__()
 
         # Create our own tuple to pass to __setstate__.
         new_state = pickled_state[2]
@@ -186,7 +186,7 @@ class Field(np.ndarray):
             setattr(self, name, state[-i])
 
         # Call the parent's __setstate__ with the other tuple elements.
-        super(Field, self).__setstate__(state[0:-i])
+        super().__setstate__(state[0:-i])
 
     def copy(self):
         """Return a copy of the Field."""
@@ -235,7 +235,7 @@ class Field(np.ndarray):
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.")
 
-        # Calculate missing info.
+        # Compute missing info.
         grid.nEx = np.prod(grid.vnEx)
         grid.nEy = np.prod(grid.vnEy)
         grid.nEz = np.prod(grid.vnEz)
@@ -398,7 +398,7 @@ class SourceField(Field):
         Default: complex.
 
     freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter `s`.
+        Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
 
         - `freq` > 0: Frequency domain, hence
@@ -478,7 +478,7 @@ def get_source_field(grid, src, freq, strength=0):
           - Point dipole: ``[x, y, z, azimuth, dip]``.
 
     freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter `s`.
+        Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
 
         - `freq` > 0: Frequency domain, hence
