@@ -33,7 +33,7 @@ high-level, specialised modelling routines.
 import numpy as np
 from concurrent import futures
 
-from emg3d import fields, solver
+from emg3d import fields, solver, models, meshes
 
 __all__ = ['Simulation']
 
@@ -41,25 +41,8 @@ __all__ = ['Simulation']
 class Simulation():
     r"""Create a simulation for a given survey on a given model.
 
-    The computational mesh(es) can be either the same as the provided model
-    mesh, or automatic gridding can be used.
-
-    .. todo::
-
-        - Properly test.
-        - Adaptive gridding.
-        - Make synthetic data; dpred; dobs.
-        - `to_dict`, `from_dict`.
-        - Include logging/verbosity; check with CLI.
-        - Check what not implemented:
-
-          - Finite length dipoles for psolve.
-          - H-fields for psolve.
-
-        - NOTHING with inversion.
-
-          - Gradient, residual, misfit.
-          - `min_amp`, `min_offset`, `max_offset`.
+    The computational grid(s) can be either the same as the provided model
+    grid, or automatic gridding can be used.
 
 
     Parameters
@@ -67,8 +50,8 @@ class Simulation():
     survey : :class:`emg3d.survey.Survey`
         The survey layout, containing sources, receivers, and frequencies.
 
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The grid. See :class:`emg3d.meshes.TensorMesh`.
+    grid : :class:`meshes.TensorMesh`
+        The grid. See :class:`meshes.TensorMesh`.
 
     model : :class:`emg3d.models.Model`
         The model. See :class:`emg3d.models.Model`.
@@ -81,8 +64,7 @@ class Simulation():
         `sslsolver = semicoarsening = linerelaxation = True`, `verb = -1`.
 
     comp_grids : str
-        Computational grids; default is currently 'same', but will change to
-        'single'.
+        Computational grids; default is 'single'.
 
         - 'same': Same grid as for model.
         - 'single': A single grid for all sources and frequencies.
@@ -95,19 +77,36 @@ class Simulation():
 
         Not implemented yet is the possibility to provide a single TensorMesh
         instance or a dict of TensorMesh instances for user-provided meshes.
-        You can still do this by setting `simulation._comp_meshes` after
+        You can still do this by setting `simulation._comp_grids` after
         instantiation.
 
     """
 
     def __init__(self, survey, grid, model, solver_opts=None,
-                 comp_grids='same', **kwargs):
+                 comp_grids='single', **kwargs):
         """Initiate a new Simulation instance."""
 
         # Store inputs (should these be copied to avoid altering them?).
         self.survey = survey
-        self.grid = grid
-        self.model = model
+
+        # Magnetic dipoles are not yet implemented in simulation.
+        if sum([not r.electric for r in survey.receivers.values()]) > 0:
+            raise TypeError(
+                    "Simulation not yet implemented for magnetic dipoles.")
+
+        # Get gridding options, set to defaults if not provided.
+        grid_opts = kwargs.pop('grid_opts', {})
+        self.grid_opts = {
+                # Defaults; overwritten by inputs v.
+                'type': 'marine',
+                'air_resistivity': 1e8,
+                'res': np.array([0.3, 1, 1e5]),
+                'min_width': np.array([200., 200., 100]),
+                'zval': np.array([-1000, -2000, 0]),
+                'verb': 1,
+                **grid_opts,
+                }
+        self._initiate_model_grid(model, grid)
         self._grids_type = comp_grids
 
         # Get solver options, set to defaults if not provided.
@@ -133,7 +132,7 @@ class Simulation():
         self._solver_info = self._initiate_none_dict()
 
         # Initialize synthetic data.
-        self.survey._ds['synthetic'] = self.survey.data*np.nan
+        self.survey._data['synthetic'] = self.survey.data.observed*np.nan
 
     def copy(self):
         """Return a copy of the Simulation."""
@@ -181,8 +180,15 @@ class Simulation():
 
                 # Get grid for this frequency if not yet computed.
                 if freq not in self._frequency_grid.keys():
-                    self._frequency_grid[freq] = None  # TODO adaptive grid
-                    raise NotImplementedError("Adaptive gridding")
+
+                    # Get grid for this frequency.
+                    # TODO does not work for fixed surveys
+                    coords = [np.r_[self.survey.src_coords[i],
+                              self.survey.rec_coords[i]] for i in range(3)]
+
+                    # Get grid and store it.
+                    self._frequency_grid[freq] = meshes.marine_csem_mesh(
+                            coords, freq=freq, **self.grid_opts)
 
                 # Store link to grid.
                 self._comp_grids[source][freq] = self._frequency_grid[freq]
@@ -195,25 +201,50 @@ class Simulation():
 
                 # Get grid for this source if not yet computed.
                 if source not in self._source_grid.keys():
-                    self._source_grid[source] = None  # TODO adaptive grid
-                    raise NotImplementedError("Adaptive gridding")
+
+                    # Get grid for this frequency.
+                    # TODO does not work for fixed surveys
+                    coords = [np.r_[self.survey.sources[source].coordinates[i],
+                              self.survey.rec_coords[i]] for i in range(3)]
+
+                    # Use average frequency (log10).
+                    mfreq = 10**np.mean(np.log10(self.survey.frequencies))
+
+                    # Get grid and store it.
+                    self._source_grid[source] = meshes.marine_csem_mesh(
+                            coords, freq=mfreq, **self.grid_opts)
 
                 # Store link to grid.
                 self._comp_grids[source][freq] = self._source_grid[source]
 
             elif self._grids_type == 'both':  # Src- & freq-dependent grids.
 
+                # Get grid for this frequency.
+                # TODO does not work for fixed surveys
+                coords = [np.r_[self.survey.sources[source].coordinates[i],
+                          self.survey.rec_coords[i]] for i in range(3)]
+
                 # Get grid and store it.
-                self._comp_grids[source][freq] = None  # TODO adaptive grid
-                raise NotImplementedError("Adaptive gridding")
+                self._comp_grids[source][freq] = meshes.marine_csem_mesh(
+                        coords, freq=freq, **self.grid_opts)
 
             else:  # Use a single grid for all sources and receivers.
                 # Default case; catches 'single' but also anything else.
 
                 # Get grid if not yet computed.
                 if not hasattr(self, '_single_grid'):
-                    self._single_grid = None  # TODO adaptive grid
-                    raise NotImplementedError("Adaptive gridding")
+
+                    # Get grid for this frequency.
+                    # TODO does not work for fixed surveys
+                    coords = [np.r_[self.survey.src_coords[i],
+                              self.survey.rec_coords[i]] for i in range(3)]
+
+                    # Use average frequency (log10).
+                    mfreq = 10**np.mean(np.log10(self.survey.frequencies))
+
+                    # Get grid and store it.
+                    self._single_grid = meshes.marine_csem_mesh(
+                            coords, freq=mfreq, **self.grid_opts)
 
                 # Store link to grid.
                 self._comp_grids[source][freq] = self._single_grid
@@ -351,6 +382,20 @@ class Simulation():
             del self._hfields[source][freq]
             self._hfields[source][freq] = None
 
+            # Extract data at receivers.
+            if self.survey.fixed:
+                rec_coords = self.survey.rec_coords[source]
+            else:
+                rec_coords = self.survey.rec_coords
+
+            # Loop over sources and frequencies.
+            resp = fields.get_receiver_response(
+                    grid=self._comp_grids[source][freq],
+                    field=self._efields[source][freq],
+                    rec=rec_coords
+            )
+            self.survey._data['synthetic'].loc[source, :, freq] = resp
+
         if return_info:
             return (self._efields[source][freq],
                     self._solver_info[source][freq])
@@ -406,11 +451,6 @@ class Simulation():
         else:
             return self._hfields[source][freq]
 
-    @property
-    def synthetic(self):
-        """Synthetic data, an :class:`xarray.DataArray` instance.."""
-        return self.survey.ds.synthetic
-
     def psolve(self, nproc=4, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
 
@@ -436,6 +476,9 @@ class Simulation():
         # Initiate futures-dict to store output.
         out = self._initiate_none_dict()
 
+        # Get solver options and update with kwargs.
+        solver_opts = {**self.solver_opts, **kwargs}
+
         # Context manager for futures.
         with futures.ProcessPoolExecutor(nproc) as executor:
 
@@ -451,7 +494,7 @@ class Simulation():
                         grid=self.comp_grids(src, freq),
                         model=self.comp_models(src, freq),
                         sfield=self.sfields(src, freq),
-                        **kwargs,
+                        **solver_opts,
                     )
 
         # Clean hfields, so they will be recomputed.
@@ -485,15 +528,96 @@ class Simulation():
                         field=self._efields[src][freq],
                         rec=rec_coords
                 )
-                self.survey._ds['synthetic'].loc[src, :, freq] = resp
+                self.data['synthetic'].loc[src, :, freq] = resp
 
     def clean(self):
         """Remove computed fields and corresponding data."""
+
+        # Clean efield, hfield, and solver info.
         for name in ['efields', 'hfields', 'solver_info']:
             delattr(self, '_'+name)
             setattr(self, '_'+name, self._initiate_none_dict())
+
+        # Set synthetic data to nan's.
+        self.data['synthetic'] = self.data.observed*np.nan
 
     def _initiate_none_dict(self):
         """Returns a dict of the structure `dict[source][freq]=None`."""
         return {src: {freq: None for freq in self.survey.frequencies}
                 for src in self.survey.sources.keys()}
+
+    def _initiate_model_grid(self, model, grid):
+        # In the marine case we assume that the sea-surface is at z=0.
+        #
+        # If the provided model does not reach the surface, we fill it up
+        # to the surface with the resistivities of the last provided layer,
+        # and add a 100 m thick air layer.
+        #
+        # So the model MUST contain at least one layer of sea water, from
+        # where the sea resistivity is deduced.
+        res_air = self.grid_opts.pop('air_resistivity')
+        grid_type = self.grid_opts.pop('type')
+
+        def extend_property(prop, check, add_values, nadd):
+
+            if check is None:
+                prop_ext = None
+
+            else:
+                prop_ext = np.zeros((grid.nCx, grid.nCy, grid.nCz+nadd))
+                prop_ext[:, :, :-nadd] = prop
+                if nadd == 2:
+                    prop_ext[:, :, -nadd] = prop[:, :, -1]
+                prop_ext[:, :, -1] = add_values
+
+            return prop_ext
+
+        if grid_type == 'marine' and grid.vectorNz[-1] < -0.01:
+            # Fill water and add air if highest depth is less then -1 cm.
+
+            # Extend hz.
+            hz_ext = np.r_[grid.hz, -max(grid.vectorNz), 100]
+
+            # Extend properties.
+            res_x = extend_property(model.res_x, model._res_x, res_air, 2)
+            res_y = extend_property(model.res_y, model._res_y, res_air, 2)
+            res_z = extend_property(model.res_z, model._res_z, res_air, 2)
+            mu_r = extend_property(model.mu_r, model._mu_r, 1, 2)
+            epsilon_r = extend_property(
+                    model.epsilon_r, model._epsilon_r, 1, 2)
+
+            # Store grid and model.
+            self.grid = meshes.TensorMesh(
+                    [grid.hx, grid.hy, hz_ext], x0=grid.x0)
+            self.model = models.Model(
+                    self.grid, res_x, res_y, res_z, mu_r, epsilon_r)
+
+        elif grid_type == 'marine' and abs(grid.vectorNz[-1]) < 0.01:
+            # Add air if highest depth is less then 1 cm.
+
+            # Extend hz.
+            hz_ext = np.r_[grid.hz, 100]
+
+            # Extend properties.
+            res_x = extend_property(model.res_x, model._res_x, res_air, 1)
+            res_y = extend_property(model.res_y, model._res_y, res_air, 1)
+            res_z = extend_property(model.res_z, model._res_z, res_air, 1)
+            mu_r = extend_property(model.mu_r, model._mu_r, 1, 1)
+            epsilon_r = extend_property(
+                    model.epsilon_r, model._epsilon_r, 1, 1)
+
+            # Store grid and model.
+            self.grid = meshes.TensorMesh(
+                    [grid.hx, grid.hy, hz_ext], x0=grid.x0)
+            self.model = models.Model(
+                    self.grid, res_x, res_y, res_z, mu_r, epsilon_r)
+
+        else:
+            # Just store provided grid and model.
+            self.grid = grid
+            self.model = model
+
+    @property
+    def data(self):
+        """Shortcut to survey.data."""
+        return self.survey.data

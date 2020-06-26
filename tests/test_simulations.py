@@ -65,7 +65,7 @@ class TestSimulation():
         rec_resp = fields.get_receiver_response(
                 self.grid, efield, self.survey.rec_coords)
         assert_allclose(
-                simulation.synthetic[1, :, 0].data, rec_resp, atol=1e-16)
+                simulation.data.synthetic[1, :, 0].data, rec_resp, atol=1e-16)
 
         # Clean and ensure it is empty
         simulation.clean()

@@ -907,9 +907,51 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
     return hx
 
 
-# def model_marine_csem():
-#     # JUST adaptive gridding, modelling is done by simulation class.
-#     # takes a model; fills up water if req., adds air
-#     # takes a survey -> deduces computational domain from that
-#     # takes gridding parameters
-#     pass
+def marine_csem_mesh(survey, res, min_width, zval, freq, verb):
+    """
+    TODO NEEDS IMPROVEMENT, MORE FLEXIBLE
+    Works for current example, but no more.
+
+    Fixed:  x: x of middle receiver
+            y: y of middle receiver
+            z: [zval[0], zval[1], 0]
+
+    Domain: x: rec_x.min-100 - rec_x.max+100
+            y: rec_y.min-100 - rec_y.max+100
+            y: zval[1]-0
+
+    """
+
+    params = {'freq': freq, 'verb': verb}
+
+    # Get cell widths and origin in each direction
+    xx, x0 = get_hx_h0(
+        res=[res[0], res[2]],
+        fixed=survey[0].min()+(survey[0].max()-survey[0].min())//2,
+        domain=[survey[0].min()-100, survey[0].max()+100],
+        min_width=min_width[0],
+        **params
+    )
+    yy, y0 = get_hx_h0(
+        res=[res[0], res[2]],
+        fixed=survey[1].min()+(survey[1].max()-survey[1].min())//2,
+        domain=[survey[1].min()-100, survey[1].max()+100],
+        min_width=min_width[1],
+        **params
+    )
+    zz, z0 = get_hx_h0(
+        res=[res[0], res[1], res[2]],
+        fixed=[zval[0], zval[1], 0],
+        domain=[zval[1], 0],
+        min_width=min_width[2],
+        **params
+    )
+
+    # Initialize mesh.
+    grid = TensorMesh([xx, yy, zz], x0=np.array([x0, y0, z0]))
+
+    if verb >= 0:
+        print(grid, end='')
+
+    # Return mesh.
+    return grid
