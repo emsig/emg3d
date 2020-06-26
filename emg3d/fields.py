@@ -131,18 +131,17 @@ class Field(np.ndarray):
             # Ensure the grid has three dimensions.
             # (Can happend with a 1D or 2D discretize mesh.)
             if None in [obj.nEx, obj.nEy, obj.nEz]:
-                print("* ERROR   :: Provided grid must be a 3D grid.")
-                raise ValueError
+                raise ValueError("Provided grid must be a 3D grid.")
 
         # Store frequency
         if freq is None and hasattr(fy_or_field, 'freq'):
             freq = fy_or_field._freq
         obj._freq = freq
         if freq == 0.0:
-            print("* ERROR   :: `freq` must be >0 (frequency domain) "
-                  "or <0 (Laplace domain).\n"
-                  f"             Provided frequency: {freq} Hz.")
-            raise ValueError("Frequency error")
+            raise ValueError(
+                    "`freq` must be >0 (frequency domain) "
+                    "or <0 (Laplace domain).\n"
+                    f"Provided frequency: {freq} Hz.")
 
         return obj
 
@@ -234,8 +233,7 @@ class Field(np.ndarray):
             grid.vnEy = inp['vnEy']
             grid.vnEz = inp['vnEz']
         except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
+            raise KeyError(f"Variable {e} missing in `inp`.")
 
         # Calculate missing info.
         grid.nEx = np.prod(grid.vnEx)
@@ -418,8 +416,7 @@ class SourceField(Field):
         """Initiate a new Source Field."""
         # Ensure frequency is provided.
         if freq is None:
-            print("* ERROR   :: SourceField requires the frequency.")
-            raise ValueError("SourceField needs `freq`.")
+            raise ValueError("SourceField requires the frequency.")
 
         if freq > 0:
             dtype = complex
@@ -511,11 +508,10 @@ def get_source_field(grid, src, freq, strength=0):
 
     # Ensure source is a point or a finite dipole.
     if len(src) not in [5, 6]:
-        print("* ERROR   :: Source is wrong defined. Must be either a point,\n"
-              "             [x, y, z, azimuth, dip], or a finite dipole,\n"
-              "             [x1, x2, y1, y2, z1, z2]. Provided source:\n"
-              f"             {src}.")
-        raise ValueError("Source error")
+        raise ValueError(
+                "Source is wrong defined. Must be either a point,"
+                "[x, y, z, azimuth, dip],\nor a finite dipole,"
+                f"[x1, x2, y1, y2, z1, z2].\nProvided source: {src}.")
     elif len(src) == 5:
         finite = False  # Infinitesimal small dipole.
     else:
@@ -523,9 +519,9 @@ def get_source_field(grid, src, freq, strength=0):
 
         # Ensure finite length dipole is not a point dipole.
         if np.allclose(np.linalg.norm(src[1::2]-src[::2]), 0):
-            print("* ERROR   :: Provided source is a point dipole, "
-                  "use the format [x, y, z, azimuth, dip] instead.")
-            raise ValueError("Source error")
+            raise ValueError(
+                    "Provided source is a point dipole, "
+                    "use the format [x, y, z, azimuth, dip] instead.")
 
     # Ensure source is within grid.
     if finite:
@@ -541,8 +537,7 @@ def get_source_field(grid, src, freq, strength=0):
     source_in *= np.any(src[ii[5]] <= grid.vectorNz[-1])
 
     if not source_in:
-        print(f"* ERROR   :: Provided source outside grid: {src}.")
-        raise ValueError("Source error")
+        raise ValueError(f"Provided source outside grid: {src}.")
 
     # Get source orientation (dxs, dys, dzs)
     if not finite:  # Point dipole: convert azimuth/dip to weights.
@@ -771,9 +766,9 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         return fx, fy, fz
 
     if len(coordinates) != 3:
-        print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
-        print(f"             Length of provided coord.: {len(coordinates)}.")
-        raise ValueError("Coordinates error")
+        raise ValueError(
+                "Coordinates needs to be in the form (x, y, z).\n"
+                f"Length of provided coord.: {len(coordinates)}.")
 
     # Get the vectors corresponding to input data. Dimensions:
     #
@@ -850,16 +845,14 @@ def get_receiver_response(grid, field, rec):
 
     # Check receiver dimension.
     if len(rec) != 5:
-        print("* ERROR   :: `rec` needs to be in the form "
-              "(x, y, z, azimuth, dip).\n             "
-              f"Length of provided `rec`: {len(rec)}.")
-        raise ValueError("Receiver error")
+        raise ValueError(
+                "`rec` needs to be in the form (x, y, z, azimuth, dip).\n"
+                f"Length of provided `rec`: {len(rec)}.")
 
     # Check field dimension to ensure it is not a particular field.
     if field.field.ndim == 3:
-        print("* ERROR   :: `field` must be a `Field`-instance, not a\n"
-              "             particular field such as `field.fx`.")
-        raise ValueError("Field error")
+        raise ValueError("`field` must be a `Field`-instance, not a\n"
+                         "particular field such as `field.fx`.")
 
     # Get the vectors corresponding to input data.
     if field.is_electric:

@@ -117,8 +117,7 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
 
     # If values is a particular field, ensure method is not 'volume'.
     if not np.all(grid.vnC == values.shape) and method == 'volume':
-        print("* ERROR   :: ``method='volume'`` not implemented for fields.")
-        raise ValueError("Method not implemented.")
+        raise ValueError("``method='volume'`` not implemented for fields.")
 
     if method == 'volume':
         points = (grid.vectorNx, grid.vectorNy, grid.vectorNz)

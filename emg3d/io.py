@@ -35,9 +35,8 @@ from emg3d import fields, models, utils, meshes, surveys
 try:
     import h5py
 except ImportError:
-    h5py = ("\n* ERROR   :: '.h5'-files require `h5py`."
-            "\n             Install it via `pip install h5py` or"
-            "\n             `conda install -c conda-forge h5py`.\n")
+    h5py = ("'.h5'-files require `h5py`. Install it via\n"
+            "`pip install h5py` or `conda install -c conda-forge h5py`.")
 
 
 __all__ = ['save', 'load']
@@ -310,8 +309,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
 
         # Check if h5py is installed.
         if isinstance(h5py, str):
-            print(h5py)
-            raise ImportError("backend='h5'")
+            raise ImportError(h5py)
 
         # Store data.
         with h5py.File(full_path, "w") as h5file:
@@ -386,8 +384,7 @@ def load(fname, **kwargs):
 
         # Check if h5py is installed.
         if isinstance(h5py, str):
-            print(h5py)
-            raise ImportError("backend='h5'")
+            raise ImportError(h5py)
 
         # Load data.
         with h5py.File(full_path, 'r') as h5file:

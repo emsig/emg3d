@@ -173,14 +173,14 @@ def test_save_and_load(tmpdir, capsys):
     assert "WARNING :: Could not de-serialize <meshes>" in outstr
 
     # Unknown keyword.
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="Unexpected "):
         io.load('ttt.npz', stupidkeyword='a')
 
     # Unknown backend/extension.
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedError, match="Backend 'what"):
         io.save(tmpdir+'/testwrongbackend', something=1, backend='what?')
     io.save(tmpdir+'/testwrongbackend.abc', something=1)
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedError, match="Extension '.abc'"):
         io.load(tmpdir+'/testwrongbackend.abc')
     if h5py:
         io.load(tmpdir+'/testwrongbackend.abc.h5')

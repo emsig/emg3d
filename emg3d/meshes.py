@@ -163,8 +163,7 @@ class TensorMesh:
         try:
             return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
         except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
+            raise KeyError(f"Variable {e} missing in `inp`.")
 
     @property
     def vol(self):
@@ -327,19 +326,18 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
         # Check length.
         if fixed.size > 3:
-            print("\n* ERROR   :: Maximum three fixed boundaries permitted.\n"
-                  f"             Provided: {fixed.size}.")
-            raise ValueError("Wrong input for fixed")
+            raise ValueError("Maximum three fixed boundaries permitted. "
+                             f"Provided: {fixed.size}.")
 
         # Sort second and third, so it doesn't matter how it was provided.
         fixed = np.array([fixed[0], max(fixed[1:]), min(fixed[1:])])
 
         # Check side.
         if np.sign(np.diff(fixed[:2])) == np.sign(np.diff(fixed[::2])):
-            print("\n* ERROR   :: 2nd and 3rd fixed boundaries have to be "
-                  "left and right of the first one.\n             "
-                  f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
-            raise ValueError("Wrong input for fixed")
+            raise ValueError(
+                    "2nd and 3rd fixed boundaries have to be left and right "
+                    "of the first one.\n"
+                    f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
 
     # Calculate skin depth.
     skind = 503.3*np.sqrt(res_arr/abs(freq))
@@ -479,10 +477,11 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     # Check finished and print info about found grid.
     if not finished:
         # Throw message if no solution was found.
-        print("\n* ERROR   :: No suitable grid found; relax your criteria.\n")
         if raise_error:
-            raise ArithmeticError("No grid found!")
+            raise ArithmeticError(
+                    "No suitable grid found; relax your criteria.")
         else:
+            print("* ERROR   :: No suitable grid found; relax your criteria.")
             hx, x0 = None, None
 
     elif verb > 0:
@@ -564,9 +563,8 @@ def get_cell_numbers(max_nr, max_prime=5, min_div=3):
 
     # Sanity check; 19 is already ridiculously high.
     if max_prime > primes[-1]:
-        print(f"* ERROR   :: Highest prime is {max_prime}, "
-              "please use a value < 20.")
-        raise ValueError("Highest prime too high")
+        raise ValueError(
+                f"Highest prime is {max_prime}, please use a value < 20.")
 
     # Restrict to max_prime.
     primes = primes[primes <= max_prime]

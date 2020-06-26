@@ -93,18 +93,18 @@ class TestSurvey():
         # == 5. Other ==
         sources = surveys.Dipole('Tx1', (0, 0, 0, 0, 0))
         # As Dipole it should fail.
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='Input format of <sources>'):
             surveys.Survey('T', sources, (1, 0, 0, 0, 0), 1)
         # Cast as list it should work.
         surveys.Survey('T', [sources], (1, 0, 0, 0, 0), 1)
         # Fixed with different sizes have to fail.
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='For fixed surveys, the number'):
             surveys.Survey('Test', s_list, [r_list[0]], 1, fixed=1)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='For fixed surveys, the number'):
             surveys.Survey('Test', s_tupl,
                            (r_tupl[0], r_tupl[0], r_tupl[0]), 1, fixed=1)
         # Duplicate names should fail.
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match='There are duplicate receiver'):
             surveys.Survey('Test', s_list, [r_list[0], r_list[0]], 1)
 
     def test_dipole_info_to_dict_elmag(self):
@@ -143,7 +143,7 @@ class TestSurvey():
 
         cpy = srvy1.to_dict()
         del cpy['sources']
-        with pytest.raises(KeyError):
+        with pytest.raises(KeyError, match="Variable 'sources' missing"):
             surveys.Survey.from_dict(cpy)
 
         srvy3 = surveys.Survey('Test', (0, 0, 0, 0, 0),
@@ -216,13 +216,11 @@ def test_Dipole(capsys):
     assert pointdip2 == finitdip2
 
     # Check wrong number of points fails.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Dipole coordinates are wrong"):
         surveys.Dipole('dip', (0, 0, 0, 0))
-    out, _ = capsys.readouterr()
-    assert "* ERROR   :: Dipole coordinates are wrong defined." in out
 
     # Check that two identical poles fails.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Dipole coordinates are wrong'):
         surveys.Dipole('dip', (0, 0, 0, 0, 0, 0))
 
     # Check adding various attributs.
@@ -245,7 +243,7 @@ def test_Dipole(capsys):
     assert source2 == source
     assert source3 == source4
     del source4['coordinates']
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError, match="Variable 'coordinates' missing"):
         surveys.Dipole.from_dict(source4)
 
     # Magnetic dipole
