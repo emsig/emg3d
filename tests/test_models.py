@@ -34,9 +34,6 @@ class TestModel:
         res_z = res_x*1.4
         mu_r = res_x*1.11
 
-        # Check representation of TensorMesh.
-        assert 'TensorMesh: 2 x 2 x 2 (8)' in grid.__repr__()
-
         _, _ = capsys.readouterr()  # Clean-up
         # Using defaults; check backwards compatibility for freq.
         sfield = fields.SourceField(grid, freq=1)

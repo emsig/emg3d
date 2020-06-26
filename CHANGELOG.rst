@@ -50,7 +50,8 @@ v0.11.0 - stable
       current model on a new mesh.
     - Added `__eq__` to `models.TensorMesh` to compare meshes.
 
-- Additional dependency `xarray` for data management.
+- Additional dependencies `discretize` for meshing and `xarray` for data
+  management.
 
 - Removed deprecated functions `data_write` and `data_read`.
 

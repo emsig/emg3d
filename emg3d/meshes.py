@@ -23,6 +23,7 @@ Everything related to meshes appropriate for the multigrid solver.
 # the License.
 
 
+import discretize
 import numpy as np
 from copy import deepcopy
 from scipy import optimize
@@ -31,23 +32,11 @@ __all__ = ['TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
            'get_domain', 'get_hx']
 
 
-class TensorMesh:
-    """Rudimentary mesh for multigrid calculation.
+class TensorMesh(discretize.TensorMesh):
+    """A slightly modified :class:`discretize.TensorMesh`.
 
-    The tensor-mesh :class:`discretize.TensorMesh` is a powerful tool,
-    including sophisticated mesh-generation possibilities in 1D, 2D, and 3D,
-    plotting routines, and much more. However, in the multigrid solver we have
-    to generate a mesh at each level, many times over and over again, and we
-    only need a very limited set of attributes. This tensor-mesh class provides
-    all required attributes. All attributes here are the same as their
-    counterparts in :class:`discretize.TensorMesh` (both in name and value).
-
-    .. warning::
-        This is a slimmed-down version of :class:`discretize.TensorMesh`, meant
-        principally for internal use by the multigrid modeller. It is highly
-        recommended to use :class:`discretize.TensorMesh` to create the input
-        meshes instead of this class. There are no input-checks carried out
-        here, and there is only one accepted input format for `h` and `x0`.
+    - Ensures input is for a 3D TensorMesh, the only mesh supported by emg3d.
+    - Adds a few attributes (`__eq__`, `copy`, `to_dict`, and `from_dict`).
 
 
     Parameters
@@ -61,48 +50,10 @@ class TensorMesh:
     """
 
     def __init__(self, h, x0):
-        """Initialize the mesh."""
-        self.x0 = x0
-
-        # Width of cells.
-        self.hx = h[0]
-        self.hy = h[1]
-        self.hz = h[2]
-
-        # Cell related properties.
-        self.nCx = int(self.hx.size)
-        self.nCy = int(self.hy.size)
-        self.nCz = int(self.hz.size)
-        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
-        self.nC = int(self.vnC.prod())
-        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
-        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
-        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
-
-        # Node related properties.
-        self.nNx = self.nCx + 1
-        self.nNy = self.nCy + 1
-        self.nNz = self.nCz + 1
-        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
-        self.nN = int(self.vnN.prod())
-        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
-        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
-        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
-
-        # Edge related properties.
-        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
-        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
-        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
-        self.nEx = int(self.vnEx.prod())
-        self.nEy = int(self.vnEy.prod())
-        self.nEz = int(self.vnEz.prod())
-        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
-        self.nE = int(self.vnE.sum())
-
-    def __repr__(self):
-        """Simple representation."""
-        return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
-                f"({self.nC:,})")
+        """Ensure it is 3D, initiate TensorMesh."""
+        if len(h) != 3 or len(x0) != 3:
+            raise ValueError('shit')
+        return super().__init__(h=[h[0], h[1], h[2]], x0=x0)
 
     def __eq__(self, mesh):
         """Compare two meshes.
@@ -165,13 +116,59 @@ class TensorMesh:
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.")
 
-    @property
-    def vol(self):
-        """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '_vol', None) is None:
-            self._vol = (self.hx[None, None, :]*self.hy[None, :, None] *
-                         self.hz[:, None, None]).ravel()
-        return self._vol
+
+class _TensorMesh:
+    """Minimal TensorMesh for internal multigrid computation.
+
+
+    Parameters
+    ----------
+    h : list of three ndarrays
+        Cell widths in [x, y, z] directions.
+
+    x0 : ndarray of dimension (3, )
+        Origin (x, y, z).
+
+    """
+
+    def __init__(self, h, x0):
+        """Initialize the mesh."""
+        self.x0 = x0
+
+        # Width of cells.
+        self.hx = h[0]
+        self.hy = h[1]
+        self.hz = h[2]
+
+        # Cell related properties.
+        self.nCx = int(self.hx.size)
+        self.nCy = int(self.hy.size)
+        self.nCz = int(self.hz.size)
+        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
+        self.nC = int(self.vnC.prod())
+        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
+        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
+        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
+
+        # Node related properties.
+        self.nNx = self.nCx + 1
+        self.nNy = self.nCy + 1
+        self.nNz = self.nCz + 1
+        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
+        self.nN = int(self.vnN.prod())
+        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
+        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
+        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
+
+        # Edge related properties.
+        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
+        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
+        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
+        self.nEx = int(self.vnEx.prod())
+        self.nEy = int(self.vnEy.prod())
+        self.nEz = int(self.vnEz.prod())
+        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
+        self.nE = int(self.vnE.sum())
 
 
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
