@@ -168,7 +168,7 @@ v0.8.0 - v0.10.x
   workaround for sslsolver when called with an initial efield introduced in
   v0.8.0 was removed.
 - Adjustment to ``utils.get_hx_h0`` (this might change your boundaries): The
-  calculation domain is now calculated so that the distance for the signal
+  computation domain is now computed so that the distance for the signal
   travelling from the source to the boundary and back to the most remote
   receiver is at least two wavelengths away. If this is within the provided
   domain, then now extra buffer is added around the domain. Additionally, the
@@ -204,7 +204,7 @@ v0.8.0 - v0.10.x
   - New attribute ``Field.is_electric``, so the field knows if it is electric
     or magnetic.
   - New ``verb``-possibility: ``verb=-1`` is a continuously updated one-liner,
-    ideal to monitor large sets of calculations or in inversions.
+    ideal to monitor large sets of computations or in inversions.
   - The returned ``info`` dictionary contains new keys:
 
     - ``runtime_at_cycle``: accumulated total runtime at each cycle;
@@ -311,8 +311,8 @@ v0.8.0 - v0.10.x
 
 **2019-10-04**
 
-- Laplace-domain calculation: By providing a negative ``freq``-value to
-  ``utils.get_source_field`` and ``utils.Model``, the calculation is carried
+- Laplace-domain computation: By providing a negative ``freq``-value to
+  ``utils.get_source_field`` and ``utils.Model``, the computation is carried
   out in the real Laplace domain ``s = freq`` instead of the complex frequency
   domain ``s = 2i*pi*freq``.
 - New meshing helper routines (particularly useful for transient modelling
@@ -365,7 +365,7 @@ v0.1.0 - v0.7.x
 
 - New routines:
 
-  - ``utils.get_h_field``: Small routine to calculate the magnetic field from
+  - ``utils.get_h_field``: Small routine to compute the magnetic field from
     the electric field using Faraday's law.
   - ``utils.get_receiver``: Small wrapper to interpolate a field at receiver
     positions. Added 3D spline interpolation; is the new default.
@@ -398,7 +398,7 @@ Further speed and memory improvements:
 - Change loop-order from x-z-y to z-x-y in Gauss-Seidel smoothing with line
   relaxation in y-direction. Hence reversed lexicographical order. This results
   in a significant speed-up, as x is the fastest changing axis.
-- Move total residual calculation from ``solver.residual`` into
+- Move total residual computation from ``solver.residual`` into
   ``njitted.amat_x``.
 - Simplifications in ``utils``:
 
@@ -414,8 +414,8 @@ Further speed and memory improvements:
 
 Memory and speed improvements:
 
-- Only calculate residual and l2-norm when absolutely necessary.
-- Inplace calculations for ``np.conjugate`` in ``solver.solver`` and
+- Only compute residual and l2-norm when absolutely necessary.
+- Inplace computations for ``np.conjugate`` in ``solver.solver`` and
   ``np.subtract`` in ``solver.residual``.
 
 
@@ -427,7 +427,7 @@ Memory and speed improvements:
 - Replace :class:`scipy.interpolate.RegularGridInterpolator` with a custom
   tailored version of it (`solver.RegularGridProlongator`); results in twice
   as fast prolongation.
-- Simplify the fine-grid calculation in ``prolongation`` without using
+- Simplify the fine-grid computation in ``prolongation`` without using
   ``gridE*``; memory friendlier.
 - Submission to JOSS.
 - Add *Multi-what?*-page to documentation.

@@ -415,7 +415,7 @@ def test_residual():
             vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
             grid.hy, grid.hz)
 
-    # Calculate residual
+    # Compute residual
     out = solver.residual(grid, vmodel, sfield, efield)
     outnorm = solver.residual(grid, vmodel, sfield, efield, True)
 
@@ -511,7 +511,7 @@ def test_mgparameters():
 def test_RegularGridProlongator():
 
     def prolon_scipy(grid, cgrid, efield, cefield, yz_points):
-        """Calculate SciPy alternative."""
+        """Compute SciPy alternative."""
         for ixc in range(cgrid.nCx):
             # Bilinear interpolation in the y-z plane
             fn = si.RegularGridInterpolator(
@@ -526,7 +526,7 @@ def test_RegularGridProlongator():
         return efield
 
     def prolon_emg3d(grid, cgrid, efield, cefield, yz_points):
-        """Calculate emg3d alternative."""
+        """Compute emg3d alternative."""
         fn = solver.RegularGridProlongator(
                 cgrid.vectorNy, cgrid.vectorNz, yz_points)
 
