@@ -1,5 +1,6 @@
 import pytest
 import empymod
+import discretize
 import numpy as np
 from scipy import constants
 from os.path import join, dirname
@@ -249,8 +250,8 @@ def test_field(tmpdir):
     with pytest.raises(KeyError, match="Variable 'field' missing"):
         fields.Field.from_dict(edict)
 
-    # Set a dimension from the mesh to None, ensure field fails.
-    grid.nEx = None
+    # Get a 2D grid and ensure it fails.
+    grid = discretize.TensorMesh([1, 1], [1, 1])
     with pytest.raises(ValueError, match='Provided grid must be a 3D grid'):
         fields.Field(grid)
 

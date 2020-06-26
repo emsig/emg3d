@@ -239,11 +239,11 @@ def test_TensorMesh():
 
     # Check __eq__.
     assert emg3dgrid == cgrid
-    # Dummies to check __eq__.
-    cgrid.vnC = cgrid.vnC[:2]
-    cgrid = emg3dgrid.copy()
-    cgrid.hx = cgrid.hx*2
-    assert emg3dgrid != cgrid
-    cgrid = emg3dgrid.copy()
-    cgrid.vnC = np.array([99, 1, 1])
-    assert emg3dgrid != cgrid
+    newgrid = meshes.TensorMesh(
+            [np.ones(3), np.ones(3), np.ones(3)], np.zeros(3))
+    assert emg3dgrid != newgrid
+
+    with pytest.raises(ValueError, match='shit'):
+        meshes.TensorMesh([np.ones(3), np.ones(3)], np.zeros(2))
+    with pytest.raises(ValueError, match='shit'):
+        meshes.TensorMesh([np.ones(3), np.ones(3)], np.zeros(3))

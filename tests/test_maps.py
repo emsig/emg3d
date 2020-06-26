@@ -109,7 +109,7 @@ def test_grid2grid():
     np.allclose(out, np.array([1.5]))
 
     # Provide ogrid.gridCC.
-    ogrid.gridCC = np.array([[0.5, 0.5, 0.5]])
+    ogrid._gridCC = np.array([[0.5, 0.5, 0.5]])
     out2 = maps.grid2grid(igrid, values, ogrid, 'linear')
     np.allclose(out2, np.array([1.5]))
 
