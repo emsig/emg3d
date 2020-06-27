@@ -75,7 +75,7 @@ itself.**
   cases for both CPU and RAM. The one possible and therefore implemented
   solution was to swap the loop-order in :func:`emg3d.core.gauss_seidel_y`.
 - Restriction and prolongation information could be saved in a dictionary
-  instead of recalculating it every time. Turns out to be not worth the
+  instead of recomputing it every time. Turns out to be not worth the
   trouble.
 - Rewrite :class:`emg3d.RegularGridInterpolator` as jitted function, but the
   iterator approach seems to be better for large grids.

@@ -225,7 +225,7 @@ def test_volume_average(njit):
     points = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
     new_points = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
 
-    # Calculate volume.
+    # Compute volume.
     vol = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'), grid_out.hz)
     vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
 

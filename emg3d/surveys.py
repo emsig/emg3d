@@ -87,17 +87,6 @@ class Survey:
     number of receiver dipoles in this case is `LxM`.
 
 
-    .. todo::
-
-        - Implement source strength (if `strength=0` (default), the source is
-          normalized to a moment of 1 A m).
-        - Reciprocity flag.
-        - For data, add noise floor and error.
-        - Add an example of the different usages to the gallery.
-        - Return receiver coordinates as list for any source.
-        - Include logging/verbosity; check with CLI.
-
-
     Parameters
     ----------
     name : str
@@ -141,11 +130,10 @@ class Survey:
 
 
     """
-    # Currently, `surveys.ds` contains an :class:`xarray.Dataset`, where
-    # `surveys.data` is a shortcut to the :class:`xarray.DataArray`
-    # `surveys.ds.data`. As such, the `Survey`-Class has an xarray-dataset as
-    # one of its attributes. Probably there would be a cleaner way to simply
-    # use xarray instead of a dedicated `Survey`-Class by utilizing, e.g.,
+    # Currently, `surveys.data` contains an :class:`xarray.Dataset`. As such,
+    # the `Survey`-Class has an xarray-dataset as one of its attributes.
+    # Probably there would be a cleaner way to simply use xarray instead of a
+    # dedicated `Survey`-Class by utilizing, e.g.,
     # :func:`xarray.register_dataset_accessor`.
 
     def __init__(self, name, sources, receivers, frequencies, data=None,
@@ -171,26 +159,26 @@ class Survey:
                             self._frequencies.size), dtype=complex)*np.nan
 
         # Initialize xarray dataset.
-        self._ds = xr.Dataset(
-            {'data': xr.DataArray(data, dims=('src', 'rec', 'freq'))},
+        self._data = xr.Dataset(
+            {'observed': xr.DataArray(data, dims=('src', 'rec', 'freq'))},
             coords={'src': list(self.sources.keys()),
                     'rec': list(self.receivers.keys()),
                     'freq': list(self.frequencies)},
         )
-        self._ds.src.attrs['long_name'] = 'Source dipole'
-        self._ds.src.attrs['src-dipoles'] = self.sources
-        self._ds.rec.attrs['long_name'] = 'Receiver dipole'
-        self._ds.rec.attrs['rec-dipoles'] = self.receivers
-        self._ds.freq.attrs['long_name'] = 'Source frequency'
-        self._ds.freq.attrs['units'] = 'Hz'
+        self._data.src.attrs['long_name'] = 'Source dipole'
+        self._data.src.attrs['src-dipoles'] = self.sources
+        self._data.rec.attrs['long_name'] = 'Receiver dipole'
+        self._data.rec.attrs['rec-dipoles'] = self.receivers
+        self._data.freq.attrs['long_name'] = 'Source frequency'
+        self._data.freq.attrs['units'] = 'Hz'
 
     def __repr__(self):
         return (f"{self.__class__.__name__}: {self.name}\n\n"
-                f"{self.ds.__repr__()}")
+                f"{self.data.__repr__()}")
 
     def _repr_html_(self):
         return (f"<h4>{self.__class__.__name__}: {self.name}</h4><br>"
-                f"{self.ds._repr_html_()}")
+                f"{self.data._repr_html_()}")
 
     def copy(self):
         """Return a copy of the Survey."""
@@ -217,7 +205,7 @@ class Survey:
         out['frequencies'] = self.frequencies
 
         # Add data.
-        out['data'] = self.data.values
+        out['observed'] = self.data.observed.values
 
         # Fixed.
         out['fixed'] = int(self.fixed)
@@ -236,7 +224,7 @@ class Survey:
         inp : dict
             Dictionary as obtained from :func:`Survey.to_dict`.
             The dictionary needs the keys `name`, `sources`, `receivers`
-            `frequencies`, `data`, and `fixed`.
+            `frequencies`, `observed`, and `fixed`.
 
         Returns
         -------
@@ -246,7 +234,7 @@ class Survey:
         try:
             return cls(name=inp['name'], sources=inp['sources'],
                        receivers=inp['receivers'],
-                       frequencies=inp['frequencies'], data=inp['data'],
+                       frequencies=inp['frequencies'], data=inp['observed'],
                        fixed=bool(inp['fixed']))
 
         except KeyError as e:
@@ -259,22 +247,22 @@ class Survey:
         Note that not all source-receiver-frequency pairs do actually have
         data. Check `size` to see how many data points there are.
         """
-        return self.ds.data.shape
+        return self.data.observed.shape
 
     @property
     def size(self):
         """Return actual data size (does NOT equal nsrc x nrec x nfreq)."""
-        return int(self.ds.data.count())
-
-    @property
-    def ds(self):
-        """Dataset, an :class:`xarray.Dataset` instance.."""
-        return self._ds
+        return int(self.data.observed.count())
 
     @property
     def data(self):
-        """Observed data, an :class:`xarray.DataArray` instance.."""
-        return self.ds.data
+        """Data, a :class:`xarray.DataSet` instance.
+
+        Contains the :class:`xarray.DataArray` `.observed`, but other data can
+        be added. E.g., :class:`emg3d.simulations.Simulation` adds the
+        `synthetic` array.
+        """
+        return self._data
 
     @property
     def sources(self):
@@ -285,6 +273,16 @@ class Survey:
     def receivers(self):
         """Receiver dict containing all receiver dipoles."""
         return self._receivers
+
+    @property
+    def src_coords(self):
+        """Return source coordinates.
+
+        The returned format is `[x, y, z, azm, dip]`, a list of 5 tuples.
+        """
+
+        return tuple(np.array([[s.xco, s.yco, s.zco, s.azm, s.dip] for s
+                     in self.sources.values()]).T)
 
     @property
     def rec_coords(self):

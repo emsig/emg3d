@@ -148,13 +148,13 @@ Laplace domain
 It is also possible to solve the problem in the **Laplace domain**, by
 using a real value for :math:`s` in Equation :eq:`fdomaindiff`, instead of the
 complex value :math:`-\mathrm{i}\omega``. This simplifies the problem from
-complex numbers to real numbers, which accelerates the calculation. It also
+complex numbers to real numbers, which accelerates the computation. It also
 improves the convergence rate, as the solution is a smoother function. The
 solver :func:`emg3d.solve` is agnostic to the data type of the provided source
 field, and can solve for real and complex problems, hence frequency and Laplace
 domain. See the documentation of the functions
 :func:`emg3d.fields.get_source_field` and :func:`emg3d.models.Model` to see how
-you can use `emg3d` for Laplace-domain calculations.
+you can use `emg3d` for Laplace-domain computations.
 
 
 Discretisation
@@ -490,9 +490,9 @@ the maximum norm and the Euclidean or 2-norm defined respectively, by
     \quad \text{and} \quad
     \|\mathbf{e}\|_{2} = \sqrt{\sum_{j=1}^{n} e_{j}^{2}} .
 
-However, as the solution is not known the error cannot be calculated either.
+However, as the solution is not known the error cannot be computed either.
 The second important measure, however, is a computable measure, the residual
-:math:`r` (calculated in :func:`emg3d.solver.residual`)
+:math:`r` (computed in :func:`emg3d.solver.residual`)
 
 
 .. math::

@@ -32,12 +32,16 @@ class TestSurvey():
         sur_list = surveys.Survey('Test', s_list, r_list, 1)
         assert sur_list.sources['Tx0'] == s_list[0]
         assert sur_list.receivers['Rx1'] == r_list[1]
+        assert_allclose(sur_list.src_coords,
+                        [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)])
         assert_allclose(sur_list.rec_coords,
                         [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)])
         # fixed
         fsur_list = surveys.Survey('Test', s_list, r_list, 1, fixed=1)
         assert fsur_list.sources['Tx0'] == s_list[0]
         assert fsur_list.receivers['Off0']['Tx1'] == r_list[1]
+        assert_allclose(fsur_list.src_coords,
+                        [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0)])
         assert_allclose(fsur_list.rec_coords['Tx0'],
                         [(0, ), (0, ), (0, ), (0, ), (0, )])
 

@@ -192,7 +192,7 @@ def test_solve(njit):
                 amat[i, j] = avec[i+5*j]
                 amat[j, i] = avec[i+5*j]
 
-        # Calculate b = A x
+        # Compute b = A x
         b = amat@x
 
         # 1. Check with numpy
@@ -451,7 +451,7 @@ def test_restrict_weights(njit):
           np.diff(grid.vectorNz[::2])]
     cgrid = meshes.TensorMesh(ch, x0=grid.x0)
 
-    # Calculate the weights in a numpy-way, instead of numba-way
+    # Compute the weights in a numpy-way, instead of numba-way
     wl, w0, wr = alternatives.alt_restrict_weights(
             grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
             cgrid.vectorCCx, cgrid.hx)

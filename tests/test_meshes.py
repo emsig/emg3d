@@ -74,7 +74,7 @@ def test_get_hx_h0(capsys):
 
     # Check dmin.
     assert out3[2]['dmin'] == 600
-    # Calculation domain has to be at least domain.
+    # Computation domain has to be at least domain.
     assert out3[1]+np.sum(out3[0]) > 14000
     assert out3[1] <= -11000
 

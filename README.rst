@@ -50,9 +50,9 @@ Features
 
 - Multigrid solver for 3D electromagnetic (EM) diffusion with regular grids
   (where source and receiver can be electric or magnetic).
-- Calculate the 3D EM field in the complex frequency domain or in the real
+- Compute the 3D EM field in the complex frequency domain or in the real
   Laplace domain.
-- Includes also routines to calculate the 3D EM field in the time domain.
+- Includes also routines to compute the 3D EM field in the time domain.
 - Can be used together with the `SimPEG <https://simpeg.xyz>`_-framework.
 - Can be used as a standalone solver or as a pre-conditioner for various Krylov
   subspace methods implemented in SciPy, e.g., BiCGSTAB
@@ -81,8 +81,8 @@ or via ``pip``:
    pip install emg3d
 
 Required are Python version 3.7 or higher and the modules `SciPy`, `Numba`,
-`xarray`, and `empymod`; `discretize` (from `SimPEG <https://simpeg.xyz>`_) is
-highly recommended. Consult the installation notes in the `manual
+`discretize`, `xarray`, and `empymod`, which will be installed automatically
+with above commands. Consult the installation notes in the `manual
 <https://emg3d.readthedocs.io/en/stable/usage.html#installation>`_ for more
 information regarding installation and requirements.
 
