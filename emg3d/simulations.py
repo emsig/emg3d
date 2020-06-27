@@ -108,6 +108,13 @@ class Simulation():
                 }
         self._initiate_model_grid(model, grid)
         self._grids_type = comp_grids
+        self._grids_type_descr = {
+                'same': 'Same grid as for model',
+                'single': 'A single grid for all sources and frequencies',
+                'frequency': 'Frequency-dependent grids',
+                'source': 'Source-dependent grids',
+                'both': 'Frequency- and source-dependent grids',
+                }
 
         # Get solver options, set to defaults if not provided.
         self.solver_opts = {
@@ -133,6 +140,27 @@ class Simulation():
 
         # Initialize synthetic data.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
+
+    def __repr__(self):
+        return (f"*{self.__class__.__name__}* of «{self.survey.name}»\n\n"
+                f"- {self.survey.__class__.__name__}: "
+                f"{self.survey.shape[0]} sources; "
+                f"{self.survey.shape[1]} receivers; "
+                f"{self.survey.shape[2]} frequencies\n"
+                f"- {self.model.__repr__()}\n"
+                f"- Gridding: {self._grids_type_descr[self._grids_type]}")
+
+    def _repr_html_(self):
+        return (f"<h3>{self.__class__.__name__}</h3>"
+                f"of «{self.survey.name}»<ul>"
+                f"<li>{self.survey.__class__.__name__}: "
+                f"{self.survey.shape[0]} sources; "
+                f"{self.survey.shape[1]} receivers; "
+                f"{self.survey.shape[2]} frequencies</li>"
+                f"<li>{self.model.__repr__()}</li>"
+                f"<li>Gridding: "
+                f"{self._grids_type_descr[self._grids_type]}</li>"
+                f"</ul>")
 
     def copy(self):
         """Return a copy of the Simulation."""
