@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import sys
 from setuptools import setup
+
+if not sys.version_info[:2] >= (3, 7):
+    sys.exit(f"emg3d is only meant for Python 3.7 and up.\n"
+             f"Current version: {sys.version_info[0]}.{sys.version_info[1]}.")
 
 # Get README and remove badges.
 readme = open('README.rst').read()
@@ -17,7 +22,7 @@ setup(
     author_email='dieter@werthmuller.org',
     url='https://empymod.github.io',
     license='Apache License V2.0',
-    packages=['emg3d'],
+    packages=['emg3d', 'emg3d.optimize'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',

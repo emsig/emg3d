@@ -377,34 +377,28 @@ class Simulation():
         efield : :class:`emg3d.fields.Field`
             Resulting electric field.
 
-        info_dict : dict
-            Dictionary with runtime info; only if ``return_info=True`` was
-            provided in `kwargs`.
-
         """
         freq = float(frequency)
         recomp = kwargs.pop('recomp', False)
-        return_info = kwargs.get('return_info', False)
+        call_from_psolve = kwargs.pop('call_from_psolve', False)
 
         # If electric field not computed yet compute it.
         if self._efields[source][freq] is None or recomp:
 
             # Get solver options and update with kwargs.
             solver_opts = {**self.solver_opts, **kwargs}
+            solver_opts['return_info'] = True  # Always return solver info.
 
             # Compute electric field.
-            efield = solver.solve(
-                    self.comp_grids(source, frequency),
-                    self.comp_models(source, frequency),
-                    self.sfields(source, frequency),
+            efield, info = solver.solve(
+                    self.comp_grids(source, freq),
+                    self.comp_models(source, freq),
+                    self.sfields(source, freq),
                     **solver_opts)
 
-            # Store electric field.
-            if return_info:
-                self._efields[source][freq] = efield[0]
-                self._solver_info[source][freq] = efield[1]
-            else:
-                self._efields[source][freq] = efield
+            # Store electric field and info.
+            self._efields[source][freq] = efield
+            self._solver_info[source][freq] = info
 
             # Clean corresponding hfield, so it will be recomputed.
             del self._hfields[source][freq]
@@ -422,11 +416,13 @@ class Simulation():
                     field=self._efields[source][freq],
                     rec=rec_coords
             )
-            self.survey._data['synthetic'].loc[source, :, freq] = resp
+            self.data.synthetic.loc[source, :, freq] = resp
 
-        if return_info:
+        # Return electric field.
+        if call_from_psolve:
             return (self._efields[source][freq],
-                    self._solver_info[source][freq])
+                    self._solver_info[source][freq],
+                    self.data.synthetic.loc[source, :, freq].data)
         else:
             return self._efields[source][freq]
 
@@ -459,25 +455,37 @@ class Simulation():
         """
         freq = float(frequency)
         recomp = kwargs.get('recomp', False)
-        return_info = kwargs.get('return_info', False)
-
-        # If electric field not computed yet compute it.
-        if self._efields[source][freq] is None or recomp:
-            _ = self.efields(source, frequency, **kwargs)
 
         # If magnetic field not computed yet compute it.
         if self._hfields[source][freq] is None or recomp:
-            hfield = fields.get_h_field(
-                    self.comp_grids(source, frequency),
-                    self.comp_models(source, frequency),
-                    self.efields(source, frequency))
-            self._hfields[source][freq] = hfield
+            self._hfields[source][freq] = fields.get_h_field(
+                    self.comp_grids(source, freq),
+                    self.comp_models(source, freq),
+                    self.efields(source, freq, **kwargs))
 
-        if return_info:
-            return (self._hfields[source][freq],
-                    self._solver_info[source][freq])
-        else:
-            return self._hfields[source][freq]
+        # Return magnetic field.
+        return self._hfields[source][freq]
+
+    def solver_info(self, source, frequency):
+        """Return the solver information of the corresponding computation.
+
+        Parameters
+        ----------
+        source : str
+            Source name.
+
+        frequency : float
+            Frequency
+
+
+        Returns
+        -------
+        info_dict : dict or None
+            Dictionary with runtime info if corresponding efield as calculated,
+            else None.
+
+        """
+        return self._solver_info[source][float(frequency)]
 
     def psolve(self, nproc=4, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
@@ -492,20 +500,10 @@ class Simulation():
             arguments of the solver except `grid`, `model`, `sfield`, and
             `efield`.
 
-
-        Returns
-        -------
-        info : dict
-            Dictionary of the form `dict_name[source][frequency]`, containing
-            the solver-info; only returned if `kwargs['return_info']=True`.
-
         """
 
         # Initiate futures-dict to store output.
         out = self._initiate_none_dict()
-
-        # Get solver options and update with kwargs.
-        solver_opts = {**self.solver_opts, **kwargs}
 
         # Context manager for futures.
         with futures.ProcessPoolExecutor(nproc) as executor:
@@ -516,46 +514,31 @@ class Simulation():
                 # Loop over frequencies.
                 for freq in out[src].keys():
 
-                    # Call emg3d
+                    # Call `self.efields`.
                     out[src][freq] = executor.submit(
-                        solver.solve,
-                        grid=self.comp_grids(src, freq),
-                        model=self.comp_models(src, freq),
-                        sfield=self.sfields(src, freq),
-                        **solver_opts,
+                        self.efields,
+                        source=src,
+                        frequency=freq,
+                        call_from_psolve=True,
+                        **kwargs,
                     )
 
         # Clean hfields, so they will be recomputed.
         del self._hfields
         self._hfields = self._initiate_none_dict()
 
-        # Extract the result(s).
-        if kwargs.get('return_info', False):
-            self._efields = {f: {k: v.result()[0] for k, v in s.items()}
+        # Extract and store the electric fields.
+        self._efields = {f: {k: v.result()[0] for k, v in s.items()}
+                         for f, s in out.items()}
+
+        # Extract and store the solver info.
+        self._solver_info = {f: {k: v.result()[1] for k, v in s.items()}
                              for f, s in out.items()}
 
-            # Return info.
-            self._solver_info = {f: {k: v.result()[1] for k, v in s.items()}
-                                 for f, s in out.items()}
-        else:
-            self._efields = {f: {k: v.result() for k, v in s.items()}
-                             for f, s in out.items()}
-
-        # Extract data at receivers.
-        if self.survey.fixed:
-            all_rec_coords = self.survey.rec_coords
-        else:
-            rec_coords = self.survey.rec_coords
-        # Loop over sources and frequencies.
+        # Extract and store responses at receiver locations.
         for src in self.survey.sources.keys():
-            if self.survey.fixed:
-                rec_coords = all_rec_coords[src]
             for freq in self.survey.frequencies:
-                resp = fields.get_receiver_response(
-                        grid=self._comp_grids[src][freq],
-                        field=self._efields[src][freq],
-                        rec=rec_coords
-                )
+                resp = out[src][freq].result()[2]
                 self.data['synthetic'].loc[src, :, freq] = resp
 
     def clean(self):
@@ -649,3 +632,75 @@ class Simulation():
     def data(self):
         """Shortcut to survey.data."""
         return self.survey.data
+
+#     def gradient(self, solver_opts=None, nproc=4, wdepth=None, wdata=None,
+#                  regularization=None, verb=2):
+#         """Computes the gradient using the adjoint-state method.
+#
+#         Following [PlMu06]_.
+#
+#         .. todo::
+#
+#             - Several parts only work for Ex at the moment, no azimuth, no
+#               dip, no magnetic fields; generalize.
+#             - Regularization is not implemented.
+#
+#
+#         Parameters
+#         ----------
+#         solver_opts : dict
+#             Parameter-dicts passed to the solver and the automatic gridding,
+#             respectively.
+#
+#         nproc : int
+#             Maximum number of processes that can be used. Default is four.
+#
+#         wdepth, wdata, regularization : dict or None
+#             Parameter-dict for depth- and data-weighting and regularization,
+#             respectively. Regularization is NOT implemented yet.
+#
+#         verb : int; optional
+#             Level of verbosity (as used in emg3d)
+#
+#
+#         Returns
+#         -------
+#         grad : ndarray
+#             Current gradient; has shape mesh.vnC (same as model properties).
+#
+#         misfit : float
+#             Current misfit; as regularization is not implemented this
+#             corresponds to the data misfit.
+#
+#         """
+#         def cprint(str, verb=verb):
+#             """Conditional print."""
+#             if verb > 1:
+#                 print(str)
+#
+#         # Get forwards electric fields (parallel).
+#         cprint("\n** Forward fields **\n")
+#         # TODO Adjust; Used to be ffields
+#
+#         self.psolve(nproc=4,
+#                     **(solver_opts if solver_opts is not None else {}),
+#                     )
+#
+#         # Get residual fields (parallel).
+#         cprint("\n** Residual fields **\n")
+#         # TODO Implement resfield- [sfield/rfield]
+#         resfields, data_misfit = resfield_parallel(
+#                 data, grids, ffields, wdata, nproc)
+#         cprint(f"   Data misfit: {data_misfit:.2e}")
+#
+#         # Get backwards electric fields (parallel).
+#         cprint("\n** Backward fields **\n")
+#         # TODO Implement resfield- [efield/bfield]
+#         bfields = self.psolve(grids, models, resfields, solver_args, nproc)
+#
+#         # Get gradient.
+#         cprint("\n** Gradient **\n")
+#         # TODO implement
+#         grad = compute_gradient(ffields, bfields, grids, mesh, wdepth)
+#
+#         return grad, data_misfit
