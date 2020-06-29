@@ -650,7 +650,7 @@ class Simulation():
     def gradient(self, nproc=4, data_weight_opts=None, **kwargs):
         """Computes the gradient using the adjoint-state method.
 
-        Following [PlMu06]_.
+        Following [PlMu08]_.
 
         .. todo::
 
