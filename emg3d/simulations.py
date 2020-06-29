@@ -33,7 +33,7 @@ high-level, specialised modelling routines.
 import numpy as np
 from concurrent import futures
 
-from emg3d import fields, solver, models, meshes
+from emg3d import fields, solver, models, meshes, optimize
 
 __all__ = ['Simulation']
 
@@ -63,7 +63,7 @@ class Simulation():
         If not provided the following defaults are used:
         `sslsolver = semicoarsening = linerelaxation = True`, `verb = -1`.
 
-    comp_grids : str
+    grids_type : str
         Computational grids; default is 'single'.
 
         - 'same': Same grid as for model.
@@ -83,7 +83,7 @@ class Simulation():
     """
 
     def __init__(self, survey, grid, model, solver_opts=None,
-                 comp_grids='single', **kwargs):
+                 grids_type='single', **kwargs):
         """Initiate a new Simulation instance."""
 
         # Store inputs (should these be copied to avoid altering them?).
@@ -107,7 +107,7 @@ class Simulation():
                 **grid_opts,
                 }
         self._initiate_model_grid(model, grid)
-        self._grids_type = comp_grids
+        self._grids_type = grids_type
         self._grids_type_descr = {
                 'same': 'Same grid as for model',
                 'single': 'A single grid for all sources and frequencies',
@@ -130,16 +130,25 @@ class Simulation():
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
-        # Initiate comp_{grids;models}-dicts and {s;e;h}fields-dicts.
+        # Initiate and fill comp_{grids;models}-dicts and sfields-dicts.
         self._comp_grids = self._initiate_none_dict()
         self._comp_models = self._initiate_none_dict()
         self._sfields = self._initiate_none_dict()
+
+        # Initiate {e;h}fields-dicts and solver_info-dict.
         self._efields = self._initiate_none_dict()
         self._hfields = self._initiate_none_dict()
         self._solver_info = self._initiate_none_dict()
 
-        # Initialize synthetic data.
+        # Initiate synthetic data.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
+
+        # Default values for some properties, work in progress TODO
+        self.data_weight_opts = {
+                'gamma_d': 0.5,
+                'beta_f': 0.25,
+                'beta_d': 1.0,
+                }
 
     def __repr__(self):
         return (f"*{self.__class__.__name__}* of «{self.survey.name}»\n\n"
@@ -377,34 +386,28 @@ class Simulation():
         efield : :class:`emg3d.fields.Field`
             Resulting electric field.
 
-        info_dict : dict
-            Dictionary with runtime info; only if ``return_info=True`` was
-            provided in `kwargs`.
-
         """
         freq = float(frequency)
         recomp = kwargs.pop('recomp', False)
-        return_info = kwargs.get('return_info', False)
+        call_from_psolve = kwargs.pop('call_from_psolve', False)
 
         # If electric field not computed yet compute it.
         if self._efields[source][freq] is None or recomp:
 
             # Get solver options and update with kwargs.
             solver_opts = {**self.solver_opts, **kwargs}
+            solver_opts['return_info'] = True  # Always return solver info.
 
             # Compute electric field.
-            efield = solver.solve(
-                    self.comp_grids(source, frequency),
-                    self.comp_models(source, frequency),
-                    self.sfields(source, frequency),
+            efield, info = solver.solve(
+                    self.comp_grids(source, freq),
+                    self.comp_models(source, freq),
+                    self.sfields(source, freq),
                     **solver_opts)
 
-            # Store electric field.
-            if return_info:
-                self._efields[source][freq] = efield[0]
-                self._solver_info[source][freq] = efield[1]
-            else:
-                self._efields[source][freq] = efield
+            # Store electric field and info.
+            self._efields[source][freq] = efield
+            self._solver_info[source][freq] = info
 
             # Clean corresponding hfield, so it will be recomputed.
             del self._hfields[source][freq]
@@ -422,11 +425,13 @@ class Simulation():
                     field=self._efields[source][freq],
                     rec=rec_coords
             )
-            self.survey._data['synthetic'].loc[source, :, freq] = resp
+            self.data.synthetic.loc[source, :, freq] = resp
 
-        if return_info:
+        # Return electric field.
+        if call_from_psolve:
             return (self._efields[source][freq],
-                    self._solver_info[source][freq])
+                    self._solver_info[source][freq],
+                    self.data.synthetic.loc[source, :, freq].data)
         else:
             return self._efields[source][freq]
 
@@ -459,25 +464,37 @@ class Simulation():
         """
         freq = float(frequency)
         recomp = kwargs.get('recomp', False)
-        return_info = kwargs.get('return_info', False)
-
-        # If electric field not computed yet compute it.
-        if self._efields[source][freq] is None or recomp:
-            _ = self.efields(source, frequency, **kwargs)
 
         # If magnetic field not computed yet compute it.
         if self._hfields[source][freq] is None or recomp:
-            hfield = fields.get_h_field(
-                    self.comp_grids(source, frequency),
-                    self.comp_models(source, frequency),
-                    self.efields(source, frequency))
-            self._hfields[source][freq] = hfield
+            self._hfields[source][freq] = fields.get_h_field(
+                    self.comp_grids(source, freq),
+                    self.comp_models(source, freq),
+                    self.efields(source, freq, **kwargs))
 
-        if return_info:
-            return (self._hfields[source][freq],
-                    self._solver_info[source][freq])
-        else:
-            return self._hfields[source][freq]
+        # Return magnetic field.
+        return self._hfields[source][freq]
+
+    def solver_info(self, source, frequency):
+        """Return the solver information of the corresponding computation.
+
+        Parameters
+        ----------
+        source : str
+            Source name.
+
+        frequency : float
+            Frequency
+
+
+        Returns
+        -------
+        info_dict : dict or None
+            Dictionary with runtime info if corresponding efield as calculated,
+            else None.
+
+        """
+        return self._solver_info[source][float(frequency)]
 
     def psolve(self, nproc=4, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
@@ -492,20 +509,10 @@ class Simulation():
             arguments of the solver except `grid`, `model`, `sfield`, and
             `efield`.
 
-
-        Returns
-        -------
-        info : dict
-            Dictionary of the form `dict_name[source][frequency]`, containing
-            the solver-info; only returned if `kwargs['return_info']=True`.
-
         """
 
         # Initiate futures-dict to store output.
         out = self._initiate_none_dict()
-
-        # Get solver options and update with kwargs.
-        solver_opts = {**self.solver_opts, **kwargs}
 
         # Context manager for futures.
         with futures.ProcessPoolExecutor(nproc) as executor:
@@ -516,46 +523,36 @@ class Simulation():
                 # Loop over frequencies.
                 for freq in out[src].keys():
 
-                    # Call emg3d
+                    # Ensure grid, model, and sfield are computed.
+                    self.comp_grids(src, freq),
+                    self.comp_models(src, freq),
+                    self.sfields(src, freq),
+
+                    # Call `self.efields`.
                     out[src][freq] = executor.submit(
-                        solver.solve,
-                        grid=self.comp_grids(src, freq),
-                        model=self.comp_models(src, freq),
-                        sfield=self.sfields(src, freq),
-                        **solver_opts,
+                        self.efields,
+                        source=src,
+                        frequency=freq,
+                        call_from_psolve=True,
+                        **kwargs,
                     )
 
         # Clean hfields, so they will be recomputed.
         del self._hfields
         self._hfields = self._initiate_none_dict()
 
-        # Extract the result(s).
-        if kwargs.get('return_info', False):
-            self._efields = {f: {k: v.result()[0] for k, v in s.items()}
+        # Extract and store the electric fields.
+        self._efields = {f: {k: v.result()[0] for k, v in s.items()}
+                         for f, s in out.items()}
+
+        # Extract and store the solver info.
+        self._solver_info = {f: {k: v.result()[1] for k, v in s.items()}
                              for f, s in out.items()}
 
-            # Return info.
-            self._solver_info = {f: {k: v.result()[1] for k, v in s.items()}
-                                 for f, s in out.items()}
-        else:
-            self._efields = {f: {k: v.result() for k, v in s.items()}
-                             for f, s in out.items()}
-
-        # Extract data at receivers.
-        if self.survey.fixed:
-            all_rec_coords = self.survey.rec_coords
-        else:
-            rec_coords = self.survey.rec_coords
-        # Loop over sources and frequencies.
+        # Extract and store responses at receiver locations.
         for src in self.survey.sources.keys():
-            if self.survey.fixed:
-                rec_coords = all_rec_coords[src]
             for freq in self.survey.frequencies:
-                resp = fields.get_receiver_response(
-                        grid=self._comp_grids[src][freq],
-                        field=self._efields[src][freq],
-                        rec=rec_coords
-                )
+                resp = out[src][freq].result()[2]
                 self.data['synthetic'].loc[src, :, freq] = resp
 
     def clean(self):
@@ -649,3 +646,195 @@ class Simulation():
     def data(self):
         """Shortcut to survey.data."""
         return self.survey.data
+
+    def gradient(self, nproc=4, data_weight_opts=None, **kwargs):
+        """Computes the gradient using the adjoint-state method.
+
+        Following [PlMu08]_.
+
+        .. todo::
+
+            - Several parts only work for Ex at the moment, no azimuth, no
+              dip, no magnetic fields; generalize.
+            - Regularization is not implemented.
+
+
+        Parameters
+        ----------
+        solver_opts : dict
+            Parameter-dicts passed to the solver and the automatic gridding,
+            respectively.
+
+        nproc : int
+            Maximum number of processes that can be used. Default is four.
+
+        wdepth, wdata, regularization : dict or None
+            Parameter-dict for depth- and data-weighting and regularization,
+            respectively. Regularization is NOT implemented yet.
+
+        verb : int; optional
+            Level of verbosity (as used in emg3d)
+
+
+        Returns
+        -------
+        grad : ndarray
+            Current gradient; has shape mesh.vnC (same as model properties).
+
+        misfit : float
+            Current misfit; as regularization is not implemented this
+            corresponds to the data misfit.
+
+        """
+
+        # So far only Ex is implemented and checked.
+        if sum([(r.azm != 0.0)+(r.dip != 0.0) for r in
+                self.survey.receivers.values()]) > 0:
+            raise TypeError(
+                    "Gradient only implement for Ex receivers at the moment.")
+
+        verb = kwargs.get('verb', 2)
+
+        def cprint(str, verb=verb):
+            """Conditional print."""
+            if verb > 1 or verb < 0:
+                print(str)
+
+        # Get forwards electric fields (parallel).
+        cprint("\n** Compute/get forward fields **\n")
+        self.psolve(nproc, **kwargs)
+
+        # Get residual fields (parallel).
+        cprint("\n** Compute misfit and residual fields **\n")
+
+        # # TODO # # DATA WEIGHTING
+        data_misfit = self.misfit(data_weight_opts)
+        cprint(f"   Data misfit: {data_misfit:.2e}")
+
+        # Get backwards electric fields (parallel).
+        cprint("\n** Backward fields **\n")
+        self._pbsolve(nproc, **kwargs)
+
+        # Get gradient.
+        cprint("\n** Compute Gradient **\n")
+        grad = optimize.gradient.gradient(self)
+
+        return grad, data_misfit
+
+    def misfit(self, data_weight_opts=None):
+
+        data_weight_opts = {
+                **self.data_weight_opts,
+                **(data_weight_opts if data_weight_opts is not None else {})}
+
+        # TODO ¿ we have to switch off src-rec-pairs with r <min_off ?
+        DW = optimize.weights.DataWeighting(**data_weight_opts)
+
+        self.survey._data['residual'] = (self.survey.data.synthetic -
+                                         self.survey.data.observed)
+        self.survey._data['wresidual'] = (self.survey.data.synthetic -
+                                          self.survey.data.observed)
+
+        for sname, src in self.survey.sources.items():
+            for freq in self.survey.frequencies:
+                data = self.data.wresidual.loc[sname, :, freq].data
+                weights = DW.weights(
+                        data, self.survey.rec_coords, src.coordinates, freq)
+                self.survey._data['wresidual'].loc[sname, :, freq] *= weights
+
+        return np.abs(np.sum(self.data.residual.data.conj() *
+                             self.data.wresidual.data))/2
+
+    def bfields(self, source, frequency, **kwargs):
+        """¿¿¿ Merge with efields or move to gradient. ???"""
+
+        freq = float(frequency)
+
+        # Get solver options and update with kwargs.
+        solver_opts = {**self.solver_opts, **kwargs}
+        solver_opts['return_info'] = True  # Always return solver info.
+
+        # Compute back-propagating electric field.
+        bfield, info = solver.solve(
+                self.comp_grids(source, freq),
+                self.comp_models(source, freq),
+                self._rfields(source, freq),
+                **solver_opts)
+
+        # Store electric field and info.
+        if not hasattr(self, '_bfield'):
+            self._bfields = self._initiate_none_dict()
+            self._back_info = self._initiate_none_dict()
+        self._bfields[source][freq] = bfield
+        self._back_info[source][freq] = info
+
+        # Return electric field.
+        return (self._bfields[source][freq],
+                self._back_info[source][freq])
+
+    def _pbsolve(self, nproc=4, **kwargs):
+        """¿¿¿ Merge with psolve or move to gradient. ???"""
+        # TODO TODO
+
+        # Initiate futures-dict to store output.
+        out = self._initiate_none_dict()
+
+        # Context manager for futures.
+        with futures.ProcessPoolExecutor(nproc) as executor:
+
+            # Loop over source positions.
+            for src in out.keys():
+
+                # Loop over frequencies.
+                for freq in out[src].keys():
+
+                    # Call `self.efields`.
+                    out[src][freq] = executor.submit(
+                        self.bfields,
+                        source=src,
+                        frequency=freq,
+                        **kwargs,
+                    )
+
+        # Extract and store the back fields.
+        self._bfields = {f: {k: v.result()[0] for k, v in s.items()}
+                         for f, s in out.items()}
+
+        # Extract and store the solver info.
+        self._back_info = {f: {k: v.result()[1] for k, v in s.items()}
+                           for f, s in out.items()}
+
+    def _rfields(self, source, frequency):
+        """¿¿¿ Merge with sfields or move to optimize/gradient. ???"""
+
+        freq = float(frequency)
+        grid = self.comp_grids(source, frequency)
+
+        # Initiate empty field
+        ResidualField = fields.SourceField(grid, freq=frequency)
+
+        # Loop over receivers, input as source.
+        for rname, rec in self.survey.receivers.items():
+
+            # Strength: in get_source_field the strength is multiplied with
+            # iwmu; so we undo this here.
+            # TODO Ey, Ez
+            strength = self.data['wresidual'].loc[
+                    source, rname, freq].data.conj()
+            strength /= ResidualField.smu0
+            # ^ WEIGHTED RESIDUAL ^!
+
+            ThisSField = fields.get_source_field(
+                grid=grid,
+                src=rec.coordinates,
+                freq=frequency,
+                strength=strength,
+            )
+
+            # If strength is zero (very unlikely), get_source_field would
+            # return a normalized field for a unit source. However, in this
+            # case we do not want that.
+            if strength != 0:
+                ResidualField += ThisSField
+
+        return ResidualField

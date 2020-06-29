@@ -243,7 +243,7 @@ def test_TensorMesh():
             [np.ones(3), np.ones(3), np.ones(3)], np.zeros(3))
     assert emg3dgrid != newgrid
 
-    with pytest.raises(ValueError, match='shit'):
+    with pytest.raises(ValueError, match='Input does not correspond to a 3D '):
         meshes.TensorMesh([np.ones(3), np.ones(3)], np.zeros(2))
-    with pytest.raises(ValueError, match='shit'):
+    with pytest.raises(ValueError, match='Input does not correspond to a 3D '):
         meshes.TensorMesh([np.ones(3), np.ones(3)], np.zeros(3))

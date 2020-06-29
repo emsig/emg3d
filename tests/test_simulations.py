@@ -20,7 +20,7 @@ class TestSimulation():
 
     def test_simple_simulation(self):
         simulation = simulations.Simulation(
-                self.survey, self.grid, self.model, comp_grids='same')
+                self.survey, self.grid, self.model, grids_type='same')
 
         # Check model
         assert simulation.comp_models('Tx1', 1.0) == self.model
@@ -42,23 +42,25 @@ class TestSimulation():
                 )
         assert_allclose(simulation.efields('Tx1', 1.0), efield)
 
-        # Check efield with return_info and recomp
-        s_efield, s_info = simulation.efields(
-                'Tx1', 1.0, recomp=True, return_info=True)
+        # Check efield with recomp
+        s_efield = simulation.efields('Tx1', 1.0, recomp=True)
         assert_allclose(s_efield, efield)
-        assert_allclose(s_info['abs_error'], info['abs_error'])
-        assert_allclose(s_info['rel_error'], info['rel_error'])
-        assert s_info['exit'] == info['exit'] == 0
+        assert_allclose(simulation._solver_info['Tx1'][1.0]['abs_error'],
+                        info['abs_error'])
+        assert_allclose(simulation._solver_info['Tx1'][1.0]['rel_error'],
+                        info['rel_error'])
+        assert simulation._solver_info['Tx1'][1.0]['exit'] == info['exit'] == 0
 
         # Check hfield
         hfield = fields.get_h_field(self.grid, self.model, efield)
         assert_allclose(simulation.hfields('Tx1', 1.0), hfield)
-        s_hfield, s_info = simulation.hfields(
-                'Tx1', 1.0, recomp=True, return_info=True)
+        s_hfield = simulation.hfields('Tx1', 1.0, recomp=True)
         assert_allclose(s_hfield, hfield)
-        assert_allclose(s_info['abs_error'], info['abs_error'])
-        assert_allclose(s_info['rel_error'], info['rel_error'])
-        assert s_info['exit'] == info['exit'] == 0
+        assert_allclose(simulation._solver_info['Tx1'][1.0]['abs_error'],
+                        info['abs_error'])
+        assert_allclose(simulation._solver_info['Tx1'][1.0]['rel_error'],
+                        info['rel_error'])
+        assert simulation._solver_info['Tx1'][1.0]['exit'] == info['exit'] == 0
 
         # psolve and check
         simulation.psolve(verb=-1)
