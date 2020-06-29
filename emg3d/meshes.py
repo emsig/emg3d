@@ -52,7 +52,8 @@ class TensorMesh(discretize.TensorMesh):
     def __init__(self, h, x0):
         """Ensure it is 3D, initiate TensorMesh."""
         if len(h) != 3 or len(x0) != 3:
-            raise ValueError('shit')
+            raise ValueError("Input does not correspond to a 3D mesh: "
+                             f"len(h): {len(h)}; len(x0): {len(x0)}")
         return super().__init__(h=[h[0], h[1], h[2]], x0=x0)
 
     def __eq__(self, mesh):

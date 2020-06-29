@@ -15,6 +15,6 @@
 # the License.
 
 
-from emg3d.optimize import gradient  # noqa
+from emg3d.optimize import gradient, weights
 
-__all__ = ['gradient']
+__all__ = ['gradient', 'weights']
