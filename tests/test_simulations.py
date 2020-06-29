@@ -20,7 +20,7 @@ class TestSimulation():
 
     def test_simple_simulation(self):
         simulation = simulations.Simulation(
-                self.survey, self.grid, self.model, comp_grids='same')
+                self.survey, self.grid, self.model, grids_type='same')
 
         # Check model
         assert simulation.comp_models('Tx1', 1.0) == self.model

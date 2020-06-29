@@ -143,6 +143,13 @@ class Simulation():
         # Initiate synthetic data.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
 
+        # Default values for some properties, work in progress TODO
+        self.data_weight_opts = {
+                'gamma_d': 0.5,
+                'beta_f': 0.25,
+                'beta_d': 1.0,
+                }
+
     def __repr__(self):
         return (f"*{self.__class__.__name__}* of «{self.survey.name}»\n\n"
                 f"- {self.survey.__class__.__name__}: "
@@ -640,7 +647,7 @@ class Simulation():
         """Shortcut to survey.data."""
         return self.survey.data
 
-    def gradient(self, nproc=4, **kwargs):
+    def gradient(self, nproc=4, data_weight_opts=None, **kwargs):
         """Computes the gradient using the adjoint-state method.
 
         Following [PlMu06]_.
@@ -701,7 +708,7 @@ class Simulation():
         cprint("\n** Compute misfit and residual fields **\n")
 
         # # TODO # # DATA WEIGHTING
-        data_misfit = self.misfit(1.)
+        data_misfit = self.misfit(data_weight_opts)
         cprint(f"   Data misfit: {data_misfit:.2e}")
 
         # Get backwards electric fields (parallel).
@@ -714,14 +721,29 @@ class Simulation():
 
         return grad, data_misfit
 
-    def misfit(self, weights):
+    def misfit(self, data_weight_opts=None):
+
+        data_weight_opts = {
+                **self.data_weight_opts,
+                **(data_weight_opts if data_weight_opts is not None else {})}
+
+        # TODO ¿ we have to switch off src-rec-pairs with r <min_off ?
+        DW = optimize.weights.DataWeighting(**data_weight_opts)
+
         self.survey._data['residual'] = (self.survey.data.synthetic -
                                          self.survey.data.observed)
         self.survey._data['wresidual'] = (self.survey.data.synthetic -
                                           self.survey.data.observed)
 
+        for sname, src in self.survey.sources.items():
+            for freq in self.survey.frequencies:
+                data = self.data.wresidual.loc[sname, :, freq].data
+                weights = DW.weights(
+                        data, self.survey.rec_coords, src.coordinates, freq)
+                self.survey._data['wresidual'].loc[sname, :, freq] *= weights
+
         return np.abs(np.sum(self.data.residual.data.conj() *
-                             (weights*self.data.residual.data)))/2
+                             self.data.wresidual.data))/2
 
     def bfields(self, source, frequency, **kwargs):
         """¿¿¿ Merge with efields or move to gradient. ???"""
