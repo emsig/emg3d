@@ -118,9 +118,9 @@ class Survey:
         Source frequencies (Hz).
 
     data : ndarray or None
-        The observed data (dtype=complex); must have shape (nsrc, nrec, nfreq)
-        or, if `fixed=True`, (nsrc, noff, nfreq).
-        If None, it will be initiated with NaN's.
+        The observed data (dtype=np.complex128); must have shape (nsrc, nrec,
+        nfreq) or, if `fixed=True`, (nsrc, noff, nfreq). If None, it will be
+        initiated with NaN's.
 
     fixed : bool
         Node-based CSEM survey (`fixed=False`; default) or streamer-type CSEM
@@ -151,12 +151,13 @@ class Survey:
         self._receivers = self._dipole_info_to_dict(receivers, 'receiver')
 
         # Initiate frequencies.
-        self._frequencies = np.array(frequencies, dtype=float, ndmin=1)
+        self._frequencies = np.array(frequencies, dtype=np.float64, ndmin=1)
 
         # Initialize NaN-data if not provided.
         if data is None:
             data = np.ones((len(self._sources), len(self._receivers),
-                            self._frequencies.size), dtype=complex)*np.nan
+                            self._frequencies.size),
+                           dtype=np.complex128)*np.nan
 
         # Initialize xarray dataset.
         self._data = xr.Dataset(
@@ -371,7 +372,7 @@ class Survey:
 
             # Expand coordinates.
             coo = np.array([nd*[val, ] if np.array(val).size == 1 else
-                           val for val in inp], dtype=float)
+                           val for val in inp], dtype=np.float64)
 
             # Extract el/mag flag or set to ones (electric) if not provided.
             if provided_elmag:
@@ -521,7 +522,7 @@ class Dipole(PointDipole):
         # Conversion to float-array fails if there are lists and tuples
         # within the tuple, or similar.
         # This should catch many wrong inputs, hopefully.
-        coords = np.array(coordinates, dtype=float)
+        coords = np.array(coordinates, dtype=np.float64)
 
         # Check size => finite or point dipole?
         if coords.size == 5:

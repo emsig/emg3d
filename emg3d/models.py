@@ -396,7 +396,7 @@ class Model:
             return None
 
         # Cast it to floats, ravel.
-        var = np.asarray(var, dtype=float).ravel('F')
+        var = np.asarray(var, dtype=np.float64).ravel('F')
 
         # Check for wrong size.
         if var.size not in [1, self.nC]:

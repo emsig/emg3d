@@ -1149,7 +1149,7 @@ class MGParameters:
         # Store maximum division-by-two level for each dimension.
         # After that, clevel = [nx, ny, nz], where nx, ny, and nz are the
         # number of times you can divide by two in this dimension.
-        clevel = np.zeros(3, dtype=int)
+        clevel = np.zeros(3, dtype=np.int_)
         for i in range(3):
             n = self.vnC[i]
             while n % 2 == 0 and n > 2:
@@ -1600,7 +1600,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
     if var._first_cycle:
 
         # Cast levels into array, get maximum.
-        _lvl_all = np.array(var._level_all, dtype=int)
+        _lvl_all = np.array(var._level_all, dtype=np.int_)
         lvl_max = np.max(_lvl_all)
 
         # Get levels, multiply by difference to get +/-.
@@ -1807,8 +1807,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
                 cgrid.vectorCCx, cgrid.hx)
     else:
-        wxlr = np.zeros(grid.nNx, dtype=float)
-        wx0 = np.ones(grid.nNx, dtype=float)
+        wxlr = np.zeros(grid.nNx, dtype=np.float64)
+        wx0 = np.ones(grid.nNx, dtype=np.float64)
         wx = (wxlr, wx0, wxlr)
 
     if sc_dir not in [2, 4, 6]:
@@ -1816,8 +1816,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.vectorNy, grid.vectorCCy, grid.hy, cgrid.vectorNy,
                 cgrid.vectorCCy, cgrid.hy)
     else:
-        wylr = np.zeros(grid.nNy, dtype=float)
-        wy0 = np.ones(grid.nNy, dtype=float)
+        wylr = np.zeros(grid.nNy, dtype=np.float64)
+        wy0 = np.ones(grid.nNy, dtype=np.float64)
         wy = (wylr, wy0, wylr)
 
     if sc_dir not in [3, 4, 5]:
@@ -1825,8 +1825,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.vectorNz, grid.vectorCCz, grid.hz, cgrid.vectorNz,
                 cgrid.vectorCCz, cgrid.hz)
     else:
-        wzlr = np.zeros(grid.nNz, dtype=float)
-        wz0 = np.ones(grid.nNz, dtype=float)
+        wzlr = np.zeros(grid.nNz, dtype=np.float64)
+        wz0 = np.ones(grid.nNz, dtype=np.float64)
         wz = (wzlr, wz0, wzlr)
 
     return wx, wy, wz

@@ -220,7 +220,8 @@ def test_volume_average(njit):
             [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
             x0=np.array([0.5, 3.33, 5]))
 
-    values = np.arange(grid_in.nC, dtype=float).reshape(grid_in.vnC, order='F')
+    values = np.arange(grid_in.nC, dtype=np.float_).reshape(
+            grid_in.vnC, order='F')
 
     points = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
     new_points = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
