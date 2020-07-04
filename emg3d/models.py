@@ -242,7 +242,7 @@ class Model:
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'])
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     # RESISTIVITIES
     @property
@@ -396,7 +396,7 @@ class Model:
             return None
 
         # Cast it to floats, ravel.
-        var = np.asarray(var, dtype=float).ravel('F')
+        var = np.asarray(var, dtype=np.float64).ravel('F')
 
         # Check for wrong size.
         if var.size not in [1, self.nC]:

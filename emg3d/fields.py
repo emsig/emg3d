@@ -49,7 +49,7 @@ class Field(np.ndarray):
 
     A `Field` can be initiated in three ways:
 
-    1. ``Field(grid, dtype=complex)``:
+    1. ``Field(grid, dtype=np.complex128)``:
        Calling it with a :class:`emg3d.meshes.TensorMesh` instance returns a
        `Field` instance of correct dimensions initiated with zeroes of data
        type `dtype`.
@@ -98,8 +98,8 @@ class Field(np.ndarray):
 
     """
 
-    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
-                freq=None):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None,
+                dtype=np.complex128, freq=None):
         """Initiate a new Field instance."""
 
         # Collect field
@@ -233,7 +233,7 @@ class Field(np.ndarray):
             grid.vnEy = inp['vnEy']
             grid.vnEz = inp['vnEz']
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
         # Compute missing info.
         grid.nEx = np.prod(grid.vnEx)
@@ -411,8 +411,8 @@ class SourceField(Field):
 
     """
 
-    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
-                freq=None):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None,
+                dtype=np.complex128, freq=None):
         """Initiate a new Source Field."""
         # Ensure frequency is provided.
         if freq is None:
@@ -503,7 +503,7 @@ def get_source_field(grid, src, freq, strength=0):
 
     """
     # Cast some parameters.
-    src = np.asarray(src, dtype=float)
+    src = np.asarray(src, dtype=np.float64)
     strength = np.asarray(strength)
 
     # Ensure source is a point or a finite dipole.

@@ -165,7 +165,7 @@ def test_solve(njit):
     # vector.
 
     # Create real symmetric matrix A.
-    avec_real = np.zeros(36, dtype=float)
+    avec_real = np.zeros(36, dtype=np.float_)
     avec_real[::6] = np.array([100, 1, 1, 1, 2, 40])
     avec_real[1:-6:6] = np.array([2, 2, 2, 3, 3])
     avec_real[2:-12:6] = np.array([3, 10, 4, 4])
@@ -173,7 +173,7 @@ def test_solve(njit):
     avec_real[4:-24:6] = np.array([5, 6])
 
     # Create complex symmetric matrix A.
-    avec_complex = np.zeros(36, dtype=complex)
+    avec_complex = np.zeros(36, dtype=np.complex_)
     avec_complex[::6] = np.array([100+100j, 1, 1, 1, 2, 40+3j])
     avec_complex[1:-6:6] = np.array([2, 2, 2+10j, 3, 3+6j])
     avec_complex[2:-12:6] = np.array([3j, 10+10j, 4, 4])
@@ -249,8 +249,8 @@ def test_restrict(njit):
     ffield.ensure_pec
 
     # Get weigths
-    wlr = np.zeros(fgrid.nNx, dtype=float)
-    w0 = np.ones(fgrid.nNx, dtype=float)
+    wlr = np.zeros(fgrid.nNx, dtype=np.float_)
+    w0 = np.ones(fgrid.nNx, dtype=np.float_)
     fw = (wlr, w0, wlr)
 
     # # CASE 0 -- regular # #

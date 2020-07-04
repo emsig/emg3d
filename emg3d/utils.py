@@ -366,7 +366,7 @@ class Fourier:
         """
 
         # Pre-allocate result.
-        out = np.zeros(self.freq_req.size, dtype=complex)
+        out = np.zeros(self.freq_req.size, dtype=np.complex128)
 
         # 1. Interpolate between fmin and fmax.
 

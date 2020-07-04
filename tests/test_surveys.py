@@ -97,7 +97,7 @@ class TestSurvey():
         # == 5. Other ==
         sources = surveys.Dipole('Tx1', (0, 0, 0, 0, 0))
         # As Dipole it should fail.
-        with pytest.raises(ValueError, match='Input format of <sources>'):
+        with pytest.raises(TypeError, match='Input format of <sources>'):
             surveys.Survey('T', sources, (1, 0, 0, 0, 0), 1)
         # Cast as list it should work.
         surveys.Survey('T', [sources], (1, 0, 0, 0, 0), 1)
@@ -224,7 +224,7 @@ def test_Dipole(capsys):
         surveys.Dipole('dip', (0, 0, 0, 0))
 
     # Check that two identical poles fails.
-    with pytest.raises(ValueError, match='Dipole coordinates are wrong'):
+    with pytest.raises(ValueError, match='The two poles are identical'):
         surveys.Dipole('dip', (0, 0, 0, 0, 0, 0))
 
     # Check adding various attributs.
