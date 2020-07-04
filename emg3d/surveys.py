@@ -238,7 +238,7 @@ class Survey:
                        fixed=bool(inp['fixed']))
 
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     @property
     def shape(self):
@@ -425,7 +425,7 @@ class Survey:
                 out = {k: Dipole.from_dict(v) for k, v in inp.items()}
 
         else:
-            raise ValueError(
+            raise TypeError(
                     f"Input format of <{name}s> not recognized: {type(inp)}.")
 
         return out
@@ -518,33 +518,30 @@ class Dipole(PointDipole):
                 print(f"* WARNING :: Unknown kwargs {{{key}: {value}}}")
             setattr(self, key, value)
 
-        # Check coordinates.
-        try:
-            # Conversion to float-array fails if there are lists and tuples
-            # within the tuple, or similar.
-            # This should catch many wrong inputs, hopefully.
-            coords = np.array(coordinates, dtype=float)
+        # Conversion to float-array fails if there are lists and tuples
+        # within the tuple, or similar.
+        # This should catch many wrong inputs, hopefully.
+        coords = np.array(coordinates, dtype=float)
 
-            # Check size => finite or point dipole?
-            if coords.size == 5:
-                self.is_finite = False
+        # Check size => finite or point dipole?
+        if coords.size == 5:
+            self.is_finite = False
 
-            elif coords.size == 6:
-                self.is_finite = True
+        elif coords.size == 6:
+            self.is_finite = True
 
-                # Ensure the two poles are distinct.
-                if np.allclose(coords[::2], coords[1::2]):
-                    raise ValueError
+            # Ensure the two poles are distinct.
+            if np.allclose(coords[::2], coords[1::2]):
+                raise ValueError(
+                        "The two poles are identical, use the format\n"
+                        "(x, y, z, azimuth, dip) instead.\n"
+                        f"Provided coordinates: {coordinates}.")
 
-            else:
-                raise ValueError
-
-        except ValueError:
+        else:
             raise ValueError(
                     "Dipole coordinates are wrong defined. They must be\n"
                     "defined either as a point, (x, y, z, azimuth, dip), or\n"
                     "as two poles, (x0, x1, y0, y1, z0, z1), all floats.\n"
-                    "In the latter, pole0 != pole1.\n"
                     f"Provided coordinates: {coordinates}.")
 
         # Get xco, yco, zco, azm, and dip.
@@ -649,4 +646,4 @@ class Dipole(PointDipole):
             return cls(name=inp['name'], coordinates=inp['coordinates'],
                        electric=inp['electric'], **kwargs)
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e

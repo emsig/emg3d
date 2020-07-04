@@ -242,7 +242,7 @@ class Model:
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'])
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     # RESISTIVITIES
     @property

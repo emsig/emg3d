@@ -95,10 +95,10 @@ def test_save_and_load(tmpdir, capsys):
         io.load('ttt.npz', stupidkeyword='a')
 
     # Unknown backend/extension.
-    with pytest.raises(NotImplementedError, match="Backend 'what"):
+    with pytest.raises(ValueError, match="Unknown backend 'what"):
         io.save(tmpdir+'/testwrongbackend', something=1, backend='what?')
     io.save(tmpdir+'/testwrongbackend.abc', something=1)
-    with pytest.raises(NotImplementedError, match="Extension '.abc'"):
+    with pytest.raises(ValueError, match="Unknown extension '.abc'"):
         io.load(tmpdir+'/testwrongbackend.abc')
     if h5py:
         io.load(tmpdir+'/testwrongbackend.abc.h5')

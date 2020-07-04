@@ -91,7 +91,7 @@ class Simulation():
 
         # Magnetic dipoles are not yet implemented in simulation.
         if sum([not r.electric for r in survey.receivers.values()]) > 0:
-            raise TypeError(
+            raise NotImplementedError(
                     "Simulation not yet implemented for magnetic dipoles.")
 
         # Get gridding options, set to defaults if not provided.
@@ -690,7 +690,7 @@ class Simulation():
         # So far only Ex is implemented and checked.
         if sum([(r.azm != 0.0)+(r.dip != 0.0) for r in
                 self.survey.receivers.values()]) > 0:
-            raise TypeError(
+            raise NotImplementedError(
                     "Gradient only implement for Ex receivers at the moment.")
 
         verb = kwargs.get('verb', 2)
