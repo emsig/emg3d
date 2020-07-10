@@ -2,8 +2,8 @@ Changelog
 #########
 
 
-v0.11.0 - stable
-""""""""""""""""
+recent versions
+"""""""""""""""
 
 *latest*
 --------
@@ -20,7 +20,7 @@ v0.11.0 - stable
 
     - Class `simulations.Simulation`, which combines a survey with a model.
       A simulation computes the e-field (and h-field) asynchronously using
-      `concurrent.futures`. To do so it creates the required meshes source and
+      `concurrent.futures`. To do so it creates the required meshes, source and
       frequency-dependent, interpolates the model accordingly, and computes the
       source-fields, 
 
@@ -52,6 +52,9 @@ v0.11.0 - stable
 
 - Additional dependencies `discretize` for meshing and `xarray` for data
   management.
+
+- New soft dependency `tqdm`, for nice progress bars in asynchronous
+  computation.
 
 - Removed deprecated functions `data_write` and `data_read`.
 

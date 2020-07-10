@@ -19,7 +19,7 @@ where:
 # Set default values
 PYTHON3VERSION="7 8"
 PRINT="/dev/null"
-PCKGS="empymod h5py xarray pytest pytest-cov pytest-flake8 scooby discretize"
+PCKGS="empymod h5py xarray pytest pytest-cov pytest-flake8 scooby discretize tqdm"
 PROPS="--flake8"
 WARN=""
 

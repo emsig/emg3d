@@ -30,10 +30,20 @@ high-level, specialised modelling routines.
 # the License.
 
 
+import itertools
 import numpy as np
-from concurrent import futures
 
 from emg3d import fields, solver, models, meshes, optimize
+
+# Check soft dependencies.
+try:
+    from tqdm.contrib.concurrent import process_map
+except ImportError:
+    from concurrent.futures import ProcessPoolExecutor
+
+    def process_map(fn, *iterables, max_workers, **kwargs):
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            return list(ex.map(fn, *iterables))
 
 __all__ = ['Simulation']
 
@@ -127,7 +137,7 @@ class Simulation():
                 'sslsolver': True,
                 'semicoarsening': True,
                 'linerelaxation': True,
-                'verb': -1,
+                'verb': 0,
                 **(solver_opts if solver_opts is not None else {}),
                 }
 
@@ -502,6 +512,9 @@ class Simulation():
         """
         return self._solver_info[source][float(frequency)]
 
+    def _call_efields(self, inp):
+        return self.efields(*inp, call_from_psolve=True)
+
     def psolve(self, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
 
@@ -514,49 +527,53 @@ class Simulation():
 
         """
 
+        # Ensure grid, model, and sfield are computed.
+        # TODO : This could be done within the field computation. But then
+        #        it might have to be done multiple times even if 'single' or
+        #        'same' grid.
+        for src in self.survey.sources.keys():  # Loop over source positions.
+            for freq in self.survey.frequencies:  # Loop over frequencies.
+                self.comp_grids(src, freq),
+                self.comp_models(src, freq),
+                self.sfields(src, freq),
+
+        # Get all source-frequency pairs.
+        srcfreq = list(itertools.product(self.survey.sources.keys(),
+                                         self.survey.frequencies))
+
         # Initiate futures-dict to store output.
-        out = self._initiate_none_dict()
-
-        # Context manager for futures.
-        with futures.ProcessPoolExecutor(self.max_workers) as executor:
-
-            # Loop over source positions.
-            for src in out.keys():
-
-                # Loop over frequencies.
-                for freq in out[src].keys():
-
-                    # Ensure grid, model, and sfield are computed.
-                    self.comp_grids(src, freq),
-                    self.comp_models(src, freq),
-                    self.sfields(src, freq),
-
-                    # Call `self.efields`.
-                    out[src][freq] = executor.submit(
-                        self.efields,
-                        source=src,
-                        frequency=freq,
-                        call_from_psolve=True,
-                        **kwargs,
-                    )
+        disable = self.max_workers >= len(srcfreq)
+        out = process_map(self._call_efields, srcfreq,
+                          max_workers=self.max_workers,
+                          desc='Compute efields',
+                          bar_format='{desc}: {bar}{n_fmt}/{total_fmt}',
+                          disable=disable)
 
         # Clean hfields, so they will be recomputed.
         del self._hfields
         self._hfields = self._initiate_none_dict()
 
-        # Extract and store the electric fields.
-        self._efields = {f: {k: v.result()[0] for k, v in s.items()}
-                         for f, s in out.items()}
-
-        # Extract and store the solver info.
-        self._solver_info = {f: {k: v.result()[1] for k, v in s.items()}
-                             for f, s in out.items()}
-
-        # Extract and store responses at receiver locations.
+        # Extract and store.
+        i = 0
+        warned = False
         for src in self.survey.sources.keys():
             for freq in self.survey.frequencies:
-                resp = out[src][freq].result()[2]
-                self.data['synthetic'].loc[src, :, freq] = resp
+                # Store efield.
+                self._efields[src][freq] = out[i][0]
+
+                # Store responses at receivers.
+                self.data['synthetic'].loc[src, :, freq] = out[i][2]
+
+                # Store solver info.
+                info = out[i][1]
+                self._solver_info[src][freq] = info
+                if info['exit'] != 0:
+                    if not warned:
+                        print("Solver warnings:")
+                        warned = True
+                    print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+
+                i += 1
 
     def clean(self):
         """Remove computed fields and corresponding data."""
@@ -696,30 +713,14 @@ class Simulation():
             raise NotImplementedError(
                     "Gradient only implement for Ex receivers at the moment.")
 
-        verb = kwargs.get('verb', 2)
-
-        def cprint(str, verb=verb):
-            """Conditional print."""
-            if verb > 1 or verb < 0:
-                print(str)
-
-        # Get forwards electric fields (parallel).
-        # cprint("\n** Compute/get forward fields **\n")
-        # self.psolve()
-
-        # # Get residual fields (parallel).
-        # cprint("\n** Compute misfit and residual fields **\n")
-
         # # TODO # # DATA WEIGHTING
         data_misfit = self.misfit(**kwargs)
-        cprint(f"   Data misfit: {data_misfit:.2e}")
+        print(f"   Data misfit: {data_misfit:.2e}")
 
         # Get backwards electric fields (parallel).
-        cprint("\n** Backward fields **\n")
         self._pbsolve(**kwargs)
 
         # Get gradient.
-        cprint("\n** Compute Gradient **\n")
         grad = optimize.gradient.gradient(self)
 
         # TODO improve the cutting to input model
@@ -727,35 +728,33 @@ class Simulation():
 
     def misfit(self, **kwargs):
 
-        verb = kwargs.get('verb', 2)
+        if not hasattr(self, '_misfit'):
 
-        def cprint(str, verb=verb):
-            """Conditional print."""
-            if verb > 1 or verb < 0:
-                print(str)
+            # Get forwards electric fields (parallel).
+            self.psolve(**kwargs)
 
-        # Get forwards electric fields (parallel).
-        cprint("\n** Compute/get forward fields **\n")
-        self.psolve(**kwargs)
+            # TODO ¿ we have to switch off src-rec-pairs with r <min_off ?
+            DW = optimize.weights.DataWeighting(**self.data_weight_opts)
 
-        cprint("\n** Compute misfit and residual fields **\n")
-        # TODO ¿ we have to switch off src-rec-pairs with r <min_off ?
-        DW = optimize.weights.DataWeighting(**self.data_weight_opts)
+            self.survey._data['residual'] = (self.survey.data.synthetic -
+                                             self.survey.data.observed)
+            self.survey._data['wresidual'] = (self.survey.data.synthetic -
+                                              self.survey.data.observed)
 
-        self.survey._data['residual'] = (self.survey.data.synthetic -
-                                         self.survey.data.observed)
-        self.survey._data['wresidual'] = (self.survey.data.synthetic -
-                                          self.survey.data.observed)
+            for sname, src in self.survey.sources.items():
+                for freq in self.survey.frequencies:
+                    data = self.data.wresidual.loc[sname, :, freq].data
+                    weig = DW.weights(
+                            data,
+                            self.survey.rec_coords,
+                            src.coordinates, freq)
 
-        for sname, src in self.survey.sources.items():
-            for freq in self.survey.frequencies:
-                data = self.data.wresidual.loc[sname, :, freq].data
-                weights = DW.weights(
-                        data, self.survey.rec_coords, src.coordinates, freq)
-                self.survey._data['wresidual'].loc[sname, :, freq] *= weights
+                    self.survey._data['wresidual'].loc[sname, :, freq] *= weig
 
-        return np.abs(np.sum(self.data.residual.data.conj() *
-                             self.data.wresidual.data))/2
+            self._misfit = np.abs(np.sum(self.data.residual.data.conj() *
+                                         self.data.wresidual.data))/2
+
+        return self._misfit
 
     def bfields(self, source, frequency, **kwargs):
         """¿¿¿ Merge with efields or move to gradient. ???"""
@@ -784,37 +783,48 @@ class Simulation():
         return (self._bfields[source][freq],
                 self._back_info[source][freq])
 
+    def _call_bfields(self, inp):
+        return self.bfields(*inp)
+
     def _pbsolve(self, **kwargs):
         """¿¿¿ Merge with psolve or move to gradient. ???"""
         # TODO TODO
 
+        # Get all source-frequency pairs.
+        srcfreq = list(itertools.product(self.survey.sources.keys(),
+                                         self.survey.frequencies))
+
         # Initiate futures-dict to store output.
-        out = self._initiate_none_dict()
+        disable = self.max_workers >= len(srcfreq)
+        out = process_map(self._call_bfields, srcfreq,
+                          max_workers=self.max_workers,
+                          desc='Compute bfields',
+                          bar_format='{desc}: {bar}{n_fmt}/{total_fmt}',
+                          disable=disable)
 
-        # Context manager for futures.
-        with futures.ProcessPoolExecutor(self.max_workers) as executor:
+        # Store electric field and info.
+        if not hasattr(self, '_bfield'):
+            self._bfields = self._initiate_none_dict()
+            self._back_info = self._initiate_none_dict()
 
-            # Loop over source positions.
-            for src in out.keys():
+        # Extract and store.
+        i = 0
+        warned = False
+        for src in self.survey.sources.keys():
+            for freq in self.survey.frequencies:
+                # Store efield.
+                self._bfields[src][freq] = out[i][0]
 
-                # Loop over frequencies.
-                for freq in out[src].keys():
+                # Store solver info.
+                info = out[i][1]
+                self._back_info[src][freq] = info
+                if info['exit'] != 0:
+                    if not warned:
+                        print("Solver warnings:")
+                        warned = True
+                    print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
 
-                    # Call `self.efields`.
-                    out[src][freq] = executor.submit(
-                        self.bfields,
-                        source=src,
-                        frequency=freq,
-                        **kwargs,
-                    )
-
-        # Extract and store the back fields.
-        self._bfields = {f: {k: v.result()[0] for k, v in s.items()}
-                         for f, s in out.items()}
-
-        # Extract and store the solver info.
-        self._back_info = {f: {k: v.result()[1] for k, v in s.items()}
-                           for f, s in out.items()}
+                i += 1
 
     def _rfields(self, source, frequency):
         """¿¿¿ Merge with sfields or move to optimize/gradient. ???"""
