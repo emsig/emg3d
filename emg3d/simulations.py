@@ -56,6 +56,10 @@ class Simulation():
     model : :class:`emg3d.models.Model`
         The model. See :class:`emg3d.models.Model`.
 
+    max_workers : int
+        The maximum number of processes that can be used to execute the
+        given calls. Default is 4.
+
     solver_opts : dict
         Passed through to :func:`emg3d.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solve` except for
@@ -82,12 +86,13 @@ class Simulation():
 
     """
 
-    def __init__(self, survey, grid, model, solver_opts=None,
-                 grids_type='single', **kwargs):
+    def __init__(self, survey, grid, model, max_workers=4, solver_opts=None,
+                 grids_type='single', data_weight_opts=None, **kwargs):
         """Initiate a new Simulation instance."""
 
         # Store inputs (should these be copied to avoid altering them?).
         self.survey = survey
+        self.max_workers = max_workers
 
         # Magnetic dipoles are not yet implemented in simulation.
         if sum([not r.electric for r in survey.receivers.values()]) > 0:
@@ -145,9 +150,11 @@ class Simulation():
 
         # Default values for some properties, work in progress TODO
         self.data_weight_opts = {
+                # Defaults; overwritten by inputs v.
                 'gamma_d': 0.5,
                 'beta_f': 0.25,
                 'beta_d': 1.0,
+                **(data_weight_opts if data_weight_opts is not None else {}),
                 }
 
     def __repr__(self):
@@ -366,8 +373,7 @@ class Simulation():
         """Return electric field for given source and frequency.
 
         The efield is only computed if it is not stored already, except if
-        `recomp=True` is in `kwargs`. All other `kwargs` are passed to
-        :func:`emg3d.solve`, overwriting `self.solver_opts`.
+        `recomp=True` is in `kwargs`.
 
         Parameters
         ----------
@@ -377,8 +383,7 @@ class Simulation():
         frequency : float
             Frequency
 
-        kwargs : dict
-            Passed to :func:`solver.solve`.
+        recomp : TODO
 
 
         Returns
@@ -391,19 +396,23 @@ class Simulation():
         recomp = kwargs.pop('recomp', False)
         call_from_psolve = kwargs.pop('call_from_psolve', False)
 
+        # Ensure no kwargs left (currently kwargs is not used).
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+
         # If electric field not computed yet compute it.
         if self._efields[source][freq] is None or recomp:
 
-            # Get solver options and update with kwargs.
-            solver_opts = {**self.solver_opts, **kwargs}
-            solver_opts['return_info'] = True  # Always return solver info.
+            solver_input = {
+                **self.solver_opts,
+                'grid': self.comp_grids(source, freq),
+                'model': self.comp_models(source, freq),
+                'sfield': self.sfields(source, freq),
+                'return_info': True,
+            }
 
             # Compute electric field.
-            efield, info = solver.solve(
-                    self.comp_grids(source, freq),
-                    self.comp_models(source, freq),
-                    self.sfields(source, freq),
-                    **solver_opts)
+            efield, info = solver.solve(**solver_input)
 
             # Store electric field and info.
             self._efields[source][freq] = efield
@@ -440,8 +449,6 @@ class Simulation():
 
         The hfield is only computed from the efield if it is not stored
         already, and so is the efield, except if `recomp=True` is in `kwargs`.
-        All other `kwargs` are passed to :func:`emg3d.solve`, overwriting
-        `self.solver_opts`.
 
 
         Parameters
@@ -452,8 +459,7 @@ class Simulation():
         frequency : float
             Frequency
 
-        kwargs : dict
-            Passed to :func:`solver.solve`.
+        recomp : TOOD
 
 
         Returns
@@ -496,14 +502,11 @@ class Simulation():
         """
         return self._solver_info[source][float(frequency)]
 
-    def psolve(self, nproc=4, **kwargs):
+    def psolve(self, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
         ----------
-        nproc : int
-            Maximum number of processes that can be used. Default is four.
-
         kwargs : dict
             Passed to :func:`emg3d.solver.solve`; can contain any of the
             arguments of the solver except `grid`, `model`, `sfield`, and
@@ -515,7 +518,7 @@ class Simulation():
         out = self._initiate_none_dict()
 
         # Context manager for futures.
-        with futures.ProcessPoolExecutor(nproc) as executor:
+        with futures.ProcessPoolExecutor(self.max_workers) as executor:
 
             # Loop over source positions.
             for src in out.keys():
@@ -583,6 +586,9 @@ class Simulation():
         res_air = self.grid_opts.pop('air_resistivity')
         grid_type = self.grid_opts.pop('type')
 
+        # To return things in the appropriate dimension.
+        self._input_nCz = grid.nCz
+
         def extend_property(prop, check, add_values, nadd):
 
             if check is None:
@@ -647,7 +653,7 @@ class Simulation():
         """Shortcut to survey.data."""
         return self.survey.data
 
-    def gradient(self, nproc=4, data_weight_opts=None, **kwargs):
+    def gradient(self, **kwargs):
         """Computes the gradient using the adjoint-state method.
 
         Following [PlMu08]_.
@@ -664,9 +670,6 @@ class Simulation():
         solver_opts : dict
             Parameter-dicts passed to the solver and the automatic gridding,
             respectively.
-
-        nproc : int
-            Maximum number of processes that can be used. Default is four.
 
         wdepth, wdata, regularization : dict or None
             Parameter-dict for depth- and data-weighting and regularization,
@@ -701,34 +704,43 @@ class Simulation():
                 print(str)
 
         # Get forwards electric fields (parallel).
-        cprint("\n** Compute/get forward fields **\n")
-        self.psolve(nproc, **kwargs)
+        # cprint("\n** Compute/get forward fields **\n")
+        # self.psolve()
 
-        # Get residual fields (parallel).
-        cprint("\n** Compute misfit and residual fields **\n")
+        # # Get residual fields (parallel).
+        # cprint("\n** Compute misfit and residual fields **\n")
 
         # # TODO # # DATA WEIGHTING
-        data_misfit = self.misfit(data_weight_opts)
+        data_misfit = self.misfit(**kwargs)
         cprint(f"   Data misfit: {data_misfit:.2e}")
 
         # Get backwards electric fields (parallel).
         cprint("\n** Backward fields **\n")
-        self._pbsolve(nproc, **kwargs)
+        self._pbsolve(**kwargs)
 
         # Get gradient.
         cprint("\n** Compute Gradient **\n")
         grad = optimize.gradient.gradient(self)
 
-        return grad, data_misfit
+        # TODO improve the cutting to input model
+        return grad[:, :, :self._input_nCz], data_misfit
 
-    def misfit(self, data_weight_opts=None):
+    def misfit(self, **kwargs):
 
-        data_weight_opts = {
-                **self.data_weight_opts,
-                **(data_weight_opts if data_weight_opts is not None else {})}
+        verb = kwargs.get('verb', 2)
 
+        def cprint(str, verb=verb):
+            """Conditional print."""
+            if verb > 1 or verb < 0:
+                print(str)
+
+        # Get forwards electric fields (parallel).
+        cprint("\n** Compute/get forward fields **\n")
+        self.psolve(**kwargs)
+
+        cprint("\n** Compute misfit and residual fields **\n")
         # TODO ¿ we have to switch off src-rec-pairs with r <min_off ?
-        DW = optimize.weights.DataWeighting(**data_weight_opts)
+        DW = optimize.weights.DataWeighting(**self.data_weight_opts)
 
         self.survey._data['residual'] = (self.survey.data.synthetic -
                                          self.survey.data.observed)
@@ -772,7 +784,7 @@ class Simulation():
         return (self._bfields[source][freq],
                 self._back_info[source][freq])
 
-    def _pbsolve(self, nproc=4, **kwargs):
+    def _pbsolve(self, **kwargs):
         """¿¿¿ Merge with psolve or move to gradient. ???"""
         # TODO TODO
 
@@ -780,7 +792,7 @@ class Simulation():
         out = self._initiate_none_dict()
 
         # Context manager for futures.
-        with futures.ProcessPoolExecutor(nproc) as executor:
+        with futures.ProcessPoolExecutor(self.max_workers) as executor:
 
             # Loop over source positions.
             for src in out.keys():

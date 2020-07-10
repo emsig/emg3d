@@ -63,7 +63,7 @@ class TestSimulation():
         assert simulation._solver_info['Tx1'][1.0]['exit'] == info['exit'] == 0
 
         # psolve and check
-        simulation.psolve(verb=-1)
+        simulation.psolve()
         rec_resp = fields.get_receiver_response(
                 self.grid, efield, self.survey.rec_coords)
         assert_allclose(

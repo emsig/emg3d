@@ -1,3 +1,6 @@
+"""
+Functionalities related to optimization (inversion).
+"""
 # Copyright 2018-2020 The emg3d Developers.
 #
 # This file is part of emg3d.

@@ -158,6 +158,8 @@ class Survey:
             data = np.ones((len(self._sources), len(self._receivers),
                             self._frequencies.size),
                            dtype=np.complex128)*np.nan
+        else:
+            data = np.atleast_3d(data)
 
         # Initialize xarray dataset.
         self._data = xr.Dataset(
