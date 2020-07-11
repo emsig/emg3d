@@ -33,7 +33,7 @@ high-level, specialised modelling routines.
 import itertools
 import numpy as np
 
-from emg3d import fields, solver, models, meshes, optimize
+from emg3d import fields, solver, models, meshes, optimize, io
 
 # Check soft dependencies.
 try:
@@ -212,6 +212,38 @@ class Simulation():
 
         """
         raise NotImplementedError
+
+    def to_file(self, fname, compression="gzip", json_indent=2):
+        """Store Simulation to a file.
+
+        Parameters
+        ----------
+        fname : str
+            File name inclusive ending, which defines the used data format.
+            Implemented are currently:
+
+            - `.h5` (default): Uses `h5py` to store inputs to a hierarchical,
+              compressed binary hdf5 file. Recommended file format, but
+              requires the module `h5py`. Default format if ending is not
+              provided or not recognized.
+            - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
+              file. Default format if `h5py` is not installed.
+            - `.json`: Uses `json` to store inputs to a hierarchical, plain
+              text file.
+
+        compression : int or str, optional
+            Passed through to h5py, default is 'gzip'.
+
+        json_indent : int or None
+            Passed through to json, default is 2.
+        """
+        io.save(fname, compression=compression, json_indent=json_indent,
+                collect_classes=False, simulation=self)
+
+    @classmethod
+    def from_file(cls, fname):
+        """Load Simulation from a file."""
+        return io.load(fname)['simulation']
 
     def comp_grids(self, source, frequency):
         """Return computational grid of the given source and frequency."""
