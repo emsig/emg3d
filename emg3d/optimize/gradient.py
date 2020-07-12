@@ -109,6 +109,18 @@ def gradient(simulation):
             # Pre-allocate the gradient for the computational grid.
             grad = np.zeros(simulation._comp_grids[src][freq].vnC, order='F')
 
+            # TODO v TEST v TODO
+            #
+            # Here, we do
+            #   1. avg_field2cell (Ex[comp] -> CC[comp])
+            #   2. grid2grid      (CC[comp] -> CC[model])
+            #
+            # Not better the other way around?
+            #   1. grid2grid      (Ex[comp] -> Ex[model])
+            #   1. avg_field2cell (Ex[model] -> CC[model])
+            #
+            # TODO ^ TEST ^ TODO
+
             # Map the field to cell centers times volume.
             maps.avg_field2cell_volume(
                     grad, simulation._comp_grids[src][freq].vol.reshape(

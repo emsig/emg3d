@@ -910,9 +910,34 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
 
 
 def marine_csem_mesh(survey, res, min_width, zval, freq, verb):
-    """
+    r"""
     TODO NEEDS IMPROVEMENT, MORE FLEXIBLE
     Works for current example, but no more.
+
+    TODO list:
+
+    - get_hx_h0:
+      - Takes: src, rec, freq, strength
+
+
+      - max-domain 100k unless provided
+
+        - 2\lambda -> {x/y}_{min/max} (2\lambda except if reaches air)
+                   -> z_min
+                   -> z_max -> 100k (2\lambda except if reaches air)
+
+      - z 1: solve \Delta_min_z \alpha_z^x \ge |max(src_z, rec_z)| => x
+      - z 2: solve \Delta_min_z \y^x \eq |max(src_z, rec_z)| => y
+
+      - survey domain:
+
+        - src_{x;y;z} (one source)
+        - rec_{x;y;z} (all receivers)
+
+      - huge amount of nx by default (and parameter)
+      - \Delta_min, pps, f (with the exc. of z just as nov; one level more)
+      - \alpha_1, \alpha_2
+      - h_x, h_y, h_z: if provided, taken, and then extended if required.
 
     Fixed:  x: x of middle receiver
             y: y of middle receiver
