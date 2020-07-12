@@ -138,7 +138,7 @@ class TestSurvey():
         assert sur_tupl.receivers['Rx0'].electric is True
         assert sur_tupl.receivers['Rx1'].electric is False
 
-    def test_copy(self):
+    def test_copy(self, tmpdir):
         # This also checks to_dict()/from_dict().
         srvy1 = surveys.Survey('Test', (0, 0, 0, 0, 0),
                                (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]])
@@ -155,6 +155,16 @@ class TestSurvey():
                                fixed=1)
         srvy4 = srvy3.copy()
         assert srvy3.sources == srvy4.sources
+
+        # Also check to_file()/from_file().
+        srvy4.to_file(tmpdir+'/test.npz')
+        srvy5 = surveys.Survey.from_file(tmpdir+'/test.npz')
+        assert srvy4.name == srvy5.name
+        assert srvy4.sources == srvy5.sources
+        assert srvy4.receivers == srvy5.receivers
+        assert srvy4.frequencies == srvy5.frequencies
+        assert srvy4.fixed == srvy5.fixed
+        assert srvy4.data == srvy5.data
 
 
 def test_PointDipole():

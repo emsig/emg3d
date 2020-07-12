@@ -47,6 +47,14 @@ except ImportError:
 
 __all__ = ['Simulation']
 
+# TODO
+# - return pre-computed efield/misfit/bfield;
+#   take care when to clean (model update).
+# - clean: just fields, just models, everything incl. meshes, etc.
+# - to_dict/to_file: clean possibilities.
+# - flag if precompute mesh/model/sfield, or do in parallel (without storing)
+# - gradient flag: sigma, log10sigma, logsigma, rho, log10rho, logrho
+
 
 class Simulation():
     r"""Create a simulation for a given survey on a given model.
@@ -436,7 +444,7 @@ class Simulation():
         """
         freq = float(frequency)
         recomp = kwargs.pop('recomp', False)
-        call_from_psolve = kwargs.pop('call_from_psolve', False)
+        call_from_compute = kwargs.pop('call_from_compute', False)
 
         # Ensure no kwargs left (currently kwargs is not used).
         if kwargs:
@@ -479,7 +487,7 @@ class Simulation():
             self.data.synthetic.loc[source, :, freq] = resp
 
         # Return electric field.
-        if call_from_psolve:
+        if call_from_compute:
             return (self._efields[source][freq],
                     self._solver_info[source][freq],
                     self.data.synthetic.loc[source, :, freq].data)
@@ -545,13 +553,18 @@ class Simulation():
         return self._solver_info[source][float(frequency)]
 
     def _call_efields(self, inp):
-        return self.efields(*inp, call_from_psolve=True)
+        return self.efields(*inp, call_from_compute=True)
 
-    def psolve(self, **kwargs):
+    def compute(self, observed=False, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
         ----------
+        observed : bool
+            By default, the data at receiver is stored in the `Survey` as
+            `synthetic`. If `observed=True`, however, it is stored in
+            `observed`.
+
         kwargs : dict
             Passed to :func:`emg3d.solver.solve`; can contain any of the
             arguments of the solver except `grid`, `model`, `sfield`, and
@@ -594,7 +607,8 @@ class Simulation():
                 self._efields[src][freq] = out[i][0]
 
                 # Store responses at receivers.
-                self.data['synthetic'].loc[src, :, freq] = out[i][2]
+                store_name = ['synthetic', 'observed'][observed]
+                self.data[store_name].loc[src, :, freq] = out[i][2]
 
                 # Store solver info.
                 info = out[i][1]
@@ -750,7 +764,7 @@ class Simulation():
         print(f"   Data misfit: {data_misfit:.2e}")
 
         # Get backwards electric fields (parallel).
-        self._pbsolve(**kwargs)
+        self._bcompute(**kwargs)
 
         # Get gradient.
         grad = optimize.gradient.gradient(self)
@@ -763,7 +777,7 @@ class Simulation():
         if not hasattr(self, '_misfit'):
 
             # Get forwards electric fields (parallel).
-            self.psolve(**kwargs)
+            self.compute(**kwargs)
 
             # TODO ¿ we have to switch off src-rec-pairs with r <min_off ?
             DW = optimize.weights.DataWeighting(**self.data_weight_opts)
@@ -818,8 +832,8 @@ class Simulation():
     def _call_bfields(self, inp):
         return self.bfields(*inp)
 
-    def _pbsolve(self, **kwargs):
-        """¿¿¿ Merge with psolve or move to gradient. ???"""
+    def _bcompute(self, **kwargs):
+        """¿¿¿ Merge with compute or move to gradient. ???"""
         # TODO TODO
 
         # Get all source-frequency pairs.

@@ -220,6 +220,31 @@ class Survey:
         else:
             return out
 
+    @classmethod
+    def from_dict(cls, inp):
+        """Convert dictionary into :class:`Survey` instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from :func:`Survey.to_dict`.
+            The dictionary needs the keys `name`, `sources`, `receivers`
+            `frequencies`, `observed`, and `fixed`.
+
+        Returns
+        -------
+        obj : :class:`Survey` instance
+
+        """
+        try:
+            return cls(name=inp['name'], sources=inp['sources'],
+                       receivers=inp['receivers'],
+                       frequencies=inp['frequencies'], data=inp['observed'],
+                       fixed=bool(inp['fixed']))
+
+        except KeyError as e:
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
+
     def to_file(self, fname, compression="gzip", json_indent=2):
         """Store Survey to a file.
 
@@ -251,31 +276,6 @@ class Survey:
     def from_file(cls, fname):
         """Load Survey from a file."""
         return io.load(fname)['survey']
-
-    @classmethod
-    def from_dict(cls, inp):
-        """Convert dictionary into :class:`Survey` instance.
-
-        Parameters
-        ----------
-        inp : dict
-            Dictionary as obtained from :func:`Survey.to_dict`.
-            The dictionary needs the keys `name`, `sources`, `receivers`
-            `frequencies`, `observed`, and `fixed`.
-
-        Returns
-        -------
-        obj : :class:`Survey` instance
-
-        """
-        try:
-            return cls(name=inp['name'], sources=inp['sources'],
-                       receivers=inp['receivers'],
-                       frequencies=inp['frequencies'], data=inp['observed'],
-                       fixed=bool(inp['fixed']))
-
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     @property
     def shape(self):
