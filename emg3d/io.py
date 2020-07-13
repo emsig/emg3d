@@ -177,7 +177,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
             json.dump(data, f, indent=json_indent)
 
     else:
-        raise NotImplementedError(f"Backend '{backend}' is not implemented.")
+        raise ValueError(f"Unknown backend '{backend}'.")
 
 
 def load(fname, **kwargs):
@@ -252,7 +252,7 @@ def load(fname, **kwargs):
 
     else:
         ext = full_path.split('.')[-1]
-        raise NotImplementedError(f"Extension '.{ext}' is not implemented.")
+        raise ValueError(f"Unknown extension '.{ext}'.")
 
     # De-serialize data.
     _dict_deserialize(data)

@@ -74,13 +74,13 @@ def test_get_hx_h0(capsys):
 
     # Check dmin.
     assert out3[2]['dmin'] == 600
-    # Calculation domain has to be at least domain.
+    # Computation domain has to be at least domain.
     assert out3[1]+np.sum(out3[0]) > 14000
     assert out3[1] <= -11000
 
     # == D == Check failure.
     # (a) With raise.
-    with pytest.raises(ArithmeticError, match='No suitable grid found; '):
+    with pytest.raises(RuntimeError, match='No suitable grid found; '):
         meshes.get_hx_h0(
                 freq=.5, res=[10., 12.], fixed=900, domain=[-10000, 10000],
                 possible_nx=[20])

@@ -58,7 +58,7 @@ class Model:
     mu_r : None, float, or ndarray
         Relative magnetic permeability (isotropic). If ndarray it must have the
         shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
-        corresponds to 1., but avoids the calculation of zeta. Magnetic
+        corresponds to 1., but avoids the computation of zeta. Magnetic
         permeability has to be bigger than zero and smaller than infinity.
 
     epsilon_r : None, float, or ndarray
@@ -240,7 +240,7 @@ class Model:
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'])
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     # RESISTIVITIES
     @property

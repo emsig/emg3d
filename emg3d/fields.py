@@ -233,7 +233,7 @@ class Field(np.ndarray):
             grid.vnEy = inp['vnEy']
             grid.vnEz = inp['vnEz']
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
         # Compute missing info.
         grid.nEx = np.prod(grid.vnEx)

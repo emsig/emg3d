@@ -31,7 +31,7 @@ install:
   - conda info -a
 
   # Install and activate environment, install packages
-  - conda create -q -n tenv python=$PYTHON $DFLTS numpy pytest pytest-cov
+  - conda create -q -n tenv -c conda-forge python=$PYTHON $DFLTS numpy empymod discretize pytest pytest-cov
   - source activate tenv
   - conda install -c conda-forge empymod>=2.0 $PCKG
   - pip install setuptools_scm coveralls pytest-flake8

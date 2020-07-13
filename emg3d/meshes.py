@@ -163,7 +163,7 @@ class TensorMesh:
         try:
             return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
         except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.")
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     @property
     def vol(self):
@@ -478,8 +478,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     if not finished:
         # Throw message if no solution was found.
         if raise_error:
-            raise ArithmeticError(
-                    "No suitable grid found; relax your criteria.")
+            raise RuntimeError("No suitable grid found; relax your criteria.")
         else:
             print("* ERROR   :: No suitable grid found; relax your criteria.")
             hx, x0 = None, None
