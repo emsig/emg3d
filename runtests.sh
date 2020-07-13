@@ -2,7 +2,7 @@
 
 # Help text
 usage="
-$(basename "$0") [-hpdw] [-v VERSION(S)]
+$(basename "$0") [-hpdnw] [-v VERSION(S)]
 
 Run pytest for emg3d locally in an isolated venv before submitting to
 GitHub/Travis-CI; by default for all supported python versions of emg3d.
@@ -12,6 +12,7 @@ where:
     -v : Python 3.x version, e.g. '-v 7' for Python 3.7. Default: '7 8'.
     -p : Print output of conda.
     -d : Delete environments after tests.
+    -n : Run tests without soft dependencies.
     -w : Disable pytest warnings.
 
 "
@@ -19,12 +20,14 @@ where:
 # Set default values
 PYTHON3VERSION="7 8"
 PRINT="/dev/null"
-PCKGS="empymod h5py pytest pytest-cov pytest-flake8 scooby"
+PCKGS="scipy numba pytest pytest-cov pytest-flake8"
+SOFT="empymod h5py scooby discretize matplotlib"
 PROPS="--flake8"
 WARN=""
+SD="_soft"
 
 # Get Optional Input
-while getopts "hv:pdw" opt; do
+while getopts "hv:pdnw" opt; do
 
   case $opt in
     h) echo "$usage"
@@ -35,6 +38,9 @@ while getopts "hv:pdw" opt; do
     p) PRINT="/dev/tty"
        ;;
     d) DELETE=true
+       ;;
+    n) SOFT=""
+       SD="_no-soft"
        ;;
     w) WARN="--disable-warnings"
        ;;
@@ -54,10 +60,10 @@ done
 for i in ${PYTHON3VERSION[@]}; do
 
   # Environment name
-  NAME=test_emg3d_3${i}
+  NAME=test_emg3d_3${i}${SD}
 
   # Print info
-  STR="  PYTHON 3."${i}"  "
+  STR="  PYTHON 3."${i}${SD}"  "
   LENGTH=$(( ($(tput cols) - ${#STR}) / 2 - 2 ))
   printf "\n  "
   printf '\e[1m\e[34m%*s' "${LENGTH}" '' | tr ' ' -
@@ -71,7 +77,7 @@ for i in ${PYTHON3VERSION[@]}; do
 
   # Create virtual environment
   if [ ! -d "$HOME/anaconda3/envs/$NAME" ]; then
-    conda create -y -c conda-forge -n $NAME python=3.${i} $PCKGS &> $PRINT
+    conda create -y -c conda-forge -n $NAME python=3.${i} $PCKGS $SOFT &> $PRINT
   fi
 
   # Activate virtual environment

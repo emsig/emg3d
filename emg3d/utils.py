@@ -22,23 +22,26 @@ Utility functions for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
-import empymod
+import copy
 import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
 from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
-# Check soft dependencies.
+# Import soft dependencies.
 try:
+    import scooby
     from scooby import Report as ScoobyReport
 except ImportError:
+    scooby = None
+
     class ScoobyReport:
-        def __init__(self, additional, core, optional, ncol, text_width, sort):
-            print("\n* WARNING :: `emg3d.Report` requires `scooby`."
-                  "\n             Install it via `pip install scooby` or"
-                  "\n             `conda install -c conda-forge scooby`.\n")
+        pass
+try:
+    import empymod
+except ImportError:
+    empymod = None
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
@@ -53,22 +56,136 @@ except ImportError:
     # properly!
     __version__ = 'unknown-'+datetime.today().strftime('%Y%m%d')
 
-# # Backwards compatibility; Deprecated to use them through utils.
-from emg3d.maps import grid2grid, interp3d
-from emg3d.models import Model, VolumeModel
-from emg3d.meshes import (TensorMesh, get_hx_h0, get_cell_numbers,
-                          get_stretched_h, get_domain, get_hx)
-from emg3d.fields import (
-        Field, SourceField, get_source_field, get_receiver, get_h_field)
 
-__all__ = ['Fourier', 'Time', 'Report',  # The ones actually here
-           'Field', 'SourceField', 'get_source_field', 'get_receiver',
-           'get_h_field', 'Model', 'VolumeModel', 'grid2grid', 'interp3d',
-           'TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
-           'get_domain', 'get_hx']
+__all__ = ['Fourier', 'Time', 'Report', 'EMArray']
+
+
+# SOFT DEPENDENCIES CHECK
+def _requires(*args, **kwargs):
+    """Decorator to wrap functions with extra dependencies.
+
+    This function is taken from `pysal` (in `lib/common.py`); see
+    https://github.com/pysal/pysal (released under the 'BSD 3-Clause "New" or
+    "Revised" License').
+
+
+    Parameters
+    ---------
+    args : list
+        Strings containing the modules to import.
+
+    verbose : bool
+        If True (default) print a warning message on import failure.
+
+
+    Returns
+    -------
+    out : func
+        Original function if all modules are importable, otherwise returns a
+        function that passes.
+    """
+    def simport(modname):
+        """Safely import a module without raising an error."""
+        try:
+            exec('import {}'.format(modname))
+            return True, eval(modname)
+        except ImportError:
+            return False, None
+
+    v = kwargs.pop('verbose', True)
+    wanted = copy.deepcopy(args)
+
+    def inner(function):
+        available = [simport(arg)[0] for arg in args]
+        if all(available):
+            return function
+        else:
+            def passer(*args, **kwargs):
+                if v:
+                    missing = [arg for i, arg in enumerate(wanted)
+                               if not available[i]]
+                    print(('missing dependencies: {d}'.format(d=missing)))
+                    print(('not running {}'.format(function.__name__)))
+                else:
+                    pass
+            return passer
+
+    return inner
+
+
+# EMArray
+class EMArray(np.ndarray):
+    r"""Create an EM-ndarray: add *amplitude* <amp> and *phase* <pha> methods.
+
+    Parameters
+    ----------
+    data : array
+        Data to which to add `.amp` and `.pha` attributes.
+
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from empymod.utils import EMArray
+    >>> emvalues = EMArray(np.array([1+1j, 1-4j, -1+2j]))
+    >>> print(f"Amplitude         : {emvalues.amp()}")
+    Amplitude         : [1.41421356 4.12310563 2.23606798]
+    >>> print(f"Phase (rad)       : {emvalues.pha()}")
+    Phase (rad)       : [ 0.78539816 -1.32581766 -4.24874137]
+    >>> print(f"Phase (deg)       : {emvalues.pha(deg=True)}")
+    Phase (deg)       : [  45.          -75.96375653 -243.43494882]
+    >>> print(f"Phase (deg; lead) : {emvalues.pha(deg=True, lag=False)}")
+    Phase (deg; lead) : [-45.          75.96375653 243.43494882]
+
+    """
+
+    def __new__(cls, data):
+        r"""Create a new EMArray."""
+        return np.asarray(data).view(cls)
+
+    def amp(self):
+        """Amplitude of the electromagnetic field."""
+        return np.abs(self.view())
+
+    def pha(self, deg=False, unwrap=True, lag=True):
+        """Phase of the electromagnetic field.
+
+        Parameters
+        ----------
+        deg : bool
+            If True the returned phase is in degrees, else in radians.
+            Default is False (radians).
+
+        unwrap : bool
+            If True the returned phase is unwrapped.
+            Default is True (unwrapped).
+
+        lag : bool
+            If True the returned phase is lag, else lead defined.
+            Default is True (lag defined).
+
+        """
+        # Get phase, lead or lag defined.
+        if lag:
+            pha = np.angle(self.view())
+        else:
+            pha = np.angle(np.conj(self.view()))
+
+        # Unwrap if `unwrap`.
+        # np.unwrap removes the EMArray class;
+        # for consistency, we wrap it in EMArray again.
+        if unwrap and self.size > 1:
+            pha = EMArray(np.unwrap(pha))
+
+        # Convert to degrees if `deg`.
+        if deg:
+            pha *= 180/np.pi
+
+        return pha
 
 
 # TIME DOMAIN
+@_requires('empymod')
 class Fourier:
     r"""Time-domain CSEM computation.
 
@@ -512,6 +629,7 @@ class Time:
         return default_timer() - self._t0
 
 
+@_requires('scooby')
 class Report(ScoobyReport):
     r"""Print date, time, and version information.
 
@@ -568,7 +686,7 @@ class Report(ScoobyReport):
         core = ['numpy', 'scipy', 'numba', 'emg3d']
 
         # Optional packages.
-        optional = ['IPython', 'matplotlib']
+        optional = ['empymod', 'discretize', 'h5py', 'matplotlib', 'IPython']
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)

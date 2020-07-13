@@ -26,10 +26,9 @@ electric and magnetic fields, and fields at receivers.
 
 import numpy as np
 from copy import deepcopy
-from empymod import EMArray
 from scipy.constants import mu_0
 
-from emg3d import maps, models
+from emg3d import maps, models, utils
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_receiver_response', 'get_h_field']
@@ -286,7 +285,7 @@ class Field(np.ndarray):
 
     def amp(self):
         """Amplitude of the electromagnetic field."""
-        return EMArray(self.view()).amp()
+        return utils.EMArray(self.view()).amp()
 
     def pha(self, deg=False, unwrap=True, lag=True):
         """Phase of the electromagnetic field.
@@ -306,7 +305,7 @@ class Field(np.ndarray):
             Default is True (lag defined).
 
         """
-        return EMArray(self.view()).pha(deg, unwrap, lag)
+        return utils.EMArray(self.view()).pha(deg, unwrap, lag)
 
     @property
     def freq(self):
@@ -743,7 +742,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
 
     Returns
     -------
-    new_values : ndarray or :class:`empymod.utils.EMArray`
+    new_values : ndarray or :class:`utils.EMArray`
         Values at `coordinates`.
 
         If input was a field it returns an EMArray, which is a subclassed
@@ -799,7 +798,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     if values.size == grid.nC:
         return out
     else:
-        return EMArray(out)
+        return utils.EMArray(out)
 
 
 def get_receiver_response(grid, field, rec):
@@ -827,7 +826,7 @@ def get_receiver_response(grid, field, rec):
 
     Returns
     -------
-    responses : :class:`empymod.utils.EMArray`
+    responses : :class:`utils.EMArray`
         Responses at receiver.
 
 
@@ -884,7 +883,7 @@ def get_receiver_response(grid, field, rec):
             resp += factors[i]*maps.interp3d(points[i], ff, rec[:3], **inp)
 
     # Return response.
-    return EMArray(resp)
+    return utils.EMArray(resp)
 
 
 def get_h_field(grid, model, field):

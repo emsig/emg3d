@@ -1,12 +1,11 @@
 import pytest
 import shelve
-import empymod
 import numpy as np
 from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose, assert_array_equal
 
-from emg3d import io, meshes, models, fields, solver
+from emg3d import io, meshes, models, fields, solver, utils
 
 # Data generated with tests/create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
@@ -342,7 +341,7 @@ def test_get_receiver():
     assert_allclose(out1, out1a)
     assert_allclose(out1b, out1c)
     assert_allclose(out1b, [0, 0, 0])
-    assert out1b.__class__ == empymod.utils.EMArray
+    assert out1b.__class__ == utils.EMArray
 
     out2 = fields.get_receiver(
             grid, field.fx, ([0.5, 1, 2], 1/3, 0.25), 'linear')
@@ -390,7 +389,7 @@ def test_get_receiver():
     out10 = fields.get_receiver(
             grid, model.res_x, (-10, -10, -10), 'linear', True)
     assert_allclose(out10, 1.)
-    assert out10.__class__ != empymod.utils.EMArray
+    assert out10.__class__ != utils.EMArray
 
 
 def test_get_receiver_response():
@@ -462,7 +461,11 @@ def test_get_receiver_response():
     efield = solver.solve(grid, model, sfield, semicoarsening=True,
                           sslsolver=True, linerelaxation=True, verb=1)
 
-    epm = empymod.bipole(src, rec, [], res, freq, verb=1)
+    # epm = empymod.bipole(src, rec, [], res, freq, verb=1)
+    epm = np.array([-1.27832028e-11+1.21383502e-11j,
+                    -1.90064149e-12+7.51937145e-12j,
+                    1.09602131e-12+3.33066197e-12j,
+                    1.25359248e-12+1.02630145e-12j])
     e3d = fields.get_receiver_response(grid, efield, rec)
 
     # 10 % is still OK, grid is very coarse for fast comp (2s)

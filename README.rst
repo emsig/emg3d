@@ -80,12 +80,12 @@ or via ``pip``:
 
    pip install emg3d
 
-Required are Python version 3.7 or higher and the modules ``NumPy``, ``SciPy``,
-``numba``, and ``empymod``; ``discretize`` (from `SimPEG
-<https://simpeg.xyz>`_) is highly recommended. Consult the installation notes
-in the `manual
+Minimum requirements are Python version 3.7 or higher and the modules ``scipy``
+and ``numba``. Various other packages are recommended or required for some
+advanced functionalities (``discretize``, ``matplotlib``, ``h5py``,
+``empymod``, ``scooby``). Consult the installation notes in the `manual
 <https://emg3d.readthedocs.io/en/stable/usage.html#installation>`_ for more
-information regarding installation and requirements.
+information regarding installation, requirements, and soft dependencies.
 
 
 Citation

@@ -4,6 +4,8 @@
 # SOFT DEPENDENCIES
 h5py
 scooby
+empymod
+discretize
 matplotlib
 
 # SETUP RELATED
