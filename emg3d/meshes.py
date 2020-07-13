@@ -83,16 +83,16 @@ class TensorMesh:
         self.nNx = self.nCx + 1
         self.nNy = self.nCy + 1
         self.nNz = self.nCz + 1
-        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=int)
+        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=np.int_)
         self.nN = int(self.vnN.prod())
         self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
         self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
         self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
 
         # Edge related properties.
-        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=int)
-        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=int)
-        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=int)
+        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=np.int_)
+        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=np.int_)
+        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=np.int_)
         self.nEx = int(self.vnEx.prod())
         self.nEy = int(self.vnEy.prod())
         self.nEz = int(self.vnEz.prod())
@@ -354,7 +354,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
             dmin = np.clip(dmin, *min_width)
 
     # Survey domain; contains all sources and receivers.
-    domain = np.array(domain, dtype=float)
+    domain = np.array(domain, dtype=np.float64)
 
     # Computation domain; big enough to avoid boundary effects.
     # To avoid boundary effects we want the signal to travel two wavelengths
@@ -644,12 +644,12 @@ def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
     """
 
     # Cast to arrays
-    domain = np.array(domain, dtype=float)
-    x0 = np.array(x0, dtype=float)
+    domain = np.array(domain, dtype=np.float64)
+    x0 = np.array(x0, dtype=np.float64)
     x0 = np.clip(x0, *domain)  # Restrict to model domain
-    min_width = np.array(min_width, dtype=float)
+    min_width = np.array(min_width, dtype=np.float64)
     if x1 is not None:
-        x1 = np.array(x1, dtype=float)
+        x1 = np.array(x1, dtype=np.float64)
         x1 = np.clip(x1, *domain)  # Restrict to model domain
 
     # If x1 is provided (a part is not stretched)

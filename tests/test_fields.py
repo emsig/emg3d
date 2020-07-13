@@ -1,4 +1,5 @@
 import pytest
+import shelve
 import empymod
 import numpy as np
 from scipy import constants
@@ -253,6 +254,13 @@ def test_field(tmpdir):
     grid.nEx = None
     with pytest.raises(ValueError, match='Provided grid must be a 3D grid'):
         fields.Field(grid)
+
+    # Ensure it can be pickled.
+    with shelve.open(tmpdir+'/test') as db:
+        db['field'] = ee2
+    with shelve.open(tmpdir+'/test') as db:
+        test = db['field']
+    assert_allclose(test, ee2)
 
 
 def test_source_field():

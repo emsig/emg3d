@@ -249,7 +249,7 @@ def test_solver_homogeneous_laplace():
     assert_allclose(dat['bicresult'], efield)
 
     # If efield is complex, assert it fails.
-    efield = fields.Field(grid, dtype=complex)
+    efield = fields.Field(grid, dtype=np.complex_)
 
     with pytest.raises(ValueError, match='Source field and electric field'):
         efield = solver.solve(grid, model, sfield, efield=efield, verb=1)
@@ -346,9 +346,9 @@ def test_restriction():
     # Get volume-averaged model parameters.
     vmodel = models.VolumeModel(grid, model, sfield)
 
-    rx = np.arange(sfield.fx.size, dtype=complex).reshape(sfield.fx.shape)
-    ry = np.arange(sfield.fy.size, dtype=complex).reshape(sfield.fy.shape)
-    rz = np.arange(sfield.fz.size, dtype=complex).reshape(sfield.fz.shape)
+    rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(sfield.fx.shape)
+    ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(sfield.fy.shape)
+    rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(sfield.fz.shape)
     rr = fields.Field(rx, ry, rz)
 
     # Restrict it

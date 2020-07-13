@@ -36,6 +36,9 @@ recent versions
 
 - Removed deprecated functions `data_write` and `data_read`.
 
+- Much bookkeeping (improve error raising and checking; chaining errors, numpy
+  types, etc).
+
 
 *v0.11.0* : Refactor
 --------------------
