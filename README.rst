@@ -82,7 +82,7 @@ or via ``pip``:
 
 Minimum requirements are Python version 3.7 or higher and the modules ``scipy``
 and ``numba``. Various other packages are recommended or required for some
-advanced functionalities (``discretize``, ``matplotlib``, ``h5py``,
+advanced functionalities (``xarray``, ``discretize``, ``matplotlib``, ``h5py``,
 ``empymod``, ``scooby``). Consult the installation notes in the `manual
 <https://emg3d.readthedocs.io/en/stable/usage.html#installation>`_ for more
 information regarding installation, requirements, and soft dependencies.

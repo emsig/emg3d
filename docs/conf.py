@@ -27,6 +27,7 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
     "discretize": ("https://discretize.simpeg.xyz/en/master", None),
     "empymod": ("https://empymod.readthedocs.io/en/stable", None),
+    "xarray": ("https://xarray.pydata.org/en/stable", None),
 }
 
 # ==== 2. General Settings ====
@@ -123,4 +124,5 @@ texinfo_documents = [
 # Papers from academic.oup results in a 104 error
 linkcheck_ignore = [
     'https://doi.org/10.1111/j.1365-246X.2010.04544.x',
+    'https://doi.org/10.1088/0266-5611/24/3/034012',
 ]

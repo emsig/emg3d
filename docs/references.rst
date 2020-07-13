@@ -47,7 +47,7 @@ References
    modeling of electromagnetic diffusion with a frequency-domain code:
    Geophysics, 73, F1--F8; DOI: `10.1190/1.2799093
    <https://doi.org/10.1190/1.2799093>`_.
-.. [PlDM07] Plessix, R.-E., M. Darnet, and W. A. Mulder, 2007, An approach for
+.. [PlDM07] Plessix, R.-É., M. Darnet, and W. A. Mulder, 2007, An approach for
    3D multisource, multifrequency CSEM modeling: Geophysics, 72, SM177--SM184;
    DOI: `10.1190/1.2744234 <https://doi.org/10.1190/1.2744234>`_.
 .. [SlHM10] Slob, E., J. Hunziker, and W. A. Mulder, 2010, Green's tensors for

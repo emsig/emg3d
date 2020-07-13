@@ -10,6 +10,12 @@ recent versions
 
 - Modules:
 
+  - `surveys` (**new**; requires `xarray`):
+
+    - Class `surveys.Survey`, which combines sources, receivers, and data.
+    - Class `surveys.Dipole`, which defines electric or magnetic point dipoles
+      and finite length dipoles.
+
   - `fields`:
 
     - Function `get_receiver_response` (**new**), which returns the response
@@ -38,6 +44,7 @@ recent versions
 
   - `empymod` is new a soft dependency, only required for `utils.Fourier`
     (time-domain modelling).
+  - New soft dependency `xarray` for the `Survey` class.
 
 - Removed deprecated functions `data_write` and `data_read`.
 

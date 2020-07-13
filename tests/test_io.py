@@ -63,12 +63,14 @@ def test_save_and_load(tmpdir, capsys):
             broken=grid3, a=None,
             field=field, what={'f': field.fx, 12: 12})
     outstr, _ = capsys.readouterr()
+    assert 'Data saved to «' in outstr
+    assert utils.__version__ in outstr
     assert 'WARNING :: Could not serialize <broken>' in outstr
 
     # Load it.
     out_npz = io.load(str(tmpdir+'/test.npz'), allow_pickle=True)
     outstr, _ = capsys.readouterr()
-    assert 'Loaded file' in outstr
+    assert 'Data loaded from «' in outstr
     assert 'test.npz' in outstr
     assert utils.__version__ in outstr
 
@@ -87,7 +89,7 @@ def test_save_and_load(tmpdir, capsys):
     np.savez_compressed(tmpdir+'/test2.npz', **fdata)
     _ = io.load(str(tmpdir+'/test2.npz'), allow_pickle=True)
     outstr, _ = capsys.readouterr()
-    assert "was not created by emg3d." in outstr
+    assert "[version/format/date unknown; not created by emg3d]." in outstr
     assert "WARNING :: Could not de-serialize <meshes>" in outstr
 
     # Unknown keyword.

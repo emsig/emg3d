@@ -29,7 +29,7 @@ import warnings
 import numpy as np
 from datetime import datetime
 
-from emg3d import fields, models, utils, meshes
+from emg3d import fields, models, utils, meshes, surveys
 
 try:
     import h5py
@@ -44,13 +44,15 @@ __all__ = ['save', 'load']
 KNOWN_CLASSES = {
     'Model': models.Model,
     'Field': fields.Field,
+    'Survey': surveys.Survey,
+    'Dipole': surveys.Dipole,
     'SourceField': fields.SourceField,
     'TensorMesh': meshes.TensorMesh,
 }
 
 
 def save(fname, backend=None, compression="gzip", **kwargs):
-    """Save meshes, models, fields, and other data to disk.
+    """Save surveys, meshes, models, fields, and more to disk.
 
     Serialize and save data to disk in different formats (see parameter
     description of `fname` for the supported file formats). The main
@@ -92,6 +94,9 @@ def save(fname, backend=None, compression="gzip", **kwargs):
         emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
         everything else collected in a `Data`-folder.
 
+    verb : int
+        If 1 (default) verbose, if 0 silent.
+
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
         properly serialized: :class:`emg3d.meshes.TensorMesh`,
@@ -106,6 +111,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     # Get and remove optional kwargs.
     json_indent = kwargs.pop('json_indent', 2)
     collect_classes = kwargs.pop('collect_classes', True)
+    verb = kwargs.pop('verb', 1)
 
     # Get absolute path.
     full_path = os.path.abspath(fname)
@@ -178,6 +184,11 @@ def save(fname, backend=None, compression="gzip", **kwargs):
 
     else:
         raise ValueError(f"Unknown backend '{backend}'.")
+
+    # Print file info.
+    if verb > 0:
+        print(f"Data saved to «{full_path}»\n[{kwargs['_version']} "
+              f"(format {kwargs['_format']}) on {kwargs['_date']}].")
 
 
 def load(fname, **kwargs):
@@ -258,6 +269,8 @@ def load(fname, **kwargs):
     _dict_deserialize(data)
 
     # Check if file was (supposedly) created by emg3d.
+    if verb > 0:
+        print(f"Data loaded from «{full_path}»")
     try:
         version = data['_version']
         date = data['_date']
@@ -265,12 +278,11 @@ def load(fname, **kwargs):
 
         # Print file info.
         if verb > 0:
-            print(f"  Loaded file {full_path}")
-            print(f"  -> Stored with {version} (format {form}) on {date}")
+            print(f"[{version} (format {form}) on {date}].")
 
     except KeyError:
         if verb > 0:
-            print(f"\n* NOTE    :: {full_path} was not created by emg3d.")
+            print("[version/format/date unknown; not created by emg3d].")
 
     return data
 

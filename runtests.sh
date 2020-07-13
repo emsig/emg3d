@@ -21,7 +21,7 @@ where:
 PYTHON3VERSION="7 8"
 PRINT="/dev/null"
 PCKGS="scipy numba pytest pytest-cov pytest-flake8"
-SOFT="empymod h5py scooby discretize matplotlib"
+SOFT="xarray empymod h5py scooby discretize matplotlib"
 PROPS="--flake8"
 WARN=""
 SD="_soft"
