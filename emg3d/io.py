@@ -25,7 +25,6 @@ Utility functions for writing and reading data.
 
 import os
 import json
-import shelve
 import warnings
 import numpy as np
 from datetime import datetime
@@ -50,158 +49,16 @@ KNOWN_CLASSES = {
 }
 
 
-def data_write(fname, keys, values, path='data', exists=0):
-    """DEPRECATED; USE :func:`save`.
-
-
-    Parameters
-    ----------
-    fname : str
-        File name.
-
-    keys : str or list of str
-        Name(s) of the values to store in file.
-
-    values : anything
-        Values to store with keys in file.
-
-    path : str, optional
-        Absolute or relative path where to store. Default is 'data'.
-
-    exists : int, optional
-        Flag how to act if a shelve with the given name already exists:
-
-        - < 0: Delete existing shelve.
-        - 0 (default): Do nothing (print that it exists).
-        - > 0: Append to existing shelve.
-
-    """
-    # Issue warning
-    mesg = ("\n    The use of `data_write` and `data_read` is deprecated.\n"
-            "    These function will be removed before v1.0.\n"
-            "    Use `emg3d.save` and `emg3d.load` instead.")
-    warnings.warn(mesg, DeprecationWarning)
-
-    # Get absolute path, create if it doesn't exist.
-    path = os.path.abspath(path)
-    os.makedirs(path, exist_ok=True)
-    full_path = os.path.join(path, fname)
-
-    # Check if shelve exists.
-    bak_exists = os.path.isfile(full_path+".bak")
-    dat_exists = os.path.isfile(full_path+".dat")
-    dir_exists = os.path.isfile(full_path+".dir")
-    if any([bak_exists, dat_exists, dir_exists]):
-        print("   > File exists, ", end="")
-        if exists == 0:
-            print("NOT SAVING THE DATA.")
-            return
-        elif exists > 0:
-            print("appending to it", end='')
-        else:
-            print("overwriting it.")
-            for extension in ["dat", "bak", "dir"]:
-                try:
-                    os.remove(full_path+"."+extension)
-                except FileNotFoundError:
-                    pass
-
-    # Cast into list.
-    if not isinstance(keys, (list, tuple)):
-        keys = [keys, ]
-        values = [values, ]
-
-    # Shelve it.
-    with shelve.open(full_path) as db:
-
-        # If appending, print the keys which will be overwritten.
-        if exists > 0:
-            over = [j for j in keys if any(i == j for i in list(db.keys()))]
-            if len(over) > 0:
-                print(" (overwriting existing key(s) "+f"{over}"[1:-1]+").")
-            else:
-                print(".")
-
-        # Writing it to the shelve.
-        for i, key in enumerate(keys):
-
-            # If the parameter is a TensorMesh instance, we set the volume
-            # None. This saves space, and it will simply be reconstructed if
-            # required.
-            if type(values[i]).__name__ == 'TensorMesh':
-                if hasattr(values[i], '_vol'):
-                    delattr(values[i], '_vol')
-
-            db[key] = values[i]
-
-
-def data_read(fname, keys=None, path="data"):
-    """DEPRECATED; USE :func:`load`.
-
-
-    Parameters
-    ----------
-    fname : str
-        File name.
-
-    keys : str, list of str, or None; optional
-        Name(s) of the values to get from file. If None, returns everything as
-        a dict. Default is None.
-
-    path : str, optional
-        Absolute or relative path where fname is stored. Default is 'data'.
-
-
-    Returns
-    -------
-    out : values or dict
-        Requested value(s) or dict containing everything if keys=None.
-
-    """
-    # Issue warning
-    mesg = ("\n    The use of `data_write` and `data_read` is deprecated.\n"
-            "    These functions will be removed before v1.0.\n"
-            "    Use `save` and `load` instead.")
-    warnings.warn(mesg, DeprecationWarning)
-
-    # Get absolute path.
-    path = os.path.abspath(path)
-    full_path = os.path.join(path, fname)
-
-    # Check if shelve exists.
-    for extension in [".dat", ".bak", ".dir"]:
-        if not os.path.isfile(full_path+extension):
-            print(f"   > File <{full_path+extension}> does not exist.")
-            if isinstance(keys, (list, tuple)):
-                return len(keys)*(None, )
-            else:
-                return None
-
-    # Get it from shelve.
-    with shelve.open(path+"/"+fname) as db:
-        if keys is None:                           # None
-            out = dict()
-            for key, item in db.items():
-                out[key] = item
-            return out
-
-        elif not isinstance(keys, (list, tuple)):  # single parameter
-            return db[keys]
-
-        else:                                      # lists/tuples of parameters
-            out = []
-            for key in keys:
-                out.append(db[key])
-            return out
-
-
 def save(fname, backend=None, compression="gzip", **kwargs):
     """Save meshes, models, fields, and other data to disk.
 
-    Serialize and save :class:`emg3d.meshes.TensorMesh`,
-    :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` instances and
-    add arbitrary other data, where instances of the same type are grouped
-    together.
+    Serialize and save data to disk in different formats (see parameter
+    description of `fname` for the supported file formats). The main
+    emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) are collected
+    in corresponding root-folders (unless `collect_classes=False`).
+
+    Any other (non-emg3d) object can be added too, as long as it knows how to
+    serialize itself.
 
     The serialized instances will be de-serialized if loaded with :func:`load`.
 
@@ -230,6 +87,11 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     json_indent : int or None
         Passed through to json, default is 2.
 
+    collect_classes : bool
+        If True (default), input data is collected in folders for the principal
+        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
+        everything else collected in a `Data`-folder.
+
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The following instances will be
         properly serialized: :class:`emg3d.meshes.TensorMesh`,
@@ -243,6 +105,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     """
     # Get and remove optional kwargs.
     json_indent = kwargs.pop('json_indent', 2)
+    collect_classes = kwargs.pop('collect_classes', True)
 
     # Get absolute path.
     full_path = os.path.abspath(fname)
@@ -254,7 +117,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
-    data = _dict_serialize(kwargs)
+    data = _dict_serialize(kwargs, collect_classes=collect_classes)
 
     # Deprecated backends.
     if backend is not None:
@@ -412,15 +275,16 @@ def load(fname, **kwargs):
     return data
 
 
-def _dict_serialize(inp, out=None, top=True):
-    """Serialize TensorMesh, Field, and Model instances in dict.
+def _dict_serialize(inp, out=None, collect_classes=True):
+    """Serialize emg3d-classes and other objects in inp-dict.
 
-    Returns a serialized dictionary <out> of <inp>, where all
-    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
-    :class:`emg3d.models.Model` instances have been serialized.
+    Returns a serialized dictionary <out> of <inp>, where all members of
+    `emg3d.io.KNOWN_CLASSES` are serialized with their respective `to_dict()`
+    methods. These instances are additionally grouped together in dictionaries,
+    and all other stuff is put into 'Data', unless `collect_classes=False`.
 
-    These instances are additionally grouped together in dictionaries, and all
-    other stuff is put into 'Data'.
+    Any other (non-emg3d) object can be added too, as long as it knows how to
+    serialize itself.
 
     There are some limitations:
 
@@ -438,8 +302,10 @@ def _dict_serialize(inp, out=None, top=True):
     out : dict
         Output dictionary; created if not provided.
 
-    top : bool
-        Used for recursion.
+    collect_classes : bool
+        If True (default), input data is collected in folders for the principal
+        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
+        everything else collected in a `Data`-folder.
 
 
     Returns
@@ -463,8 +329,8 @@ def _dict_serialize(inp, out=None, top=True):
         if not isinstance(key, str):
             key = str(key)
 
-        # Take care of the following instances (if we are in the
-        # top-directory they get their own category):
+        # Take care of the following instances
+        # (if we are in the root-directory they get their own category):
         if (isinstance(value, tuple(KNOWN_CLASSES.values())) or
                 hasattr(value, 'x0')):
 
@@ -483,15 +349,19 @@ def _dict_serialize(inp, out=None, top=True):
                     print(f"* WARNING :: Could not serialize <{key}>")
                     continue
 
-            # If we are in the top-directory put them in their own category.
-            if top:
+            # If we are in the root-directory put them in their own category.
+            # `collect_classes` can only be True in root-directory, as it is
+            # set to False in recursion.
+            if collect_classes:
                 value = {key: to_dict}
                 key = name
             else:
                 value = to_dict
 
-        elif top:
-            if key.startswith('_'):  # Store meta-data in top-level...
+        elif collect_classes:
+            # `collect_classes` can only be True in root-directory, as it is
+            # set to False in recursion.
+            if key.startswith('_'):  # Store meta-data in root-level...
                 out[key] = value
                 continue
             else:                    # ...rest falls into Data/.
@@ -504,7 +374,7 @@ def _dict_serialize(inp, out=None, top=True):
 
         # If value is a dict use recursion, else store.
         if isinstance(value, dict):
-            _dict_serialize(value, out[key], False)
+            _dict_serialize(value, out[key], collect_classes=False)
         else:
             # Limitation 2: None
             if value is None:
@@ -518,12 +388,11 @@ def _dict_serialize(inp, out=None, top=True):
 
 
 def _dict_deserialize(inp):
-    """De-serialize TensorMesh, Field, and Model instances in dict.
+    """De-serialize emg3d-classes and other objects in inp-dict.
 
-    De-serializes in-place dictionary <inp>, where all
-    :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
-    :class:`emg3d.models.Model` instances have been de-serialized. It also
-    converts back 'NoneType'-strings to None.
+    De-serializes in-place dictionary <inp>, where all members of
+    `emg3d.io.KNOWN_CLASSES` are de-serialized with their respective
+    `from_dict()` methods. It also converts back 'NoneType'-strings to None.
 
 
     Parameters

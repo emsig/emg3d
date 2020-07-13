@@ -2,8 +2,8 @@ Changelog
 #########
 
 
-v0.11.0 - stable
-""""""""""""""""
+recent versions
+"""""""""""""""
 
 *latest*
 --------
@@ -27,11 +27,14 @@ v0.11.0 - stable
       `fname` instead.
     - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and
       new `.json`.
+    - New parameter `collect_classes`, which can be used to switch-off the
+      collection of the main classes in root-level dictionaries.
 
   - `meshes`:
 
     - Added `__eq__` to `models.TensorMesh` to compare meshes.
 
+- Removed deprecated functions `data_write` and `data_read`.
 
 
 *v0.11.0* : Refactor
