@@ -23,6 +23,7 @@ Utility functions for the multigrid solver.
 # the License.
 
 import copy
+import importlib
 import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
@@ -87,8 +88,7 @@ def _requires(*args, **kwargs):
     def simport(modname):
         """Safely import a module without raising an error."""
         try:
-            exec('import {}'.format(modname))
-            return True, eval(modname)
+            return True, importlib.import_module(modname)
         except ImportError:
             return False, None
 
@@ -104,8 +104,8 @@ def _requires(*args, **kwargs):
                 if v:
                     missing = [arg for i, arg in enumerate(wanted)
                                if not available[i]]
-                    print(('missing dependencies: {d}'.format(d=missing)))
-                    print(('not running {}'.format(function.__name__)))
+                    print("=> This feature of `emg3d` requires the following, "
+                          f"missing soft dependencies: {missing}.")
                 else:
                     pass
             return passer
@@ -686,7 +686,8 @@ class Report(ScoobyReport):
         core = ['numpy', 'scipy', 'numba', 'emg3d']
 
         # Optional packages.
-        optional = ['empymod', 'discretize', 'h5py', 'matplotlib', 'IPython']
+        optional = ['empymod', 'xarray', 'discretize', 'h5py', 'matplotlib',
+                    'IPython']
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)

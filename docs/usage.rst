@@ -34,6 +34,7 @@ Minimum requirements are Python version 3.7 or higher and the modules ``scipy``
 and ``numba``. Various other packages are recommended or required for some
 advanced functionalities, namely:
 
+- ``xarray``: For the ``Survey`` class (many sources and receivers at once).
 - ``discretize``: For advanced meshing tools (fancy mesh-representations and
   plotting utilities).
 - ``matplotlib``: To use the plotting utilities within ``discretize``.
@@ -157,11 +158,6 @@ input grid had 49,152 cells, and the coarsest grid had 12 cells.
 
 Related ecosystem
 -----------------
-
-The hard dependencies for emg3d are with ``numpy``, ``scipy``, ``numba``, and
-``empymod`` comparably low. However, emg3d is, as such, "only" a solver. It
-does not contain fancy grid- nor model-creation routines or plotting functions.
-There exist other packages which do that much better.
 
 To create advanced meshes it is recommended to use `discretize
 <https://discretize.simpeg.xyz>`_ from the SimPEG framework. It also comes with

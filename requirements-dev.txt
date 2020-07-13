@@ -4,6 +4,7 @@
 # SOFT DEPENDENCIES
 h5py
 scooby
+xarray
 empymod
 discretize
 matplotlib
