@@ -512,7 +512,7 @@ class VolumeModel:
         # Initiate eta
         eta = field.smu0*grid.vol.reshape(grid.vnC, order='F')
 
-        # Calculate eta depending on epsilon.
+        # Compute eta depending on epsilon.
         if model.epsilon_r is None:  # Diffusive approximation.
             eta /= getattr(model, name)
 

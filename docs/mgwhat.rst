@@ -26,7 +26,7 @@ the full matrix. This is how it achieves its relatively low memory consumption.
 To solve the system, it solves for all fields adjacent to one node, moves then
 to the next node, and so on until it reaches the last node, see :numref:`Figure
 %s <smoother>`, where the red lines indicate the fields which are solved
-simultaneously per step (the fields on the boundaries are never calculated, as
+simultaneously per step (the fields on the boundaries are never computed, as
 they are assumed to be 0).
 
 .. figure:: _static/schematics2.svg
@@ -56,7 +56,7 @@ Moving between different grids
 The main thinking behind multigrid is now that we move to coarser grids. This
 has two advantages:
 
-- Fewer cells means faster calculation and less memory.
+- Fewer cells means faster computation and less memory.
 - Coarser grid size transforms lower frequency error to higher frequency error,
   relatively to cell size, which means faster convergence.
 

@@ -184,12 +184,12 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     for more details. A maximum of three hard/fixed boundaries can be provided
     (one of which is the grid center).
 
-    The minimum cell width is calculated through :math:`\delta/\rm{pps}`, where
+    The minimum cell width is computed through :math:`\delta/\rm{pps}`, where
     the skin depth is given by :math:`\delta = 503.3 \sqrt{\rho/f}`, and the
     parameter `pps` stands for 'points-per-skindepth'. The minimum cell width
     can be restricted with the parameter `min_width`.
 
-    The actual calculation domain adds a buffer zone around the (survey)
+    The actual computation domain adds a buffer zone around the (survey)
     domain. The thickness of the buffer is six times the skin depth. The field
     is basically zero after two wavelengths. A wavelength is
     :math:`2\pi\delta`, hence roughly 6 times the skin depth. Taking a factor 6
@@ -214,16 +214,16 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     ----------
 
     freq : float
-        Frequency (Hz) to calculate the skin depth. The skin depth is a concept
+        Frequency (Hz) to compute the skin depth. The skin depth is a concept
         defined in the frequency domain. If a negative frequency is provided,
-        it is assumed that the calculation is carried out in the Laplace
-        domain. To calculate the skin depth, the value of `freq` is then
+        it is assumed that the computation is carried out in the Laplace
+        domain. To compute the skin depth, the value of `freq` is then
         multiplied by :math:`-2\pi`, to simulate the closest
         frequency-equivalent.
 
     res : float or list
-        Resistivity (Ohm m) to calculate the skin depth. The skin depth is
-        used to calculate the minimum cell width and the boundary thicknesses.
+        Resistivity (Ohm m) to compute the skin depth. The skin depth is
+        used to compute the minimum cell width and the boundary thicknesses.
         Up to three resistivities can be provided:
 
         - float: Same resistivity for everything;
@@ -231,7 +231,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         - [min_width, left boundary, right boundary].
 
     domain : list
-        Contains the survey-domain limits [min, max]. The actual calculation
+        Contains the survey-domain limits [min, max]. The actual computation
         domain consists of this domain plus a buffer zone around it, which
         depends on frequency and resistivity.
 
@@ -257,7 +257,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         Default is None.
 
     pps : int, optional
-        Points per skindepth; minimum cell width is calculated via
+        Points per skindepth; minimum cell width is computed via
         `dmin = skindepth/pps`.
         Default = 3.
 
@@ -269,7 +269,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         and a maximum stretching of 1.5 in the buffer zone; step size is 0.01.
 
     max_domain : float, optional
-        Maximum calculation domain from fixed[0] (usually source position).
+        Maximum computation domain from fixed[0] (usually source position).
         Default is 100,000.
 
     raise_error : bool, optional
@@ -339,9 +339,9 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
                     "of the first one.\n"
                     f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
 
-    # Calculate skin depth.
+    # Compute skin depth.
     skind = 503.3*np.sqrt(res_arr/abs(freq))
-    if freq < 0:  # For Laplace-domain calculations.
+    if freq < 0:  # For Laplace-domain computations.
         skind /= np.sqrt(2*np.pi)
 
     # Minimum cell width.
@@ -356,7 +356,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     # Survey domain; contains all sources and receivers.
     domain = np.array(domain, dtype=float)
 
-    # Calculation domain; big enough to avoid boundary effects.
+    # Computation domain; big enough to avoid boundary effects.
     # To avoid boundary effects we want the signal to travel two wavelengths
     # from the source to the boundary and back to the receiver.
     # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
@@ -376,16 +376,16 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     dist_buff = np.max([np.zeros(2), (two_lambda - dist_in_domain)/2], axis=0)
 
     # (d) Add buffer to domain.
-    calc_domain = np.array([domain[0]-dist_buff[0], domain[1]+dist_buff[1]])
+    comp_domain = np.array([domain[0]-dist_buff[0], domain[1]+dist_buff[1]])
 
     # (e) Restrict total domain to max_domain.
-    calc_domain[0] = max(calc_domain[0], fixed[0]-max_domain)
-    calc_domain[1] = min(calc_domain[1], fixed[0]+max_domain)
+    comp_domain[0] = max(comp_domain[0], fixed[0]-max_domain)
+    comp_domain[1] = min(comp_domain[1], fixed[0]+max_domain)
 
     # Initiate flag if terminated.
     finished = False
 
-    # Initiate alpha variables for survey and calculation domains.
+    # Initiate alpha variables for survey and computation domains.
     sa, ca = 1.0, 1.0
 
     # Loop over possible cell numbers from small to big.
@@ -435,22 +435,22 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
             # Get actual stretching (differs in case of fixed layers).
             sa_adj = np.max([hx[1:]/hx[:-1], hx[:-1]/hx[1:]])
 
-            # Loop over possible alphas for calc_domain.
+            # Loop over possible alphas for comp_domain.
             for ca in np.arange(sa, alpha[1]+alpha[2]/2, alpha[2]):
 
-                # 4. Fill to left calc_domain.
+                # 4. Fill to left comp_domain.
                 thxl = hx[0]*ca**np.arange(1, nx_remain+1)
                 nl = np.sum((asurv_domain[0]-np.cumsum(thxl)) >
-                            calc_domain[0])+1
+                            comp_domain[0])+1
 
-                # 5. Fill to right calc_domain.
+                # 5. Fill to right comp_domain.
                 thxr = hx[-1]*ca**np.arange(1, nx_remain+1)
                 nr = np.sum((asurv_domain[1]+np.cumsum(thxr)) <
-                            calc_domain[1])+1
+                            comp_domain[1])+1
 
                 # 6. Get remaining number of cells and check termination
                 # criteria.
-                ncdc = nl+nr  # Number of calc_domain cells.
+                ncdc = nl+nr  # Number of comp_domain cells.
                 nx_remain2 = nx-nsdc-ncdc
 
                 if nx_remain2 < 0:  # Not good, try next.
@@ -461,7 +461,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
                 nr += int(np.ceil(nx_remain2/2))   # more on the right.
                 hx = np.r_[thxl[:nl][::-1], hx, thxr[:nr]]
 
-                # Calculate origin.
+                # Compute origin.
                 x0 = float(asurv_domain[0]-np.sum(thxl[:nl]))
 
                 # Mark it as finished and break out of the loop.
@@ -495,8 +495,8 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
                   f"{skind[2]:.0f}")
         print(f"   Survey domain       [m] : {domain[0]:.0f} - "
               f"{domain[1]:.0f}")
-        print(f"   Calculation domain  [m] : {calc_domain[0]:.0f} - "
-              f"{calc_domain[1]:.0f}")
+        print(f"   Computation domain  [m] : {comp_domain[0]:.0f} - "
+              f"{comp_domain[1]:.0f}")
         print(f"   Final extent        [m] : {x0:.0f} - "
               f"{x0+np.sum(hx):.0f}")
         extstr = f"   Min/max cell width  [m] : {min(hx):.0f} / "
@@ -507,7 +507,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         else:
             sastr = f"{sa:.3f}"
         print(extstr+f"{max(hxo):.0f} / {max(hx):.0f}")
-        print(alstr+f"/calc       : {sastr} / {ca:.3f}")
+        print(alstr+f"/comp       : {sastr} / {ca:.3f}")
         print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
         print()
 
@@ -665,7 +665,7 @@ def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
         # Get number of non-stretched cells
         n_nos = int(np.ceil((x1-x0)/min_width))
 
-        # Re-calculate min_width to fit with x0-x1-limits:
+        # Re-compute min_width to fit with x0-x1-limits:
         min_width = (x1-x0)/n_nos
 
         # Subtract one cell, because the standard scheme provides one
@@ -730,9 +730,9 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
                fact_min=0.2, fact_neg=5, fact_pos=None):
     r"""Get domain extent and minimum cell width as a function of skin depth.
 
-    Returns the extent of the calculation domain and the minimum cell width as
+    Returns the extent of the computation domain and the minimum cell width as
     a multiple of the skin depth, with possible user restrictions on minimum
-    calculation domain and range of possible minimum cell widths.
+    computation domain and range of possible minimum cell widths.
 
     .. math::
 
@@ -746,21 +746,21 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
     ----------
 
     x0 : float
-        Center of the calculation domain. Normally the source location.
+        Center of the computation domain. Normally the source location.
         Default is 0.
 
     freq : float
-        Frequency (Hz) to calculate the skin depth. The skin depth is a concept
+        Frequency (Hz) to compute the skin depth. The skin depth is a concept
         defined in the frequency domain. If a negative frequency is provided,
-        it is assumed that the calculation is carried out in the Laplace
-        domain. To calculate the skin depth, the value of `freq` is then
+        it is assumed that the computation is carried out in the Laplace
+        domain. To compute the skin depth, the value of `freq` is then
         multiplied by :math:`-2\pi`, to simulate the closest
         frequency-equivalent.
 
         Default is 1 Hz.
 
     res : float, optional
-        Resistivity (Ohm m) to calculate skin depth.
+        Resistivity (Ohm m) to compute skin depth.
         Default is 0.3 Ohm m (sea water).
 
     limits : None or list
@@ -770,7 +770,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         Default is None.
 
     min_width : None, float, or list of two floats
-        Minimum cell width is calculated as a function of skin depth:
+        Minimum cell width is computed as a function of skin depth:
         fact_min*sd. If `min_width` is a float, this is used. If a list of
         two values [min, max] are provided, they are used to restrain
         min_width. Default is None.
@@ -790,7 +790,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         Minimum cell width.
 
     domain : list
-        Start- and end-points of calculation domain.
+        Start- and end-points of computation domain.
 
     """
 
@@ -798,9 +798,9 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
     if fact_pos is None:
         fact_pos = fact_neg
 
-    # Calculate the skin depth.
+    # Compute the skin depth.
     skind = 503.3*np.sqrt(res/abs(freq))
-    if freq < 0:  # For Laplace-domain calculations.
+    if freq < 0:  # For Laplace-domain computations.
         skind /= np.sqrt(2*np.pi)
 
     # Estimate minimum cell width.
@@ -811,7 +811,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         else:
             h_min = np.clip(h_min, *min_width)
 
-    # Estimate calculation domain.
+    # Estimate computation domain.
     domain = [x0-fact_neg*skind, x0+fact_pos*skind]
     if limits is not None:  # Respect user input.
         domain = [min(limits[0], domain[0]), max(limits[1], domain[1])]
@@ -874,7 +874,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
             if x0 == domain[1]:
                 alr = alr[::-1]
 
-            # Calculate differences
+            # Compute differences
             hx = alr*np.diff(domain)/sum(alr)
 
         else:
@@ -889,7 +889,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
             al = a**np.arange(nl-1, -1, -1)
             ar = a**np.arange(1, nr+1)
 
-            # Calculate differences
+            # Compute differences
             if resp_domain:
                 # This version honours domain[0] and domain[1], but to achieve
                 # this it introduces one stretch-factor which is different from
