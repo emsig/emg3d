@@ -37,8 +37,7 @@ except ImportError:
     scooby = None
 
     class ScoobyReport:
-        def __init__(self, additional, core, optional, ncol, text_width, sort):
-            pass
+        pass
 try:
     import empymod
 except ImportError:
