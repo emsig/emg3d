@@ -141,9 +141,9 @@ def test_save_and_load(tmpdir, capsys):
     model = models.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
 
     # Save it.
-    io.save(tmpdir+'/test', emg3d=grid, discretize=grid2, model=model,
+    io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
             broken=grid3, a=None,
-            field=field, what={'f': field.fx, 12: 12}, backend="npz")
+            field=field, what={'f': field.fx, 12: 12})
     outstr, _ = capsys.readouterr()
     assert 'WARNING :: Could not serialize <broken>' in outstr
 
@@ -173,16 +173,23 @@ def test_save_and_load(tmpdir, capsys):
     assert "WARNING :: Could not de-serialize <meshes>" in outstr
 
     # Unknown keyword.
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="Unexpected "):
         io.load('ttt.npz', stupidkeyword='a')
 
     # Unknown backend/extension.
-    with pytest.raises(NotImplementedError):
-        io.save('ttt', backend='a')
-    with pytest.raises(NotImplementedError):
-        io.load('ttt.abc')
+    with pytest.raises(NotImplementedError, match="Backend 'what"):
+        io.save(tmpdir+'/testwrongbackend', something=1, backend='what?')
+    io.save(tmpdir+'/testwrongbackend.abc', something=1)
+    with pytest.raises(NotImplementedError, match="Extension '.abc'"):
+        io.load(tmpdir+'/testwrongbackend.abc')
+    if h5py:
+        io.load(tmpdir+'/testwrongbackend.abc.h5')
+    else:
+        io.load(tmpdir+'/testwrongbackend.abc.npz')
 
     # Ensure deprecated backend/extension still work.
+    if h5py:
+        io.save(tmpdir+'/ttt', backend='h5py')
     io.save(tmpdir+'/ttt', backend='numpy')
 
     # Test h5py.
@@ -205,7 +212,7 @@ def test_save_and_load(tmpdir, capsys):
             # Ensure deprecated backend/extension still work.
             io.save(tmpdir+'/ttt', backend='h5py')
         with pytest.raises(ImportError):
-            io.save(tmpdir+'/test-h5', grid=grid)
+            io.save(tmpdir+'/test.h5', grid=grid)
         with pytest.raises(ImportError):
             io.load(str(tmpdir+'/test-h5.h5'))
 

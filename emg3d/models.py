@@ -240,8 +240,7 @@ class Model:
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'])
         except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
+            raise KeyError(f"Variable {e} missing in `inp`.")
 
     # RESISTIVITIES
     @property
@@ -336,19 +335,17 @@ class Model:
 
         # Check for wrong size.
         if var.size not in [1, self.nC]:
-            print(f"* ERROR   :: Shape of {name} must be (), {self.vnC}, or "
-                  f"{self.nC}.\n             Provided: {var.shape}.")
-            raise ValueError("Wrong Shape")
+            raise ValueError(
+                    f"Shape of {name} must be (), {self.vnC}, or "
+                    f"{self.nC}.\nProvided: {var.shape}.")
 
         # Check 0 < val or 0 <= val.
         if not np.all(var > 0):
-            print(f"* ERROR   :: `{name}` must be all `0 < var`.")
-            raise ValueError("Parameter error")
+            raise ValueError(f"`{name}` must be all `0 < var`.")
 
         # Check val < inf.
         if not np.all(var < np.inf):
-            print(f"* ERROR   :: `{name}` must be all `var < inf`.")
-            raise ValueError("Parameter error")
+            raise ValueError(f"`{name}` must be all `var < inf`.")
 
         return var
 
