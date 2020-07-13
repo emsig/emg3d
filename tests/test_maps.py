@@ -101,7 +101,7 @@ def test_grid2grid():
     values = np.array([1.0, 2.0]).reshape(igrid.vnC)
 
     # Provide wrong dimension:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='There are 2 points and 1 values'):
         maps.grid2grid(igrid, values[1:, :, :], ogrid)
 
     # Simple, linear example.
@@ -201,7 +201,7 @@ def test_grid2grid():
     assert_allclose(fz, new_field.fz)
 
     # Ensure Field fails with 'volume'.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="``method='volume'`` not impl"):
         maps.grid2grid(grid, field, cgrid, method='volume')
 
 
@@ -220,12 +220,13 @@ def test_volume_average(njit):
             [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
             x0=np.array([0.5, 3.33, 5]))
 
-    values = np.arange(grid_in.nC, dtype=float).reshape(grid_in.vnC, order='F')
+    values = np.arange(grid_in.nC, dtype=np.float_).reshape(
+            grid_in.vnC, order='F')
 
     points = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
     new_points = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
 
-    # Calculate volume.
+    # Compute volume.
     vol = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'), grid_out.hz)
     vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
 

@@ -41,10 +41,10 @@ def test_get_hx_h0(capsys):
     info = (
         "   Skin depth          [m] : 2251\n"
         "   Survey domain       [m] : -2000 - 2000\n"
-        "   Calculation domain  [m] : -14692 - 15592\n"
+        "   Computation domain  [m] : -14692 - 15592\n"
         "   Final extent        [m] : -15698 - 15998\n"
         f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3382\n"
-        "   Alpha survey/calc       : "
+        "   Alpha survey/comp       : "
         f"{out1[2]['amin']:.3f} / {out1[2]['amax']:.3f}\n"
         "   Number of cells (s/c/r) : 20 (6/14/0)\n"
     )
@@ -74,13 +74,13 @@ def test_get_hx_h0(capsys):
 
     # Check dmin.
     assert out3[2]['dmin'] == 600
-    # Calculation domain has to be at least domain.
+    # Computation domain has to be at least domain.
     assert out3[1]+np.sum(out3[0]) > 14000
     assert out3[1] <= -11000
 
     # == D == Check failure.
     # (a) With raise.
-    with pytest.raises(ArithmeticError):
+    with pytest.raises(RuntimeError, match='No suitable grid found; '):
         meshes.get_hx_h0(
                 freq=.5, res=[10., 12.], fixed=900, domain=[-10000, 10000],
                 possible_nx=[20])
@@ -98,12 +98,12 @@ def test_get_hx_h0(capsys):
 
     # == E == Fixed boundaries
     # Too many values.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Maximum three fixed boundaries'):
         meshes.get_hx_h0(
             freq=1, res=1, fixed=[-900, -1000, 0, 5], domain=[-2000, 0],
             possible_nx=[64, 128])
     # Two additional values, but both on same side.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='2nd and 3rd fixed boundaries'):
         meshes.get_hx_h0(
             freq=1, res=1, fixed=[900, -1000, -1200], domain=[-2000, 0],
             possible_nx=[64, 128])
@@ -191,10 +191,8 @@ def test_get_cell_numbers(capsys):
     numbers = meshes.get_cell_numbers(max_nr=128, max_prime=5, min_div=3)
     assert_allclose([16, 24, 32, 40, 48, 64, 80, 96, 128], numbers)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Highest prime is 25, '):
         numbers = meshes.get_cell_numbers(max_nr=128, max_prime=25, min_div=3)
-    out, _ = capsys.readouterr()
-    assert "* ERROR   :: Highest prime is 25" in out
 
     numbers = meshes.get_cell_numbers(max_nr=50, max_prime=3, min_div=5)
     assert len(numbers) == 0
@@ -236,7 +234,7 @@ def test_TensorMesh():
     cdgrid = meshes.TensorMesh.from_dict(dgrid)
     assert_allclose(cdgrid.vol, emg3dgrid.vol)
     del dgrid['hx']
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError, match="Variable 'hx' missing in `inp`"):
         meshes.TensorMesh.from_dict(dgrid)
 
     # Check __eq__.

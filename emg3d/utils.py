@@ -70,10 +70,10 @@ __all__ = ['Fourier', 'Time', 'Report',  # The ones actually here
 
 # TIME DOMAIN
 class Fourier:
-    r"""Time-domain CSEM calculation.
+    r"""Time-domain CSEM computation.
 
     Class to carry out time-domain modelling with the frequency-domain code
-    `emg3d`. Instances of the class take care of calculating the required
+    `emg3d`. Instances of the class take care of computing the required
     frequencies, the interpolation from coarse, limited-band frequencies to the
     required frequencies, and carrying out the actual transform.
 
@@ -86,16 +86,16 @@ class Fourier:
     exact implementations of the Fourier transforms and its parameters.
     Note that also the `verb`-argument follows the definition in `empymod`.
 
-    The mapping from calculated frequencies to the frequencies required for the
+    The mapping from computed frequencies to the frequencies required for the
     Fourier transform is done in three steps:
 
     - Data for :math:`f>f_\mathrm{max}` is set to 0+0j.
     - Data for :math:`f<f_\mathrm{min}` is interpolated by adding an additional
       data point at a frequency of 1e-100 Hz. The data for this point is
-      ``data.real[0]+0j``, hence the real part of the lowest calculated
+      ``data.real[0]+0j``, hence the real part of the lowest computed
       frequency and zero imaginary part. Interpolation is carried out using
       PCHIP :func:`scipy.interpolate.pchip_interpolate`.
-    - Data for :math:`f_\mathrm{min}\le f \le f_\mathrm{max}` is calculated
+    - Data for :math:`f_\mathrm{min}\le f \le f_\mathrm{max}` is computed
       with cubic spline interpolation (on a log-scale)
       :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
 
@@ -111,12 +111,12 @@ class Fourier:
         Desired times (s).
 
     fmin, fmax : float
-        Minimum and maximum frequencies (Hz) to calculate:
+        Minimum and maximum frequencies (Hz) to compute:
 
           - Data for freq > fmax is set to 0+0j.
           - Data for freq < fmin is interpolated, using an extra data-point at
             f = 1e-100 Hz, with value data.real[0]+0j. (Hence zero imaginary
-            part, and the lowest calculated real value.)
+            part, and the lowest computed real value.)
 
     signal : {0, 1, -1}, optional
         Source signal, default is 0:
@@ -153,12 +153,12 @@ class Fourier:
 
 
     freq_inp : array
-        Frequencies to use for calculation. Mutually exclusive with
+        Frequencies to use for computation. Mutually exclusive with
         `every_x_freq`.
 
     every_x_freq : int
         Every `every_x_freq`-th frequency of the required frequency-range is
-        used for calculation. Mutually exclusive with `freq_calc`.
+        used for computation. Mutually exclusive with `freq_calc`.
 
 
     """
@@ -222,13 +222,13 @@ class Fourier:
 
     @property
     def freq_calc_i(self):
-        """Indices of `freq_coarse` which have to be calculated."""
+        """Indices of `freq_coarse` which have to be computed."""
         ind = (self.freq_coarse >= self.fmin) & (self.freq_coarse <= self.fmax)
         return ind
 
     @property
     def freq_calc(self):
-        """Frequencies at which the model has to be calculated."""
+        """Frequencies at which the model has to be computed."""
         return self.freq_coarse[self.freq_calc_i]
 
     @property
@@ -242,7 +242,7 @@ class Fourier:
 
         In fact, it is dow via interpolation, using an extra data-point at f =
         1e-100 Hz, with value data.real[0]+0j. (Hence zero imaginary part, and
-        the lowest calculated real value.)
+        the lowest computed real value.)
         """
         return self.freq_req[self.freq_extrapolate_i]
 
@@ -290,23 +290,23 @@ class Fourier:
 
     @property
     def fmax(self):
-        """Maximum frequency (Hz) to calculate."""
+        """Maximum frequency (Hz) to compute."""
         return self._fmax
 
     @fmax.setter
     def fmax(self, fmax):
-        """Update maximum frequency (Hz) to calculate."""
+        """Update maximum frequency (Hz) to compute."""
         self._fmax = fmax
         self._print_freq_calc()
 
     @property
     def fmin(self):
-        """Minimum frequency (Hz) to calculate."""
+        """Minimum frequency (Hz) to compute."""
         return self._fmin
 
     @fmin.setter
     def fmin(self, fmin):
-        """Update minimum frequency (Hz) to calculate."""
+        """Update minimum frequency (Hz) to compute."""
         self._fmin = fmin
         self._print_freq_calc()
 
@@ -350,7 +350,7 @@ class Fourier:
         self._check_time()
 
     def interpolate(self, fdata):
-        """Interpolate from calculated data to required data.
+        """Interpolate from computed data to required data.
 
         Parameters
         ----------
@@ -366,7 +366,7 @@ class Fourier:
         """
 
         # Pre-allocate result.
-        out = np.zeros(self.freq_req.size, dtype=complex)
+        out = np.zeros(self.freq_req.size, dtype=np.complex128)
 
         # 1. Interpolate between fmin and fmax.
 
@@ -387,7 +387,7 @@ class Fourier:
         # 2. Extrapolate from freq_req.min to fmin using PCHIP.
 
         # 2.a Extend freq_req/data by adding a point at 1e-100 Hz with
-        # - same real part as lowest calculated frequency and
+        # - same real part as lowest computed frequency and
         # - zero imaginary part.
         freq_ext = np.r_[1e-100, self.freq_calc]
         data_ext = np.r_[fdata[0].real-1e-100j, fdata]
@@ -401,7 +401,7 @@ class Fourier:
         return out
 
     def freq2time(self, fdata, off):
-        """Calculate corresponding time-domain signal.
+        """Compute corresponding time-domain signal.
 
         Carry out the actual Fourier transform.
 
@@ -420,7 +420,7 @@ class Fourier:
             Time-domain data corresponding to Fourier.time.
 
         """
-        # Interpolate the calculated data at the required frequencies.
+        # Interpolate the computed data at the required frequencies.
         inp_data = self.interpolate(fdata)
 
         # Carry out the Fourier transform.
@@ -473,7 +473,7 @@ class Fourier:
                     self.freq_req, "   Req. freq  [Hz] : ", self.verb)
 
     def _print_freq_calc(self):
-        """Print actually calculated frequency range."""
+        """Print actually computed frequency range."""
         if self.verb > 2:
             empymod.utils._prnt_min_max_val(
                     self.freq_calc, "   Calc. freq [Hz] : ", self.verb)

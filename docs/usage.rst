@@ -105,7 +105,7 @@ origin, with a 10 Hz signal of 1 A.
     >>> sfield = emg3d.fields.get_source_field(
     >>>     grid, src=[0, 0, 0, 0, 0], freq=10.0)
 
-Now we can calculate the electric field with ``emg3d``:
+Now we can compute the electric field with ``emg3d``:
 
 .. code-block:: python
 
@@ -143,7 +143,7 @@ Now we can calculate the electric field with ``emg3d``:
 
     :: emg3d END   :: 15:24:42 :: runtime = 0:00:02
 
-So the calculation required seven multigrid F-cycles and took just a bit more
+So the computation required seven multigrid F-cycles and took just a bit more
 than 2 seconds. It was able to coarsen in each dimension four times, where the
 input grid had 49,152 cells, and the coarsest grid had 12 cells.
 
@@ -166,7 +166,7 @@ Projects which can be used to compare or validate the results are, e.g.,
 `empymod <https://empymod.github.io>`_ for layered models or `SimPEG
 <https://simpeg.xyz>`_ for 3D models. It is also possible to create a
 geological model with `GemPy <https://www.gempy.org>`_ and, again via
-discretize, move it to emg3d to calculate CSEM responses for it.
+discretize, move it to emg3d to compute CSEM responses for it.
 
 Have a look at the `gallery <https://empymod.github.io/emg3d-gallery>`_ for
 many examples of how to use emg3d together with the mentioned projects and
@@ -187,7 +187,7 @@ Here a few additional information.
   are no new nodes created as coarsening is done by combining adjacent
   cells. The more times the grid dimension can be divided by two the better it
   is suited for MG. Ideally, the dimension of the coarsest grid should be a low
-  prime number :math:`p`, for which good sizes can then be calculated with
+  prime number :math:`p`, for which good sizes can then be computed with
   :math:`p 2^n`. Good grid sizes (in each direction) up to 1024 are
 
   - :math:`2·2^{0, 1, ..., 9}`: 2,  4,  8, 16,  32,  64, 128, 256, 512, 1024,

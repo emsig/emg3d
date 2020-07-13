@@ -168,7 +168,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 1: Print warnings.
         - 2: Print runtime and information about the method.
         - 3: Print additional information for each MG-cycle.
-        - 4: Print everything (slower due to additional error calculations).
+        - 4: Print everything (slower due to additional error computations).
         - -1: Print one-liner (dynamically updated).
 
     **kwargs : Optional solver options:
@@ -260,7 +260,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>> # with a frequency of 10 Hz.
     >>> sfield = emg3d.fields.get_source_field(
     >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
-    >>> # Calculate the electric signal.
+    >>> # Compute the electric signal.
     >>> efield = emg3d.solve(grid, model, sfield, verb=3)
     >>> # Get the corresponding magnetic signal.
     >>> hfield = emg3d.fields.get_h_field(grid, model, efield)
@@ -307,16 +307,16 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
                f"v{utils.__version__}\n", 1)
     var.cprint(var, 1)
 
-    # Calculate reference error for tolerance.
+    # Compute reference error for tolerance.
     var.l2_refe = sl.norm(sfield)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
     if sfield.freq is None:
-        print("* ERROR   :: Source field is missing frequency information;\n"
-              "             Create it with `emg3d.fields.get_source_field`, or"
-              "\n             initiate it with `emg3d.fields.SourceField`.")
-        raise ValueError('Input data types')
+        raise ValueError(
+                "Source field is missing frequency information;\n"
+                "Create it with `emg3d.fields.get_source_field`, or\n"
+                "initiate it with `emg3d.fields.SourceField`.")
 
     # Get volume-averaged model values.
     vmodel = models.VolumeModel(grid, model, sfield)
@@ -332,11 +332,10 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
         # Ensure efield has same data type as sfield.
         if sfield.dtype != efield.dtype:
-            print("* ERROR   :: Source field and electric field must have the "
-                  "same dtype;\n             complex (f-domain) or real (s-"
-                  f"domain). Provided:\n             sfield: {sfield.dtype}; "
-                  f"efield: {efield.dtype}.")
-            raise ValueError('Input data types')
+            raise ValueError(
+                    "Source field and electric field must have the\n same "
+                    "dtype; complex (f-domain) or real (s-domain).\n Provided:"
+                    f"sfield: {sfield.dtype}; efield: {efield.dtype}.")
 
         # If provided efield is missing frequency information, add it from the
         # source field.
@@ -491,7 +490,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         cycmax = new_cycmax
     cyc = 0  # Initiate cycle count.
 
-    # Calculate current error (l2-norms).
+    # Compute current error (l2-norms).
     l2_last = residual(grid, model, sfield, efield, True)
 
     # Initiate the error-array to check for stagnation.
@@ -510,7 +509,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
-        # Smooth and re-calculate error.
+        # Smooth and re-compute error.
         smoothing(grid, model, sfield, efield, var.nu_init, var.lr_dir)
 
         # Print initial smoothing info.
@@ -652,7 +651,7 @@ def krylov(grid, model, sfield, efield, var):
         # Cast current efield to Field instance.
         efield = fields.Field(grid, efield)
 
-        # Calculate A x.
+        # Compute A x.
         rfield = fields.Field(grid, dtype=efield.dtype, freq=freq)
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
@@ -746,7 +745,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     direct solver.
 
 
-    This is a simple wrapper for the jitted calculation in
+    This is a simple wrapper for the jitted computation in
     :func:`emg3d.core.gauss_seidel`, :func:`emg3d.core.gauss_seidel_x`,
     :func:`emg3d.core.gauss_seidel_y`, and
     :func:`emg3d.core.gauss_seidel_z` (`@njit` can not [yet] access class
@@ -788,7 +787,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
 
-    # Calculate and store fields (in-place)
+    # Compute and store fields (in-place)
     if lr_dir == 0:             # Standard MG
         core.gauss_seidel(efield.fx, efield.fy, efield.fz, *inp)
 
@@ -858,7 +857,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     if sc_dir in [3, 4, 5]:  # No coarsening in z-direction.
         rz = 1
 
-    # Calculate distances of coarse grid.
+    # Compute distances of coarse grid.
     ch = [np.diff(grid.vectorNx[::rx]),
           np.diff(grid.vectorNy[::ry]),
           np.diff(grid.vectorNz[::rz])]
@@ -891,7 +890,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     # Get the weights (Equation 9 of [Muld06]_).
     wx, wy, wz = _get_restriction_weights(grid, cgrid, sc_dir)
 
-    # Calculate the source terms (Equation 8 in [Muld06]_).
+    # Compute the source terms (Equation 8 in [Muld06]_).
     # Initiate zero field.
     csfield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
     core.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
@@ -981,7 +980,7 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
 
 def residual(grid, model, sfield, efield, norm=False):
-    r"""Calculating the residual.
+    r"""Computing the residual.
 
     Returns the complete residual as given in [Muld06]_, page 636, middle of
     the right column:
@@ -993,7 +992,7 @@ def residual(grid, model, sfield, efield, norm=False):
                      - \nabla \times \mu_\mathrm{r}^{-1} \nabla \times
                        \mathbf{E} \right) .
 
-    This is a simple wrapper for the jitted calculation in
+    This is a simple wrapper for the jitted computation in
     :func:`emg3d.core.amat_x` (`@njit` can not [yet] access class
     attributes). See :func:`emg3d.core.amat_x` for more details and
     corresponding theory.
@@ -1150,7 +1149,7 @@ class MGParameters:
         # Store maximum division-by-two level for each dimension.
         # After that, clevel = [nx, ny, nz], where nx, ny, and nz are the
         # number of times you can divide by two in this dimension.
-        clevel = np.zeros(3, dtype=int)
+        clevel = np.zeros(3, dtype=np.int_)
         for i in range(3):
             n = self.vnC[i]
             while n % 2 == 0 and n > 2:
@@ -1200,10 +1199,10 @@ class MGParameters:
 
         # Check at least two cells in each direction
         if np.any(np.array(self.vnC) < 2):
-            print("* ERROR   :: Nr. of cells must be at least two in each\n"
-                  "             direction. Provided shape: "
-                  f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
-            raise ValueError('nCx/nCy/nCz')
+            raise ValueError(
+                    "Nr. of cells must be at least two in each direction\n"
+                    "Provided shape: "
+                    f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
 
     def cprint(self, info, verbosity, **kwargs):
         """Conditional printing.
@@ -1268,12 +1267,12 @@ class MGParameters:
 
             # Ensure numbers are within 0 <= sc_dir <= 3
             if np.any(sc_cycle < 0) or np.any(sc_cycle > 3):
-                print("* ERROR   :: `semicoarsening` must be one of  "
-                      f"(False, True, 0, 1, 2, 3).\n"
-                      f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle, "
-                      f"e.g. 1213.\n{'Provided:':>23} "
-                      f"semicoarsening={self.semicoarsening}.")
-                raise ValueError('semicoarsening')
+                raise ValueError(
+                        "`semicoarsening` must be one of "
+                        "(False, True, 0, 1, 2, 3).\n"
+                        f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle,"
+                        f" e.g. 1213.\n{'Provided:':>23} "
+                        f"semicoarsening={self.semicoarsening}.")
 
         # Get first (or only) direction.
         if self.sc_cycle:
@@ -1303,12 +1302,12 @@ class MGParameters:
 
             # Ensure numbers are within 0 <= lr_dir <= 7
             if np.any(lr_cycle < 0) or np.any(lr_cycle > 7):
-                print("* ERROR   :: `linerelaxation` must be one of  "
-                      f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
-                      f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
-                      f"to cycle, e.g. 1213.\n{'Provided:':>23} "
-                      f"linerelaxation={self.linerelaxation}.")
-                raise ValueError('linerelaxation')
+                raise ValueError(
+                        "`linerelaxation` must be one of "
+                        f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
+                        f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
+                        f"to cycle, e.g. 1213.\n{'Provided:':>23} "
+                        f"linerelaxation={self.linerelaxation}.")
 
         # Get first (only) direction
         if self.lr_cycle:
@@ -1329,15 +1328,14 @@ class MGParameters:
         if self.sslsolver is True:
             self.sslsolver = 'bicgstab'
         elif self.sslsolver is not False and self.sslsolver not in solvers:
-            print("* ERROR   :: `sslsolver` must be True, False, or one of")
-            print(f"             {solvers}.")
-            print(f"             Provided: sslsolver={self.sslsolver!r}.")
-            raise ValueError('sslsolver!r')
+            raise ValueError(
+                    f"`sslsolver` must be True, False, or one of {solvers}.\n"
+                    f"Provided: sslsolver={self.sslsolver!r}.")
 
         if self.cycle not in ['F', 'V', 'W', None]:
-            print("* ERROR   :: `cycle` must be one of {'F', 'V', 'W', None}."
-                  f"\n             Provided: cycle={self.cycle}.")
-            raise ValueError('cycle')
+            raise ValueError(
+                    "`cycle` must be one of {'F', 'V', 'W', None}.\n"
+                    f"Provided: cycle={self.cycle}.")
 
         # Add maximum MG cycles depending on cycle
         if self.cycle in ['F', 'W']:
@@ -1347,10 +1345,9 @@ class MGParameters:
 
         # Ensure at least cycle or sslsolver is set
         if not self.sslsolver and not self.cycle:
-            print("* ERROR   :: At least `cycle` or `sslsolver` is "
-                  "required.\n             Provided input: "
-                  f"cycle={self.cycle}; sslsolver={self.sslsolver}.")
-            raise ValueError('cycle/sslsolver')
+            raise ValueError(
+                    "At least `cycle` or `sslsolver` is required.\nProvided"
+                    f"input: cycle={self.cycle}; sslsolver={self.sslsolver}.")
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
         self.ssl_maxit = 0             # Maximum iteration
@@ -1372,7 +1369,7 @@ class RegularGridProlongator:
 
     The main difference (besides the pre-sets) is that this version allows to
     initiate an instance with the coarse and fine grids. This initialize will
-    calculate the required weights, and it has therefore only to be done once.
+    compute the required weights, and it has therefore only to be done once.
 
     After this, interpolating values from the coarse to the fine grid can be
     carried out much faster.
@@ -1429,7 +1426,7 @@ class RegularGridProlongator:
         return result
 
     def _set_edges_and_weights(self, xy, cxy):
-        """Calculate weights to go from xy- to cxy-coordinates."""
+        """Compute weights to go from xy- to cxy-coordinates."""
 
         # Find relevant edges between which cxy are situated.
         indices = []
@@ -1448,7 +1445,7 @@ class RegularGridProlongator:
         # Find relevant values; each i and i+1 represents a edge.
         self.edges = itertools.product(*[[i, i + 1] for i in indices])
 
-        # Calculate weights.
+        # Compute weights.
         self.weight = np.ones((4, self.size))
         for n, edge_indices in enumerate(self._get_edges_copy()):
             partial_weight = 1.
@@ -1603,7 +1600,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
     if var._first_cycle:
 
         # Cast levels into array, get maximum.
-        _lvl_all = np.array(var._level_all, dtype=int)
+        _lvl_all = np.array(var._level_all, dtype=np.int_)
         lvl_max = np.max(_lvl_all)
 
         # Get levels, multiply by difference to get +/-.
@@ -1810,8 +1807,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
                 cgrid.vectorCCx, cgrid.hx)
     else:
-        wxlr = np.zeros(grid.nNx, dtype=float)
-        wx0 = np.ones(grid.nNx, dtype=float)
+        wxlr = np.zeros(grid.nNx, dtype=np.float64)
+        wx0 = np.ones(grid.nNx, dtype=np.float64)
         wx = (wxlr, wx0, wxlr)
 
     if sc_dir not in [2, 4, 6]:
@@ -1819,8 +1816,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.vectorNy, grid.vectorCCy, grid.hy, cgrid.vectorNy,
                 cgrid.vectorCCy, cgrid.hy)
     else:
-        wylr = np.zeros(grid.nNy, dtype=float)
-        wy0 = np.ones(grid.nNy, dtype=float)
+        wylr = np.zeros(grid.nNy, dtype=np.float64)
+        wy0 = np.ones(grid.nNy, dtype=np.float64)
         wy = (wylr, wy0, wylr)
 
     if sc_dir not in [3, 4, 5]:
@@ -1828,15 +1825,15 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.vectorNz, grid.vectorCCz, grid.hz, cgrid.vectorNz,
                 cgrid.vectorCCz, cgrid.hz)
     else:
-        wzlr = np.zeros(grid.nNz, dtype=float)
-        wz0 = np.ones(grid.nNz, dtype=float)
+        wzlr = np.zeros(grid.nNz, dtype=np.float64)
+        wz0 = np.ones(grid.nNz, dtype=np.float64)
         wz = (wzlr, wz0, wzlr)
 
     return wx, wy, wz
 
 
 def _get_prolongation_coordinates(grid, d1, d2):
-    """Calculate required coordinates of finer grid for prolongation."""
+    """Compute required coordinates of finer grid for prolongation."""
     D2, D1 = np.broadcast_arrays(
             getattr(grid, 'vectorN'+d2), getattr(grid, 'vectorN'+d1)[:, None])
     return np.r_[D1.ravel('F'), D2.ravel('F')].reshape(-1, 2, order='F')

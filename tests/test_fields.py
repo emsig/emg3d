@@ -1,4 +1,5 @@
 import pytest
+import shelve
 import empymod
 import numpy as np
 from scipy import constants
@@ -75,24 +76,18 @@ def test_get_source_field(capsys):
     out, _ = capsys.readouterr()  # Empty capsys
 
     # Provide wrong source definition. Ensure it fails.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Source is wrong defined'):
         sfield = fields.get_source_field(grid, [0, 0, 0], 1)
-    out, _ = capsys.readouterr()
-    assert "ERROR   :: Source is wrong defined. Must be" in out
 
     # Put source way out. Ensure it fails.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Provided source outside grid'):
         src = [1e10, 1e10, 1e10, 0, 0]
         sfield = fields.get_source_field(grid, src, 1)
-    out, _ = capsys.readouterr()
-    assert "ERROR   :: Provided source outside grid" in out
 
     # Put finite dipole of zero length. Ensure it fails.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Provided source is a point dipole'):
         src = [0, 0, 100, 100, -200, -200]
         sfield = fields.get_source_field(grid, src, 1)
-    out, _ = capsys.readouterr()
-    assert "* ERROR   :: Provided source is a point dipole" in out
 
     # Same for Laplace domain
     src = [100, 200, 300, 27, 31]
@@ -252,13 +247,20 @@ def test_field(tmpdir):
 
     edict = ee.to_dict()
     del edict['field']
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError, match="Variable 'field' missing"):
         fields.Field.from_dict(edict)
 
     # Set a dimension from the mesh to None, ensure field fails.
     grid.nEx = None
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Provided grid must be a 3D grid'):
         fields.Field(grid)
+
+    # Ensure it can be pickled.
+    with shelve.open(tmpdir+'/test') as db:
+        db['field'] = ee2
+    with shelve.open(tmpdir+'/test') as db:
+        test = db['field']
+    assert_allclose(test, ee2)
 
 
 def test_source_field():
@@ -274,16 +276,16 @@ def test_source_field():
     assert hasattr(ss, 'vx')
 
     # Check 0 Hz frequency.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`freq` must be >0'):
         ss = fields.SourceField(grid, freq=0)
 
     # Check no frequency.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='SourceField requires the frequency'):
         ss = fields.SourceField(grid)
 
     sdict = ss.to_dict()
     del sdict['field']
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError, match="Variable 'field' missing in `inp`"):
         fields.SourceField.from_dict(sdict)
 
 
@@ -327,7 +329,7 @@ def test_get_receiver():
     field = fields.Field(grid)
 
     # Provide wrong rec_loc input:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Coordinates needs to be in the'):
         fields.get_receiver(grid, field.fx, (1, 1))
 
     # Simple linear interpolation test.
@@ -399,11 +401,11 @@ def test_get_receiver_response():
     efield.field = np.ones(efield.size) + 1j*np.ones(efield.size)
 
     # Provide wrong rec_loc input:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`rec` needs to be in the form'):
         fields.get_receiver_response(grid, efield, (1, 1, 1))
 
     # Provide particular field instead of field instance:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`field` must be a `Field`-inst'):
         fields.get_receiver_response(grid, efield.fx, (1, 1, 1, 0, 0))
 
     # Comparison to `get_receiver`.

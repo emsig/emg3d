@@ -2,21 +2,42 @@ Changelog
 #########
 
 
+recent versions
+"""""""""""""""
+
 *latest*
 --------
 
-- `fields`: New function `get_receiver_response`, which returns the response
-  for arbitrarily rotated receivers.
-- `io`: New `backend='json'`, writes to a hierarchical, plain json file.
-  Changed backend name to actual file extension: `npz` (instead of `numpy`);
-  `h5` (instead of `h5py`), and new `json`. (`numpy` and `h5py` are
-  deprecated.)
-- Added `__eq__` to `models.TensorMesh` to compare meshes.
-- Improvements to `Field` and `SourceField`:
+- Modules:
 
-  - `_sval` and `_smu0` not stored any longer, derived from `_freq`.
-  - `SourceField` is now using the `copy()` and `from_dict()` from its parents
-    class `Field`.
+  - `fields`:
+
+    - Function `get_receiver_response` (**new**), which returns the response
+      for arbitrarily rotated receivers.
+    - Improvements to `Field` and `SourceField`:
+
+      - `_sval` and `_smu0` not stored any longer, derived from `_freq`.
+      - `SourceField` is now using the `copy()` and `from_dict()` from its
+        parents class `Field`.
+
+  - `io`:
+
+    - File-format `json` (**new**), writes to a hierarchical, plain json file.
+    - **Deprecated** the use of `backend`, it uses the file extension of
+      `fname` instead.
+    - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and
+      new `.json`.
+    - New parameter `collect_classes`, which can be used to switch-off the
+      collection of the main classes in root-level dictionaries.
+
+  - `meshes`:
+
+    - Added `__eq__` to `models.TensorMesh` to compare meshes.
+
+- Removed deprecated functions `data_write` and `data_read`.
+
+- Much bookkeeping (improve error raising and checking; chaining errors, numpy
+  types, etc).
 
 
 *v0.11.0* : Refactor
@@ -60,6 +81,9 @@ were removed, however.
   - Fixed `to_dict`, `from_dict`, and `copy` for the `SourceField`.
   - Fixed `io` for `SourceField`, that was not implemented properly.
 
+
+v0.8.0 - v0.10.x
+""""""""""""""""
 
 *v0.10.1* : Zero Source
 -----------------------
@@ -295,6 +319,9 @@ were removed, however.
   - Changed parameter ``h_min`` to ``min_width`` for consistency reasons in
     ``utils.get_stretched_h``.
 
+
+v0.1.0 - v0.7.x
+"""""""""""""""
 
 *v0.7.1* : JOSS article
 -----------------------

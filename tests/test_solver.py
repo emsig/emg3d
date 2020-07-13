@@ -141,10 +141,8 @@ def test_solver_homogeneous(capsys):
     # Provide an initial source-field without frequency information.
     wrong_sfield = fields.Field(grid)
     wrong_sfield.field = sfield.field
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Source field is missing frequency"):
         solver.solve(grid, model, wrong_sfield, efield=efield, verb=2)
-    out, _ = capsys.readouterr()
-    assert "ERROR   :: Source field is missing frequency information" in out
 
     # Check stagnation by providing an almost zero source field.
     _ = solver.solve(grid, model, sfield*0+1e-20, maxit=100)
@@ -251,9 +249,9 @@ def test_solver_homogeneous_laplace():
     assert_allclose(dat['bicresult'], efield)
 
     # If efield is complex, assert it fails.
-    efield = fields.Field(grid, dtype=complex)
+    efield = fields.Field(grid, dtype=np.complex_)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Source field and electric field'):
         efield = solver.solve(grid, model, sfield, efield=efield, verb=1)
 
 
@@ -348,9 +346,9 @@ def test_restriction():
     # Get volume-averaged model parameters.
     vmodel = models.VolumeModel(grid, model, sfield)
 
-    rx = np.arange(sfield.fx.size, dtype=complex).reshape(sfield.fx.shape)
-    ry = np.arange(sfield.fy.size, dtype=complex).reshape(sfield.fy.shape)
-    rz = np.arange(sfield.fz.size, dtype=complex).reshape(sfield.fz.shape)
+    rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(sfield.fx.shape)
+    ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(sfield.fy.shape)
+    rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(sfield.fz.shape)
     rr = fields.Field(rx, ry, rz)
 
     # Restrict it
@@ -417,7 +415,7 @@ def test_residual():
             vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
             grid.hy, grid.hz)
 
-    # Calculate residual
+    # Compute residual
     out = solver.residual(grid, vmodel, sfield, efield)
     outnorm = solver.residual(grid, vmodel, sfield, efield, True)
 
@@ -466,7 +464,7 @@ def test_mgparameters():
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=2,
                               linerelaxation=False, vnC=vnC, verb=1)
     assert 'semicoarsening : True [2]' in var.__repr__()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`semicoarsening` must be one of'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=5,
                             linerelaxation=False, vnC=vnC, verb=1)
 
@@ -481,12 +479,12 @@ def test_mgparameters():
                               linerelaxation=1, vnC=vnC, verb=1, clevel=1)
     assert 'linerelaxation : True [1]' in var.__repr__()
     assert_allclose(var.clevel, 1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`linerelaxation` must be one of'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
                             linerelaxation=-9, vnC=vnC, verb=1)
 
     # 3. sslsolver and cycle
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='At least `cycle` or `sslsolver`'):
         solver.MGParameters(cycle=None, sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=vnC, verb=1)
     var = solver.MGParameters(cycle='F', sslsolver=True, semicoarsening=True,
@@ -494,18 +492,18 @@ def test_mgparameters():
     assert "sslsolver : 'bicgstab'" in var.__repr__()
     assert var.ssl_maxit == 33
     assert var.maxit == 3
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`sslsolver` must be True'):
         solver.MGParameters(cycle='F', sslsolver='abcd', semicoarsening=0,
                             linerelaxation=False, vnC=vnC, verb=1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`sslsolver` must be True'):
         solver.MGParameters(cycle='F', sslsolver=4, semicoarsening=0,
                             linerelaxation=False, vnC=vnC, verb=1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='`cycle` must be one of'):
         solver.MGParameters(cycle='G', sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=vnC, verb=1)
 
     # 4. Wrong grid size
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='Nr. of cells must be at least'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=(1, 2, 3), verb=1)
 
@@ -513,7 +511,7 @@ def test_mgparameters():
 def test_RegularGridProlongator():
 
     def prolon_scipy(grid, cgrid, efield, cefield, yz_points):
-        """Calculate SciPy alternative."""
+        """Compute SciPy alternative."""
         for ixc in range(cgrid.nCx):
             # Bilinear interpolation in the y-z plane
             fn = si.RegularGridInterpolator(
@@ -528,7 +526,7 @@ def test_RegularGridProlongator():
         return efield
 
     def prolon_emg3d(grid, cgrid, efield, cefield, yz_points):
-        """Calculate emg3d alternative."""
+        """Compute emg3d alternative."""
         fn = solver.RegularGridProlongator(
                 cgrid.vectorNy, cgrid.vectorNz, yz_points)
 

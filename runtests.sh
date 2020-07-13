@@ -19,9 +19,8 @@ where:
 # Set default values
 PYTHON3VERSION="7 8"
 PRINT="/dev/null"
-PCKGS="numpy scipy pytest pytest-cov numba h5py"
+PCKGS="empymod h5py pytest pytest-cov pytest-flake8 scooby"
 PROPS="--flake8"
-INST="pytest-flake8 scooby"
 WARN=""
 
 # Get Optional Input
@@ -70,19 +69,13 @@ for i in ${PYTHON3VERSION[@]}; do
   printf '%*s\n' "${LENGTH}" '' | tr ' ' -
   printf "\e[0m\n"
 
-  # Create venv
+  # Create virtual environment
   if [ ! -d "$HOME/anaconda3/envs/$NAME" ]; then
-    conda create -y -n $NAME python=3.${i} $PCKGS &> $PRINT
+    conda create -y -c conda-forge -n $NAME python=3.${i} $PCKGS &> $PRINT
   fi
 
-  # Activate venv
+  # Activate virtual environment
   source activate $NAME
-
-  # Install flake8
-  if [ ! -d "$HOME/anaconda3/envs"+$NAME ]; then
-    conda install -y -c conda-forge empymod &> $PRINT
-    pip install $INST &> $PRINT
-  fi
 
   # Run tests
   pytest --cov=emg3d $PROPS $WARN

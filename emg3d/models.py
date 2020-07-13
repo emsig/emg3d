@@ -58,7 +58,7 @@ class Model:
     mu_r : None, float, or ndarray
         Relative magnetic permeability (isotropic). If ndarray it must have the
         shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
-        corresponds to 1., but avoids the calculation of zeta. Magnetic
+        corresponds to 1., but avoids the computation of zeta. Magnetic
         permeability has to be bigger than zero and smaller than infinity.
 
     epsilon_r : None, float, or ndarray
@@ -240,8 +240,7 @@ class Model:
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'])
         except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     # RESISTIVITIES
     @property
@@ -332,23 +331,21 @@ class Model:
             return None
 
         # Cast it to floats, ravel.
-        var = np.asarray(var, dtype=float).ravel('F')
+        var = np.asarray(var, dtype=np.float64).ravel('F')
 
         # Check for wrong size.
         if var.size not in [1, self.nC]:
-            print(f"* ERROR   :: Shape of {name} must be (), {self.vnC}, or "
-                  f"{self.nC}.\n             Provided: {var.shape}.")
-            raise ValueError("Wrong Shape")
+            raise ValueError(
+                    f"Shape of {name} must be (), {self.vnC}, or "
+                    f"{self.nC}.\nProvided: {var.shape}.")
 
         # Check 0 < val or 0 <= val.
         if not np.all(var > 0):
-            print(f"* ERROR   :: `{name}` must be all `0 < var`.")
-            raise ValueError("Parameter error")
+            raise ValueError(f"`{name}` must be all `0 < var`.")
 
         # Check val < inf.
         if not np.all(var < np.inf):
-            print(f"* ERROR   :: `{name}` must be all `var < inf`.")
-            raise ValueError("Parameter error")
+            raise ValueError(f"`{name}` must be all `var < inf`.")
 
         return var
 
@@ -515,7 +512,7 @@ class VolumeModel:
         # Initiate eta
         eta = field.smu0*grid.vol.reshape(grid.vnC, order='F')
 
-        # Calculate eta depending on epsilon.
+        # Compute eta depending on epsilon.
         if model.epsilon_r is None:  # Diffusive approximation.
             eta /= getattr(model, name)
 

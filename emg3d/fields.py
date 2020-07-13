@@ -49,7 +49,7 @@ class Field(np.ndarray):
 
     A `Field` can be initiated in three ways:
 
-    1. ``Field(grid, dtype=complex)``:
+    1. ``Field(grid, dtype=np.complex128)``:
        Calling it with a :class:`emg3d.meshes.TensorMesh` instance returns a
        `Field` instance of correct dimensions initiated with zeroes of data
        type `dtype`.
@@ -86,7 +86,7 @@ class Field(np.ndarray):
         Default: complex.
 
     freq : float, optional
-        Source frequency (Hz), used to calculate the Laplace parameter `s`.
+        Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
 
         - `freq` > 0: Frequency domain, hence
@@ -98,8 +98,8 @@ class Field(np.ndarray):
 
     """
 
-    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
-                freq=None):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None,
+                dtype=np.complex128, freq=None):
         """Initiate a new Field instance."""
 
         # Collect field
@@ -131,18 +131,17 @@ class Field(np.ndarray):
             # Ensure the grid has three dimensions.
             # (Can happend with a 1D or 2D discretize mesh.)
             if None in [obj.nEx, obj.nEy, obj.nEz]:
-                print("* ERROR   :: Provided grid must be a 3D grid.")
-                raise ValueError
+                raise ValueError("Provided grid must be a 3D grid.")
 
         # Store frequency
         if freq is None and hasattr(fy_or_field, 'freq'):
             freq = fy_or_field._freq
         obj._freq = freq
         if freq == 0.0:
-            print("* ERROR   :: `freq` must be >0 (frequency domain) "
-                  "or <0 (Laplace domain).\n"
-                  f"             Provided frequency: {freq} Hz.")
-            raise ValueError("Frequency error")
+            raise ValueError(
+                    "`freq` must be >0 (frequency domain) "
+                    "or <0 (Laplace domain).\n"
+                    f"Provided frequency: {freq} Hz.")
 
         return obj
 
@@ -164,7 +163,7 @@ class Field(np.ndarray):
         => https://stackoverflow.com/a/26599346
         """
         # Get the parent's __reduce__ tuple.
-        pickled_state = super(Field, self).__reduce__()
+        pickled_state = super().__reduce__()
 
         # Create our own tuple to pass to __setstate__.
         new_state = pickled_state[2]
@@ -187,7 +186,7 @@ class Field(np.ndarray):
             setattr(self, name, state[-i])
 
         # Call the parent's __setstate__ with the other tuple elements.
-        super(Field, self).__setstate__(state[0:-i])
+        super().__setstate__(state[0:-i])
 
     def copy(self):
         """Return a copy of the Field."""
@@ -234,10 +233,9 @@ class Field(np.ndarray):
             grid.vnEy = inp['vnEy']
             grid.vnEz = inp['vnEz']
         except KeyError as e:
-            print(f"* ERROR   :: Variable {e} missing in `inp`.")
-            raise
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
-        # Calculate missing info.
+        # Compute missing info.
         grid.nEx = np.prod(grid.vnEx)
         grid.nEy = np.prod(grid.vnEy)
         grid.nEz = np.prod(grid.vnEz)
@@ -400,7 +398,7 @@ class SourceField(Field):
         Default: complex.
 
     freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter `s`.
+        Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
 
         - `freq` > 0: Frequency domain, hence
@@ -413,13 +411,12 @@ class SourceField(Field):
 
     """
 
-    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None, dtype=complex,
-                freq=None):
+    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None,
+                dtype=np.complex128, freq=None):
         """Initiate a new Source Field."""
         # Ensure frequency is provided.
         if freq is None:
-            print("* ERROR   :: SourceField requires the frequency.")
-            raise ValueError("SourceField needs `freq`.")
+            raise ValueError("SourceField requires the frequency.")
 
         if freq > 0:
             dtype = complex
@@ -481,7 +478,7 @@ def get_source_field(grid, src, freq, strength=0):
           - Point dipole: ``[x, y, z, azimuth, dip]``.
 
     freq : float
-        Source frequency (Hz), used to calculate the Laplace parameter `s`.
+        Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
 
         - `freq` > 0: Frequency domain, hence
@@ -506,16 +503,15 @@ def get_source_field(grid, src, freq, strength=0):
 
     """
     # Cast some parameters.
-    src = np.asarray(src, dtype=float)
+    src = np.asarray(src, dtype=np.float64)
     strength = np.asarray(strength)
 
     # Ensure source is a point or a finite dipole.
     if len(src) not in [5, 6]:
-        print("* ERROR   :: Source is wrong defined. Must be either a point,\n"
-              "             [x, y, z, azimuth, dip], or a finite dipole,\n"
-              "             [x1, x2, y1, y2, z1, z2]. Provided source:\n"
-              f"             {src}.")
-        raise ValueError("Source error")
+        raise ValueError(
+                "Source is wrong defined. Must be either a point,"
+                "[x, y, z, azimuth, dip],\nor a finite dipole,"
+                f"[x1, x2, y1, y2, z1, z2].\nProvided source: {src}.")
     elif len(src) == 5:
         finite = False  # Infinitesimal small dipole.
     else:
@@ -523,9 +519,9 @@ def get_source_field(grid, src, freq, strength=0):
 
         # Ensure finite length dipole is not a point dipole.
         if np.allclose(np.linalg.norm(src[1::2]-src[::2]), 0):
-            print("* ERROR   :: Provided source is a point dipole, "
-                  "use the format [x, y, z, azimuth, dip] instead.")
-            raise ValueError("Source error")
+            raise ValueError(
+                    "Provided source is a point dipole, "
+                    "use the format [x, y, z, azimuth, dip] instead.")
 
     # Ensure source is within grid.
     if finite:
@@ -541,8 +537,7 @@ def get_source_field(grid, src, freq, strength=0):
     source_in *= np.any(src[ii[5]] <= grid.vectorNz[-1])
 
     if not source_in:
-        print(f"* ERROR   :: Provided source outside grid: {src}.")
-        raise ValueError("Source error")
+        raise ValueError(f"Provided source outside grid: {src}.")
 
     # Get source orientation (dxs, dys, dzs)
     if not finite:  # Point dipole: convert azimuth/dip to weights.
@@ -601,35 +596,21 @@ def get_source_field(grid, src, freq, strength=0):
         iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
         iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
 
-        # Indices and field strength in x-direction
-        if ix == nx-1:
-            rx = 1.0
-            ex = 1.0
-            ix1 = ix
-        else:
-            ix1 = ix+1
-            rx = (src[0]-xx[ix])/(xx[ix1]-xx[ix])
-            ex = 1.0-rx
+        def get_index_and_strength(ic, nc, csrc, cc):
+            """Return index and field strength in c-direction."""
+            if ic == nc-1:
+                ic1 = ic
+                rc = 1.0
+                ec = 1.0
+            else:
+                ic1 = ic+1
+                rc = (csrc-cc[ic])/(cc[ic1]-cc[ic])
+                ec = 1.0-rc
+            return rc, ec, ic1
 
-        # Indices and field strength in y-direction
-        if iy == ny-1:
-            ry = 1.0
-            ey = 1.0
-            iy1 = iy
-        else:
-            iy1 = iy+1
-            ry = (src[1]-yy[iy])/(yy[iy1]-yy[iy])
-            ey = 1.0-ry
-
-        # Indices and field strength in z-direction
-        if iz == nz-1:
-            rz = 1.0
-            ez = 1.0
-            iz1 = iz
-        else:
-            iz1 = iz+1
-            rz = (src[2]-zz[iz])/(zz[iz1]-zz[iz])
-            ez = 1.0-rz
+        rx, ex, ix1 = get_index_and_strength(ix, nx, src[0], xx)
+        ry, ey, iy1 = get_index_and_strength(iy, ny, src[1], yy)
+        rz, ez, iz1 = get_index_and_strength(iz, nz, src[2], zz)
 
         s[ix, iy, iz] = ex*ey*ez
         s[ix1, iy, iz] = rx*ey*ez
@@ -785,9 +766,9 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         return fx, fy, fz
 
     if len(coordinates) != 3:
-        print("* ERROR   :: Coordinates  needs to be in the form (x, y, z).")
-        print(f"             Length of provided coord.: {len(coordinates)}.")
-        raise ValueError("Coordinates error")
+        raise ValueError(
+                "Coordinates needs to be in the form (x, y, z).\n"
+                f"Length of provided coord.: {len(coordinates)}.")
 
     # Get the vectors corresponding to input data. Dimensions:
     #
@@ -864,16 +845,14 @@ def get_receiver_response(grid, field, rec):
 
     # Check receiver dimension.
     if len(rec) != 5:
-        print("* ERROR   :: `rec` needs to be in the form "
-              "(x, y, z, azimuth, dip).\n             "
-              f"Length of provided `rec`: {len(rec)}.")
-        raise ValueError("Receiver error")
+        raise ValueError(
+                "`rec` needs to be in the form (x, y, z, azimuth, dip).\n"
+                f"Length of provided `rec`: {len(rec)}.")
 
     # Check field dimension to ensure it is not a particular field.
     if field.field.ndim == 3:
-        print("* ERROR   :: `field` must be a `Field`-instance, not a\n"
-              "             particular field such as `field.fx`.")
-        raise ValueError("Field error")
+        raise ValueError("`field` must be a `Field`-instance, not a\n"
+                         "particular field such as `field.fx`.")
 
     # Get the vectors corresponding to input data.
     if field.is_electric:

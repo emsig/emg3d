@@ -116,3 +116,11 @@ texinfo_documents = [
      author, 'emg3d', description,
      'Electromagnetic geophysical modelling'),
 ]
+
+
+# ==== 5. linkcheck ====
+
+# Papers from academic.oup results in a 104 error
+linkcheck_ignore = [
+    'https://doi.org/10.1111/j.1365-246X.2010.04544.x',
+]
