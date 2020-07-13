@@ -1,20 +1,24 @@
 import re
 import pytest
-import empymod
 import numpy as np
 from timeit import default_timer
 from numpy.testing import assert_allclose
 
-# Optional import
+# Soft dependencies
 try:
     import scooby
 except ImportError:
-    scooby = False
+    scooby = None
+try:
+    import empymod
+except ImportError:
+    empymod = None
 
 from emg3d import utils
 
 
 # TIME DOMAIN
+@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 class TestFourier:
     def test_defaults(self, capsys):
         time = np.logspace(-2, 2)
@@ -194,6 +198,7 @@ def test_Time():
 
 
 # OTHER
+@pytest.mark.skipif(scooby is None, reason="scooby not installed.")
 def test_report(capsys):
     out, _ = capsys.readouterr()  # Empty capsys
 
@@ -203,7 +208,8 @@ def test_report(capsys):
         out1 = utils.Report()
         out2 = scooby.Report(
                 core=['numpy', 'scipy', 'numba', 'emg3d'],
-                optional=['IPython', 'matplotlib'],
+                optional=['empymod', 'discretize', 'h5py', 'matplotlib',
+                          'IPython'],
                 ncol=4)
 
         # Ensure they're the same; exclude time to avoid errors.

@@ -34,7 +34,14 @@ recent versions
 
     - Added `__eq__` to `models.TensorMesh` to compare meshes.
 
+- Dependencies:
+
+  - `empymod` is new a soft dependency, only required for `utils.Fourier`
+    (time-domain modelling).
+
 - Removed deprecated functions `data_write` and `data_read`.
+
+- Removed all deprecated functions from `utils`.
 
 - Much bookkeeping (improve error raising and checking; chaining errors, numpy
   types, etc).

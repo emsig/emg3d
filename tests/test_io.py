@@ -152,16 +152,16 @@ def test_save_and_load(tmpdir, capsys):
 
 def test_compare_dicts(capsys):
     # Create test data
-    grid = utils.TensorMesh(
+    grid = meshes.TensorMesh(
             [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
             np.zeros(3))
 
-    model = utils.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
+    model = models.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
 
     e1 = create_dummy(*grid.vnEx)
     e2 = create_dummy(*grid.vnEy)
     e3 = create_dummy(*grid.vnEz)
-    ee = utils.Field(e1, e2, e3, freq=.938)
+    ee = fields.Field(e1, e2, e3, freq=.938)
 
     dict1 = io._dict_serialize(
             {'model': model, 'grid': grid, 'field': ee,

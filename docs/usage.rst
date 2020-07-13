@@ -30,9 +30,16 @@ or via ``pip``:
 
    pip install emg3d
 
-Required are Python version 3.7 or higher and the modules ``NumPy`` and
-``SciPy``, ``Numba``, and ``empymod``; ``discretize`` (from `SimPEG
-<https://simpeg.xyz>`_) is highly recommended.
+Minimum requirements are Python version 3.7 or higher and the modules ``scipy``
+and ``numba``. Various other packages are recommended or required for some
+advanced functionalities, namely:
+
+- ``discretize``: For advanced meshing tools (fancy mesh-representations and
+  plotting utilities).
+- ``matplotlib``: To use the plotting utilities within ``discretize``.
+- ``h5py``: Save and load data in the HDF5 format.
+- ``empymod``: Time-domain modelling (``utils.Fourier``).
+- ``scooby``: For the version and system report (``emg3d.Report()``).
 
 If you are new to Python we recommend using a Python distribution, which will
 ensure that all dependencies are met, specifically properly compiled versions
