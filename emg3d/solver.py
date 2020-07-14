@@ -727,7 +727,7 @@ def krylov(grid, model, sfield, efield, var):
     pre = "\n   > "
     if i < 0:
         if var.exit_message == '':
-            var.exit_message = f"Error in {var.sslsolver}"
+            var.exit_message = f"Error in {var.sslsolver} ({i})"
         pre = "\n* ERROR   :: "
     elif i > 0:
         var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
@@ -1721,7 +1721,8 @@ def _terminate(var, l2_last, l2_stag, it):
         #       cycle-type is only run once, before returning to the SSL.
 
     elif it == var.maxit:                # Maximum iterations reached.
-        var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
+        if not var.sslsolver:
+            var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
         finished = True
 
     # Force abort (ssl solver) or print info.
