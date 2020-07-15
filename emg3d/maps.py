@@ -33,7 +33,9 @@ from emg3d import fields
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
-__all__ = ['grid2grid', 'interp3d']
+__all__ = ['grid2grid', 'interp3d', 'BasicMap', 'MapConductivity',
+           'MapLgConductivity', 'MapLnConductivity', 'MapResistivity',
+           'MapLgResistivity', 'MapLnResistivity']
 
 
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
@@ -271,6 +273,145 @@ def interp3d(points, values, new_points, method, fill_value, mode):
         new_values = result.reshape(xi_shape[:-1])
 
     return new_values
+
+
+# Maps
+class BasicMap:
+    # TODO
+    """Maps conductivity to a variety of representations and back.
+
+    bla
+
+    """
+
+    def __init__(self, name, description, f_string, b_string):
+        """Initiate the map."""
+        self.name = name
+        self.description = description
+        self._f_string = f_string
+        self._b_string = b_string
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}: {self.description}\n"
+                "   Maps investigation variable `x` to\n"
+                "   computational variable `σ` (conductivity):\n"
+                f"   => forward  : {self._f_string}\n"
+                f"   <= backward : {self._b_string}")
+
+    def forward(self):
+        """Conductivity to mapping."""
+        raise NotImplementedError("Forward map not implemented.")
+
+    def backward(self):
+        """Mapping to conductivity."""
+        raise NotImplementedError("Backward map not implemented.")
+
+    def derivative(self):
+        """Map derivative from conductivity back to mapping space."""
+        raise NotImplementedError("Derivative map not implemented.")
+
+
+class MapConductivity(BasicMap):
+    """Maps conductivity to conductivity and back."""
+
+    def __init__(self):
+        super().__init__('Conductivity', 'conductivity', 'x = σ', 'σ = x')
+
+    def forward(self, conductivity):
+        return conductivity
+
+    def backward(self, mapped):
+        return mapped
+
+    def derivative(self, gradient, conductivity):
+        pass
+
+
+class MapLgConductivity(BasicMap):
+    """Maps conductivity to log_10(conductivity) and back."""
+
+    def __init__(self):
+        super().__init__('Conductivity', 'log_10(conductivity)',
+                         'x = log_10(σ)', 'σ = 10^x')
+
+    def forward(self, conductivity):
+        return np.log10(conductivity)
+
+    def backward(self, mapped):
+        return 10**mapped
+
+    def derivative(self, gradient, conductivity):
+        gradient /= conductivity*np.log(10)
+
+
+class MapLnConductivity(BasicMap):
+    """Maps conductivity to log_e(conductivity) and back."""
+
+    def __init__(self):
+        super().__init__('LnConductivity', 'log_e(conductivity)',
+                         'x = log_e(σ)', 'σ = exp(x)')
+
+    def forward(self, conductivity):
+        return np.log(conductivity)
+
+    def backward(self, mapped):
+        return np.exp(mapped)
+
+    def derivative(self, gradient, conductivity):
+        gradient /= conductivity
+
+
+class MapResistivity(BasicMap):
+    """Maps conductivity to resistivity and back."""
+
+    def __init__(self):
+        super().__init__('Resistivity', 'resistivity',
+                         'x = ρ = σ^-1', 'σ = ρ^-1 = x^-1')
+
+    def forward(self, conductivity):
+        return 1.0/conductivity
+
+    def backward(self, mapped):
+        return 1.0/mapped
+
+    def derivative(self, gradient, conductivity):
+        gradient /= -conductivity**2
+
+
+class MapLgResistivity(BasicMap):
+    """Maps conductivity to log_10(resistivity) and back."""
+
+    def __init__(self):
+        super().__init__('LgResistivity', 'log_10(resistivity)',
+                         'x = log_10(ρ) = log_10(σ^-1)',
+                         'σ = ρ^-1 = 10^-x')
+
+    def forward(self, conductivity):
+        return np.log10(1.0/conductivity)
+
+    def backward(self, mapped):
+        return 10**-mapped
+
+    def derivative(self, gradient, conductivity):
+        gradient /= -conductivity*np.log(10)
+
+
+class MapLnResistivity(BasicMap):
+    """Maps conductivity to log_e(resistivity) and back."""
+
+    def __init__(self):
+        super().__init__('LnResistivity', 'log_e(resistivity)',
+                         'x = log_e(ρ) = log_e(σ^-1)',
+                         'σ = ρ^-1 = exp(x^-1)')
+
+    def forward(self, conductivity):
+        return np.log(conductivity**-1)
+
+    def backward(self, data):
+        return np.exp(data**-1)
+
+    def derivative(self, gradient, conductivity):
+        gradient /= -conductivity
 
 
 # Volume averaging

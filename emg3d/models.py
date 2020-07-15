@@ -27,6 +27,8 @@ import numpy as np
 from copy import deepcopy
 from scipy.constants import epsilon_0
 
+from emg3d import maps
+
 __all__ = ['Model', 'VolumeModel']
 
 
@@ -55,6 +57,12 @@ class Model:
         shape of grid.vnC (F-ordered) or grid.nC. Resistivities have to be
         bigger than zero and smaller than infinity.
 
+        Resistivities responds to the `mapping='Resistivity'`, and these
+        parameters are called like this for historic reason. However,
+        internally `emg3d` works with conductivities. You can provide different
+        types of parameters for `res_{x;y;z}`, see the parameter `mapping` for
+        the implemented types.
+
     mu_r : None, float, or ndarray
         Relative magnetic permeability (isotropic). If ndarray it must have the
         shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
@@ -68,10 +76,22 @@ class Model:
        the default. Electric permittivity has to be bigger than zero and
        smaller than infinity.
 
+    mapping : str
+        Defines what type the input `res_{x;y;z}`-values correspond to. By
+        default, they represent resistivities (Ohm.m). The implemented types
+        are:
+
+        - 'Conductivity'; σ (S/m),
+        - 'LgConductivity'; log_10(σ),
+        - 'LnConductivity'; log_e(σ),
+        - 'Resistivity'; ρ (Ohm.m); Default,
+        - 'LgResistivity'; log_10(ρ),
+        - 'LnResistivity'; log_e(ρ).
+
     """
 
     def __init__(self, grid, res_x=1., res_y=None, res_z=None, mu_r=None,
-                 epsilon_r=None):
+                 epsilon_r=None, mapping='Resistivity'):
         """Initiate a new model."""
 
         # Store required info from grid.
@@ -101,16 +121,46 @@ class Model:
         else:                                # 3: Tri-axial anisotropy.
             self.case = 3
 
+        # Get map.
+        self.map = getattr(maps, 'Map'+mapping)()
+
+        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+        # - Adjust check_parameter
+        # - Add prop_{x;y;z} etc
+        # - Store/change everything to conductivities
+        # - Create deprec-warnings.
+        # - Add mapping to __repr__
+        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+
         # Initiate all parameters.
-        self._res_x = self._check_parameter(res_x, 'res_x')
-        self._res_y = self._check_parameter(res_y, 'res_y')
-        self._res_z = self._check_parameter(res_z, 'res_z')
+        self._con_x = self._check_parameter(self.map.forward(res_x), 'res_x')
+        # backwards comp. TODO
+        self._res_x = self._check_parameter(1/self._con_x, 'res_x')
+
+        if res_y is None:
+            self._con_y = None
+            self._res_y = None
+        else:
+            self._con_y = self._check_parameter(
+                    self.map.forward(res_y), 'res_y')
+            # backwards comp. TODO
+            self._res_y = self._check_parameter(1/self._con_y, 'res_y')
+
+        if res_z is None:
+            self._con_z = None
+            self._res_z = None
+        else:
+            self._con_z = self._check_parameter(
+                    self.map.forward(res_z), 'res_z')
+            # backwards comp. TODO
+            self._res_z = self._check_parameter(1/self._con_z, 'res_z')
+
         self._mu_r = self._check_parameter(mu_r, 'mu_r')
         self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
 
     def __repr__(self):
         """Simple representation."""
-        return (f"Model; {self.case_names[self.case]} resistivities"
+        return (f"Model; {self.case_names[self.case]} {self.map.description}"
                 f"{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}"
                 f"; {self.vnC[0]} x {self.vnC[1]} x {self.vnC[2]} "
@@ -211,6 +261,9 @@ class Model:
         # vnC.
         out['vnC'] = self.vnC
 
+        # mapping.
+        out['map'] = self.map.name
+
         # Name
         out['__class__'] = self.__class__.__name__
 
@@ -228,7 +281,7 @@ class Model:
         inp : dict
             Dictionary as obtained from :func:`Model.to_dict`.
             The dictionary needs the keys `res_x`, `res_y`, `res_z`, `mu_r`,
-            `epsilon_r`, and `vnC`.
+            `epsilon_r`, `vnC`, and `mapping`.
 
         Returns
         -------
@@ -236,9 +289,10 @@ class Model:
 
         """
         try:
+            mapping = inp.pop('map', 'Resistivity')
             return cls(grid=inp['vnC'], res_x=inp['res_x'], res_y=inp['res_y'],
                        res_z=inp['res_z'], mu_r=inp['mu_r'],
-                       epsilon_r=inp['epsilon_r'])
+                       epsilon_r=inp['epsilon_r'], mapping=mapping)
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 

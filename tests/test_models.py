@@ -43,7 +43,7 @@ class TestModel:
         model1 = models.Model(grid)
 
         # Check representation of Model.
-        assert 'Model; isotropic resistivities' in model1.__repr__()
+        assert 'Model; isotropic resistivity' in model1.__repr__()
 
         model1e = models.Model(grid)
         model1.mu_r = None
