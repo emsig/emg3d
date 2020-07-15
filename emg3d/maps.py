@@ -383,19 +383,17 @@ def _volume_avg_weights(x1, x2):
     ix1 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x1.
     ix2 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x2.
     center = 0.0
-    i1, i2, i = 0, 0, 0
+    i1, i2, i, ii = 0, 0, 0, 0
     for i in range(nh):
-        hs[i] = xs[i+1]-xs[i]
-        center = xs[i]+0.5*hs[i]
-        if center < x2[0]:
-            hs[i] = 0.0
-        elif center > x2[n2-1]:
-            hs[i] = 0.0
-        while i1 < n1-1 and center >= x1[i1]:
-            i1 += 1
-        while i2 < n2-1 and center >= x2[i2]:
-            i2 += 1
-        ix1[i] = min(max(i1-1, 0), n1-1)
-        ix2[i] = min(max(i2-1, 0), n2-1)
+        center = 0.5*(xs[i]+xs[i+1])
+        if x2[0] <= center and center <= x2[n2-1]:
+            hs[ii] = xs[i+1]-xs[i]
+            while i1 < n1-1 and center >= x1[i1]:
+                i1 += 1
+            while i2 < n2-1 and center >= x2[i2]:
+                i2 += 1
+            ix1[ii] = min(max(i1-1, 0), n1-1)
+            ix2[ii] = min(max(i2-1, 0), n2-1)
+            ii += 1
 
-    return hs, ix1, ix2
+    return hs[:ii], ix1[:ii], ix2[:ii]
