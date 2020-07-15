@@ -331,7 +331,7 @@ class MapLgConductivity(BasicMap):
     """Maps conductivity to log_10(conductivity) and back."""
 
     def __init__(self):
-        super().__init__('Conductivity', 'log_10(conductivity)',
+        super().__init__('LgConductivity', 'log_10(conductivity)',
                          'x = log_10(σ)', 'σ = 10^x')
 
     def forward(self, conductivity):

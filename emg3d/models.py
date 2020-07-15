@@ -133,7 +133,7 @@ class Model:
         # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 
         # Initiate all parameters.
-        self._con_x = self._check_parameter(self.map.forward(res_x), 'res_x')
+        self._con_x = self._check_parameter(self.map.backward(res_x), 'res_x')
         # backwards comp. TODO
         self._res_x = self._check_parameter(1/self._con_x, 'res_x')
 
@@ -142,7 +142,7 @@ class Model:
             self._res_y = None
         else:
             self._con_y = self._check_parameter(
-                    self.map.forward(res_y), 'res_y')
+                    self.map.backward(res_y), 'res_y')
             # backwards comp. TODO
             self._res_y = self._check_parameter(1/self._con_y, 'res_y')
 
@@ -151,7 +151,7 @@ class Model:
             self._res_z = None
         else:
             self._con_z = self._check_parameter(
-                    self.map.forward(res_z), 'res_z')
+                    self.map.backward(res_z), 'res_z')
             # backwards comp. TODO
             self._res_z = self._check_parameter(1/self._con_z, 'res_z')
 
@@ -216,15 +216,28 @@ class Model:
             except ValueError:
                 equal = False
 
-        # Compare resistivities.
-        if equal:
-            equal *= np.all(self.res_x == model.res_x)
-            equal *= np.all(self.res_y == model.res_y)
-            equal *= np.all(self.res_z == model.res_z)
-            equal *= np.all(self.mu_r == model.mu_r)
-            equal *= np.all(self.epsilon_r == model.epsilon_r)
+            # Check map.
+            equal *= model.map.name == self.map.name
 
-        return equal
+        # Compare values.
+        if equal:
+            equal *= np.allclose(self.res_x, model.res_x)
+            equal *= np.allclose(self.res_y, model.res_y)
+            equal *= np.allclose(self.res_z, model.res_z)
+            if self.mu_r is None:
+                equal *= model.mu_r is None
+            elif model.mu_r is None:
+                equal *= self.mu_r is None
+            else:
+                equal *= np.allclose(self.mu_r, model.mu_r)
+            if self.epsilon_r is None:
+                equal *= model.epsilon_r is None
+            elif model.epsilon_r is None:
+                equal *= self.epsilon_r is None
+            else:
+                equal *= np.allclose(self.epsilon_r, model.epsilon_r)
+
+        return bool(equal)
 
     def copy(self):
         """Return a copy of the Model."""
@@ -236,13 +249,16 @@ class Model:
         out = {}
 
         # resistivities.
-        out['res_x'] = self.res_x
+        # TODO out['res_x'] = self.res_x
+        out['res_x'] = self.map.forward(self._con_x)
         if self.case in [1, 3]:
-            out['res_y'] = self.res_y
+            # TODO out['res_y'] = self.res_y
+            out['res_y'] = self.map.forward(self._con_y)
         else:
             out['res_y'] = None
         if self.case in [2, 3]:
-            out['res_z'] = self.res_z
+            # TODO out['res_z'] = self.res_z
+            out['res_z'] = self.map.forward(self._con_z)
         else:
             out['res_z'] = None
 
