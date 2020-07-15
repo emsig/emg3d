@@ -257,21 +257,21 @@ def test_volume_avg_weights(njit):
             x0=np.array([0.5, 3.33, 5]))
 
     wx, ix_in, ix_out = volume_avg_weights(grid_in.vectorNx, grid_out.vectorNx)
-    assert_allclose(wx, [0, 0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 0.5, 0.5, 1, 1,
-                         1, 0.5, 0])
-    assert_allclose(ix_in, [0, 0, 1, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 10, 10])
-    assert_allclose(ix_out, [0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3])
+    assert_allclose(wx,
+                    [0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 0.5, 0.5, 1, 1, 1, 0.5])
+    assert_allclose(ix_in, [0, 1, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 10])
+    assert_allclose(ix_out, [0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3])
 
     wy, iy_in, iy_out = volume_avg_weights(grid_in.vectorNy, grid_out.vectorNy)
-    assert_allclose(wy, [0, 0, 0.67, 0.33, 1.67, 0.33, 1.67, 1.33, 0.67, 2.,
-                         1.33, 0.67, 2, 2, 0.33, 0.])
-    assert_allclose(iy_in, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 9, 9])
-    assert_allclose(iy_out, [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4])
+    assert_allclose(wy, [0.67, 0.33, 1.67, 0.33, 1.67, 1.33, 0.67, 2.,
+                         1.33, 0.67, 2, 2, 0.33])
+    assert_allclose(iy_in, [1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 9])
+    assert_allclose(iy_out, [0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 4])
 
     wz, iz_in, iz_out = volume_avg_weights(grid_in.vectorNz, grid_out.vectorNz)
-    assert_allclose(wz, [0, 1, 2, 2, 1, 4, 5, 6, 0])
-    assert_allclose(iz_in, [0, 0, 0, 0, 1, 1, 1, 2, 2])
-    assert_allclose(iz_out, [0, 0, 1, 2, 2, 3, 4, 5, 5])
+    assert_allclose(wz, [1, 2, 2, 1, 4, 5, 6])
+    assert_allclose(iz_in, [0, 0, 0, 1, 1, 1, 2])
+    assert_allclose(iz_out, [0, 1, 2, 2, 3, 4, 5])
 
     w, inp, out = volume_avg_weights(np.array([0., 5, 7, 10]),
                                      np.array([-1., 1, 4, 6, 7, 11]))
