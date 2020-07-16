@@ -20,9 +20,10 @@ grid = meshes.TensorMesh(**input_grid)
 
 input_model = {
     'grid': grid,
-    'res_x': 1.5,
-    'res_y': 2.0,
-    'res_z': 3.3,
+    'property_x': 1.5,
+    'property_y': 2.0,
+    'property_z': 3.3,
+    'mapping': 'Resistivity'
     }
 model = models.Model(**input_model)
 
@@ -77,10 +78,11 @@ grid = meshes.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
 
 # Initialize model
 # Create a model with random resistivities between [0, 50)
-res_x = np.random.random(grid.nC)*50
-res_y = np.random.random(grid.nC)*50
-res_z = np.random.random(grid.nC)*50
-model = models.Model(grid, res_x, res_y, res_z)
+property_x = np.random.random(grid.nC)*50
+property_y = np.random.random(grid.nC)*50
+property_z = np.random.random(grid.nC)*50
+model = models.Model(grid, property_x, property_y, property_z,
+                     mapping='Resistivity')
 
 # Initialize source field
 sfield = fields.get_source_field(grid, src, freq)
@@ -162,9 +164,10 @@ grid_l = meshes.TensorMesh(**input_grid_l)
 
 input_model_l = {
     'grid': grid_l,
-    'res_x': 1.5,
-    'res_y': 2.0,
-    'res_z': 3.3,
+    'property_x': 1.5,
+    'property_y': 2.0,
+    'property_z': 3.3,
+    'mapping': 'Resistivity'
     }
 model_l = models.Model(**input_model_l)
 
@@ -195,5 +198,4 @@ out_l = {
     }
 
 
-io.save('../data/regression', res=out, reg_2=reg_2, grid=mesh, lap=out_l,
-        backend='numpy')
+io.save('../data/regression.npz', res=out, reg_2=reg_2, grid=mesh, lap=out_l)

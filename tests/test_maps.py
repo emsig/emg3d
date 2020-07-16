@@ -3,7 +3,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from . import alternatives
-from emg3d import fields, maps, meshes
+from emg3d import fields, maps, meshes, models
 
 
 def test_grid2grid_volume():
@@ -278,3 +278,131 @@ def test_volume_avg_weights(njit):
     assert_allclose(w, [1, 1, 3, 1, 1, 1, 3, 1])
     assert_allclose(inp, [0, 0, 0, 0, 1, 1, 2, 2])
     assert_allclose(out, [0, 0, 1, 2, 2, 3, 4, 4])
+
+
+class TestMaps:
+    mesh = meshes.TensorMesh(
+            [np.array([1, 1]), np.array([1, 1]), np.array([1])],
+            np.array([0, 0, 0]))
+
+    values = np.array([1, 2, 3, 4])
+
+    def test_basic(self):
+        class MyMap(maps._Map):
+            def __init__(self):
+                super().__init__('my awesome map')
+
+        testmap = MyMap()
+
+        assert "MyMap: my awesome map" in testmap.__repr__()
+
+        with pytest.raises(NotImplementedError, match='Forward map not imple'):
+            testmap.forward(1)
+
+        with pytest.raises(NotImplementedError, match='Backward map not impl'):
+            testmap.backward(1)
+
+        with pytest.raises(NotImplementedError, match='Derivative map not im'):
+            testmap.derivative(1, 1)
+
+    def test_conductivity(self):
+        model = models.Model(self.mesh, self.values, mapping='Conductivity')
+
+        # Forward
+        forward = model.map.forward(model.property_x)
+        np.allclose(forward, self.values)
+
+        # Backward
+        backward = model.map.backward(forward)
+        np.allclose(backward, model.property_x)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative(gradient, model.property_x)
+        np.allclose(derivative, derivative)
+
+    def test_lgconductivity(self):
+        model = models.Model(self.mesh, self.values, mapping='LgConductivity')
+
+        # Forward
+        forward = model.map.forward(model.property_x)
+        np.allclose(forward, np.log10(self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        np.allclose(backward, 10**model.property_x)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative(gradient, model.property_x)
+        np.allclose(derivative, gradient/derivative/np.log(10))
+
+    def test_lnconductivity(self):
+        model = models.Model(self.mesh, self.values, mapping='LnConductivity')
+
+        # Forward
+        forward = model.map.forward(model.property_x)
+        np.allclose(forward, np.log(self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        np.allclose(backward, np.exp(model.property_x))
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative(gradient, model.property_x)
+        np.allclose(derivative, gradient/derivative)
+
+    def test_resistivity(self):
+        model = models.Model(self.mesh, self.values, mapping='Resistivity')
+
+        # Forward
+        forward = model.map.forward(model.property_x)
+        np.allclose(forward, 1/self.values)
+
+        # Backward
+        backward = model.map.backward(forward)
+        np.allclose(backward, model.property_x)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative(gradient, model.property_x)
+        np.allclose(derivative, -1/derivative**2)
+
+    def test_lgresistivity(self):
+        model = models.Model(self.mesh, self.values, mapping='LgResistivity')
+
+        # Forward
+        forward = model.map.forward(model.property_x)
+        np.allclose(forward, np.log10(1/self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        np.allclose(backward, 10**-model.property_x)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative(gradient, model.property_x)
+        np.allclose(derivative, -gradient/derivative/np.log(10))
+
+    def test_lnresistivity(self):
+        model = models.Model(self.mesh, self.values, mapping='LnResistivity')
+
+        # Forward
+        forward = model.map.forward(model.property_x)
+        np.allclose(forward, np.log(1/self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        np.allclose(backward, np.exp(1/model.property_x))
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative(gradient, model.property_x)
+        np.allclose(derivative, -gradient/derivative)

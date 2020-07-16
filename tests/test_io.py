@@ -158,7 +158,8 @@ def test_compare_dicts(capsys):
             [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
             np.zeros(3))
 
-    model = models.Model(grid, res_x=1., res_y=2., res_z=3., mu_r=4.)
+    model = models.Model(grid, property_x=1., property_y=2.,
+                         property_z=3., mu_r=4.)
 
     e1 = create_dummy(*grid.vnEx)
     e2 = create_dummy(*grid.vnEy)
@@ -186,7 +187,7 @@ def test_compare_dicts(capsys):
     out = io._compare_dicts(dict1, dict2, True)
     assert out is False
     outstr, _ = capsys.readouterr()
-    assert " True  :: Model      > model      > res_x" in outstr
+    assert " True  :: Model      > model      > property_x" in outstr
     assert "  {1}  ::                           mu_r" in outstr
     assert " False ::                           hy" in outstr
     assert " True  ::                           cc         > another" in outstr

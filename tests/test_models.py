@@ -43,13 +43,13 @@ class TestModel:
         model1 = models.Model(grid)
 
         # Check representation of Model.
-        assert 'Model; isotropic resistivities' in model1.__repr__()
+        assert 'Model [resistivity]; isotropic' in model1.__repr__()
 
         model1e = models.Model(grid)
         model1.mu_r = None
         model1.epsilon_r = None
         vmodel1 = models.VolumeModel(grid, model1, sfield)
-        assert_allclose(model1.res_x, model1.res_y)
+        assert_allclose(model1.property_x, model1.property_y)
         assert_allclose(model1.nC, grid.nC)
         assert_allclose(model1.vnC, grid.vnC)
         assert_allclose(vmodel1.eta_z, vmodel1.eta_y)
@@ -58,17 +58,17 @@ class TestModel:
 
         # Assert that the cases changes if we assign y- and z- resistivities
         # (I).
-        model1.res_x = model1.res_x
+        model1.property_x = model1.property_x
         assert model1.case == 0
-        model1.res_y = 2*model1.res_x
+        model1.property_y = 2*model1.property_x
         assert model1.case == 1
-        model1.res_z = 2*model1.res_x
+        model1.property_z = 2*model1.property_x
         assert model1.case == 3
 
         assert model1e.case == 0
-        model1e.res_z = 2*model1.res_x
+        model1e.property_z = 2*model1.property_x
         assert model1e.case == 2
-        model1e.res_y = 2*model1.res_x
+        model1e.property_y = 2*model1.property_x
         assert model1e.case == 3
 
         model1.epsilon_r = 1  # Just set to 1 CURRENTLY.
@@ -79,24 +79,24 @@ class TestModel:
         # Using ints
         model2 = models.Model(grid, 2., 3., 4.)
         vmodel2 = models.VolumeModel(grid, model2, sfield)
-        assert_allclose(model2.res_x*1.5, model2.res_y)
-        assert_allclose(model2.res_x*2, model2.res_z)
+        assert_allclose(model2.property_x*1.5, model2.property_y)
+        assert_allclose(model2.property_x*2, model2.property_z)
 
-        # VTI: Setting res_x and res_z, not res_y
-        model2b = models.Model(grid, 2., res_z=4.)
+        # VTI: Setting property_x and property_z, not property_y
+        model2b = models.Model(grid, 2., property_z=4.)
         vmodel2b = models.VolumeModel(grid, model2b, sfield)
-        assert_allclose(model2b.res_x, model2b.res_y)
+        assert_allclose(model2b.property_x, model2b.property_y)
         assert_allclose(vmodel2b.eta_y, vmodel2b.eta_x)
-        model2b.res_z = model2b.res_x
-        model2c = models.Model(grid, 2., res_z=model2b.res_z.copy())
+        model2b.property_z = model2b.property_x
+        model2c = models.Model(grid, 2., property_z=model2b.property_z.copy())
         vmodel2c = models.VolumeModel(grid, model2c, sfield)
-        assert_allclose(model2c.res_x, model2c.res_z)
+        assert_allclose(model2c.property_x, model2c.property_z)
         assert_allclose(vmodel2c.eta_z, vmodel2c.eta_x)
 
-        # HTI: Setting res_x and res_y, not res_z
+        # HTI: Setting property_x and property_y, not property_z
         model2d = models.Model(grid, 2., 4.)
         vmodel2d = models.VolumeModel(grid, model2d, sfield)
-        assert_allclose(model2d.res_x, model2d.res_z)
+        assert_allclose(model2d.property_x, model2d.property_z)
         assert_allclose(vmodel2d.eta_z, vmodel2d.eta_x)
 
         # Pure air, epsilon_r init with 0 => should be 1!
@@ -104,12 +104,12 @@ class TestModel:
         assert model6.epsilon_r is None
 
         # Check wrong shape
-        with pytest.raises(ValueError, match='Shape of res_x must be ()'):
+        with pytest.raises(ValueError, match='Shape of property_x must be ()'):
             models.Model(grid, np.arange(1, 11))
-        with pytest.raises(ValueError, match='Shape of res_y must be ()'):
-            models.Model(grid, res_y=np.ones((2, 5, 6)))
-        with pytest.raises(ValueError, match='Shape of res_z must be ()'):
-            models.Model(grid, res_z=np.array([1, 3]))
+        with pytest.raises(ValueError, match='Shape of property_y must be ()'):
+            models.Model(grid, property_y=np.ones((2, 5, 6)))
+        with pytest.raises(ValueError, match='Shape of property_z must be ()'):
+            models.Model(grid, property_z=np.array([1, 3]))
         with pytest.raises(ValueError, match='Shape of mu_r must be ()'):
             models.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
@@ -132,10 +132,10 @@ class TestModel:
 
         # Check setters vnC
         tres = np.ones(grid.vnC)
-        model3.res_x[:, :, :] = tres*2.0
-        model3.res_y[:, :1, :] = tres[:, :1, :]*3.0
-        model3.res_y[:, 1:, :] = tres[:, 1:, :]*3.0
-        model3.res_z = tres*4.0
+        model3.property_x[:, :, :] = tres*2.0
+        model3.property_y[:, :1, :] = tres[:, :1, :]*3.0
+        model3.property_y[:, 1:, :] = tres[:, 1:, :]*3.0
+        model3.property_z = tres*4.0
         model3.mu_r = tres*5.0
         model3.epsilon_r = tres*6.0
         assert_allclose(tres*2., model3.res_x)
@@ -160,19 +160,82 @@ class TestModel:
         assert_allclose(vmodel4.zeta, grid.vol.reshape(grid.vnC, order='F'))
 
         # Check a couple of out-of-range failures
-        with pytest.raises(ValueError, match='`res_x` must be all'):
+        with pytest.raises(ValueError, match='`property_x` must be all'):
             _ = models.Model(grid, res_x=res_x*0)
         Model = models.Model(grid, res_x=res_x)
-        with pytest.raises(ValueError, match='`res_x` must be all'):
-            Model._check_parameter(res_x*0, 'res_x')
-        with pytest.raises(ValueError, match='`res_x` must be all'):
-            Model._check_parameter(-1.0, 'res_x')
-        with pytest.raises(ValueError, match='`res_y` must be all'):
+        with pytest.raises(ValueError, match='`property_x` must be all'):
+            Model._check_parameter(res_x*0, 'property_x')
+        with pytest.raises(ValueError, match='`property_x` must be all'):
+            Model._check_parameter(-1.0, 'property_x')
+        with pytest.raises(ValueError, match='`property_y` must be all'):
             _ = models.Model(grid, res_y=np.inf)
-        with pytest.raises(ValueError, match='`res_z` must be all'):
+        with pytest.raises(ValueError, match='`property_z` must be all'):
             _ = models.Model(grid, res_z=res_z*np.inf)
         with pytest.raises(ValueError, match='`mu_r` must be all'):
             _ = models.Model(grid, mu_r=-1)
+
+
+class TestModel2:
+
+    def test_kwargs(self):
+
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        with pytest.raises(TypeError, match='Unexpected '):
+            models.Model(grid, somekeyword=None)
+
+    def test_equal_mapping(self):
+
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        model1 = models.Model(grid)
+        model2 = models.Model(grid, mapping='Conductivity')
+
+        check = model1 == model2
+
+        assert check is False
+
+    def test_old_dict(self):
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        model1 = models.Model(grid, 1., 2., 3.)
+        mydict = model1.to_dict()
+        mydict['res_x'] = mydict['property_x']
+        mydict['res_y'] = mydict['property_y']
+        mydict['res_z'] = mydict['property_z']
+        del mydict['property_x']
+        del mydict['property_y']
+        del mydict['property_z']
+
+        model2 = models.Model.from_dict(mydict)
+
+        assert model1 == model2
+
+    def test_negative_values(self):
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        # Check these fails.
+        with pytest.raises(ValueError, match='`property_x` must be '):
+            models.Model(grid, property_x=-1, mapping='Conductivity')
+        with pytest.raises(ValueError, match='`property_x` must be '):
+            models.Model(grid, property_x=-1, mapping='Resistivity')
+
+        # Check these do not fail.
+        models.Model(grid, property_x=-1, mapping='LgConductivity')
+        models.Model(grid, property_x=-1, mapping='LnConductivity')
+        models.Model(grid, property_x=-1, mapping='LgResistivity')
+        models.Model(grid, property_x=-1, mapping='LnResistivity')
 
 
 class TestModelOperators:
@@ -220,9 +283,9 @@ class TestModelOperators:
         c = self.model_int + self.model_vnC
         assert a == b
         assert a != c
-        assert a.res_x[0, 0, 0] == 3.0
-        assert b.res_x[0, 0, 0] == 3.0
-        assert c.res_x[0, 0, 0] == 2.0
+        assert a.property_x[0, 0, 0] == 3.0
+        assert b.property_x[0, 0, 0] == 3.0
+        assert c.property_x[0, 0, 0] == 2.0
 
         # Addition with something else than a model
         with pytest.raises(TypeError):
@@ -304,9 +367,9 @@ class TestModelOperators:
         assert model_new3 == self.model_mu_a
         assert model_new4 == self.model_epsilon_a
 
-        assert model_new1.res_x.base is not self.model_vnC.res_x.base
-        assert model_new2.res_y.base is not self.model_3_a.res_y.base
-        assert model_new2.res_z.base is not self.model_3_a.res_z.base
+        assert model_new1.property_x.base is not self.model_vnC.property_x.base
+        assert model_new2.property_y.base is not self.model_3_a.property_y.base
+        assert model_new2.property_z.base is not self.model_3_a.property_z.base
         assert model_new3.mu_r.base is not self.model_mu_a.mu_r.base
         assert (model_new4.epsilon_r.base is not
                 self.model_epsilon_a.epsilon_r.base)
@@ -314,13 +377,14 @@ class TestModelOperators:
     def test_dict(self):
         # dict is already tested via copy. Just the other cases here.
         mdict = self.model_3_b.to_dict()
-        keys = ['res_x', 'res_y', 'res_z', 'mu_r', 'epsilon_r', 'vnC']
+        keys = ['property_x', 'property_y', 'property_z', 'mu_r', 'epsilon_r',
+                'vnC']
         for key in keys:
             assert key in mdict.keys()
         for key in keys[:3]:
             val = getattr(self.model_3_b, key)
             assert_allclose(mdict[key], val)
 
-        del mdict['res_x']
-        with pytest.raises(KeyError, match="Variable 'res_x' missing"):
+        del mdict['property_x']
+        with pytest.raises(KeyError, match="Variable 'property_x' missing"):
             models.Model.from_dict(mdict)
