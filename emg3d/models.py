@@ -23,6 +23,7 @@ Everything to create model-properties for the multigrid solver.
 # the License.
 
 
+import warnings
 import numpy as np
 from copy import deepcopy
 from scipy.constants import epsilon_0
@@ -36,12 +37,13 @@ __all__ = ['Model', 'VolumeModel']
 class Model:
     r"""Create a model instance.
 
-    Class to provide model parameters (x-, y-, and z-directed resistivities,
-    electric permittivity and magnetic permeability) to the solver. Relative
-    magnetic permeability :math:`\mu_\mathrm{r}` is by default set to one and
-    electric permittivity :math:`\varepsilon_\mathrm{r}` is by default set to
-    zero, but they can also be provided (isotropically). Keep in mind that the
-    multigrid method as implemented in `emg3d` only works for the diffusive
+    Class to provide model parameters (x-, y-, and z-directed properties
+    [resistivity or conductivity; linear or on log_10/log_e-scale], electric
+    permittivity and magnetic permeability) to the solver. Relative magnetic
+    permeability :math:`\mu_\mathrm{r}` is by default set to one and electric
+    permittivity :math:`\varepsilon_\mathrm{r}` is by default set to zero, but
+    they can also be provided (isotropically). Keep in mind that the multigrid
+    method as implemented in `emg3d` only works for the diffusive
     approximation. As soon as the displacement-part in the Maxwell's equations
     becomes too dominant it will fail (high frequencies or very high electric
     permittivity).
@@ -52,16 +54,18 @@ class Model:
     grid : TensorMesh
         Grid on which to apply model.
 
-    res_x, res_y, res_z : float or ndarray; default to 1.
-        Resistivity in x-, y-, and z-directions. If ndarray, they must have the
-        shape of grid.vnC (F-ordered) or grid.nC. Resistivities have to be
-        bigger than zero and smaller than infinity.
+    property_{x;y;z} : float or ndarray; default to 1.
+        Material property in x-, y-, and z-directions. If ndarray, they must
+        have the shape of grid.vnC (F-ordered) or grid.nC.
 
-        Resistivities responds to the `mapping='Resistivity'`, and these
-        parameters are called like this for historic reason. However,
-        internally `emg3d` works with conductivities. You can provide different
-        types of parameters for `res_{x;y;z}`, see the parameter `mapping` for
-        the implemented types.
+        By default, property refers to electrical resistivity. However, this
+        can be changed with an appropriate map. For more info, see the
+        description of the parameter `mapping`. The internals of `emg3d` work,
+        irrelevant of the map, with electrical conductivities.
+
+        Resistivities and conductivities have to be bigger than zero and
+        smaller than infinity (if provided on a linear scale; not on
+        logarithmic scales).
 
     mu_r : None, float, or ndarray
         Relative magnetic permeability (isotropic). If ndarray it must have the
@@ -70,14 +74,14 @@ class Model:
         permeability has to be bigger than zero and smaller than infinity.
 
     epsilon_r : None, float, or ndarray
-       Relative electric permittivity (isotropic). If ndarray it must have the
-       shape of grid.vnC (F-ordered) or grid.nC. The displacement part is
-       completely neglected (diffusive approximation) if set to None, which is
-       the default. Electric permittivity has to be bigger than zero and
-       smaller than infinity.
+        Relative electric permittivity (isotropic). If ndarray it must have the
+        shape of grid.vnC (F-ordered) or grid.nC. The displacement part is
+        completely neglected (diffusive approximation) if set to None, which is
+        the default. Electric permittivity has to be bigger than zero and
+        smaller than infinity.
 
     mapping : str
-        Defines what type the input `res_{x;y;z}`-values correspond to. By
+        Defines what type the input `property_{x;y;z}`-values correspond to. By
         default, they represent resistivities (Ohm.m). The implemented types
         are:
 
@@ -90,9 +94,32 @@ class Model:
 
     """
 
-    def __init__(self, grid, res_x=1., res_y=None, res_z=None, mu_r=None,
-                 epsilon_r=None, mapping='Resistivity'):
+    _res_warning = (
+        "\n    The keywords `res_{x;y;z}` are deprecated and will be removed."
+        "\n    Use the keywords `property_{x;y;z}` instead."
+    )
+
+    def __init__(self, grid, property_x=1., property_y=None, property_z=None,
+                 mu_r=None, epsilon_r=None, mapping='Resistivity', **kwargs):
         """Initiate a new model."""
+
+        # Check kwargs; purely for backwards compatibility.
+        if any([key.startswith('res') for key in kwargs.keys()]):
+            warnings.warn(self._res_warning, DeprecationWarning)
+
+            res_x = kwargs.pop('res_x', None)
+            res_y = kwargs.pop('res_y', None)
+            res_z = kwargs.pop('res_z', None)
+
+            property_x = property_x if res_x is None else res_x
+            property_y = property_y if res_y is None else res_y
+            property_z = property_z if res_z is None else res_z
+
+            mapping = 'Resistivity'
+
+        # Ensure no kwargs left.
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Store required info from grid.
         if hasattr(grid, 'shape'):
@@ -112,55 +139,35 @@ class Model:
 
         # Check case.
         self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
-        if res_y is None and res_z is None:  # 0: Isotropic.
+        if property_y is None and property_z is None:
+            # 0: Isotropic.
             self.case = 0
-        elif res_z is None:                  # 1: HTI.
+        elif property_z is None:
+            # 1: HTI.
             self.case = 1
-        elif res_y is None:                  # 2: VTI.
+        elif property_y is None:
+            # 2: VTI.
             self.case = 2
-        else:                                # 3: Tri-axial anisotropy.
+        else:
+            # 3: Tri-axial anisotropy.
             self.case = 3
 
         # Get map.
         self.map = getattr(maps, 'Map'+mapping)()
 
-        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-        # - Adjust check_parameter
-        # - Add prop_{x;y;z} etc
-        # - Store/change everything to conductivities
-        # - Create deprec-warnings.
-        # - Add mapping to __repr__
-        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-
         # Initiate all parameters.
-        self._con_x = self._check_parameter(self.map.backward(res_x), 'res_x')
-        # backwards comp. TODO
-        self._res_x = self._check_parameter(1/self._con_x, 'res_x')
-
-        if res_y is None:
-            self._con_y = None
-            self._res_y = None
-        else:
-            self._con_y = self._check_parameter(
-                    self.map.backward(res_y), 'res_y')
-            # backwards comp. TODO
-            self._res_y = self._check_parameter(1/self._con_y, 'res_y')
-
-        if res_z is None:
-            self._con_z = None
-            self._res_z = None
-        else:
-            self._con_z = self._check_parameter(
-                    self.map.backward(res_z), 'res_z')
-            # backwards comp. TODO
-            self._res_z = self._check_parameter(1/self._con_z, 'res_z')
-
+        self._property_x = self._check_parameter(
+                property_x, 'property_x', True)
+        self._property_y = self._check_parameter(
+                property_y, 'property_y', True)
+        self._property_z = self._check_parameter(
+                property_z, 'property_z', True)
         self._mu_r = self._check_parameter(mu_r, 'mu_r')
         self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
 
     def __repr__(self):
         """Simple representation."""
-        return (f"Model; {self.case_names[self.case]} {self.map.description}"
+        return (f"Model [{self.map.description}]; {self.case_names[self.case]}"
                 f"{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}"
                 f"; {self.vnC[0]} x {self.vnC[1]} x {self.vnC[2]} "
@@ -216,14 +223,11 @@ class Model:
             except ValueError:
                 equal = False
 
-            # Check map.
-            equal *= model.map.name == self.map.name
-
         # Compare values.
         if equal:
-            equal *= np.allclose(self.res_x, model.res_x)
-            equal *= np.allclose(self.res_y, model.res_y)
-            equal *= np.allclose(self.res_z, model.res_z)
+            equal *= np.allclose(self.property_x, model.property_x)
+            equal *= np.allclose(self.property_y, model.property_y)
+            equal *= np.allclose(self.property_z, model.property_z)
             if self.mu_r is None:
                 equal *= model.mu_r is None
             elif model.mu_r is None:
@@ -248,19 +252,16 @@ class Model:
         # Initiate dict.
         out = {}
 
-        # resistivities.
-        # TODO out['res_x'] = self.res_x
-        out['res_x'] = self.map.forward(self._con_x)
+        # Properties.
+        out['property_x'] = self.property_x
         if self.case in [1, 3]:
-            # TODO out['res_y'] = self.res_y
-            out['res_y'] = self.map.forward(self._con_y)
+            out['property_y'] = self.property_y
         else:
-            out['res_y'] = None
+            out['property_y'] = None
         if self.case in [2, 3]:
-            # TODO out['res_z'] = self.res_z
-            out['res_z'] = self.map.forward(self._con_z)
+            out['property_z'] = self.property_z
         else:
-            out['res_z'] = None
+            out['property_z'] = None
 
         # mu_r.
         if self.mu_r is not None:
@@ -277,8 +278,8 @@ class Model:
         # vnC.
         out['vnC'] = self.vnC
 
-        # mapping.
-        out['map'] = self.map.name
+        # Map.
+        out['mapping'] = self.map.name
 
         # Name
         out['__class__'] = self.__class__.__name__
@@ -296,8 +297,8 @@ class Model:
         ----------
         inp : dict
             Dictionary as obtained from :func:`Model.to_dict`.
-            The dictionary needs the keys `res_x`, `res_y`, `res_z`, `mu_r`,
-            `epsilon_r`, `vnC`, and `mapping`.
+            The dictionary needs the keys `property_x`, `property_y`,
+            `property_z`, `mu_r`, `epsilon_r`, `vnC`, and `mapping`.
 
         Returns
         -------
@@ -305,65 +306,96 @@ class Model:
 
         """
         try:
-            mapping = inp.pop('map', 'Resistivity')
-            return cls(grid=inp['vnC'], res_x=inp['res_x'], res_y=inp['res_y'],
-                       res_z=inp['res_z'], mu_r=inp['mu_r'],
-                       epsilon_r=inp['epsilon_r'], mapping=mapping)
+            # Check `res`; purely for backwards compatibility.
+            if any([key.startswith('res') for key in inp]):
+                warnings.warn(cls._res_warning, DeprecationWarning)
+
+                inp['property_x'] = inp.pop('res_x', None)
+                inp['property_z'] = inp.pop('res_y', None)
+                inp['property_y'] = inp.pop('res_z', None)
+                inp['mapping'] = 'Resistivity'
+
+            return cls(grid=inp['vnC'], property_x=inp['property_x'],
+                       property_y=inp['property_y'],
+                       property_z=inp['property_z'], mu_r=inp['mu_r'],
+                       epsilon_r=inp['epsilon_r'], mapping=inp['mapping'])
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
-    # RESISTIVITIES
+    # PROPERTY
     @property
-    def res_x(self):
-        r"""Resistivity in x-direction."""
-        return self._return_parameter(self._res_x)
+    def property_x(self):
+        r"""Property in x-direction."""
+        return self._return_parameter(self._property_x)
 
-    @res_x.setter
-    def res_x(self, res):
-        r"""Update resistivity in x-direction."""
-        self._res_x = self._check_parameter(res, 'res_x')
+    @property_x.setter
+    def property_x(self, property_x):
+        r"""Update property in x-direction."""
+        self._property_x = self._check_parameter(
+                property_x, 'property_x', True)
 
     @property
-    def res_y(self):
-        r"""Resistivity in y-direction."""
+    def property_y(self):
+        r"""Property in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self._return_parameter(self._res_y)
-        else:                    # Return res_x.
-            return self._return_parameter(self._res_x)
+            return self._return_parameter(self._property_y)
+        else:                    # Return property_x.
+            return self._return_parameter(self._property_x)
 
-    @res_y.setter
-    def res_y(self, res):
-        r"""Update resistivity in y-direction."""
+    @property_y.setter
+    def property_y(self, property_y):
+        r"""Update property in y-direction."""
 
-        # Adjust case in case res_z was not set so far.
+        # Adjust case in case property_z was not set so far.
         if self.case == 0:  # If it was isotropic, it is HTI now.
             self.case = 1
         elif self.case == 2:  # If it was VTI, it is tri-axial now.
             self.case = 3
 
         # Update it.
-        self._res_y = self._check_parameter(res, 'res_y')
+        self._property_y = self._check_parameter(
+                property_y, 'property_y', True)
 
     @property
-    def res_z(self):
-        r"""Resistivity in z-direction."""
+    def property_z(self):
+        r"""Property in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self._return_parameter(self._res_z)
-        else:                    # Return res_x.
-            return self._return_parameter(self._res_x)
+            return self._return_parameter(self._property_z)
+        else:                    # Return property_x.
+            return self._return_parameter(self._property_x)
 
-    @res_z.setter
-    def res_z(self, res):
-        r"""Update resistivity in z-direction."""
+    @property_z.setter
+    def property_z(self, property_z):
+        r"""Update property in z-direction."""
 
-        # Adjust case in case res_z was not set so far.
+        # Adjust case in case property_z was not set so far.
         if self.case == 0:  # If it was isotropic, it is VTI now.
             self.case = 2
         elif self.case == 1:  # If it was HTI, it is tri-axial now.
             self.case = 3
 
         # Update it.
-        self._res_z = self._check_parameter(res, 'res_z')
+        self._property_z = self._check_parameter(
+                property_z, 'property_z', True)
+
+    # Backwards compatibility for deprecated attributes.
+    @property
+    def res_x(self):
+        warnings.warn(self._res_warning, DeprecationWarning)
+        fmap = maps.MapResistivity()
+        return fmap.forward(self.map.backward(self.property_x))
+
+    @property
+    def res_y(self):
+        warnings.warn(self._res_warning, DeprecationWarning)
+        fmap = maps.MapResistivity()
+        return fmap.forward(self.map.backward(self.property_y))
+
+    @property
+    def res_z(self):
+        warnings.warn(self._res_warning, DeprecationWarning)
+        fmap = maps.MapResistivity()
+        return fmap.forward(self.map.backward(self.property_z))
 
     # MAGNETIC PERMEABILITIES
     @property
@@ -389,7 +421,7 @@ class Model:
         self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
 
     # INTERNAL UTILITIES
-    def _check_parameter(self, var, name):
+    def _check_parameter(self, var, name, mapped=False):
         """Check parameter.
 
         - Shape must be (), (1,), nC, or vnC.
@@ -409,12 +441,13 @@ class Model:
                     f"Shape of {name} must be (), {self.vnC}, or "
                     f"{self.nC}.\nProvided: {var.shape}.")
 
-        # Check 0 < val or 0 <= val.
-        if not np.all(var > 0):
-            raise ValueError(f"`{name}` must be all `0 < var`.")
+        # Check they are positive.
+        if not mapped or (mapped and ('Lg' or 'Ln') not in self.map.name):
+            if not np.all(var > 0):
+                raise ValueError(f"`{name}` must be all `0 < var`.")
 
-        # Check val < inf.
-        if not np.all(var < np.inf):
+        # Check |val| < inf.
+        if not np.all(np.abs(var) < np.inf):
             raise ValueError(f"`{name}` must be all `var < inf`.")
 
         return var
@@ -434,7 +467,7 @@ class Model:
         """Check if `self` and `model` are consistent for operations.
 
         Note: {hx; hy; hz} is not checked. As long as the models have the
-              same shape and resistivity type the operation will be carried
+              same shape, isotropy, and mapping the operation will be carried
               out.
 
         """
@@ -447,7 +480,7 @@ class Model:
 
         # Ensure the two instances have the same case.
         if self.case != model.case:
-            msg = ("Models must be of the same resistivity type but have types"
+            msg = ("Models must be of the same isotropy type but have types"
                    f" '{self.case_names[self.case]}' and"
                    f" '{model.case_names[model.case]}'.")
             raise ValueError(msg)
@@ -467,21 +500,27 @@ class Model:
                    f"and '{hasattr(model.epsilon_r, 'dtype')}'.")
             raise ValueError(msg)
 
+        # Ensure the two instances have the same mapping:
+        if self.map.name != model.map.name:
+            msg = ("Models must have the same mapping but have mappings"
+                   f" '{self.map.name}' and '{model.map.name}'.")
+            raise ValueError(msg)
+
     def _apply_operator(self, model, operator):
         """Apply the provided operator to self and model."""
 
         kwargs = {}
 
-        # Subtract resistivities.
-        kwargs['res_x'] = operator(self.res_x, model.res_x)
+        # Subtract properties.
+        kwargs['property_x'] = operator(self.property_x, model.property_x)
         if self.case in [1, 3]:
-            kwargs['res_y'] = operator(self.res_y, model.res_y)
+            kwargs['property_y'] = operator(self.property_y, model.property_y)
         else:
-            kwargs['res_y'] = None
+            kwargs['property_y'] = None
         if self.case in [2, 3]:
-            kwargs['res_z'] = operator(self.res_z, model.res_z)
+            kwargs['property_z'] = operator(self.property_z, model.property_z)
         else:
-            kwargs['res_z'] = None
+            kwargs['property_z'] = None
 
         # Subtract mu_r.
         if self.mu_r is not None:
@@ -494,6 +533,8 @@ class Model:
             kwargs['epsilon_r'] = operator(self.epsilon_r, model.epsilon_r)
         else:
             kwargs['epsilon_r'] = None
+
+        kwargs['mapping'] = self.map.name
 
         return kwargs
 
@@ -535,15 +576,15 @@ class VolumeModel:
         self.case = model.case
 
         # eta_x
-        self._eta_x = self.calculate_eta('res_x', grid, model, sfield)
+        self._eta_x = self.calculate_eta('property_x', grid, model, sfield)
 
         # eta_y
         if model.case in [1, 3]:  # HTI or tri-axial.
-            self._eta_y = self.calculate_eta('res_y', grid, model, sfield)
+            self._eta_y = self.calculate_eta('property_y', grid, model, sfield)
 
         # eta_z
         if self.case in [2, 3]:  # VTI or tri-axial.
-            self._eta_z = self.calculate_eta('res_z', grid, model, sfield)
+            self._eta_z = self.calculate_eta('property_z', grid, model, sfield)
 
         # zeta
         self._zeta = self.calculate_zeta('mu_r', grid, model)
@@ -577,18 +618,18 @@ class VolumeModel:
 
     @staticmethod
     def calculate_eta(name, grid, model, field):
-        r"""eta: volume divided by resistivity."""
+        r"""eta: volume multiplied with conductivity."""
 
         # Initiate eta
         eta = field.smu0*grid.vol.reshape(grid.vnC, order='F')
 
         # Compute eta depending on epsilon.
         if model.epsilon_r is None:  # Diffusive approximation.
-            eta /= getattr(model, name)
+            eta *= model.map.backward(getattr(model, name))
 
         else:
             eps_term = field.sval*epsilon_0*model.epsilon_r
-            sig_term = 1./getattr(model, name)
+            sig_term = model.map.backward(getattr(model, name))
             eta *= sig_term - eps_term
 
         return eta
