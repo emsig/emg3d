@@ -289,15 +289,15 @@ class _Map:
                 "    Maps investigation variable `x` to\n"
                 "    computational variable `σ` (conductivity).")
 
-    def forward(self):
+    def forward(self, conductivity):
         """Conductivity to mapping."""
         raise NotImplementedError("Forward map not implemented.")
 
-    def backward(self):
+    def backward(self, mapped):
         """Mapping to conductivity."""
         raise NotImplementedError("Backward map not implemented.")
 
-    def derivative(self):
+    def derivative(self, gradient, conductivity):
         """Map derivative from conductivity back to mapping space."""
         raise NotImplementedError("Derivative map not implemented.")
 

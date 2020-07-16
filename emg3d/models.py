@@ -228,17 +228,11 @@ class Model:
             equal *= np.allclose(self.property_x, model.property_x)
             equal *= np.allclose(self.property_y, model.property_y)
             equal *= np.allclose(self.property_z, model.property_z)
-            if self.mu_r is None:
-                equal *= model.mu_r is None
-            elif model.mu_r is None:
-                equal *= self.mu_r is None
-            else:
+            # operator_test ensures mu_r are both or neither None.
+            if self.mu_r is not None:
                 equal *= np.allclose(self.mu_r, model.mu_r)
-            if self.epsilon_r is None:
-                equal *= model.epsilon_r is None
-            elif model.epsilon_r is None:
-                equal *= self.epsilon_r is None
-            else:
+            # operator_test ensures epsilon_r are both or neither None.
+            if self.epsilon_r is not None:
                 equal *= np.allclose(self.epsilon_r, model.epsilon_r)
 
         return bool(equal)
@@ -311,8 +305,8 @@ class Model:
                 warnings.warn(cls._res_warning, DeprecationWarning)
 
                 inp['property_x'] = inp.pop('res_x', None)
-                inp['property_z'] = inp.pop('res_y', None)
-                inp['property_y'] = inp.pop('res_z', None)
+                inp['property_y'] = inp.pop('res_y', None)
+                inp['property_z'] = inp.pop('res_z', None)
                 inp['mapping'] = 'Resistivity'
 
             return cls(grid=inp['vnC'], property_x=inp['property_x'],

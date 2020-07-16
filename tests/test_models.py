@@ -175,6 +175,51 @@ class TestModel:
             _ = models.Model(grid, mu_r=-1)
 
 
+class TestModel2:
+
+    def test_kwargs(self):
+
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        with pytest.raises(TypeError, match='Unexpected '):
+            models.Model(grid, somekeyword=None)
+
+    def test_equal_mapping(self):
+
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        model1 = models.Model(grid)
+        model2 = models.Model(grid, mapping='Conductivity')
+
+        check = model1 == model2
+
+        assert check is False
+
+    def test_old_dict(self):
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        model1 = models.Model(grid, 1., 2., 3.)
+        mydict = model1.to_dict()
+        mydict['res_x'] = mydict['property_x']
+        mydict['res_y'] = mydict['property_y']
+        mydict['res_z'] = mydict['property_z']
+        del mydict['property_x']
+        del mydict['property_y']
+        del mydict['property_z']
+
+        model2 = models.Model.from_dict(mydict)
+
+        assert model1 == model2
+
+
 class TestModelOperators:
 
     # Define two different sized meshes.
