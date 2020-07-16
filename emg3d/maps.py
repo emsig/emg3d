@@ -421,8 +421,8 @@ class MapLnResistivity(_Map):
     def forward(self, conductivity):
         return np.log(conductivity**-1)
 
-    def backward(self, data):
-        return np.exp(data**-1)
+    def backward(self, mapped):
+        return np.exp(mapped**-1)
 
     def derivative(self, gradient, conductivity):
         gradient /= -conductivity

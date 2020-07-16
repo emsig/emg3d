@@ -8,7 +8,8 @@ recent versions
 *latest*
 --------
 
-This is quite a huge release, and not completely backwards compatible.
+This is a big release with many new features, and unfortunately not completely
+backwards compatible.
 
 - Modules:
 
@@ -21,13 +22,13 @@ This is quite a huge release, and not completely backwards compatible.
   - `models` & `maps`:
 
     - Model instances take new the parameters `property_{x;y;z}` instead of
-      `res_{x;y;z}`. The properties can be either resistivity, conductivity,
-      or log_10 or log_e thereof. What is actually provided has to defined in
-      the parameter `mapping`. By default, it remains resistivity, as it was
-      until now. The keywords `res_{x;y;z}` are **deprecated**, but still
-      accepted at the moment. The attributes `model.res_{x;y;z}` are still
-      available too, but equally **deprecated**. However, it is **no longer
-      possible to assigne values to these attributes**, which is a **backwards
+      `res_{x;y;z}`. The properties can be either resistivity, conductivity, or
+      log_{e;10} thereof. What is actually provided has to be defined with the
+      parameter `mapping`. By default, it remains resistivity, as it was until
+      now. The keywords `res_{x;y;z}` are **deprecated**, but still accepted at
+      the moment. The attributes `model.res_{x;y;z}` are still available too,
+      but equally **deprecated**. However, it is **no longer possible to
+      assign values to these attributes**, which is a **backwards
       incompatible** change. (The corresponding mappings that make this
       possible live in `maps`).
 
