@@ -219,6 +219,24 @@ class TestModel2:
 
         assert model1 == model2
 
+    def test_negative_values(self):
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
+                np.zeros(3))
+
+        # Check these fails.
+        with pytest.raises(ValueError, match='`property_x` must be '):
+            models.Model(grid, property_x=-1, mapping='Conductivity')
+        with pytest.raises(ValueError, match='`property_x` must be '):
+            models.Model(grid, property_x=-1, mapping='Resistivity')
+
+        # Check these do not fail.
+        models.Model(grid, property_x=-1, mapping='LgConductivity')
+        models.Model(grid, property_x=-1, mapping='LnConductivity')
+        models.Model(grid, property_x=-1, mapping='LgResistivity')
+        models.Model(grid, property_x=-1, mapping='LnResistivity')
+
 
 class TestModelOperators:
 

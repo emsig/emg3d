@@ -436,7 +436,7 @@ class Model:
                     f"{self.nC}.\nProvided: {var.shape}.")
 
         # Check they are positive.
-        if not mapped or (mapped and ('Lg' or 'Ln') not in self.map.name):
+        if not mapped or (mapped and not self.map.name.startswith('L')):
             if not np.all(var > 0):
                 raise ValueError(f"`{name}` must be all `0 < var`.")
 
