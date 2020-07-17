@@ -66,6 +66,8 @@ backwards compatible.
 
 - Removed all deprecated functions from `utils`.
 
+- Re-organise API-docs.
+
 - Much bookkeeping (improve error raising and checking; chaining errors, numpy
   types, etc).
 

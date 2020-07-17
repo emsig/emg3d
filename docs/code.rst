@@ -3,30 +3,39 @@ Code
 
 .. automodule:: emg3d
 
-.. automodule:: emg3d.solver
-    :members:
-    :exclude-members: solve, solver
+.. automodapi:: emg3d.meshes
+   :no-inheritance-diagram:
+   :no-main-docstr:
 
-.. automodule:: emg3d.core
-    :members:
+.. automodapi:: emg3d.models
+   :no-inheritance-diagram:
+   :no-main-docstr:
 
-.. automodule:: emg3d.utils
-    :members:
+.. automodapi:: emg3d.fields
+   :no-inheritance-diagram:
+   :no-main-docstr:
 
-.. automodule:: emg3d.meshes
-    :members:
+.. automodapi:: emg3d.io
+   :no-inheritance-diagram:
+   :no-main-docstr:
 
-.. automodule:: emg3d.models
-    :members:
+.. automodapi:: emg3d.surveys
+   :no-inheritance-diagram:
+   :no-main-docstr:
 
-.. automodule:: emg3d.maps
-    :members:
+.. automodapi:: emg3d.maps
+   :no-inheritance-diagram:
+   :no-main-docstr:
 
-.. automodule:: emg3d.fields
-    :members:
+.. automodapi:: emg3d.utils
+   :no-inheritance-diagram:
+   :no-main-docstr:
 
-.. automodule:: emg3d.io
-    :members:
+.. automodapi:: emg3d.solver
+   :no-inheritance-diagram:
+   :no-main-docstr:
+   :skip: solve
 
-.. automodule:: emg3d.surveys
-    :members:
+.. automodapi:: emg3d.core
+   :no-inheritance-diagram:
+   :no-main-docstr:

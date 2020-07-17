@@ -6,12 +6,16 @@ from emg3d import __version__
 # Load extensions
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.todo',
     'sphinx.ext.intersphinx',
     'numpydoc',
+    'sphinx_automodapi.automodapi',
 ]
+autosummary_generate = True
+add_module_names = True
 
 # Numpydoc settings
 numpydoc_show_class_members = False
