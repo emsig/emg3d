@@ -32,8 +32,9 @@ high-level, specialised modelling routines.
 
 import itertools
 import numpy as np
+from copy import deepcopy
 
-from emg3d import fields, solver, io
+from emg3d import fields, solver, io, surveys, models, meshes
 
 # Check soft dependencies.
 try:
@@ -58,7 +59,7 @@ class Simulation():
 
         The Simulation-class has currently a few limitations:
 
-        - `adaptive` must be `'same'`;
+        - `gridding` must be `'same'`;
         - `survey.fixed`: must be `False`;
         - sources and receivers must be electric;
         - sources strength is always normalized to 1 Am.
@@ -83,10 +84,10 @@ class Simulation():
         The maximum number of processes that can be used to execute the
         given calls. Default is 4.
 
-    adaptive : str
-        Method how the adaptive computational grids are computed. The default
-        is currently 'same', the only implemented method so far. This will
-        change in the future, probably to 'single'. The different methods are:
+    gridding : str
+        Method how the computational grids are computed. The default is
+        currently 'same', the only implemented method so far. This will change
+        in the future, probably to 'single'. The different methods are:
 
         - 'same': Same grid as for the input model.
         - 'single': A single grid for all sources and frequencies.
@@ -114,18 +115,19 @@ class Simulation():
 
     """
 
-    def __init__(self, survey, grid, model, max_workers=4, adaptive='same',
-                 **kwargs):
+    def __init__(self, name, survey, grid, model, max_workers=4,
+                 gridding='same', **kwargs):
         """Initiate a new Simulation instance."""
 
         # Store inputs.
+        self.name = name
         self.survey = survey
         self.grid = grid
         self.model = model
         self.max_workers = max_workers
 
-        self.adaptive = adaptive
-        self._adaptive_descr = {
+        self.gridding = gridding
+        self._gridding_descr = {
                 'same': 'Same grid as for model',
                 'single': 'A single grid for all sources and frequencies',
                 'frequency': 'Frequency-dependent grids',
@@ -141,10 +143,10 @@ class Simulation():
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Check current limitations.
-        if self.adaptive != 'same':
+        if self.gridding != 'same':
             raise NotImplementedError(
                     "Simulation currently only implemented for "
-                    "`adaptive='same'`.")
+                    "`gridding='same'`.")
 
         if self.survey.fixed:
             raise NotImplementedError(
@@ -182,16 +184,17 @@ class Simulation():
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
 
     def __repr__(self):
-        return (f"*{self.__class__.__name__}* of «{self.survey.name}»\n\n"
+        return (f"*{self.__class__.__name__}* «{self.name}» "
+                f"of «{self.survey.name}»\n\n"
                 f"- {self.survey.__class__.__name__}: "
                 f"{self.survey.shape[0]} sources; "
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies\n"
                 f"- {self.model.__repr__()}\n"
-                f"- Gridding: {self._adaptive_descr[self.adaptive]}")
+                f"- Gridding: {self._gridding_descr[self.gridding]}")
 
     def _repr_html_(self):
-        return (f"<h3>{self.__class__.__name__}</h3>"
+        return (f"<h3>{self.__class__.__name__} «{self.name}»</h3>"
                 f"of «{self.survey.name}»<ul>"
                 f"<li>{self.survey.__class__.__name__}: "
                 f"{self.survey.shape[0]} sources; "
@@ -199,16 +202,81 @@ class Simulation():
                 f"{self.survey.shape[2]} frequencies</li>"
                 f"<li>{self.model.__repr__()}</li>"
                 f"<li>Gridding: "
-                f"{self._adaptive_descr[self.adaptive]}</li>"
+                f"{self._gridding_descr[self.gridding]}</li>"
                 f"</ul>")
 
-    def copy(self):
-        """Return a copy of the Simulation."""
-        return self.from_dict(self.to_dict(True))
+    def copy(self, what='computed'):
+        """Return a copy of the Simulation.
 
-    def to_dict(self, copy=False):
-        """Store the necessary information of the Simulation in a dict."""
-        raise NotImplementedError
+        See `to_dict` for more information regarding `what`.
+
+        """
+        return self.from_dict(self.to_dict(what, True))
+
+    def to_dict(self, what='computed', copy=False):
+        """Store the necessary information of the Simulation in a dict.
+
+
+        Parameters
+        ----------
+        what : str
+            What to store. Currently implemented:
+
+            - 'computed' (default):
+              Stores all computed properties (`_dict_efield`,
+              `_dict_efield_info`, `survey._data['synthetic']`).
+
+            - 'results':
+              Stores only the response at receivers,
+              `survey._data['synthetic']`.
+
+            - 'derived':
+              Stores all derived properties (`_dict_grid`, `_dict_model`,
+              `_dict_sfield`, `_dict_hfield`).
+
+            - 'all':
+              Stores everything.
+
+            - 'plain':
+              Only stores the plain Simulation (as initiated).
+
+        """
+
+        if what not in ['computed', 'results', 'derived', 'all', 'plain']:
+            raise TypeError(f"Unrecognized `what`: {what}")
+
+        # Initiate dict.
+        out = {'name': self.name, '__class__': self.__class__.__name__}
+
+        # Add initiation parameters.
+        out['survey'] = self.survey.to_dict()
+        out['grid'] = self.grid.to_dict()
+        out['model'] = self.model.to_dict()
+        out['max_workers'] = self.max_workers
+        out['gridding'] = self.gridding
+        out['solver_opts'] = self.solver_opts
+
+        # Get required derived/computed properties.
+        store = []
+
+        if what in ['derived', 'all']:
+            store += ['grid', 'model', 'sfield', 'hfield']
+
+        if what in ['computed', 'all']:
+            store += ['efield', 'efield_info']
+
+        # store dicts.
+        for name in store:
+            out['_dict_'+name] = getattr(self, '_dict_'+name)
+
+        # store data.
+        if what in ['computed', 'results', 'all']:
+            out['synthetic'] = self.data.synthetic
+
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
 
     @classmethod
     def from_dict(cls, inp):
@@ -219,48 +287,51 @@ class Simulation():
         ----------
         inp : dict
             Dictionary as obtained from :func:`Simulation.to_dict`.
-            The dictionary needs the keys TODO.
 
         Returns
         -------
         obj : :class:`Simulation` instance
 
         """
-        raise NotImplementedError
+        try:
 
-    def to_file(self, fname, what='results', compression="gzip",
+            # Initiate class.
+            out = cls(
+                    name=inp.get('name'),
+                    survey=surveys.Survey.from_dict(inp.get('survey')),
+                    grid=meshes.TensorMesh.from_dict(inp.get('grid')),
+                    model=models.Model.from_dict(inp.get('model')),
+                    max_workers=inp.get('max_workers'),
+                    gridding=inp.get('gridding'),
+                    solver_opts=inp.get('solver_opts'),
+                    )
+
+            # Add existing derived/computed properties.
+            data = ['grid', 'model', 'sfield', 'hfield', 'efield',
+                    'efield_info']
+
+            for pname in data:
+                name = '_dict_'+pname
+                if name in inp.keys():
+                    setattr(out, pname, inp.get(name))
+
+            if 'synthetic' in inp.keys():
+                out.data['synthetic'] = inp.get('synthetic')
+
+            return out
+
+        except KeyError as e:
+            raise KeyError(f"Variable {e} missing in `inp`.") from e
+
+    def to_file(self, fname, what='results', inplace=False, compression="gzip",
                 json_indent=2):
         """Store Simulation to a file.
 
-        Work in progress...
 
-        # Options
-        - 'results': A, B      # Input and results
-        - 'resultsonly': B     # Just the results (can not be recovered)
-        - 'computed': A, B, C  # Input, fields, and results
-        - 'all': A, B, C, D    # plus derived meshes/models etc.
+        => inplace True/False
+        => what
 
-        # (A) Input
-        - survey
-        - grid  # (restore orig using self._input_nCz)
-        - model # (restore orig using self._input_nCz)
-        - max_workers
-        - solver_opts
-        - adaptive
-        - kwargs
-
-        # (B) Results (if you don't want to store them => self.clean())
-        - survey.data.synthetic
-        => all variables: list(survey.data.keys())
-
-        # (C) Computed quantities
-        - _dict_efield, _dict_efield_info
-
-        # (D) Derived quantities
-        - _dict_grid
-        - _dict_model
-        - _dict_sfield
-        - _dict_hfield
+        => test if new version compatible with old version.
 
         Parameters
         ----------
@@ -307,8 +378,8 @@ class Simulation():
         # Get grid if it is not stored yet.
         if self._dict_grid[source][freq] is None:
 
-            # Act depending on adaptive:
-            if self.adaptive == 'same':  # Same grid as for provided model.
+            # Act depending on gridding:
+            if self.gridding == 'same':  # Same grid as for provided model.
 
                 # Store link to grid.
                 self._dict_grid[source][freq] = self.grid
@@ -325,8 +396,8 @@ class Simulation():
         # Get model if it is not stored yet.
         if self._dict_model[source][freq] is None:
 
-            # Act depending on adaptive:
-            if self.adaptive == 'same':  # Same grid as for provided model.
+            # Act depending on gridding:
+            if self.gridding == 'same':  # Same grid as for provided model.
 
                 # Store link to model.
                 self._dict_model[source][freq] = self.model
@@ -450,7 +521,7 @@ class Simulation():
         # => This could be done within the field computation. But then it might
         #    have to be done multiple times even if 'single' or 'same' grid.
         #    Something to keep in mind.
-        #    For `adaptive='same'` it does not really matter.
+        #    For `gridding='same'` it does not really matter.
         for src in self.survey.sources.keys():  # Loop over source positions.
             for freq in self.survey.frequencies:  # Loop over frequencies.
                 self.get_grid(src, freq),
@@ -461,8 +532,13 @@ class Simulation():
         srcfreq = list(itertools.product(self.survey.sources.keys(),
                                          self.survey.frequencies))
 
-        # Disable progress bar if there are >= workers than jobs.
-        disable = self.max_workers >= len(srcfreq)
+        # We remove the ones that were already computed.
+        remove = []
+        for src, freq in srcfreq:
+            if self._dict_efield[src][freq] is not None:
+                remove += [(src, freq)]
+        for src, freq in remove:
+            srcfreq.remove((src, freq))
 
         # Initiate futures-dict to store output.
         out = process_map(
@@ -470,19 +546,19 @@ class Simulation():
                 srcfreq,
                 max_workers=self.max_workers,
                 desc='Compute efields',
-                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}',
-                disable=disable
+                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
         )
 
         # Clean hfields, so they will be recomputed.
         del self._dict_hfield
         self._dict_hfield = self._dict_initiate()
 
-        # Extract and store.
-        warned = False
+        # The store-name is not water-tight if beforehand get_efield was used
+        # or similar. It works with a clean simulation.compute.
         store_name = ['synthetic', 'observed'][observed]
 
-        # Loop over src-freq combinations.
+        # Loop over src-freq combinations to extract and store.
+        warned = False  # Flag for warnings.
         for i, (src, freq) in enumerate(srcfreq):
 
             # Store efield.
@@ -501,7 +577,7 @@ class Simulation():
             self.data[store_name].loc[src, :, freq] = out[i][2]
 
     # UTILS
-    def clean(self, what):
+    def clean(self, what='computed'):
         """Clean part of the data base.
 
         Parameters
@@ -509,13 +585,13 @@ class Simulation():
         what : str
             What to clean. Currently implemented:
 
+            - 'computed' (default):
+              Removes all computed properties (`_dict_efield`,
+              `_dict_efield_info`, `survey._data['synthetic']`).
+
             - 'derived':
               Removes all derived properties (`_dict_grid`, `_dict_model`,
               `_dict_sfield`, `_dict_hfield`).
-
-            - 'computed':
-              Removes all computed properties (`_dict_efield`,
-              `_dict_efield_info`, `survey._data['synthetic']`).
 
             - 'keepresults':
               Both 'derived' and 'computed', except for the responses at

@@ -20,7 +20,7 @@ class TestSimulation():
 
     def test_simple_simulation(self):
         simulation = simulations.Simulation(
-                self.survey, self.grid, self.model, adaptive='same')
+                'Test1', self.survey, self.grid, self.model, gridding='same')
 
         # Check model
         assert simulation.get_model('Tx1', 1.0) == self.model
@@ -70,4 +70,4 @@ class TestSimulation():
     def test_errors(self):
         with pytest.raises(TypeError):
             simulations.Simulation(
-                    self.survey, self.grid, self.model, unknown=True)
+                    'Test2', self.survey, self.grid, self.model, unknown=True)

@@ -29,7 +29,7 @@ import warnings
 import numpy as np
 from datetime import datetime
 
-from emg3d import fields, models, utils, meshes, surveys
+from emg3d import fields, models, utils, meshes, surveys, simulations
 
 try:
     import h5py
@@ -46,8 +46,9 @@ KNOWN_CLASSES = {
     'Field': fields.Field,
     'Survey': surveys.Survey,
     'Dipole': surveys.Dipole,
-    'SourceField': fields.SourceField,
     'TensorMesh': meshes.TensorMesh,
+    'SourceField': fields.SourceField,
+    'Simulation': simulations.Simulation,
 }
 
 
