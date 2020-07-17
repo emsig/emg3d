@@ -61,7 +61,7 @@ def test_save_and_load(tmpdir, capsys):
     # Save it.
     io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
             broken=grid3, a=None,
-            field=field, what={'f': field.fx, 12: 12})
+            field=field, what={'f': field.fx, 12: 12}, collect_classes=True)
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
     assert utils.__version__ in outstr
@@ -82,7 +82,7 @@ def test_save_and_load(tmpdir, capsys):
 
     # Check message from loading another file
 
-    data = io._dict_serialize({'meshes': grid})
+    data = io._dict_serialize({'meshes': grid}, collect_classes=True)
     fdata = io._dict_flatten(data)
     del fdata['TensorMesh>meshes>hx']
 
@@ -116,7 +116,8 @@ def test_save_and_load(tmpdir, capsys):
     if h5py:
         io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
                 a=1.0, b=1+1j,
-                model=model, field=field, what={'f': field.fx})
+                model=model, field=field, what={'f': field.fx},
+                collect_classes=True)
         out_h5 = io.load(str(tmpdir+'/test.h5'))
         assert out_h5['Model']['model'] == model
         assert out_h5['Data']['a'] == 1.0
@@ -139,7 +140,8 @@ def test_save_and_load(tmpdir, capsys):
     # Test json.
     io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
             a=1.0, b=1+1j,
-            model=model, field=field, what={'f': field.fx}, backend='json')
+            model=model, field=field, what={'f': field.fx}, backend='json',
+            collect_classes=True)
     out_json = io.load(str(tmpdir+'/test.json'))
     assert out_json['Model']['model'] == model
     assert out_json['Data']['a'] == 1.0
@@ -171,11 +173,55 @@ def test_compare_dicts(capsys):
              'a': 1, 'b': None, 'c': 1e-9+1j*1e13,
              'd': {'aa': np.arange(10), 'bb': np.sqrt(1.0),
                    'cc': {'another': 1}, 'dd': None}
-             })
+             },
+            )
 
     dict2 = dc(dict1)
-    out = io._compare_dicts(dict1, dict2)
-    assert out is True
+    assert io._compare_dicts(dict1, dict2)
+
+    del dict1['d']['bb']
+    del dict2['field']
+    del dict2['model']['mu_r']
+    dict2['grid']['hy'] *= 2
+    dict2['whatever'] = 'whatever'
+    dict2['2onlydict'] = {'booh': 12}
+
+    out = io._compare_dicts(dict1, dict2, True)
+    assert out is False
+    outstr, _ = capsys.readouterr()
+    assert " True  :: model      > property_x" in outstr
+    assert "  {1}  ::              mu_r" in outstr
+    assert " False ::              hy" in outstr
+    assert " True  ::              cc         > another" in outstr
+    assert "  {2}  :: d          > bb" in outstr
+    assert "  {2}  :: 2onlydict" in outstr
+
+
+def test_compare_dicts_collected(capsys):
+    # Create test data
+    grid = meshes.TensorMesh(
+            [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
+            np.zeros(3))
+
+    model = models.Model(grid, property_x=1., property_y=2.,
+                         property_z=3., mu_r=4.)
+
+    e1 = create_dummy(*grid.vnEx)
+    e2 = create_dummy(*grid.vnEy)
+    e3 = create_dummy(*grid.vnEz)
+    ee = fields.Field(e1, e2, e3, freq=.938)
+
+    dict1 = io._dict_serialize(
+            {'model': model, 'grid': grid, 'field': ee,
+             'a': 1, 'b': None, 'c': 1e-9+1j*1e13,
+             'd': {'aa': np.arange(10), 'bb': np.sqrt(1.0),
+                   'cc': {'another': 1}, 'dd': None}
+             },
+            collect_classes=True,
+            )
+
+    dict2 = dc(dict1)
+    assert io._compare_dicts(dict1, dict2)
 
     del dict1['Data']['d']['bb']
     del dict2['Field']

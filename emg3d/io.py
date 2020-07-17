@@ -56,8 +56,8 @@ def save(fname, backend=None, compression="gzip", **kwargs):
 
     Serialize and save data to disk in different formats (see parameter
     description of `fname` for the supported file formats). The main
-    emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) are collected
-    in corresponding root-folders (unless `collect_classes=False`).
+    emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) can be
+    collected in corresponding root-folders by setting `collect_classes=True`.
 
     Any other (non-emg3d) object can be added too, as long as it knows how to
     serialize itself.
@@ -90,9 +90,9 @@ def save(fname, backend=None, compression="gzip", **kwargs):
         Passed through to json, default is 2.
 
     collect_classes : bool
-        If True (default), input data is collected in folders for the principal
+        If True, input data is collected in folders for the principal
         emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
-        everything else collected in a `Data`-folder.
+        everything else collected in a `Data`-folder. Defaults to False.
 
     verb : int
         If 1 (default) verbose, if 0 silent.
@@ -110,7 +110,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     """
     # Get and remove optional kwargs.
     json_indent = kwargs.pop('json_indent', 2)
-    collect_classes = kwargs.pop('collect_classes', True)
+    collect_classes = kwargs.pop('collect_classes', False)
     verb = kwargs.pop('verb', 1)
 
     # Get absolute path.
@@ -287,13 +287,13 @@ def load(fname, **kwargs):
     return data
 
 
-def _dict_serialize(inp, out=None, collect_classes=True):
+def _dict_serialize(inp, out=None, collect_classes=False):
     """Serialize emg3d-classes and other objects in inp-dict.
 
     Returns a serialized dictionary <out> of <inp>, where all members of
     `emg3d.io.KNOWN_CLASSES` are serialized with their respective `to_dict()`
     methods. These instances are additionally grouped together in dictionaries,
-    and all other stuff is put into 'Data', unless `collect_classes=False`.
+    and all other stuff is put into 'Data' if `collect_classes=True`.
 
     Any other (non-emg3d) object can be added too, as long as it knows how to
     serialize itself.
@@ -315,9 +315,9 @@ def _dict_serialize(inp, out=None, collect_classes=True):
         Output dictionary; created if not provided.
 
     collect_classes : bool
-        If True (default), input data is collected in folders for the principal
+        If True, input data is collected in folders for the principal
         emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
-        everything else collected in a `Data`-folder.
+        everything else collected in a `Data`-folder. Default is False.
 
 
     Returns

@@ -863,7 +863,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
           np.diff(grid.vectorNz[::rz])]
 
     # Create new `TensorMesh` instance for coarse grid
-    cgrid = meshes.TensorMesh(ch, grid.x0)
+    cgrid = meshes._TensorMesh(ch, grid.x0)
 
     # 2. RESTRICT MODEL
 

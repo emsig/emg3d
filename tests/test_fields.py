@@ -5,6 +5,12 @@ from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose, assert_array_equal
 
+# Import soft dependencies.
+try:
+    import discretize
+except ImportError:
+    discretize = None
+
 from emg3d import io, meshes, models, fields, solver, utils
 
 # Data generated with tests/create_data/regression.py
@@ -250,7 +256,10 @@ def test_field(tmpdir):
         fields.Field.from_dict(edict)
 
     # Set a dimension from the mesh to None, ensure field fails.
-    grid.nEx = None
+    if discretize is None:
+        grid.nEx = None
+    else:
+        grid = discretize.TensorMesh([1, 1], [1, 1])
     with pytest.raises(ValueError, match='Provided grid must be a 3D grid'):
         fields.Field(grid)
 
