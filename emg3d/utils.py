@@ -687,7 +687,7 @@ class Report(ScoobyReport):
 
         # Optional packages.
         optional = ['empymod', 'xarray', 'discretize', 'h5py', 'matplotlib',
-                    'IPython']
+                    'tqdm', 'IPython']
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)

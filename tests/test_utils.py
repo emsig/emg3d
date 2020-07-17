@@ -234,7 +234,7 @@ def test_report(capsys):
         out2 = scooby.Report(
                 core=['numpy', 'scipy', 'numba', 'emg3d'],
                 optional=['empymod', 'xarray', 'discretize', 'h5py',
-                          'matplotlib', 'IPython'],
+                          'matplotlib', 'tqdm', 'IPython'],
                 ncol=4)
 
         # Ensure they're the same; exclude time to avoid errors.
