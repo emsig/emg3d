@@ -34,9 +34,6 @@ class TestModel:
         res_z = res_x*1.4
         mu_r = res_x*1.11
 
-        # Check representation of TensorMesh.
-        assert 'TensorMesh: 2 x 2 x 2 (8)' in grid.__repr__()
-
         _, _ = capsys.readouterr()  # Clean-up
         # Using defaults; check backwards compatibility for freq.
         sfield = fields.SourceField(grid, freq=1)
@@ -173,6 +170,49 @@ class TestModel:
             _ = models.Model(grid, res_z=res_z*np.inf)
         with pytest.raises(ValueError, match='`mu_r` must be all'):
             _ = models.Model(grid, mu_r=-1)
+
+    def test_interpolate(self):
+
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([2, 2]), np.array([4, 4]), np.array([5, 5])],
+                np.zeros(3))
+
+        grid2 = meshes.TensorMesh(
+                [np.array([2]), np.array([4]), np.array([5])],
+                np.array([1, 2, 2.5]))
+
+        property_x = create_dummy(*grid.vnC, False)
+        property_y = property_x/2.0
+        property_z = property_x*1.4
+        mu_r = property_x*1.11
+        epsilon_r = property_x*3.33
+
+        model1inp = models.Model(grid, property_x)
+
+        model1out = model1inp.interpolate2grid(grid, grid2)
+        assert_allclose(model1out._property_x[0],
+                        10**(np.sum(np.log10(model1inp.property_x))/8))
+        assert model1out._property_y is None
+        assert model1out._property_z is None
+        assert model1out._mu_r is None
+        assert model1out._epsilon_r is None
+
+        model2inp = models.Model(
+                grid, property_x=property_x, property_y=property_y,
+                property_z=property_z, mu_r=mu_r, epsilon_r=epsilon_r)
+
+        model2out = model2inp.interpolate2grid(grid, grid2)
+        assert_allclose(model2out._property_x[0],
+                        10**(np.sum(np.log10(model2inp.property_x))/8))
+        assert_allclose(model2out._property_y[0],
+                        10**(np.sum(np.log10(model2inp.property_y))/8))
+        assert_allclose(model2out._property_z[0],
+                        10**(np.sum(np.log10(model2inp.property_z))/8))
+        assert_allclose(model2out._mu_r[0],
+                        10**(np.sum(np.log10(model2inp.mu_r))/8))
+        assert_allclose(model2out._epsilon_r[0],
+                        10**(np.sum(np.log10(model2inp.epsilon_r))/8))
 
 
 class TestModel2:

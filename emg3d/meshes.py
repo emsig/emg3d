@@ -27,27 +27,19 @@ import numpy as np
 from copy import deepcopy
 from scipy import optimize
 
+# Import soft dependencies.
+try:
+    import discretize.TensorMesh as dTensorMesh
+except ImportError:
+    class dTensorMesh:
+        pass
+
 __all__ = ['TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
            'get_domain', 'get_hx']
 
 
-class TensorMesh:
-    """Rudimentary mesh for multigrid calculation.
-
-    The tensor-mesh :class:`discretize.TensorMesh` is a powerful tool,
-    including sophisticated mesh-generation possibilities in 1D, 2D, and 3D,
-    plotting routines, and much more. However, in the multigrid solver we have
-    to generate a mesh at each level, many times over and over again, and we
-    only need a very limited set of attributes. This tensor-mesh class provides
-    all required attributes. All attributes here are the same as their
-    counterparts in :class:`discretize.TensorMesh` (both in name and value).
-
-    .. warning::
-        This is a slimmed-down version of :class:`discretize.TensorMesh`, meant
-        principally for internal use by the multigrid modeller. It is highly
-        recommended to use :class:`discretize.TensorMesh` to create the input
-        meshes instead of this class. There are no input-checks carried out
-        here, and there is only one accepted input format for `h` and `x0`.
+class _TensorMesh:
+    """Minimal TensorMesh for internal multigrid computation.
 
 
     Parameters
@@ -103,6 +95,42 @@ class TensorMesh:
         """Simple representation."""
         return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
                 f"({self.nC:,})")
+
+    @property
+    def vol(self):
+        """Construct cell volumes of the 3D model as 1D array."""
+        if getattr(self, '_vol', None) is None:
+            self._vol = (self.hx[None, None, :]*self.hy[None, :, None] *
+                         self.hz[:, None, None]).ravel()
+        return self._vol
+
+
+class TensorMesh(dTensorMesh, _TensorMesh):
+    """A slightly modified :class:`discretize.TensorMesh`.
+
+    Adds a few attributes (`__eq__`, `copy`, `to_dict`, and `from_dict`) to the
+    :class:`discretize.TensorMesh`.
+
+    Falls back to a minimal TensorMesh if `discretize` is not installed.
+    Nothing fancy is possible with the minimal TensorMesh, particularly NO
+    plotting nor nice repr-functions.
+
+
+    Parameters
+    ----------
+    h : list of three ndarrays
+        Cell widths in [x, y, z] directions.
+
+    x0 : ndarray of dimension (3, )
+        Origin (x, y, z).
+
+    """
+
+    def __init__(self, h, x0):
+        """Initiate TensorMesh."""
+        # Cast `h` to list, as `discretize.TensorMesh`
+        # fails if `h` is an # ndarray.
+        super().__init__(h=list(h), x0=x0)
 
     def __eq__(self, mesh):
         """Compare two meshes.
@@ -164,14 +192,6 @@ class TensorMesh:
             return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
-
-    @property
-    def vol(self):
-        """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '_vol', None) is None:
-            self._vol = (self.hx[None, None, :]*self.hy[None, :, None] *
-                         self.hz[:, None, None]).ravel()
-        return self._vol
 
 
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,

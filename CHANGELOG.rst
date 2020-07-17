@@ -31,6 +31,8 @@ backwards compatible.
       assign values to these attributes**, which is a **backwards
       incompatible** change. (The corresponding mappings that make this
       possible live in `maps`).
+    - A model knows now how to interpolate itself from its grid to another grid
+      (`interpolate2grid`).
 
   - `fields`:
 
@@ -49,11 +51,13 @@ backwards compatible.
       `fname` instead.
     - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and
       new `.json`.
-    - New parameter `collect_classes`, which can be used to switch-off the
-      collection of the main classes in root-level dictionaries.
+    - New parameter `collect_classes`, which can be used to switch-on
+      collection of the main classes in root-level dictionaries. By default,
+      they are no longer collected (**changed**).
 
   - `meshes`:
 
+    - `meshes.TensorMesh` **new** inherits from `discretize` if installed.
     - Added `__eq__` to `models.TensorMesh` to compare meshes.
 
 - Dependencies:
