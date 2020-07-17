@@ -303,7 +303,7 @@ class _Map:
 
 
 class MapConductivity(_Map):
-    """Maps variable `x` to computational variable `σ` (conductivity).
+    """Maps `σ` to computational variable `σ` (conductivity).
 
     - forward: x = σ
     - backward: σ = x
@@ -324,7 +324,7 @@ class MapConductivity(_Map):
 
 
 class MapLgConductivity(_Map):
-    """Maps variable `x` to computational variable `σ` (conductivity).
+    """Maps `log_10(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(σ)
     - backward: σ = 10^x
@@ -345,7 +345,7 @@ class MapLgConductivity(_Map):
 
 
 class MapLnConductivity(_Map):
-    """Maps variable `x` to computational variable `σ` (conductivity).
+    """Maps `log_e(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(σ)
     - backward: σ = exp(x)
@@ -366,7 +366,7 @@ class MapLnConductivity(_Map):
 
 
 class MapResistivity(_Map):
-    """Maps variable `x` to computational variable `σ` (conductivity).
+    """Maps `ρ` to computational variable `σ` (conductivity).
 
     - forward: x = ρ = σ^-1
     - backward: σ = ρ^-1 = x^-1
@@ -387,7 +387,7 @@ class MapResistivity(_Map):
 
 
 class MapLgResistivity(_Map):
-    """Maps variable `x` to computational variable `σ` (conductivity).
+    """Maps `log_10(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(ρ) = log_10(σ^-1)
     - backward: σ = ρ^-1 = 10^-x
@@ -408,7 +408,7 @@ class MapLgResistivity(_Map):
 
 
 class MapLnResistivity(_Map):
-    """Maps variable `x` to computational variable `σ` (conductivity).
+    """Maps `log_e(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(ρ) = log_e(σ^-1)
     - backward: σ = ρ^-1 = exp(x^-1)

@@ -17,6 +17,7 @@ sphinx
 numpydoc
 sphinx_numfig
 sphinx_rtd_theme
+sphinx_automodapi
 
 # FOR TESTING
 pytest

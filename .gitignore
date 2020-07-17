@@ -3,6 +3,7 @@ __pycache__/
 
 # Sphinx
 docs/_build/
+docs/api/
 
 # Pytest and coverage related
 htmlcov

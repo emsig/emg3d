@@ -179,11 +179,11 @@ more!
 Tipps and Tricks
 ----------------
 
-The function :func:`emg3d.solve` is the main entry point, and it takes care
-whether multigrid is used as a solver or as a preconditioner (or not at all),
-while the actual multigrid solver is :func:`emg3d.solver.multigrid`. Most input
-parameters for :func:`emg3d.solve` are sufficiently described in its docstring.
-Here a few additional information.
+The function :func:`emg3d.solver.solve` is the main entry point, and it takes
+care whether multigrid is used as a solver or as a preconditioner (or not at
+all), while the actual multigrid solver is :func:`emg3d.solver.multigrid`. Most
+input parameters for :func:`emg3d.solver.solve` are sufficiently described in
+its docstring. Here a few additional information.
 
 - You can input any three-dimensional grid into `emg3d`. However, the
   implemented multigrid technique works with the existing nodes, meaning there

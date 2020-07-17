@@ -8,10 +8,10 @@ solver `emg3d`. More specific theory is covered in the docstrings of many
 functions, have a look at the :doc:`code`-section or follow the links to the
 corresponding functions here within the theory. If you just want to use the
 solver, but do not care much about the internal functionality, then the
-function :func:`emg3d.solve` is the only function you will ever need. It is the
-main entry point, and it takes care whether multigrid is used as a solver or as
-a preconditioner (or not at all), while the actual multigrid solver is
-:func:`emg3d.solver.multigrid`.
+function :func:`emg3d.solver.solve` is the only function you will ever need. It
+is the main entry point, and it takes care whether multigrid is used as a
+solver or as a preconditioner (or not at all), while the actual multigrid
+solver is :func:`emg3d.solver.multigrid`.
 
 .. note::
 
@@ -150,9 +150,9 @@ using a real value for :math:`s` in Equation :eq:`fdomaindiff`, instead of the
 complex value :math:`-\mathrm{i}\omega``. This simplifies the problem from
 complex numbers to real numbers, which accelerates the computation. It also
 improves the convergence rate, as the solution is a smoother function. The
-solver :func:`emg3d.solve` is agnostic to the data type of the provided source
-field, and can solve for real and complex problems, hence frequency and Laplace
-domain. See the documentation of the functions
+solver :func:`emg3d.solver.solve` is agnostic to the data type of the provided
+source field, and can solve for real and complex problems, hence frequency and
+Laplace domain. See the documentation of the functions
 :func:`emg3d.fields.get_source_field` and :func:`emg3d.models.Model` to see how
 you can use `emg3d` for Laplace-domain computations.
 
