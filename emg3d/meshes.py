@@ -128,8 +128,9 @@ class TensorMesh(dTensorMesh, _TensorMesh):
 
     def __init__(self, h, x0):
         """Initiate TensorMesh."""
-        # `discretize.TensorMesh` fails if `h` is an ndarray.
-        return super().__init__(h=list(h), x0=x0)
+        # Cast `h` to list, as `discretize.TensorMesh`
+        # fails if `h` is an # ndarray.
+        super().__init__(h=list(h), x0=x0)
 
     def __eq__(self, mesh):
         """Compare two meshes.
