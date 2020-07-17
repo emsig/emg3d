@@ -5,6 +5,12 @@ from numpy.testing import assert_allclose
 
 from emg3d import meshes, io
 
+# Import soft dependencies.
+try:
+    import discretize
+except ImportError:
+    discretize = None
+
 # Data generated with create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
 
@@ -242,3 +248,16 @@ def test_TensorMesh():
     newgrid = meshes.TensorMesh(
             [np.ones(3), np.ones(3), np.ones(3)], np.zeros(3))
     assert emg3dgrid != newgrid
+
+
+def test_TensorMesh_repr():
+    # Create some dummy data
+    grid = meshes.TensorMesh([np.ones(2), np.ones(2), np.ones(2)], np.zeros(3))
+
+    # Check representation of TensorMesh.
+    if discretize is None:
+        assert 'TensorMesh: 2 x 2 x 2 (8)' in grid.__repr__()
+        assert not hasattr(grid, '_repr_html_')
+    else:
+        assert 'TensorMesh: 8 cells' in grid.__repr__()
+        assert hasattr(grid, '_repr_html_')

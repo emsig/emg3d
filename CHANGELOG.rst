@@ -31,6 +31,8 @@ backwards compatible.
       assign values to these attributes**, which is a **backwards
       incompatible** change. (The corresponding mappings that make this
       possible live in `maps`).
+    - A model knows now how to interpolate itself from its grid to another grid
+      (`interpolate2grid`).
 
   - `fields`:
 

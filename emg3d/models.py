@@ -414,6 +414,70 @@ class Model:
         r"""Update electric permittivity."""
         self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
 
+    def interpolate2grid(self, grid, new_grid, **grid2grid_opts):
+        """Interpolate `Model` located on `grid` to `new_grid`.
+
+
+        Parameters
+        ----------
+        grid, new_grid : TensorMesh
+            Input and output model grids;
+            :class:`emg3d.meshes.TensorMesh` instances.
+
+        grid2grid_opts : dict
+            Passed through to :func:`maps.grid2grid`. Defaults are
+            `method='volume'`, `log=True`, and `extrapolate=True`.
+
+
+        Returns
+        -------
+        NewModel : Model
+            New :class:`Model` instance on `new_grid`.
+
+        """
+
+        # Get solver options, set to defaults if not provided.
+        inp = {
+                'method': 'volume',
+                'extrapolate': True,
+                'log': True,
+                **(grid2grid_opts if grid2grid_opts is not None else {}),
+                'grid': grid,
+                'new_grid': new_grid
+        }
+
+        # property_x (always).
+        property_x = maps.grid2grid(values=self.property_x, **inp)
+
+        # property_y.
+        if self.case in [1, 3]:
+            property_y = maps.grid2grid(values=self.property_y, **inp)
+        else:
+            property_y = None
+
+        # property_z.
+        if self.case in [2, 3]:
+            property_z = maps.grid2grid(values=self.property_z, **inp)
+        else:
+            property_z = None
+
+        # mu_r.
+        if self._mu_r is not None:
+            mu_r = maps.grid2grid(values=self.mu_r, **inp)
+        else:
+            mu_r = None
+
+        # epsilon_r.
+        if self._epsilon_r is not None:
+            epsilon_r = maps.grid2grid(values=self.epsilon_r, **inp)
+        else:
+            epsilon_r = None
+
+        # Assemble coarse model.
+        return Model(new_grid, property_x=property_x, property_y=property_y,
+                     property_z=property_z, mu_r=mu_r, epsilon_r=epsilon_r,
+                     mapping=self.map.name)
+
     # INTERNAL UTILITIES
     def _check_parameter(self, var, name, mapped=False):
         """Check parameter.

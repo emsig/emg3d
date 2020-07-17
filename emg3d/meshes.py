@@ -96,67 +96,6 @@ class _TensorMesh:
         return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
                 f"({self.nC:,})")
 
-    def __eq__(self, mesh):
-        """Compare two meshes.
-
-        The provided `mesh` can be either a `emg3d` or a `discretize`
-        TensorMesh.
-
-        """
-
-        # Check if mesh is of the same instance.
-        equal = mesh.__class__.__name__ == self.__class__.__name__
-
-        # Check dimensions.
-        if equal:
-            equal *= mesh.vnC.size == self.vnC.size
-
-        # Check shape.
-        if equal:
-            equal *= np.all(self.vnC == mesh.vnC)
-
-        # Check distances and origin.
-        if equal:
-            equal *= np.allclose(self.hx, mesh.hx, atol=0)
-            equal *= np.allclose(self.hy, mesh.hy, atol=0)
-            equal *= np.allclose(self.hz, mesh.hz, atol=0)
-            equal *= np.allclose(self.x0, mesh.x0, atol=0)
-
-        return bool(equal)
-
-    def copy(self):
-        """Return a copy of the TensorMesh."""
-        return TensorMesh.from_dict(self.to_dict(True))
-
-    def to_dict(self, copy=False):
-        """Store the necessary information of the TensorMesh in a dict."""
-        out = {'hx': self.hx, 'hy': self.hy, 'hz': self.hz, 'x0': self.x0,
-               '__class__': self.__class__.__name__}
-        if copy:
-            return deepcopy(out)
-        else:
-            return out
-
-    @classmethod
-    def from_dict(cls, inp):
-        """Convert dictionary into :class:`TensorMesh` instance.
-
-        Parameters
-        ----------
-        inp : dict
-            Dictionary as obtained from :func:`TensorMesh.to_dict`.
-            The dictionary needs the keys `hx`, `hy`, `hz`, and `x0`.
-
-        Returns
-        -------
-        obj : :class:`TensorMesh` instance
-
-        """
-        try:
-            return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
-
     @property
     def vol(self):
         """Construct cell volumes of the 3D model as 1D array."""
@@ -191,6 +130,34 @@ class TensorMesh(dTensorMesh, _TensorMesh):
         """Initiate TensorMesh."""
         # `discretize.TensorMesh` fails if `h` is an ndarray.
         return super().__init__(h=list(h), x0=x0)
+
+    def __eq__(self, mesh):
+        """Compare two meshes.
+
+        The provided `mesh` can be either a `emg3d` or a `discretize`
+        TensorMesh.
+
+        """
+
+        # Check if mesh is of the same instance.
+        equal = mesh.__class__.__name__ == self.__class__.__name__
+
+        # Check dimensions.
+        if equal:
+            equal *= mesh.vnC.size == self.vnC.size
+
+        # Check shape.
+        if equal:
+            equal *= np.all(self.vnC == mesh.vnC)
+
+        # Check distances and origin.
+        if equal:
+            equal *= np.allclose(self.hx, mesh.hx, atol=0)
+            equal *= np.allclose(self.hy, mesh.hy, atol=0)
+            equal *= np.allclose(self.hz, mesh.hz, atol=0)
+            equal *= np.allclose(self.x0, mesh.x0, atol=0)
+
+        return bool(equal)
 
     def copy(self):
         """Return a copy of the TensorMesh."""
