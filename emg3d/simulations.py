@@ -429,30 +429,28 @@ class Simulation():
         return self._dict_efield_info[source][float(frequency)]
 
     # ASYNCHRONOUS COMPUTATION
-    def _call_efields(self, inp):
+    def _get_efield(self, inp):
+        """Wrapper of `get_efield` for `concurrent.futures`."""
         return self.get_efield(*inp, call_from_compute=True)
 
-    def compute(self, observed=False, **kwargs):
+    def compute(self, observed=False):
         """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
         ----------
         observed : bool
-            By default, the data at receiver is stored in the `Survey` as
-            `synthetic`. If `observed=True`, however, it is stored in
-            `observed`.
-
-        kwargs : dict
-            Passed to :func:`emg3d.solver.solve`; can contain any of the
-            arguments of the solver except `grid`, `model`, `sfield`, and
-            `efield`.
+            By default, the data at receiver locations is stored in the
+            `Survey` as `synthetic`. If `observed=True`, however, it is stored
+            in `observed`.
 
         """
 
-        # Ensure grid, model, and sfield are computed.
-        # TODO : This could be done within the field computation. But then
-        #        it might have to be done multiple times even if 'single' or
-        #        'same' grid.
+        # Ensure grids, models, and source fields are computed.
+        #
+        # => This could be done within the field computation. But then it might
+        #    have to be done multiple times even if 'single' or 'same' grid.
+        #    Something to keep in mind.
+        #    For `adaptive='same'` it does not really matter.
         for src in self.survey.sources.keys():  # Loop over source positions.
             for freq in self.survey.frequencies:  # Loop over frequencies.
                 self.get_grid(src, freq),
@@ -463,70 +461,89 @@ class Simulation():
         srcfreq = list(itertools.product(self.survey.sources.keys(),
                                          self.survey.frequencies))
 
-        # Initiate futures-dict to store output.
+        # Disable progress bar if there are >= workers than jobs.
         disable = self.max_workers >= len(srcfreq)
-        out = process_map(self._call_efields, srcfreq,
-                          max_workers=self.max_workers,
-                          desc='Compute efields',
-                          bar_format='{desc}: {bar}{n_fmt}/{total_fmt}',
-                          disable=disable)
+
+        # Initiate futures-dict to store output.
+        out = process_map(
+                self._get_efield,
+                srcfreq,
+                max_workers=self.max_workers,
+                desc='Compute efields',
+                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}',
+                disable=disable
+        )
 
         # Clean hfields, so they will be recomputed.
         del self._dict_hfield
         self._dict_hfield = self._dict_initiate()
 
         # Extract and store.
-        i = 0
         warned = False
-        for src in self.survey.sources.keys():
-            for freq in self.survey.frequencies:
-                # Store efield.
-                self._dict_efield[src][freq] = out[i][0]
+        store_name = ['synthetic', 'observed'][observed]
 
-                # Store responses at receivers.
-                store_name = ['synthetic', 'observed'][observed]
-                self.data[store_name].loc[src, :, freq] = out[i][2]
+        # Loop over src-freq combinations.
+        for i, (src, freq) in enumerate(srcfreq):
 
-                # Store solver info.
-                info = out[i][1]
-                self._dict_efield_info[src][freq] = info
-                if info['exit'] != 0:
-                    if not warned:
-                        print("Solver warnings:")
-                        warned = True
-                    print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+            # Store efield.
+            self._dict_efield[src][freq] = out[i][0]
 
-                i += 1
+            # Store solver info.
+            info = out[i][1]
+            self._dict_efield_info[src][freq] = info
+            if info['exit'] != 0:
+                if not warned:
+                    print("Solver warnings:")
+                    warned = True
+                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+
+            # Store responses at receivers.
+            self.data[store_name].loc[src, :, freq] = out[i][2]
 
     # UTILS
-    def clean(self):
-        """Remove computed fields and corresponding data.
+    def clean(self, what):
+        """Clean part of the data base.
 
-        Delete computed by now:
-            - survey._data['synthetic']
-            - _misfit
-            - gradient # (NOT STORED YET!)
-            - _dict_efield, _dict_efield_info
-            - _bfields, _bfields_info
-            - _dict_hfield
-            - _rfields # (Never actually stored)
+        Parameters
+        ----------
+        what : str
+            What to clean. Currently implemented:
 
-        Do not delete:
-            - _dict_grid
-            - _dict_model
-            - _dict_sfield
+            - 'derived':
+              Removes all derived properties (`_dict_grid`, `_dict_model`,
+              `_dict_sfield`, `_dict_hfield`).
 
-        Later, for inversion, we'll need a flag to also delete _dict_model,
-        and maybe move/store 'synthetic' & misfit somewhere else.
+            - 'computed':
+              Removes all computed properties (`_dict_efield`,
+              `_dict_efield_info`, `survey._data['synthetic']`).
+
+            - 'keepresults':
+              Both 'derived' and 'computed', except for the responses at
+              receiver locations `survey._data['synthetic']`.
+
+            - 'all':
+              Both 'derived' and 'computed'.
+
         """
+        if what not in ['derived', 'computed', 'keepresults', 'all']:
+            raise TypeError(f"Unrecognized `what`: {what}")
 
-        # Clean efield, hfield, and solver info.
-        for name in ['efield', 'hfield', 'efield_info']:
+        clean = []
+
+        if what in ['derived', 'keepresults', 'all']:
+            clean += ['grid', 'model', 'sfield', 'hfield']
+
+        if what in ['computed', 'keepresults', 'all']:
+            clean += ['efield', 'efield_info']
+
+        # Clean dicts.
+        for name in clean:
             delattr(self, '_dict_'+name)
             setattr(self, '_dict_'+name, self._dict_initiate())
 
-        # Set synthetic data to nan's.
-        self.data['synthetic'] = self.data.observed*np.nan
+        # Clean data.
+        if what in ['computed', 'all']:
+            self.data['synthetic'] = self.data.observed*np.nan
 
     def _dict_initiate(self):
         """Returns a dict of the structure `dict[source][freq]=None`."""

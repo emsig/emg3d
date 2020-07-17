@@ -62,7 +62,7 @@ class TestSimulation():
                 simulation.data.synthetic[1, :, 0].data, rec_resp, atol=1e-16)
 
         # Clean and ensure it is empty
-        simulation.clean()
+        simulation.clean('all')
         assert simulation._dict_efield['Tx1'][1.0] is None
         assert simulation._dict_hfield['Tx1'][1.0] is None
         assert simulation._dict_efield_info['Tx1'][1.0] is None
