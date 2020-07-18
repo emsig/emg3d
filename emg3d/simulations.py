@@ -208,7 +208,7 @@ class Simulation():
     def copy(self, what='computed'):
         """Return a copy of the Simulation.
 
-        See `to_dict` for more information regarding `what`.
+        See `to_file` for more information regarding `what`.
 
         """
         return self.from_dict(self.to_dict(what, True))
@@ -216,34 +216,17 @@ class Simulation():
     def to_dict(self, what='computed', copy=False):
         """Store the necessary information of the Simulation in a dict.
 
-
-        Parameters
-        ----------
-        what : str
-            What to store. Currently implemented:
-
-            - 'computed' (default):
-              Stores all computed properties (`_dict_efield`,
-              `_dict_efield_info`, `survey._data['synthetic']`).
-
-            - 'results':
-              Stores only the response at receivers,
-              `survey._data['synthetic']`.
-
-            - 'derived':
-              Stores all derived properties (`_dict_grid`, `_dict_model`,
-              `_dict_sfield`, `_dict_hfield`).
-
-            - 'all':
-              Stores everything.
-
-            - 'plain':
-              Only stores the plain Simulation (as initiated).
+        See `to_file` for more information regarding `what`.
 
         """
 
-        if what not in ['computed', 'results', 'derived', 'all', 'plain']:
+        if what not in ['computed', 'results', 'all', 'plain']:
             raise TypeError(f"Unrecognized `what`: {what}")
+
+        # If to_dict is called from to_file, it has a _what_to_file attribute.
+        if hasattr(self, '_what_to_file'):
+            what = self._what_to_file
+            delattr(self, '_what_to_file')
 
         # Initiate dict.
         out = {'name': self.name, '__class__': self.__class__.__name__}
@@ -256,10 +239,10 @@ class Simulation():
         out['gridding'] = self.gridding
         out['solver_opts'] = self.solver_opts
 
-        # Get required derived/computed properties.
+        # Get required properties.
         store = []
 
-        if what in ['derived', 'all']:
+        if what == 'all':
             store += ['grid', 'model', 'sfield', 'hfield']
 
         if what in ['computed', 'all']:
@@ -323,15 +306,9 @@ class Simulation():
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
-    def to_file(self, fname, what='results', inplace=False, compression="gzip",
-                json_indent=2):
+    def to_file(self, fname, what='computed', compression="gzip",
+                json_indent=2, verb=1):
         """Store Simulation to a file.
-
-
-        => inplace True/False
-        => what
-
-        => test if new version compatible with old version.
 
         Parameters
         ----------
@@ -348,27 +325,62 @@ class Simulation():
             - `.json`: Uses `json` to store inputs to a hierarchical, plain
               text file.
 
+        what : str
+            What to store. Currently implemented:
+
+            - 'computed' (default):
+              Stores all computed properties: electric fields and responses at
+              receiver locations.
+            - 'results':
+              Stores only the response at receiver locations.
+            - 'all':
+              Stores everything.
+            - 'plain':
+              Only stores the plain Simulation (as initiated).
+
         compression : int or str, optional
             Passed through to h5py, default is 'gzip'.
 
         json_indent : int or None
             Passed through to json, default is 2.
+
+        verb : int
+            Silent if 0, verbose if 1.
+
         """
+
+        # Add what to self, will be removed in to_dict.
+        self._what_to_file = what
+
         if what == 'resultsonly':
             # Can not be loaded with `from_file`, but with `emg3d.load`.
             io.save(fname, compression=compression, json_indent=json_indent,
-                    collect_classes=False,
-                    synthetic=self.survey.data.synthetic)
-        else:
-            raise NotImplementedError
-            # io.save(fname, compression=compression, json_indent=json_indent,
-            #         collect_classes=False, simulation=self)
+                    collect_classes=False, verb=verb, simulation=self)
 
     @classmethod
-    def from_file(cls, fname):
-        """Load Simulation from a file."""
-        raise NotImplementedError
-        # return io.load(fname)['simulation']
+    def from_file(cls, fname, verb=1):
+        """Load Simulation from a file.
+
+        Parameters
+        ----------
+        fname : str
+            File name including extension. Used backend depends on the file
+            extensions:
+
+            - '.npz': numpy-binary
+            - '.h5': h5py-binary (needs `h5py`)
+            - '.json': json
+
+        verb : int
+            Silent if 0, verbose if 1.
+
+        Returns
+        -------
+        simulation : :class:`Simulation`
+            The simulation that was stored in the file.
+
+        """
+        return io.load(fname, verb=verb)['simulation']
 
     # GET FUNCTIONS
     def get_grid(self, source, frequency):
@@ -586,31 +598,25 @@ class Simulation():
             What to clean. Currently implemented:
 
             - 'computed' (default):
-              Removes all computed properties (`_dict_efield`,
-              `_dict_efield_info`, `survey._data['synthetic']`).
-
-            - 'derived':
-              Removes all derived properties (`_dict_grid`, `_dict_model`,
-              `_dict_sfield`, `_dict_hfield`).
-
+              Removes all computed properties: electric and magnetic fields and
+              responses at receiver locations.
             - 'keepresults':
-              Both 'derived' and 'computed', except for the responses at
-              receiver locations `survey._data['synthetic']`.
-
+              Removes everything  except for the responses at receiver
+              locations.
             - 'all':
-              Both 'derived' and 'computed'.
+              Removes everything (leaves it plain as initiated).
 
         """
-        if what not in ['derived', 'computed', 'keepresults', 'all']:
+        if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}")
 
         clean = []
 
-        if what in ['derived', 'keepresults', 'all']:
-            clean += ['grid', 'model', 'sfield', 'hfield']
+        if what in ['keepresults', 'all']:
+            clean += ['grid', 'model', 'sfield']
 
         if what in ['computed', 'keepresults', 'all']:
-            clean += ['efield', 'efield_info']
+            clean += ['efield', 'efield_info', 'hfield']
 
         # Clean dicts.
         for name in clean:
