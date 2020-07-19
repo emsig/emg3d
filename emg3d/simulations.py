@@ -185,7 +185,7 @@ class Simulation():
 
     def __repr__(self):
         return (f"*{self.__class__.__name__}* «{self.name}» "
-                f"of «{self.survey.name}»\n\n"
+                f"of {self.survey.__class__.__name__} «{self.survey.name}»\n\n"
                 f"- {self.survey.__class__.__name__}: "
                 f"{self.survey.shape[0]} sources; "
                 f"{self.survey.shape[1]} receivers; "
@@ -195,7 +195,7 @@ class Simulation():
 
     def _repr_html_(self):
         return (f"<h3>{self.__class__.__name__} «{self.name}»</h3>"
-                f"of «{self.survey.name}»<ul>"
+                f"of {self.survey.__class__.__name__} «{self.survey.name}»<ul>"
                 f"<li>{self.survey.__class__.__name__}: "
                 f"{self.survey.shape[0]} sources; "
                 f"{self.survey.shape[1]} receivers; "
@@ -243,14 +243,15 @@ class Simulation():
         store = []
 
         if what == 'all':
-            store += ['grid', 'model', 'sfield', 'hfield']
+            store += ['_dict_grid', '_dict_model', '_dict_sfield',
+                      '_dict_hfield']
 
         if what in ['computed', 'all']:
-            store += ['efield', 'efield_info']
+            store += ['_dict_efield', '_dict_efield_info']
 
         # store dicts.
         for name in store:
-            out['_dict_'+name] = getattr(self, '_dict_'+name)
+            out[name] = getattr(self, name)
 
         # store data.
         if what in ['computed', 'results', 'all']:
@@ -277,26 +278,24 @@ class Simulation():
 
         """
         try:
-
             # Initiate class.
             out = cls(
-                    name=inp.get('name'),
-                    survey=surveys.Survey.from_dict(inp.get('survey')),
-                    grid=meshes.TensorMesh.from_dict(inp.get('grid')),
-                    model=models.Model.from_dict(inp.get('model')),
-                    max_workers=inp.get('max_workers'),
-                    gridding=inp.get('gridding'),
-                    solver_opts=inp.get('solver_opts'),
+                    name=inp['name'],
+                    survey=surveys.Survey.from_dict(inp['survey']),
+                    grid=meshes.TensorMesh.from_dict(inp['grid']),
+                    model=models.Model.from_dict(inp['model']),
+                    max_workers=inp['max_workers'],
+                    gridding=inp['gridding'],
+                    solver_opts=inp['solver_opts'],
                     )
 
             # Add existing derived/computed properties.
-            data = ['grid', 'model', 'sfield', 'hfield', 'efield',
-                    'efield_info']
+            data = ['_dict_grid', '_dict_model', '_dict_sfield',
+                    '_dict_hfield', '_dict_efield', '_dict_efield_info']
 
-            for pname in data:
-                name = '_dict_'+pname
+            for name in data:
                 if name in inp.keys():
-                    setattr(out, pname, inp.get(name))
+                    setattr(out, name, inp.get(name))
 
             if 'synthetic' in inp.keys():
                 out.data['synthetic'] = inp.get('synthetic')
@@ -352,10 +351,8 @@ class Simulation():
         # Add what to self, will be removed in to_dict.
         self._what_to_file = what
 
-        if what == 'resultsonly':
-            # Can not be loaded with `from_file`, but with `emg3d.load`.
-            io.save(fname, compression=compression, json_indent=json_indent,
-                    collect_classes=False, verb=verb, simulation=self)
+        io.save(fname, compression=compression, json_indent=json_indent,
+                collect_classes=False, verb=verb, simulation=self)
 
     @classmethod
     def from_file(cls, fname, verb=1):

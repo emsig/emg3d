@@ -25,7 +25,8 @@ backwards compatible.
       A simulation computes the e-field (and h-field) asynchronously using
       `concurrent.futures`. To do so it creates the required meshes, source and
       frequency-dependent, interpolates the model accordingly, and computes the
-      source-fields. 
+      source-fields. If `tqdm` is installed it displays a progress bar for the
+      asynchronous computation.
 
   - `models` & `maps`:
 
@@ -76,14 +77,16 @@ backwards compatible.
   - New soft dependency `tqdm` for nice progress bars in asynchronous
     computation.
 
-- Removed deprecated functions `data_write` and `data_read`.
+- Deprecations and removals:
 
-- Removed all deprecated functions from `utils`.
+  - Removed deprecated functions `data_write` and `data_read`.
+  - Removed all deprecated functions from `utils`.
 
-- Re-organise API-docs.
+- Miscellaneous:
 
-- Much bookkeeping (improve error raising and checking; chaining errors, numpy
-  types, etc).
+  - Re-organise API-docs.
+  - Much bookkeeping (improve error raising and checking; chaining errors,
+    numpy types, etc).
 
 
 *v0.11.0* : Refactor
