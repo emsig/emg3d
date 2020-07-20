@@ -2,6 +2,12 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
+# Soft dependencies
+try:
+    import xarray
+except ImportError:
+    xarray = None
+
 from emg3d import meshes, models, surveys, simulations, fields, solver
 
 

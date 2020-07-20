@@ -440,7 +440,7 @@ class Model:
         inp = {
                 'method': 'volume',
                 'extrapolate': True,
-                'log': True,
+                'log': not self.map.name.startswith('L'),
                 **(grid2grid_opts if grid2grid_opts is not None else {}),
                 'grid': grid,
                 'new_grid': new_grid
