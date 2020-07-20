@@ -552,3 +552,95 @@ def _volume_avg_weights(x1, x2):
             ii += 1
 
     return hs[:ii], ix1[:ii], ix2[:ii]
+
+
+# Field to cell centers and back again.
+# TODO, NEEDS DOCUMENTATION                                                    #
+@nb.njit(**_numba_setting)
+def avg_field2cell_volume(grad, vol, ex, ey, ez):
+    r"""Average edges (fields) to cell values.
+
+    TODO: Document.
+
+    The same could be achieved by a LinearOperator or a Stencil, or simply with
+    discretize (much simpler but slightly slower):
+
+    .. code-block:: python
+
+        >>> def volume_disc(grid, field):
+        >>>     out = +grid.aveEx2CC*field.fx.ravel('F')*grid.vol
+        >>>     out += grid.aveEy2CC*field.fy.ravel('F')*grid.vol
+        >>>     out += grid.aveEz2CC*field.fz.ravel('F')*grid.vol
+        >>>     return out.reshape(grid.vnC, order='F')
+
+    .. code-block:: python
+
+        >>> def volume_disc(grid, field):
+        >>>     out = grid.aveE2CC*field*grid.vol
+        >>>     return out.reshape(grid.vnC, order='F')
+
+    """
+
+    # Get dimensions
+    nx, ny, nz = vol.shape
+
+    for iz in range(nz+1):
+        izm = max(0, iz-1)
+        izp = min(nz-1, iz)
+
+        for iy in range(ny+1):
+            iym = max(0, iy-1)
+            iyp = min(ny-1, iy)
+
+            for ix in range(nx+1):
+                ixm = max(0, ix-1)
+                ixp = min(nx-1, ix)
+
+                # Multiply by volume
+                if ix < nx:
+                    grad[ix, iym, izm] -= vol[ixm, iym, izm]*ex[ix, iy, iz]/4
+                    grad[ix, iyp, izm] -= vol[ixm, iyp, izm]*ex[ix, iy, iz]/4
+                    grad[ix, iym, izp] -= vol[ixm, iym, izp]*ex[ix, iy, iz]/4
+                    grad[ix, iyp, izp] -= vol[ixm, iyp, izp]*ex[ix, iy, iz]/4
+
+                if iy < ny:
+                    grad[ixm, iy, izm] -= vol[ixm, iym, izm]*ey[ix, iy, iz]/4
+                    grad[ixp, iy, izm] -= vol[ixp, iym, izm]*ey[ix, iy, iz]/4
+                    grad[ixm, iy, izp] -= vol[ixm, iym, izp]*ey[ix, iy, iz]/4
+                    grad[ixp, iy, izp] -= vol[ixp, iym, izp]*ey[ix, iy, iz]/4
+
+                if iz < nz:
+                    grad[ixm, iym, iz] -= vol[ixm, iym, izm]*ez[ix, iy, iz]/4
+                    grad[ixp, iym, iz] -= vol[ixp, iym, izm]*ez[ix, iy, iz]/4
+                    grad[ixm, iyp, iz] -= vol[ixm, iyp, izm]*ez[ix, iy, iz]/4
+                    grad[ixp, iyp, iz] -= vol[ixp, iyp, izm]*ez[ix, iy, iz]/4
+
+
+@nb.njit(**_numba_setting)
+def avg_cell2field_volume(sx, sy, sz, eta_x, eta_y, eta_z):
+    r"""Average cell values to edges (fields).
+
+    TODO: Document.
+
+    """
+
+    # Get dimensions
+    nx, ny, nz = eta_x.shape
+
+    for iz in range(nz):
+        izm = max(0, iz-1)
+        for iy in range(ny):
+            iym = max(0, iy-1)
+            for ix in range(nx):
+                ixm = max(0, ix-1)
+
+                stx = (eta_x[ix, iym, izm] + eta_x[ix, iym, iz] +
+                       eta_x[ix, iy, izm] + eta_x[ix, iy, iz])
+                sty = (eta_y[ixm, iy, izm] + eta_y[ix, iy, izm] +
+                       eta_y[ixm, iy, iz] + eta_y[ix, iy, iz])
+                stz = (eta_z[ixm, iym, iz] + eta_z[ix, iym, iz] +
+                       eta_z[ixm, iy, iz] + eta_z[ix, iy, iz])
+
+                sx[ix, iy, iz] *= stx/4
+                sy[ix, iy, iz] *= sty/4
+                sz[ix, iy, iz] *= stz/4

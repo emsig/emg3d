@@ -22,7 +22,7 @@ setup(
     author_email='dieter@werthmuller.org',
     url='https://empymod.github.io',
     license='Apache License V2.0',
-    packages=['emg3d'],
+    packages=['emg3d', 'emg3d.optimize'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',

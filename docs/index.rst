@@ -31,3 +31,4 @@ Version: |version| ~ Date: |today|
 
    solver
    code
+   optimize

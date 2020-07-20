@@ -34,7 +34,7 @@ import itertools
 import numpy as np
 from copy import deepcopy
 
-from emg3d import fields, solver, io, surveys, models, meshes
+from emg3d import fields, solver, io, surveys, models, meshes, optimize
 
 # Check soft dependencies.
 try:
@@ -220,6 +220,8 @@ class Simulation():
 
         """
 
+        # TODO not adjusted for optimize                                       #
+
         if what not in ['computed', 'results', 'all', 'plain']:
             raise TypeError(f"Unrecognized `what`: {what}")
 
@@ -277,6 +279,9 @@ class Simulation():
         obj : :class:`Simulation` instance
 
         """
+
+        # TODO not adjusted for optimize                                       #
+
         try:
             # Initiate class.
             out = cls(
@@ -605,6 +610,9 @@ class Simulation():
               Removes everything (leaves it plain as initiated).
 
         """
+
+        # TODO not adjusted for optimize                                       #
+
         if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}")
 
@@ -635,3 +643,7 @@ class Simulation():
     def data(self):
         """Shortcut to survey.data."""
         return self.survey.data
+
+    # OPTIMIZATION
+    # TODO misfit()                                                            #
+    # TODO gradient()                                                          #

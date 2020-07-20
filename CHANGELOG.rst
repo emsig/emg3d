@@ -28,6 +28,8 @@ backwards compatible.
       source-fields. If `tqdm` is installed it displays a progress bar for the
       asynchronous computation.
 
+  - `optimize` (**new**) TODO
+
   - `models` & `maps`:
 
     - Model instances take new the parameters `property_{x;y;z}` instead of

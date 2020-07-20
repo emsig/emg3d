@@ -32,6 +32,7 @@ from emg3d import fields
 from emg3d import meshes
 from emg3d import models
 from emg3d import surveys
+from emg3d import optimize
 from emg3d import simulations
 
 # Import most important functions and classes
@@ -48,7 +49,8 @@ from emg3d.meshes import TensorMesh  # noqa
 from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
 
 __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
-           'models', 'Report', 'save', 'load', 'surveys', 'simulations']
+           'models', 'Report', 'save', 'load', 'surveys', 'simulations',
+           'optimize']
 
 # Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__
