@@ -153,15 +153,14 @@ class TestSimulation():
             simulations.Simulation.from_dict(sim_dict)
 
         # Also check to_file()/from_file().
-        # TODO
-        # self.simulation.to_file(tmpdir+'/test.npz', what='all')
-        # sim2 = simulations.Simulation.from_file(tmpdir+'/test.npz')
-        # assert self.simulation.name == sim2.name
-        # assert self.simulation.survey.name == sim2.survey.name
-        # assert self.simulation.max_workers == sim2.max_workers
-        # assert self.simulation.gridding == sim2.gridding
-        # assert self.simulation.grid == sim2.grid
-        # assert self.simulation.model == sim2.model
+        self.simulation.to_file(tmpdir+'/test.npz', what='all')
+        sim2 = simulations.Simulation.from_file(tmpdir+'/test.npz')
+        assert self.simulation.name == sim2.name
+        assert self.simulation.survey.name == sim2.survey.name
+        assert self.simulation.max_workers == sim2.max_workers
+        assert self.simulation.gridding == sim2.gridding
+        assert self.simulation.grid == sim2.grid
+        assert self.simulation.model == sim2.model
 
         # Clean and ensure it is empty
         self.simulation.clean('all')

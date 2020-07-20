@@ -298,7 +298,8 @@ class Simulation():
                     setattr(out, name, inp.get(name))
 
             if 'synthetic' in inp.keys():
-                out.data['synthetic'] = inp.get('synthetic')
+                synthetic = out.data.observed*0+inp['synthetic']
+                out.survey._data['synthetic'] = synthetic
 
             return out
 
