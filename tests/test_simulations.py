@@ -5,6 +5,7 @@ from numpy.testing import assert_allclose
 from emg3d import meshes, models, surveys, simulations, fields, solver
 
 
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestSimulation():
     # Create a simple survey
     sources = (0, [1000, 3000, 5000], -950, 0, 0)

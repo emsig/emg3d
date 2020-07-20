@@ -534,9 +534,9 @@ class Simulation():
         #    For `gridding='same'` it does not really matter.
         for src in self.survey.sources.keys():  # Loop over source positions.
             for freq in self.survey.frequencies:  # Loop over frequencies.
-                self.get_grid(src, freq),
-                self.get_model(src, freq),
-                self.get_sfield(src, freq),
+                _ = self.get_grid(src, freq)
+                _ = self.get_model(src, freq)
+                _ = self.get_sfield(src, freq)
 
         # Get all source-frequency pairs.
         srcfreq = list(itertools.product(self.survey.sources.keys(),
