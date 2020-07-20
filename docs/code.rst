@@ -23,6 +23,10 @@ Code
    :no-inheritance-diagram:
    :headings:=^
 
+.. automodapi:: emg3d.simulations
+   :no-inheritance-diagram:
+   :headings:=^
+
 .. automodapi:: emg3d.maps
    :no-inheritance-diagram:
    :headings:=^

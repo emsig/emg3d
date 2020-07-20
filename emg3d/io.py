@@ -29,7 +29,7 @@ import warnings
 import numpy as np
 from datetime import datetime
 
-from emg3d import fields, models, utils, meshes, surveys
+from emg3d import fields, models, utils, meshes, surveys, simulations
 
 try:
     import h5py
@@ -46,8 +46,9 @@ KNOWN_CLASSES = {
     'Field': fields.Field,
     'Survey': surveys.Survey,
     'Dipole': surveys.Dipole,
-    'SourceField': fields.SourceField,
     'TensorMesh': meshes.TensorMesh,
+    'SourceField': fields.SourceField,
+    'Simulation': simulations.Simulation,
 }
 
 
@@ -399,7 +400,7 @@ def _dict_serialize(inp, out=None, collect_classes=False):
         return out
 
 
-def _dict_deserialize(inp):
+def _dict_deserialize(inp, first_call=True):
     """De-serialize emg3d-classes and other objects in inp-dict.
 
     De-serializes in-place dictionary <inp>, where all members of
@@ -414,18 +415,18 @@ def _dict_deserialize(inp):
 
     """
 
+    # Recursively replace 'NoneType' by None.
+    if first_call:
+        _nonetype_to_none(inp)
+
     # Loop over items.
     for key, value in inp.items():
 
-        # Analyze if it is a dict, else ignore (check for 'NoneType').
+        # If it is a dict, deserialize if KNOWN_CLASS or recursion.
         if isinstance(value, dict):
 
             # If it has a __class__-key, de-serialize.
             if '__class__' in value.keys():
-
-                for k2, v2 in value.items():
-                    if isinstance(v2, str) and v2 == 'NoneType':
-                        value[k2] = None
 
                 # De-serialize, overwriting all the existing entries.
                 try:
@@ -437,10 +438,16 @@ def _dict_deserialize(inp):
                     print(f"* WARNING :: Could not de-serialize <{key}>")
 
             # In no __class__-key or de-serialization fails, use recursion.
-            _dict_deserialize(value)
+            _dict_deserialize(value, False)
 
-        elif isinstance(value, str) and value == 'NoneType':
-            inp[key] = None
+
+def _nonetype_to_none(inp):
+    """Recursively replace 'NoneType' by None in inp-dict."""
+    for k, v in inp.items():
+        if isinstance(v, dict):
+            _nonetype_to_none(v)
+        elif isinstance(v, str) and v == 'NoneType':
+            inp[k] = None
 
 
 def _dict_flatten(data):
