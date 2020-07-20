@@ -13,28 +13,30 @@ from emg3d import meshes, models, surveys, simulations, fields, solver
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestSimulation():
-    # Create a simple survey
-    sources = (0, [1000, 3000, 5000], -950, 0, 0)
-    receivers = (np.arange(12)*500, 0, -1000, 0, 0)
-    frequencies = (1.0, 2.0)
-    survey = surveys.Survey('Test', sources, receivers, frequencies)
+    if xarray is not None:
+        # Create a simple survey
+        sources = (0, [1000, 3000, 5000], -950, 0, 0)
+        receivers = (np.arange(12)*500, 0, -1000, 0, 0)
+        frequencies = (1.0, 2.0)
 
-    # Create a simple grid and model
-    grid = meshes.TensorMesh(
-            [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
-            np.array([-1250, -1250, -2250]))
-    model = models.Model(grid, 1)
+        survey = surveys.Survey('Test', sources, receivers, frequencies)
 
-    # Create a simulation, compute all fields.
-    simulation = simulations.Simulation(
-            'Test1', survey, grid, model, max_workers=1,
-            solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
-                         'linerelaxation': False, 'semicoarsening': False},
-            gridding='same')
+        # Create a simple grid and model
+        grid = meshes.TensorMesh(
+                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
+                np.array([-1250, -1250, -2250]))
+        model = models.Model(grid, 1)
 
-    # Do first one single and then all together.
-    simulation.get_efield('Tx0', 2.0)
-    simulation.compute()
+        # Create a simulation, compute all fields.
+        simulation = simulations.Simulation(
+                'Test1', survey, grid, model, max_workers=1,
+                solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
+                             'linerelaxation': False, 'semicoarsening': False},
+                gridding='same')
+
+        # Do first one single and then all together.
+        simulation.get_efield('Tx0', 2.0)
+        simulation.compute()
 
     def test_derived(self):
 
