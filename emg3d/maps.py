@@ -35,7 +35,7 @@ _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 __all__ = ['grid2grid', 'interp3d', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
-           'MapLnResistivity']
+           'MapLnResistivity', 'edges2cellaverages']
 
 
 # INTERPOLATIONS
@@ -555,38 +555,30 @@ def _volume_average_weights(x1, x2):
     return hs[:ii], ix1[:ii], ix2[:ii]
 
 
-# EDGES <=> CENTERS
+# EDGES => CENTERS
 @nb.njit(**_numba_setting)
-def edges2cellaverages(grad, vol, ex, ey, ez):
+def edges2cellaverages(ex, ey, ez, vol, out_x, out_y, out_z):
     r"""Interpolate fields defined on edges to volume-averaged cell values.
 
-    .. note::
 
-        - This is currently limited to an isotropic gradient.
+    Parameters
+    ----------
+    ex, ey, ez : ndarray
+        Electric fields in x-, y-, and z-directions, as obtained from
+        :class:`emg3d.fields.Field`.
 
+    vol : ndarray
+        Volumes of the grid, as obtained from :class:`emg3d.meshes.TensorMesh`.
 
-    The same could be achieved by a LinearOperator or a Stencil, or simply with
-    discretize (much simpler but slightly slower):
-
-    .. code-block:: python
-
-        >>> def volume_disc(grid, field):
-        >>>     out = +grid.aveEx2CC*field.fx.ravel('F')*grid.vol
-        >>>     out += grid.aveEy2CC*field.fy.ravel('F')*grid.vol
-        >>>     out += grid.aveEz2CC*field.fz.ravel('F')*grid.vol
-        >>>     return out.reshape(grid.vnC, order='F')
-
-    .. code-block:: python
-
-        >>> def volume_disc(grid, field):
-        >>>     out = grid.aveE2CC*field*grid.vol
-        >>>     return out.reshape(grid.vnC, order='F')
+    out_x, out_y, out_z : ndarray
+        Arrays where the results are placed (per direction).
 
     """
 
     # Get dimensions
     nx, ny, nz = vol.shape
 
+    # Loop over dimensions.
     for iz in range(nz+1):
         izm = max(0, iz-1)
         izp = min(nz-1, iz)
@@ -599,51 +591,21 @@ def edges2cellaverages(grad, vol, ex, ey, ez):
                 ixm = max(0, ix-1)
                 ixp = min(nx-1, ix)
 
-                # Multiply by volume
+                # Multiply field by volume/4.
                 if ix < nx:
-                    grad[ix, iym, izm] += vol[ix, iym, izm]*ex[ix, iy, iz]/4
-                    grad[ix, iyp, izm] += vol[ix, iyp, izm]*ex[ix, iy, iz]/4
-                    grad[ix, iym, izp] += vol[ix, iym, izp]*ex[ix, iy, iz]/4
-                    grad[ix, iyp, izp] += vol[ix, iyp, izp]*ex[ix, iy, iz]/4
+                    out_x[ix, iym, izm] += vol[ix, iym, izm]*ex[ix, iy, iz]/4
+                    out_x[ix, iyp, izm] += vol[ix, iyp, izm]*ex[ix, iy, iz]/4
+                    out_x[ix, iym, izp] += vol[ix, iym, izp]*ex[ix, iy, iz]/4
+                    out_x[ix, iyp, izp] += vol[ix, iyp, izp]*ex[ix, iy, iz]/4
 
                 if iy < ny:
-                    grad[ixm, iy, izm] += vol[ixm, iy, izm]*ey[ix, iy, iz]/4
-                    grad[ixp, iy, izm] += vol[ixp, iy, izm]*ey[ix, iy, iz]/4
-                    grad[ixm, iy, izp] += vol[ixm, iy, izp]*ey[ix, iy, iz]/4
-                    grad[ixp, iy, izp] += vol[ixp, iy, izp]*ey[ix, iy, iz]/4
+                    out_y[ixm, iy, izm] += vol[ixm, iy, izm]*ey[ix, iy, iz]/4
+                    out_y[ixp, iy, izm] += vol[ixp, iy, izm]*ey[ix, iy, iz]/4
+                    out_y[ixm, iy, izp] += vol[ixm, iy, izp]*ey[ix, iy, iz]/4
+                    out_y[ixp, iy, izp] += vol[ixp, iy, izp]*ey[ix, iy, iz]/4
 
                 if iz < nz:
-                    grad[ixm, iym, iz] += vol[ixm, iym, iz]*ez[ix, iy, iz]/4
-                    grad[ixp, iym, iz] += vol[ixp, iym, iz]*ez[ix, iy, iz]/4
-                    grad[ixm, iyp, iz] += vol[ixm, iyp, iz]*ez[ix, iy, iz]/4
-                    grad[ixp, iyp, iz] += vol[ixp, iyp, iz]*ez[ix, iy, iz]/4
-
-
-@nb.njit(**_numba_setting)
-def cellaverages2edges(sx, sy, sz, eta_x, eta_y, eta_z):
-    r"""Average cell values to edges (fields).
-
-    TODO: Document.
-
-    """
-
-    # Get dimensions
-    nx, ny, nz = eta_x.shape
-
-    for iz in range(nz):
-        izm = max(0, iz-1)
-        for iy in range(ny):
-            iym = max(0, iy-1)
-            for ix in range(nx):
-                ixm = max(0, ix-1)
-
-                stx = (eta_x[ix, iym, izm] + eta_x[ix, iym, iz] +
-                       eta_x[ix, iy, izm] + eta_x[ix, iy, iz])
-                sty = (eta_y[ixm, iy, izm] + eta_y[ix, iy, izm] +
-                       eta_y[ixm, iy, iz] + eta_y[ix, iy, iz])
-                stz = (eta_z[ixm, iym, iz] + eta_z[ix, iym, iz] +
-                       eta_z[ixm, iy, iz] + eta_z[ix, iy, iz])
-
-                sx[ix, iy, iz] *= stx/4
-                sy[ix, iy, iz] *= sty/4
-                sz[ix, iy, iz] *= stz/4
+                    out_z[ixm, iym, iz] += vol[ixm, iym, iz]*ez[ix, iy, iz]/4
+                    out_z[ixp, iym, iz] += vol[ixp, iym, iz]*ez[ix, iy, iz]/4
+                    out_z[ixm, iyp, iz] += vol[ixm, iyp, iz]*ez[ix, iy, iz]/4
+                    out_z[ixp, iyp, iz] += vol[ixp, iyp, iz]*ez[ix, iy, iz]/4

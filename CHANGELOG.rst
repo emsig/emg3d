@@ -30,7 +30,7 @@ backwards compatible.
 
   - `optimize` (**new**) TODO
 
-  - `models` & `maps`:
+  - `models`:
 
     - Model instances take new the parameters `property_{x;y;z}` instead of
       `res_{x;y;z}`. The properties can be either resistivity, conductivity, or
@@ -40,10 +40,16 @@ backwards compatible.
       the moment. The attributes `model.res_{x;y;z}` are still available too,
       but equally **deprecated**. However, it is **no longer possible to
       assign values to these attributes**, which is a **backwards
-      incompatible** change. (The corresponding mappings that make this
-      possible live in `maps`).
+      incompatible** change.
     - A model knows now how to interpolate itself from its grid to another grid
       (`interpolate2grid`).
+
+  - `maps`:
+
+    - **New** mappings for `models.Model` instances: The mappings take care of
+      how to transform the investigation variable to conductivity and back, and
+      how it affects its derivative.
+    - **New** interpolation routine `edges2cellaverages`.
 
   - `fields`:
 

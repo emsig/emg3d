@@ -5,6 +5,12 @@ from numpy.testing import assert_allclose
 from . import alternatives
 from emg3d import fields, maps, meshes, models
 
+# Import soft dependencies.
+try:
+    import discretize
+except ImportError:
+    discretize = None
+
 
 def test_grid2grid_volume():
     # == X == Simple 1D model
@@ -433,11 +439,15 @@ def test_edges2cellaverages(njit):
     field.fz[1, 1, 0] = fz
 
     # Initiate gradient.
-    grad = np.zeros(grid.vnC, order='F', dtype=complex)
+    grad_x = np.zeros(grid.vnC, order='F', dtype=complex)
+    grad_y = np.zeros(grid.vnC, order='F', dtype=complex)
+    grad_z = np.zeros(grid.vnC, order='F', dtype=complex)
 
     # Call function.
-    maps.edges2cellaverages(grad, grid.vol.reshape(grid.vnC, order='F'),
-                            field.fx, field.fy, field.fz)
+    vol = grid.vol.reshape(grid.vnC, order='F')
+    maps.edges2cellaverages(field.fx, field.fy, field.fz,
+                            vol, grad_x, grad_y, grad_z)
+    grad = grad_x + grad_y + grad_z
 
     # Check all eight cells explicitly by
     # - computing the volume of the cell;
@@ -450,3 +460,34 @@ def test_edges2cellaverages(njit):
     assert_allclose(0j, grad[1, 0, 1])
     assert_allclose(x0*y1*z1*(fx+fy)/4, grad[0, 1, 1])
     assert_allclose(x1*y1*z1*fy/4, grad[1, 1, 1])
+
+    # Separately.
+    assert_allclose(x0*y0*z0*fx/4, grad_x[0, 0, 0])
+    assert_allclose(x0*y0*z0*fz/4, grad_z[0, 0, 0])
+
+    assert_allclose(x0*y1*z0*fx/4, grad_x[0, 1, 0])
+    assert_allclose(x0*y1*z0*fy/4, grad_y[0, 1, 0])
+    assert_allclose(x0*y1*z0*fz/4, grad_z[0, 1, 0])
+
+    assert_allclose(x1*y1*z0*fy/4, grad_y[1, 1, 0])
+    assert_allclose(x1*y1*z0*fz/4, grad_z[1, 1, 0])
+
+    assert_allclose(x0*y1*z1*fx/4, grad_x[0, 1, 1])
+    assert_allclose(x0*y1*z1*fy/4, grad_y[0, 1, 1])
+
+    if discretize is not None:
+        def volume_disc(grid, field):
+            out = grid.aveE2CC*field*grid.vol
+            return out.reshape(grid.vnC, order='F')
+
+        assert_allclose(grad, 3*volume_disc(grid, field))
+
+    if discretize is not None:
+
+        out_x = grid.aveEx2CC*field.fx.ravel('F')*grid.vol
+        out_y = grid.aveEy2CC*field.fy.ravel('F')*grid.vol
+        out_z = grid.aveEz2CC*field.fz.ravel('F')*grid.vol
+
+        assert_allclose(grad_x, out_x.reshape(grid.vnC, order='F'))
+        assert_allclose(grad_y, out_y.reshape(grid.vnC, order='F'))
+        assert_allclose(grad_z, out_z.reshape(grid.vnC, order='F'))

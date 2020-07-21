@@ -107,7 +107,9 @@ def adjointstate(simulation):
                     simulation._dict_efield[src][freq].smu0)
 
             # Pre-allocate the gradient for the computational grid.
-            grad = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
+            grad_x = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
+            grad_y = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
+            grad_z = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
 
             # TODO v TEST v TODO
             #
@@ -122,17 +124,17 @@ def adjointstate(simulation):
             # TODO ^ TEST ^ TODO
 
             # Map the field to cell centers times volume.
-            # subtract: grad-V*E
-            maps.edges2cellaverages(
-                    grad, -simulation._dict_grid[src][freq].vol.reshape(
-                        simulation._dict_grid[src][freq].vnC, order='F'),
-                    efield.fx, efield.fy, efield.fz)
+            vnC = simulation._dict_grid[src][freq].vnC
+            vol = simulation._dict_grid[src][freq].vol.reshape(vnC, order='F')
+            maps.edges2cellaverages(efield.fx, efield.fy, efield.fz,
+                                    vol, grad_x, grad_y, grad_z)
+            grad = grad_x + grad_y + grad_z
 
             # Bring the gradient back from the computation grid to the model
             # grid.
             tgrad = maps.grid2grid(
                         simulation._dict_grid[src][freq],
-                        grad, simulation.grid, method='cubic')
+                        -grad, simulation.grid, method='cubic')
 
             # TODO generalize (chain rule of mapping)
             simulation.model.map.derivative(tgrad, simulation.model.property_x)

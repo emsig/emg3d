@@ -1,5 +1,5 @@
-Code
-####
+Modelling
+#########
 
 .. automodule:: emg3d
 
