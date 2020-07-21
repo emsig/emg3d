@@ -173,12 +173,12 @@ class Simulation():
                 }
 
         # Initiate dictionaries with None's.
-        self._dict_grid = self._dict_initiate()
-        self._dict_model = self._dict_initiate()
-        self._dict_sfield = self._dict_initiate()
-        self._dict_efield = self._dict_initiate()
-        self._dict_hfield = self._dict_initiate()
-        self._dict_efield_info = self._dict_initiate()
+        self._dict_grid = self._dict_initiate
+        self._dict_model = self._dict_initiate
+        self._dict_sfield = self._dict_initiate
+        self._dict_efield = self._dict_initiate
+        self._dict_hfield = self._dict_initiate
+        self._dict_efield_info = self._dict_initiate
 
         # Initiate synthetic data with NaN's.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
@@ -530,22 +530,7 @@ class Simulation():
             in `observed`.
 
         """
-
-        # Ensure grids, models, and source fields are computed.
-        #
-        # => This could be done within the field computation. But then it might
-        #    have to be done multiple times even if 'single' or 'same' grid.
-        #    Something to keep in mind.
-        #    For `gridding='same'` it does not really matter.
-        for src in self.survey.sources.keys():  # Loop over source positions.
-            for freq in self.survey.frequencies:  # Loop over frequencies.
-                _ = self.get_grid(src, freq)
-                _ = self.get_model(src, freq)
-                _ = self.get_sfield(src, freq)
-
-        # Get all source-frequency pairs.
-        srcfreq = list(itertools.product(self.survey.sources.keys(),
-                                         self.survey.frequencies))
+        srcfreq = self._srcfreq.copy()
 
         # We remove the ones that were already computed.
         remove = []
@@ -554,6 +539,17 @@ class Simulation():
                 remove += [(src, freq)]
         for src, freq in remove:
             srcfreq.remove((src, freq))
+
+        # Ensure grids, models, and source fields are computed.
+        #
+        # => This could be done within the field computation. But then it might
+        #    have to be done multiple times even if 'single' or 'same' grid.
+        #    Something to keep in mind.
+        #    For `gridding='same'` it does not really matter.
+        for src, freq in srcfreq:
+            _ = self.get_grid(src, freq)
+            _ = self.get_model(src, freq)
+            _ = self.get_sfield(src, freq)
 
         # Initiate futures-dict to store output.
         out = process_map(
@@ -566,7 +562,7 @@ class Simulation():
 
         # Clean hfields, so they will be recomputed.
         del self._dict_hfield
-        self._dict_hfield = self._dict_initiate()
+        self._dict_hfield = self._dict_initiate
 
         # The store-name is not water-tight if beforehand get_efield was used
         # or similar. It works with a clean simulation.compute.
@@ -590,6 +586,73 @@ class Simulation():
 
             # Store responses at receivers.
             self.data[store_name].loc[src, :, freq] = out[i][2]
+
+    # DATA
+    @property
+    def data(self):
+        """Shortcut to survey.data."""
+        return self.survey.data
+
+    # OPTIMIZATION
+
+    # TODO gradient()
+
+    @property
+    def data_misfit(self):
+        r"""Return the misfit between observed and synthetic data.
+
+        The weighted least-squares functional, as implemented in `emg3d`, is
+        given by Equation 1 [PlMu08]_,
+
+        .. math::
+            :label:misfit
+
+                J(\textbf{p}) = \frac{1}{2} \sum_f\sum_s\sum_r
+                  \left\{
+                    \left\lVert
+                      W_{s,r,f}^e\left(\textbf{e}_{s,r,f}[\sigma(\textbf{p})]
+                      -\textbf{e}_{s,r,f}^\text{obs}\right)
+                    \right\rVert^2
+                  + \left\lVert
+                      W_{s,r,f}^h\left(\textbf{h}_{s,r,f}[\sigma(\textbf{p})]
+                      -\textbf{h}_{s,r,f}^\text{obs}\right)
+                    \right\rVert^2
+                  \right\}
+                + R(\textbf{p}) \, .
+
+        """
+
+        # Compute it if not stored already.
+        # if getattr(self, '_data_misfit', None) is None:
+
+        # # TODO: - Data weighting;
+        # #       - Min_offset;
+        # #       - Noise floor.
+        # DW = optimize.weights.DataWeighting(**self.data_weight_opts)
+
+        # Store the residual.
+        self.data['residual'] = (self.data.synthetic - self.data.observed)
+
+        # Store a copy for the weighted residual.
+        self.data['wresidual'] = self.data.residual.copy()
+
+
+        # Compute the weights.
+        for src, freq in self._srcfreq:
+            data = self.data.wresidual.loc[src, :, freq].data
+
+            # # TODO: Actual weights.
+            # weig = DW.weights(
+            #         data,
+            #         self.survey.rec_coords,
+            #         self.survey.sources[src].coords,
+            #         freq)
+            # self.survey._data['wresidual'].loc[sname, :, freq] *= weig
+
+        self._data_misfit = np.sum(np.abs(self.data.residual.data.conj() *
+                                          self.data.wresidual.data))/2
+
+        return self._data_misfit
 
     # UTILS
     def clean(self, what='computed'):
@@ -627,23 +690,24 @@ class Simulation():
         # Clean dicts.
         for name in clean:
             delattr(self, '_dict_'+name)
-            setattr(self, '_dict_'+name, self._dict_initiate())
+            setattr(self, '_dict_'+name, self._dict_initiate)
 
         # Clean data.
         if what in ['computed', 'all']:
             self.data['synthetic'] = self.data.observed*np.nan
 
+    @property
     def _dict_initiate(self):
         """Returns a dict of the structure `dict[source][freq]=None`."""
         return {src: {freq: None for freq in self.survey.frequencies}
                 for src in self.survey.sources.keys()}
-
-    # DATA
     @property
-    def data(self):
-        """Shortcut to survey.data."""
-        return self.survey.data
+    def _srcfreq(self):
+        """Return list of all source-frequency pairs."""
 
-    # OPTIMIZATION
-    # TODO misfit()                                                            #
-    # TODO gradient()                                                          #
+        if getattr(self, '__srcfreq', None) is None:
+            self.__srcfreq = list(
+                    itertools.product(self.survey.sources.keys(),
+                                      self.survey.frequencies))
+
+        return self.__srcfreq

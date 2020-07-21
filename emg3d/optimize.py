@@ -3,6 +3,8 @@
 :mod:`gradient` -- Gradient of misfit
 =====================================
 
+Functionalities related to optimization (inversion).
+
 Functions to compute the gradient of the misfit function using the
 adjoint-state method, see [PlMu08]_.
 
@@ -111,7 +113,7 @@ def adjointstate(simulation):
             grad_y = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
             grad_z = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
 
-            # TODO v TEST v TODO
+            # TODO v TEST v TODO                                               #
             #
             # Here, we do
             #   1. edges2cellaverages (Ex[comp] -> CC[comp])
@@ -121,7 +123,7 @@ def adjointstate(simulation):
             #   1. grid2grid      (Ex[comp] -> Ex[model])
             #   1. edges2cellaverages (Ex[model] -> CC[model])
             #
-            # TODO ^ TEST ^ TODO
+            # TODO ^ TEST ^ TODO                                               #
 
             # Map the field to cell centers times volume.
             vnC = simulation._dict_grid[src][freq].vnC

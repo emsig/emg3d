@@ -28,7 +28,10 @@ backwards compatible.
       source-fields. If `tqdm` is installed it displays a progress bar for the
       asynchronous computation.
 
-  - `optimize` (**new**) TODO
+  - `optimize` (**new**)
+
+    - Functionalities related to inversion (data misfit, gradient, data and
+      depth weighting).
 
   - `models`:
 

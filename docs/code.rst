@@ -1,5 +1,5 @@
-Modelling
-#########
+Code
+####
 
 .. automodule:: emg3d
 
@@ -28,6 +28,10 @@ Modelling
    :headings:=^
 
 .. automodapi:: emg3d.maps
+   :no-inheritance-diagram:
+   :headings:=^
+
+.. automodapi:: emg3d.optimize
    :no-inheritance-diagram:
    :headings:=^
 
