@@ -464,9 +464,9 @@ def volume_average(edges_x, edges_y, edges_z, values,
     """
 
     # Get the weights and indices for each direction.
-    wx, ix_in, ix_out = _volume_avg_weights(edges_x, new_edges_x)
-    wy, iy_in, iy_out = _volume_avg_weights(edges_y, new_edges_y)
-    wz, iz_in, iz_out = _volume_avg_weights(edges_z, new_edges_z)
+    wx, ix_in, ix_out = _volume_average_weights(edges_x, new_edges_x)
+    wy, iy_in, iy_out = _volume_average_weights(edges_y, new_edges_y)
+    wz, iz_in, iz_out = _volume_average_weights(edges_z, new_edges_z)
 
     # Loop over the elements and sum up the contributions.
     for iz, w_z in enumerate(wz):
@@ -486,8 +486,8 @@ def volume_average(edges_x, edges_y, edges_z, values,
 
 
 @nb.njit(**_numba_setting)
-def _volume_avg_weights(x1, x2):
-    """Returns the weights for the volume averaging technique.
+def _volume_average_weights(x1, x2):
+    """Returaveragethe weights for the volume averaging technique.
 
 
     Parameters
@@ -557,10 +557,13 @@ def _volume_avg_weights(x1, x2):
 
 # EDGES <=> CENTERS
 @nb.njit(**_numba_setting)
-def avg_field2cell_volume(grad, vol, ex, ey, ez):
-    r"""Average edges (fields) to cell values.
+def edges2cellaverages(grad, vol, ex, ey, ez):
+    r"""Interpolate fields defined on edges to volume-averaged cell values.
 
-    TODO: Document.
+    .. note::
+
+        - This is currently limited to an isotropic gradient.
+
 
     The same could be achieved by a LinearOperator or a Stencil, or simply with
     discretize (much simpler but slightly slower):
@@ -598,26 +601,26 @@ def avg_field2cell_volume(grad, vol, ex, ey, ez):
 
                 # Multiply by volume
                 if ix < nx:
-                    grad[ix, iym, izm] -= vol[ixm, iym, izm]*ex[ix, iy, iz]/4
-                    grad[ix, iyp, izm] -= vol[ixm, iyp, izm]*ex[ix, iy, iz]/4
-                    grad[ix, iym, izp] -= vol[ixm, iym, izp]*ex[ix, iy, iz]/4
-                    grad[ix, iyp, izp] -= vol[ixm, iyp, izp]*ex[ix, iy, iz]/4
+                    grad[ix, iym, izm] += vol[ix, iym, izm]*ex[ix, iy, iz]/4
+                    grad[ix, iyp, izm] += vol[ix, iyp, izm]*ex[ix, iy, iz]/4
+                    grad[ix, iym, izp] += vol[ix, iym, izp]*ex[ix, iy, iz]/4
+                    grad[ix, iyp, izp] += vol[ix, iyp, izp]*ex[ix, iy, iz]/4
 
                 if iy < ny:
-                    grad[ixm, iy, izm] -= vol[ixm, iym, izm]*ey[ix, iy, iz]/4
-                    grad[ixp, iy, izm] -= vol[ixp, iym, izm]*ey[ix, iy, iz]/4
-                    grad[ixm, iy, izp] -= vol[ixm, iym, izp]*ey[ix, iy, iz]/4
-                    grad[ixp, iy, izp] -= vol[ixp, iym, izp]*ey[ix, iy, iz]/4
+                    grad[ixm, iy, izm] += vol[ixm, iy, izm]*ey[ix, iy, iz]/4
+                    grad[ixp, iy, izm] += vol[ixp, iy, izm]*ey[ix, iy, iz]/4
+                    grad[ixm, iy, izp] += vol[ixm, iy, izp]*ey[ix, iy, iz]/4
+                    grad[ixp, iy, izp] += vol[ixp, iy, izp]*ey[ix, iy, iz]/4
 
                 if iz < nz:
-                    grad[ixm, iym, iz] -= vol[ixm, iym, izm]*ez[ix, iy, iz]/4
-                    grad[ixp, iym, iz] -= vol[ixp, iym, izm]*ez[ix, iy, iz]/4
-                    grad[ixm, iyp, iz] -= vol[ixm, iyp, izm]*ez[ix, iy, iz]/4
-                    grad[ixp, iyp, iz] -= vol[ixp, iyp, izm]*ez[ix, iy, iz]/4
+                    grad[ixm, iym, iz] += vol[ixm, iym, iz]*ez[ix, iy, iz]/4
+                    grad[ixp, iym, iz] += vol[ixp, iym, iz]*ez[ix, iy, iz]/4
+                    grad[ixm, iyp, iz] += vol[ixm, iyp, iz]*ez[ix, iy, iz]/4
+                    grad[ixp, iyp, iz] += vol[ixp, iyp, iz]*ez[ix, iy, iz]/4
 
 
 @nb.njit(**_numba_setting)
-def avg_cell2field_volume(sx, sy, sz, eta_x, eta_y, eta_z):
+def cellaverages2edges(sx, sy, sz, eta_x, eta_y, eta_z):
     r"""Average cell values to edges (fields).
 
     TODO: Document.

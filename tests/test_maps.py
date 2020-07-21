@@ -243,11 +243,11 @@ def test_volume_average(njit):
 
 
 @pytest.mark.parametrize("njit", [True, False])
-def test_volume_avg_weights(njit):
+def test_volume_average_weights(njit):
     if njit:
-        volume_avg_weights = maps._volume_avg_weights
+        volume_avg_weights = maps._volume_average_weights
     else:
-        volume_avg_weights = maps._volume_avg_weights.py_func
+        volume_avg_weights = maps._volume_average_weights.py_func
 
     grid_in = meshes.TensorMesh(
             [np.ones(11), np.ones(10)*2, np.ones(3)*10],
@@ -406,3 +406,47 @@ class TestMaps:
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
         np.allclose(derivative, -gradient/derivative)
+
+
+@pytest.mark.parametrize("njit", [True, False])
+def test_edges2cellaverages(njit):
+    if njit:
+        edges2cellaverages = maps.edges2cellaverages
+    else:
+        edges2cellaverages = maps.edges2cellaverages.py_func
+
+    # To test it, we create a mesh 2x2x2 cells,
+    # where all hx/hy/hz have distinct lengths.
+    x0, x1 = 2, 3
+    y0, y1 = 4, 5
+    z0, z1 = 6, 7
+
+    grid = meshes.TensorMesh([[x0, x1], [y0, y1], [z0, z1]], [0, 0, 0])
+    field = fields.Field(grid)
+
+    # Only three edges have a value, one in each direction.
+    fx = 1.23+9.87j
+    fy = 2.68-5.48j
+    fz = 1.57+7.63j
+    field.fx[0, 1, 1] = fx
+    field.fy[1, 1, 1] = fy
+    field.fz[1, 1, 0] = fz
+
+    # Initiate gradient.
+    grad = np.zeros(grid.vnC, order='F', dtype=complex)
+
+    # Call function.
+    maps.edges2cellaverages(grad, grid.vol.reshape(grid.vnC, order='F'),
+                            field.fx, field.fy, field.fz)
+
+    # Check all eight cells explicitly by
+    # - computing the volume of the cell;
+    # - multiplying with the present fields in that cell.
+    assert_allclose(x0*y0*z0*(fx+fz)/4, grad[0, 0, 0])
+    assert_allclose(x1*y0*z0*fz/4, grad[1, 0, 0])
+    assert_allclose(x0*y1*z0*(fx+fy+fz)/4, grad[0, 1, 0])
+    assert_allclose(x1*y1*z0*(fy+fz)/4, grad[1, 1, 0])
+    assert_allclose(x0*y0*z1*fx/4, grad[0, 0, 1])
+    assert_allclose(0j, grad[1, 0, 1])
+    assert_allclose(x0*y1*z1*(fx+fy)/4, grad[0, 1, 1])
+    assert_allclose(x1*y1*z1*fy/4, grad[1, 1, 1])

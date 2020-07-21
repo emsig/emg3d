@@ -112,18 +112,19 @@ def adjointstate(simulation):
             # TODO v TEST v TODO
             #
             # Here, we do
-            #   1. avg_field2cell (Ex[comp] -> CC[comp])
+            #   1. edges2cellaverages (Ex[comp] -> CC[comp])
             #   2. grid2grid      (CC[comp] -> CC[model])
             #
             # Not better the other way around?
             #   1. grid2grid      (Ex[comp] -> Ex[model])
-            #   1. avg_field2cell (Ex[model] -> CC[model])
+            #   1. edges2cellaverages (Ex[model] -> CC[model])
             #
             # TODO ^ TEST ^ TODO
 
             # Map the field to cell centers times volume.
-            maps.avg_field2cell_volume(
-                    grad, simulation._dict_grid[src][freq].vol.reshape(
+            # subtract: grad-V*E
+            maps.edges2cellaverages(
+                    grad, -simulation._dict_grid[src][freq].vol.reshape(
                         simulation._dict_grid[src][freq].vnC, order='F'),
                     efield.fx, efield.fy, efield.fz)
 
