@@ -38,6 +38,7 @@ __all__ = ['grid2grid', 'interp3d', 'MapConductivity', 'MapLgConductivity',
            'MapLnResistivity']
 
 
+# INTERPOLATIONS
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
               log=False):
     """Interpolate `values` located on `grid` to `new_grid`.
@@ -275,7 +276,7 @@ def interp3d(points, values, new_points, method, fill_value, mode):
     return new_values
 
 
-# Maps
+# MAPS
 class _Map:
     """Maps variable `x` to computational variable `σ` (conductivity)."""
 
@@ -428,7 +429,7 @@ class MapLnResistivity(_Map):
         gradient /= -conductivity
 
 
-# Volume averaging
+# VOLUME AVERAGING
 @nb.njit(**_numba_setting)
 def volume_average(edges_x, edges_y, edges_z, values,
                    new_edges_x, new_edges_y, new_edges_z, new_values, new_vol):
@@ -554,8 +555,7 @@ def _volume_avg_weights(x1, x2):
     return hs[:ii], ix1[:ii], ix2[:ii]
 
 
-# Field to cell centers and back again.
-# TODO, NEEDS DOCUMENTATION                                                    #
+# EDGES <=> CENTERS
 @nb.njit(**_numba_setting)
 def avg_field2cell_volume(grad, vol, ex, ey, ez):
     r"""Average edges (fields) to cell values.
