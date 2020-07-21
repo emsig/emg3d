@@ -6,7 +6,8 @@
 Functionalities related to optimization (inversion), e.g., misfit function,
 gradient of the misfit function, or data- and depth-weighting.
 
-Currently it follows the adjoint-state method as described in [PlMu08]_.
+Currently it follows the implementation of [PlMu08]_, using the adjoint-state
+technique for the gradient.
 
 """
 # Copyright 2018-2020 The emg3d Developers.
@@ -30,10 +31,112 @@ import numpy as np
 
 from emg3d import maps
 
-__all__ = ['gradient', 'data_misfit']
+__all__ = ['as_gradient', 'data_misfit']
 
 
-def gradient(simulation):
+def data_misfit(simulation):
+    r"""Return the misfit between observed and synthetic data.
+
+    The weighted least-squares functional, as implemented in `emg3d`, is
+    given by Equation 1 of [PlMu08]_,
+
+    .. math::
+        :label: misfit
+
+            J(\textbf{p}) = \frac{1}{2} \sum_f\sum_s\sum_r
+                \left\{
+                \left\lVert
+                    W_{s,r,f}^e \Delta_e
+                \right\rVert^2
+                + \left\lVert
+                    W_{s,r,f}^h \Delta_h
+                \right\rVert^2
+                \right\}
+            + R(\textbf{p}) \, ,
+
+    where
+
+    .. math::
+        :label: misfit_e
+
+            \Delta_e = \textbf{e}_{s,r,f}[\sigma(\textbf{p})]
+                       -\textbf{e}_{s,r,f}^\text{obs} \, ,
+
+    and
+
+    .. math::
+        :label: misfit_h
+
+            \Delta_h = \textbf{h}_{s,r,f}[\sigma(\textbf{p})]
+                       -\textbf{h}_{s,r,f}^\text{obs} \, .
+
+    Here, :math:`f, s, r` stand for frequency, source, and receiver,
+    respectively; :math:`W^{\{e;h\}}` are the weighting functions for the
+    electric and magnetic data residual, :math:`\{e;h\}^\text{obs}` are the
+    observed electric and magnetic data, and :math:`\{e;h\}` are the synthetic
+    electric and magnetic data, computed for a given conductivity
+    :math:`\sigma`, which depends on the model parameters :math:`\textbf{p}`.
+    Finally, :math:`R(\textbf{p}` is a regularization term.
+
+
+    .. note::
+
+        This is an early implementation of the misfit function. Currently not
+        yet implemented are:
+
+        - Data weighting (also min. offset; noise floor; etc);
+        - Magnetic data;
+        - Regularization term.
+
+
+    Parameters
+    ----------
+    simulation : :class:`emg3d.simulations.Simulation`
+        The simulation.
+
+
+    Returns
+    -------
+    data_misfit : float
+        Value of the misfit function.
+
+    """
+
+    # Compute the residual
+    residual = simulation.data.synthetic - simulation.data.observed
+
+    # Store a copy for the weighted residual.
+    wresidual = residual.copy()
+
+    # # TODO: - Data weighting;
+    # #       - Min_offset;
+    # #       - Noise floor.
+    # DW = DataWeighting(**simulation.data_weight_opts)
+    #
+    # Compute the weights.
+    # for src, freq in simulation._srcfreq:
+    #     data = simulation.data.wresidual.loc[src, :, freq].data
+    #
+    #     # # TODO: Actual weights.
+    #     # weighting = DW.weights(
+    #     #         data,
+    #     #         simulation.survey.rec_coords,
+    #     #         simulation.survey.sources[src].coords,
+    #     #         freq)
+    #     # wresidual.loc[sname, :, freq] *= weighting
+
+    # Store them in Simulation.
+    simulation.data['residual'] = residual
+    simulation.data['wresidual'] = wresidual
+
+    # Compute misfit
+    data_misfit = residual.data.conj() * wresidual.data
+    data_misfit = data_misfit.real.sum()/2
+
+    return data_misfit
+
+
+def as_gradient(simulation):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete gradient for a single source at a single frequency is given by
@@ -146,57 +249,3 @@ def gradient(simulation):
             grad_model += tgrad
 
     return grad_model
-
-
-def data_misfit(simulation):
-    r"""Return the misfit between observed and synthetic data.
-
-    The weighted least-squares functional, as implemented in `emg3d`, is
-    given by Equation 1 [PlMu08]_,
-
-    .. math::
-        :label:misfit
-
-            J(\textbf{p}) = \frac{1}{2} \sum_f\sum_s\sum_r
-                \left\{
-                \left\lVert
-                    W_{s,r,f}^e\left(\textbf{e}_{s,r,f}[\sigma(\textbf{p})]
-                    -\textbf{e}_{s,r,f}^\text{obs}\right)
-                \right\rVert^2
-                + \left\lVert
-                    W_{s,r,f}^h\left(\textbf{h}_{s,r,f}[\sigma(\textbf{p})]
-                    -\textbf{h}_{s,r,f}^\text{obs}\right)
-                \right\rVert^2
-                \right\}
-            + R(\textbf{p}) \, .
-
-    """
-
-    # # TODO: - Data weighting;
-    # #       - Min_offset;
-    # #       - Noise floor.
-    # DW = optimize.weights.DataWeighting(**self.data_weight_opts)
-
-    # Store the residual.
-    simulation.data['residual'] = (simulation.data.synthetic -
-                                   simulation.data.observed)
-
-    # Store a copy for the weighted residual.
-    simulation.data['wresidual'] = simulation.data.residual.copy()
-
-    # Compute the weights.
-    # for src, freq in simulation._srcfreq:
-    #     data = simulation.data.wresidual.loc[src, :, freq].data
-    #
-    #     # # TODO: Actual weights.
-    #     # weig = DW.weights(
-    #     #         data,
-    #     #         simulation.survey.rec_coords,
-    #     #         simulation.survey.sources[src].coords,
-    #     #         freq)
-    #     # simulation.survey._data['wresidual'].loc[sname, :, freq] *= weig
-
-    data_misfit = np.sum(np.abs(simulation.data.residual.data.conj() *
-                                simulation.data.wresidual.data))/2
-
-    return data_misfit
