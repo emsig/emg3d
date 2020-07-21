@@ -219,8 +219,7 @@ class Simulation():
         See `to_file` for more information regarding `what`.
 
         """
-
-        # TODO not adjusted for optimize                                       #
+        # TODO: Adjusted for optimize.
 
         if what not in ['computed', 'results', 'all', 'plain']:
             raise TypeError(f"Unrecognized `what`: {what}")
@@ -280,7 +279,7 @@ class Simulation():
 
         """
 
-        # TODO not adjusted for optimize                                       #
+        # TODO: Adjusted for optimize.
 
         try:
             # Initiate class.
@@ -594,63 +593,29 @@ class Simulation():
         return self.survey.data
 
     # OPTIMIZATION
+    @property
+    def gradient(self):
+        r"""Return the gradient of the misfit function.
 
-    # TODO gradient()
+        See :func:`emg3d.optimize.gradient`.
+
+        """
+        # Compute it if not stored already.
+        if getattr(self, '_gradient', None) is None:
+            self._gradient = optimize.gradient(self)
+
+        return self._gradient
 
     @property
     def data_misfit(self):
-        r"""Return the misfit between observed and synthetic data.
+        r"""Return the misfit function.
 
-        The weighted least-squares functional, as implemented in `emg3d`, is
-        given by Equation 1 [PlMu08]_,
-
-        .. math::
-            :label:misfit
-
-                J(\textbf{p}) = \frac{1}{2} \sum_f\sum_s\sum_r
-                  \left\{
-                    \left\lVert
-                      W_{s,r,f}^e\left(\textbf{e}_{s,r,f}[\sigma(\textbf{p})]
-                      -\textbf{e}_{s,r,f}^\text{obs}\right)
-                    \right\rVert^2
-                  + \left\lVert
-                      W_{s,r,f}^h\left(\textbf{h}_{s,r,f}[\sigma(\textbf{p})]
-                      -\textbf{h}_{s,r,f}^\text{obs}\right)
-                    \right\rVert^2
-                  \right\}
-                + R(\textbf{p}) \, .
+        See :func:`emg3d.optimize.data_misfit`.
 
         """
-
         # Compute it if not stored already.
-        # if getattr(self, '_data_misfit', None) is None:
-
-        # # TODO: - Data weighting;
-        # #       - Min_offset;
-        # #       - Noise floor.
-        # DW = optimize.weights.DataWeighting(**self.data_weight_opts)
-
-        # Store the residual.
-        self.data['residual'] = (self.data.synthetic - self.data.observed)
-
-        # Store a copy for the weighted residual.
-        self.data['wresidual'] = self.data.residual.copy()
-
-
-        # Compute the weights.
-        for src, freq in self._srcfreq:
-            data = self.data.wresidual.loc[src, :, freq].data
-
-            # # TODO: Actual weights.
-            # weig = DW.weights(
-            #         data,
-            #         self.survey.rec_coords,
-            #         self.survey.sources[src].coords,
-            #         freq)
-            # self.survey._data['wresidual'].loc[sname, :, freq] *= weig
-
-        self._data_misfit = np.sum(np.abs(self.data.residual.data.conj() *
-                                          self.data.wresidual.data))/2
+        if getattr(self, '_data_misfit', None) is None:
+            self._data_misfit = optimize.data_misfit(self)
 
         return self._data_misfit
 
@@ -673,8 +638,7 @@ class Simulation():
               Removes everything (leaves it plain as initiated).
 
         """
-
-        # TODO not adjusted for optimize                                       #
+        # TODO: Adjusted for optimize.
 
         if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}")
@@ -701,6 +665,7 @@ class Simulation():
         """Returns a dict of the structure `dict[source][freq]=None`."""
         return {src: {freq: None for freq in self.survey.frequencies}
                 for src in self.survey.sources.keys()}
+
     @property
     def _srcfreq(self):
         """Return list of all source-frequency pairs."""

@@ -445,8 +445,8 @@ def test_edges2cellaverages(njit):
 
     # Call function.
     vol = grid.vol.reshape(grid.vnC, order='F')
-    maps.edges2cellaverages(field.fx, field.fy, field.fz,
-                            vol, grad_x, grad_y, grad_z)
+    edges2cellaverages(field.fx, field.fy, field.fz,
+                       vol, grad_x, grad_y, grad_z)
     grad = grad_x + grad_y + grad_z
 
     # Check all eight cells explicitly by

@@ -1,12 +1,12 @@
 """
 
-:mod:`gradient` -- Gradient of misfit
-=====================================
+:mod:`optimize` -- Inversion
+============================
 
-Functionalities related to optimization (inversion).
+Functionalities related to optimization (inversion), e.g., misfit function,
+gradient of the misfit function, or data- and depth-weighting.
 
-Functions to compute the gradient of the misfit function using the
-adjoint-state method, see [PlMu08]_.
+Currently it follows the adjoint-state method as described in [PlMu08]_.
 
 """
 # Copyright 2018-2020 The emg3d Developers.
@@ -27,15 +27,13 @@ adjoint-state method, see [PlMu08]_.
 
 
 import numpy as np
-# from concurrent import futures
 
 from emg3d import maps
-# from emg3d.optimize import weights
 
-__all__ = ['adjointstate']
+__all__ = ['gradient', 'data_misfit']
 
 
-def adjointstate(simulation):
+def gradient(simulation):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete gradient for a single source at a single frequency is given by
@@ -113,7 +111,7 @@ def adjointstate(simulation):
             grad_y = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
             grad_z = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
 
-            # TODO v TEST v TODO                                               #
+            # TODO v TEST v TODO
             #
             # Here, we do
             #   1. edges2cellaverages (Ex[comp] -> CC[comp])
@@ -123,7 +121,7 @@ def adjointstate(simulation):
             #   1. grid2grid      (Ex[comp] -> Ex[model])
             #   1. edges2cellaverages (Ex[model] -> CC[model])
             #
-            # TODO ^ TEST ^ TODO                                               #
+            # TODO ^ TEST ^ TODO
 
             # Map the field to cell centers times volume.
             vnC = simulation._dict_grid[src][freq].vnC
@@ -148,3 +146,57 @@ def adjointstate(simulation):
             grad_model += tgrad
 
     return grad_model
+
+
+def data_misfit(simulation):
+    r"""Return the misfit between observed and synthetic data.
+
+    The weighted least-squares functional, as implemented in `emg3d`, is
+    given by Equation 1 [PlMu08]_,
+
+    .. math::
+        :label:misfit
+
+            J(\textbf{p}) = \frac{1}{2} \sum_f\sum_s\sum_r
+                \left\{
+                \left\lVert
+                    W_{s,r,f}^e\left(\textbf{e}_{s,r,f}[\sigma(\textbf{p})]
+                    -\textbf{e}_{s,r,f}^\text{obs}\right)
+                \right\rVert^2
+                + \left\lVert
+                    W_{s,r,f}^h\left(\textbf{h}_{s,r,f}[\sigma(\textbf{p})]
+                    -\textbf{h}_{s,r,f}^\text{obs}\right)
+                \right\rVert^2
+                \right\}
+            + R(\textbf{p}) \, .
+
+    """
+
+    # # TODO: - Data weighting;
+    # #       - Min_offset;
+    # #       - Noise floor.
+    # DW = optimize.weights.DataWeighting(**self.data_weight_opts)
+
+    # Store the residual.
+    simulation.data['residual'] = (simulation.data.synthetic -
+                                   simulation.data.observed)
+
+    # Store a copy for the weighted residual.
+    simulation.data['wresidual'] = simulation.data.residual.copy()
+
+    # Compute the weights.
+    # for src, freq in simulation._srcfreq:
+    #     data = simulation.data.wresidual.loc[src, :, freq].data
+    #
+    #     # # TODO: Actual weights.
+    #     # weig = DW.weights(
+    #     #         data,
+    #     #         simulation.survey.rec_coords,
+    #     #         simulation.survey.sources[src].coords,
+    #     #         freq)
+    #     # simulation.survey._data['wresidual'].loc[sname, :, freq] *= weig
+
+    data_misfit = np.sum(np.abs(simulation.data.residual.data.conj() *
+                                simulation.data.wresidual.data))/2
+
+    return data_misfit
