@@ -31,7 +31,7 @@ import numpy as np
 
 from emg3d import maps
 
-__all__ = ['as_gradient', 'data_misfit']
+__all__ = ['as_gradient', 'data_misfit', 'DataWeighting']
 
 
 def data_misfit(simulation):
@@ -84,7 +84,6 @@ def data_misfit(simulation):
         This is an early implementation of the misfit function. Currently not
         yet implemented are:
 
-        - Data weighting (also min. offset; noise floor; etc);
         - Magnetic data;
         - Regularization term.
 
@@ -108,22 +107,24 @@ def data_misfit(simulation):
     # Store a copy for the weighted residual.
     wresidual = residual.copy()
 
-    # # TODO: - Data weighting;
-    # #       - Min_offset;
-    # #       - Noise floor.
-    # DW = DataWeighting(**simulation.data_weight_opts)
-    #
+    # TODO: DataWeighting:
+    #       - Make a function
+    #       - Only takes the residual DataArray
+    #       - Returns the wresidual DataArray
+    #       - Internally loops over sources and receivers
+    # TODO: - Data weighting;
+    #       - Min_offset;
+    #       - Noise floor.
+    DW = DataWeighting(**simulation.data_weight_opts)
+
     # Compute the weights.
-    # for src, freq in simulation._srcfreq:
-    #     data = simulation.data.wresidual.loc[src, :, freq].data
-    #
-    #     # # TODO: Actual weights.
-    #     # weighting = DW.weights(
-    #     #         data,
-    #     #         simulation.survey.rec_coords,
-    #     #         simulation.survey.sources[src].coords,
-    #     #         freq)
-    #     # wresidual.loc[sname, :, freq] *= weighting
+    for src, freq in simulation._srcfreq:
+        # TODO: Actual weights.
+        DW.weights(
+                wresidual.loc[src, :, freq].data,
+                simulation.survey.rec_coords,
+                simulation.survey.sources[src].coordinates,
+                freq)
 
     # Store them in Simulation.
     simulation.data['residual'] = residual
@@ -179,6 +180,18 @@ def as_gradient(simulation):
         Current gradient; has shape mesh.vnC (same as model properties).
 
     """
+
+    # # So far only Ex is implemented and checked.
+    # if sum([(r.azm != 0.0)+(r.dip != 0.0) for r in
+    #        simulation.survey.receivers.values()]) > 0:
+    #    raise NotImplementedError(
+    #            "Gradient only implement for Ex receivers "
+    #            "at the moment.")
+    # # TODO # # DATA WEIGHTING
+    # data_misfit = simulation.data_misfit
+    # # Get backwards electric fields (parallel).
+    # ????._bcompute()
+
     # Get depth weighting (preconditioner) instance if wdepth is not None.
     # D = None  # TODO
     # wdepth if wdepth is None else weights.DepthWeighting(mesh, **wdepth)
@@ -249,3 +262,91 @@ def as_gradient(simulation):
             grad_model += tgrad
 
     return grad_model
+
+
+class DataWeighting:
+    r"""Data Weighting; Plessix and Mulder, equation 18.
+
+    .. math::
+        :label: data-weighting
+
+        W(\textbf{x}_s, \textbf{x}_r, \omega) =
+        \frac{\lVert\textbf{x}_s-\textbf{x}_r\rVert^{\gamma_d}}
+        {\omega^{\beta_f}
+         \lVert E^\text{ref}(\textbf{x}_s, \textbf{x}_r, \omega)
+         \rVert^{\beta_d}}
+
+
+
+
+    .. todo::
+
+        - Currently, low amplitudes are switched-off, because it is divided by
+          data. Test if small offsets should also be switched off.
+        - Include other data weighting functions.
+
+
+    Parameters
+    ----------
+    gamma_d : float
+        Offset weighting exponent.
+
+    beta_d : float
+        Data weighting exponent.
+
+    beta_f : float
+        Frequency weighting exponent.
+
+    """
+
+    def __init__(self, gamma_d=0.5, beta_d=1.0, beta_f=0.25):
+        """Initialize new DataWeighting instance."""
+
+        # Store values
+        self.gamma_d = gamma_d
+        self.beta_d = beta_d
+        self.beta_f = beta_f
+
+    def weights(self, data, rec, src, freq, noise_floor=1e-25):
+        """[PlMu08]_, equation 18.
+
+
+        Parameters
+        ----------
+        data : ndarray
+            CSEM data.
+
+        rec, src : tupples
+            Receiver and source coordinates.
+
+        freq : float
+            Frequency (Hz)
+
+        noise_floor : float
+            Data with amplitudes below the noise floor get zero data weighting
+            (data weighting divides by the amplitude, which is a problem if the
+            amplitude is zero).
+
+
+        Returns
+        -------
+        data_weight : ndarray
+            Data weights (size of number of receivers).
+
+        """
+
+        # Mute
+        mute = np.abs(data) < noise_floor
+
+        # Get offsets.
+        locs = np.stack([rec[0]-src[0], rec[1]-src[1], rec[2]-src[2]])
+        offsets = np.linalg.norm(locs, axis=0)
+
+        # Compute the data weight.
+        data_weight = offsets**self.gamma_d / (2*np.pi*freq)**self.beta_f
+        data_weight /= np.sqrt(np.real(data*data.conj()))**self.beta_d
+
+        # Set small amplitudes to zero.
+        data_weight[mute] = 0
+
+        data *= data_weight

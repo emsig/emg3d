@@ -137,6 +137,7 @@ class Simulation():
 
         # Get kwargs.
         solver_opts = kwargs.pop('solver_opts', {})
+        data_weight_opts = kwargs.pop('data_weight_opts', {})
 
         # Ensure no kwargs left (currently kwargs is not used).
         if kwargs:
@@ -170,6 +171,14 @@ class Simulation():
                 'linerelaxation': True,
                 'verb': 0,
                 **solver_opts,  # Overwrites defaults.
+                }
+
+        # Set default data weighting options if not provided.
+        self.data_weight_opts = {
+                'gamma_d': 0.5,
+                'beta_f': 0.25,
+                'beta_d': 1.0,
+                **data_weight_opts,  # Overwrites defaults.
                 }
 
         # Initiate dictionaries with None's.
@@ -219,7 +228,7 @@ class Simulation():
         See `to_file` for more information regarding `what`.
 
         """
-        # TODO: Adjusted for optimize.
+        # TODO: Adjust for optimize.
 
         if what not in ['computed', 'results', 'all', 'plain']:
             raise TypeError(f"Unrecognized `what`: {what}")
@@ -258,6 +267,11 @@ class Simulation():
         if what in ['computed', 'results', 'all']:
             out['synthetic'] = self.data.synthetic
 
+            # v TODO v
+            out['gradient'] = self._gradient
+            out['data_misfit'] = self._data_misfit
+            # ^ TODO ^
+
         if copy:
             return deepcopy(out)
         else:
@@ -279,7 +293,7 @@ class Simulation():
 
         """
 
-        # TODO: Adjusted for optimize.
+        # TODO: Adjust for optimize.
 
         try:
             # Initiate class.
@@ -304,6 +318,11 @@ class Simulation():
             if 'synthetic' in inp.keys():
                 synthetic = out.data.observed*0+inp['synthetic']
                 out.survey._data['synthetic'] = synthetic
+
+                # v TODO v
+                out._gradient = inp['gradient']
+                out._data_misfit = inp['data_misfit']
+                # ^ TODO ^
 
             return out
 
@@ -597,14 +616,15 @@ class Simulation():
     def gradient(self):
         r"""Return the gradient of the misfit function.
 
-        See :func:`emg3d.optimize.gradient`.
+        See :func:`emg3d.optimize.as_gradient`.
 
         """
         # Compute it if not stored already.
         if getattr(self, '_gradient', None) is None:
             self._gradient = optimize.gradient(self)
 
-        return self._gradient
+        # TODO improve the cutting to input model
+        return self._gradient[:, :, :self._input_nCz]
 
     @property
     def data_misfit(self):
@@ -618,6 +638,112 @@ class Simulation():
             self._data_misfit = optimize.data_misfit(self)
 
         return self._data_misfit
+
+    def bfields(self, source, frequency, **kwargs):
+        """¿¿¿ Merge with efields or move to gradient. ???"""
+
+        freq = float(frequency)
+
+        # Get solver options and update with kwargs.
+        solver_opts = {**self.solver_opts, **kwargs}
+        solver_opts['return_info'] = True  # Always return solver info.
+
+        # Compute back-propagating electric field.
+        bfield, info = solver.solve(
+                self.get_grid(source, freq),
+                self.get_model(source, freq),
+                self._rfields(source, freq),
+                **solver_opts)
+
+        # Store electric field and info.
+        if not hasattr(self, '_dict_bfield'):
+            self._dict_bfield = self._dict_initiate()
+            self._back_info = self._dict_initiate()
+        self._dict_bfield[source][freq] = bfield
+        self._back_info[source][freq] = info
+
+        # Return electric field.
+        return (self._dict_bfield[source][freq],
+                self._back_info[source][freq])
+
+    def _call_bfields(self, inp):
+        return self.bfields(*inp)
+
+    def _bcompute(self, **kwargs):
+        """¿¿¿ Merge with compute or move to gradient. ???"""
+        # TODO TODO
+
+        # Get all source-frequency pairs.
+        srcfreq = list(itertools.product(self.survey.sources.keys(),
+                                         self.survey.frequencies))
+
+        # Initiate futures-dict to store output.
+        disable = self.max_workers >= len(srcfreq)
+        out = process_map(
+                self._call_bfields, srcfreq,
+                max_workers=self.max_workers,
+                desc='Compute bfields',
+                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+                disable=disable)
+
+        # Store electric field and info.
+        if not hasattr(self, '_dict_bfield'):
+            self._dict_bfield = self._dict_initiate()
+            self._back_info = self._dict_initiate()
+
+        # Extract and store.
+        i = 0
+        warned = False
+        for src in self.survey.sources.keys():
+            for freq in self.survey.frequencies:
+                # Store efield.
+                self._dict_bfield[src][freq] = out[i][0]
+
+                # Store solver info.
+                info = out[i][1]
+                self._back_info[src][freq] = info
+                if info['exit'] != 0:
+                    if not warned:
+                        print("Solver warnings:")
+                        warned = True
+                    print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+
+                i += 1
+
+    def _rfields(self, source, frequency):
+        """¿¿¿ Merge with sfields or move to optimize/gradient. ???"""
+
+        freq = float(frequency)
+        grid = self.get_grid(source, frequency)
+
+        # Initiate empty field
+        ResidualField = fields.SourceField(grid, freq=frequency)
+
+        # Loop over receivers, input as source.
+        for rname, rec in self.survey.receivers.items():
+
+            # Strength: in get_source_field the strength is multiplied with
+            # iwmu; so we undo this here.
+            # TODO Ey, Ez
+            strength = self.data['wresidual'].loc[
+                    source, rname, freq].data.conj()
+            strength /= ResidualField.smu0
+            # ^ WEIGHTED RESIDUAL ^!
+
+            ThisSField = fields.get_source_field(
+                grid=grid,
+                src=rec.coordinates,
+                freq=frequency,
+                strength=strength,
+            )
+
+            # If strength is zero (very unlikely), get_source_field would
+            # return a normalized field for a unit source. However, in this
+            # case we do not want that.
+            if strength != 0:
+                ResidualField += ThisSField
+
+        return ResidualField
 
     # UTILS
     def clean(self, what='computed'):
@@ -638,7 +764,7 @@ class Simulation():
               Removes everything (leaves it plain as initiated).
 
         """
-        # TODO: Adjusted for optimize.
+        # TODO: Adjust for optimize.
 
         if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}")
