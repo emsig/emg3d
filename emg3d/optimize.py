@@ -39,7 +39,7 @@ def misfit(simulation):
     r"""Return the misfit function.
 
     The weighted least-squares functional, often called objective function or
-    misfit function, as implemented in `emg3d`, is given by Equation 1 of
+    misfit function, as implemented in `emg3d`, is given by Equation 1 in
     [PlMu08]_,
 
     .. math::
@@ -54,7 +54,7 @@ def misfit(simulation):
                     W_{s,r,f}^h \Delta^h
                 \right\rVert^2
                 \right\}
-            + R(\textbf{p}) \, ,
+            + R(\textbf{p}) \ ,
 
     where :math:`\Delta^{\{e;h\}}` are the residuals between the observed and
     synthetic data,
@@ -63,7 +63,7 @@ def misfit(simulation):
         :label: misfit_e
 
             \Delta^e = \textbf{e}_{s,r,f}[\sigma(\textbf{p})]
-                       -\textbf{e}_{s,r,f}^\text{obs} \, ,
+                       -\textbf{e}_{s,r,f}^\text{obs} \ ,
 
     and
 
@@ -71,7 +71,7 @@ def misfit(simulation):
         :label: misfit_h
 
             \Delta^h = \textbf{h}_{s,r,f}[\sigma(\textbf{p})]
-                       -\textbf{h}_{s,r,f}^\text{obs} \, .
+                       -\textbf{h}_{s,r,f}^\text{obs} \ .
 
     Here, :math:`f, s, r` stand for frequency, source, and receiver,
     respectively; :math:`W^{\{e;h\}}` are the weighting functions for the
@@ -105,6 +105,12 @@ def misfit(simulation):
 
     """
 
+    # Ensure all fields have been computed.
+    test_efield = sum([1 if simulation._dict_efield[src][freq] is None else 0
+                       for src, freq in simulation._srcfreq])
+    if test_efield:
+        simulation.compute()
+
     # Compute the residual
     residual = simulation.data.synthetic - simulation.data.observed
     simulation.data['residual'] = residual
@@ -123,125 +129,106 @@ def gradient(simulation):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete gradient for a single source at a single frequency is given by
-    Equation (10) of [PlMu08]_:
+    Equation (10) in [PlMu08]_,
 
     .. math::
 
+        \nabla_p J(\textbf{p}) =
         -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_x
                \frac{\partial S}{\partial \textbf{p}} \textbf{E}_x
         -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_y
                \frac{\partial S}{\partial \textbf{p}} \textbf{E}_y
         -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_z
-               \frac{\partial S}{\partial \textbf{p}} \textbf{E}_z  ,
+               \frac{\partial S}{\partial \textbf{p}} \textbf{E}_z \ ,
 
     where the grid notation (:math:`\{k, l, m\}` and its :math:`\{+1/2\}`
-    equivalents) have been ommitted for brevity, except in the :math:`\sum`
-    symbols.
+    equivalents) have been omitted for brevity (except for the sum symbols).
+
+
+    .. note::
+
+        The gradient has currently additional limitations to the one in
+        the `Simulation` class:
+
+        - Only x-directed, electric receivers (:math:`E_x`) are implemented.
 
 
     Parameters
     ----------
-    ffields, bfields : dict
-        Dictionary (over sources and frequencies) containing the forward and
-        backward electric fields.
-
-    grids : dict
-        Dictionary containing the grids corresponding to the provided fields.
-
-    mesh : TensorMesh
-        Model grid, on which the gradient is computed; a
-        ``emg3d.utils.TensorMesh`` instance.
-
-    wdepth : dict or None
-        Parameter-dict for depth weighting.
+    simulation : :class:`emg3d.simulations.Simulation`
+        The simulation.
 
 
     Returns
     -------
     grad : ndarray
-        Current gradient; has shape mesh.vnC (same as model properties).
+        Adjoint-state gradient (same shape as simulation.model).
 
     """
 
-    # # So far only Ex is implemented and checked.
-    # if sum([(r.azm != 0.0)+(r.dip != 0.0) for r in
-    #        simulation.survey.receivers.values()]) > 0:
-    #    raise NotImplementedError(
-    #            "Gradient only implement for Ex receivers "
-    #            "at the moment.")
-    # # TODO # # DATA WEIGHTING
-    # data_misfit = simulation.data_misfit
-    # # Get backwards electric fields (parallel).
-    # ????._bcompute()
+    # Check limitation: So far only Ex is implemented and checked.
+    if sum([(r.azm != 0.0)+(r.dip != 0.0) for r in
+           simulation.survey.receivers.values()]) > 0:
+        raise NotImplementedError(
+                "Gradient only implement for Ex receivers "
+                "at the moment.")
 
-    # Get depth weighting (preconditioner) instance if wdepth is not None.
-    # D = None  # TODO
-    # wdepth if wdepth is None else weights.DepthWeighting(mesh, **wdepth)
+    # Ensure misfit has been computed (and therefore the electric fields).
+    _ = simulation.misfit
+
+    # Compute back-propagating electric fields.
+    simulation._bcompute()
 
     # Pre-allocate the gradient on the mesh.
     grad_model = np.zeros(simulation.grid.vnC, order='F')
 
-    # Initiate the preconditioner-dict.
-    # precond_dict = {}
+    # Loop over source-frequency pairs.
+    for src, freq in simulation._srcfreq:
 
-    # Loop over sources.
-    for src in simulation.survey.sources.keys():
+        # Multiply forward field with backward field; take real part.
+        efield = -np.real(
+                simulation._dict_bfield[src][freq] *
+                simulation._dict_efield[src][freq] *
+                simulation._dict_efield[src][freq].smu0)
 
-        # Loop over frequencies.
-        for freq in simulation.survey.frequencies:
+        # Pre-allocate the gradient for the computational grid.
+        vnC = simulation._dict_grid[src][freq].vnC
+        grad_x = np.zeros(vnC, order='F')
+        grad_y = np.zeros(vnC, order='F')
+        grad_z = np.zeros(vnC, order='F')
 
-            # Get depth weights.
-            # if D is not None:
-            #     if freq in precond_dict.keys():
-            #         precond = precond_dict[freq]
-            #     else:
-            #         precond = D.weights(freq).reshape(mesh.vnC, order='F')
-            #         precond_dict[freq] = precond
+        # => TEST what is faster.
+        #
+        # Here, we do
+        #   1. edges2cellaverages (Ex[comp] -> CC[comp])
+        #   2. grid2grid          (CC[comp] -> CC[model])
+        #
+        # How about the other way around?
+        #   1. grid2grid          (Ex[comp] -> Ex[model])
+        #   1. edges2cellaverages (Ex[model] -> CC[model])
 
-            # Multiply forward field with backward field; take real part.
-            efield = -np.real(
-                    simulation._dict_bfield[src][freq] *
-                    simulation._dict_efield[src][freq] *
-                    simulation._dict_efield[src][freq].smu0)
+        # Map the field to cell centers times volume.
+        vol = simulation._dict_grid[src][freq].vol.reshape(vnC, order='F')
+        maps.edges2cellaverages(ex=efield.fx, ey=efield.fy, ez=efield.fz,
+                                vol=vol,
+                                out_x=grad_x, out_y=grad_y, out_z=grad_z)
+        grad = grad_x + grad_y + grad_z
 
-            # Pre-allocate the gradient for the computational grid.
-            grad_x = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
-            grad_y = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
-            grad_z = np.zeros(simulation._dict_grid[src][freq].vnC, order='F')
+        # Bring the gradient back from the computation grid to the model grid.
+        tgrad = maps.grid2grid(
+                    simulation._dict_grid[src][freq],
+                    -grad, simulation.grid, method='cubic')
 
-            # TODO v TEST v TODO
-            #
-            # Here, we do
-            #   1. edges2cellaverages (Ex[comp] -> CC[comp])
-            #   2. grid2grid      (CC[comp] -> CC[model])
-            #
-            # Not better the other way around?
-            #   1. grid2grid      (Ex[comp] -> Ex[model])
-            #   1. edges2cellaverages (Ex[model] -> CC[model])
-            #
-            # TODO ^ TEST ^ TODO
+        # => Frequency-dependent depth-weighting should go here.
 
-            # Map the field to cell centers times volume.
-            vnC = simulation._dict_grid[src][freq].vnC
-            vol = simulation._dict_grid[src][freq].vol.reshape(vnC, order='F')
-            maps.edges2cellaverages(efield.fx, efield.fy, efield.fz,
-                                    vol, grad_x, grad_y, grad_z)
-            grad = grad_x + grad_y + grad_z
+        # Add the gradient of this source/frequency to the total gradient.
+        grad_model += tgrad
 
-            # Bring the gradient back from the computation grid to the model
-            # grid.
-            tgrad = maps.grid2grid(
-                        simulation._dict_grid[src][freq],
-                        -grad, simulation.grid, method='cubic')
+    # => Frequency-independent depth-weighting should go here.
 
-            # TODO generalize (chain rule of mapping)
-            simulation.model.map.derivative(tgrad, simulation.model.property_x)
-
-            # Add this src-freq gradient to the total gradient.
-            # if D is not None:
-            #     grad_model += precond*tgrad
-            # else:
-            grad_model += tgrad
+    # Apply derivative of property-map
+    # (in case the property is something else than conductivity).
+    simulation.model.map.derivative(grad_model, simulation.model.property_x)
 
     return grad_model
 
@@ -258,7 +245,7 @@ def data_weighting(simulation):
         \frac{\lVert\textbf{x}_s-\textbf{x}_r\rVert^{\gamma_d}}
         {\omega^{\beta_f}
          \lVert E^\text{ref}(\textbf{x}_s, \textbf{x}_r, \omega)
-         \rVert^{\beta_d}}\, .
+         \rVert^{\beta_d}}\ .
 
 
     Parameters
@@ -306,123 +293,15 @@ def data_weighting(simulation):
     data_weight /= (omega**beta_f)[None, None, :]
 
     # (B.3) Third term: Amplitude weighting.
-    ref_data = simulation.data.get(refname, None)
-    if ref_data is None:
-        print(f"Reference data '{refname}' not found, using 'observed'.")
-        ref_data = simulation.data.observed
-    data_weight /= np.sqrt(np.real(ref_data.conj()*ref_data))**beta_d
+    if beta_d != 0.0:  # Because of the warn-print check if required.
+        ref_data = simulation.data.get(refname, None)
+        if ref_data is None:
+            print(f"Reference data '{refname}' not found, using 'observed'.")
+            ref_data = simulation.data.observed
+        data_weight /= np.sqrt(np.real(ref_data.conj()*ref_data))**beta_d
 
     # (C) APPLY.
     wresidual = simulation.data.residual * data_weight
     wresidual.data[mute] = 0.0
 
     return wresidual
-
-
-##########
-
-def bfields(self, source, frequency, **kwargs):
-    """¿¿¿ Merge with efields or move to gradient. ???"""
-
-    freq = float(frequency)
-
-    # Get solver options and update with kwargs.
-    solver_opts = {**self.solver_opts, **kwargs}
-    solver_opts['return_info'] = True  # Always return solver info.
-
-    # Compute back-propagating electric field.
-    bfield, info = solver.solve(
-            self.get_grid(source, freq),
-            self.get_model(source, freq),
-            self._rfields(source, freq),
-            **solver_opts)
-
-    # Store electric field and info.
-    if not hasattr(self, '_dict_bfield'):
-        self._dict_bfield = self._dict_initiate()
-        self._back_info = self._dict_initiate()
-    self._dict_bfield[source][freq] = bfield
-    self._back_info[source][freq] = info
-
-    # Return electric field.
-    return (self._dict_bfield[source][freq],
-            self._back_info[source][freq])
-
-def _call_bfields(self, inp):
-    return self.bfields(*inp)
-
-def _bcompute(self, **kwargs):
-    """¿¿¿ Merge with compute or move to gradient. ???"""
-    # TODO TODO
-
-    # Get all source-frequency pairs.
-    srcfreq = list(itertools.product(self.survey.sources.keys(),
-                                        self.survey.frequencies))
-
-    # Initiate futures-dict to store output.
-    disable = self.max_workers >= len(srcfreq)
-    out = process_map(
-            self._call_bfields, srcfreq,
-            max_workers=self.max_workers,
-            desc='Compute bfields',
-            bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
-            disable=disable)
-
-    # Store electric field and info.
-    if not hasattr(self, '_dict_bfield'):
-        self._dict_bfield = self._dict_initiate()
-        self._back_info = self._dict_initiate()
-
-    # Extract and store.
-    i = 0
-    warned = False
-    for src in self.survey.sources.keys():
-        for freq in self.survey.frequencies:
-            # Store efield.
-            self._dict_bfield[src][freq] = out[i][0]
-
-            # Store solver info.
-            info = out[i][1]
-            self._back_info[src][freq] = info
-            if info['exit'] != 0:
-                if not warned:
-                    print("Solver warnings:")
-                    warned = True
-                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
-
-            i += 1
-
-def _rfields(self, source, frequency):
-    """¿¿¿ Merge with sfields or move to optimize/gradient. ???"""
-
-    freq = float(frequency)
-    grid = self.get_grid(source, frequency)
-
-    # Initiate empty field
-    ResidualField = fields.SourceField(grid, freq=frequency)
-
-    # Loop over receivers, input as source.
-    for rname, rec in self.survey.receivers.items():
-
-        # Strength: in get_source_field the strength is multiplied with
-        # iwmu; so we undo this here.
-        # TODO Ey, Ez
-        strength = self.data['wresidual'].loc[
-                source, rname, freq].data.conj()
-        strength /= ResidualField.smu0
-        # ^ WEIGHTED RESIDUAL ^!
-
-        ThisSField = fields.get_source_field(
-            grid=grid,
-            src=rec.coordinates,
-            freq=frequency,
-            strength=strength,
-        )
-
-        # If strength is zero (very unlikely), get_source_field would
-        # return a normalized field for a unit source. However, in this
-        # case we do not want that.
-        if strength != 0:
-            ResidualField += ThisSField
-
-    return ResidualField

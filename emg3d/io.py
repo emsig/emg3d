@@ -434,7 +434,8 @@ def _dict_deserialize(inp, first_call=True):
                     inp[key] = inst.from_dict(value)
                     continue
 
-                except (AttributeError, KeyError):  # Gracefully fail.
+                except (NotImplementedError, AttributeError, KeyError):
+                    # Gracefully fail.
                     print(f"* WARNING :: Could not de-serialize <{key}>")
 
             # In no __class__-key or de-serialization fails, use recursion.

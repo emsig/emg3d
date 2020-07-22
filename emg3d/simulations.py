@@ -714,3 +714,91 @@ class Simulation:
                                       self.survey.frequencies))
 
         return self.__srcfreq
+
+    # BACKWARDS PROPAGATING FIELD
+    # This stuff would probably be better at home in `optimize`.
+
+    def _get_bfields(self, inp):
+        """Return back-propagated electric field for given inp (src, freq)."""
+
+        # Input parameters.
+        solver_input = {
+            **self.solver_opts,
+            'grid': self.get_grid(*inp),
+            'model': self.get_model(*inp),
+            'sfield': self._get_rfield(*inp),  # Residual field.
+            'return_info': True,
+        }
+
+        # Compute and return back-propagated electric field.
+        return solver.solve(**solver_input)
+
+    def _bcompute(self):
+        """Compute bfields asynchronously for all sources and frequencies."""
+
+        # Initiate futures-dict to store output.
+        out = process_map(
+                self._get_bfields,
+                self._srcfreq,
+                max_workers=self.max_workers,
+                desc='Compute bfields',
+                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+        )
+
+        # Store back-propagated electric field and info.
+        if not hasattr(self, '_dict_bfield'):
+            self._dict_bfield = self._dict_initiate
+            self._dict_bfield_info = self._dict_initiate
+
+        # Loop over src-freq combinations to extract and store.
+        warned = False  # Flag for warnings.
+        for i, (src, freq) in enumerate(self._srcfreq):
+
+            # Store bfield.
+            self._dict_bfield[src][freq] = out[i][0]
+
+            # Store solver info.
+            info = out[i][1]
+            self._dict_bfield_info[src][freq] = info
+            if info['exit'] != 0:
+                if not warned:
+                    print("Solver warnings:")
+                    warned = True
+                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+
+    def _get_rfield(self, source, frequency):
+        """Return residual source field for given source and frequency.
+
+        => Only for Ex-field at the moment.
+
+        """
+
+        freq = float(frequency)
+        grid = self.get_grid(source, frequency)
+
+        # Initiate empty field
+        ResidualField = fields.SourceField(grid, freq=frequency)
+
+        # Loop over receivers, input as source.
+        for name, rec in self.survey.receivers.items():
+
+            # Strength: in get_source_field the strength is multiplied with
+            # iwmu; so we undo this here.
+            strength = self.data.wresidual.loc[source, name, freq].data.conj()
+            strength /= ResidualField.smu0
+            # ^ WEIGHTED RESIDUAL ^!
+
+            ThisSField = fields.get_source_field(
+                grid=grid,
+                src=rec.coordinates,
+                freq=frequency,
+                strength=strength,
+            )
+
+            # If strength is zero (very unlikely), get_source_field would
+            # return a normalized field for a unit source. However, in this
+            # case we do not want that.
+            if strength != 0:
+                ResidualField += ThisSField
+
+        return ResidualField
