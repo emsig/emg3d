@@ -28,17 +28,19 @@ technique for the gradient.
 
 
 import numpy as np
+import scipy.linalg as sl
 
 from emg3d import maps
 
-__all__ = ['as_gradient', 'data_misfit', 'DataWeighting']
+__all__ = ['gradient', 'misfit', 'data_weighting']
 
 
-def data_misfit(simulation):
-    r"""Return the misfit between observed and synthetic data.
+def misfit(simulation):
+    r"""Return the misfit function.
 
-    The weighted least-squares functional, as implemented in `emg3d`, is
-    given by Equation 1 of [PlMu08]_,
+    The weighted least-squares functional, often called objective function or
+    misfit function, as implemented in `emg3d`, is given by Equation 1 of
+    [PlMu08]_,
 
     .. math::
         :label: misfit
@@ -46,20 +48,21 @@ def data_misfit(simulation):
             J(\textbf{p}) = \frac{1}{2} \sum_f\sum_s\sum_r
                 \left\{
                 \left\lVert
-                    W_{s,r,f}^e \Delta_e
+                    W_{s,r,f}^e \Delta^e
                 \right\rVert^2
                 + \left\lVert
-                    W_{s,r,f}^h \Delta_h
+                    W_{s,r,f}^h \Delta^h
                 \right\rVert^2
                 \right\}
             + R(\textbf{p}) \, ,
 
-    where
+    where :math:`\Delta^{\{e;h\}}` are the residuals between the observed and
+    synthetic data,
 
     .. math::
         :label: misfit_e
 
-            \Delta_e = \textbf{e}_{s,r,f}[\sigma(\textbf{p})]
+            \Delta^e = \textbf{e}_{s,r,f}[\sigma(\textbf{p})]
                        -\textbf{e}_{s,r,f}^\text{obs} \, ,
 
     and
@@ -67,16 +70,17 @@ def data_misfit(simulation):
     .. math::
         :label: misfit_h
 
-            \Delta_h = \textbf{h}_{s,r,f}[\sigma(\textbf{p})]
+            \Delta^h = \textbf{h}_{s,r,f}[\sigma(\textbf{p})]
                        -\textbf{h}_{s,r,f}^\text{obs} \, .
 
     Here, :math:`f, s, r` stand for frequency, source, and receiver,
     respectively; :math:`W^{\{e;h\}}` are the weighting functions for the
-    electric and magnetic data residual, :math:`\{e;h\}^\text{obs}` are the
-    observed electric and magnetic data, and :math:`\{e;h\}` are the synthetic
+    electric and magnetic data residual,
+    :math:`\{\textbf{e};\textbf{h}\}^\text{obs}` are the observed electric and
+    magnetic data, and :math:`\{\textbf{e};\textbf{h}\}` are the synthetic
     electric and magnetic data, computed for a given conductivity
     :math:`\sigma`, which depends on the model parameters :math:`\textbf{p}`.
-    Finally, :math:`R(\textbf{p}` is a regularization term.
+    Finally, :math:`R(\textbf{p})` is a regularization term.
 
 
     .. note::
@@ -96,48 +100,26 @@ def data_misfit(simulation):
 
     Returns
     -------
-    data_misfit : float
+    misfit : float
         Value of the misfit function.
 
     """
 
     # Compute the residual
     residual = simulation.data.synthetic - simulation.data.observed
-
-    # Store a copy for the weighted residual.
-    wresidual = residual.copy()
-
-    # TODO: DataWeighting:
-    #       - Make a function
-    #       - Only takes the residual DataArray
-    #       - Returns the wresidual DataArray
-    #       - Internally loops over sources and receivers
-    # TODO: - Data weighting;
-    #       - Min_offset;
-    #       - Noise floor.
-    DW = DataWeighting(**simulation.data_weight_opts)
-
-    # Compute the weights.
-    for src, freq in simulation._srcfreq:
-        # TODO: Actual weights.
-        DW.weights(
-                wresidual.loc[src, :, freq].data,
-                simulation.survey.rec_coords,
-                simulation.survey.sources[src].coordinates,
-                freq)
-
-    # Store them in Simulation.
     simulation.data['residual'] = residual
+
+    # Get weighted residual.
+    wresidual = data_weighting(simulation)
     simulation.data['wresidual'] = wresidual
 
     # Compute misfit
-    data_misfit = residual.data.conj() * wresidual.data
-    data_misfit = data_misfit.real.sum()/2
+    misfit = (residual.data.conj() * wresidual.data).real.sum()/2
 
-    return data_misfit
+    return misfit
 
 
-def as_gradient(simulation):
+def gradient(simulation):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete gradient for a single source at a single frequency is given by
@@ -264,8 +246,10 @@ def as_gradient(simulation):
     return grad_model
 
 
-class DataWeighting:
-    r"""Data Weighting; Plessix and Mulder, equation 18.
+def data_weighting(simulation):
+    r"""Return weighted residual.
+
+    Returns the weighted residual as given in Equation 18 of [PlMu08]_,
 
     .. math::
         :label: data-weighting
@@ -274,79 +258,171 @@ class DataWeighting:
         \frac{\lVert\textbf{x}_s-\textbf{x}_r\rVert^{\gamma_d}}
         {\omega^{\beta_f}
          \lVert E^\text{ref}(\textbf{x}_s, \textbf{x}_r, \omega)
-         \rVert^{\beta_d}}
-
-
-
-
-    .. todo::
-
-        - Currently, low amplitudes are switched-off, because it is divided by
-          data. Test if small offsets should also be switched off.
-        - Include other data weighting functions.
+         \rVert^{\beta_d}}\, .
 
 
     Parameters
     ----------
-    gamma_d : float
-        Offset weighting exponent.
+    simulation : :class:`emg3d.simulations.Simulation`
+        The simulation. The parameters for data weighting are set in the
+        call to `Simulation` through the parameter `data_weight_opts`.
 
-    beta_d : float
-        Data weighting exponent.
 
-    beta_f : float
-        Frequency weighting exponent.
+    Returns
+    -------
+    wresidual : DataArray
+        The weighted residual (:math:`W^e \Delta^e`).
 
     """
+    # Get relevant parameters.
+    gamma_d = simulation.data_weight_opts.get('gamma_d', 0.5)
+    beta_d = simulation.data_weight_opts.get('beta_d', 1.0)
+    beta_f = simulation.data_weight_opts.get('beta_f', 0.25)
+    min_off = simulation.data_weight_opts.get('min_off', 1000.0)
+    noise_floor = simulation.data_weight_opts.get('noise_floor', 1e-15)
+    refname = simulation.data_weight_opts.get('reference', 'reference')
 
-    def __init__(self, gamma_d=0.5, beta_d=1.0, beta_f=0.25):
-        """Initialize new DataWeighting instance."""
+    # (A) MUTING.
 
-        # Store values
-        self.gamma_d = gamma_d
-        self.beta_d = beta_d
-        self.beta_f = beta_f
+    # Get all small amplitudes.
+    mute = np.abs(simulation.data.observed.data) < noise_floor
 
-    def weights(self, data, rec, src, freq, noise_floor=1e-25):
-        """[PlMu08]_, equation 18.
+    # Add all near offsets.
+    offsets = sl.norm(
+                np.array(simulation.survey.rec_coords[:3])[:, None, :] -
+                np.array(simulation.survey.src_coords[:3])[:, :, None],
+                axis=0,
+                check_finite=False,
+            )
+    mute += (offsets < min_off)[:, :, None]
+
+    # (B) WEIGHTS.
+
+    # (B.1) First term: Offset weighting (f-indep.).
+    data_weight = (offsets**gamma_d)[:, :, None]
+
+    # (B.2) Second term: Frequency weighting (src-freq-indep.).
+    omega = 2*np.pi*simulation.survey.frequencies
+    data_weight /= (omega**beta_f)[None, None, :]
+
+    # (B.3) Third term: Amplitude weighting.
+    ref_data = simulation.data.get(refname, None)
+    if ref_data is None:
+        print(f"Reference data '{refname}' not found, using 'observed'.")
+        ref_data = simulation.data.observed
+    data_weight /= np.sqrt(np.real(ref_data.conj()*ref_data))**beta_d
+
+    # (C) APPLY.
+    wresidual = simulation.data.residual * data_weight
+    wresidual.data[mute] = 0.0
+
+    return wresidual
 
 
-        Parameters
-        ----------
-        data : ndarray
-            CSEM data.
+##########
 
-        rec, src : tupples
-            Receiver and source coordinates.
+def bfields(self, source, frequency, **kwargs):
+    """¿¿¿ Merge with efields or move to gradient. ???"""
 
-        freq : float
-            Frequency (Hz)
+    freq = float(frequency)
 
-        noise_floor : float
-            Data with amplitudes below the noise floor get zero data weighting
-            (data weighting divides by the amplitude, which is a problem if the
-            amplitude is zero).
+    # Get solver options and update with kwargs.
+    solver_opts = {**self.solver_opts, **kwargs}
+    solver_opts['return_info'] = True  # Always return solver info.
 
+    # Compute back-propagating electric field.
+    bfield, info = solver.solve(
+            self.get_grid(source, freq),
+            self.get_model(source, freq),
+            self._rfields(source, freq),
+            **solver_opts)
 
-        Returns
-        -------
-        data_weight : ndarray
-            Data weights (size of number of receivers).
+    # Store electric field and info.
+    if not hasattr(self, '_dict_bfield'):
+        self._dict_bfield = self._dict_initiate()
+        self._back_info = self._dict_initiate()
+    self._dict_bfield[source][freq] = bfield
+    self._back_info[source][freq] = info
 
-        """
+    # Return electric field.
+    return (self._dict_bfield[source][freq],
+            self._back_info[source][freq])
 
-        # Mute
-        mute = np.abs(data) < noise_floor
+def _call_bfields(self, inp):
+    return self.bfields(*inp)
 
-        # Get offsets.
-        locs = np.stack([rec[0]-src[0], rec[1]-src[1], rec[2]-src[2]])
-        offsets = np.linalg.norm(locs, axis=0)
+def _bcompute(self, **kwargs):
+    """¿¿¿ Merge with compute or move to gradient. ???"""
+    # TODO TODO
 
-        # Compute the data weight.
-        data_weight = offsets**self.gamma_d / (2*np.pi*freq)**self.beta_f
-        data_weight /= np.sqrt(np.real(data*data.conj()))**self.beta_d
+    # Get all source-frequency pairs.
+    srcfreq = list(itertools.product(self.survey.sources.keys(),
+                                        self.survey.frequencies))
 
-        # Set small amplitudes to zero.
-        data_weight[mute] = 0
+    # Initiate futures-dict to store output.
+    disable = self.max_workers >= len(srcfreq)
+    out = process_map(
+            self._call_bfields, srcfreq,
+            max_workers=self.max_workers,
+            desc='Compute bfields',
+            bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+            disable=disable)
 
-        data *= data_weight
+    # Store electric field and info.
+    if not hasattr(self, '_dict_bfield'):
+        self._dict_bfield = self._dict_initiate()
+        self._back_info = self._dict_initiate()
+
+    # Extract and store.
+    i = 0
+    warned = False
+    for src in self.survey.sources.keys():
+        for freq in self.survey.frequencies:
+            # Store efield.
+            self._dict_bfield[src][freq] = out[i][0]
+
+            # Store solver info.
+            info = out[i][1]
+            self._back_info[src][freq] = info
+            if info['exit'] != 0:
+                if not warned:
+                    print("Solver warnings:")
+                    warned = True
+                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+
+            i += 1
+
+def _rfields(self, source, frequency):
+    """¿¿¿ Merge with sfields or move to optimize/gradient. ???"""
+
+    freq = float(frequency)
+    grid = self.get_grid(source, frequency)
+
+    # Initiate empty field
+    ResidualField = fields.SourceField(grid, freq=frequency)
+
+    # Loop over receivers, input as source.
+    for rname, rec in self.survey.receivers.items():
+
+        # Strength: in get_source_field the strength is multiplied with
+        # iwmu; so we undo this here.
+        # TODO Ey, Ez
+        strength = self.data['wresidual'].loc[
+                source, rname, freq].data.conj()
+        strength /= ResidualField.smu0
+        # ^ WEIGHTED RESIDUAL ^!
+
+        ThisSField = fields.get_source_field(
+            grid=grid,
+            src=rec.coordinates,
+            freq=frequency,
+            strength=strength,
+        )
+
+        # If strength is zero (very unlikely), get_source_field would
+        # return a normalized field for a unit source. However, in this
+        # case we do not want that.
+        if strength != 0:
+            ResidualField += ThisSField
+
+    return ResidualField

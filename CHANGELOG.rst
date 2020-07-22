@@ -28,11 +28,6 @@ backwards compatible.
       source-fields. If `tqdm` is installed it displays a progress bar for the
       asynchronous computation.
 
-  - `optimize` (**new**)
-
-    - Functionalities related to inversion (data misfit, gradient, data and
-      depth weighting).
-
   - `models`:
 
     - Model instances take new the parameters `property_{x;y;z}` instead of
@@ -79,6 +74,12 @@ backwards compatible.
 
     - `meshes.TensorMesh` **new** inherits from `discretize` if installed.
     - Added `__eq__` to `models.TensorMesh` to compare meshes.
+
+  - `optimize` (**new**)
+
+    - Functionalities related to inversion (data misfit, gradient, data and
+      depth weighting). This module is in an early stage, and the API will
+      likely change in the future.
 
 - Dependencies:
 
