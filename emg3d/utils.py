@@ -27,6 +27,7 @@ import importlib
 import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
+from concurrent.futures import ProcessPoolExecutor
 from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
@@ -691,3 +692,19 @@ class Report(ScoobyReport):
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
+
+
+# MISC
+def _process_map(fn, *iterables, max_workers, **kwargs):
+    """Imitate tqdm.contrib.concurrent.process_map without tqdm.
+
+    emg3d.simulation uses `process_map` from `tqdm` to run jobs asynchronously.
+    However, `tqdm` is a soft dependency. In case it is not installed we simply
+    use `concurrent.futures.ProcessPoolExecutor`, from the standard library,
+    and imitate the behaviour of process_map (basically a
+    `ProcessPoolExecutor.map`, returned as a list, and wrapped in a context
+    manager).
+
+    """
+    with ProcessPoolExecutor(max_workers=max_workers) as ex:
+        return list(ex.map(fn, *iterables))

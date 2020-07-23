@@ -40,11 +40,9 @@ from emg3d import fields, solver, io, surveys, models, meshes, optimize
 try:
     from tqdm.contrib.concurrent import process_map
 except ImportError:
-    from concurrent.futures import ProcessPoolExecutor
-
-    def process_map(fn, *iterables, max_workers, **kwargs):
-        with ProcessPoolExecutor(max_workers=max_workers) as ex:
-            return list(ex.map(fn, *iterables))
+    # If you have tqdm installed, but don't want to use it, simply do
+    # `emg3d.simulation.process_map = emg3d.utils._process_map`.
+    from emg3d.utils import _process_map as process_map
 
 __all__ = ['Simulation']
 
