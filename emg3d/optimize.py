@@ -221,7 +221,7 @@ def gradient(simulation):
 
         # => Frequency-dependent depth-weighting should go here.
 
-        # Add the gradient of this source/frequency to the total gradient.
+        # Add this src-freq gradient to the total gradient.
         grad_model += tgrad
 
     # => Frequency-independent depth-weighting should go here.

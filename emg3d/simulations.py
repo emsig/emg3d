@@ -147,6 +147,7 @@ class Simulation:
         self.model = model
         self.max_workers = max_workers
 
+        # Get gridding options, set to defaults if not provided.
         self.gridding = gridding
         self._gridding_descr = {
                 'same': 'Same grid as for model',
@@ -155,6 +156,7 @@ class Simulation:
                 'source': 'Source-dependent grids',
                 'both': 'Frequency- and source-dependent grids',
                 }
+        self.gridding_opts = kwargs.pop('gridding_opts', {})
 
         # Get kwargs.
         self.solver_opts = {

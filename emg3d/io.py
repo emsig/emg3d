@@ -358,8 +358,9 @@ def _dict_serialize(inp, out=None, collect_classes=False):
                 try:
                     to_dict = {'hx': value.hx, 'hy': value.hy, 'hz': value.hz,
                                'x0': value.x0, '__class__': name}
-                except AttributeError:  # Gracefully fail.
-                    print(f"* WARNING :: Could not serialize <{key}>")
+                except AttributeError as e:  # Gracefully fail.
+                    print(f"* WARNING :: Could not serialize <{key}>.\n"
+                          f"             {e}")
                     continue
 
             # If we are in the root-directory put them in their own category.
@@ -434,9 +435,10 @@ def _dict_deserialize(inp, first_call=True):
                     inp[key] = inst.from_dict(value)
                     continue
 
-                except (NotImplementedError, AttributeError, KeyError):
+                except (NotImplementedError, AttributeError, KeyError) as e:
                     # Gracefully fail.
-                    print(f"* WARNING :: Could not de-serialize <{key}>")
+                    print(f"* WARNING :: Could not de-serialize <{key}>.\n"
+                          f"             {e}")
 
             # In no __class__-key or de-serialization fails, use recursion.
             _dict_deserialize(value, False)
