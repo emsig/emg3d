@@ -564,7 +564,7 @@ class Simulation:
         """Wrapper of `get_efield` for `concurrent.futures`."""
         return self.get_efield(*inp, call_from_compute=True)
 
-    def compute(self, observed=False, use_as_reference=False):
+    def compute(self, observed=False, reference=False):
         """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
@@ -574,7 +574,7 @@ class Simulation:
             `Survey` as `synthetic`. If `observed=True`, however, it is stored
             in `observed`.
 
-        use_as_reference : bool
+        reference : bool
             If True, it stores the current result also as reference model,
             which is used by the data weighting functions. This is usually
             done for the initial model in an inversion.
@@ -636,7 +636,7 @@ class Simulation:
             # Store responses at receivers.
             self.data[store_name].loc[src, :, freq] = out[i][2]
 
-        if use_as_reference:
+        if reference:
             self.data['reference'] = self.data[store_name].copy()
 
     # DATA
