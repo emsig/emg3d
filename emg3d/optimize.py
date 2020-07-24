@@ -150,7 +150,8 @@ def gradient(simulation):
         The gradient has currently additional limitations to the one in
         the `Simulation` class:
 
-        - Only x-directed, electric receivers (:math:`E_x`) are implemented.
+        - Only x-directed, electric receivers (:math:`E_x`).
+        - Only isotropic models.
 
 
     Parameters
@@ -166,12 +167,16 @@ def gradient(simulation):
 
     """
 
-    # Check limitation: So far only Ex is implemented and checked.
+    # Check limitation 1: So far only x-directed electric receivers.
     if sum([(r.azm != 0.0)+(r.dip != 0.0) for r in
            simulation.survey.receivers.values()]) > 0:
         raise NotImplementedError(
-                "Gradient only implement for Ex receivers "
-                "at the moment.")
+                "Gradient only implemented for x-directed electric receivers.")
+
+    # Check limitation 2: So far only isotropic models.
+    if simulation.model.case != 0:
+        raise NotImplementedError(
+                "Gradient only implemented for isotropic models.")
 
     # Ensure misfit has been computed (and therefore the electric fields).
     _ = simulation.misfit

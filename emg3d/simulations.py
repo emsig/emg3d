@@ -206,6 +206,12 @@ class Simulation:
         # Initiate synthetic data with NaN's.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
 
+        # `tqdm`-options; undocumented for the moment.
+        # This is likely to change with regards to verbosity and logging.
+        self._tqdm_opts = {
+                'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+                }
+
     def __repr__(self):
         return (f"*{self.__class__.__name__}* «{self.name}» "
                 f"of {self.survey.__class__.__name__} «{self.survey.name}»\n\n"
@@ -320,11 +326,26 @@ class Simulation:
 
             # Add existing derived/computed properties.
             data = ['_dict_grid', '_dict_model', '_dict_sfield',
-                    '_dict_hfield', '_dict_efield', '_dict_efield_info',
-                    '_gradient', '_misfit']
+                    '_dict_hfield', '_dict_efield', '_dict_efield_info']
             for name in data:
                 if name in inp.keys():
-                    setattr(out, name, inp.get(name))
+                    values = inp.get(name)
+
+                    # Storing to_file makes strings out of the freq-keys.
+                    # Undo this.
+                    for src, val in values.items():
+                        for freq, v in val.items():
+                            values[src][float(freq)] = val.pop(freq)
+
+                    # De-serialize Model, Field, and TensorMesh instances.
+                    io._dict_deserialize(values)
+
+                    setattr(out, name, values)
+
+            data = ['gradient', 'misfit']
+            for name in data:
+                if name in inp.keys():
+                    setattr(out, '_'+name, inp.get(name))
 
             # Add stored data (synthetic, residual, reference, etc).
             for name in inp['data'].keys():
@@ -585,8 +606,7 @@ class Simulation:
                 self._get_efield,
                 srcfreq,
                 max_workers=self.max_workers,
-                desc='Compute efields',
-                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+                **{'desc': 'Compute efields', **self._tqdm_opts},
         )
 
         # Clean hfields, so they will be recomputed.
@@ -741,8 +761,7 @@ class Simulation:
                 self._get_bfields,
                 self._srcfreq,
                 max_workers=self.max_workers,
-                desc='Compute bfields',
-                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+                **{'desc': 'Backprop. residuals', **self._tqdm_opts},
         )
 
         # Store back-propagated electric field and info.
@@ -786,19 +805,16 @@ class Simulation:
             # iwmu; so we undo this here.
             strength = self.data.wresidual.loc[source, name, freq].data.conj()
             strength /= ResidualField.smu0
-            # ^ WEIGHTED RESIDUAL ^!
-
-            ThisSField = fields.get_source_field(
-                grid=grid,
-                src=rec.coordinates,
-                freq=frequency,
-                strength=strength,
-            )
 
             # If strength is zero (very unlikely), get_source_field would
             # return a normalized field for a unit source. However, in this
             # case we do not want that.
             if strength != 0:
-                ResidualField += ThisSField
+                ResidualField += fields.get_source_field(
+                    grid=grid,
+                    src=rec.coordinates,
+                    freq=frequency,
+                    strength=strength,
+                )
 
         return ResidualField
