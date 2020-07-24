@@ -656,7 +656,11 @@ class Simulation:
             self.gridding = 'single'
 
         elif isinstance(gridding, dict):
-            self._dict_grid = gridding
+            for src, freq in self._srcfreq:
+                self._dict_grid[src][freq] = gridding.get(
+                        src, {}).get(freq, None)
+            self._grid_comp = self.grid
+            self._model_comp = self.model
             self.gridding = 'both'
 
     # DATA

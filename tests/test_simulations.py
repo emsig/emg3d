@@ -101,7 +101,7 @@ class TestSimulation():
         with pytest.raises(TypeError, match="Unknown `gridding`-option"):
             simulations.Simulation(
                     'Test2', self.survey, self.grid, self.model,
-                    gridding='single')
+                    gridding='frequency')
 
         tsurvey = self.survey.copy()
         tsurvey.fixed = True
@@ -120,6 +120,23 @@ class TestSimulation():
         with pytest.raises(NotImplementedError, match="or magnetic receivers"):
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
+
+        # Provide grids
+        grids = self.simulation._dict_grid.copy()
+
+        # Ensure it works normally
+        sim = simulations.Simulation(
+                'Test2', self.survey, self.grid, self.model, gridding=grids)
+        sim.get_model('Tx1', 1.0)
+
+        # Delete one, ensure it fails.
+        grids['Tx1'][1.0] = None
+        sim = simulations.Simulation(
+                'Test2', self.survey, self.grid, self.model, gridding=grids)
+        with pytest.raises(TypeError, match="Provided grid-dict misses "):
+            sim.get_grid('Tx1', 1.0)
+        with pytest.raises(TypeError, match="Provided grid-dict misses "):
+            sim.get_model('Tx1', 1.0)
 
     def test_reprs(self):
         test = self.simulation.__repr__()
