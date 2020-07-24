@@ -21,12 +21,13 @@ backwards compatible.
 
   - `simulations` (**new**; soft-dependencies `discretize` & `tqdm`):
 
-    - Class `simulations.Simulation`, which combines a survey with a model.
-      A simulation computes the e-field (and h-field) asynchronously using
+    - Class `simulations.Simulation`, which combines a survey with a model. A
+      simulation computes the e-field (and h-field) asynchronously using
       `concurrent.futures`. To do so it creates the required meshes, source and
       frequency-dependent, interpolates the model accordingly, and computes the
       source-fields. If `tqdm` is installed it displays a progress bar for the
-      asynchronous computation.
+      asynchronous computation. Note that the simulation class has still some
+      limitations, consult the class documentation.
 
   - `models`:
 
@@ -83,8 +84,9 @@ backwards compatible.
 
 - Dependencies:
 
-  - `empymod` is new a soft dependency, only required for `utils.Fourier`
-    (time-domain modelling).
+  - `empymod` is now a soft dependency (no longer a hard dependency), only
+    required for `utils.Fourier` (time-domain modelling).
+  - Existing soft dependency `discretize` is now baked straight into `meshes`.
   - New soft dependency `xarray` for the `Survey` class.
   - New soft dependency `tqdm` for nice progress bars in asynchronous
     computation.

@@ -84,23 +84,16 @@ class Simulation:
         The maximum number of processes that can be used to execute the
         given calls. Default is 4.
 
-    gridding : str
+    gridding : str, TensorMesh, or dict
         Method how the computational grids are computed. The default is
-        currently 'same', the only implemented method so far. This will change
-        in the future, probably to 'single'. The different methods are:
+        currently 'same', the only supported string-method so far (automatic
+        gridding will be implemented in the future).
 
         - 'same': Same grid as for the input model.
-        - 'single': A single grid for all sources and frequencies.
-        - 'frequency': Frequency-dependent grids.
-        - 'source': Source-dependent grids.
-        - 'both': Frequency- and source-dependent grids.
-
-        Except for 'same', the grids are created using ...
-
-        Not planned (yet) is the possibility to provide a single TensorMesh
-        instance or a dict of TensorMesh instances for user-provided meshes.
-        You can still do this by setting `simulation._dict_grid` after
-        instantiation.
+        - TensorMesh: The provided TensorMesh is used for all sources and
+          frequencies.
+        - dict: The dict must have the form `dict[source][frequency]`,
+          containing a TensorMesh for each source-frequency pair.
 
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
@@ -148,7 +141,6 @@ class Simulation:
         self.max_workers = max_workers
 
         # Get gridding options, set to defaults if not provided.
-        self.gridding = gridding
         self._gridding_descr = {
                 'same': 'Same grid as for model',
                 'single': 'A single grid for all sources and frequencies',
@@ -156,7 +148,9 @@ class Simulation:
                 'source': 'Source-dependent grids',
                 'both': 'Frequency- and source-dependent grids',
                 }
+        # gridding_opts will be used for the automatic gridding.
         self.gridding_opts = kwargs.pop('gridding_opts', {})
+        self._initiate_model_grid(gridding)
 
         # Get kwargs.
         self.solver_opts = {
@@ -171,12 +165,6 @@ class Simulation:
         # Ensure no kwargs left (currently kwargs is not used).
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
-
-        # Check current limitations.
-        if self.gridding != 'same':
-            raise NotImplementedError(
-                    "Simulation currently only implemented for "
-                    "`gridding='same'`.")
 
         if self.survey.fixed:
             raise NotImplementedError(
@@ -194,8 +182,6 @@ class Simulation:
                     "Simulation not yet implemented for magnetic receivers.")
 
         # Initiate dictionaries and other values with None's.
-        self._dict_grid = self._dict_initiate
-        self._dict_model = self._dict_initiate
         self._dict_sfield = self._dict_initiate
         self._dict_efield = self._dict_initiate
         self._dict_hfield = self._dict_initiate
@@ -439,12 +425,16 @@ class Simulation:
         if self._dict_grid[source][freq] is None:
 
             # Act depending on gridding:
-            if self.gridding == 'same':  # Same grid as for provided model.
+            if self.gridding in ['same', 'single']:
 
                 # Store link to grid.
-                self._dict_grid[source][freq] = self.grid
+                self._dict_grid[source][freq] = self._grid_comp
 
-            # Rest is not yet implemented.
+            else:  # self.gridding == 'both'
+
+                raise TypeError(
+                        "Provided grid-dict misses the following "
+                        "source-frequency pair: {source}, {freq} Hz.")
 
         # Return grid.
         return self._dict_grid[source][freq]
@@ -457,12 +447,17 @@ class Simulation:
         if self._dict_model[source][freq] is None:
 
             # Act depending on gridding:
-            if self.gridding == 'same':  # Same grid as for provided model.
+            if self.gridding in ['same', 'single']:
 
                 # Store link to model.
-                self._dict_model[source][freq] = self.model
+                self._dict_model[source][freq] = self._model_comp
 
-            # Rest is not yet implemented.
+            elif self.gridding == 'both':  # Src- & freq-dependent grids.
+
+                # Get model and store it.
+                model = self._model_comp.interpolate2grid(
+                            self._grid_comp, self.get_grid(source, freq))
+                self._dict_model[source][freq] = model
 
         # Return model.
         return self._dict_model[source][freq]
@@ -638,6 +633,31 @@ class Simulation:
 
         if reference:
             self.data['reference'] = self.data[store_name].copy()
+
+    # GRIDDING
+    def _initiate_model_grid(self, gridding):
+        """Initiate the computational grids and models."""
+
+        # Initiate grid- and model-dicts.
+        self._dict_grid = self._dict_initiate
+        self._dict_model = self._dict_initiate
+
+        if isinstance(gridding, str):
+            if gridding not in ['single', 'same']:
+                raise TypeError(f"Unknown `gridding`-option: '{gridding}'.")
+
+            self._grid_comp = self.grid
+            self._model_comp = self.model
+            self.gridding = gridding
+
+        elif isinstance(gridding, meshes.TensorMesh):
+            self._grid_comp = gridding
+            self._model_comp = self.model.interpolate2grid(self.grid, gridding)
+            self.gridding = 'single'
+
+        elif isinstance(gridding, dict):
+            self._dict_grid = gridding
+            self.gridding = 'both'
 
     # DATA
     @property

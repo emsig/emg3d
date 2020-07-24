@@ -98,7 +98,7 @@ class TestSimulation():
             simulations.Simulation(
                     'Test2', self.survey, self.grid, self.model, unknown=True)
 
-        with pytest.raises(NotImplementedError, match="for `gridding='same'`"):
+        with pytest.raises(TypeError, match="Unknown `gridding`-option"):
             simulations.Simulation(
                     'Test2', self.survey, self.grid, self.model,
                     gridding='single')

@@ -52,5 +52,9 @@ __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
            'models', 'Report', 'save', 'load', 'surveys', 'simulations',
            'optimize']
 
+# Ensure users see Deprecation Warnings, but just once.
+import warnings
+warnings.filterwarnings("once", module='emg3d', category=DeprecationWarning)
+
 # Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__
