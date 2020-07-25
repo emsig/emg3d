@@ -102,8 +102,8 @@ class TestOptimize():
             optimize.gradient(simulation)
 
 
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_derivative():
-
     # Create a simple mesh.
     hx = np.ones(64)*100
     mesh = meshes.TensorMesh([hx, hx, hx], x0=[0, 0, 0])
