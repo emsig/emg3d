@@ -23,12 +23,12 @@ are in the :mod:`emg3d.core` as numba-jitted functions.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import itertools
+from dataclasses import dataclass
+
 import numpy as np
 import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
-from dataclasses import dataclass
 
 from emg3d import core, meshes, models, fields, utils
 

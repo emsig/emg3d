@@ -22,12 +22,12 @@ Utility functions for writing and reading data.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import os
 import json
 import warnings
-import numpy as np
 from datetime import datetime
+
+import numpy as np
 
 from emg3d import fields, models, utils, meshes, surveys, simulations
 

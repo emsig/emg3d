@@ -22,9 +22,9 @@ Everything related to meshes appropriate for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+from copy import deepcopy
 
 import numpy as np
-from copy import deepcopy
 from scipy import optimize
 
 # Import soft dependencies.

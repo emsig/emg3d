@@ -24,10 +24,11 @@ Utility functions for the multigrid solver.
 
 import copy
 import importlib
-import numpy as np
 from timeit import default_timer
 from datetime import datetime, timedelta
 from concurrent.futures import ProcessPoolExecutor
+
+import numpy as np
 from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 

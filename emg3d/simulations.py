@@ -29,12 +29,12 @@ high-level, specialised modelling routines.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import itertools
-import numpy as np
 from copy import deepcopy
 
-from emg3d import fields, solver, io, surveys, models, meshes, optimize
+import numpy as np
+
+from emg3d import fields, solver, surveys, models, meshes, optimize
 
 # Check soft dependencies.
 try:
@@ -297,6 +297,7 @@ class Simulation:
         obj : :class:`Simulation` instance
 
         """
+        from emg3d import io
 
         try:
             # Initiate class.
@@ -384,6 +385,7 @@ class Simulation:
             Silent if 0, verbose if 1.
 
         """
+        from emg3d import io
 
         # Add what to self, will be removed in to_dict.
         self._what_to_file = what
@@ -414,6 +416,7 @@ class Simulation:
             The simulation that was stored in the file.
 
         """
+        from emg3d import io
         return io.load(fname, verb=verb)['simulation']
 
     # GET FUNCTIONS

@@ -22,12 +22,12 @@ A survey stores a set of sources, receivers, and the measured data.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
-import numpy as np
 from copy import deepcopy
 from dataclasses import dataclass
 
-from emg3d import io, utils
+import numpy as np
+
+from emg3d import utils
 
 # Import soft dependencies.
 try:
@@ -291,6 +291,7 @@ class Survey:
         verb : int
             Silent if 0, verbose if 1.
         """
+        from emg3d import io
         io.save(fname, compression=compression, json_indent=json_indent,
                 collect_classes=False, verb=verb, survey=self)
 
@@ -318,6 +319,7 @@ class Survey:
             The survey that was stored in the file.
 
         """
+        from emg3d import io
         return io.load(fname, verb=verb)['survey']
 
     @property

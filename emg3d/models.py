@@ -22,10 +22,10 @@ Everything to create model-properties for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import warnings
-import numpy as np
 from copy import deepcopy
+
+import numpy as np
 from scipy.constants import epsilon_0
 
 from emg3d import maps
