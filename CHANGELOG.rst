@@ -5,11 +5,26 @@ Changelog
 recent versions
 """""""""""""""
 
-*latest*
---------
+
+*v0.12.0* : Survey & Simulation
+-------------------------------
+
+**2020-07-25**
 
 This is a big release with many new features, and unfortunately not completely
-backwards compatible.
+backwards compatible. The main new features are the new **Survey** and
+**Simulation** classes, as well as some initial work for **optimization**
+(misfit, gradient). Also, a **Model** can now be a resistivity model, a
+conductivity model, or the logarithm (natural or base 10) therefore. Receivers
+can now be arbitrarily rotated, just as the sources. In addition to the
+existing **soft-dependencies** `empymod`, `discretize`, and `h5py` there are
+the new soft-dependencies `xarray` and `tqm`; `discretize` is now much tighter
+integrated. For the new survey and simulation classes `xarray` is a required
+dependency. However, the only hard dependency remain `scipy` and `numba`, if
+you use `emg3d` purely as a solver. Data reading and writing has new a
+JSON-backend, in addition to the existing HDF5 and NumPy-backends.
+
+In more detail:
 
 - Modules:
 
@@ -19,15 +34,15 @@ backwards compatible.
     - Class `surveys.Dipole`, which defines electric or magnetic point dipoles
       and finite length dipoles.
 
-  - `simulations` (**new**; soft-dependencies `discretize` & `tqdm`):
+  - `simulations` (**new**; requires `xarray`; soft-dependency `tqdm`):
 
     - Class `simulations.Simulation`, which combines a survey with a model. A
       simulation computes the e-field (and h-field) asynchronously using
-      `concurrent.futures`. To do so it creates the required meshes, source and
-      frequency-dependent, interpolates the model accordingly, and computes the
-      source-fields. If `tqdm` is installed it displays a progress bar for the
-      asynchronous computation. Note that the simulation class has still some
-      limitations, consult the class documentation.
+      `concurrent.futures`. This class will include automatic, source- and
+      frequency-dependent gridding in the future. If `tqdm` is installed it
+      displays a progress bar for the asynchronous computation. Note that the
+      simulation class has still some limitations, consult the class
+      documentation.
 
   - `models`:
 
@@ -78,20 +93,23 @@ backwards compatible.
 
   - `optimize` (**new**)
 
-    - Functionalities related to inversion (data misfit, gradient, data and
-      depth weighting). This module is in an early stage, and the API will
-      likely change in the future.
+    - Functionalities related to inversion (data misfit, gradient, data
+      weighting, and depth weighting). This module is in an early stage, and
+      the API will likely change in the future. Current functions are `misfit`,
+      `gradient` (using the adjoint-state method), and `data_weighting`. These
+      functionalities are best accessed through the `Simulation` class.
 
 - Dependencies:
 
   - `empymod` is now a soft dependency (no longer a hard dependency), only
     required for `utils.Fourier` (time-domain modelling).
   - Existing soft dependency `discretize` is now baked straight into `meshes`.
-  - New soft dependency `xarray` for the `Survey` class.
+  - New soft dependency `xarray` for the `Survey` class (and therefore also for
+    the `Simulation` class and the `optimize` module).
   - New soft dependency `tqdm` for nice progress bars in asynchronous
     computation.
 
-- Deprecations and removals:
+- **Deprecations** and removals:
 
   - Removed deprecated functions `data_write` and `data_read`.
   - Removed all deprecated functions from `utils`.
