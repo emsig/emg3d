@@ -22,12 +22,11 @@ Everything related to meshes appropriate for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+from copy import deepcopy
 
 import numpy as np
-from copy import deepcopy
 from scipy import optimize
 
-# Import soft dependencies.
 try:
     import discretize.TensorMesh as dTensorMesh
 except ImportError:
@@ -57,9 +56,9 @@ class _TensorMesh:
         self.x0 = x0
 
         # Width of cells.
-        self.hx = h[0]
-        self.hy = h[1]
-        self.hz = h[2]
+        self.hx = np.array(h[0])
+        self.hy = np.array(h[1])
+        self.hz = np.array(h[2])
 
         # Cell related properties.
         self.nCx = int(self.hx.size)

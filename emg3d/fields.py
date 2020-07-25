@@ -23,9 +23,9 @@ electric and magnetic fields, and fields at receivers.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+from copy import deepcopy
 
 import numpy as np
-from copy import deepcopy
 from scipy.constants import mu_0
 
 from emg3d import maps, models, utils

@@ -23,7 +23,6 @@ The core functionalities, the most computationally demanding parts, of the
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import numba as nb
 import numpy as np
 

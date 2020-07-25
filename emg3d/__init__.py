@@ -23,6 +23,8 @@ sped-up through jitted ``numba``-functions.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
+
 # Import modules
 from emg3d import io
 from emg3d import maps
@@ -32,6 +34,7 @@ from emg3d import fields
 from emg3d import meshes
 from emg3d import models
 from emg3d import surveys
+from emg3d import optimize
 from emg3d import simulations
 
 # Import most important functions and classes
@@ -44,11 +47,17 @@ from emg3d import core  # noqa
 from emg3d.fields import Field  # noqa
 from emg3d.models import Model  # noqa
 from emg3d.utils import Fourier  # noqa
+from emg3d.surveys import Survey  # noqa
 from emg3d.meshes import TensorMesh  # noqa
+from emg3d.simulations import Simulation  # noqa
 from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
 
 __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
-           'models', 'Report', 'save', 'load', 'surveys', 'simulations']
+           'models', 'Report', 'save', 'load', 'surveys', 'simulations',
+           'optimize']
+
+# Ensure users see Deprecation Warnings, but just once.
+warnings.filterwarnings("once", module='emg3d', category=DeprecationWarning)
 
 # Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__

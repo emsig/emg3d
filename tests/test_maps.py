@@ -5,6 +5,12 @@ from numpy.testing import assert_allclose
 from . import alternatives
 from emg3d import fields, maps, meshes, models
 
+# Import soft dependencies.
+try:
+    import discretize
+except ImportError:
+    discretize = None
+
 
 def test_grid2grid_volume():
     # == X == Simple 1D model
@@ -243,11 +249,11 @@ def test_volume_average(njit):
 
 
 @pytest.mark.parametrize("njit", [True, False])
-def test_volume_avg_weights(njit):
+def test_volume_average_weights(njit):
     if njit:
-        volume_avg_weights = maps._volume_avg_weights
+        volume_avg_weights = maps._volume_average_weights
     else:
-        volume_avg_weights = maps._volume_avg_weights.py_func
+        volume_avg_weights = maps._volume_average_weights.py_func
 
     grid_in = meshes.TensorMesh(
             [np.ones(11), np.ones(10)*2, np.ones(3)*10],
@@ -406,3 +412,82 @@ class TestMaps:
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
         np.allclose(derivative, -gradient/derivative)
+
+
+@pytest.mark.parametrize("njit", [True, False])
+def test_edges2cellaverages(njit):
+    if njit:
+        edges2cellaverages = maps.edges2cellaverages
+    else:
+        edges2cellaverages = maps.edges2cellaverages.py_func
+
+    # To test it, we create a mesh 2x2x2 cells,
+    # where all hx/hy/hz have distinct lengths.
+    x0, x1 = 2, 3
+    y0, y1 = 4, 5
+    z0, z1 = 6, 7
+
+    grid = meshes.TensorMesh([[x0, x1], [y0, y1], [z0, z1]], [0, 0, 0])
+    field = fields.Field(grid)
+
+    # Only three edges have a value, one in each direction.
+    fx = 1.23+9.87j
+    fy = 2.68-5.48j
+    fz = 1.57+7.63j
+    field.fx[0, 1, 1] = fx
+    field.fy[1, 1, 1] = fy
+    field.fz[1, 1, 0] = fz
+
+    # Initiate gradient.
+    grad_x = np.zeros(grid.vnC, order='F', dtype=complex)
+    grad_y = np.zeros(grid.vnC, order='F', dtype=complex)
+    grad_z = np.zeros(grid.vnC, order='F', dtype=complex)
+
+    # Call function.
+    vol = grid.vol.reshape(grid.vnC, order='F')
+    edges2cellaverages(field.fx, field.fy, field.fz,
+                       vol, grad_x, grad_y, grad_z)
+    grad = grad_x + grad_y + grad_z
+
+    # Check all eight cells explicitly by
+    # - computing the volume of the cell;
+    # - multiplying with the present fields in that cell.
+    assert_allclose(x0*y0*z0*(fx+fz)/4, grad[0, 0, 0])
+    assert_allclose(x1*y0*z0*fz/4, grad[1, 0, 0])
+    assert_allclose(x0*y1*z0*(fx+fy+fz)/4, grad[0, 1, 0])
+    assert_allclose(x1*y1*z0*(fy+fz)/4, grad[1, 1, 0])
+    assert_allclose(x0*y0*z1*fx/4, grad[0, 0, 1])
+    assert_allclose(0j, grad[1, 0, 1])
+    assert_allclose(x0*y1*z1*(fx+fy)/4, grad[0, 1, 1])
+    assert_allclose(x1*y1*z1*fy/4, grad[1, 1, 1])
+
+    # Separately.
+    assert_allclose(x0*y0*z0*fx/4, grad_x[0, 0, 0])
+    assert_allclose(x0*y0*z0*fz/4, grad_z[0, 0, 0])
+
+    assert_allclose(x0*y1*z0*fx/4, grad_x[0, 1, 0])
+    assert_allclose(x0*y1*z0*fy/4, grad_y[0, 1, 0])
+    assert_allclose(x0*y1*z0*fz/4, grad_z[0, 1, 0])
+
+    assert_allclose(x1*y1*z0*fy/4, grad_y[1, 1, 0])
+    assert_allclose(x1*y1*z0*fz/4, grad_z[1, 1, 0])
+
+    assert_allclose(x0*y1*z1*fx/4, grad_x[0, 1, 1])
+    assert_allclose(x0*y1*z1*fy/4, grad_y[0, 1, 1])
+
+    if discretize is not None:
+        def volume_disc(grid, field):
+            out = grid.aveE2CC*field*grid.vol
+            return out.reshape(grid.vnC, order='F')
+
+        assert_allclose(grad, 3*volume_disc(grid, field))
+
+    if discretize is not None:
+
+        out_x = grid.aveEx2CC*field.fx.ravel('F')*grid.vol
+        out_y = grid.aveEy2CC*field.fy.ravel('F')*grid.vol
+        out_z = grid.aveEz2CC*field.fz.ravel('F')*grid.vol
+
+        assert_allclose(grad_x, out_x.reshape(grid.vnC, order='F'))
+        assert_allclose(grad_y, out_y.reshape(grid.vnC, order='F'))
+        assert_allclose(grad_z, out_z.reshape(grid.vnC, order='F'))

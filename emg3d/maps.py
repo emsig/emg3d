@@ -23,21 +23,19 @@ grids.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import numba as nb
 import numpy as np
 from scipy import interpolate, ndimage
 
-from emg3d import fields
+__all__ = ['grid2grid', 'interp3d', 'MapConductivity', 'MapLgConductivity',
+           'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
+           'MapLnResistivity', 'edges2cellaverages']
 
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
-__all__ = ['grid2grid', 'interp3d', 'MapConductivity', 'MapLgConductivity',
-           'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
-           'MapLnResistivity']
 
-
+# INTERPOLATIONS
 def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
               log=False):
     """Interpolate `values` located on `grid` to `new_grid`.
@@ -115,7 +113,7 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
                        extrapolate, log)
 
         # Return a field instance.
-        return fields.Field(fx, fy, fz)
+        return values.__class__(fx, fy, fz)
 
     # If values is a particular field, ensure method is not 'volume'.
     if not np.all(grid.vnC == values.shape) and method == 'volume':
@@ -275,7 +273,7 @@ def interp3d(points, values, new_points, method, fill_value, mode):
     return new_values
 
 
-# Maps
+# MAPS
 class _Map:
     """Maps variable `x` to computational variable `σ` (conductivity)."""
 
@@ -428,7 +426,7 @@ class MapLnResistivity(_Map):
         gradient /= -conductivity
 
 
-# Volume averaging
+# VOLUME AVERAGING
 @nb.njit(**_numba_setting)
 def volume_average(edges_x, edges_y, edges_z, values,
                    new_edges_x, new_edges_y, new_edges_z, new_values, new_vol):
@@ -463,9 +461,9 @@ def volume_average(edges_x, edges_y, edges_z, values,
     """
 
     # Get the weights and indices for each direction.
-    wx, ix_in, ix_out = _volume_avg_weights(edges_x, new_edges_x)
-    wy, iy_in, iy_out = _volume_avg_weights(edges_y, new_edges_y)
-    wz, iz_in, iz_out = _volume_avg_weights(edges_z, new_edges_z)
+    wx, ix_in, ix_out = _volume_average_weights(edges_x, new_edges_x)
+    wy, iy_in, iy_out = _volume_average_weights(edges_y, new_edges_y)
+    wz, iz_in, iz_out = _volume_average_weights(edges_z, new_edges_z)
 
     # Loop over the elements and sum up the contributions.
     for iz, w_z in enumerate(wz):
@@ -485,8 +483,8 @@ def volume_average(edges_x, edges_y, edges_z, values,
 
 
 @nb.njit(**_numba_setting)
-def _volume_avg_weights(x1, x2):
-    """Returns the weights for the volume averaging technique.
+def _volume_average_weights(x1, x2):
+    """Returaveragethe weights for the volume averaging technique.
 
 
     Parameters
@@ -552,3 +550,59 @@ def _volume_avg_weights(x1, x2):
             ii += 1
 
     return hs[:ii], ix1[:ii], ix2[:ii]
+
+
+# EDGES => CENTERS
+@nb.njit(**_numba_setting)
+def edges2cellaverages(ex, ey, ez, vol, out_x, out_y, out_z):
+    r"""Interpolate fields defined on edges to volume-averaged cell values.
+
+
+    Parameters
+    ----------
+    ex, ey, ez : ndarray
+        Electric fields in x-, y-, and z-directions, as obtained from
+        :class:`emg3d.fields.Field`.
+
+    vol : ndarray
+        Volumes of the grid, as obtained from :class:`emg3d.meshes.TensorMesh`.
+
+    out_x, out_y, out_z : ndarray
+        Arrays where the results are placed (per direction).
+
+    """
+
+    # Get dimensions
+    nx, ny, nz = vol.shape
+
+    # Loop over dimensions.
+    for iz in range(nz+1):
+        izm = max(0, iz-1)
+        izp = min(nz-1, iz)
+
+        for iy in range(ny+1):
+            iym = max(0, iy-1)
+            iyp = min(ny-1, iy)
+
+            for ix in range(nx+1):
+                ixm = max(0, ix-1)
+                ixp = min(nx-1, ix)
+
+                # Multiply field by volume/4.
+                if ix < nx:
+                    out_x[ix, iym, izm] += vol[ix, iym, izm]*ex[ix, iy, iz]/4
+                    out_x[ix, iyp, izm] += vol[ix, iyp, izm]*ex[ix, iy, iz]/4
+                    out_x[ix, iym, izp] += vol[ix, iym, izp]*ex[ix, iy, iz]/4
+                    out_x[ix, iyp, izp] += vol[ix, iyp, izp]*ex[ix, iy, iz]/4
+
+                if iy < ny:
+                    out_y[ixm, iy, izm] += vol[ixm, iy, izm]*ey[ix, iy, iz]/4
+                    out_y[ixp, iy, izm] += vol[ixp, iy, izm]*ey[ix, iy, iz]/4
+                    out_y[ixm, iy, izp] += vol[ixm, iy, izp]*ey[ix, iy, iz]/4
+                    out_y[ixp, iy, izp] += vol[ixp, iy, izp]*ey[ix, iy, iz]/4
+
+                if iz < nz:
+                    out_z[ixm, iym, iz] += vol[ixm, iym, iz]*ez[ix, iy, iz]/4
+                    out_z[ixp, iym, iz] += vol[ixp, iym, iz]*ez[ix, iy, iz]/4
+                    out_z[ixm, iyp, iz] += vol[ixm, iyp, iz]*ez[ix, iy, iz]/4
+                    out_z[ixp, iyp, iz] += vol[ixp, iyp, iz]*ez[ix, iy, iz]/4

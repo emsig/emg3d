@@ -23,12 +23,12 @@ are in the :mod:`emg3d.core` as numba-jitted functions.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import itertools
+from dataclasses import dataclass
+
 import numpy as np
 import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
-from dataclasses import dataclass
 
 from emg3d import core, meshes, models, fields, utils
 
@@ -308,7 +308,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     var.cprint(var, 1)
 
     # Compute reference error for tolerance.
-    var.l2_refe = sl.norm(sfield)
+    var.l2_refe = sl.norm(sfield, check_finite=False)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
@@ -1036,7 +1036,7 @@ def residual(grid, model, sfield, efield, norm=False):
                 grid.hx, grid.hy, grid.hz)
 
     if norm:  # Return its error.
-        return sl.norm(rfield)
+        return sl.norm(rfield, check_finite=False)
     else:     # Return residual.
         return rfield
 

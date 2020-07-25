@@ -36,7 +36,7 @@ class TestSimulation():
 
         # Do first one single and then all together.
         simulation.get_efield('Tx0', 2.0)
-        simulation.compute()
+        simulation.compute(reference=True)
 
     def test_derived(self):
 
@@ -98,10 +98,10 @@ class TestSimulation():
             simulations.Simulation(
                     'Test2', self.survey, self.grid, self.model, unknown=True)
 
-        with pytest.raises(NotImplementedError, match="for `gridding='same'`"):
+        with pytest.raises(TypeError, match="Unknown `gridding`-option"):
             simulations.Simulation(
                     'Test2', self.survey, self.grid, self.model,
-                    gridding='single')
+                    gridding='frequency')
 
         tsurvey = self.survey.copy()
         tsurvey.fixed = True
@@ -120,6 +120,23 @@ class TestSimulation():
         with pytest.raises(NotImplementedError, match="or magnetic receivers"):
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
+
+        # Provide grids
+        grids = self.simulation._dict_grid.copy()
+
+        # Ensure it works normally
+        sim = simulations.Simulation(
+                'Test2', self.survey, self.grid, self.model, gridding=grids)
+        sim.get_model('Tx1', 1.0)
+
+        # Delete one, ensure it fails.
+        grids['Tx1'][1.0] = None
+        sim = simulations.Simulation(
+                'Test2', self.survey, self.grid, self.model, gridding=grids)
+        with pytest.raises(TypeError, match="Provided grid-dict misses "):
+            sim.get_grid('Tx1', 1.0)
+        with pytest.raises(TypeError, match="Provided grid-dict misses "):
+            sim.get_model('Tx1', 1.0)
 
     def test_reprs(self):
         test = self.simulation.__repr__()
@@ -178,3 +195,19 @@ class TestSimulation():
         assert self.simulation._dict_efield_info['Tx1'][1.0] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             self.simulation.clean('nothing')
+
+    def test_gradient(self):
+        # Create another mesh, so there will be a difference.
+        newgrid = meshes.TensorMesh(
+                [np.ones(16)*500, np.ones(8)*1000, np.ones(8)*1000],
+                np.array([-1250, -1250, -2250]))
+
+        simulation = simulations.Simulation(
+                'TestX', self.survey, self.grid, self.model, max_workers=1,
+                solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
+                             'linerelaxation': False, 'semicoarsening': False},
+                gridding=newgrid)
+
+        grad = simulation.gradient
+
+        assert grad.shape == self.model.shape

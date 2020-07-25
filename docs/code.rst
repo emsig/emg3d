@@ -31,6 +31,10 @@ Code
    :no-inheritance-diagram:
    :headings:=^
 
+.. automodapi:: emg3d.optimize
+   :no-inheritance-diagram:
+   :headings:=^
+
 .. automodapi:: emg3d.utils
    :no-inheritance-diagram:
    :headings:=^

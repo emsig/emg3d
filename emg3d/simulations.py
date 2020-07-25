@@ -29,28 +29,25 @@ high-level, specialised modelling routines.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import itertools
-import numpy as np
 from copy import deepcopy
 
-from emg3d import fields, solver, io, surveys, models, meshes
+import numpy as np
 
-# Check soft dependencies.
 try:
     from tqdm.contrib.concurrent import process_map
 except ImportError:
-    from concurrent.futures import ProcessPoolExecutor
+    # If you have tqdm installed, but don't want to use it, simply do
+    # `emg3d.simulation.process_map = emg3d.utils._process_map`.
+    from emg3d.utils import _process_map as process_map
 
-    def process_map(fn, *iterables, max_workers, **kwargs):
-        with ProcessPoolExecutor(max_workers=max_workers) as ex:
-            return list(ex.map(fn, *iterables))
+from emg3d import fields, solver, surveys, models, meshes, optimize
 
 __all__ = ['Simulation']
 
 
-class Simulation():
-    r"""Create a simulation for a given survey on a given model.
+class Simulation:
+    """Create a simulation for a given survey on a given model.
 
     The computational grid(s) can be either the same as the provided model
     grid, or automatic gridding can be used.
@@ -63,6 +60,8 @@ class Simulation():
         - `survey.fixed`: must be `False`;
         - sources and receivers must be electric;
         - sources strength is always normalized to 1 Am.
+        - Anything related to `optimization` is considered experimental/alpha,
+          and might change in the future.
 
 
     Parameters
@@ -84,23 +83,16 @@ class Simulation():
         The maximum number of processes that can be used to execute the
         given calls. Default is 4.
 
-    gridding : str
+    gridding : str, TensorMesh, or dict
         Method how the computational grids are computed. The default is
-        currently 'same', the only implemented method so far. This will change
-        in the future, probably to 'single'. The different methods are:
+        currently 'same', the only supported string-method so far (automatic
+        gridding will be implemented in the future).
 
         - 'same': Same grid as for the input model.
-        - 'single': A single grid for all sources and frequencies.
-        - 'frequency': Frequency-dependent grids.
-        - 'source': Source-dependent grids.
-        - 'both': Frequency- and source-dependent grids.
-
-        Except for 'same', the grids are created using ...
-
-        Not planned (yet) is the possibility to provide a single TensorMesh
-        instance or a dict of TensorMesh instances for user-provided meshes.
-        You can still do this by setting `simulation._dict_grid` after
-        instantiation.
+        - TensorMesh: The provided TensorMesh is used for all sources and
+          frequencies.
+        - dict: The dict must have the form `dict[source][frequency]`,
+          containing a TensorMesh for each source-frequency pair.
 
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
@@ -112,6 +104,27 @@ class Simulation():
         - `semicoarsening = True`;
         - `linerelaxation = True`;
         - `verb = 0` (yet warnings are capture and shown).
+
+        Note that these defaults are different from the defaults in
+        :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
+        many cases, but they are the most robust combination at which you can
+        throw most things.
+
+    data_weight_opts : dict, optional
+        Applied in :func:`emg3d.optimize.data_weighting` (defaults in
+        <brackets>):
+
+        - `gamma_d` : float <0.5>; Offset weighting exponent.
+        - `beta_d` : float <1.0>; Data weighting exponent.
+        - `beta_f` : float <0.25>; Frequency weighting exponent.
+        - `noise_floor` : float <1e-15>; Data with amplitudes below the noise
+          floor are switched off.
+        - `min_off`: float <1000>; Receiver closer to the source than
+          `min_offest` are switched off.
+        - `reference`: str <'reference'>; Name of the data to use for
+          normalization. By default the data from the reference model; if not
+          found, the observed data are used.
+
 
     """
 
@@ -126,7 +139,7 @@ class Simulation():
         self.model = model
         self.max_workers = max_workers
 
-        self.gridding = gridding
+        # Get gridding options, set to defaults if not provided.
         self._gridding_descr = {
                 'same': 'Same grid as for model',
                 'single': 'A single grid for all sources and frequencies',
@@ -134,19 +147,23 @@ class Simulation():
                 'source': 'Source-dependent grids',
                 'both': 'Frequency- and source-dependent grids',
                 }
+        # gridding_opts will be used for the automatic gridding.
+        self.gridding_opts = kwargs.pop('gridding_opts', {})
+        self._initiate_model_grid(gridding)
 
         # Get kwargs.
-        solver_opts = kwargs.pop('solver_opts', {})
+        self.solver_opts = {
+                'sslsolver': True,       # Default in solve is False.
+                'semicoarsening': True,  # "
+                'linerelaxation': True,  # "
+                'verb': 0,
+                **kwargs.pop('solver_opts', {}),  # Overwrites defaults.
+                }
+        self.data_weight_opts = kwargs.pop('data_weight_opts', {})
 
         # Ensure no kwargs left (currently kwargs is not used).
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
-
-        # Check current limitations.
-        if self.gridding != 'same':
-            raise NotImplementedError(
-                    "Simulation currently only implemented for "
-                    "`gridding='same'`.")
 
         if self.survey.fixed:
             raise NotImplementedError(
@@ -163,25 +180,22 @@ class Simulation():
             raise NotImplementedError(
                     "Simulation not yet implemented for magnetic receivers.")
 
-        # Set default solver options if not provided.
-        self.solver_opts = {
-                'sslsolver': True,
-                'semicoarsening': True,
-                'linerelaxation': True,
-                'verb': 0,
-                **solver_opts,  # Overwrites defaults.
-                }
-
-        # Initiate dictionaries with None's.
-        self._dict_grid = self._dict_initiate()
-        self._dict_model = self._dict_initiate()
-        self._dict_sfield = self._dict_initiate()
-        self._dict_efield = self._dict_initiate()
-        self._dict_hfield = self._dict_initiate()
-        self._dict_efield_info = self._dict_initiate()
+        # Initiate dictionaries and other values with None's.
+        self._dict_sfield = self._dict_initiate
+        self._dict_efield = self._dict_initiate
+        self._dict_hfield = self._dict_initiate
+        self._dict_efield_info = self._dict_initiate
+        self._gradient = None
+        self._misfit = None
 
         # Initiate synthetic data with NaN's.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
+
+        # `tqdm`-options; undocumented for the moment.
+        # This is likely to change with regards to verbosity and logging.
+        self._tqdm_opts = {
+                'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+                }
 
     def __repr__(self):
         return (f"*{self.__class__.__name__}* «{self.name}» "
@@ -254,8 +268,13 @@ class Simulation():
             out[name] = getattr(self, name)
 
         # store data.
+        out['data'] = {}
         if what in ['computed', 'results', 'all']:
-            out['synthetic'] = self.data.synthetic
+            for name in list(self.data.data_vars):
+                if name != 'observed':  # Stored in Survey.
+                    out['data'][name] = self.data.get(name)
+            out['gradient'] = self._gradient
+            out['misfit'] = self._misfit
 
         if copy:
             return deepcopy(out)
@@ -277,6 +296,8 @@ class Simulation():
         obj : :class:`Simulation` instance
 
         """
+        from emg3d import io
+
         try:
             # Initiate class.
             out = cls(
@@ -292,14 +313,31 @@ class Simulation():
             # Add existing derived/computed properties.
             data = ['_dict_grid', '_dict_model', '_dict_sfield',
                     '_dict_hfield', '_dict_efield', '_dict_efield_info']
-
             for name in data:
                 if name in inp.keys():
-                    setattr(out, name, inp.get(name))
+                    values = inp.get(name)
 
-            if 'synthetic' in inp.keys():
-                synthetic = out.data.observed*0+inp['synthetic']
-                out.survey._data['synthetic'] = synthetic
+                    # Storing to_file makes strings out of the freq-keys.
+                    # Undo this.
+                    new_values = {}
+                    for src, val in values.items():
+                        new_values[src] = {}
+                        for freq, v in val.items():
+                            new_values[src][float(freq)] = val.get(freq)
+
+                    # De-serialize Model, Field, and TensorMesh instances.
+                    io._dict_deserialize(new_values)
+
+                    setattr(out, name, new_values)
+
+            data = ['gradient', 'misfit']
+            for name in data:
+                if name in inp.keys():
+                    setattr(out, '_'+name, inp.get(name))
+
+            # Add stored data (synthetic, residual, reference, etc).
+            for name in inp['data'].keys():
+                out.data[name] = out.data.observed*inp['data'][name]
 
             return out
 
@@ -348,6 +386,7 @@ class Simulation():
             Silent if 0, verbose if 1.
 
         """
+        from emg3d import io
 
         # Add what to self, will be removed in to_dict.
         self._what_to_file = what
@@ -378,6 +417,7 @@ class Simulation():
             The simulation that was stored in the file.
 
         """
+        from emg3d import io
         return io.load(fname, verb=verb)['simulation']
 
     # GET FUNCTIONS
@@ -389,12 +429,16 @@ class Simulation():
         if self._dict_grid[source][freq] is None:
 
             # Act depending on gridding:
-            if self.gridding == 'same':  # Same grid as for provided model.
+            if self.gridding in ['same', 'single']:
 
                 # Store link to grid.
-                self._dict_grid[source][freq] = self.grid
+                self._dict_grid[source][freq] = self._grid_comp
 
-            # Rest is not yet implemented.
+            else:  # self.gridding == 'both'
+
+                raise TypeError(
+                        "Provided grid-dict misses the following "
+                        "source-frequency pair: {source}, {freq} Hz.")
 
         # Return grid.
         return self._dict_grid[source][freq]
@@ -407,12 +451,17 @@ class Simulation():
         if self._dict_model[source][freq] is None:
 
             # Act depending on gridding:
-            if self.gridding == 'same':  # Same grid as for provided model.
+            if self.gridding in ['same', 'single']:
 
                 # Store link to model.
-                self._dict_model[source][freq] = self.model
+                self._dict_model[source][freq] = self._model_comp
 
-            # Rest is not yet implemented.
+            elif self.gridding == 'both':  # Src- & freq-dependent grids.
+
+                # Get model and store it.
+                model = self._model_comp.interpolate2grid(
+                            self._grid_comp, self.get_grid(source, freq))
+                self._dict_model[source][freq] = model
 
         # Return model.
         return self._dict_model[source][freq]
@@ -514,7 +563,7 @@ class Simulation():
         """Wrapper of `get_efield` for `concurrent.futures`."""
         return self.get_efield(*inp, call_from_compute=True)
 
-    def compute(self, observed=False):
+    def compute(self, observed=False, reference=False):
         """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
@@ -524,23 +573,13 @@ class Simulation():
             `Survey` as `synthetic`. If `observed=True`, however, it is stored
             in `observed`.
 
+        reference : bool
+            If True, it stores the current result also as reference model,
+            which is used by the data weighting functions. This is usually
+            done for the initial model in an inversion.
+
         """
-
-        # Ensure grids, models, and source fields are computed.
-        #
-        # => This could be done within the field computation. But then it might
-        #    have to be done multiple times even if 'single' or 'same' grid.
-        #    Something to keep in mind.
-        #    For `gridding='same'` it does not really matter.
-        for src in self.survey.sources.keys():  # Loop over source positions.
-            for freq in self.survey.frequencies:  # Loop over frequencies.
-                _ = self.get_grid(src, freq)
-                _ = self.get_model(src, freq)
-                _ = self.get_sfield(src, freq)
-
-        # Get all source-frequency pairs.
-        srcfreq = list(itertools.product(self.survey.sources.keys(),
-                                         self.survey.frequencies))
+        srcfreq = self._srcfreq.copy()
 
         # We remove the ones that were already computed.
         remove = []
@@ -550,18 +589,28 @@ class Simulation():
         for src, freq in remove:
             srcfreq.remove((src, freq))
 
+        # Ensure grids, models, and source fields are computed.
+        #
+        # => This could be done within the field computation. But then it might
+        #    have to be done multiple times even if 'single' or 'same' grid.
+        #    Something to keep in mind.
+        #    For `gridding='same'` it does not really matter.
+        for src, freq in srcfreq:
+            _ = self.get_grid(src, freq)
+            _ = self.get_model(src, freq)
+            _ = self.get_sfield(src, freq)
+
         # Initiate futures-dict to store output.
         out = process_map(
                 self._get_efield,
                 srcfreq,
                 max_workers=self.max_workers,
-                desc='Compute efields',
-                bar_format='{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
+                **{'desc': 'Compute efields', **self._tqdm_opts},
         )
 
         # Clean hfields, so they will be recomputed.
         del self._dict_hfield
-        self._dict_hfield = self._dict_initiate()
+        self._dict_hfield = self._dict_initiate
 
         # The store-name is not water-tight if beforehand get_efield was used
         # or similar. It works with a clean simulation.compute.
@@ -586,6 +635,72 @@ class Simulation():
             # Store responses at receivers.
             self.data[store_name].loc[src, :, freq] = out[i][2]
 
+        # If it shall be used as reference save a copy.
+        if reference:
+            self.data['reference'] = self.data[store_name].copy()
+
+    # GRIDDING
+    def _initiate_model_grid(self, gridding):
+        """Initiate the computational grids and models."""
+
+        # Initiate grid- and model-dicts.
+        self._dict_grid = self._dict_initiate
+        self._dict_model = self._dict_initiate
+
+        if isinstance(gridding, str):
+            if gridding not in ['single', 'same']:
+                raise TypeError(f"Unknown `gridding`-option: '{gridding}'.")
+
+            self._grid_comp = self.grid
+            self._model_comp = self.model
+            self.gridding = gridding
+
+        elif isinstance(gridding, meshes.TensorMesh):
+            self._grid_comp = gridding
+            self._model_comp = self.model.interpolate2grid(self.grid, gridding)
+            self.gridding = 'single'
+
+        elif isinstance(gridding, dict):
+            for src, freq in self._srcfreq:
+                self._dict_grid[src][freq] = gridding.get(
+                        src, {}).get(freq, None)
+            self._grid_comp = self.grid
+            self._model_comp = self.model
+            self.gridding = 'both'
+
+    # DATA
+    @property
+    def data(self):
+        """Shortcut to survey.data."""
+        return self.survey.data
+
+    # OPTIMIZATION
+    @property
+    def gradient(self):
+        """Return the gradient of the misfit function.
+
+        See :func:`emg3d.optimize.gradient`.
+
+        """
+        # Compute it if not stored already.
+        if self._gradient is None:
+            self._gradient = optimize.gradient(self)
+
+        return self._gradient
+
+    @property
+    def misfit(self):
+        """Return the misfit function.
+
+        See :func:`emg3d.optimize.misfit`.
+
+        """
+        # Compute it if not stored already.
+        if self._misfit is None:
+            self._misfit = optimize.misfit(self)
+
+        return self._misfit
+
     # UTILS
     def clean(self, what='computed'):
         """Clean part of the data base.
@@ -605,33 +720,130 @@ class Simulation():
               Removes everything (leaves it plain as initiated).
 
         """
+
         if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}")
 
         clean = []
 
         if what in ['keepresults', 'all']:
-            clean += ['grid', 'model', 'sfield']
+            clean += ['_dict_grid', '_dict_model', '_dict_sfield']
 
         if what in ['computed', 'keepresults', 'all']:
-            clean += ['efield', 'efield_info', 'hfield']
+            clean += ['_dict_efield', '_dict_efield_info', '_dict_hfield']
 
         # Clean dicts.
         for name in clean:
-            delattr(self, '_dict_'+name)
-            setattr(self, '_dict_'+name, self._dict_initiate())
+            delattr(self, name)
+            setattr(self, name, self._dict_initiate)
 
         # Clean data.
         if what in ['computed', 'all']:
+            for name in list(self.data.data_vars):
+                if name != 'observed':
+                    del self.data[name]
             self.data['synthetic'] = self.data.observed*np.nan
+            for name in ['_gradient', '_misfit']:
+                delattr(self, name)
+                setattr(self, name, None)
 
+    @property
     def _dict_initiate(self):
         """Returns a dict of the structure `dict[source][freq]=None`."""
         return {src: {freq: None for freq in self.survey.frequencies}
                 for src in self.survey.sources.keys()}
 
-    # DATA
     @property
-    def data(self):
-        """Shortcut to survey.data."""
-        return self.survey.data
+    def _srcfreq(self):
+        """Return list of all source-frequency pairs."""
+
+        if getattr(self, '__srcfreq', None) is None:
+            self.__srcfreq = list(
+                    itertools.product(self.survey.sources.keys(),
+                                      self.survey.frequencies))
+
+        return self.__srcfreq
+
+    # BACKWARDS PROPAGATING FIELD
+    # This stuff would probably be better at home in `optimize`.
+
+    def _get_bfields(self, inp):
+        """Return back-propagated electric field for given inp (src, freq)."""
+
+        # Input parameters.
+        solver_input = {
+            **self.solver_opts,
+            'grid': self.get_grid(*inp),
+            'model': self.get_model(*inp),
+            'sfield': self._get_rfield(*inp),  # Residual field.
+            'return_info': True,
+        }
+
+        # Compute and return back-propagated electric field.
+        return solver.solve(**solver_input)
+
+    def _bcompute(self):
+        """Compute bfields asynchronously for all sources and frequencies."""
+
+        # Initiate futures-dict to store output.
+        out = process_map(
+                self._get_bfields,
+                self._srcfreq,
+                max_workers=self.max_workers,
+                **{'desc': 'Back-propagate ', **self._tqdm_opts},
+        )
+
+        # Store back-propagated electric field and info.
+        if not hasattr(self, '_dict_bfield'):
+            self._dict_bfield = self._dict_initiate
+            self._dict_bfield_info = self._dict_initiate
+
+        # Loop over src-freq combinations to extract and store.
+        warned = False  # Flag for warnings.
+        for i, (src, freq) in enumerate(self._srcfreq):
+
+            # Store bfield.
+            self._dict_bfield[src][freq] = out[i][0]
+
+            # Store solver info.
+            info = out[i][1]
+            self._dict_bfield_info[src][freq] = info
+            if info['exit'] != 0:
+                if not warned:
+                    print("Solver warnings:")
+                    warned = True
+                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+
+    def _get_rfield(self, source, frequency):
+        """Return residual source field for given source and frequency.
+
+        => Only for Ex-field at the moment.
+
+        """
+
+        freq = float(frequency)
+        grid = self.get_grid(source, frequency)
+
+        # Initiate empty field
+        ResidualField = fields.SourceField(grid, freq=frequency)
+
+        # Loop over receivers, input as source.
+        for name, rec in self.survey.receivers.items():
+
+            # Strength: in get_source_field the strength is multiplied with
+            # iwmu; so we undo this here.
+            strength = self.data.wresidual.loc[source, name, freq].data.conj()
+            strength /= ResidualField.smu0
+
+            # If strength is zero (very unlikely), get_source_field would
+            # return a normalized field for a unit source. However, in this
+            # case we do not want that.
+            if strength != 0:
+                ResidualField += fields.get_source_field(
+                    grid=grid,
+                    src=rec.coordinates,
+                    freq=frequency,
+                    strength=strength,
+                )
+
+        return ResidualField

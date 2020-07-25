@@ -22,10 +22,10 @@ Everything to create model-properties for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import warnings
-import numpy as np
 from copy import deepcopy
+
+import numpy as np
 from scipy.constants import epsilon_0
 
 from emg3d import maps
@@ -446,30 +446,37 @@ class Model:
                 'new_grid': new_grid
         }
 
+        def ensure_vnc(prop):
+            """Expand float-properties to shape vnC."""
+            return prop*np.ones(grid.vnC) if prop.size == 1 else prop
+
         # property_x (always).
-        property_x = maps.grid2grid(values=self.property_x, **inp)
+        property_x = maps.grid2grid(values=ensure_vnc(self.property_x), **inp)
 
         # property_y.
         if self.case in [1, 3]:
-            property_y = maps.grid2grid(values=self.property_y, **inp)
+            property_y = maps.grid2grid(
+                    values=ensure_vnc(self.property_y), **inp)
         else:
             property_y = None
 
         # property_z.
         if self.case in [2, 3]:
-            property_z = maps.grid2grid(values=self.property_z, **inp)
+            property_z = maps.grid2grid(
+                    values=ensure_vnc(self.property_z), **inp)
         else:
             property_z = None
 
         # mu_r.
         if self._mu_r is not None:
-            mu_r = maps.grid2grid(values=self.mu_r, **inp)
+            mu_r = maps.grid2grid(values=ensure_vnc(self.mu_r), **inp)
         else:
             mu_r = None
 
         # epsilon_r.
         if self._epsilon_r is not None:
-            epsilon_r = maps.grid2grid(values=self.epsilon_r, **inp)
+            epsilon_r = maps.grid2grid(
+                values=ensure_vnc(self.epsilon_r), **inp)
         else:
             epsilon_r = None
 

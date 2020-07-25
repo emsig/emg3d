@@ -22,14 +22,12 @@ Utility functions for writing and reading data.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
 import os
 import json
 import warnings
-import numpy as np
 from datetime import datetime
 
-from emg3d import fields, models, utils, meshes, surveys, simulations
+import numpy as np
 
 try:
     import h5py
@@ -37,6 +35,7 @@ except ImportError:
     h5py = ("'.h5'-files require `h5py`. Install it via\n"
             "`pip install h5py` or `conda install -c conda-forge h5py`.")
 
+from emg3d import fields, models, utils, meshes, surveys, simulations
 
 __all__ = ['save', 'load']
 
@@ -358,8 +357,9 @@ def _dict_serialize(inp, out=None, collect_classes=False):
                 try:
                     to_dict = {'hx': value.hx, 'hy': value.hy, 'hz': value.hz,
                                'x0': value.x0, '__class__': name}
-                except AttributeError:  # Gracefully fail.
-                    print(f"* WARNING :: Could not serialize <{key}>")
+                except AttributeError as e:  # Gracefully fail.
+                    print(f"* WARNING :: Could not serialize <{key}>.\n"
+                          f"             {e}")
                     continue
 
             # If we are in the root-directory put them in their own category.
@@ -434,8 +434,10 @@ def _dict_deserialize(inp, first_call=True):
                     inp[key] = inst.from_dict(value)
                     continue
 
-                except (AttributeError, KeyError):  # Gracefully fail.
-                    print(f"* WARNING :: Could not de-serialize <{key}>")
+                except (NotImplementedError, AttributeError, KeyError) as e:
+                    # Gracefully fail.
+                    print(f"* WARNING :: Could not de-serialize <{key}>.\n"
+                          f"             {e}")
 
             # In no __class__-key or de-serialization fails, use recursion.
             _dict_deserialize(value, False)
