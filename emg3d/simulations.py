@@ -319,14 +319,16 @@ class Simulation:
 
                     # Storing to_file makes strings out of the freq-keys.
                     # Undo this.
+                    new_values = {}
                     for src, val in values.items():
+                        new_values[src] = {}
                         for freq, v in val.items():
-                            values[src][float(freq)] = val.pop(freq)
+                            new_values[src][float(freq)] = val.get(freq)
 
                     # De-serialize Model, Field, and TensorMesh instances.
-                    io._dict_deserialize(values)
+                    io._dict_deserialize(new_values)
 
-                    setattr(out, name, values)
+                    setattr(out, name, new_values)
 
             data = ['gradient', 'misfit']
             for name in data:
