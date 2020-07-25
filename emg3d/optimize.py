@@ -290,11 +290,11 @@ def data_weighting(simulation):
     # (B) WEIGHTS.
 
     # (B.1) First term: Offset weighting (f-indep.).
-    data_weight = (offsets**gamma_d)[:, :, None]
+    off_weight = offsets**gamma_d
 
     # (B.2) Second term: Frequency weighting (src-freq-indep.).
     omega = 2*np.pi*simulation.survey.frequencies
-    data_weight /= (omega**beta_f)[None, None, :]
+    data_weight = off_weight[:, :, None]/(omega**beta_f)[None, None, :]
 
     # (B.3) Third term: Amplitude weighting.
     if beta_d != 0.0:  # Because of the warn-print check if required.

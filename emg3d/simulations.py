@@ -635,6 +635,7 @@ class Simulation:
             # Store responses at receivers.
             self.data[store_name].loc[src, :, freq] = out[i][2]
 
+        # If it shall be used as reference save a copy.
         if reference:
             self.data['reference'] = self.data[store_name].copy()
 

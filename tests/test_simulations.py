@@ -36,7 +36,7 @@ class TestSimulation():
 
         # Do first one single and then all together.
         simulation.get_efield('Tx0', 2.0)
-        simulation.compute()
+        simulation.compute(reference=True)
 
     def test_derived(self):
 
@@ -195,3 +195,19 @@ class TestSimulation():
         assert self.simulation._dict_efield_info['Tx1'][1.0] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             self.simulation.clean('nothing')
+
+    def test_gradient(self):
+        # Create another mesh, so there will be a difference.
+        newgrid = meshes.TensorMesh(
+                [np.ones(16)*500, np.ones(8)*1000, np.ones(8)*1000],
+                np.array([-1250, -1250, -2250]))
+
+        simulation = simulations.Simulation(
+                'TestX', self.survey, self.grid, self.model, max_workers=1,
+                solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
+                             'linerelaxation': False, 'semicoarsening': False},
+                gridding=newgrid)
+
+        grad = simulation.gradient
+
+        assert grad.shape == self.model.shape
