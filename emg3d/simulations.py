@@ -34,15 +34,14 @@ from copy import deepcopy
 
 import numpy as np
 
-from emg3d import fields, solver, surveys, models, meshes, optimize
-
-# Check soft dependencies.
 try:
     from tqdm.contrib.concurrent import process_map
 except ImportError:
     # If you have tqdm installed, but don't want to use it, simply do
     # `emg3d.simulation.process_map = emg3d.utils._process_map`.
     from emg3d.utils import _process_map as process_map
+
+from emg3d import fields, solver, surveys, models, meshes, optimize
 
 __all__ = ['Simulation']
 

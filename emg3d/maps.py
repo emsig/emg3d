@@ -27,14 +27,12 @@ import numba as nb
 import numpy as np
 from scipy import interpolate, ndimage
 
-from emg3d import fields
-
-# Numba-settings
-_numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
-
 __all__ = ['grid2grid', 'interp3d', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
            'MapLnResistivity', 'edges2cellaverages']
+
+# Numba-settings
+_numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 
 # INTERPOLATIONS
@@ -115,7 +113,7 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
                        extrapolate, log)
 
         # Return a field instance.
-        return fields.Field(fx, fy, fz)
+        return values.__class__(fx, fy, fz)
 
     # If values is a particular field, ensure method is not 'volume'.
     if not np.all(grid.vnC == values.shape) and method == 'volume':

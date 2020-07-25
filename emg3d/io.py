@@ -29,14 +29,13 @@ from datetime import datetime
 
 import numpy as np
 
-from emg3d import fields, models, utils, meshes, surveys, simulations
-
 try:
     import h5py
 except ImportError:
     h5py = ("'.h5'-files require `h5py`. Install it via\n"
             "`pip install h5py` or `conda install -c conda-forge h5py`.")
 
+from emg3d import fields, models, utils, meshes, surveys, simulations
 
 __all__ = ['save', 'load']
 

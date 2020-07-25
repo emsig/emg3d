@@ -27,7 +27,6 @@ from copy import deepcopy
 import numpy as np
 from scipy import optimize
 
-# Import soft dependencies.
 try:
     import discretize.TensorMesh as dTensorMesh
 except ImportError:

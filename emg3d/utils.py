@@ -32,7 +32,6 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
-# Import soft dependencies.
 try:
     import scooby
     from scooby import Report as ScoobyReport
@@ -41,6 +40,7 @@ except ImportError:
 
     class ScoobyReport:
         pass
+
 try:
     import empymod
 except ImportError:
@@ -58,7 +58,6 @@ except ImportError:
     # warning here, but this case *should* be rare. emg3d should be installed
     # properly!
     __version__ = 'unknown-'+datetime.today().strftime('%Y%m%d')
-
 
 __all__ = ['Fourier', 'Time', 'Report', 'EMArray']
 

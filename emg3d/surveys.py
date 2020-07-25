@@ -27,14 +27,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from emg3d import utils
-
-# Import soft dependencies.
 try:
     import xarray
 except ImportError:
     xarray = None
 
+from emg3d import utils
 
 __all__ = ['Survey', 'Dipole', 'PointDipole']
 
