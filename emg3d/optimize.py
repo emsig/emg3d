@@ -201,7 +201,7 @@ def gradient(simulation):
         grad_y = np.zeros(vnC, order='F')
         grad_z = np.zeros(vnC, order='F')
 
-        # => TEST what is faster.
+        # => TEST what is faster / more accurate.
         #
         # Here, we do
         #   1. edges2cellaverages (Ex[comp] -> CC[comp])

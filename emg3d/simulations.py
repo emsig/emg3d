@@ -790,7 +790,7 @@ class Simulation:
                 self._get_bfields,
                 self._srcfreq,
                 max_workers=self.max_workers,
-                **{'desc': 'Backprop. residuals', **self._tqdm_opts},
+                **{'desc': 'Back-propagate ', **self._tqdm_opts},
         )
 
         # Store back-propagated electric field and info.

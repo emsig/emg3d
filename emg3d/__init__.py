@@ -47,7 +47,9 @@ from emg3d import core  # noqa
 from emg3d.fields import Field  # noqa
 from emg3d.models import Model  # noqa
 from emg3d.utils import Fourier  # noqa
+from emg3d.surveys import Survey  # noqa
 from emg3d.meshes import TensorMesh  # noqa
+from emg3d.simulations import Simulation  # noqa
 from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
 
 __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
