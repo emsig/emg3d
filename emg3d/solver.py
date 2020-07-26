@@ -38,7 +38,7 @@ __all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
 
 # MAIN USER-FACING FUNCTION
 def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
-          semicoarsening=False, linerelaxation=False, verb=2, **kwargs):
+          semicoarsening=False, linerelaxation=False, verb=1, **kwargs):
     r"""Solver for 3D CSEM data with tri-axial electrical anisotropy.
 
     The principal solver of `emg3d` is using the multigrid method as presented
@@ -162,14 +162,15 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         line relaxation in y direction; the reason is speed (memory access).
 
     verb : int; optional
-        Level of verbosity (the higher the more verbose). Default is 2.
+        Level of verbosity (the higher the more verbose). Default is 1.
 
-        - 0: Print nothing.
-        - 1: Print warnings.
-        - 2: Print runtime and information about the method.
-        - 3: Print additional information for each MG-cycle.
-        - 4: Print everything (slower due to additional error computations).
-        - -1: Print one-liner (dynamically updated).
+        - 0: Nothing.
+        - 1: Warnings.
+        - 2: One-liner at the end.
+        - 3: Runtime and information about the method.
+        - 4: Additional information for each MG-cycle.
+        - 5: Everything (slower due to additional error computations).
+        - -1: One-liner (dynamically updated).
 
     **kwargs : Optional solver options:
 
@@ -251,17 +252,18 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>> import numpy as np
     >>> # Create a simple grid, 8 cells of length 1 in each direction,
     >>> # starting at the origin.
-    >>> grid = emg3d.meshes.TensorMesh(
+    >>> grid = emg3d.TensorMesh(
     >>>         [np.ones(8), np.ones(8), np.ones(8)],
     >>>         x0=np.array([0, 0, 0]))
     >>> # The model is a fullspace with tri-axial anisotropy.
-    >>> model = emg3d.models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    >>> model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
+    >>>                     property_z=3.3, mapping='Resistivity')
     >>> # The source is a x-directed, horizontal dipole at (4, 4, 4)
     >>> # with a frequency of 10 Hz.
     >>> sfield = emg3d.fields.get_source_field(
     >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
     >>> # Compute the electric signal.
-    >>> efield = emg3d.solve(grid, model, sfield, verb=3)
+    >>> efield = emg3d.solve(grid, model, sfield, verb=4)
     >>> # Get the corresponding magnetic signal.
     >>> hfield = emg3d.fields.get_h_field(grid, model, efield)
     .
@@ -270,7 +272,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
        linerelaxation : False [0]           maxit     : 50
-       nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 3
+       nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 4
        Original grid  :   8 x   8 x   8     => 512 cells
        Coarsest grid  :   2 x   2 x   2     => 8 cells
        Coarsest level :   2 ;   2 ;   2
@@ -304,8 +306,8 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Start logging and print all parameters.
     var.cprint(f"\n:: emg3d START :: {var.time.now} :: "
-               f"v{utils.__version__}\n", 1)
-    var.cprint(var, 1)
+               f"v{utils.__version__}\n", 2)
+    var.cprint(var, 2)
 
     # Compute reference error for tolerance.
     var.l2_refe = sl.norm(sfield, check_finite=False)
@@ -380,9 +382,9 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         header += f"{'solver':<20}"
         if var.cycle:
             header += f"{'MG':<11} l s"
-        var.cprint(header+"\n", 2)
+        var.cprint(header+"\n", 3)
     elif var.cycle:
-        var.cprint(header+f"{'[abs. error, last/prev]':>29}   l s\n", 2)
+        var.cprint(header+f"{'[abs. error, last/prev]':>29}   l s\n", 3)
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
@@ -394,9 +396,9 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     exit_status = int(var.exit_message != 'CONVERGED')
 
     # Print runtime information.
-    if var.verb < 0:
+    if var.verb < 0 or var.verb == 2:
         var.one_liner(var.l2, True)
-    elif var.verb > 1:
+    elif var.verb > 2:
         if var.sslsolver:  # sslsolver-specific info.
             info = f"   > Solver steps     : {var._ssl_it}\n"
             if var.cycle:
@@ -406,7 +408,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         info += f"   > Final rel. error : {var.l2/var.l2_refe:.3e}\n\n"
         info += f":: emg3d END   :: {var.time.now} :: "
         info += f"runtime = {var.time.runtime}\n"
-        var.cprint(info, 1)
+        var.cprint(info, 2)
     elif var.verb == 1 and exit_status == 1:
         var.cprint(f"* WARNING :: {var.exit_message}", 0)
 
@@ -497,14 +499,14 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     l2_stag = np.ones(var._maxcycle)*l2_last
 
     # Keep track on the levels during the first cycle, for QC.
-    if var._first_cycle and var.verb > 2:
+    if var._first_cycle and var.verb > 3:
         var._level_all.append(level)
 
     # Print initial call info.
     if level == 0:
-        var.cprint("     it cycmax               error", 3)
-        var.cprint("      level [  dimension  ]            info\n", 3)
-        if var.verb > 3:
+        var.cprint("     it cycmax               error", 4)
+        var.cprint("      level [  dimension  ]            info\n", 4)
+        if var.verb > 4:
             _print_gs_info(it, level, cycmax, grid, l2_last, "initial error")
 
     # Initial smoothing (nu_init).
@@ -513,7 +515,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         smoothing(grid, model, sfield, efield, var.nu_init, var.lr_dir)
 
         # Print initial smoothing info.
-        if var.verb > 3:
+        if var.verb > 4:
             norm = residual(grid, model, sfield, efield, True)
             _print_gs_info(it, level, cycmax, grid, norm, "initial smoothing")
 
@@ -533,7 +535,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             smoothing(grid, model, sfield, efield, var.nu_coarse, var.lr_dir)
 
             # Print coarsest grid smoothing info.
-            if var.verb > 3:
+            if var.verb > 4:
                 norm = residual(grid, model, sfield, efield, True)
                 _print_gs_info(it, level, cycmax, grid, norm, "coarsest level")
 
@@ -544,7 +546,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 smoothing(grid, model, sfield, efield, var.nu_pre, var.lr_dir)
 
                 # Print pre-smoothing info.
-                if var.verb > 3:
+                if var.verb > 4:
                     norm = residual(grid, model, sfield, efield, True)
                     _print_gs_info(
                             it, level, cycmax, grid, norm, "pre-smoothing")
@@ -565,7 +567,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             prolongation(grid, efield, cgrid, cefield, sc_dir)
 
             # Append current prolongation level for QC.
-            if var._first_cycle and var.verb > 2:
+            if var._first_cycle and var.verb > 3:
                 var._level_all.append(level)
 
             # (B.5) Post-smoothing (nu_post).
@@ -573,7 +575,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 smoothing(grid, model, sfield, efield, var.nu_post, var.lr_dir)
 
                 # Print post-smoothing info.
-                if var.verb > 3:
+                if var.verb > 4:
                     norm = residual(grid, model, sfield, efield, True)
                     _print_gs_info(
                             it, level, cycmax, grid, norm, "post-smoothing")
@@ -696,7 +698,7 @@ def krylov(grid, model, sfield, efield, var):
         var.error_at_cycle = np.r_[var.error_at_cycle, var.l2]
 
         # Print error (only if verbose).
-        if var.verb > 2:
+        if var.verb > 3:
 
             log = f"   [{var.time.now}]   {var.l2/var.l2_refe:.3e} "
             log += f" after {var._ssl_it:3} {var.sslsolver}-cycles"
@@ -706,7 +708,7 @@ def krylov(grid, model, sfield, efield, var):
             if var._ssl_it == 1 and var.it == 0 and var.cycle is not None:
                 log += "\n"
 
-            var.cprint(log, 2)
+            var.cprint(log, 3)
 
         elif var.verb < 0:
 
@@ -733,7 +735,7 @@ def krylov(grid, model, sfield, efield, var):
         var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
     else:
         var.exit_message = "CONVERGED"
-    var.cprint(pre+var.exit_message, 1)
+    var.cprint(pre+var.exit_message, 2)
 
 
 # MULTIGRID SUB-ROUTINES
@@ -1588,10 +1590,10 @@ def _print_cycle_info(var, l2_last, l2_prev):
     if var.verb < 0:  # One-liner
         var.one_liner(l2_last)
         return
-    elif var.verb < 3:
+    elif var.verb < 4:
         # Set first_cycle to False, to stop logging.
         return
-    elif var.verb > 3:
+    elif var.verb > 4:
         info = "\n"
     else:
         info = ""
@@ -1637,11 +1639,11 @@ def _print_cycle_info(var, l2_last, l2_prev):
         info += f"[{l2_last:.3e}, {l2_last/l2_prev:.3f}]"
     info += f"   {var.lr_dir} {var.sc_dir}"
 
-    if var.verb > 3:
+    if var.verb > 4:
         info += "\n"
 
     # Print the info.
-    var.cprint(info, 2)
+    var.cprint(info, 3)
 
 
 def _print_gs_info(it, level, cycmax, grid, norm, text):
@@ -1730,11 +1732,11 @@ def _terminate(var, l2_last, l2_stag, it):
         if var.sslsolver and sslabort:  # Force abortion of SSL solver.
             raise _ConvergenceError
         elif not var.sslsolver:  # Print info (if not preconditioner).
-            if var.verb < 4:
+            if var.verb < 5:
                 add = "\n"
             else:
                 add = ""
-            var.cprint(add+"   > "+var.exit_message, 1)
+            var.cprint(add+"   > "+var.exit_message, 2)
 
     return finished
 

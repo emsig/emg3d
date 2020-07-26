@@ -65,7 +65,7 @@ def test_solver_homogeneous(capsys):
     assert_allclose(dat['Vresult'], vfield)
 
     # BiCGSTAB with some print checking.
-    efield = solver.solve(grid, model, sfield, verb=3, sslsolver=True)
+    efield = solver.solve(grid, model, sfield, verb=4, sslsolver=True)
     out, _ = capsys.readouterr()
     assert ' emg3d START ::' in out
     assert ' [hh:mm:ss] ' in out
@@ -79,7 +79,7 @@ def test_solver_homogeneous(capsys):
     assert_allclose(dat['bicresult'], efield)
 
     # Same as previous, without BiCGSTAB, but some print checking.
-    efield = solver.solve(grid, model, sfield, verb=3)
+    efield = solver.solve(grid, model, sfield, verb=4)
     out, _ = capsys.readouterr()
     assert ' emg3d START ::' in out
     assert ' [hh:mm:ss] ' in out
@@ -91,7 +91,7 @@ def test_solver_homogeneous(capsys):
     # Max it
     maxit = 2
     _, info = solver.solve(
-            grid, model, sfield, verb=2, maxit=maxit, return_info=True)
+            grid, model, sfield, verb=3, maxit=maxit, return_info=True)
     out, _ = capsys.readouterr()
     assert ' MAX. ITERATION REACHED' in out
     assert maxit == info['it_mg']
@@ -99,18 +99,18 @@ def test_solver_homogeneous(capsys):
     assert 'MAX. ITERATION REACHED' in info['exit_message']
 
     # BiCGSTAB with lower verbosity, print checking.
-    _ = solver.solve(grid, model, sfield, verb=2, maxit=1, sslsolver=True)
+    _ = solver.solve(grid, model, sfield, verb=3, maxit=1, sslsolver=True)
     out, _ = capsys.readouterr()
     assert ' MAX. ITERATION REACHED' in out
 
     # Just check if it runs without failing for other solvers.
-    _ = solver.solve(grid, model, sfield, verb=3, maxit=1,
+    _ = solver.solve(grid, model, sfield, verb=5, maxit=1,
                      sslsolver='gcrotmk')
 
     # Provide initial field.
     _, _ = capsys.readouterr()  # empty
     efield_copy = efield.copy()
-    outarray = solver.solve(grid, model, sfield, efield_copy)
+    outarray = solver.solve(grid, model, sfield, efield_copy, verb=3)
     out, _ = capsys.readouterr()
 
     # Ensure there is no output.
@@ -133,7 +133,7 @@ def test_solver_homogeneous(capsys):
     efield = fields.Field(grid)
     outarray = solver.solve(
             grid, model, sfield, efield, sslsolver=True, semicoarsening=True,
-            linerelaxation=True, maxit=2, verb=3)
+            linerelaxation=True, maxit=2, verb=4)
     out, _ = capsys.readouterr()
     assert "after                       1 F-cycles    4 1" in out
     assert "after                       2 F-cycles    5 2" in out
@@ -150,7 +150,7 @@ def test_solver_homogeneous(capsys):
     assert "STAGNATED" in out
 
     # Check a zero field is returned for a zero source field.
-    efield = solver.solve(grid, model, sfield*0, maxit=100)
+    efield = solver.solve(grid, model, sfield*0, maxit=100, verb=3)
     out, _ = capsys.readouterr()
     assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
     assert np.linalg.norm(efield) == 0.0
@@ -165,7 +165,7 @@ def test_solver_heterogeneous(capsys):
     inp = dat['inp']
     for n in ['nu_init', 'nu_pre', 'nu_coarse', 'nu_post']:
         inp[n] = int(inp[n])
-    inp['verb'] = 4
+    inp['verb'] = 5
 
     efield = solver.solve(grid, model, sfield, **inp)
 
@@ -187,10 +187,10 @@ def test_solver_heterogeneous(capsys):
     # One test without post-smoothing to check if it runs.
     efield4 = solver.solve(
             grid, model, sfield, sslsolver=True, semicoarsening=True,
-            linerelaxation=True, maxit=20, nu_pre=0, nu_post=4, verb=3)
+            linerelaxation=True, maxit=20, nu_pre=0, nu_post=4, verb=4)
     efield5 = solver.solve(
             grid, model, sfield, sslsolver=True, semicoarsening=True,
-            linerelaxation=True, maxit=20, nu_pre=4, nu_post=0, verb=3)
+            linerelaxation=True, maxit=20, nu_pre=4, nu_post=0, verb=4)
     # They don't converge, and hence don't agree. Just a lazy test.
     assert_allclose(efield4, efield5, atol=1e-15, rtol=1e-5)
 
@@ -202,7 +202,7 @@ def test_solver_heterogeneous(capsys):
             x0=np.array([-0.5, -1, -1]))
     sfield = fields.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
     model = models.Model(mesh)
-    _ = solver.solve(mesh, model, sfield, verb=3, nu_pre=0)
+    _ = solver.solve(mesh, model, sfield, verb=4, nu_pre=0)
     out, _ = capsys.readouterr()
     assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
     assert "DIVERGED" in out
@@ -214,6 +214,7 @@ def test_one_liner(capsys):
     model = models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
     sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
 
+    # Dynamic one-liner.
     out, _ = capsys.readouterr()
     _ = solver.solve(grid, model, sfield, verb=-1)
     out, _ = capsys.readouterr()
@@ -222,6 +223,13 @@ def test_one_liner(capsys):
 
     out, _ = capsys.readouterr()
     _ = solver.solve(grid, model, sfield, sslsolver=True, verb=-1)
+    out, _ = capsys.readouterr()
+    assert '3(5); 0:00:' in out
+    assert '; CONVERGED' in out
+
+    # One-liner.
+    out, _ = capsys.readouterr()
+    _ = solver.solve(grid, model, sfield, sslsolver=True, verb=2)
     out, _ = capsys.readouterr()
     assert '3(5); 0:00:' in out
     assert '; CONVERGED' in out
@@ -440,7 +448,7 @@ def test_krylov(capsys):
     # Get var-instance
     var = solver.MGParameters(
             cycle=None, sslsolver=True, semicoarsening=False,
-            linerelaxation=False, vnC=grid.vnC, verb=3,
+            linerelaxation=False, vnC=grid.vnC, verb=4,
             maxit=-1,  # Set stupid input to make bicgstab fail.
     )
     var.l2_refe = sl.norm(sfield, check_finite=False)
