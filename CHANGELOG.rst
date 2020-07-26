@@ -6,6 +6,17 @@ recent versions
 """""""""""""""
 
 
+latest
+------
+
+- Changes in `verbosity` for `emg3d.solve`:
+
+  - New default verbosity is 1 (only warnings; before it was 2).
+  - Verbosities {-1;0;1} remain unchanged.
+  - Verbosities {2;3;4} => {3;4;5}.
+  - New verbosity 2: Only shows a one-liner at the end (plus warnings).
+
+
 *v0.12.0* : Survey & Simulation
 -------------------------------
 
