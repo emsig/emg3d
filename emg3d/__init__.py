@@ -44,13 +44,13 @@ from emg3d.io import save, load
 
 # # For top-namespace
 from emg3d import core  # noqa
-from emg3d.fields import Field  # noqa
 from emg3d.models import Model  # noqa
 from emg3d.utils import Fourier  # noqa
 from emg3d.surveys import Survey  # noqa
 from emg3d.meshes import TensorMesh  # noqa
 from emg3d.simulations import Simulation  # noqa
-from emg3d.fields import get_source_field, get_receiver, get_h_field  # noqa
+from emg3d.fields import (Field, get_source_field, get_receiver,  # noqa
+                          get_receiver_response, get_h_field)
 
 __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
            'models', 'Report', 'save', 'load', 'surveys', 'simulations',
