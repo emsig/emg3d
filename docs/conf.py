@@ -95,7 +95,7 @@ htmlhelp_basename = 'emg3ddoc'
 
 # -- CSS fixes --
 def setup(app):
-    app.add_stylesheet("style.css")
+    app.add_css_file("style.css")
 
 
 # ==== 4. Other Document Type Settings ====
