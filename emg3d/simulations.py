@@ -1,7 +1,7 @@
 """
 
-:mod:`simulation` -- Model a survey
-===================================
+Model a survey
+==============
 
 A simulation is the computation (modelling) of electromagnetic responses of a
 resistivity (conductivity) model for a given survey.

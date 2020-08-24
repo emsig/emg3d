@@ -11,6 +11,7 @@ htmlcov
 .coverage.*
 .pytest_cache/
 tests/create_data/tmp/
+*.log
 
 # setuptools_scm
 emg3d/version.py

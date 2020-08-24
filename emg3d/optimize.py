@@ -1,7 +1,7 @@
 """
 
-:mod:`optimize` -- Inversion
-============================
+Inversion
+=========
 
 Functionalities related to optimization (inversion), e.g., misfit function,
 gradient of the misfit function, or data- and depth-weighting.

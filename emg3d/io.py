@@ -1,7 +1,7 @@
 """
 
-:mod:`io` -- I/O utilities
-==========================
+I/O utilities
+=============
 
 Utility functions for writing and reading data.
 

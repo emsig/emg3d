@@ -9,30 +9,36 @@ recent versions
 latest
 ------
 
+- New Module ``cli`` for command-line interaction:
 
-- Modules:
+  The command-line interface can currently be used to forward model an entire
+  ``Simulation``, and also to compute the misfit of it with respect to some
+  data and the gradient of the misfit function. See the section "CLI interface"
+  in the documentation for more info.
 
-  - `solver`: Changes in `verbosity` for `emg3d.solve`:
+- Other changes:
+
+  - ``solver``: Changes in ``verbosity`` for ``emg3d.solve``:
 
     - New default verbosity is 1 (only warnings; before it was 2).
     - Verbosities {-1;0;1} remain unchanged.
     - Verbosities {2;3;4} => {3;4;5}.
     - New verbosity 2: Only shows a one-liner at the end (plus warnings).
 
-  - `survey` and `simulation`: `to_file` and `from_file` have new a parameter
-    `name`, to store and load with a particular name instead of the default
-    `survey`/`simulation` (useful when storing, e.g., many surveys in one
-    file).
+  - ``survey`` and ``simulation``: ``to_file`` and ``from_file`` have new a
+    parameter ``name``, to store and load with a particular name instead of the
+    default ``survey``/``simulation`` (useful when storing, e.g., many surveys
+    in one file).
 
-  - `survey`: stores new also the reference-data; different data (observed,
+  - ``survey``: stores new also the reference-data; different data (observed,
     reference) is contained in a data-dict when storing.
 
-  - `simulation`: takes new a `verb` parameter.
+  - ``simulation``: takes new a ``verb`` parameter.
 
-  - `optimize`: falls back new to `synthetic` instead of `observed` if
-    `reference` not found.
+  - ``optimize``: falls back new to ``synthetic`` instead of ``observed`` if
+    ```reference`` not found.
 
-  - `io`: `np.bool_` are converted back to `bool` when loading.
+  - ``io``: ``np.bool_`` are converted back to ``bool`` when loading.
 
 
 *v0.12.0* : Survey & Simulation
@@ -46,102 +52,106 @@ backwards compatible. The main new features are the new **Survey** and
 (misfit, gradient). Also, a **Model** can now be a resistivity model, a
 conductivity model, or the logarithm (natural or base 10) therefore. Receivers
 can now be arbitrarily rotated, just as the sources. In addition to the
-existing **soft-dependencies** `empymod`, `discretize`, and `h5py` there are
-the new soft-dependencies `xarray` and `tqm`; `discretize` is now much tighter
-integrated. For the new survey and simulation classes `xarray` is a required
-dependency. However, the only hard dependency remain `scipy` and `numba`, if
-you use `emg3d` purely as a solver. Data reading and writing has new a
-JSON-backend, in addition to the existing HDF5 and NumPy-backends.
+existing **soft-dependencies** ``empymod``, ``discretize``, and ``h5py`` there
+are the new soft-dependencies ``xarray`` and ``tqm``; ``discretize`` is now
+much tighter integrated. For the new survey and simulation classes ``xarray``
+is a required dependency. However, the only hard dependency remain ``scipy``
+and ``numba``, if you use ``emg3d`` purely as a solver. Data reading and
+writing has new a JSON-backend, in addition to the existing HDF5 and
+NumPy-backends.
 
 In more detail:
 
 - Modules:
 
-  - `surveys` (**new**; requires `xarray`):
+  - ``surveys`` (**new**; requires ``xarray``):
 
-    - Class `surveys.Survey`, which combines sources, receivers, and data.
-    - Class `surveys.Dipole`, which defines electric or magnetic point dipoles
-      and finite length dipoles.
+    - Class ``surveys.Survey``, which combines sources, receivers, and data.
+    - Class ``surveys.Dipole``, which defines electric or magnetic point
+      dipoles and finite length dipoles.
 
-  - `simulations` (**new**; requires `xarray`; soft-dependency `tqdm`):
+  - ``simulations`` (**new**; requires ``xarray``; soft-dependency ``tqdm``):
 
-    - Class `simulations.Simulation`, which combines a survey with a model. A
+    - Class ``simulations.Simulation``, which combines a survey with a model. A
       simulation computes the e-field (and h-field) asynchronously using
-      `concurrent.futures`. This class will include automatic, source- and
-      frequency-dependent gridding in the future. If `tqdm` is installed it
+      ``concurrent.futures``. This class will include automatic, source- and
+      frequency-dependent gridding in the future. If ``tqdm`` is installed it
       displays a progress bar for the asynchronous computation. Note that the
       simulation class has still some limitations, consult the class
       documentation.
 
-  - `models`:
+  - ``models``:
 
-    - Model instances take new the parameters `property_{x;y;z}` instead of
-      `res_{x;y;z}`. The properties can be either resistivity, conductivity, or
-      log_{e;10} thereof. What is actually provided has to be defined with the
-      parameter `mapping`. By default, it remains resistivity, as it was until
-      now. The keywords `res_{x;y;z}` are **deprecated**, but still accepted at
-      the moment. The attributes `model.res_{x;y;z}` are still available too,
-      but equally **deprecated**. However, it is **no longer possible to
-      assign values to these attributes**, which is a **backwards
+    - Model instances take new the parameters ``property_{x;y;z}`` instead of
+      ``res_{x;y;z}``. The properties can be either resistivity, conductivity,
+      or log_{e;10} thereof. What is actually provided has to be defined with
+      the parameter ``mapping``. By default, it remains resistivity, as it was
+      until now. The keywords ``res_{x;y;z}`` are **deprecated**, but still
+      accepted at the moment. The attributes ``model.res_{x;y;z}`` are still
+      available too, but equally **deprecated**. However, it is **no longer
+      possible to assign values to these attributes**, which is a **backwards
       incompatible** change.
     - A model knows now how to interpolate itself from its grid to another grid
-      (`interpolate2grid`).
+      (``interpolate2grid``).
 
-  - `maps`:
+  - ``maps``:
 
-    - **New** mappings for `models.Model` instances: The mappings take care of
-      how to transform the investigation variable to conductivity and back, and
-      how it affects its derivative.
-    - **New** interpolation routine `edges2cellaverages`.
+    - **New** mappings for ``models.Model`` instances: The mappings take care
+      of how to transform the investigation variable to conductivity and back,
+      and how it affects its derivative.
+    - **New** interpolation routine ``edges2cellaverages``.
 
-  - `fields`:
+  - ``fields``:
 
-    - Function `get_receiver_response` (**new**), which returns the response
+    - Function ``get_receiver_response`` (**new**), which returns the response
       for arbitrarily rotated receivers.
-    - Improvements to `Field` and `SourceField`:
+    - Improvements to ``Field`` and ``SourceField``:
 
-      - `_sval` and `_smu0` not stored any longer, derived from `_freq`.
-      - `SourceField` is now using the `copy()` and `from_dict()` from its
-        parents class `Field`.
+      - ``_sval`` and ``_smu0`` not stored any longer, derived from ``_freq``.
+      - ``SourceField`` is now using the ``copy()`` and ``from_dict()`` from
+        its parents class ``Field``.
 
-  - `io`:
+  - ``io``:
 
-    - File-format `json` (**new**), writes to a hierarchical, plain json file.
-    - **Deprecated** the use of `backend`, it uses the file extension of
-      `fname` instead.
-    - This means `.npz` (instead of `numpy`), `.h5` (instead of `h5py`), and
-      new `.json`.
-    - New parameter `collect_classes`, which can be used to switch-on
+    - File-format ``json`` (**new**), writes to a hierarchical, plain json
+      file.
+    - **Deprecated** the use of ``backend``, it uses the file extension of
+      ``fname`` instead.
+    - This means ``.npz`` (instead of ``numpy``), ``.h5`` (instead of
+      ``h5py``), and new ``.json``.
+    - New parameter ``collect_classes``, which can be used to switch-on
       collection of the main classes in root-level dictionaries. By default,
       they are no longer collected (**changed**).
 
-  - `meshes`:
+  - ``meshes``:
 
-    - `meshes.TensorMesh` **new** inherits from `discretize` if installed.
-    - Added `__eq__` to `models.TensorMesh` to compare meshes.
+    - ``meshes.TensorMesh`` **new** inherits from ``discretize`` if installed.
+    - Added ``__eq__`` to ``models.TensorMesh`` to compare meshes.
 
-  - `optimize` (**new**)
+  - ``optimize`` (**new**)
 
     - Functionalities related to inversion (data misfit, gradient, data
       weighting, and depth weighting). This module is in an early stage, and
-      the API will likely change in the future. Current functions are `misfit`,
-      `gradient` (using the adjoint-state method), and `data_weighting`. These
-      functionalities are best accessed through the `Simulation` class.
+      the API will likely change in the future. Current functions are
+      ``misfit``, ``gradient`` (using the adjoint-state method), and
+      ``data_weighting``. These functionalities are best accessed through the
+      ``Simulation`` class.
 
 - Dependencies:
 
-  - `empymod` is now a soft dependency (no longer a hard dependency), only
-    required for `utils.Fourier` (time-domain modelling).
-  - Existing soft dependency `discretize` is now baked straight into `meshes`.
-  - New soft dependency `xarray` for the `Survey` class (and therefore also for
-    the `Simulation` class and the `optimize` module).
-  - New soft dependency `tqdm` for nice progress bars in asynchronous
+  - ``empymod`` is now a soft dependency (no longer a hard dependency), only
+    required for ``utils.Fourier`` (time-domain modelling).
+  - Existing soft dependency ``discretize`` is now baked straight into
+    ``meshes``.
+  - New soft dependency ``xarray`` for the ``Survey`` class (and therefore also
+    for the ``Simulation`` class and the ``optimize`` module).
+  - New soft dependency ``tqdm`` for nice progress bars in asynchronous
     computation.
 
 - **Deprecations** and removals:
 
-  - Removed deprecated functions `data_write` and `data_read`.
-  - Removed all deprecated functions from `utils`.
+  - Removed deprecated functions ``data_write`` and ``data_read``.
+  - Removed all deprecated functions from ``utils``.
 
 - Miscellaneous:
 
@@ -155,41 +165,43 @@ In more detail:
 
 **2020-05-05**
 
-Grand refactor with new internal layout. Mainly splitting-up `utils` into
+Grand refactor with new internal layout. Mainly splitting-up ``utils`` into
 smaller bits. Most functionalities (old names) are currently retained in
-`utils` and it should be mostly backwards compatible for now, but they are
+``utils`` and it should be mostly backwards compatible for now, but they are
 deprecated and will eventually be removed. Some previously deprecated functions
 were removed, however.
 
 - Removed deprecated functions:
 
-  - `emg3d.solver.solver` (use `emg3d.solver.solve` instead).
-  - Aliases of `emg3d.io.data_write` and `emg3d.io.data_read` in `emg3d.utils`.
+  - ``emg3d.solver.solver`` (use ``emg3d.solver.solve`` instead).
+  - Aliases of ``emg3d.io.data_write`` and ``emg3d.io.data_read`` in
+    ``emg3d.utils``.
 
 - Changes:
 
-  - `SourceField` has now the same signature as `Field` (this might break your
-    code if you called `SourceField` directly, with positional arguments, and
-    not through `get_source_field`).
+  - ``SourceField`` has now the same signature as ``Field`` (this might break
+    your code if you called ``SourceField`` directly, with positional
+    arguments, and not through ``get_source_field``).
   - More functions and classes in the top namespace.
-  - Replaced `core.l2norm` with `scipy.linalg.norm`, as SciPy 1.4 got the
+  - Replaced ``core.l2norm`` with ``scipy.linalg.norm``, as SciPy 1.4 got the
     following PR: https://github.com/scipy/scipy/pull/10397 (reason to raise
     minimum SciPy to 1.4).
   - Increased minimum required versions of dependencies to
 
-    - `scipy>=1.4.0` (raised from 1.1, see note above)
-    - `empymod>=2.0.0` (no min requirement before)
-    - `numba>=0.45.0` (raised from 0.40)
+    - ``scipy>=1.4.0`` (raised from 1.1, see note above)
+    - ``empymod>=2.0.0`` (no min requirement before)
+    - ``numba>=0.45.0`` (raised from 0.40)
 
 - New layout
 
-  - `njitted` -> `core`.
-  - `utils` split in `fields`, `meshes`, `models`, `maps`, and `utils`.
+  - ``njitted`` -> ``core``.
+  - ``utils`` split in ``fields``, ``meshes``, ``models``, ``maps``, and
+    ``utils``.
 
 - Bugfixes:
 
-  - Fixed `to_dict`, `from_dict`, and `copy` for the `SourceField`.
-  - Fixed `io` for `SourceField`, that was not implemented properly.
+  - Fixed ``to_dict``, ``from_dict``, and ``copy`` for the ``SourceField``.
+  - Fixed ``io`` for ``SourceField``, that was not implemented properly.
 
 
 v0.8.0 - v0.10.x
@@ -243,7 +255,7 @@ v0.8.0 - v0.10.x
 
 - Internal and bug fixes:
 
-  - All I/O-related stuff moved to its own file `io.py`.
+  - All I/O-related stuff moved to its own file ``io.py``.
   - Change from ``NUMBA_DISABLE_JIT`` to use ``py_func`` for testing and
     coverage.
   - Bugfix: ``emg3d.njitted.restrict`` did not store the {x;y;z}-field if
@@ -519,8 +531,8 @@ Memory and speed improvements:
 **2019-05-26**
 
 - Replace :class:`scipy.interpolate.RegularGridInterpolator` with a custom
-  tailored version of it (`solver.RegularGridProlongator`); results in twice
-  as fast prolongation.
+  tailored version of it (class:`emg3d.solver.RegularGridProlongator`); results
+  in twice as fast prolongation.
 - Simplify the fine-grid computation in ``prolongation`` without using
   ``gridE*``; memory friendlier.
 - Submission to JOSS.

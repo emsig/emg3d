@@ -1,7 +1,7 @@
 """
 
-:mod:`survey` -- Surveys
-========================
+Surveys
+=======
 
 A survey stores a set of sources, receivers, and the measured data.
 

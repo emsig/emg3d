@@ -1,7 +1,7 @@
 """
 
-:mod:`fields` -- Electric and magnetic fields
-=============================================
+Electric and magnetic fields
+============================
 
 Everything related to the multigrid solver that is a field: source field,
 electric and magnetic fields, and fields at receivers.

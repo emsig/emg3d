@@ -18,6 +18,7 @@ Version: |version| ~ Date: |today|
    mgwhat
    theory
    cpu_and_ram
+   cli
    gallery
    references
    credits
