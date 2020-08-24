@@ -103,7 +103,7 @@ class TestOptimize():
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-def test_derivative():
+def test_derivative(capsys):
     # Create a simple mesh.
     hx = np.ones(64)*100
     mesh = meshes.TensorMesh([hx, hx, hx], x0=[0, 0, 0])
@@ -147,13 +147,14 @@ def test_derivative():
         'max_workers': 1,
         'gridding': 'same',
         'data_weight_opts': data_weight_opts,
+        'verb': 3,
     }
 
     # Compute data (pre-computed and passed to Survey above)
     sim_data = simulations.Simulation(model=model_true, **sim_inp)
     sim_data.compute(observed=True)
 
-    # Compute ajdoint state misfit and gradient
+    # Compute adjoint state misfit and gradient
     sim_data = simulations.Simulation(model=model_init, **sim_inp)
     data_misfit = sim_data.misfit
     grad = sim_data.gradient
@@ -164,3 +165,14 @@ def test_derivative():
     nrmsd = random_fd_gradient(
             1, survey, model_init, mesh, grad, data_misfit, sim_inp)
     assert nrmsd < 1.0
+
+    # Check wrong reference data
+    sim_inp['data_weight_opts']['beta_d'] = 1.0
+    sim_inp['data_weight_opts']['reference'] = 'dummy'
+    sim_inp['solver_opts']['maxit'] = 1
+    _ = capsys.readouterr()  # Clean
+    sim_data = simulations.Simulation(model=model_init, **sim_inp)
+    _ = sim_data.misfit
+    outstr, _ = capsys.readouterr()
+
+    assert "Reference data 'dummy' not found, using 'synthetic'." in outstr

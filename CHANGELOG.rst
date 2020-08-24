@@ -9,12 +9,30 @@ recent versions
 latest
 ------
 
-- Changes in `verbosity` for `emg3d.solve`:
 
-  - New default verbosity is 1 (only warnings; before it was 2).
-  - Verbosities {-1;0;1} remain unchanged.
-  - Verbosities {2;3;4} => {3;4;5}.
-  - New verbosity 2: Only shows a one-liner at the end (plus warnings).
+- Modules:
+
+  - `solver`: Changes in `verbosity` for `emg3d.solve`:
+
+    - New default verbosity is 1 (only warnings; before it was 2).
+    - Verbosities {-1;0;1} remain unchanged.
+    - Verbosities {2;3;4} => {3;4;5}.
+    - New verbosity 2: Only shows a one-liner at the end (plus warnings).
+
+  - `survey` and `simulation`: `to_file` and `from_file` have new a parameter
+    `name`, to store and load with a particular name instead of the default
+    `survey`/`simulation` (useful when storing, e.g., many surveys in one
+    file).
+
+  - `survey`: stores new also the reference-data; different data (observed,
+    reference) is contained in a data-dict when storing.
+
+  - `simulation`: takes new a `verb` parameter.
+
+  - `optimize`: falls back new to `synthetic` instead of `observed` if
+    `reference` not found.
+
+  - `io`: `np.bool_` are converted back to `bool` when loading.
 
 
 *v0.12.0* : Survey & Simulation

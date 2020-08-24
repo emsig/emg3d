@@ -164,6 +164,7 @@ class TestSurvey():
         assert srvy3.sources == srvy4.sources
 
         # Also check to_file()/from_file().
+        srvy4.data['reference'] = srvy4.data['observed'].copy()*2
         srvy4.to_file(tmpdir+'/test.npz')
         srvy5 = surveys.Survey.from_file(tmpdir+'/test.npz')
         assert srvy4.name == srvy5.name
@@ -171,7 +172,15 @@ class TestSurvey():
         assert srvy4.receivers == srvy5.receivers
         assert srvy4.frequencies == srvy5.frequencies
         assert srvy4.fixed == srvy5.fixed
-        assert srvy4.data == srvy5.data
+        assert_allclose(srvy4.data.observed, srvy5.data.observed)
+        assert_allclose(srvy4.data.reference, srvy5.data.reference)
+
+        # Test backwards compatibility.
+        srvy5 = srvy5.to_dict()
+        srvy5['observed'] = srvy5['data']['observed']
+        del srvy5['data']
+        srvy6 = surveys.Survey.from_dict(srvy5)
+        assert_allclose(srvy5['observed'], srvy6.data.observed)
 
 
 def test_PointDipole():

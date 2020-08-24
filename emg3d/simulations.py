@@ -125,6 +125,14 @@ class Simulation:
           normalization. By default the data from the reference model; if not
           found, the observed data are used.
 
+    verb : int; optional
+        Level of verbosity. Default is 0.
+
+        - -1: Error.
+        - 0: Warning.
+        - 1: Info.
+        - 2: Debug.
+
 
     """
 
@@ -138,6 +146,7 @@ class Simulation:
         self.grid = grid
         self.model = model
         self.max_workers = max_workers
+        self.verb = kwargs.pop('verb', 0)
 
         # Get gridding options, set to defaults if not provided.
         self._gridding_descr = {
@@ -271,7 +280,8 @@ class Simulation:
         out['data'] = {}
         if what in ['computed', 'results', 'all']:
             for name in list(self.data.data_vars):
-                if name != 'observed':  # Stored in Survey.
+                # These two are stored in the Survey instance.
+                if name not in ['observed', 'reference']:
                     out['data'][name] = self.data.get(name)
             out['gradient'] = self._gradient
             out['misfit'] = self._misfit
@@ -335,7 +345,7 @@ class Simulation:
                 if name in inp.keys():
                     setattr(out, '_'+name, inp.get(name))
 
-            # Add stored data (synthetic, residual, reference, etc).
+            # Add stored data (synthetic, residual, etc).
             for name in inp['data'].keys():
                 out.data[name] = out.data.observed*inp['data'][name]
 
@@ -344,8 +354,7 @@ class Simulation:
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
-    def to_file(self, fname, what='computed', compression="gzip",
-                json_indent=2, verb=1):
+    def to_file(self, fname, what='computed', name='simulation', **kwargs):
         """Store Simulation to a file.
 
         Parameters
@@ -376,14 +385,11 @@ class Simulation:
             - 'plain':
               Only stores the plain Simulation (as initiated).
 
-        compression : int or str, optional
-            Passed through to h5py, default is 'gzip'.
+        name : str
+            Name under which the survey is stored within the file.
 
-        json_indent : int or None
-            Passed through to json, default is 2.
-
-        verb : int
-            Silent if 0, verbose if 1.
+        kwargs : Keyword arguments, optional
+            Passed through to :func:`io.save`.
 
         """
         from emg3d import io
@@ -391,11 +397,16 @@ class Simulation:
         # Add what to self, will be removed in to_dict.
         self._what_to_file = what
 
-        io.save(fname, compression=compression, json_indent=json_indent,
-                collect_classes=False, verb=verb, simulation=self)
+        kwargs[name] = self                # Add simulation to dict.
+        kwargs['collect_classes'] = False  # Ensure classes are not collected.
+        # If verb is not defined, use verbosity of simulation.
+        if 'verb' not in kwargs:
+            kwargs['verb'] = self.verb
+
+        io.save(fname, **kwargs)
 
     @classmethod
-    def from_file(cls, fname, verb=1):
+    def from_file(cls, fname, name='simulation', **kwargs):
         """Load Simulation from a file.
 
         Parameters
@@ -408,8 +419,11 @@ class Simulation:
             - '.h5': h5py-binary (needs `h5py`)
             - '.json': json
 
-        verb : int
-            Silent if 0, verbose if 1.
+        name : str
+            Name under which the simulation is stored within the file.
+
+        kwargs : Keyword arguments, optional
+            Passed through to :func:`io.load`.
 
         Returns
         -------
@@ -418,7 +432,7 @@ class Simulation:
 
         """
         from emg3d import io
-        return io.load(fname, verb=verb)['simulation']
+        return io.load(fname, **kwargs)[name]
 
     # GET FUNCTIONS
     def get_grid(self, source, frequency):
@@ -569,9 +583,9 @@ class Simulation:
         Parameters
         ----------
         observed : bool
-            By default, the data at receiver locations is stored in the
-            `Survey` as `synthetic`. If `observed=True`, however, it is stored
-            in `observed`.
+            If True, it stores the current result also as observed model.
+            This is usually done for pure forward modelling (not inversion).
+            It will as such be stored within the survey.
 
         reference : bool
             If True, it stores the current result also as reference model,
@@ -612,10 +626,6 @@ class Simulation:
         del self._dict_hfield
         self._dict_hfield = self._dict_initiate
 
-        # The store-name is not water-tight if beforehand get_efield was used
-        # or similar. It works with a clean simulation.compute.
-        store_name = ['synthetic', 'observed'][observed]
-
         # Loop over src-freq combinations to extract and store.
         warned = False  # Flag for warnings.
         for i, (src, freq) in enumerate(srcfreq):
@@ -626,18 +636,20 @@ class Simulation:
             # Store solver info.
             info = out[i][1]
             self._dict_efield_info[src][freq] = info
-            if info['exit'] != 0:
+            if info['exit'] != 0 and self.verb >= 0:
                 if not warned:
                     print("Solver warnings:")
                     warned = True
                 print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
 
             # Store responses at receivers.
-            self.data[store_name].loc[src, :, freq] = out[i][2]
+            self.data['synthetic'].loc[src, :, freq] = out[i][2]
 
-        # If it shall be used as reference save a copy.
+        # If it shall be used as observed or as a reference save a copy.
+        if observed:
+            self.data['observed'] = self.data['synthetic'].copy()
         if reference:
-            self.data['reference'] = self.data[store_name].copy()
+            self.data['reference'] = self.data['synthetic'].copy()
 
     # GRIDDING
     def _initiate_model_grid(self, gridding):
@@ -740,7 +752,7 @@ class Simulation:
         # Clean data.
         if what in ['computed', 'all']:
             for name in list(self.data.data_vars):
-                if name != 'observed':
+                if name not in ['observed', 'reference']:
                     del self.data[name]
             self.data['synthetic'] = self.data.observed*np.nan
             for name in ['_gradient', '_misfit']:
@@ -808,7 +820,7 @@ class Simulation:
             # Store solver info.
             info = out[i][1]
             self._dict_bfield_info[src][freq] = info
-            if info['exit'] != 0:
+            if info['exit'] != 0 and self.verb >= 0:
                 if not warned:
                     print("Solver warnings:")
                     warned = True

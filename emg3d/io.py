@@ -119,7 +119,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
     kwargs['_version'] = 'emg3d v' + utils.__version__
-    kwargs['_format'] = '0.12.0'  # File format; version of emg3d when changed.
+    kwargs['_format'] = '0.13.0'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
@@ -405,7 +405,8 @@ def _dict_deserialize(inp, first_call=True):
 
     De-serializes in-place dictionary <inp>, where all members of
     `emg3d.io.KNOWN_CLASSES` are de-serialized with their respective
-    `from_dict()` methods. It also converts back 'NoneType'-strings to None.
+    `from_dict()` methods. It also converts back `'NoneType'`-strings to
+    `None`, and `np.bool_` to `bool`.
 
 
     Parameters
@@ -415,7 +416,7 @@ def _dict_deserialize(inp, first_call=True):
 
     """
 
-    # Recursively replace 'NoneType' by None.
+    # Recursively replace `'NoneType'` by `None` and `np.bool_` by `bool`.
     if first_call:
         _nonetype_to_none(inp)
 
@@ -444,12 +445,24 @@ def _dict_deserialize(inp, first_call=True):
 
 
 def _nonetype_to_none(inp):
-    """Recursively replace 'NoneType' by None in inp-dict."""
+    """Recursively replace side-effects in inp-dict from storing to disc.
+
+    Changes:
+
+    - Replace `NoneType'` by `None`.
+    - `np.bool_` are cast back to `bool` (because `bool` is converted to
+      `np.bool_` for some file formats).
+
+    """
     for k, v in inp.items():
         if isinstance(v, dict):
             _nonetype_to_none(v)
         elif isinstance(v, str) and v == 'NoneType':
             inp[k] = None
+        elif isinstance(v, np.bool_):
+            inp[k] = bool(v)
+        elif isinstance(v, np.ndarray) and v.dtype == np.bool_:
+            inp[k] = bool(np.squeeze(v))
 
 
 def _dict_flatten(data):
