@@ -98,11 +98,6 @@ class TestSimulation():
             simulations.Simulation(
                     'Test2', self.survey, self.grid, self.model, unknown=True)
 
-        with pytest.raises(TypeError, match="Unknown `gridding`-option"):
-            simulations.Simulation(
-                    'Test2', self.survey, self.grid, self.model,
-                    gridding='frequency')
-
         tsurvey = self.survey.copy()
         tsurvey.fixed = True
         with pytest.raises(NotImplementedError, match="`survey.fixed=False`"):
@@ -128,15 +123,6 @@ class TestSimulation():
         sim = simulations.Simulation(
                 'Test2', self.survey, self.grid, self.model, gridding=grids)
         sim.get_model('Tx1', 1.0)
-
-        # Delete one, ensure it fails.
-        grids['Tx1'][1.0] = None
-        sim = simulations.Simulation(
-                'Test2', self.survey, self.grid, self.model, gridding=grids)
-        with pytest.raises(TypeError, match="Provided grid-dict misses "):
-            sim.get_grid('Tx1', 1.0)
-        with pytest.raises(TypeError, match="Provided grid-dict misses "):
-            sim.get_model('Tx1', 1.0)
 
     def test_reprs(self):
         test = self.simulation.__repr__()
