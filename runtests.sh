@@ -20,7 +20,7 @@ where:
 # Set default values
 PYTHON3VERSION="7 8"
 PRINT="/dev/null"
-PCKGS="scipy numba pytest pytest-cov pytest-flake8"
+PCKGS="scipy numba pytest pytest-cov pytest-flake8 pytest-console-scripts"
 SOFT="xarray empymod h5py scooby discretize matplotlib"
 PROPS="--flake8"
 WARN=""
@@ -82,6 +82,9 @@ for i in ${PYTHON3VERSION[@]}; do
 
   # Activate virtual environment
   source activate $NAME
+
+  # Install emg3d
+  python setup.py install &> $PRINT
 
   # Run tests
   pytest --cov=emg3d $PROPS $WARN

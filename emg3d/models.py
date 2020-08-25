@@ -1,7 +1,7 @@
 """
 
-:mod:`models` -- Earth properties
-=================================
+Earth properties
+================
 
 Everything to create model-properties for the multigrid solver.
 

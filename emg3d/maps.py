@@ -1,7 +1,7 @@
 """
 
-:mod:`maps` -- Interpolation routines
-=====================================
+Interpolation routines
+======================
 
 Interpolation routines mapping grids to grids, grids to fields, and fields to
 grids.

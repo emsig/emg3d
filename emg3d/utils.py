@@ -1,7 +1,7 @@
 """
 
-:mod:`utils` -- Utilities
-=========================
+Utilities
+=========
 
 Utility functions for the multigrid solver.
 

@@ -1,7 +1,7 @@
 """
 
-:mod:`optimize` -- Inversion
-============================
+Inversion
+=========
 
 Functionalities related to optimization (inversion), e.g., misfit function,
 gradient of the misfit function, or data- and depth-weighting.
@@ -300,8 +300,10 @@ def data_weighting(simulation):
     if beta_d != 0.0:  # Because of the warn-print check if required.
         ref_data = simulation.data.get(refname, None)
         if ref_data is None:
-            print(f"Reference data '{refname}' not found, using 'observed'.")
-            ref_data = simulation.data.observed
+            if simulation.verb >= 0:
+                print(f"Reference data '{refname}' not found, "
+                      "using 'synthetic'.")
+            ref_data = simulation.data.synthetic
         data_weight /= np.sqrt(np.real(ref_data.conj()*ref_data))**beta_d
 
     # (C) APPLY.

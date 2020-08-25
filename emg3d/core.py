@@ -1,7 +1,7 @@
 """
 
-:mod:`core` -- Number crunching
-===============================
+Number crunching
+================
 
 The core functionalities, the most computationally demanding parts, of the
 :mod:`emg3d.solver` as just-in-time (jit) compiled functions using ``numba``.

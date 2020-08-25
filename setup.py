@@ -22,13 +22,18 @@ setup(
     author_email='dieter@werthmuller.org',
     url='https://empymod.github.io',
     license='Apache License V2.0',
-    packages=['emg3d'],
+    packages=['emg3d', 'emg3d.cli'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
+    entry_points={
+        'console_scripts': [
+            'emg3d=emg3d.cli.main:main',
+        ],
+    },
     python_requires='>=3.7',
     install_requires=[
         'scipy>=1.4.0',

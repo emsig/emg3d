@@ -1,7 +1,7 @@
 """
 
-:mod:`meshes` -- Discretization
-===============================
+Discretization
+==============
 
 Everything related to meshes appropriate for the multigrid solver.
 

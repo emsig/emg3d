@@ -60,7 +60,7 @@ def test_save_and_load(tmpdir, capsys):
 
     # Save it.
     io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
-            broken=grid3, a=None,
+            broken=grid3, a=None, b=True,
             field=field, what={'f': field.fx, 12: 12}, collect_classes=True)
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
@@ -79,6 +79,7 @@ def test_save_and_load(tmpdir, capsys):
     assert_allclose(grid.vol, out_npz['TensorMesh']['emg3d'].vol)
     assert_allclose(grid.vol, out_npz['TensorMesh']['discretize'].vol)
     assert_allclose(out_npz['Data']['what']['f'], field.fx)
+    assert out_npz['Data']['b'] is True
 
     # Check message from loading another file
 
@@ -115,13 +116,14 @@ def test_save_and_load(tmpdir, capsys):
     # Test h5py.
     if h5py:
         io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
-                a=1.0, b=1+1j,
+                a=1.0, b=1+1j, c=True,
                 model=model, field=field, what={'f': field.fx},
                 collect_classes=True)
         out_h5 = io.load(str(tmpdir+'/test.h5'))
         assert out_h5['Model']['model'] == model
         assert out_h5['Data']['a'] == 1.0
         assert out_h5['Data']['b'] == 1+1j
+        assert out_h5['Data']['c'] is True
         assert_allclose(field.fx, out_h5['Field']['field'].fx)
         assert_allclose(grid.vol, out_h5['TensorMesh']['emg3d'].vol)
         assert_allclose(grid.vol, out_h5['TensorMesh']['discretize'].vol)

@@ -47,3 +47,20 @@ Code
 .. automodapi:: emg3d.core
    :no-inheritance-diagram:
    :headings:=^
+
+Code - CLI
+##########
+
+.. automodule:: emg3d.cli
+
+.. automodapi:: emg3d.cli.main
+   :no-inheritance-diagram:
+   :headings:=^
+
+.. automodapi:: emg3d.cli.run
+   :no-inheritance-diagram:
+   :headings:=^
+
+.. automodapi:: emg3d.cli.parser
+   :no-inheritance-diagram:
+   :headings:=^

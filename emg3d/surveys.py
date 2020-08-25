@@ -1,7 +1,7 @@
 """
 
-:mod:`survey` -- Surveys
-========================
+Surveys
+=======
 
 A survey stores a set of sources, receivers, and the measured data.
 
@@ -225,8 +225,11 @@ class Survey:
         # Add frequencies.
         out['frequencies'] = self.frequencies
 
-        # Add data.
-        out['observed'] = self.data.observed.values
+        # Add `observed` and `reference`, if it exist.
+        out['data'] = {}
+        out['data']['observed'] = self.data.observed
+        if 'reference' in self.data.keys():
+            out['data']['reference'] = self.data.reference
 
         # Fixed.
         out['fixed'] = int(self.fixed)
@@ -246,7 +249,7 @@ class Survey:
         inp : dict
             Dictionary as obtained from :func:`Survey.to_dict`.
             The dictionary needs the keys `name`, `sources`, `receivers`
-            `frequencies`, `observed`, and `fixed`.
+            `frequencies`, `data`, and `fixed`.
 
         Returns
         -------
@@ -254,15 +257,32 @@ class Survey:
 
         """
         try:
-            return cls(name=inp['name'], sources=inp['sources'],
-                       receivers=inp['receivers'],
-                       frequencies=inp['frequencies'], data=inp['observed'],
-                       fixed=bool(inp['fixed']))
+            # Backwards compatibility (emg3d < 0.13); remove eventually.
+            if 'observed' in inp.keys():
+                data = inp['observed']
+                new_format = False
+            else:
+                data = None
+                new_format = True
+
+            # Initiate survey.
+            out = cls(name=inp['name'], sources=inp['sources'],
+                      receivers=inp['receivers'],
+                      frequencies=inp['frequencies'], data=data,
+                      fixed=bool(inp['fixed']))
+
+            # Add all data.
+            if new_format:
+                for key, value in inp['data'].items():
+                    out._data[key] = out.data.observed*np.nan
+                    out._data[key][...] = value
+
+            return out
 
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
-    def to_file(self, fname, compression="gzip", json_indent=2, verb=1):
+    def to_file(self, fname, name='survey', **kwargs):
         """Store Survey to a file.
 
         Parameters
@@ -280,22 +300,21 @@ class Survey:
             - `.json`: Uses `json` to store inputs to a hierarchical, plain
               text file.
 
-        compression : int or str, optional
-            Passed through to h5py, default is 'gzip'.
+        name : str
+            Name under which the survey is stored within the file.
 
-        json_indent : int or None
-            Passed through to json, default is 2.
+        kwargs : Keyword arguments, optional
+            Passed through to :func:`io.save`.
 
-        verb : int
-            Silent if 0, verbose if 1.
         """
         from emg3d import io
-        io.save(fname, compression=compression, json_indent=json_indent,
-                collect_classes=False, verb=verb, survey=self)
+        kwargs[name] = self                # Add survey to dict.
+        kwargs['collect_classes'] = False  # Ensure classes are not collected.
+        io.save(fname, **kwargs)
 
     @classmethod
     @utils._requires('xarray')
-    def from_file(cls, fname, verb=1):
+    def from_file(cls, fname, name='survey', **kwargs):
         """Load Survey from a file.
 
         Parameters
@@ -308,8 +327,12 @@ class Survey:
             - '.h5': h5py-binary (needs `h5py`)
             - '.json': json
 
-        verb : int
-            Silent if 0, verbose if 1.
+        name : str
+            Name under which the survey is stored within the file.
+
+        kwargs : Keyword arguments, optional
+            Passed through to :func:`io.load`.
+
 
         Returns
         -------
@@ -318,7 +341,7 @@ class Survey:
 
         """
         from emg3d import io
-        return io.load(fname, verb=verb)['survey']
+        return io.load(fname, **kwargs)[name]
 
     @property
     def shape(self):
