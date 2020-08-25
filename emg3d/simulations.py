@@ -84,11 +84,14 @@ class Simulation:
         given calls. Default is 4.
 
     gridding : str, TensorMesh, or dict
-        Method how the computational grids are computed. The default is
-        currently 'same', the only supported string-method so far (automatic
-        gridding will be implemented in the future).
+        Method how the computational grids are computed. Default is 'single'.
+        The different methods are:
 
         - 'same': Same grid as for the input model.
+        - 'single': A single grid for all sources and frequencies.
+        - 'frequency': Frequency-dependent grids.
+        - 'source': Source-dependent grids.
+        - 'both': Frequency- and source-dependent grids.
         - TensorMesh: The provided TensorMesh is used for all sources and
           frequencies.
         - dict: The dict must have the form `dict[source][frequency]`,
@@ -137,18 +140,17 @@ class Simulation:
     """
 
     def __init__(self, name, survey, grid, model, max_workers=4,
-                 gridding='same', **kwargs):
+                 gridding='single', **kwargs):
         """Initiate a new Simulation instance."""
 
         # Store inputs.
         self.name = name
         self.survey = survey
-        self.grid = grid
-        self.model = model
         self.max_workers = max_workers
         self.verb = kwargs.pop('verb', 0)
 
         # Get gridding options, set to defaults if not provided.
+        self.gridding = gridding
         self._gridding_descr = {
                 'same': 'Same grid as for model',
                 'single': 'A single grid for all sources and frequencies',
@@ -156,9 +158,15 @@ class Simulation:
                 'source': 'Source-dependent grids',
                 'both': 'Frequency- and source-dependent grids',
                 }
-        # gridding_opts will be used for the automatic gridding.
-        self.gridding_opts = kwargs.pop('gridding_opts', {})
-        self._initiate_model_grid(gridding)
+        self.gridding_opts = {
+                'type': 'marine',
+                'air_resistivity': 1e8,
+                'res': np.array([0.3, 1, 1e5]),
+                'min_width': np.array([200., 200., 100]),
+                'zval': np.array([-1000, -2000, 0]),
+                **kwargs.pop('gridding_opts', {}),  # Overwrites defaults.
+                }
+        self._initiate_model_grid(model, grid)
 
         # Get kwargs.
         self.solver_opts = {
@@ -190,6 +198,8 @@ class Simulation:
                     "Simulation not yet implemented for magnetic receivers.")
 
         # Initiate dictionaries and other values with None's.
+        self._dict_grid = self._dict_initiate
+        self._dict_model = self._dict_initiate
         self._dict_sfield = self._dict_initiate
         self._dict_efield = self._dict_initiate
         self._dict_hfield = self._dict_initiate
@@ -443,16 +453,91 @@ class Simulation:
         if self._dict_grid[source][freq] is None:
 
             # Act depending on gridding:
-            if self.gridding in ['same', 'single']:
+            if self.gridding == 'same':  # Same grid as for provided model.
 
                 # Store link to grid.
-                self._dict_grid[source][freq] = self._grid_comp
+                self._dict_grid[source][freq] = self.grid
 
-            else:  # self.gridding == 'both'
+            elif self.gridding == 'frequency':  # Frequency-dependent grids.
 
-                raise TypeError(
-                        "Provided grid-dict misses the following "
-                        "source-frequency pair: {source}, {freq} Hz.")
+                # Initiate dict.
+                if not hasattr(self, '_grid_frequency'):
+                    self._grid_frequency = {}
+
+                # Get grid for this frequency if not yet computed.
+                if freq not in self._grid_frequency.keys():
+
+                    # Get grid for this frequency.
+                    # TODO does not work for fixed surveys
+                    coords = [np.r_[self.survey.src_coords[i],
+                              self.survey.rec_coords[i]] for i in range(3)]
+
+                    # Get grid and store it.
+                    self._grid_frequency[freq] = meshes.marine_csem_mesh(
+                            coords, freq=freq, verb=self.verb,
+                            **self.gridding_opts)
+
+                # Store link to grid.
+                self._dict_grid[source][freq] = self._grid_frequency[freq]
+
+            elif self.gridding == 'source':  # Source-dependent grids.
+
+                # Initiate dict.
+                if not hasattr(self, '_grid_source'):
+                    self._grid_source = {}
+
+                # Get grid for this source if not yet computed.
+                if source not in self._grid_source.keys():
+
+                    # Get grid for this frequency.
+                    # TODO does not work for fixed surveys
+                    coords = [np.r_[self.survey.sources[source].coordinates[i],
+                              self.survey.rec_coords[i]] for i in range(3)]
+
+                    # Use average frequency (log10).
+                    mfreq = 10**np.mean(np.log10(self.survey.frequencies))
+
+                    # Get grid and store it.
+                    self._grid_source[source] = meshes.marine_csem_mesh(
+                            coords, freq=mfreq, verb=self.verb,
+                            **self.gridding_opts)
+
+                # Store link to grid.
+                self._dict_grid[source][freq] = self._grid_source[source]
+
+            elif self.gridding == 'both':  # Src- & freq-dependent grids.
+
+                # Get grid for this frequency.
+                # TODO does not work for fixed surveys
+                coords = [np.r_[self.survey.sources[source].coordinates[i],
+                          self.survey.rec_coords[i]] for i in range(3)]
+
+                # Get grid and store it.
+                self._dict_grid[source][freq] = meshes.marine_csem_mesh(
+                        coords, freq=freq, verb=self.verb,
+                        **self.gridding_opts)
+
+            else:  # Use a single grid for all sources and receivers.
+                # Default case; catches 'single' but also anything else.
+
+                # Get grid if not yet computed.
+                if not hasattr(self, '_grid_single'):
+
+                    # Get grid for this frequency.
+                    # TODO does not work for fixed surveys
+                    coords = [np.r_[self.survey.src_coords[i],
+                              self.survey.rec_coords[i]] for i in range(3)]
+
+                    # Use average frequency (log10).
+                    mfreq = 10**np.mean(np.log10(self.survey.frequencies))
+
+                    # Get grid and store it.
+                    self._grid_single = meshes.marine_csem_mesh(
+                            coords, freq=mfreq, verb=self.verb,
+                            **self.gridding_opts)
+
+                # Store link to grid.
+                self._dict_grid[source][freq] = self._grid_single
 
         # Return grid.
         return self._dict_grid[source][freq]
@@ -465,17 +550,55 @@ class Simulation:
         if self._dict_model[source][freq] is None:
 
             # Act depending on gridding:
-            if self.gridding in ['same', 'single']:
+            if self.gridding == 'same':  # Same grid as for provided model.
 
                 # Store link to model.
-                self._dict_model[source][freq] = self._model_comp
+                self._dict_model[source][freq] = self.model
+
+            elif self.gridding == 'frequency':  # Frequency-dependent grids.
+
+                # Initiate dict.
+                if not hasattr(self, '_model_frequency'):
+                    self._model_frequency = {}
+
+                # Get model for this frequency if not yet computed.
+                if freq not in self._model_frequency.keys():
+                    self._model_frequency[freq] = self.model.interpolate2grid(
+                            self.grid, self.get_grid(source, freq))
+
+                # Store link to model.
+                self._dict_model[source][freq] = self._model_frequency[freq]
+
+            elif self.gridding == 'source':  # Source-dependent grids.
+
+                # Initiate dict.
+                if not hasattr(self, '_model_source'):
+                    self._model_source = {}
+
+                # Get model for this source if not yet computed.
+                if source not in self._model_source.keys():
+                    self._model_source[freq] = self.model.interpolate2grid(
+                            self.grid, self.get_grid(source, freq))
+
+                # Store link to model.
+                self._dict_model[source][freq] = self._model_source[source]
 
             elif self.gridding == 'both':  # Src- & freq-dependent grids.
 
                 # Get model and store it.
-                model = self._model_comp.interpolate2grid(
-                            self._grid_comp, self.get_grid(source, freq))
-                self._dict_model[source][freq] = model
+                self._dict_model[source][freq] = self.model.interpolate2grid(
+                            self.grid, self.get_grid(source, freq))
+
+            else:  # Use a single grid for all sources and receivers.
+                # Default case; catches 'single' but also anything else.
+
+                # Get model if not yet computed.
+                if not hasattr(self, '_model_single'):
+                    self._model_single = self.model.interpolate2grid(
+                            self.grid, self.get_grid(source, freq))
+
+                # Store link to model.
+                self._dict_model[source][freq] = self._model_single
 
         # Return model.
         return self._dict_model[source][freq]
@@ -651,34 +774,89 @@ class Simulation:
         if reference:
             self.data['reference'] = self.data['synthetic'].copy()
 
-    # GRIDDING
-    def _initiate_model_grid(self, gridding):
-        """Initiate the computational grids and models."""
+    # AUTOMATED GRIDDING
+    def _initiate_model_grid(self, model, grid):
+        # In the marine case we assume that the sea-surface is at z=0.
+        #
+        # If the provided model does not reach the surface, we fill it up
+        # to the surface with the resistivities of the last provided layer,
+        # and add a 100 m thick air layer.
+        #
+        # So the model MUST contain at least one layer of sea water, from
+        # where the sea resistivity is deduced.
+        res_air = self.gridding_opts.pop('air_resistivity')
+        property_air = model.map.forward(1.0/res_air)
+        grid_type = self.gridding_opts.pop('type')
 
-        # Initiate grid- and model-dicts.
-        self._dict_grid = self._dict_initiate
-        self._dict_model = self._dict_initiate
+        # To return things in the appropriate dimension.
+        self._input_nCz = grid.nCz
 
-        if isinstance(gridding, str):
-            if gridding not in ['single', 'same']:
-                raise TypeError(f"Unknown `gridding`-option: '{gridding}'.")
+        def extend_property(prop, check, add_values, nadd):
 
-            self._grid_comp = self.grid
-            self._model_comp = self.model
-            self.gridding = gridding
+            if check is None:
+                prop_ext = None
 
-        elif isinstance(gridding, meshes.TensorMesh):
-            self._grid_comp = gridding
-            self._model_comp = self.model.interpolate2grid(self.grid, gridding)
-            self.gridding = 'single'
+            else:
+                prop_ext = np.zeros((grid.nCx, grid.nCy, grid.nCz+nadd))
+                prop_ext[:, :, :-nadd] = prop
+                if nadd == 2:
+                    prop_ext[:, :, -nadd] = prop[:, :, -1]
+                prop_ext[:, :, -1] = add_values
 
-        elif isinstance(gridding, dict):
-            for src, freq in self._srcfreq:
-                self._dict_grid[src][freq] = gridding.get(
-                        src, {}).get(freq, None)
-            self._grid_comp = self.grid
-            self._model_comp = self.model
-            self.gridding = 'both'
+            return prop_ext
+
+        if grid_type == 'marine' and grid.vectorNz[-1] < -0.01:
+            # Fill water and add air if highest depth is less then -1 cm.
+
+            # Extend hz.
+            hz_ext = np.r_[grid.hz, -max(grid.vectorNz), 100]
+
+            # Extend properties.
+            property_x = extend_property(
+                    model.property_x, model._property_x, property_air, 2)
+            property_y = extend_property(
+                    model.property_y, model._property_y, property_air, 2)
+            property_z = extend_property(
+                    model.property_z, model._property_z, property_air, 2)
+            mu_r = extend_property(model.mu_r, model._mu_r, 1, 2)
+            epsilon_r = extend_property(
+                    model.epsilon_r, model._epsilon_r, 1, 2)
+
+            # Store grid and model.
+            self.grid = meshes.TensorMesh(
+                    [grid.hx, grid.hy, hz_ext], x0=grid.x0)
+            self.model = models.Model(
+                    self.grid, property_x, property_y, property_z, mu_r,
+                    epsilon_r, mapping=model.map.name)
+
+        elif grid_type == 'marine' and abs(grid.vectorNz[-1]) < 0.01:
+            # Add air if highest depth is less then 1 cm.
+
+            # Extend hz.
+            hz_ext = np.r_[grid.hz, 100]
+
+            # Extend properties.
+            property_x = extend_property(
+                    model.property_x, model._property_x, property_air, 1)
+            property_y = extend_property(
+                    model.property_y, model._property_y, property_air, 1)
+            property_z = extend_property(
+                    model.property_z, model._property_z, property_air, 1)
+            mu_r = extend_property(model.mu_r, model._mu_r, 1, 1)
+            epsilon_r = extend_property(
+                    model.epsilon_r, model._epsilon_r, 1, 1)
+
+            # Store grid and model.
+            self.grid = meshes.TensorMesh(
+                    [grid.hx, grid.hy, hz_ext], x0=grid.x0)
+            self.model = models.Model(
+                    self.grid, property_x, property_y, property_z, mu_r,
+                    epsilon_r, mapping=model.map.name)
+
+        else:
+            # Just store provided grid and model.
+            self.grid = grid
+            self.model = model
 
     # DATA
     @property
@@ -698,7 +876,7 @@ class Simulation:
         if self._gradient is None:
             self._gradient = optimize.gradient(self)
 
-        return self._gradient
+        return self._gradient[:, :, :self._input_nCz]
 
     @property
     def misfit(self):

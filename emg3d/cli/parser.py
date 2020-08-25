@@ -231,5 +231,35 @@ def parse_config_file(args_dict):
         if wdata:
             simulation['data_weight_opts'] = wdata
 
+    # # Gridding # #
+
+    if 'gridding_opts' in cfg.sections():
+        grid = {}
+
+        # Int.
+        for key in ['type', ]:
+            if cfg.has_option('gridding_opts', key):
+                grid[key] = cfg.get('gridding_opts', key)
+
+        # Lists of floats.
+        for key in ['res', 'min_width', 'zval']:
+            if cfg.has_option('gridding_opts', key):
+                grid[key] = [float(v) for v in
+                             cfg.get('gridding_opts', key).split(',')]
+
+        # Float.
+        for key in ['air_resistivity', ]:
+            if cfg.has_option('gridding_opts', key):
+                grid[key] = cfg.getfloat('gridding_opts', key)
+
+        # Int.
+        for key in ['verb', ]:
+            if cfg.has_option('gridding_opts', key):
+                grid[key] = cfg.getint('gridding_opts', key)
+
+        # Add to simulation dict if not empty.
+        if grid:
+            simulation['gridding_opts'] = grid
+
     # Return.
     return {'files': files, 'simulation_options': simulation}, term
