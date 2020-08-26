@@ -211,3 +211,34 @@ class TestSimulation():
         grad = simulation.gradient
 
         assert grad.shape == self.model.shape
+
+
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+def test_source_strength():
+
+    # Create a simple survey; source with and source without strength.
+    strength = 5.678
+    srccoords = (0, 3000, -950, 0, 0)
+    sources = [surveys.Dipole('NoStrength', srccoords),
+               surveys.Dipole('Strength', srccoords, strength=strength)]
+    receivers = (np.arange(12)*500, 0, -1000, 0, 0)
+    frequencies = 1.0
+    survey = surveys.Survey('Test', sources, receivers, frequencies)
+
+    # Create a simple grid and model.
+    grid = meshes.TensorMesh(
+            [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
+            np.array([-1250, -1250, -2250]))
+    model = models.Model(grid, 1)
+
+    # Create a simulation, compute all fields.
+    simulation = simulations.Simulation(
+            'Test2', survey, grid, model, max_workers=1,
+            solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
+                         'linerelaxation': False, 'semicoarsening': False},
+            gridding='same')
+
+    simulation.compute()
+
+    data = survey.data['synthetic'].values
+    assert_allclose(data[0, :, :]*strength, data[1, :, :])

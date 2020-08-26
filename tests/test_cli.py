@@ -34,10 +34,21 @@ def test_basic(script_runner):
     # Exclude time to avoid errors.
     assert emg3d.utils.Report().__repr__()[115:] in ret.stdout
 
-    # Test emg3d/cli/_main_.py by calling the file.
+    # Test emg3d/cli/_main_.py by calling the file - I.
     ret = script_runner.run('python', 'emg3d/cli/main.py', '--version')
     assert ret.success
     assert emg3d.utils.__version__ in ret.stdout
+
+    # Test emg3d/cli/_main_.py by calling the file - II.
+    ret = script_runner.run('python', 'emg3d/cli/main.py', '--report')
+    assert ret.success
+    # Exclude time to avoid errors.
+    assert emg3d.utils.Report().__repr__()[115:] in ret.stdout
+
+    # Test emg3d/cli/_main_.py by calling the file - III.
+    ret = script_runner.run('python', 'emg3d/cli/main.py', '-d')
+    assert not ret.success
+    assert "CONFIGURATION FILE NOT FOUND" in ret.stderr
 
     os.environ["NUMBA_DISABLE_JIT"] = "0"
 

@@ -59,7 +59,6 @@ class Simulation:
         - `gridding` must be `'same'`;
         - `survey.fixed`: must be `False`;
         - sources and receivers must be electric;
-        - sources strength is always normalized to 1 Am.
         - Anything related to `optimization` is considered experimental/alpha,
           and might change in the future.
 
@@ -487,11 +486,18 @@ class Simulation:
         # Get source field if it is not stored yet.
         if self._dict_sfield[source][freq] is None:
 
+            # Get source and source strength.
+            src = self.survey.sources[source]
+            if hasattr(src, 'strength'):
+                strength = src.strength
+            else:
+                strength = 0
+
             sfield = fields.get_source_field(
                     grid=self.get_grid(source, frequency),
-                    src=self.survey.sources[source].coordinates,
+                    src=src.coordinates,
                     freq=frequency,
-                    strength=0)
+                    strength=strength)
 
             self._dict_sfield[source][freq] = sfield
 
