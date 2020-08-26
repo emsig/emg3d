@@ -146,11 +146,8 @@ def gradient(simulation):
 
     .. note::
 
-        The gradient has currently additional limitations to the one in
-        the `Simulation` class:
-
-        - Only x-directed, electric receivers (:math:`E_x`).
-        - Only isotropic models.
+        The gradient is currently only implemented for electric sources and
+        receivers with isotropic models.
 
 
     Parameters
@@ -165,12 +162,6 @@ def gradient(simulation):
         Adjoint-state gradient (same shape as simulation.model).
 
     """
-
-    # Check limitation 1: So far only x-directed electric receivers.
-    if sum([(r.azm != 0.0)+(r.dip != 0.0) for r in
-           simulation.survey.receivers.values()]) > 0:
-        raise NotImplementedError(
-                "Gradient only implemented for x-directed electric receivers.")
 
     # Check limitation 2: So far only isotropic models.
     if simulation.model.case != 0:

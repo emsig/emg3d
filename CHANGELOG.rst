@@ -35,8 +35,11 @@ latest
 
   - ``simulation``: takes new a ``verb`` parameter.
 
-  - ``optimize``: falls back new to ``synthetic`` instead of ``observed`` if
-    ```reference`` not found.
+  - ``optimize``:
+
+    - Gradient now possible for arbitrarily rotated sources and receivers.
+    - Falls back to ``synthetic`` instead of ``observed`` now if ``reference``
+      not found.
 
   - ``io``: ``np.bool_`` are converted back to ``bool`` when loading.
 
