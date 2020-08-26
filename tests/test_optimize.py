@@ -89,12 +89,6 @@ class TestOptimize():
 
     def test_errors(self):
 
-        # Rotated receivers.
-        simulation = self.simulation.copy()
-        simulation.survey.receivers['Rx01'].dip = 10
-        with pytest.raises(NotImplementedError, match='x-directed electric r'):
-            optimize.gradient(simulation)
-
         # Anisotropic models.
         simulation = self.simulation.copy()
         simulation.model = models.Model(self.grid, 1, 2, 3)
