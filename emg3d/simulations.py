@@ -1005,11 +1005,7 @@ class Simulation:
                 print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
 
     def _get_rfield(self, source, frequency):
-        """Return residual source field for given source and frequency.
-
-        => Only for Ex-field at the moment.
-
-        """
+        """Return residual source field for given source and frequency."""
 
         freq = float(frequency)
         grid = self.get_grid(source, frequency)
