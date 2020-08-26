@@ -192,16 +192,6 @@ def gradient(simulation):
         grad_y = np.zeros(vnC, order='F')
         grad_z = np.zeros(vnC, order='F')
 
-        # => TEST what is faster / more accurate.
-        #
-        # Here, we do
-        #   1. edges2cellaverages (Ex[comp] -> CC[comp])
-        #   2. grid2grid          (CC[comp] -> CC[model])
-        #
-        # How about the other way around?
-        #   1. grid2grid          (Ex[comp] -> Ex[model])
-        #   1. edges2cellaverages (Ex[model] -> CC[model])
-
         # Map the field to cell centers times volume.
         vol = simulation._dict_grid[src][freq].vol.reshape(vnC, order='F')
         maps.edges2cellaverages(ex=efield.fx, ey=efield.fy, ez=efield.fz,

@@ -56,7 +56,6 @@ class Simulation:
 
         The Simulation-class has currently a few limitations:
 
-        - `gridding` must be `'same'`;
         - `survey.fixed`: must be `False`;
         - sources and receivers must be electric;
         - sources strength is always normalized to 1 Am.
