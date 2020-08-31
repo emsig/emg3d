@@ -1,8 +1,4 @@
 """
-
-Model a survey
-==============
-
 A simulation is the computation (modelling) of electromagnetic responses of a
 resistivity (conductivity) model for a given survey.
 
@@ -11,7 +7,6 @@ with tri-axial electrical anisotropy. However, it contains most functionalities
 to also act as a modeller. The simulation module combines all these things
 by combining surveys with computational meshes and fields and providing
 high-level, specialised modelling routines.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

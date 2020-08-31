@@ -109,7 +109,8 @@ origin, with a 10 Hz signal of 1 A.
 
 .. code-block:: python
 
-    >>> model = emg3d.models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    >>> model = emg3d.models.Model(
+    >>>     grid, property_x=1.5, property_y=1.8, property_z=3.3)
     >>> sfield = emg3d.fields.get_source_field(
     >>>     grid, src=[0, 0, 0, 0, 0], freq=10.0)
 
@@ -117,9 +118,9 @@ Now we can compute the electric field with ``emg3d``:
 
 .. code-block:: python
 
-    >>> efield = emg3d.solve(grid, model, sfield, verb=3)
+    >>> efield = emg3d.solve(grid, model, sfield, verb=4)
 
-    :: emg3d START :: 15:24:40 :: v0.9.1
+    :: emg3d START :: 15:24:40 :: v0.13.0
 
        MG-cycle       : 'F'                 sslsolver : False
        semicoarsening : False [0]           tol       : 1e-06
@@ -176,8 +177,8 @@ many examples of how to use emg3d together with the mentioned projects and
 more!
 
 
-Tipps and Tricks
-----------------
+Tips and Tricks
+---------------
 
 The function :func:`emg3d.solver.solve` is the main entry point, and it takes
 care whether multigrid is used as a solver or as a preconditioner (or not at

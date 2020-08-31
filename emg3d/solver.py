@@ -1,11 +1,6 @@
 """
-
-Multigrid solver
-================
-
-The actual solver routines. The most computationally intensive parts, however,
-are in the :mod:`emg3d.core` as numba-jitted functions.
-
+The actual multigrid solver routines. The most computationally intensive parts,
+however, are in the :mod:`emg3d.core` as numba-jitted functions.
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

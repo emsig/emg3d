@@ -1,10 +1,5 @@
 """
-
-I/O utilities
-=============
-
 Utility functions for writing and reading data.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

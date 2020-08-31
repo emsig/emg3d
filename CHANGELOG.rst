@@ -43,6 +43,8 @@ latest
 
   - ``io``: ``np.bool_`` are converted back to ``bool`` when loading.
 
+  - Re-arrange, improve, and update documentation.
+
 
 *v0.12.0* : Survey & Simulation
 -------------------------------
