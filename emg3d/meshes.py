@@ -1,10 +1,5 @@
 """
-
-Discretization
-==============
-
 Everything related to meshes appropriate for the multigrid solver.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

@@ -1,11 +1,6 @@
 """
-
-Interpolation routines
-======================
-
 Interpolation routines mapping grids to grids, grids to fields, and fields to
 grids.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

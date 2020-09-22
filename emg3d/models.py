@@ -1,10 +1,5 @@
 """
-
-Earth properties
-================
-
 Everything to create model-properties for the multigrid solver.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

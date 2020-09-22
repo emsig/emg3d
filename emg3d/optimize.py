@@ -146,8 +146,8 @@ def gradient(simulation):
 
     .. note::
 
-        The gradient is currently only implemented for electric sources and
-        receivers with isotropic models.
+        The gradient is currently implemented only for electric sources and
+        receivers and only for isotropic models.
 
 
     Parameters

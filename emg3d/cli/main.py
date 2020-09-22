@@ -1,10 +1,5 @@
 """
-
-Command-line interface (CLI)
-============================
-
 Entry point for the command-line interface (CLI).
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

@@ -1,10 +1,5 @@
 """
-
-Surveys
-=======
-
 A survey stores a set of sources, receivers, and the measured data.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #
