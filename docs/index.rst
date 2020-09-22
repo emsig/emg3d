@@ -30,5 +30,9 @@ Version: |version| ~ Date: |today|
    :hidden:
    :caption: API
 
-   solver
-   code
+   code-solv
+   code-msaf
+   code-sas
+   code-opt
+   code-utio
+   code-cli

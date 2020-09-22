@@ -1,10 +1,5 @@
 """
-
-Driver function for CLI
-=======================
-
 Functions that actually call emg3d within the CLI interface.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

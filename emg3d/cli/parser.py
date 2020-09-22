@@ -1,10 +1,5 @@
 """
-
-Parser for CLI config file
-==========================
-
 Parser for the configuration file of the command-line interface.
-
 """
 # Copyright 2018-2020 The emg3d Developers.
 #

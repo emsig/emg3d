@@ -6,8 +6,11 @@ recent versions
 """""""""""""""
 
 
-latest
-------
+*v0.13.0* : CLI
+---------------
+
+**2020-09-22**
+
 
 - New Module ``cli`` for command-line interaction:
 
@@ -15,6 +18,11 @@ latest
   ``Simulation``, and also to compute the misfit of it with respect to some
   data and the gradient of the misfit function. See the section "CLI interface"
   in the documentation for more info.
+
+
+*Note that, while* ``cli`` *(v0.13.0) and* ``optimize`` *(v0.12.0) are
+implemented, they are still in development and are likely going to change
+throughout the next two minor releases or so.*
 
 - Other changes:
 
@@ -42,6 +50,8 @@ latest
       not found.
 
   - ``io``: ``np.bool_`` are converted back to ``bool`` when loading.
+
+  - Re-arrange, improve, and update documentation.
 
 
 *v0.12.0* : Survey & Simulation
