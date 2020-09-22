@@ -242,13 +242,6 @@ Please make sure your code follows the pep8-guidelines by using, for instance,
 the python module ``flake8``, and also that your code is covered with
 appropriate tests. Just get in touch if you have any doubts.
 
-The structure of ``emg3d`` is:
-
-- ``solver``: These are the main routines, the flow of the multigrid method;
-- ``njited``: The expensive parts (computation, memory) are here in jitted
-  functions; and
-- ``utils``: Some helper routines.
-
 
 Tests and benchmarks
 --------------------
