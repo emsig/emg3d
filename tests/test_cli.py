@@ -158,7 +158,8 @@ class TestParser:
             f.write("[simulation]\n")
             f.write("max_workers=5\n")
             f.write("gridding=fancything\n")
-            f.write("name=PyTest simulation")
+            f.write("name=PyTest simulation\n")
+            f.write("min_offset=1320")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -166,6 +167,7 @@ class TestParser:
         assert cfg['simulation_options']['max_workers'] == 5
         assert cfg['simulation_options']['gridding'] == 'fancything'
         assert cfg['simulation_options']['name'] == "PyTest simulation"
+        assert cfg['simulation_options']['min_offset'] == 1320.0
 
     def test_solver(self, tmpdir):
 
@@ -186,26 +188,6 @@ class TestParser:
         assert test['cycle'] == 'V'
         assert test['tol'] == 0.0001
         assert test['nu_init'] == 2
-
-    def test_dataweigths(self, tmpdir):
-
-        # Write a config file.
-        config = os.path.join(tmpdir, 'emg3d.cfg')
-        with open(config, 'w') as f:
-            f.write("[data_weight_opts]\n")
-            f.write("reference=synthetic\n")
-            f.write("gamma_d=2.0\n")
-            f.write("noise_floor=1e-4\n")
-            f.write("min_off=0")
-
-        args_dict = self.args_dict.copy()
-        args_dict['config'] = config
-        cfg, term = cli.parser.parse_config_file(args_dict)
-        test = cfg['simulation_options']['data_weight_opts']
-        assert test['reference'] == 'synthetic'
-        assert test['gamma_d'] == 2.0
-        assert test['noise_floor'] == 0.0001
-        assert test['min_off'] == 0
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -231,7 +213,10 @@ class TestRun:
         name='CLI Survey',
         sources=(4125, 4000, 4000, 0, 0),
         receivers=(np.arange(17)*250+2000, 4000, 3950, 0, 0),
-        frequencies=1)
+        frequencies=1,
+        noise_floor=1e-15,
+        relative_error=0.05,
+    )
 
     # Create a dummy grid and model.
     xx = np.ones(16)*500

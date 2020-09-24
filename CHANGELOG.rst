@@ -5,6 +5,15 @@ Changelog
 recent versions
 """""""""""""""
 
+- ``survey``: A ``Survey`` has new attributes ``standard_error``,
+  ``noise_floor``, and ``relative_error``.
+- ``simulation``: ``compute()`` takes a new argument, ``add_noise``. If
+  ``observerd=True`` and ``add_noise=True``, random noise is added to the
+  observed data. ``reference`` is not an argument any longer, there is no
+  ``reference`` model in the new data weighting.
+- ``optimize``: Completely changed misfit and data-weighting to more sensible
+  functions. Check the API for the new formulae.
+
 
 *v0.13.0* : CLI
 ---------------

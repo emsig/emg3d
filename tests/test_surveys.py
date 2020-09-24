@@ -30,6 +30,22 @@ class TestSurvey():
         assert 'Test' in srvy._repr_html_()
         assert 'Coordinates' in srvy._repr_html_()
 
+        with pytest.raises(TypeError, match="Unexpected "):
+            surveys.Survey('Test', sources, receivers, frequencies, bla='a')
+
+    def test_standard_deviation(self):
+        sources = (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0)
+        receivers = ([1000, 2000, 3000, 4000], 2000, -1000, 0, 0)
+        frequencies = (1, 0.1, 2, 3)
+        nf = 1e-15
+        re = 0.05
+        srvy = surveys.Survey('Test', sources, receivers, frequencies,
+                              relative_error=re, noise_floor=nf)
+
+        assert srvy.noise_floor == nf
+        assert srvy.relative_error == re
+        # TODO
+
     def test_dipole_info_to_dict(self):
         # == 1. List ==
         s_list = [surveys.Dipole('Tx0', (0, 0, 0, 0, 0)),
@@ -164,7 +180,6 @@ class TestSurvey():
         assert srvy3.sources == srvy4.sources
 
         # Also check to_file()/from_file().
-        srvy4.data['reference'] = srvy4.data['observed'].copy()*2
         srvy4.to_file(tmpdir+'/test.npz')
         srvy5 = surveys.Survey.from_file(tmpdir+'/test.npz')
         assert srvy4.name == srvy5.name
@@ -173,7 +188,6 @@ class TestSurvey():
         assert srvy4.frequencies == srvy5.frequencies
         assert srvy4.fixed == srvy5.fixed
         assert_allclose(srvy4.data.observed, srvy5.data.observed)
-        assert_allclose(srvy4.data.reference, srvy5.data.reference)
 
         # Test backwards compatibility.
         srvy5 = srvy5.to_dict()

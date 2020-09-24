@@ -515,6 +515,27 @@ def test_mgparameters():
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
                             linerelaxation=False, vnC=(1, 2, 3), verb=1)
 
+    # 5. Bad grid size
+    inp = {'cycle': 'F', 'sslsolver': False, 'semicoarsening': False,
+           'linerelaxation': False, 'verb': 1}
+    txt = ":: Grid not optimal for MG solver ::"
+
+    # One large prime => warning.
+    var = solver.MGParameters(vnC=(11*2**3, 2**5, 2**4), **inp)
+    assert txt in var.__repr__()
+
+    # Large primes, but clevel smaller => no warning.
+    var = solver.MGParameters(vnC=(11*2**5, 11*2**4, 11*2**5), clevel=4, **inp)
+    assert txt not in var.__repr__()
+
+    # Large primes, clevel bigger => warning.
+    var = solver.MGParameters(vnC=(11*2**5, 11*2**4, 11*2**5), clevel=5, **inp)
+    assert txt in var.__repr__()
+
+    # Only 2 times dividable => warning.
+    var = solver.MGParameters(vnC=(2**3, 2**3, 2**3), **inp)
+    assert txt in var.__repr__()
+
 
 def test_RegularGridProlongator():
 

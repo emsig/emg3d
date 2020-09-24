@@ -23,7 +23,7 @@ import logging
 
 import numpy as np
 
-from emg3d import io, utils, simulations
+from emg3d import io, utils, surveys, simulations
 from emg3d.cli import parser
 
 
@@ -70,6 +70,41 @@ def simulation(args_dict):
     # Load input.
     sdata = io.load(cfg['files']['survey'], verb=verb_io)
     mdata = io.load(cfg['files']['model'], verb=verb_io)
+    min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
+
+    # Select data.
+    data = cfg['data']
+    if data:
+
+        # Get a dict.
+        tdata = sdata['survey']
+        tdict = tdata.to_dict()
+
+        # Select sources.
+        if 'sources' in data.keys():
+            tdata._data = tdata.data.sel(src=data['sources'])
+            tdict['sources'] = {
+                    k: tdict['sources'][k] for k in data['sources']}
+
+        # Select receivers.
+        if 'receivers' in data.keys():
+            tdata._data = tdata.data.sel(rec=data['receivers'])
+            tdict['receivers'] = {
+                    k: tdict['receivers'][k] for k in data['receivers']}
+
+        # Select frequencies.
+        if 'frequencies' in data.keys():
+            tdata._data = tdata.data.sel(freq=data['frequencies'])
+            tdict['frequencies'] = data['frequencies']
+
+        # Replace with selected data.
+        for key in tdict['data'].keys():
+            tdict['data'][key] = tdata.data[key].data
+
+        # Get new survey from reduced dict.
+        sdata['survey'] = surveys.Survey.from_dict(tdict)
+
+    # Create simulation.
     sim = simulations.Simulation(
             survey=sdata['survey'],
             grid=mdata['mesh'],
@@ -91,6 +126,9 @@ def simulation(args_dict):
     # Compute forward model (all calls).
     if dry_run:
         output['data'] = np.zeros_like(sim.data.synthetic)
+    elif function == 'forward':
+        sim.compute(observed=True, min_offset=min_offset)
+        output['data'] = sim.data.observed
     else:
         sim.compute()
         output['data'] = sim.data.synthetic
@@ -101,6 +139,7 @@ def simulation(args_dict):
             output['misfit'] = 0.0
         else:
             output['misfit'] = sim.misfit
+        output['n_observations'] = sim.survey.size
 
     # Compute the gradient.
     if function == 'gradient':

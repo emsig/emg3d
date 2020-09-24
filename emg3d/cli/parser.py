@@ -167,7 +167,11 @@ def parse_config_file(args_dict):
     if cfg.has_option('simulation', key):
         simulation[key] = cfg.get('simulation', key)
     else:
-        simulation['name'] = "emg3d CLI run"
+        simulation[key] = "emg3d CLI run"
+
+    key = 'min_offset'
+    if cfg.has_option('simulation', key):
+        simulation[key] = cfg.getfloat('simulation', key)
 
     # # Solver parameters  # #
 
@@ -203,28 +207,13 @@ def parse_config_file(args_dict):
         if solver:
             simulation['solver_opts'] = solver
 
-    # # Data weighting # #
+    # # Data selection parameters  # #
 
-    # Check if wdata-section exists; otherwise no data weighting.
-    if 'data_weight_opts' in cfg.sections():
-
-        # Initiate wdata-dict.
-        wdata = {}
-
-        # Check for reference.
-        key = 'reference'
-        if cfg.has_option('data_weight_opts', key):
-            wdata[key] = cfg.get('data_weight_opts', key)
-
-        # Check for other parameters.
-        keys = ['gamma_d', 'beta_d', 'beta_f', 'noise_floor', 'min_off']
-        for key in keys:
-            if cfg.has_option('data_weight_opts', key):
-                wdata[key] = cfg.getfloat('data_weight_opts', key)
-
-        # Add to simulation dict if not empty.
-        if wdata:
-            simulation['data_weight_opts'] = wdata
+    data = {}
+    if 'data' in cfg.sections():
+        for key, value in cfg['data'].items():
+            data[key] = [v.strip() for v in cfg.get('data', key).split(',')]
 
     # Return.
-    return {'files': files, 'simulation_options': simulation}, term
+    out = {'files': files, 'simulation_options': simulation, 'data': data}
+    return out, term

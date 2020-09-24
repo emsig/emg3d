@@ -290,8 +290,8 @@ class _Map:
         """Mapping to conductivity."""
         raise NotImplementedError("Backward map not implemented.")
 
-    def derivative(self, gradient, conductivity):
-        """Map derivative from conductivity back to mapping space."""
+    def derivative(self, gradient, mapped):
+        """Map gradient from conductivity to mapping space."""
         raise NotImplementedError("Derivative map not implemented.")
 
 
@@ -312,7 +312,7 @@ class MapConductivity(_Map):
     def backward(self, mapped):
         return mapped
 
-    def derivative(self, gradient, conductivity):
+    def derivative(self, gradient, mapped):
         pass
 
 
@@ -333,8 +333,8 @@ class MapLgConductivity(_Map):
     def backward(self, mapped):
         return 10**mapped
 
-    def derivative(self, gradient, conductivity):
-        gradient /= conductivity*np.log(10)
+    def derivative(self, gradient, mapped):
+        gradient /= self.backward(mapped)*np.log(10)
 
 
 class MapLnConductivity(_Map):
@@ -354,8 +354,8 @@ class MapLnConductivity(_Map):
     def backward(self, mapped):
         return np.exp(mapped)
 
-    def derivative(self, gradient, conductivity):
-        gradient /= conductivity
+    def derivative(self, gradient, mapped):
+        gradient /= self.backward(mapped)
 
 
 class MapResistivity(_Map):
@@ -375,8 +375,8 @@ class MapResistivity(_Map):
     def backward(self, mapped):
         return 1.0/mapped
 
-    def derivative(self, gradient, conductivity):
-        gradient /= -conductivity**2
+    def derivative(self, gradient, mapped):
+        gradient /= -self.backward(mapped)**2
 
 
 class MapLgResistivity(_Map):
@@ -396,8 +396,8 @@ class MapLgResistivity(_Map):
     def backward(self, mapped):
         return 10**-mapped
 
-    def derivative(self, gradient, conductivity):
-        gradient /= -conductivity*np.log(10)
+    def derivative(self, gradient, mapped):
+        gradient /= -self.backward(mapped)*np.log(10)
 
 
 class MapLnResistivity(_Map):
@@ -417,8 +417,8 @@ class MapLnResistivity(_Map):
     def backward(self, mapped):
         return np.exp(mapped**-1)
 
-    def derivative(self, gradient, conductivity):
-        gradient /= -conductivity
+    def derivative(self, gradient, mapped):
+        gradient /= -self.backward(mapped)
 
 
 # VOLUME AVERAGING

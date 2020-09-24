@@ -37,10 +37,12 @@ example; remove the comment signs to use them.
   # Simulation parameters
   # ---------------------
   # Input parameters for the `Simulation` class, except for `solver_opts` and
-  # `data_weight_opts` (defined in their own section).
+  # `data_weight_opts` (defined in their own section), but including the
+  # parameter `add_noise` for `compute()`.
   [simulation]
-  # max_workers = 4            # Also via -n or --nproc
-  # gridding = same            # Default will change in the future
+  # max_workers = 4    # Also via -n or --nproc
+  # gridding = same    # Default will change in the future
+  # min_offset = 0.0   # Only relevant if `observed=True` (r<r_min set to NaN).
 
   # Solver options
   # --------------
@@ -57,15 +59,12 @@ example; remove the comment signs to use them.
   # linerelaxation = True
   # verb = 0
 
-  # Data weighting options
-  # ----------------------
-  # Data weigthing options.
-  # See https://emg3d.readthedocs.io/en/stable/simulation.html for a list of
-  # all parameters.
-  [data_weight_opts]
-  # gamma_d = 0.5
-  # beta_d = 1.0
-  # beta_f = 0.25
-  # noise_floor = 1e-15
-  # min_off = 1000
-  # reference = reference
+  # Data
+  # ----
+  # Select which sources, receivers, and frequencies of the survey are used. By
+  # default all data is used. These are comma-separated lists.
+  #
+  [data]
+  # sources = Tx02, Tx08, Tx14
+  # receivers = Rx01, Rx10
+  # frequencies = 0.5, 0.75
