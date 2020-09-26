@@ -21,9 +21,17 @@ however, are in the :mod:`emg3d.core` as numba-jitted functions.
 import itertools
 from dataclasses import dataclass
 
+import discretize  # TODO: handle soft dependency
 import numpy as np
 import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
+
+try:
+    from tqdm.contrib.concurrent import process_map
+except ImportError:
+    # If you have tqdm installed, but don't want to use it, simply do
+    # `emg3d.simulation.process_map = emg3d.utils._process_map`.
+    from emg3d.utils import _process_map as process_map
 
 from emg3d import core, meshes, models, fields, utils
 
@@ -428,6 +436,95 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         return efield
     elif var.return_info:                  # info.
         return info_dict
+
+
+class Solver:
+
+    # `tqdm`-options; undocumented for the moment.
+    # This is likely to change with regards to verbosity and logging.
+    _tqdm_opts = {
+        'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]'
+    }
+
+    def __init__(self, grid, model, sfield, solver_opts=None, **kwargs):
+
+        # TODO - should we check input?
+        # check = kwargs.pop('check', True)
+
+        # Ensure no kwargs left.
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+
+        if solver_opts is None:
+            solver_opts = {}
+
+        self.max_workers = solver_opts.pop('max_workers', 4)
+        self.solver_opts = {
+            'sslsolver': True,       # Most expensive settings (CPU, RAM),
+            'semicoarsening': True,  # but most robust, so we use them at the
+            'linerelaxation': True,  # risk of slower performance.
+            'verb': 0,
+            **solver_opts,  # User settings overwrite above but not below.
+            'return_info': True,
+        }
+
+        # Cast input to tuples.
+        if isinstance(grid, discretize.TensorMesh):
+            grid = (grid, )
+        if isinstance(model, models.Model):
+            model = (model, )
+        if isinstance(sfield, fields.SourceField):
+            sfield = (sfield, )
+
+        # Get sizes and max size.
+        sizes = np.array([len(grid), len(model), len(sfield)])
+        length = sizes.max()
+
+        # Ensure they are all of length 1 or nmax.
+        if np.unique(sizes[sizes != 1]).size > 1:
+            msg = ("All input tuples must have same length or length of one.\n"
+                   f"Provided: lengths of [grid, model, sfield]: {sizes}.")
+            raise TypeError(msg)
+
+        # Get a list for process_map.
+        fact = length//sizes
+        self.plist = list(zip(grid*fact[0], model*fact[1], sfield*fact[2]))
+
+    def _solve(self, inp):
+        """Wrapper of solver for `concurrent.futures`."""
+        return solve(*inp, **self.solver_opts)
+
+    def fields(self):
+
+        out = process_map(
+                self._solve,
+                self.plist,
+                max_workers=self.max_workers,
+                **{'desc': 'emg3d solve', **self._tqdm_opts},
+        )
+        info = []
+        fiel = []
+        for i, val in enumerate(out):
+            fiel.append(val[0])
+            info.append(val[1])
+        self._info = info
+
+        return fiel
+
+    def info(self):
+        return getattr(self, '_info', None)
+
+    def warn(self):
+        if getattr(self, '_info', None) is not None:
+
+            warned = False  # Flag for warnings.
+            for i, info in enumerate(self._info):
+
+                if info['exit'] != 0:
+                    if not warned:
+                        print("Solver warnings:")
+                        warned = True
+                    print(f"- {i} : {info['exit_message']}")
 
 
 # SOLVERS
