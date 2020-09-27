@@ -21,7 +21,6 @@ however, are in the :mod:`emg3d.core` as numba-jitted functions.
 import itertools
 from dataclasses import dataclass
 
-import discretize  # TODO: handle soft dependency
 import numpy as np
 import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
@@ -439,6 +438,22 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
 
 class Solver:
+    """
+
+    TODOs:
+    - Document properly.
+    - Test.
+    - Adjust Simulation-class to use it.
+    - if models are ndarrays instead of Model instances, mapping must be
+      provided. This approach is not possible for epsilon_r, mu_r.
+    - If sfields are ndarrays instead of SourceField instances, frequencies
+      must be provided, which must have the same length as sfields.
+      Source strength cannot be set in this way.
+
+    grids, model, and sfields must all be iterables.
+
+
+    """
 
     # `tqdm`-options; undocumented for the moment.
     # This is likely to change with regards to verbosity and logging.
@@ -446,17 +461,23 @@ class Solver:
         'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]'
     }
 
-    def __init__(self, grid, model, sfield, solver_opts=None, **kwargs):
+    def __init__(self, grid_tuple, model_tuple, sfield_tuple, **kwargs):
 
-        # TODO - should we check input?
-        # check = kwargs.pop('check', True)
+        mapping = kwargs.pop('mapping', None)
+        frequencies = kwargs.pop('frequencies', None)
+        solver_opts = kwargs.pop('solver_opts', {})
 
         # Ensure no kwargs left.
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
-        if solver_opts is None:
-            solver_opts = {}
+        # Ensure the user did not provide parameters which cannot be set in
+        # solver_opts.
+        not_possible = ['grid', 'model', 'sfield', 'efield', 'return_info']
+        for key in not_possible:
+            val = solver_opts.pop(key, None)
+            if val is not None:
+                print(f"Warning: `{key}` cannot be set through `solver_opts`.")
 
         self.max_workers = solver_opts.pop('max_workers', 4)
         self.solver_opts = {
@@ -468,27 +489,44 @@ class Solver:
             'return_info': True,
         }
 
-        # Cast input to tuples.
-        if isinstance(grid, discretize.TensorMesh):
-            grid = (grid, )
-        if isinstance(model, models.Model):
-            model = (model, )
-        if isinstance(sfield, fields.SourceField):
-            sfield = (sfield, )
-
         # Get sizes and max size.
-        sizes = np.array([len(grid), len(model), len(sfield)])
+        sizes = np.array(
+                [len(grid_tuple), len(model_tuple), len(sfield_tuple)]
+        )
         length = sizes.max()
 
         # Ensure they are all of length 1 or nmax.
         if np.unique(sizes[sizes != 1]).size > 1:
             msg = ("All input tuples must have same length or length of one.\n"
-                   f"Provided: lengths of [grid, model, sfield]: {sizes}.")
+                   "Provided tuple lengths "
+                   f"[grid_tuple, model_tuple, sfield_tuple]: {sizes}.")
             raise TypeError(msg)
 
+        # Expand inputs if necessary.
+        fac = length//sizes
+        grid_tuple = grid_tuple*fac[0]
+        model_tuple = model_tuple*fac[1]
+        sfield_tuple = sfield_tuple*fac[2]
+
+        # Create Models if ndarrays where provided.
+        if mapping is not None:
+            model_tuple = [
+                models.Model(grid_tuple[i], model_tuple[i], mapping=mapping)
+                for i, m in enumerate(model_tuple)
+            ]
+
+        # Create SourceFields if ndarrays (vectors) where provided.
+        if frequencies is not None:
+            sfield_tuple = [
+                    fields.SourceField(
+                        grid_tuple[i],
+                        -1j*2*np.pi*frequencies[i]*sfield_tuple[i]*fields.mu_0,
+                        freq=frequencies[i])
+                    for i, m in enumerate(sfield_tuple)
+            ]
+
         # Get a list for process_map.
-        fact = length//sizes
-        self.plist = list(zip(grid*fact[0], model*fact[1], sfield*fact[2]))
+        self.plist = list(zip(grid_tuple, model_tuple, sfield_tuple))
 
     def _solve(self, inp):
         """Wrapper of solver for `concurrent.futures`."""
@@ -514,7 +552,7 @@ class Solver:
     def info(self):
         return getattr(self, '_info', None)
 
-    def warn(self):
+    def print_warnings(self, msg='- '):
         if getattr(self, '_info', None) is not None:
 
             warned = False  # Flag for warnings.
@@ -524,7 +562,7 @@ class Solver:
                     if not warned:
                         print("Solver warnings:")
                         warned = True
-                    print(f"- {i} : {info['exit_message']}")
+                    print(f"{msg}{i} : {info['exit_message']}")
 
 
 # SOLVERS
