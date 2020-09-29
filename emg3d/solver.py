@@ -458,6 +458,8 @@ class Solver:
 
     doc: `check=True` to switch-off checks
 
+    - only property_{x;y;z}
+
 
     """
 
@@ -585,23 +587,29 @@ class Solver:
 
         # Create Models if ndarrays where provided.
         if mapping is not None:
-            model_tuple = [
-                models.Model(grid_tuple[i], model_tuple[i], mapping=mapping)
-                for i, m in enumerate(model_tuple)
-            ]
+            model_list = []
+            for i, m in enumerate(model_tuple):
+                m = np.atleast_2d(m.T).T
+                model = models.Model(
+                    grid_tuple[i],
+                    property_x=m[:, 0],
+                    property_y=None if m.shape[1] < 2 else m[:, 1],
+                    property_z=None if m.shape[1] < 3 else m[:, 2],
+                    mapping=mapping)
+                model_list.append(model)
 
         # Create SourceFields if ndarrays (vectors) where provided.
         if frequencies is not None:
-            sfield_tuple = [
-                    fields.SourceField(
-                        grid_tuple[i],
-                        -1j*2*np.pi*frequencies[i]*sfield_tuple[i]*fields.mu_0,
-                        freq=frequencies[i])
-                    for i, m in enumerate(sfield_tuple)
-            ]
+            sfield_list = []
+            for i, s in enumerate(sfield_tuple):
+                sfield = fields.SourceField(
+                    grid_tuple[i],
+                    -1j*2*np.pi*frequencies[i]*s*fields.mu_0,
+                    freq=frequencies[i])
+                sfield_list.append(sfield)
 
         # Get a list for process_map.
-        return list(zip(grid_tuple, model_tuple, sfield_tuple))
+        return list(zip(grid_tuple, model_list, sfield_list))
 
 
 # SOLVERS
