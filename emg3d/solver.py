@@ -440,6 +440,10 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 class Solver:
     """
 
+    This is a higher level `solve` routine wrapped as a class. It uses the most
+    expensive but most robust settings by default, and caries out various tests
+    on the input data.
+
     TODOs:
     - Document properly.
     - Test.
@@ -452,6 +456,8 @@ class Solver:
 
     grids, model, and sfields must all be iterables.
 
+    doc: `check=True` to switch-off checks
+
 
     """
 
@@ -461,15 +467,11 @@ class Solver:
         'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]'
     }
 
-    def __init__(self, grid_tuple, model_tuple, sfield_tuple, **kwargs):
+    def __init__(self, max_workers=4, check_grid=True, **solver_opts):
 
-        mapping = kwargs.pop('mapping', None)
-        frequencies = kwargs.pop('frequencies', None)
-        solver_opts = kwargs.pop('solver_opts', {})
-
-        # Ensure no kwargs left.
-        if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+        # Store max_workers and check_grid.
+        self.max_workers = max_workers
+        self.check_grid = check_grid
 
         # Ensure the user did not provide parameters which cannot be set in
         # solver_opts.
@@ -479,7 +481,7 @@ class Solver:
             if val is not None:
                 print(f"Warning: `{key}` cannot be set through `solver_opts`.")
 
-        self.max_workers = solver_opts.pop('max_workers', 4)
+        # Collect remaining solver_opts; set defaults.
         self.solver_opts = {
             'sslsolver': True,       # Most expensive settings (CPU, RAM),
             'semicoarsening': True,  # but most robust, so we use them at the
@@ -488,6 +490,79 @@ class Solver:
             **solver_opts,  # User settings overwrite above but not below.
             'return_info': True,
         }
+
+    def _solve(self, inp):
+        """Wrapper of solver for `concurrent.futures`."""
+        return solve(*inp, **self.solver_opts)
+
+    def solve(self, grid_tuple, model_tuple, sfield_tuple, mapping=None,
+              frequencies=None):
+
+        # Get map list if input provided.
+        process_list = self._set_map_process_list(
+                grid_tuple, model_tuple, sfield_tuple, mapping, frequencies)
+
+        # Check if grids are appropriate for emg3d.
+        self._check_grid(grid_tuple)
+
+        # Solve it using a process_map.
+        out = process_map(
+                self._solve,
+                process_list,
+                max_workers=self.max_workers,
+                **{'desc': 'emg3d solve', **self._tqdm_opts},
+        )
+
+        # Store info and return fields.
+        info = []
+        fiel = []
+        for i, val in enumerate(out):
+            fiel.append(val[0])
+            info.append(val[1])
+        self._info = info
+
+        return fiel
+
+    @property
+    def info(self):
+        return getattr(self, '_info', None)
+
+    def print_warnings(self, msg='- '):
+        if getattr(self, '_info', None) is not None:
+
+            warned = False  # Flag for warnings.
+            for i, info in enumerate(self._info):
+
+                if info['exit'] != 0:
+                    if not warned:
+                        print("Solver warnings:")
+                        warned = True
+                    print(f"{msg}{i} : {info['exit_message']}")
+
+    def _check_grid(self, grid_tuple):
+        if not self.check_grid:
+            return
+
+        good_numbers = meshes.get_cell_numbers(
+                max_nr=50000, max_prime=5, min_div=0)  # Extreme values
+
+        for grid in grid_tuple:
+
+            # Ensure meshes are TensorMesh.
+            if not isinstance(grid, meshes.dTensorMesh):
+                raise TypeError("Mesh must a TensorMesh.")
+
+            # Ensure it is a 3D mesh.
+            if grid.dim != 3:
+                raise TypeError('Mesh must be 3D.')
+
+        # Check mesh dimensions, warn if not optimal.
+        if any(nC not in good_numbers for nC in grid.vnC):
+            print(f"Warning: mesh dimension {(grid.vnC)} is not optimal "
+                  f"for MG solver.\nGood numbers are:\n{good_numbers}")
+
+    def _set_map_process_list(
+            self, grid_tuple, model_tuple, sfield_tuple, mapping, frequencies):
 
         # Get sizes and max size.
         sizes = np.array(
@@ -526,43 +601,7 @@ class Solver:
             ]
 
         # Get a list for process_map.
-        self.plist = list(zip(grid_tuple, model_tuple, sfield_tuple))
-
-    def _solve(self, inp):
-        """Wrapper of solver for `concurrent.futures`."""
-        return solve(*inp, **self.solver_opts)
-
-    def fields(self):
-
-        out = process_map(
-                self._solve,
-                self.plist,
-                max_workers=self.max_workers,
-                **{'desc': 'emg3d solve', **self._tqdm_opts},
-        )
-        info = []
-        fiel = []
-        for i, val in enumerate(out):
-            fiel.append(val[0])
-            info.append(val[1])
-        self._info = info
-
-        return fiel
-
-    def info(self):
-        return getattr(self, '_info', None)
-
-    def print_warnings(self, msg='- '):
-        if getattr(self, '_info', None) is not None:
-
-            warned = False  # Flag for warnings.
-            for i, info in enumerate(self._info):
-
-                if info['exit'] != 0:
-                    if not warned:
-                        print("Solver warnings:")
-                        warned = True
-                    print(f"{msg}{i} : {info['exit_message']}")
+        return list(zip(grid_tuple, model_tuple, sfield_tuple))
 
 
 # SOLVERS
