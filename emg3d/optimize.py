@@ -59,7 +59,7 @@ def misfit(simulation):
 
     The data weight of observation :math:`d_i` is given by :math:`W_i =
     \varsigma^{-1}_i`, where :math:`\varsigma_i` is the standard deviation of
-    the observation.
+    the observation (see :attr:`emg3d.surveys.Survey.standard_deviation`).
 
     .. note::
 

@@ -578,7 +578,7 @@ class Simulation:
             NaN.
 
         min_offset : float
-            Default to 0.0. Data in `data.observed` where the offset <
+            Default is 0.0. Data in `data.observed` where the offset <
             min_offset are set to NaN.
 
         """
@@ -859,7 +859,7 @@ class Simulation:
             residual = self.data.residual.loc[source, name, freq].data
             if np.isnan(residual):
                 continue
-            strength = self.data.residual.loc[source, name, freq].data.conj()
+            strength = residual.conj()
             strength *= self.data.weights.loc[source, name, freq].data.conj()
             strength /= ResidualField.smu0
 

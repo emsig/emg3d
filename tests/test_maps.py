@@ -97,118 +97,123 @@ def test_grid2grid_volume():
     assert_allclose(np.sum(values_out*vol_out), np.sum(values_in*vol_in))
 
 
-def test_grid2grid():
-    igrid = meshes.TensorMesh(
-            [np.array([1, 1]), np.array([1]), np.array([1])],
-            [0, 0, 0])
-    ogrid = meshes.TensorMesh(
-            [np.array([1]), np.array([1]), np.array([1])],
-            [0, 0, 0])
-    values = np.array([1.0, 2.0]).reshape(igrid.vnC)
+class TestGrid2grid():
 
-    # Provide wrong dimension:
-    with pytest.raises(ValueError, match='There are 2 points and 1 values'):
-        maps.grid2grid(igrid, values[1:, :, :], ogrid)
+    def test_linear(self):
+        igrid = meshes.TensorMesh(
+                [np.array([1, 1]), np.array([1, 1, 1]), np.array([1, 1, 1])],
+                [0, -1, -1])
+        ogrid = meshes.TensorMesh(
+                [np.array([1]), np.array([1]), np.array([1])],
+                [0.5, 0, 0])
+        values = np.r_[9*[1.0, ], 9*[2.0, ]].reshape(igrid.vnC)
 
-    # Simple, linear example.
-    out = maps.grid2grid(igrid, values, ogrid, 'linear')
-    np.allclose(out, np.array([1.5]))
+        # Provide wrong dimension:
+        with pytest.raises(ValueError, match='There are 2 points and 1 valu'):
+            maps.grid2grid(igrid, values[1:, :, :], ogrid)
 
-    # Provide ogrid.gridCC.
-    ogrid._gridCC = np.array([[0.5, 0.5, 0.5]])
-    out2 = maps.grid2grid(igrid, values, ogrid, 'linear')
-    np.allclose(out2, np.array([1.5]))
+        # Simple, linear example.
+        out = maps.grid2grid(igrid, values, ogrid, 'linear')
+        assert_allclose(out[0, 0, 0], 1.5)
 
-    # Check 'linear' and 'cubic' yield almost the same result for a well
-    # determined, very smoothly changing example.
+        # Provide ogrid.gridCC.
+        ogrid._gridCC = np.array([[0.5, 0.5, 0.5]])
+        out2 = maps.grid2grid(igrid, values, ogrid, 'linear')
+        assert_allclose(out2[0, 0, 0], 1.5)
 
-    # Fine grid.
-    fgrid = meshes.TensorMesh(
-        [np.ones(2**6)*10, np.ones(2**5)*100, np.ones(2**4)*1000],
-        x0=np.array([-320., -1600, -8000]))
+    def test_linear_cubic(self):
+        # Check 'linear' and 'cubic' yield almost the same result for a well
+        # determined, very smoothly changing example.
 
-    # Smoothly changing model for fine grid.
-    cmodel = np.arange(1, fgrid.nC+1).reshape(fgrid.vnC, order='F')
+        # Fine grid.
+        fgrid = meshes.TensorMesh(
+            [np.ones(2**6)*10, np.ones(2**5)*100, np.ones(2**4)*1000],
+            x0=np.array([-320., -1600, -8000]))
 
-    # Coarser grid.
-    cgrid = meshes.TensorMesh(
-        [np.ones(2**5)*15, np.ones(2**4)*150, np.ones(2**3)*1500],
-        x0=np.array([-240., -1200, -6000]))
+        # Smoothly changing model for fine grid.
+        cmodel = np.arange(1, fgrid.nC+1).reshape(fgrid.vnC, order='F')
 
-    # Interpolate linearly and cubic spline.
-    lin_model = maps.grid2grid(fgrid, cmodel, cgrid, 'linear')
-    cub_model = maps.grid2grid(fgrid, cmodel, cgrid, 'cubic')
+        # Coarser grid.
+        cgrid = meshes.TensorMesh(
+            [np.ones(2**5)*15, np.ones(2**4)*150, np.ones(2**3)*1500],
+            x0=np.array([-240., -1200, -6000]))
 
-    # Compare
-    assert np.max(np.abs((lin_model-cub_model)/lin_model*100)) < 1.0
+        # Interpolate linearly and cubic spline.
+        lin_model = maps.grid2grid(fgrid, cmodel, cgrid, 'linear')
+        cub_model = maps.grid2grid(fgrid, cmodel, cgrid, 'cubic')
 
-    # Assert it is 'nearest' or extrapolate if points are outside.
-    tgrid = meshes.TensorMesh(
-            [np.array([1, 1, 1, 1]), np.array([1, 1, 1, 1]),
-             np.array([1, 1, 1, 1])], x0=np.array([0., 0, 0]))
-    tmodel = np.ones(tgrid.nC).reshape(tgrid.vnC, order='F')
-    tmodel[:, 0, :] = 2
-    t2grid = meshes.TensorMesh(
-            [np.array([1]), np.array([1]), np.array([1])],
-            x0=np.array([2, -1, 2]))
+        # Compare
+        assert np.max(np.abs((lin_model-cub_model)/lin_model*100)) < 1.0
 
-    # Nearest with cubic.
-    out = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic')
-    assert_allclose(out, 2.)
+    def test_nearest(self):
+        # Assert it is 'nearest' or extrapolate if points are outside.
+        tgrid = meshes.TensorMesh(
+                [np.array([1, 1, 1, 1]), np.array([1, 1, 1, 1]),
+                 np.array([1, 1, 1, 1])], x0=np.array([0., 0, 0]))
+        tmodel = np.ones(tgrid.nC).reshape(tgrid.vnC, order='F')
+        tmodel[:, 0, :] = 2
+        t2grid = meshes.TensorMesh(
+                [np.array([1]), np.array([1]), np.array([1])],
+                x0=np.array([2, -1, 2]))
 
-    # Same, but with log.
-    vlog = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic', log=True)
-    vlin = maps.grid2grid(tgrid, np.log10(tmodel), t2grid, 'cubic')
-    assert_allclose(vlog, 10**vlin)
+        # Nearest with cubic.
+        out = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic')
+        assert_allclose(out, 2.)
 
-    # Extrapolate with linear.
-    out = maps.grid2grid(tgrid, tmodel, t2grid, 'linear')
-    assert_allclose(out, 3.)
+        # Same, but with log.
+        vlog = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic', log=True)
+        vlin = maps.grid2grid(tgrid, np.log10(tmodel), t2grid, 'cubic')
+        assert_allclose(vlog, 10**vlin)
 
-    # Same, but with log.
-    vlog = maps.grid2grid(tgrid, tmodel, t2grid, 'linear', log=True)
-    vlin = maps.grid2grid(tgrid, np.log10(tmodel), t2grid, 'linear')
-    assert_allclose(vlog, 10**vlin)
+        # Extrapolate with linear.
+        out = maps.grid2grid(tgrid, tmodel, t2grid, 'linear')
+        assert_allclose(out, 3.)
 
-    # Assert it is 0 if points are outside.
-    out = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic', False)
-    assert_allclose(out, 0.)
-    out = maps.grid2grid(tgrid, tmodel, t2grid, 'linear', False)
-    assert_allclose(out, 0.)
+        # Same, but with log.
+        vlog = maps.grid2grid(tgrid, tmodel, t2grid, 'linear', log=True)
+        vlin = maps.grid2grid(tgrid, np.log10(tmodel), t2grid, 'linear')
+        assert_allclose(vlog, 10**vlin)
 
-    # Provide a Field instance
-    grid = meshes.TensorMesh(
-            [np.array([1, 2]), np.array([1, 2]), np.array([1, 2])],
-            [0, 0, 0])
-    cgrid = meshes.TensorMesh(
-            [np.array([1.5, 1]), np.array([1.5]), np.array([1.5])],
-            [0, 0, 0])
-    field = fields.Field(grid)
+        # Assert it is 0 if points are outside.
+        out = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic', False)
+        assert_allclose(out, 0.)
+        out = maps.grid2grid(tgrid, tmodel, t2grid, 'linear', False)
+        assert_allclose(out, 0.)
 
-    # Simple linear interpolation test.
-    field.fx = np.arange(1, field.fx.size+1)
-    field.fy = np.arange(1, field.fy.size+1)
-    field.fz = np.arange(1, field.fz.size+1)
+    def test_field(self):
+        # Provide a Field instance
+        grid = meshes.TensorMesh(
+                [np.array([1, 2]), np.array([1, 2]), np.array([1, 2])],
+                [0, 0, 0])
+        cgrid = meshes.TensorMesh(
+                [np.array([1.5, 1]), np.array([1.5]), np.array([1.5])],
+                [0, 0, 0])
+        field = fields.Field(grid)
 
-    new_field = maps.grid2grid(grid, field, cgrid, method='linear')
-    fx = maps.grid2grid(grid, field.fx, cgrid, method='linear')
-    fy = maps.grid2grid(grid, field.fy, cgrid, method='linear')
-    fz = maps.grid2grid(grid, field.fz, cgrid, method='linear')
-    assert_allclose(fx, new_field.fx)
-    assert_allclose(fy, new_field.fy)
-    assert_allclose(fz, new_field.fz)
+        # Simple linear interpolation test.
+        field.fx = np.arange(1, field.fx.size+1)
+        field.fy = np.arange(1, field.fy.size+1)
+        field.fz = np.arange(1, field.fz.size+1)
 
-    new_field = maps.grid2grid(grid, field, cgrid, method='cubic')
-    fx = maps.grid2grid(grid, field.fx, cgrid, method='cubic')
-    fy = maps.grid2grid(grid, field.fy, cgrid, method='cubic')
-    fz = maps.grid2grid(grid, field.fz, cgrid, method='cubic')
-    assert_allclose(fx, new_field.fx)
-    assert_allclose(fy, new_field.fy)
-    assert_allclose(fz, new_field.fz)
+        new_field = maps.grid2grid(grid, field, cgrid, method='linear')
+        fx = maps.grid2grid(grid, field.fx, cgrid, method='linear')
+        fy = maps.grid2grid(grid, field.fy, cgrid, method='linear')
+        fz = maps.grid2grid(grid, field.fz, cgrid, method='linear')
+        assert_allclose(fx, new_field.fx)
+        assert_allclose(fy, new_field.fy)
+        assert_allclose(fz, new_field.fz)
 
-    # Ensure Field fails with 'volume'.
-    with pytest.raises(ValueError, match="``method='volume'`` not impl"):
-        maps.grid2grid(grid, field, cgrid, method='volume')
+        new_field = maps.grid2grid(grid, field, cgrid, method='cubic')
+        fx = maps.grid2grid(grid, field.fx, cgrid, method='cubic')
+        fy = maps.grid2grid(grid, field.fy, cgrid, method='cubic')
+        fz = maps.grid2grid(grid, field.fz, cgrid, method='cubic')
+        assert_allclose(fx, new_field.fx)
+        assert_allclose(fy, new_field.fy)
+        assert_allclose(fz, new_field.fz)
+
+        # Ensure Field fails with 'volume'.
+        with pytest.raises(ValueError, match="``method='volume'`` not impl"):
+            maps.grid2grid(grid, field, cgrid, method='volume')
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -291,7 +296,7 @@ class TestMaps:
             [np.array([1, 1]), np.array([1, 1]), np.array([1])],
             np.array([0, 0, 0]))
 
-    values = np.array([1, 2, 3, 4])
+    values = np.array([0.01, 10, 3, 4])
 
     def test_basic(self):
         class MyMap(maps._Map):
@@ -315,103 +320,107 @@ class TestMaps:
         model = models.Model(self.mesh, self.values, mapping='Conductivity')
 
         # Forward
-        forward = model.map.forward(model.property_x)
-        np.allclose(forward, self.values)
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, self.values)
 
         # Backward
         backward = model.map.backward(forward)
-        np.allclose(backward, model.property_x)
+        assert_allclose(backward, self.values)
 
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
-        np.allclose(derivative, derivative)
+        assert_allclose(derivative, derivative)
 
     def test_lgconductivity(self):
-        model = models.Model(self.mesh, self.values, mapping='LgConductivity')
+        model = models.Model(self.mesh, np.log10(self.values),
+                             mapping='LgConductivity')
 
         # Forward
-        forward = model.map.forward(model.property_x)
-        np.allclose(forward, np.log10(self.values))
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log10(self.values))
 
         # Backward
         backward = model.map.backward(forward)
-        np.allclose(backward, 10**model.property_x)
+        assert_allclose(backward, self.values)
 
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
-        np.allclose(derivative, gradient/derivative/np.log(10))
+        assert_allclose(gradient, derivative/10**model.property_x/np.log(10))
 
     def test_lnconductivity(self):
-        model = models.Model(self.mesh, self.values, mapping='LnConductivity')
+        model = models.Model(self.mesh, np.log(self.values),
+                             mapping='LnConductivity')
 
         # Forward
-        forward = model.map.forward(model.property_x)
-        np.allclose(forward, np.log(self.values))
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log(self.values))
 
         # Backward
         backward = model.map.backward(forward)
-        np.allclose(backward, np.exp(model.property_x))
+        assert_allclose(backward, self.values)
 
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
-        np.allclose(derivative, gradient/derivative)
+        assert_allclose(gradient, derivative/np.exp(model.property_x))
 
     def test_resistivity(self):
-        model = models.Model(self.mesh, self.values, mapping='Resistivity')
+        model = models.Model(self.mesh, 1/self.values, mapping='Resistivity')
 
         # Forward
-        forward = model.map.forward(model.property_x)
-        np.allclose(forward, 1/self.values)
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, 1/self.values)
 
         # Backward
         backward = model.map.backward(forward)
-        np.allclose(backward, model.property_x)
+        assert_allclose(backward, self.values)
 
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
-        np.allclose(derivative, -1/derivative**2)
+        assert_allclose(gradient, -derivative/(1/model.property_x)**2)
 
     def test_lgresistivity(self):
-        model = models.Model(self.mesh, self.values, mapping='LgResistivity')
+        model = models.Model(self.mesh, np.log10(1/self.values),
+                             mapping='LgResistivity')
 
         # Forward
-        forward = model.map.forward(model.property_x)
-        np.allclose(forward, np.log10(1/self.values))
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log10(1/self.values))
 
         # Backward
         backward = model.map.backward(forward)
-        np.allclose(backward, 10**-model.property_x)
+        assert_allclose(backward, self.values)
 
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
-        np.allclose(derivative, -gradient/derivative/np.log(10))
+        assert_allclose(gradient, -derivative/10**-model.property_x/np.log(10))
 
     def test_lnresistivity(self):
-        model = models.Model(self.mesh, self.values, mapping='LnResistivity')
+        model = models.Model(self.mesh, np.log(self.values),
+                             mapping='LnResistivity')
 
         # Forward
-        forward = model.map.forward(model.property_x)
-        np.allclose(forward, np.log(1/self.values))
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log(1/self.values))
 
         # Backward
         backward = model.map.backward(forward)
-        np.allclose(backward, np.exp(1/model.property_x))
+        assert_allclose(backward, self.values)
 
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
         model.map.derivative(gradient, model.property_x)
-        np.allclose(derivative, -gradient/derivative)
+        assert_allclose(gradient, -derivative/np.exp(-model.property_x))
 
 
 @pytest.mark.parametrize("njit", [True, False])

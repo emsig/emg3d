@@ -5,14 +5,42 @@ Changelog
 recent versions
 """""""""""""""
 
+
+*latest (dev)*
+--------------
+
+For most of the changes applies: See the API docs for more info of the relevant
+implementation.
+
 - ``survey``: A ``Survey`` has new attributes ``standard_error``,
   ``noise_floor``, and ``relative_error``.
-- ``simulation``: ``compute()`` takes a new argument, ``add_noise``. If
-  ``observerd=True`` and ``add_noise=True``, random noise is added to the
-  observed data. ``reference`` is not an argument any longer, there is no
-  ``reference`` model in the new data weighting.
 - ``optimize``: Completely changed misfit and data-weighting to more sensible
-  functions. Check the API for the new formulae.
+  functions.
+- ``simulation``:
+
+  - ``compute()`` takes a new argument, ``min_offset``. If ``observed=True``,
+    it will add Gaussian random noise according to the standard deviation of
+    the data; it will set receivers responses below the minimum offset to NaN.
+  - There is no longer a ``reference`` model.
+  - ``misfit`` and ``gradient`` can now handle observations with NaN's.
+
+- ``cli``:
+
+  - As a consequence of the changes the ``data_weight_opts`` got removed.
+  - New section ``[data]``  to select the wanted data.
+  - Section ``[simulation]`` has a new parameter ``min_offset`` (for creating
+    observed data).
+  - Output has a new parameter ``n_observations`` if ``misfit`` or ``gradient``
+    were called, which is the number of observations that were used to compute
+    the misfit.
+
+- ``maps``: Fixed the mapping of the gradients (``Conductivity`` is the only
+  mapping that was not affected by this bug).
+
+- Various:
+
+  - Improve documentation (and verbosity) with regards to «good» number of
+    cells.
 
 
 *v0.13.0* : CLI

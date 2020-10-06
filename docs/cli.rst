@@ -36,9 +36,9 @@ example; remove the comment signs to use them.
 
   # Simulation parameters
   # ---------------------
-  # Input parameters for the `Simulation` class, except for `solver_opts` and
-  # `data_weight_opts` (defined in their own section), but including the
-  # parameter `add_noise` for `compute()`.
+  # Input parameters for the `Simulation` class, except for `solver_opts`
+  # (defined in their own section), but including the parameter `min_offset`
+  # for `compute()`.
   [simulation]
   # max_workers = 4    # Also via -n or --nproc
   # gridding = same    # Default will change in the future
@@ -63,7 +63,6 @@ example; remove the comment signs to use them.
   # ----
   # Select which sources, receivers, and frequencies of the survey are used. By
   # default all data is used. These are comma-separated lists.
-  #
   [data]
   # sources = Tx02, Tx08, Tx14
   # receivers = Rx01, Rx10

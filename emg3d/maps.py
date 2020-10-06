@@ -412,10 +412,10 @@ class MapLnResistivity(_Map):
         super().__init__('log_e(resistivity)')
 
     def forward(self, conductivity):
-        return np.log(conductivity**-1)
+        return np.log(1.0/conductivity)
 
     def backward(self, mapped):
-        return np.exp(mapped**-1)
+        return np.exp(-mapped)
 
     def derivative(self, gradient, mapped):
         gradient /= -self.backward(mapped)

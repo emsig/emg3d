@@ -134,11 +134,7 @@ class Survey:
 
     noise_floor, relative_error : float
         Noise floor and relative error of the data. Default to None.
-        They must be either floats, or three-dimensional arrays of shape
-        `([nsrc or 1], [nrec or 1], [nfreq or 1])`; dimensions of one will be
-        broadcasted. E.g., to have a frequency-dependent noise floor for a
-        dataset of arbitrary amount of sources and receivers, and three
-        frequencies: `noise_floor=np.array([[[nf1, nf2, nf3]]])`.
+        See :attr:`Survey.standard_deviation` for more info.
 
     """
     # Currently, `surveys.data` contains an :class:`xarray.Dataset`. As such,
@@ -455,7 +451,7 @@ class Survey:
 
         .. code-block:: python
 
-            survey.standard_deviation = ndarray
+            survey.standard_deviation = ndarray  # (nsrc, nrec, nfreq)
 
         Alternatively, one can set the `noise_floor` :math:`\epsilon_\text{nf}`
         and the `relative_error` :math:`\epsilon_\text{r}`:
@@ -465,14 +461,25 @@ class Survey:
             survey.noise_floor = float
             survey.relative error = float
 
-        The standard deviation :math:`\varsigma` is then given by
+        They must be either floats, or three-dimensional arrays of shape
+        ``([nsrc or 1], [nrec or 1], [nfreq or 1])``; dimensions of one will be
+        broadcasted to the corresponding size. E.g., for a dataset of arbitrary
+        amount of sources and receivers with three frequencies you can define
+        a purely frequency-dependent relative error via
+        ``relative_error=np.array([[[err_f1, err_f2, err_f3]]])``.
+
+        The standard deviation :math:`\varsigma_i` of observation :math:`d_i`
+        is then given in terms of the noise floor
+        :math:`\epsilon_{\text{nf};i}` and the relative error
+        :math:`\epsilon_{\text{re};i}` by
 
         .. math::
             :label: std
 
-            \mathbf{\varsigma} = \sqrt{
-                \epsilon_\text{nf}^2 +
-                \left(\epsilon_\text{r}|\mathbf{d}|\right)^2 } \, .
+            \varsigma_i = \sqrt{
+                \epsilon_{\text{nf}; i}^2 +
+                \left(\epsilon_{\text{re}; i}|d_i|\right)^2 } \, .
+
 
         """
         # If `std` was set, return it, else compute it from noise_floor and
