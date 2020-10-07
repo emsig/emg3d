@@ -37,6 +37,7 @@ class TestSimulation():
 
         # Do first one single and then all together.
         simulation.get_efield('Tx0', 2.0)
+        simulation.compute(observed=True)
 
     def test_derived(self):
 
@@ -211,6 +212,17 @@ class TestSimulation():
         grad = simulation.gradient
 
         assert grad.shape == self.model.shape
+
+    def test_synthetic(self):
+        sim = self.simulation.copy()
+
+        # Switch off noise_floor, relative_error, min_offset => No noise.
+        sim.survey.noise_floor = None
+        sim.survey.relative_error = None
+        sim._dict_efield = sim._dict_initiate  # Reset
+        sim.compute(observed=True)
+        assert_allclose(sim.data.synthetic, sim.data.observed)
+        assert sim.survey.size == sim.data.observed.size
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

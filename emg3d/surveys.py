@@ -233,7 +233,7 @@ class Survey:
         # Add `observed` and `std`, if it exists.
         out['data'] = {'observed': self.data.observed.data}
         if 'std' in self.data.keys():
-            out['data']['std'] = self.data.std.data
+            out['data']['std'] = self.data['std'].data
 
         # Add `noise_floor` and `relative error`.
         out['noise_floor'] = self.data.noise_floor
@@ -440,7 +440,7 @@ class Survey:
     @observed.setter
     def observed(self, observed):
         """Update observed data."""
-        self._data['observed'] = observed
+        self._data['observed'][...] = observed
 
     @property
     def standard_deviation(self):
@@ -466,7 +466,7 @@ class Survey:
         broadcasted to the corresponding size. E.g., for a dataset of arbitrary
         amount of sources and receivers with three frequencies you can define
         a purely frequency-dependent relative error via
-        ``relative_error=np.array([[[err_f1, err_f2, err_f3]]])``.
+        ``relative_error=np.array([err_f1, err_f2, err_f3])[None, None, :]``.
 
         The standard deviation :math:`\varsigma_i` of observation :math:`d_i`
         is then given in terms of the noise floor
@@ -497,28 +497,27 @@ class Survey:
                     "It can also be set directly (same shape as data).")
 
             # Initiate std (xarray of same type as the observed data)
-            std = self.data.observed.real*0.0
+            std = self.data.observed.copy(data=np.zeros(self.shape))
 
             # Add noise floor if given.
             if self.noise_floor is not None:
-                std += (self.relative_error*np.abs(self.data.observed))**2
+                std += self.noise_floor**2
 
             # Add relative error if given.
             if self.relative_error is not None:
-                std += self.noise_floor**2
+                std += np.abs(self.relative_error*self.data.observed)**2
 
-            # Compute standard deviation.
-            std = np.sqrt(std)
-
-            # Set std for NaN-data to NaN as well.
-            std.data[np.isnan(self.data.observed.data)] = np.nan
-
-            return std
+            # Return.
+            return np.sqrt(std)
 
     @standard_deviation.setter
     def standard_deviation(self, std):
         """Update standard deviation."""
-        self._data['std'] = self.data.observed.real*0 + std
+        # An eventual noise_floor is kept, can be desirable when creating
+        # observed data. However, we set relative_error to 'std', which serves
+        # as a flag.
+        self.relative_error = 'std'
+        self._data['std'] = self.data.observed.copy(data=std)
 
     @property
     def noise_floor(self):
