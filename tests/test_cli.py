@@ -226,18 +226,19 @@ class TestRun:
             'dry_run': True,
             }
 
-    # Create a tiny dummy survey.
-    data = np.ones((1, 17, 1))
-    data[0, 8:11, 0] = np.nan
-    survey = emg3d.Survey(
-        name='CLI Survey',
-        sources=(4125, 4000, 4000, 0, 0),
-        receivers=(np.arange(17)*250+2000, 4000, 3950, 0, 0),
-        frequencies=1,
-        noise_floor=1e-15,
-        relative_error=0.05,
-        data=data,
-    )
+    if xarray is not None:
+        # Create a tiny dummy survey.
+        data = np.ones((1, 17, 1))
+        data[0, 8:11, 0] = np.nan
+        survey = emg3d.Survey(
+            name='CLI Survey',
+            sources=(4125, 4000, 4000, 0, 0),
+            receivers=(np.arange(17)*250+2000, 4000, 3950, 0, 0),
+            frequencies=1,
+            noise_floor=1e-15,
+            relative_error=0.05,
+            data=data,
+        )
 
     # Create a dummy grid and model.
     xx = np.ones(16)*500
