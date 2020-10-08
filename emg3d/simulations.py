@@ -640,8 +640,7 @@ class Simulation:
             self.data['observed'] = self.data['synthetic'].copy()
 
             # Add noise noise_floor and/or relative_error given.
-            if (self.data.noise_floor is not None or
-                    self.data.relative_error is not None):
+            if self.survey.standard_deviation is not None:
 
                 # Create noise.
                 std = self.survey.standard_deviation

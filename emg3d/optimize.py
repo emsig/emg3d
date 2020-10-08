@@ -82,6 +82,14 @@ def misfit(simulation):
         Value of the misfit function.
 
     """
+    std = simulation.survey.standard_deviation
+    # Raise warning if not set-up properly.
+    if std is None:
+        raise ValueError(
+            "Either `noise_floor` or `relative_error` or both must\n"
+            "be provided to compute the `standard_deviation`.\n"
+            "It can also be set directly (same shape as data).\n"
+            "The standard deviation is required to compute the misfit.")
 
     # Ensure all fields have been computed.
     test_efield = sum([1 if simulation._dict_efield[src][freq] is None else 0
@@ -95,7 +103,7 @@ def misfit(simulation):
 
     # Get weighted residual.
     if 'weights' not in simulation.data.keys():
-        simulation.data['weights'] = 1/simulation.survey.standard_deviation
+        simulation.data['weights'] = 1/std
     weights = simulation.data['weights']
 
     # Compute misfit

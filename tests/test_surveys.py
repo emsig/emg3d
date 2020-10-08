@@ -54,12 +54,10 @@ class TestSurvey():
         test_std = np.arange(srvy.size).reshape(srvy.shape)
         srvy.standard_deviation = test_std
         assert_allclose(srvy.noise_floor, nf)
-        assert srvy.relative_error == 'std'
+        assert_allclose(srvy.relative_error, re)
         assert_allclose(srvy.standard_deviation.data, test_std)
-
-        srvy2 = surveys.Survey('Test', sources, receivers, frequencies)
-        with pytest.raises(ValueError, match="Either `noise_floor` or"):
-            srvy2.standard_deviation
+        srvy.standard_deviation = None  # Delete again
+        assert_allclose(srvy.standard_deviation.data, std)
 
     def test_dipole_info_to_dict(self):
         # == 1. List ==

@@ -480,6 +480,16 @@ class Survey:
                 \epsilon_{\text{nf}; i}^2 +
                 \left(\epsilon_{\text{re}; i}|d_i|\right)^2 } \, .
 
+        Note that a set standard deviation is prioritized over potentially also
+        defined noise floor and relative error. To use the noise floor and the
+        relative error after defining standard deviation directly you would
+        have to reset it like
+
+        .. code-block:: python
+
+            survey.standard_deviation = None
+
+        after which Equation :eq:`std` would be used again.
 
         """
         # If `std` was set, return it, else compute it from noise_floor and
@@ -487,14 +497,7 @@ class Survey:
         if 'std' in self._data.keys():
             return self.data['std']
 
-        else:
-
-            # Raise warning if not set-up properly.
-            if self.noise_floor is None and self.relative_error is None:
-                raise ValueError(
-                    "Either `noise_floor` or `relative_error` or both must\n"
-                    "be provided to compute the `standard_deviation`.\n"
-                    "It can also be set directly (same shape as data).")
+        elif self.noise_floor is not None or self.relative_error is not None:
 
             # Initiate std (xarray of same type as the observed data)
             std = self.data.observed.copy(data=np.zeros(self.shape))
@@ -510,14 +513,18 @@ class Survey:
             # Return.
             return np.sqrt(std)
 
+        else:
+            # If nothing is defined, return None
+            return None
+
     @standard_deviation.setter
     def standard_deviation(self, std):
         """Update standard deviation."""
-        # An eventual noise_floor is kept, can be desirable when creating
-        # observed data. However, we set relative_error to 'std', which serves
-        # as a flag.
-        self.relative_error = 'std'
-        self._data['std'] = self.data.observed.copy(data=std)
+        # If None it means basically to delete it; otherwise set it.
+        if std is None:
+            del self._data['std']
+        else:
+            self._data['std'] = self.data.observed.copy(data=std)
 
     @property
     def noise_floor(self):

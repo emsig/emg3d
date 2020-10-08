@@ -93,6 +93,9 @@ class TestOptimize():
         with pytest.raises(NotImplementedError, match='for isotropic models'):
             optimize.gradient(simulation)
 
+        with pytest.raises(ValueError, match="Either `noise_floor` or"):
+            optimize.misfit(simulation)
+
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_derivative(capsys):
