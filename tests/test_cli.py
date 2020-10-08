@@ -150,6 +150,17 @@ class TestParser:
         assert cfg['files']['log'] == tmpdir+'/results.log'
         assert cfg['files']['store_simulation'] is True
 
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            # Write a config file.
+            config = os.path.join(tmpdir, 'emg3d.cfg')
+            with open(config, 'w') as f:
+                f.write("[files]\n")
+                f.write(f"path={tmpdir}\n")
+                f.write("whatever=bla")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            cfg, term = cli.parser.parse_config_file(args_dict)
+
     def test_simulation(self, tmpdir):
 
         # Write a config file.
@@ -206,6 +217,16 @@ class TestParser:
         assert test['sources'] == ['Tx11']
         assert test['receivers'] == ['Rx1', 'Rx2']
         assert test['frequencies'] == ['1']
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            # Write a config file.
+            config = os.path.join(tmpdir, 'emg3d.cfg')
+            with open(config, 'w') as f:
+                f.write("[data]\n")
+                f.write("whatever=bla")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            cfg, term = cli.parser.parse_config_file(args_dict)
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

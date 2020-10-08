@@ -136,6 +136,10 @@ class Survey:
         Noise floor and relative error of the data. Default to None.
         See :attr:`Survey.standard_deviation` for more info.
 
+    std : ndarray or None
+        Standard deviation of the data, same shape as data. Default to None.
+        See :attr:`Survey.standard_deviation` for more info.
+
     """
     # Currently, `surveys.data` contains an :class:`xarray.Dataset`. As such,
     # the `Survey`-Class has an xarray-dataset as one of its attributes.
@@ -163,8 +167,10 @@ class Survey:
         # Initialize xarray dataset.
         self._initiate_dataset(data)
 
-        self.data.attrs['noise_floor'] = kwargs.pop('noise_floor', None)
-        self.data.attrs['relative_error'] = kwargs.pop('relative_error', None)
+        # Get the optional keywords related to standard deviation.
+        self.noise_floor = kwargs.pop('noise_floor', None)
+        self.relative_error = kwargs.pop('relative_error', None)
+        self.standard_deviation = kwargs.pop('std', None)
 
         # Ensure no kwargs left.
         if kwargs:
@@ -458,8 +464,8 @@ class Survey:
 
         .. code-block:: python
 
-            survey.noise_floor = float
-            survey.relative error = float
+            survey.noise_floor = float or ndarray      # (> 0 or None)
+            survey.relative error = float or ndarray   # (> 0 or None)
 
         They must be either floats, or three-dimensional arrays of shape
         ``([nsrc or 1], [nrec or 1], [nfreq or 1])``; dimensions of one will be
@@ -521,9 +527,13 @@ class Survey:
     def standard_deviation(self, std):
         """Update standard deviation."""
         # If None it means basically to delete it; otherwise set it.
-        if std is None:
+        if std is None and 'std' in self.data:
             del self._data['std']
-        else:
+        elif std is not None:
+            # Ensure all values are bigger than zero.
+            if np.any(std <= 0.0):
+                raise ValueError(
+                    "All values of `std` must be bigger than zero.")
             self._data['std'] = self.data.observed.copy(data=std)
 
     @property
@@ -537,7 +547,27 @@ class Survey:
 
     @noise_floor.setter
     def noise_floor(self, noise_floor):
-        """Update noise floor."""
+        """Update noise floor.
+
+        See :attr:`Survey.standard_deviation` for more info.
+        """
+        if noise_floor is not None:
+
+            # Ensure all values are bigger than zero.
+            if np.any(noise_floor <= 0.0):
+                raise ValueError(
+                    "All values of `noise_floor` must be bigger than zero.")
+
+            # Ensure it can be broadcast to data.
+            try:
+                _ = np.ones(self.shape)*noise_floor
+            except ValueError as e:
+                raise ValueError(
+                    "Shape of `noise_floor` is not broadcastable to data.\n"
+                    f"Shape of `noise_floor`: {np.shape(noise_floor)}; "
+                    f"`data`: {self.shape}."
+                ) from e
+
         self._data.attrs['noise_floor'] = noise_floor
 
     @property
@@ -551,7 +581,27 @@ class Survey:
 
     @relative_error.setter
     def relative_error(self, relative_error):
-        """Update relative error."""
+        """Update relative error.
+
+        See :attr:`Survey.standard_deviation` for more info.
+        """
+        if relative_error is not None:
+
+            # Ensure all values are bigger than zero.
+            if np.any(relative_error <= 0.0):
+                raise ValueError(
+                    "All values of `relative_error` must be bigger than zero.")
+
+            # Ensure it can be broadcast to data.
+            try:
+                _ = np.ones(self.shape)*relative_error
+            except ValueError as e:
+                raise ValueError(
+                    "Shape of `relative_error` is not broadcastable to data.\n"
+                    f"Shape of `relative_error`: {np.shape(relative_error)}; "
+                    f"`data`: {self.shape}."
+                ) from e
+
         self._data.attrs['relative_error'] = relative_error
 
     def _dipole_info_to_dict(self, inp, name):

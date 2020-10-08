@@ -162,7 +162,7 @@ def simulation(args_dict):
         logger.debug(infostr)
 
     # Store output to disk.
-    if cfg['files'].get('store_simulation', False):
+    if cfg['files']['store_simulation']:
         output['simulation'] = sim
     io.save(cfg['files']['output'], **output, verb=verb_io)
 

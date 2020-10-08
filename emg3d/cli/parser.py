@@ -137,8 +137,12 @@ def parse_config_file(args_dict):
     files['output'] = str(files['output'])
 
     # Store options.
-    if cfg.has_option('files', 'store_simulation'):
-        files['store_simulation'] = cfg.getboolean('files', 'store_simulation')
+    files['store_simulation'] = bool(all_files.pop('store_simulation', False))
+
+    # Ensure no keys are left.
+    if all_files:
+        raise TypeError(f"Unexpected parameter in [files]: "
+                        f"{list(all_files.keys())}")
 
     # # Simulation parameters  # #
 
@@ -211,8 +215,18 @@ def parse_config_file(args_dict):
 
     data = {}
     if 'data' in cfg.sections():
-        for key, value in cfg['data'].items():
-            data[key] = [v.strip() for v in cfg.get('data', key).split(',')]
+        # Get all parameters.
+        all_data = dict(cfg.items('data'))
+
+        for key in ['sources', 'receivers', 'frequencies']:
+            value = all_data.pop(key, False)
+            if value:
+                data[key] = [v.strip() for v in value.split(',')]
+
+        # Ensure no keys are left.
+        if all_data:
+            raise TypeError(f"Unexpected parameter in [data]: "
+                            f"{list(all_data.keys())}")
 
     # Return.
     out = {'files': files, 'simulation_options': simulation, 'data': data}

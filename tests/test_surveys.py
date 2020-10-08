@@ -37,9 +37,13 @@ class TestSurvey():
         sources = (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0)
         receivers = ([1000, 3000, 4000], 2000, -1000, 0, 0)
         frequencies = (1, 0.1, 2, 3)
+        srvy0 = surveys.Survey('Test', sources, receivers, frequencies,
+                               data=np.ones((5, 3, 4)))
+        assert srvy0.standard_deviation is None
+
         # Test f-dependent noise-floor and source-dependent rel. error.
-        nf = np.arange(4)[None, None, :]*1e-15  # No noise floor for f=1.0
-        re = np.arange(5)[:, None, None]/100    # No rel. error for Tx1
+        nf = np.arange(1, 5)[None, None, :]*1e-15  # No noise floor for f=1.0
+        re = np.arange(1, 6)[:, None, None]/100    # No rel. error for Tx1
         srvy = surveys.Survey('Test', sources, receivers, frequencies,
                               relative_error=re, noise_floor=nf,
                               data=np.ones((5, 3, 4)))
@@ -51,13 +55,24 @@ class TestSurvey():
         assert_allclose(srvy.standard_deviation.data, std)
 
         # Set the standard deviations
-        test_std = np.arange(srvy.size).reshape(srvy.shape)
+        test_std = np.arange(1, srvy.size+1).reshape(srvy.shape)
         srvy.standard_deviation = test_std
         assert_allclose(srvy.noise_floor, nf)
         assert_allclose(srvy.relative_error, re)
         assert_allclose(srvy.standard_deviation.data, test_std)
         srvy.standard_deviation = None  # Delete again
         assert_allclose(srvy.standard_deviation.data, std)
+
+        with pytest.raises(ValueError, match='All values of `std` must be'):
+            srvy.standard_deviation = np.zeros(srvy.shape)
+        with pytest.raises(ValueError, match='All values of `noise_floor`'):
+            srvy.noise_floor = 0.0
+        with pytest.raises(ValueError, match='All values of `relative_error'):
+            srvy.relative_error = 0.0
+        with pytest.raises(ValueError, match='Shape of `noise_floor`'):
+            srvy.noise_floor = np.ones(srvy.shape)[:, :2, :]
+        with pytest.raises(ValueError, match='Shape of `relative_error'):
+            srvy.relative_error = np.ones(srvy.shape)[2:6, :, :]
 
     def test_dipole_info_to_dict(self):
         # == 1. List ==
@@ -180,7 +195,7 @@ class TestSurvey():
                                (1000, 0, 0, 0, 0), 1.0)
         # Set observed and standard deviation.
         srvy1.observed = [[[3+3j]]]
-        srvy1.standard_deviation = [[[1.1]]]
+        srvy1.standard_deviation = np.array([[[1.1]]])
         srvy2 = srvy1.copy()
         assert srvy1.sources == srvy2.sources
 
@@ -193,7 +208,7 @@ class TestSurvey():
                                (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]],
                                fixed=1)
         srvy4 = srvy3.copy()
-        srvy4.standard_deviation = [[[1.1]]]
+        srvy4.standard_deviation = np.array([[[1.1]]])
         assert srvy3.sources == srvy4.sources
 
         # Also check to_file()/from_file().

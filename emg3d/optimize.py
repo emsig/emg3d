@@ -87,7 +87,7 @@ def misfit(simulation):
     if std is None:
         raise ValueError(
             "Either `noise_floor` or `relative_error` or both must\n"
-            "be provided to compute the `standard_deviation`.\n"
+            "be provided (>0) to compute the `standard_deviation`.\n"
             "It can also be set directly (same shape as data).\n"
             "The standard deviation is required to compute the misfit.")
 
@@ -179,16 +179,6 @@ def gradient(simulation):
         grad_x = np.zeros(vnC, order='F')
         grad_y = np.zeros(vnC, order='F')
         grad_z = np.zeros(vnC, order='F')
-
-        # => TEST what is faster / more accurate.
-        #
-        # Here, we do
-        #   1. edges2cellaverages (Ex[comp] -> CC[comp])
-        #   2. grid2grid          (CC[comp] -> CC[model])
-        #
-        # How about the other way around?
-        #   1. grid2grid          (Ex[comp] -> Ex[model])
-        #   1. edges2cellaverages (Ex[model] -> CC[model])
 
         # Map the field to cell centers times volume.
         vol = simulation._dict_grid[src][freq].vol.reshape(vnC, order='F')
