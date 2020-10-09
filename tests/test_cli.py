@@ -91,6 +91,17 @@ class TestParser:
         assert cfg['files']['output'] == tmpdir+'/emg3d_out.h5'
         assert cfg['files']['log'] == tmpdir+'/emg3d_out.log'
 
+        # Provide file names
+        args_dict = self.args_dict.copy()
+        args_dict['survey'] = 'test.h5'
+        args_dict['model'] = 'unkno.wn'
+        args_dict['output'] = 'out.npz'
+        args_dict['config'] = config
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        assert cfg['files']['survey'] == tmpdir+'/test.h5'
+        assert cfg['files']['model'] == tmpdir+'/unkno.h5'
+        assert cfg['files']['output'] == tmpdir+'/out.npz'
+
         # .-trick.
         args_dict = self.args_dict.copy()
         args_dict['config'] = '.'

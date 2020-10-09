@@ -113,12 +113,14 @@ def parse_config_file(args_dict):
     files = {'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
     for key, value in files.items():
 
+        config_or_default = all_files.pop(key, value)
+
         # Get terminal input.
         fname = term.pop(key)
 
         # If there was no terminal input, get config-file; else, default.
         if fname is None:
-            fname = all_files.pop(key, value)
+            fname = config_or_default
 
         # Get absolute paths.
         ffile = Path(os.path.join(path, fname))
