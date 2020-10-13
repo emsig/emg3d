@@ -103,11 +103,11 @@ def misfit(simulation):
 
     # Get weighted residual.
     if 'weights' not in simulation.data.keys():
-        simulation.data['weights'] = 1/std
+        simulation.data['weights'] = 1/std**2
     weights = simulation.data['weights']
 
     # Compute misfit
-    misfit = (residual.data.conj() * weights * residual.data).real.sum()/2
+    misfit = np.sum(weights*(residual.data.conj()*residual.data).real)/2
 
     return misfit.data
 
