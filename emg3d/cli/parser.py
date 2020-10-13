@@ -138,8 +138,10 @@ def parse_config_file(args_dict):
     files['log'] = str(files['output'].with_suffix('.log'))
     files['output'] = str(files['output'])
 
-    # Store options.
-    files['store_simulation'] = bool(all_files.pop('store_simulation', False))
+    # Store options (get it with getboolean, and remove from dict).
+    files['store_simulation'] = cfg.getboolean(
+            'files', 'store_simulation', fallback=False)
+    _ = all_files.pop('store_simulation', None)
 
     # Ensure no keys are left.
     if all_files:

@@ -150,7 +150,7 @@ class TestParser:
             f.write("survey=testit.json\n")
             f.write("model=thismodel\n")
             f.write("output=results.npz\n")
-            f.write("store_simulation=true")
+            f.write("store_simulation=false")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -159,7 +159,7 @@ class TestParser:
         assert cfg['files']['model'] == tmpdir+'/thismodel.h5'
         assert cfg['files']['output'] == tmpdir+'/results.npz'
         assert cfg['files']['log'] == tmpdir+'/results.log'
-        assert cfg['files']['store_simulation'] is True
+        assert cfg['files']['store_simulation'] is False
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             # Write a config file.
