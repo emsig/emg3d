@@ -17,7 +17,6 @@ Everything to create model-properties for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -89,28 +88,9 @@ class Model:
 
     """
 
-    _res_warning = (
-        "\n    The keywords `res_{x;y;z}` are deprecated and will be removed."
-        "\n    Use the keywords `property_{x;y;z}` instead."
-    )
-
     def __init__(self, grid, property_x=1., property_y=None, property_z=None,
                  mu_r=None, epsilon_r=None, mapping='Resistivity', **kwargs):
         """Initiate a new model."""
-
-        # Check kwargs; purely for backwards compatibility.
-        if any([key.startswith('res') for key in kwargs.keys()]):
-            warnings.warn(self._res_warning, DeprecationWarning)
-
-            res_x = kwargs.pop('res_x', None)
-            res_y = kwargs.pop('res_y', None)
-            res_z = kwargs.pop('res_z', None)
-
-            property_x = property_x if res_x is None else res_x
-            property_y = property_y if res_y is None else res_y
-            property_z = property_z if res_z is None else res_z
-
-            mapping = 'Resistivity'
 
         # Ensure no kwargs left.
         if kwargs:
@@ -295,15 +275,6 @@ class Model:
 
         """
         try:
-            # Check `res`; purely for backwards compatibility.
-            if any([key.startswith('res') for key in inp]):
-                warnings.warn(cls._res_warning, DeprecationWarning)
-
-                inp['property_x'] = inp.pop('res_x', None)
-                inp['property_y'] = inp.pop('res_y', None)
-                inp['property_z'] = inp.pop('res_z', None)
-                inp['mapping'] = 'Resistivity'
-
             return cls(grid=inp['vnC'], property_x=inp['property_x'],
                        property_y=inp['property_y'],
                        property_z=inp['property_z'], mu_r=inp['mu_r'],
@@ -366,25 +337,6 @@ class Model:
         # Update it.
         self._property_z = self._check_parameter(
                 property_z, 'property_z', True)
-
-    # Backwards compatibility for deprecated attributes.
-    @property
-    def res_x(self):
-        warnings.warn(self._res_warning, DeprecationWarning)
-        fmap = maps.MapResistivity()
-        return fmap.forward(self.map.backward(self.property_x))
-
-    @property
-    def res_y(self):
-        warnings.warn(self._res_warning, DeprecationWarning)
-        fmap = maps.MapResistivity()
-        return fmap.forward(self.map.backward(self.property_y))
-
-    @property
-    def res_z(self):
-        warnings.warn(self._res_warning, DeprecationWarning)
-        fmap = maps.MapResistivity()
-        return fmap.forward(self.map.backward(self.property_z))
 
     # MAGNETIC PERMEABILITIES
     @property
