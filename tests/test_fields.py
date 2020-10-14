@@ -396,7 +396,7 @@ def test_get_receiver():
     # Check it works with model parameters.
     model = models.Model(grid, np.ones(grid.vnC))
     out10 = fields.get_receiver(
-            grid, model.res_x, (-10, -10, -10), 'linear', True)
+            grid, model.property_x, (-10, -10, -10), 'linear', True)
     assert_allclose(out10, 1.)
     assert out10.__class__ != utils.EMArray
 

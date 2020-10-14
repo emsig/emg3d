@@ -211,7 +211,7 @@ def test_solver_heterogeneous(capsys):
 def test_one_liner(capsys):
     grid = meshes.TensorMesh(
             [np.ones(8), np.ones(8), np.ones(8)], x0=np.array([0, 0, 0]))
-    model = models.Model(grid, res_x=1.5, res_y=1.8, res_z=3.3)
+    model = models.Model(grid, property_x=1.5, property_y=1.8, property_z=3.3)
     sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
 
     # Dynamic one-liner.
@@ -294,9 +294,9 @@ def test_smoothing():
         x = np.arange(1, grid.nCx+1)*2
         y = 1/np.arange(1, grid.nCy+1)
         z = np.arange(1, grid.nCz+1)[::-1]/10
-        res_x = np.outer(np.outer(x, y), z).ravel()
+        property_x = np.outer(np.outer(x, y), z).ravel()
         freq = 0.319
-        model = models.Model(grid, res_x, 0.8*res_x, 2*res_x)
+        model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
 
         # Create a source field
         sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
@@ -403,9 +403,9 @@ def test_residual():
     x = np.arange(1, grid.nCx+1)*2
     y = 1/np.arange(1, grid.nCy+1)
     z = np.arange(1, grid.nCz+1)[::-1]/10
-    res_x = np.outer(np.outer(x, y), z).ravel()
+    property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = models.Model(grid, res_x, 0.8*res_x, 2*res_x)
+    model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
 
     # Create a source field
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)

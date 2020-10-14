@@ -6,6 +6,14 @@ recent versions
 """""""""""""""
 
 
+*latest (dev, will become v0.14.0)*
+-----------------------------------
+
+- ``models.Model``: Removed deprecated parameters ``res_{x;y;z}``.
+
+- ``io.save``: Removed deprecated parameter ``backend`` in ``save``.
+
+
 *v0.13.0* : CLI
 ---------------
 
