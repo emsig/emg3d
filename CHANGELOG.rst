@@ -11,7 +11,10 @@ recent versions
 
 - ``models.Model``: Removed deprecated parameters ``res_{x;y;z}``.
 
-- ``io.save``: Removed deprecated parameter ``backend`` in ``save``.
+- ``io.save``:
+
+  - Removed deprecated parameter ``backend`` in ``save``.
+  - File extension has to be provided in ``save``, no default any longer.
 
 - ``meshes``: Deprecated the old meshing routines ``get_stretched_h``,
   ``get_domain``, ``get_hx``; will be removed in the future.

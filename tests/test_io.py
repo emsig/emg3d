@@ -98,17 +98,14 @@ def test_save_and_load(tmpdir, capsys):
         io.load('ttt.npz', stupidkeyword='a')
 
     # Unknown extension.
-    io.save(tmpdir+'/testwrongextension.abc', something=1)
+    with pytest.raises(ValueError, match="Unknown extension '.abc'"):
+        io.save(tmpdir+'/testwrongextension.abc', something=1)
     with pytest.raises(ValueError, match="Unknown extension '.abc'"):
         io.load(tmpdir+'/testwrongextension.abc')
-    if h5py:
-        io.load(tmpdir+'/testwrongextension.abc.h5')
-    else:
-        io.load(tmpdir+'/testwrongextension.abc.npz')
 
     # Test h5py.
     if h5py:
-        io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
+        io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
                 a=1.0, b=1+1j, c=True,
                 model=model, field=field, what={'f': field.fx},
                 collect_classes=True)

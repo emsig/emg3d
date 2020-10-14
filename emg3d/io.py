@@ -45,7 +45,7 @@ KNOWN_CLASSES = {
 }
 
 
-def save(fname, compression="gzip", **kwargs):
+def save(fname, **kwargs):
     """Save surveys, meshes, models, fields, and more to disk.
 
     Serialize and save data to disk in different formats (see parameter
@@ -65,12 +65,11 @@ def save(fname, compression="gzip", **kwargs):
         File name inclusive ending, which defines the used data format.
         Implemented are currently:
 
-        - `.h5` (default): Uses `h5py` to store inputs to a hierarchical,
-          compressed binary hdf5 file. Recommended file format, but requires
-          the module `h5py`. Default format if ending is not provided or not
-          recognized.
+        - `.h5`: Uses `h5py` to store inputs to a hierarchical, compressed
+          binary hdf5 file. Recommended file format, but requires the module
+          `h5py`.
         - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
-          file. Default format if `h5py` is not installed.
+          file.
         - `.json`: Uses `json` to store inputs to a hierarchical, plain text
           file.
 
@@ -100,6 +99,7 @@ def save(fname, compression="gzip", **kwargs):
 
     """
     # Get and remove optional kwargs.
+    compression = kwargs.pop('compression', 'gzip')
     json_indent = kwargs.pop('json_indent', 2)
     collect_classes = kwargs.pop('collect_classes', False)
     verb = kwargs.pop('verb', 1)
@@ -116,18 +116,8 @@ def save(fname, compression="gzip", **kwargs):
     # sorted TensorMesh, Field, and Model instances.
     data = _dict_serialize(kwargs, collect_classes=collect_classes)
 
-    # Get extension from `fname`.
-    if full_path.split('.')[-1] in ['npz', 'h5', 'json']:
-        extension = full_path.split('.')[-1]
-    else:  # Fallback to default.
-        if isinstance(h5py, str):
-            extension = 'npz'
-        else:
-            extension = 'h5'
-        full_path += '.'+extension
-
     # Save data depending on the extension.
-    if extension == "npz":
+    if full_path.endswith('.npz'):
 
         # Convert hierarchical dict to a flat dict.
         data = _dict_flatten(data)
@@ -135,7 +125,7 @@ def save(fname, compression="gzip", **kwargs):
         # Store flattened data.
         np.savez_compressed(full_path, **data)
 
-    elif extension == "h5":
+    elif full_path.endswith('.h5'):
 
         # Check if h5py is installed.
         if isinstance(h5py, str):
@@ -145,7 +135,7 @@ def save(fname, compression="gzip", **kwargs):
         with h5py.File(full_path, "w") as h5file:
             _hdf5_add_to(data, h5file, compression)
 
-    elif extension == "json":
+    elif full_path.endswith('.json'):
 
         # Move arrays to lists and decompose complex data.
         data = _dict_dearray_decomp(data)
@@ -155,7 +145,8 @@ def save(fname, compression="gzip", **kwargs):
             json.dump(data, f, indent=json_indent)
 
     else:
-        raise ValueError(f"Unknown extension '{extension}'.")
+        ext = full_path.split('.')[-1]
+        raise ValueError(f"Unknown extension '.{ext}'.")
 
     # Print file info.
     if verb > 0:
