@@ -8,14 +8,14 @@ from emg3d import solver, meshes, models, fields, io
 # # # # # # # # # # 1. Homogeneous VTI fullspace # # # # # # # # # #
 
 freq = 1.
-hx_min, xdomain = meshes.get_domain(x0=0, freq=freq)
-hy_min, ydomain = meshes.get_domain(x0=0, freq=freq)
-hz_min, zdomain = meshes.get_domain(x0=250, freq=freq)
-nx = 2**3
-hx = meshes.get_stretched_h(hx_min, xdomain, nx, 0)
-hy = meshes.get_stretched_h(hy_min, ydomain, nx, 0)
-hz = meshes.get_stretched_h(hz_min, zdomain, nx, 250)
-input_grid = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
+hxy, hxy0 = meshes.get_hx_h0(
+        freq=freq, res=2, domain=[-50, 50], max_domain=1500,
+        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
+hz, hz0 = meshes.get_hx_h0(
+        freq=freq, res=3.3, domain=[200, 300], max_domain=1500,
+        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
+
+input_grid = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
 grid = meshes.TensorMesh(**input_grid)
 
 input_model = {
@@ -67,14 +67,15 @@ out = {
 src = [50., 110., 250., 25, 15]
 freq = 0.375
 
-hx_min, xdomain = meshes.get_domain(x0=0, freq=.1)
-hy_min, ydomain = meshes.get_domain(x0=0, freq=.1)
-hz_min, zdomain = meshes.get_domain(x0=250, freq=.1)
-hx = meshes.get_stretched_h(hx_min, xdomain, 8, 0)
-hy = meshes.get_stretched_h(hy_min, ydomain, 4, 0)
-hz = meshes.get_stretched_h(hz_min, zdomain, 16, 250)
-grid = meshes.TensorMesh([hx, hy, hz], x0=(xdomain[0], ydomain[0], zdomain[0]))
+hxy, hxy0 = meshes.get_hx_h0(
+        freq=freq, res=50, domain=[src[0], src[1]], max_domain=5000,
+        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
+hz, hz0 = meshes.get_hx_h0(
+        freq=freq, res=3.3, domain=[src[2]-20, src[2]+20], max_domain=5000,
+        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
 
+input_grid = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
+grid = meshes.TensorMesh(**input_grid)
 
 # Initialize model
 # Create a model with random resistivities between [0, 50)
@@ -99,10 +100,9 @@ nu_post = 2
 clevel = 10  # Way to high
 
 efield = solver.solve(
-        grid, model, sfield,
-        semicoarsening=semicoarsening, linerelaxation=linerelaxation,
-        verb=verb, tol=tol, maxit=maxit, nu_init=nu_init, nu_pre=nu_pre,
-        nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
+        grid, model, sfield, semicoarsening=semicoarsening,
+        linerelaxation=linerelaxation, tol=tol, maxit=maxit, nu_init=nu_init,
+        nu_pre=nu_pre, nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
 hfield = fields.get_h_field(grid, model, efield)
 
@@ -114,7 +114,7 @@ reg_2 = {
     'inp': {
         'semicoarsening': semicoarsening,
         'linerelaxation': linerelaxation,
-        'verb': verb,
+        'verb': 4,
         'tol': tol,
         'maxit': maxit,
         'nu_init': nu_init,
@@ -152,14 +152,14 @@ for attr in all_attr:
 # # # # # # # # # # 4. Homogeneous VTI fullspace LAPLACE # # # # # # # # # #
 
 freq = -2*np.pi
-hx_min, xdomain = meshes.get_domain(x0=0, freq=freq)
-hy_min, ydomain = meshes.get_domain(x0=0, freq=freq)
-hz_min, zdomain = meshes.get_domain(x0=250, freq=freq)
-nx = 2**3
-hx = meshes.get_stretched_h(hx_min, xdomain, nx, 0)
-hy = meshes.get_stretched_h(hy_min, ydomain, nx, 0)
-hz = meshes.get_stretched_h(hz_min, zdomain, nx, 250)
-input_grid_l = {'h': [hx, hy, hz], 'x0': (xdomain[0], ydomain[0], zdomain[0])}
+hxy, hxy0 = meshes.get_hx_h0(
+        freq=freq, res=2, domain=[-1, 1], max_domain=1500,
+        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
+hz, hz0 = meshes.get_hx_h0(
+        freq=freq, res=3.3, domain=[240, 260], max_domain=1500,
+        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
+
+input_grid_l = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
 grid_l = meshes.TensorMesh(**input_grid_l)
 
 input_model_l = {

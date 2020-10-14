@@ -301,7 +301,7 @@ def test_get_h_field():
     # Mainly regression tests, not ideal.
 
     # Check it does still the same (pure regression).
-    dat = REGRES['Data']['reg_2']
+    dat = REGRES['reg_2']
     grid = dat['grid']
     model = dat['model']
     efield = dat['result']
@@ -313,7 +313,7 @@ def test_get_h_field():
     assert hout.is_electric is False
 
     # Add some mu_r - Just 1, to trigger, and compare.
-    dat = REGRES['Data']['res']
+    dat = REGRES['res']
     grid = dat['grid']
     efield = dat['Fresult']
     model1 = models.Model(**dat['input_model'])

@@ -13,6 +13,9 @@ recent versions
 
 - ``io.save``: Removed deprecated parameter ``backend`` in ``save``.
 
+- ``meshes``: Deprecated the old meshing routines ``get_stretched_h``,
+  ``get_domain``, ``get_hx``; will be removed in the future.
+
 
 *v0.13.0* : CLI
 ---------------

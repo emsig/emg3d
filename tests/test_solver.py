@@ -27,7 +27,7 @@ def create_dummy(nx, ny, nz):
 def test_solver_homogeneous(capsys):
     # Regression test for homogeneous halfspace.
     # Not very sophisticated; replace/extend by more detailed tests.
-    dat = REGRES['Data']['res']
+    dat = REGRES['res']
 
     grid = meshes.TensorMesh(**dat['input_grid'])
     model = models.Model(**dat['input_model'])
@@ -45,8 +45,8 @@ def test_solver_homogeneous(capsys):
 
     # Experimental:
     # Check if norms are also the same, at least for first two cycles.
-    assert "1.509e-01  after   1 F-cycles   [9.161e-07, 0.151]   0 0" in out
-    assert "1.002e-01  after   2 F-cycles   [6.082e-07, 0.664]   0 0" in out
+    assert "4.091e-02  after   1 F-cycles   [1.937e-07, 0.041]   0 0" in out
+    assert "4.529e-03  after   2 F-cycles   [2.144e-08, 0.111]   0 0" in out
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['Fresult'], efield)
@@ -158,7 +158,7 @@ def test_solver_homogeneous(capsys):
 
 def test_solver_heterogeneous(capsys):
     # Regression test for heterogeneous case.
-    dat = REGRES['Data']['reg_2']
+    dat = REGRES['reg_2']
     grid = dat['grid']
     model = dat['model']
     sfield = dat['sfield']
@@ -238,7 +238,7 @@ def test_one_liner(capsys):
 def test_solver_homogeneous_laplace():
     # Regression test for homogeneous halfspace in Laplace domain.
     # Not very sophisticated; replace/extend by more detailed tests.
-    dat = REGRES['Data']['lap']
+    dat = REGRES['lap']
 
     grid = meshes.TensorMesh(**dat['input_grid'])
     model = models.Model(**dat['input_model'])
@@ -248,13 +248,13 @@ def test_solver_homogeneous_laplace():
     efield = solver.solve(grid, model, sfield, verb=1)
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['Fresult'], efield)
+    assert_allclose(dat['Fresult'], efield, rtol=5e-6)
 
     # BiCGSTAB with some print checking.
     efield = solver.solve(grid, model, sfield, verb=1, sslsolver=True)
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['bicresult'], efield)
+    assert_allclose(dat['bicresult'], efield, rtol=5e-6)
 
     # If efield is complex, assert it fails.
     efield = fields.Field(grid, dtype=np.complex_)
@@ -438,9 +438,11 @@ def test_krylov(capsys):
     # Just check here for bicgstab-error.
 
     # Load any case.
-    dat = REGRES['Data']['res']
+    dat = REGRES['res']
     grid = meshes.TensorMesh(**dat['input_grid'])
     model = models.Model(**dat['input_model'])
+    model.property_x /= 100000  # Set stupid input to make bicgstab fail.
+    model.property_y *= 100000  # Set stupid input to make bicgstab fail.
     sfield = fields.get_source_field(**dat['input_source'])
     vmodel = models.VolumeModel(grid, model, sfield)
     efield = fields.Field(grid)  # Initiate e-field.
@@ -448,8 +450,7 @@ def test_krylov(capsys):
     # Get var-instance
     var = solver.MGParameters(
             cycle=None, sslsolver=True, semicoarsening=False,
-            linerelaxation=False, vnC=grid.vnC, verb=4,
-            maxit=-1,  # Set stupid input to make bicgstab fail.
+            linerelaxation=False, vnC=grid.vnC, verb=4, maxit=-1,
     )
     var.l2_refe = sl.norm(sfield, check_finite=False)
 
