@@ -17,6 +17,7 @@ Everything related to meshes appropriate for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -30,6 +31,11 @@ except ImportError:
 
 __all__ = ['TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
            'get_domain', 'get_hx']
+
+MESHWARNING = (
+    "\n    `get_stretched_h`, `get_domain`, and `get_hx` are"
+    "\n    deprecated and will be removed. Use `get_hx_h0` instead."
+)
 
 
 class _TensorMesh:
@@ -599,7 +605,7 @@ def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
     Returns `nx` cell widths within `domain`, where the minimum cell width is
     `min_width`. The cells are not stretched within `x0` and `x1`, and outside
     uses a power-law stretching. The actual stretching factor and the number of
-    cells left and right of `x0` and `x1` are find in a minimization process.
+    cells left and right of `x0` and `x1` are found in a minimization process.
 
     The domain is not completely respected. The starting point of the domain
     is, but the endpoint of the domain might slightly shift (this is more
@@ -656,6 +662,7 @@ def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
         Cell widths of mesh.
 
     """
+    warnings.warn(MESHWARNING, DeprecationWarning)
 
     # Cast to arrays
     domain = np.array(domain, dtype=np.float64)
@@ -806,6 +813,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         Start- and end-points of computation domain.
 
     """
+    warnings.warn(MESHWARNING, DeprecationWarning)
 
     # Set fact_pos to fact_neg if not provided.
     if fact_pos is None:
@@ -835,11 +843,11 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
 def get_hx(alpha, domain, nx, x0, resp_domain=True):
     r"""Return cell widths for given input.
 
-    Find the number of cells left and right of `x0`, `nl` and `nr`
-    respectively, for the provided alpha. For this, we solve
+    Find the number of cells left (``nl``) and right (``nr``) of the center
+    ``x0`` for the provided alpha. For this, we solve
 
     .. math::   \frac{x_\text{max}-x_0}{x_0-x_\text{min}} =
-                \frac{a^{nr}-1}{a^{nl}-1}
+                \frac{a^\text{nr}-1}{a^\text{nl}-1}
 
     where :math:`a = 1+\alpha`.
 
@@ -851,17 +859,17 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
         Stretching factor `a` is given by ``a=1+alpha``.
 
     domain : list
-        [start, end] of model domain.
+        ``[x_min, x_max]`` of model domain.
 
     nx : int
         Number of cells.
 
     x0 : float
-        Center of the grid. `x0` is restricted to `domain`.
+        Center of the grid. ``x0`` is restricted to ``domain``.
 
     resp_domain : bool
-        If False (default), then the domain-end might shift slightly to assure
-        that the same stretching factor is applied throughout. If set to True,
+        If False, then the domain-end might shift slightly to assure that the
+        same stretching factor is applied throughout. If set to True (default),
         however, the domain is respected absolutely. This will introduce one
         stretch-factor which is different from the other stretch factors, to
         accommodate the restriction. This one-off factor is between the left-
@@ -871,9 +879,12 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
     Returns
     -------
     hx : ndarray
-        Cell widths of mesh.
+        Cell widths of mesh. All points are given by
+        ``np.r_[xmin, xmin+np.cumsum(hx)]``
 
     """
+    warnings.warn(MESHWARNING, DeprecationWarning)
+
     if alpha <= 0.:  # If alpha <= 0: equal spacing (no stretching at all)
         hx = np.ones(nx)*np.diff(np.squeeze(domain))/nx
 
@@ -882,7 +893,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
 
         # Get hx depending if x0 is on the domain boundary or not.
         if np.isclose(x0, domain[0]) or np.isclose(x0, domain[1]):
-            # Get al a's
+            # Get all a's
             alr = np.diff(domain)*alpha/(a**nx-1)*a**np.arange(nx)
             if x0 == domain[1]:
                 alr = alr[::-1]

@@ -6,16 +6,18 @@ recent versions
 """""""""""""""
 
 
-*latest (dev)*
---------------
+*latest (dev, will become v0.14.0)*
+-----------------------------------
 
 For most of the changes applies: See the API docs for more info of the relevant
 implementation.
 
 - ``survey``: A ``Survey`` has new attributes ``standard_error``,
   ``noise_floor``, and ``relative_error``.
+
 - ``optimize``: Completely changed misfit and data-weighting to more sensible
   functions.
+
 - ``simulation``:
 
   - ``compute()`` takes a new argument, ``min_offset``. If ``observed=True``,
@@ -36,6 +38,16 @@ implementation.
 
 - ``maps``: Fixed the mapping of the gradients (``Conductivity`` is the only
   mapping that was not affected by this bug).
+
+- ``models.Model``: Removed deprecated parameters ``res_{x;y;z}``.
+
+- ``io.save``:
+
+  - Removed deprecated parameter ``backend`` in ``save``.
+  - File extension has to be provided in ``save``, no default any longer.
+
+- ``meshes``: Deprecated the old meshing routines ``get_stretched_h``,
+  ``get_domain``, ``get_hx``; will be removed in the future.
 
 - Various:
 

@@ -19,7 +19,6 @@ Utility functions for writing and reading data.
 
 import os
 import json
-import warnings
 from datetime import datetime
 
 import numpy as np
@@ -46,7 +45,7 @@ KNOWN_CLASSES = {
 }
 
 
-def save(fname, backend=None, compression="gzip", **kwargs):
+def save(fname, **kwargs):
     """Save surveys, meshes, models, fields, and more to disk.
 
     Serialize and save data to disk in different formats (see parameter
@@ -66,17 +65,13 @@ def save(fname, backend=None, compression="gzip", **kwargs):
         File name inclusive ending, which defines the used data format.
         Implemented are currently:
 
-        - `.h5` (default): Uses `h5py` to store inputs to a hierarchical,
-          compressed binary hdf5 file. Recommended file format, but requires
-          the module `h5py`. Default format if ending is not provided or not
-          recognized.
+        - `.h5`: Uses `h5py` to store inputs to a hierarchical, compressed
+          binary hdf5 file. Recommended file format, but requires the module
+          `h5py`.
         - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
-          file. Default format if `h5py` is not installed.
+          file.
         - `.json`: Uses `json` to store inputs to a hierarchical, plain text
           file.
-
-    backend : deprecated
-        Set the appropriate file-ending in `fname` instead.
 
     compression : int or str, optional
         Passed through to h5py, default is 'gzip'.
@@ -104,6 +99,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
 
     """
     # Get and remove optional kwargs.
+    compression = kwargs.pop('compression', 'gzip')
     json_indent = kwargs.pop('json_indent', 2)
     collect_classes = kwargs.pop('collect_classes', False)
     verb = kwargs.pop('verb', 1)
@@ -120,37 +116,8 @@ def save(fname, backend=None, compression="gzip", **kwargs):
     # sorted TensorMesh, Field, and Model instances.
     data = _dict_serialize(kwargs, collect_classes=collect_classes)
 
-    # Deprecated backends.
-    if backend is not None:
-        mesg = ("\n    The use of `backend` is deprecated and will be removed."
-                "\n    Use the file-endings [`.h5`, `.npz`, `.json`] instead.")
-        warnings.warn(mesg, DeprecationWarning)
-
-        if backend == 'numpy':
-            backend = 'npz'
-        elif backend == 'h5py':
-            backend = 'h5'
-        else:
-            backend = backend
-
-        # Add file-ending if necessary.
-        if not full_path.endswith('.'+backend):
-            full_path += '.'+backend
-
-    else:
-
-        # Get backend from `fname`.
-        if full_path.split('.')[-1] in ['npz', 'h5', 'json']:
-            backend = full_path.split('.')[-1]
-        else:  # Fallback to default.
-            if isinstance(h5py, str):
-                backend = 'npz'
-            else:
-                backend = 'h5'
-            full_path += '.'+backend
-
-    # Save data depending on the backend.
-    if backend == "npz":
+    # Save data depending on the extension.
+    if full_path.endswith('.npz'):
 
         # Convert hierarchical dict to a flat dict.
         data = _dict_flatten(data)
@@ -158,7 +125,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
         # Store flattened data.
         np.savez_compressed(full_path, **data)
 
-    elif backend == "h5":
+    elif full_path.endswith('.h5'):
 
         # Check if h5py is installed.
         if isinstance(h5py, str):
@@ -168,7 +135,7 @@ def save(fname, backend=None, compression="gzip", **kwargs):
         with h5py.File(full_path, "w") as h5file:
             _hdf5_add_to(data, h5file, compression)
 
-    elif backend == "json":
+    elif full_path.endswith('.json'):
 
         # Move arrays to lists and decompose complex data.
         data = _dict_dearray_decomp(data)
@@ -178,7 +145,8 @@ def save(fname, backend=None, compression="gzip", **kwargs):
             json.dump(data, f, indent=json_indent)
 
     else:
-        raise ValueError(f"Unknown backend '{backend}'.")
+        ext = full_path.split('.')[-1]
+        raise ValueError(f"Unknown extension '.{ext}'.")
 
     # Print file info.
     if verb > 0:
@@ -197,8 +165,7 @@ def load(fname, **kwargs):
     Parameters
     ----------
     fname : str
-        File name including extension. Used backend depends on the file
-        extensions:
+        File name including extension. Possibilities:
 
         - '.npz': numpy-binary
         - '.h5': h5py-binary (needs `h5py`)
@@ -696,7 +663,7 @@ def _hdf5_get_from(h5file):
 def _compare_dicts(dict1, dict2, verb=False, **kwargs):
     """Return True if the two dicts `dict1` and `dict2` are the same.
 
-    Private method, not foolproof. Useful for developing new backends.
+    Private method, not foolproof. Useful for developing new extensions.
 
     If `verb=True`, it prints it key starting with the following legend:
 

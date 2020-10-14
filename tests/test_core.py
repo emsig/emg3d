@@ -29,9 +29,9 @@ def test_amat_x(njit):
     x = np.arange(1, grid.nCx+1)*2
     y = 1/np.arange(1, grid.nCy+1)
     z = np.arange(1, grid.nCz+1)[::-1]/10
-    res_x = np.outer(np.outer(x, y), z).ravel()
+    property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = models.Model(grid, res_x, 0.8*res_x, 2*res_x)
+    model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
 
     # Create a source field
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
@@ -119,11 +119,11 @@ def test_gauss_seidel(njit):
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
         # Initialize model with some resistivities.
-        res_x = np.arange(grid.nC)+1
-        res_y = 0.5*np.arange(grid.nC)+1
-        res_z = 2*np.arange(grid.nC)+1
+        property_x = np.arange(grid.nC)+1
+        property_y = 0.5*np.arange(grid.nC)+1
+        property_z = 2*np.arange(grid.nC)+1
 
-        model = models.Model(grid, res_x, res_y, res_z)
+        model = models.Model(grid, property_x, property_y, property_z)
 
         # Initialize source field.
         sfield = fields.get_source_field(grid, src, freq)
