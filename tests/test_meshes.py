@@ -223,7 +223,7 @@ def test_get_hx():
 
 def test_TensorMesh():
     # Load mesh created with discretize.TensorMesh.
-    grid = REGRES['Data']['grid']
+    grid = REGRES['grid']
 
     # Use this grid instance to create emg3d equivalent.
     emg3dgrid = meshes.TensorMesh(

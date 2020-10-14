@@ -29,10 +29,10 @@ class TestModel:
                 [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
                 np.zeros(3))
 
-        res_x = create_dummy(*grid.vnC, False)
-        res_y = res_x/2.0
-        res_z = res_x*1.4
-        mu_r = res_x*1.11
+        property_x = create_dummy(*grid.vnC, False)
+        property_y = property_x/2.0
+        property_z = property_x*1.4
+        mu_r = property_x*1.11
 
         _, _ = capsys.readouterr()  # Clean-up
         # Using defaults; check backwards compatibility for freq.
@@ -112,19 +112,21 @@ class TestModel:
 
         # Check with all inputs
         gridvol = grid.vol.reshape(grid.vnC, order='F')
-        model3 = models.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
+        model3 = models.Model(
+            grid, property_x, property_y, property_z, mu_r=mu_r)
         vmodel3 = models.VolumeModel(grid, model3, sfield)
-        assert_allclose(model3.res_x, model3.res_y*2)
-        assert_allclose(model3.res_x.shape, grid.vnC)
-        assert_allclose(model3.res_x, model3.res_z/1.4)
+        assert_allclose(model3.property_x, model3.property_y*2)
+        assert_allclose(model3.property_x.shape, grid.vnC)
+        assert_allclose(model3.property_x, model3.property_z/1.4)
         assert_allclose(gridvol/mu_r, vmodel3.zeta)
         # Check with all inputs
-        model3b = models.Model(grid, res_x.ravel('F'), res_y.ravel('F'),
-                               res_z.ravel('F'), mu_r=mu_r.ravel('F'))
+        model3b = models.Model(
+            grid, property_x.ravel('F'), property_y.ravel('F'),
+            property_z.ravel('F'), mu_r=mu_r.ravel('F'))
         vmodel3b = models.VolumeModel(grid, model3b, sfield)
-        assert_allclose(model3b.res_x, model3b.res_y*2)
-        assert_allclose(model3b.res_x.shape, grid.vnC)
-        assert_allclose(model3b.res_x, model3b.res_z/1.4)
+        assert_allclose(model3b.property_x, model3b.property_y*2)
+        assert_allclose(model3b.property_x.shape, grid.vnC)
+        assert_allclose(model3b.property_x, model3b.property_z/1.4)
         assert_allclose(gridvol/mu_r, vmodel3b.zeta)
 
         # Check setters vnC
@@ -135,16 +137,16 @@ class TestModel:
         model3.property_z = tres*4.0
         model3.mu_r = tres*5.0
         model3.epsilon_r = tres*6.0
-        assert_allclose(tres*2., model3.res_x)
-        assert_allclose(tres*3., model3.res_y)
-        assert_allclose(tres*4., model3.res_z)
+        assert_allclose(tres*2., model3.property_x)
+        assert_allclose(tres*3., model3.property_y)
+        assert_allclose(tres*4., model3.property_z)
         assert_allclose(tres*6., model3.epsilon_r)
 
         # Check eta
         iomep = sfield.sval*models.epsilon_0
-        eta_x = sfield.smu0*(1./model3.res_x + iomep)*gridvol
-        eta_y = sfield.smu0*(1./model3.res_y + iomep)*gridvol
-        eta_z = sfield.smu0*(1./model3.res_z + iomep)*gridvol
+        eta_x = sfield.smu0*(1./model3.property_x + iomep)*gridvol
+        eta_y = sfield.smu0*(1./model3.property_y + iomep)*gridvol
+        eta_z = sfield.smu0*(1./model3.property_z + iomep)*gridvol
         vmodel3 = models.VolumeModel(grid, model3, sfield)
         assert_allclose(vmodel3.eta_x, eta_x)
         assert_allclose(vmodel3.eta_y, eta_y)
@@ -158,16 +160,16 @@ class TestModel:
 
         # Check a couple of out-of-range failures
         with pytest.raises(ValueError, match='`property_x` must be all'):
-            _ = models.Model(grid, res_x=res_x*0)
-        Model = models.Model(grid, res_x=res_x)
+            _ = models.Model(grid, property_x=property_x*0)
+        Model = models.Model(grid, property_x=property_x)
         with pytest.raises(ValueError, match='`property_x` must be all'):
-            Model._check_parameter(res_x*0, 'property_x')
+            Model._check_parameter(property_x*0, 'property_x')
         with pytest.raises(ValueError, match='`property_x` must be all'):
             Model._check_parameter(-1.0, 'property_x')
         with pytest.raises(ValueError, match='`property_y` must be all'):
-            _ = models.Model(grid, res_y=np.inf)
+            _ = models.Model(grid, property_y=np.inf)
         with pytest.raises(ValueError, match='`property_z` must be all'):
-            _ = models.Model(grid, res_z=res_z*np.inf)
+            _ = models.Model(grid, property_z=property_z*np.inf)
         with pytest.raises(ValueError, match='`mu_r` must be all'):
             _ = models.Model(grid, mu_r=-1)
 
@@ -241,24 +243,6 @@ class TestModel2:
 
         assert check is False
 
-    def test_old_dict(self):
-        grid = meshes.TensorMesh(
-                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
-                np.zeros(3))
-
-        model1 = models.Model(grid, 1., 2., 3.)
-        mydict = model1.to_dict()
-        mydict['res_x'] = mydict['property_x']
-        mydict['res_y'] = mydict['property_y']
-        mydict['res_z'] = mydict['property_z']
-        del mydict['property_x']
-        del mydict['property_y']
-        del mydict['property_z']
-
-        model2 = models.Model.from_dict(mydict)
-
-        assert model1 == model2
-
     def test_negative_values(self):
         # Create some dummy data
         grid = meshes.TensorMesh(
@@ -290,8 +274,8 @@ class TestModelOperators:
     model_int = models.Model(mesh_base, 1.)
     model_1_a = models.Model(mesh_base, 1., 2.)
     model_1_b = models.Model(mesh_base, 2., 4.)
-    model_2_a = models.Model(mesh_base, 1., res_z=3.)
-    model_2_b = models.Model(mesh_base, 2., res_z=6.)
+    model_2_a = models.Model(mesh_base, 1., property_z=3.)
+    model_2_b = models.Model(mesh_base, 2., property_z=6.)
     model_3_a = models.Model(mesh_base, 1., 2., 3.)
     model_3_b = models.Model(mesh_base, 2., 4., 6.)
     model_mu_a = models.Model(mesh_base, 1., mu_r=1.)
@@ -333,19 +317,19 @@ class TestModelOperators:
 
         # All different cases
         a = self.model_1_a + self.model_1_a
-        assert a.res_x == self.model_1_b.res_x
-        assert a.res_y == self.model_1_b.res_y
-        assert a.res_z.base is a.res_x.base
+        assert a.property_x == self.model_1_b.property_x
+        assert a.property_y == self.model_1_b.property_y
+        assert a.property_z.base is a.property_x.base
 
         a = self.model_2_a + self.model_2_a
-        assert a.res_x == self.model_2_b.res_x
-        assert a.res_y.base is a.res_x.base
-        assert a.res_z == self.model_2_b.res_z
+        assert a.property_x == self.model_2_b.property_x
+        assert a.property_y.base is a.property_x.base
+        assert a.property_z == self.model_2_b.property_z
 
         a = self.model_3_a + self.model_3_a
-        assert a.res_x == self.model_3_b.res_x
-        assert a.res_y == self.model_3_b.res_y
-        assert a.res_z == self.model_3_b.res_z
+        assert a.property_x == self.model_3_b.property_x
+        assert a.property_y == self.model_3_b.property_y
+        assert a.property_z == self.model_3_b.property_z
 
         # mu_r and epsilon_r
         a = self.model_mu_a + self.model_mu_a
@@ -360,19 +344,19 @@ class TestModelOperators:
 
         # All different cases
         a = self.model_1_b - self.model_1_a
-        assert a.res_x == self.model_1_a.res_x
-        assert a.res_y == self.model_1_a.res_y
-        assert a.res_z.base is a.res_x.base
+        assert a.property_x == self.model_1_a.property_x
+        assert a.property_y == self.model_1_a.property_y
+        assert a.property_z.base is a.property_x.base
 
         a = self.model_2_b - self.model_2_a
-        assert a.res_x == self.model_2_a.res_x
-        assert a.res_y.base is a.res_x.base
-        assert a.res_z == self.model_2_a.res_z
+        assert a.property_x == self.model_2_a.property_x
+        assert a.property_y.base is a.property_x.base
+        assert a.property_z == self.model_2_a.property_z
 
         a = self.model_3_b - self.model_3_a
-        assert a.res_x == self.model_3_a.res_x
-        assert a.res_y == self.model_3_a.res_y
-        assert a.res_z == self.model_3_a.res_z
+        assert a.property_x == self.model_3_a.property_x
+        assert a.property_y == self.model_3_a.property_y
+        assert a.property_z == self.model_3_a.property_z
 
         # mu_r and epsilon_r
         a = self.model_mu_b - self.model_mu_a

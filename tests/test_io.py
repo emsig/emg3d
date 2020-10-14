@@ -52,11 +52,11 @@ def test_save_and_load(tmpdir, capsys):
     field.ensure_pec
 
     # Some model.
-    res_x = create_dummy(*grid.vnC, False)
-    res_y = res_x/2.0
-    res_z = res_x*1.4
-    mu_r = res_x*1.11
-    model = models.Model(grid, res_x, res_y, res_z, mu_r=mu_r)
+    property_x = create_dummy(*grid.vnC, False)
+    property_y = property_x/2.0
+    property_z = property_x*1.4
+    mu_r = property_x*1.11
+    model = models.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
 
     # Save it.
     io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
@@ -97,25 +97,15 @@ def test_save_and_load(tmpdir, capsys):
     with pytest.raises(TypeError, match="Unexpected "):
         io.load('ttt.npz', stupidkeyword='a')
 
-    # Unknown backend/extension.
-    with pytest.raises(ValueError, match="Unknown backend 'what"):
-        io.save(tmpdir+'/testwrongbackend', something=1, backend='what?')
-    io.save(tmpdir+'/testwrongbackend.abc', something=1)
+    # Unknown extension.
     with pytest.raises(ValueError, match="Unknown extension '.abc'"):
-        io.load(tmpdir+'/testwrongbackend.abc')
-    if h5py:
-        io.load(tmpdir+'/testwrongbackend.abc.h5')
-    else:
-        io.load(tmpdir+'/testwrongbackend.abc.npz')
-
-    # Ensure deprecated backend/extension still work.
-    if h5py:
-        io.save(tmpdir+'/ttt', backend='h5py')
-    io.save(tmpdir+'/ttt', backend='numpy')
+        io.save(tmpdir+'/testwrongextension.abc', something=1)
+    with pytest.raises(ValueError, match="Unknown extension '.abc'"):
+        io.load(tmpdir+'/testwrongextension.abc')
 
     # Test h5py.
     if h5py:
-        io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
+        io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
                 a=1.0, b=1+1j, c=True,
                 model=model, field=field, what={'f': field.fx},
                 collect_classes=True)
@@ -132,17 +122,14 @@ def test_save_and_load(tmpdir, capsys):
         assert io._compare_dicts(out_h5, out_npz) is True
     else:
         with pytest.raises(ImportError):
-            # Ensure deprecated backend/extension still work.
-            io.save(tmpdir+'/ttt', backend='h5py')
-        with pytest.raises(ImportError):
             io.save(tmpdir+'/test.h5', grid=grid)
         with pytest.raises(ImportError):
             io.load(str(tmpdir+'/test-h5.h5'))
 
     # Test json.
-    io.save(tmpdir+'/test', emg3d=grid, discretize=grid2,
+    io.save(tmpdir+'/test.json', emg3d=grid, discretize=grid2,
             a=1.0, b=1+1j,
-            model=model, field=field, what={'f': field.fx}, backend='json',
+            model=model, field=field, what={'f': field.fx},
             collect_classes=True)
     out_json = io.load(str(tmpdir+'/test.json'))
     assert out_json['Model']['model'] == model
