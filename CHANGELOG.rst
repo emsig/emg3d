@@ -9,8 +9,7 @@ recent versions
 *latest (dev, will become v0.14.0)*
 -----------------------------------
 
-For most of the changes applies: See the API docs for more info of the relevant
-implementation.
+See the API docs for more info of the relevant implementation.
 
 - ``survey``: A ``Survey`` has new attributes ``standard_error``,
   ``noise_floor``, and ``relative_error``.

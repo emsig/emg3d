@@ -135,7 +135,8 @@ def gradient(simulation):
     .. note::
 
         The gradient is currently implemented only for electric sources and
-        receivers and only for isotropic models.
+        receivers; only for isotropic models; and not for electric permittivity
+        nor magnetic permeability.
 
 
     Parameters
@@ -199,8 +200,9 @@ def gradient(simulation):
 
     # => Frequency-independent depth-weighting should go here.
 
-    # Apply derivative of property-map
+    # Apply derivative-chain of property-map
     # (in case the property is something else than conductivity).
-    simulation.model.map.derivative(grad_model, simulation.model.property_x)
+    simulation.model.map.derivative_chain(
+            grad_model, simulation.model.property_x)
 
     return grad_model

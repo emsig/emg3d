@@ -313,8 +313,8 @@ class TestMaps:
         with pytest.raises(NotImplementedError, match='Backward map not impl'):
             testmap.backward(1)
 
-        with pytest.raises(NotImplementedError, match='Derivative map not im'):
-            testmap.derivative(1, 1)
+        with pytest.raises(NotImplementedError, match='Derivative chain not '):
+            testmap.derivative_chain(1, 1)
 
     def test_conductivity(self):
         model = models.Model(self.mesh, self.values, mapping='Conductivity')
@@ -330,7 +330,7 @@ class TestMaps:
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
-        model.map.derivative(gradient, model.property_x)
+        model.map.derivative_chain(gradient, model.property_x)
         assert_allclose(derivative, derivative)
 
     def test_lgconductivity(self):
@@ -348,8 +348,8 @@ class TestMaps:
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
-        model.map.derivative(gradient, model.property_x)
-        assert_allclose(gradient, derivative/10**model.property_x/np.log(10))
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, derivative*10**model.property_x*np.log(10))
 
     def test_lnconductivity(self):
         model = models.Model(self.mesh, np.log(self.values),
@@ -366,8 +366,8 @@ class TestMaps:
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
-        model.map.derivative(gradient, model.property_x)
-        assert_allclose(gradient, derivative/np.exp(model.property_x))
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, derivative*np.exp(model.property_x))
 
     def test_resistivity(self):
         model = models.Model(self.mesh, 1/self.values, mapping='Resistivity')
@@ -383,8 +383,8 @@ class TestMaps:
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
-        model.map.derivative(gradient, model.property_x)
-        assert_allclose(gradient, -derivative/(1/model.property_x)**2)
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, -derivative*(1/model.property_x)**2)
 
     def test_lgresistivity(self):
         model = models.Model(self.mesh, np.log10(1/self.values),
@@ -401,8 +401,8 @@ class TestMaps:
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
-        model.map.derivative(gradient, model.property_x)
-        assert_allclose(gradient, -derivative/10**-model.property_x/np.log(10))
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, -derivative*10**-model.property_x*np.log(10))
 
     def test_lnresistivity(self):
         model = models.Model(self.mesh, np.log(self.values),
@@ -419,8 +419,8 @@ class TestMaps:
         # Derivative
         gradient = 2*np.ones(model.property_x.shape)
         derivative = gradient.copy()
-        model.map.derivative(gradient, model.property_x)
-        assert_allclose(gradient, -derivative/np.exp(-model.property_x))
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, -derivative*np.exp(-model.property_x))
 
 
 @pytest.mark.parametrize("njit", [True, False])
