@@ -28,6 +28,7 @@ import itertools
 from copy import deepcopy
 
 import numpy as np
+import scipy.linalg as sl
 
 try:
     from tqdm.contrib.concurrent import process_map
@@ -106,21 +107,6 @@ class Simulation:
         many cases, but they are the most robust combination at which you can
         throw most things.
 
-    data_weight_opts : dict, optional
-        Applied in :func:`emg3d.optimize.data_weighting` (defaults in
-        <brackets>):
-
-        - `gamma_d` : float <0.5>; Offset weighting exponent.
-        - `beta_d` : float <1.0>; Data weighting exponent.
-        - `beta_f` : float <0.25>; Frequency weighting exponent.
-        - `noise_floor` : float <1e-15>; Data with amplitudes below the noise
-          floor are switched off.
-        - `min_off`: float <1000>; Receiver closer to the source than
-          `min_offest` are switched off.
-        - `reference`: str <'reference'>; Name of the data to use for
-          normalization. By default the data from the reference model; if not
-          found, the observed data are used.
-
     verb : int; optional
         Level of verbosity. Default is 0.
 
@@ -169,7 +155,6 @@ class Simulation:
                 'verb': 0,
                 **kwargs.pop('solver_opts', {}),  # Overwrites defaults.
                 }
-        self.data_weight_opts = kwargs.pop('data_weight_opts', {})
 
         # Ensure no kwargs left (currently kwargs is not used).
         if kwargs:
@@ -284,7 +269,7 @@ class Simulation:
         if what in ['computed', 'results', 'all']:
             for name in list(self.data.data_vars):
                 # These two are stored in the Survey instance.
-                if name not in ['observed', 'reference']:
+                if name not in ['observed', 'std']:
                     out['data'][name] = self.data.get(name)
             out['gradient'] = self._gradient
             out['misfit'] = self._misfit
@@ -700,7 +685,7 @@ class Simulation:
         """Wrapper of `get_efield` for `concurrent.futures`."""
         return self.get_efield(*inp, call_from_compute=True)
 
-    def compute(self, observed=False, reference=False):
+    def compute(self, observed=False, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
@@ -708,12 +693,15 @@ class Simulation:
         observed : bool
             If True, it stores the current result also as observed model.
             This is usually done for pure forward modelling (not inversion).
-            It will as such be stored within the survey.
+            It will as such be stored within the survey. If the survey has
+            either `relative_error` or `noise_floor`, random Gaussian noise
+            with std will be added to the `data.observed` (not to
+            data.synthetic). Also, data below the noise floor will be set to
+            NaN.
 
-        reference : bool
-            If True, it stores the current result also as reference model,
-            which is used by the data weighting functions. This is usually
-            done for the initial model in an inversion.
+        min_offset : float
+            Default is 0.0. Data in `data.observed` where the offset <
+            min_offset are set to NaN.
 
         """
         srcfreq = self._srcfreq.copy()
@@ -768,11 +756,37 @@ class Simulation:
             # Store responses at receivers.
             self.data['synthetic'].loc[src, :, freq] = out[i][2]
 
-        # If it shall be used as observed or as a reference save a copy.
+        # If it shall be used as observed data save a copy.
         if observed:
+
             self.data['observed'] = self.data['synthetic'].copy()
-        if reference:
-            self.data['reference'] = self.data['synthetic'].copy()
+
+            # Add noise noise_floor and/or relative_error given.
+            if self.survey.standard_deviation is not None:
+
+                # Create noise.
+                std = self.survey.standard_deviation
+                random = np.random.randn(self.survey.size*2)
+                noise_re = std*random[::2].reshape(self.survey.shape)
+                noise_im = std*random[1::2].reshape(self.survey.shape)
+
+                # Add noise to observed data.
+                self.data['observed'].data += noise_re + 1j*noise_im
+
+            # Set data below the noise floor to NaN.
+            if self.data.noise_floor is not None:
+                min_amp = abs(self.data.synthetic.data) < self.data.noise_floor
+                self.data['observed'].data[min_amp] = np.nan + 1j*np.nan
+
+            # Set near-offsets to NaN.
+            offsets = sl.norm(
+                np.array(self.survey.rec_coords[:3])[:, None, :] -
+                np.array(self.survey.src_coords[:3])[:, :, None],
+                axis=0,
+                check_finite=False,
+            )
+            min_off = offsets < kwargs.get('min_offset', 0.0)
+            self.data['observed'].data[min_off] = np.nan + 1j*np.nan
 
     # AUTOMATED GRIDDING
     def _initiate_model_grid(self, model, grid):
@@ -930,7 +944,7 @@ class Simulation:
         # Clean data.
         if what in ['computed', 'all']:
             for name in list(self.data.data_vars):
-                if name not in ['observed', 'reference']:
+                if name not in ['observed', 'std']:
                     del self.data[name]
             self.data['synthetic'] = self.data.observed*np.nan
             for name in ['_gradient', '_misfit']:
@@ -1018,7 +1032,11 @@ class Simulation:
 
             # Strength: in get_source_field the strength is multiplied with
             # iwmu; so we undo this here.
-            strength = self.data.wresidual.loc[source, name, freq].data.conj()
+            residual = self.data.residual.loc[source, name, freq].data
+            if np.isnan(residual):
+                continue
+            strength = residual.conj()
+            strength *= self.data.weights.loc[source, name, freq].data.conj()
             strength /= ResidualField.smu0
 
             # If strength is zero (very unlikely), get_source_field would

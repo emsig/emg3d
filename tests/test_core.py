@@ -278,8 +278,8 @@ def test_restrict(njit):
     assert cfield.fz.sum() == ffield.fz.sum()
 
     # Assert fields are multiples from each other.
-    np.allclose(cfield.fx[0, :, :]*2, cfield.fy[:, 0, :])
-    np.allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
+    assert_allclose(cfield.fx[0, :, :]*2, cfield.fy[:, 0, :])
+    assert_allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
 
     # # CASE 1 -- y & z # #
 
@@ -300,7 +300,7 @@ def test_restrict(njit):
     assert cfield.fz.sum() == ffield.fz.sum()
 
     # Assert fields are multiples from each other.
-    np.allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
+    assert_allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
 
     # # CASE 2 -- x & z # #
 
@@ -321,7 +321,7 @@ def test_restrict(njit):
     assert cfield.fz.sum() == ffield.fz.sum()
 
     # Assert fields are multiples from each other.
-    np.allclose(cfield.fx[0, :, :].T*2, cfield.fz[:, :, 0])
+    assert_allclose(cfield.fx[0, :, :].T*4, cfield.fz[:, :, 0])
 
     # # CASE 3 -- x & y # #
 
@@ -343,7 +343,7 @@ def test_restrict(njit):
     assert cfield.fz.sum() == ffield.fz.sum()
 
     # Assert fields are multiples from each other.
-    np.allclose(cfield.fx[0, :, :]*2, cfield.fy[:, 0, :])
+    assert_allclose(cfield.fx[0, :, :]*2, cfield.fy[:, 0, :])
 
     # # CASE 4 -- x # #
 
@@ -364,7 +364,7 @@ def test_restrict(njit):
     assert cfield.fz.sum() == ffield.fz.sum()
 
     # Assert fields are multiples from each other.
-    np.allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
+    assert_allclose(cfield.fy[:, 0, :]*2, cfield.fz[:, :, 0])
 
     # # CASE 5 -- y # #
 
@@ -385,7 +385,7 @@ def test_restrict(njit):
     assert cfield.fz.sum() == ffield.fz.sum()
 
     # Assert fields are multiples from each other.
-    np.allclose(cfield.fx[0, :, :].T*4, cfield.fz[:, :, 0])
+    assert_allclose(cfield.fx[0, :, :].T*4, cfield.fz[:, :, 0])
 
     # # CASE 6 -- z # #
 
@@ -406,7 +406,7 @@ def test_restrict(njit):
     assert cfield.fz.sum() == ffield.fz.sum()
 
     # Assert fields are multiples from each other.
-    np.allclose(cfield.fx[0, :, :]*4, cfield.fy[:, 0, :])
+    assert_allclose(cfield.fx[0, :, :]*2, cfield.fy[:, 0, :])
 
 
 @pytest.mark.parametrize("njit", [True, False])

@@ -1,6 +1,6 @@
 import pytest
 import dataclasses
-# import numpy as np
+import numpy as np
 from numpy.testing import assert_allclose
 
 # Soft dependencies
@@ -29,6 +29,50 @@ class TestSurvey():
         assert 'Test' in srvy.__repr__()
         assert 'Test' in srvy._repr_html_()
         assert 'Coordinates' in srvy._repr_html_()
+
+        with pytest.raises(TypeError, match="Unexpected "):
+            surveys.Survey('Test', sources, receivers, frequencies, bla='a')
+
+    def test_standard_deviation(self):
+        sources = (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0)
+        receivers = ([1000, 3000, 4000], 2000, -1000, 0, 0)
+        frequencies = (1, 0.1, 2, 3)
+        srvy0 = surveys.Survey('Test', sources, receivers, frequencies,
+                               data=np.ones((5, 3, 4)))
+        assert srvy0.standard_deviation is None
+
+        # Test f-dependent noise-floor and source-dependent rel. error.
+        nf = np.arange(1, 5)[None, None, :]*1e-15  # No noise floor for f=1.0
+        re = np.arange(1, 6)[:, None, None]/100    # No rel. error for Tx1
+        srvy = surveys.Survey('Test', sources, receivers, frequencies,
+                              relative_error=re, noise_floor=nf,
+                              data=np.ones((5, 3, 4)))
+
+        assert_allclose(srvy.noise_floor, nf)
+        assert_allclose(srvy.relative_error, re)
+        # As data are ones, we can check standard_deviation without it.
+        std = np.sqrt(np.ones(srvy.shape)*nf**2 + np.ones(srvy.shape)*re**2)
+        assert_allclose(srvy.standard_deviation.data, std)
+
+        # Set the standard deviations
+        test_std = np.arange(1, srvy.size+1).reshape(srvy.shape)
+        srvy.standard_deviation = test_std
+        assert_allclose(srvy.noise_floor, nf)
+        assert_allclose(srvy.relative_error, re)
+        assert_allclose(srvy.standard_deviation.data, test_std)
+        srvy.standard_deviation = None  # Delete again
+        assert_allclose(srvy.standard_deviation.data, std)
+
+        with pytest.raises(ValueError, match='All values of `std` must be'):
+            srvy.standard_deviation = np.zeros(srvy.shape)
+        with pytest.raises(ValueError, match='All values of `noise_floor`'):
+            srvy.noise_floor = 0.0
+        with pytest.raises(ValueError, match='All values of `relative_error'):
+            srvy.relative_error = 0.0
+        with pytest.raises(ValueError, match='Shape of `noise_floor`'):
+            srvy.noise_floor = np.ones(srvy.shape)[:, :2, :]
+        with pytest.raises(ValueError, match='Shape of `relative_error'):
+            srvy.relative_error = np.ones(srvy.shape)[2:6, :, :]
 
     def test_dipole_info_to_dict(self):
         # == 1. List ==
@@ -148,7 +192,10 @@ class TestSurvey():
     def test_copy(self, tmpdir):
         # This also checks to_dict()/from_dict().
         srvy1 = surveys.Survey('Test', (0, 0, 0, 0, 0),
-                               (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]])
+                               (1000, 0, 0, 0, 0), 1.0)
+        # Set observed and standard deviation.
+        srvy1.observed = [[[3+3j]]]
+        srvy1.standard_deviation = np.array([[[1.1]]])
         srvy2 = srvy1.copy()
         assert srvy1.sources == srvy2.sources
 
@@ -161,10 +208,10 @@ class TestSurvey():
                                (1000, 0, 0, 0, 0), 1.0, [[[3+3j]]],
                                fixed=1)
         srvy4 = srvy3.copy()
+        srvy4.standard_deviation = np.array([[[1.1]]])
         assert srvy3.sources == srvy4.sources
 
         # Also check to_file()/from_file().
-        srvy4.data['reference'] = srvy4.data['observed'].copy()*2
         srvy4.to_file(tmpdir+'/test.npz')
         srvy5 = surveys.Survey.from_file(tmpdir+'/test.npz')
         assert srvy4.name == srvy5.name
@@ -172,15 +219,15 @@ class TestSurvey():
         assert srvy4.receivers == srvy5.receivers
         assert srvy4.frequencies == srvy5.frequencies
         assert srvy4.fixed == srvy5.fixed
-        assert_allclose(srvy4.data.observed, srvy5.data.observed)
-        assert_allclose(srvy4.data.reference, srvy5.data.reference)
+        assert_allclose(srvy4.observed, srvy5.observed)
+        assert_allclose(srvy4.standard_deviation, srvy5.standard_deviation)
 
         # Test backwards compatibility.
         srvy5 = srvy5.to_dict()
         srvy5['observed'] = srvy5['data']['observed']
         del srvy5['data']
         srvy6 = surveys.Survey.from_dict(srvy5)
-        assert_allclose(srvy5['observed'], srvy6.data.observed)
+        assert_allclose(srvy5['observed'], srvy6.observed)
 
 
 def test_PointDipole():

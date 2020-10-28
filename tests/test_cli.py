@@ -91,6 +91,17 @@ class TestParser:
         assert cfg['files']['output'] == tmpdir+'/emg3d_out.h5'
         assert cfg['files']['log'] == tmpdir+'/emg3d_out.log'
 
+        # Provide file names
+        args_dict = self.args_dict.copy()
+        args_dict['survey'] = 'test.h5'
+        args_dict['model'] = 'unkno.wn'
+        args_dict['output'] = 'out.npz'
+        args_dict['config'] = config
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        assert cfg['files']['survey'] == tmpdir+'/test.h5'
+        assert cfg['files']['model'] == tmpdir+'/unkno.h5'
+        assert cfg['files']['output'] == tmpdir+'/out.npz'
+
         # .-trick.
         args_dict = self.args_dict.copy()
         args_dict['config'] = '.'
@@ -139,7 +150,7 @@ class TestParser:
             f.write("survey=testit.json\n")
             f.write("model=thismodel\n")
             f.write("output=results.npz\n")
-            f.write("store_simulation=true")
+            f.write("store_simulation=false")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -148,7 +159,18 @@ class TestParser:
         assert cfg['files']['model'] == tmpdir+'/thismodel.h5'
         assert cfg['files']['output'] == tmpdir+'/results.npz'
         assert cfg['files']['log'] == tmpdir+'/results.log'
-        assert cfg['files']['store_simulation'] is True
+        assert cfg['files']['store_simulation'] is False
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            # Write a config file.
+            config = os.path.join(tmpdir, 'emg3d.cfg')
+            with open(config, 'w') as f:
+                f.write("[files]\n")
+                f.write(f"path={tmpdir}\n")
+                f.write("whatever=bla")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            cfg, term = cli.parser.parse_config_file(args_dict)
 
     def test_simulation(self, tmpdir):
 
@@ -158,7 +180,8 @@ class TestParser:
             f.write("[simulation]\n")
             f.write("max_workers=5\n")
             f.write("gridding=fancything\n")
-            f.write("name=PyTest simulation")
+            f.write("name=PyTest simulation\n")
+            f.write("min_offset=1320")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -166,6 +189,7 @@ class TestParser:
         assert cfg['simulation_options']['max_workers'] == 5
         assert cfg['simulation_options']['gridding'] == 'fancything'
         assert cfg['simulation_options']['name'] == "PyTest simulation"
+        assert cfg['simulation_options']['min_offset'] == 1320.0
 
     def test_solver(self, tmpdir):
 
@@ -187,25 +211,33 @@ class TestParser:
         assert test['tol'] == 0.0001
         assert test['nu_init'] == 2
 
-    def test_dataweigths(self, tmpdir):
+    def test_data(self, tmpdir):
 
         # Write a config file.
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
-            f.write("[data_weight_opts]\n")
-            f.write("reference=synthetic\n")
-            f.write("gamma_d=2.0\n")
-            f.write("noise_floor=1e-4\n")
-            f.write("min_off=0")
+            f.write("[data]\n")
+            f.write("sources=Tx11\n")
+            f.write("receivers=Rx1, Rx2\n")
+            f.write("frequencies=1")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        test = cfg['simulation_options']['data_weight_opts']
-        assert test['reference'] == 'synthetic'
-        assert test['gamma_d'] == 2.0
-        assert test['noise_floor'] == 0.0001
-        assert test['min_off'] == 0
+        test = cfg['data']
+        assert test['sources'] == ['Tx11']
+        assert test['receivers'] == ['Rx1', 'Rx2']
+        assert test['frequencies'] == ['1']
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            # Write a config file.
+            config = os.path.join(tmpdir, 'emg3d.cfg')
+            with open(config, 'w') as f:
+                f.write("[data]\n")
+                f.write("whatever=bla")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            cfg, term = cli.parser.parse_config_file(args_dict)
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -226,12 +258,19 @@ class TestRun:
             'dry_run': True,
             }
 
-    # Create a tiny dummy survey.
-    survey = emg3d.Survey(
-        name='CLI Survey',
-        sources=(4125, 4000, 4000, 0, 0),
-        receivers=(np.arange(17)*250+2000, 4000, 3950, 0, 0),
-        frequencies=1)
+    if xarray is not None:
+        # Create a tiny dummy survey.
+        data = np.ones((1, 17, 1))
+        data[0, 8:11, 0] = np.nan
+        survey = emg3d.Survey(
+            name='CLI Survey',
+            sources=(4125, 4000, 4000, 0, 0),
+            receivers=(np.arange(17)*250+2000, 4000, 3950, 0, 0),
+            frequencies=1,
+            noise_floor=1e-15,
+            relative_error=0.05,
+            data=data,
+        )
 
     # Create a dummy grid and model.
     xx = np.ones(16)*500
@@ -270,7 +309,7 @@ class TestRun:
             f.write("sslsolver=False\n")
             f.write("semicoarsening=False\n")
             f.write("linerelaxation=False\n")
-            f.write("maxit=1")
+            f.write("maxit=1\n")
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)
@@ -298,6 +337,8 @@ class TestRun:
         assert_allclose(res1['misfit'].shape, res2['misfit'].shape)
         assert_allclose(res1['gradient'].shape, res2['gradient'].shape)
         assert 'simulation' in res2
+        assert res1['n_observations'] == np.isfinite(self.data).sum()
+        assert res2['n_observations'] == np.isfinite(self.data).sum()
 
         # Actually run one iteration (to output2.npz).
         args_dict = self.args_dict.copy()
@@ -311,3 +352,29 @@ class TestRun:
         res3 = emg3d.load(os.path.join(tmpdir, 'output3.npz'))
         assert 'misfit' not in res3
         assert 'gradient' not in res3
+
+    def test_data(self, tmpdir, capsys):
+
+        # Write a config file.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[data]\n")
+            f.write("sources=Tx0\n")
+            f.write("receivers=Rx04, Rx09, Rx01, Rx11, Rx05\n")
+            f.write("frequencies=1")
+
+        # Store survey and model.
+        self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)
+        emg3d.save(os.path.join(tmpdir, 'model.npz'), model=self.model,
+                   mesh=self.grid, verb=1)
+
+        # Run a dry run (to output.npz).
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
+        args_dict['path'] = tmpdir
+        cli.run.simulation(args_dict)
+
+        # Ensure dry_run returns same shaped data as the real thing.
+        res = emg3d.load(os.path.join(tmpdir, 'output.npz'))
+        assert_allclose(res['data'].shape, (1, 5, 1))
+        assert res['n_observations'] == 4

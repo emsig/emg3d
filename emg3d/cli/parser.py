@@ -113,12 +113,14 @@ def parse_config_file(args_dict):
     files = {'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
     for key, value in files.items():
 
+        config_or_default = all_files.pop(key, value)
+
         # Get terminal input.
         fname = term.pop(key)
 
         # If there was no terminal input, get config-file; else, default.
         if fname is None:
-            fname = all_files.pop(key, value)
+            fname = config_or_default
 
         # Get absolute paths.
         ffile = Path(os.path.join(path, fname))
@@ -136,9 +138,15 @@ def parse_config_file(args_dict):
     files['log'] = str(files['output'].with_suffix('.log'))
     files['output'] = str(files['output'])
 
-    # Store options.
-    if cfg.has_option('files', 'store_simulation'):
-        files['store_simulation'] = cfg.getboolean('files', 'store_simulation')
+    # Store options (get it with getboolean, and remove from dict).
+    files['store_simulation'] = cfg.getboolean(
+            'files', 'store_simulation', fallback=False)
+    _ = all_files.pop('store_simulation', None)
+
+    # Ensure no keys are left.
+    if all_files:
+        raise TypeError(f"Unexpected parameter in [files]: "
+                        f"{list(all_files.keys())}")
 
     # # Simulation parameters  # #
 
@@ -167,7 +175,11 @@ def parse_config_file(args_dict):
     if cfg.has_option('simulation', key):
         simulation[key] = cfg.get('simulation', key)
     else:
-        simulation['name'] = "emg3d CLI run"
+        simulation[key] = "emg3d CLI run"
+
+    key = 'min_offset'
+    if cfg.has_option('simulation', key):
+        simulation[key] = cfg.getfloat('simulation', key)
 
     # # Solver parameters  # #
 
@@ -203,28 +215,22 @@ def parse_config_file(args_dict):
         if solver:
             simulation['solver_opts'] = solver
 
-    # # Data weighting # #
+    # # Data selection parameters  # #
 
-    # Check if wdata-section exists; otherwise no data weighting.
-    if 'data_weight_opts' in cfg.sections():
+    data = {}
+    if 'data' in cfg.sections():
+        # Get all parameters.
+        all_data = dict(cfg.items('data'))
 
-        # Initiate wdata-dict.
-        wdata = {}
+        for key in ['sources', 'receivers', 'frequencies']:
+            value = all_data.pop(key, False)
+            if value:
+                data[key] = [v.strip() for v in value.split(',')]
 
-        # Check for reference.
-        key = 'reference'
-        if cfg.has_option('data_weight_opts', key):
-            wdata[key] = cfg.get('data_weight_opts', key)
-
-        # Check for other parameters.
-        keys = ['gamma_d', 'beta_d', 'beta_f', 'noise_floor', 'min_off']
-        for key in keys:
-            if cfg.has_option('data_weight_opts', key):
-                wdata[key] = cfg.getfloat('data_weight_opts', key)
-
-        # Add to simulation dict if not empty.
-        if wdata:
-            simulation['data_weight_opts'] = wdata
+        # Ensure no keys are left.
+        if all_data:
+            raise TypeError(f"Unexpected parameter in [data]: "
+                            f"{list(all_data.keys())}")
 
     # # Gridding # #
 
@@ -257,4 +263,5 @@ def parse_config_file(args_dict):
             simulation['gridding_opts'] = grid
 
     # Return.
-    return {'files': files, 'simulation_options': simulation}, term
+    out = {'files': files, 'simulation_options': simulation, 'data': data}
+    return out, term
