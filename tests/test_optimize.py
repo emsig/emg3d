@@ -85,8 +85,6 @@ class TestOptimize():
                              'linerelaxation': False, 'semicoarsening': False},
                 gridding='same')
 
-        simulation.compute(reference=True)
-
     def test_errors(self):
 
         # Anisotropic models.
@@ -94,6 +92,9 @@ class TestOptimize():
         simulation.model = models.Model(self.grid, 1, 2, 3)
         with pytest.raises(NotImplementedError, match='for isotropic models'):
             optimize.gradient(simulation)
+
+        with pytest.raises(ValueError, match="Either `noise_floor` or"):
+            optimize.misfit(simulation)
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -108,6 +109,8 @@ def test_derivative(capsys):
         sources=(1650, 3200, 3200, 0, 0),
         receivers=(4750, 3200, 3200, 0, 0),
         frequencies=1.0,
+        noise_floor=1e-15,
+        relative_error=0.05,
     )
 
     # Background Model
@@ -126,13 +129,6 @@ def test_derivative(capsys):
         'linerelaxation': False,
         'tol': 5e-5,  # Reduce tolerance to speed-up
     }
-    data_weight_opts = {
-        'gamma_d': 0,
-        'beta_f': 0,
-        'beta_d': 0,
-        'min_off': 0,
-        'noise_floor': 0,
-    }
     sim_inp = {
         'name': 'Testing',
         'survey': survey,
@@ -140,7 +136,6 @@ def test_derivative(capsys):
         'solver_opts': solver_opts,
         'max_workers': 1,
         'gridding': 'same',
-        'data_weight_opts': data_weight_opts,
         'verb': 3,
     }
 
@@ -159,14 +154,3 @@ def test_derivative(capsys):
     nrmsd = random_fd_gradient(
             1, survey, model_init, mesh, grad, data_misfit, sim_inp)
     assert nrmsd < 1.0
-
-    # Check wrong reference data
-    sim_inp['data_weight_opts']['beta_d'] = 1.0
-    sim_inp['data_weight_opts']['reference'] = 'dummy'
-    sim_inp['solver_opts']['maxit'] = 1
-    _ = capsys.readouterr()  # Clean
-    sim_data = simulations.Simulation(model=model_init, **sim_inp)
-    _ = sim_data.misfit
-    outstr, _ = capsys.readouterr()
-
-    assert "Reference data 'dummy' not found, using 'synthetic'." in outstr

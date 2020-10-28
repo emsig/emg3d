@@ -27,60 +27,39 @@ technique for the gradient.
 # the License.
 
 import numpy as np
-import scipy.linalg as sl
 
 from emg3d import maps
 
-__all__ = ['gradient', 'misfit', 'data_weighting']
+__all__ = ['gradient', 'misfit']
 
 
 def misfit(simulation):
     r"""Return the misfit function.
 
-    The weighted least-squares functional, often called objective function or
-    misfit function, as implemented in `emg3d`, is given by Equation 1 in
-    [PlMu08]_,
+    The data misfit or weighted least-squares functional using an :math:`l_2`
+    norm is given by
 
     .. math::
         :label: misfit
 
-            J(\textbf{p}) = \frac{1}{2} \sum_f\sum_s\sum_r
+            \phi = \frac{1}{2} \sum_f\sum_s\sum_r
                 \left\{
                 \left\lVert
-                    W_{s,r,f}^e \Delta^e
-                \right\rVert^2
-                + \left\lVert
-                    W_{s,r,f}^h \Delta^h
-                \right\rVert^2
+                    W_{s,r,f} \left(
+                       \textbf{d}_{s,r,f}^\text{pred}
+                       -\textbf{d}_{s,r,f}^\text{obs}
+                    \right) \right\rVert^2
                 \right\}
-            + R(\textbf{p}) \ ,
-
-    where :math:`\Delta^{\{e;h\}}` are the residuals between the observed and
-    synthetic data,
-
-    .. math::
-        :label: misfit_e
-
-            \Delta^e = \textbf{e}_{s,r,f}[\sigma(\textbf{p})]
-                       -\textbf{e}_{s,r,f}^\text{obs} \ ,
-
-    and
-
-    .. math::
-        :label: misfit_h
-
-            \Delta^h = \textbf{h}_{s,r,f}[\sigma(\textbf{p})]
-                       -\textbf{h}_{s,r,f}^\text{obs} \ .
+            + R \ .
 
     Here, :math:`f, s, r` stand for frequency, source, and receiver,
-    respectively; :math:`W^{\{e;h\}}` are the weighting functions for the
-    electric and magnetic data residual,
-    :math:`\{\textbf{e};\textbf{h}\}^\text{obs}` are the observed electric and
-    magnetic data, and :math:`\{\textbf{e};\textbf{h}\}` are the synthetic
-    electric and magnetic data, computed for a given conductivity
-    :math:`\sigma`, which depends on the model parameters :math:`\textbf{p}`.
-    Finally, :math:`R(\textbf{p})` is a regularization term.
+    respectively; :math:`\textbf{d}^\text{obs}` are the observed electric and
+    magnetic data, and :math:`\textbf{d}^\text{pred}` are the synthetic
+    electric and magnetic data. Finally, :math:`R` is a regularization term.
 
+    The data weight of observation :math:`d_i` is given by :math:`W_i =
+    \varsigma^{-1}_i`, where :math:`\varsigma_i` is the standard deviation of
+    the observation (see :attr:`emg3d.surveys.Survey.standard_deviation`).
 
     .. note::
 
@@ -103,6 +82,14 @@ def misfit(simulation):
         Value of the misfit function.
 
     """
+    std = simulation.survey.standard_deviation
+    # Raise warning if not set-up properly.
+    if std is None:
+        raise ValueError(
+            "Either `noise_floor` or `relative_error` or both must\n"
+            "be provided (>0) to compute the `standard_deviation`.\n"
+            "It can also be set directly (same shape as data).\n"
+            "The standard deviation is required to compute the misfit.")
 
     # Ensure all fields have been computed.
     test_efield = sum([1 if simulation._dict_efield[src][freq] is None else 0
@@ -115,13 +102,14 @@ def misfit(simulation):
     simulation.data['residual'] = residual
 
     # Get weighted residual.
-    wresidual = data_weighting(simulation)
-    simulation.data['wresidual'] = wresidual
+    if 'weights' not in simulation.data.keys():
+        simulation.data['weights'] = 1/std**2
+    weights = simulation.data['weights']
 
     # Compute misfit
-    misfit = (residual.data.conj() * wresidual.data).real.sum()/2
+    misfit = np.sum(weights*(residual.data.conj()*residual.data).real)/2
 
-    return misfit
+    return misfit.data
 
 
 def gradient(simulation):
@@ -132,7 +120,7 @@ def gradient(simulation):
 
     .. math::
 
-        \nabla_p J(\textbf{p}) =
+        \nabla_p \phi(\textbf{p}) =
         -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_x
                \frac{\partial S}{\partial \textbf{p}} \textbf{E}_x
         -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_y
@@ -147,7 +135,8 @@ def gradient(simulation):
     .. note::
 
         The gradient is currently implemented only for electric sources and
-        receivers and only for isotropic models.
+        receivers; only for isotropic models; and not for electric permittivity
+        nor magnetic permeability.
 
 
     Parameters
@@ -192,16 +181,6 @@ def gradient(simulation):
         grad_y = np.zeros(vnC, order='F')
         grad_z = np.zeros(vnC, order='F')
 
-        # => TEST what is faster / more accurate.
-        #
-        # Here, we do
-        #   1. edges2cellaverages (Ex[comp] -> CC[comp])
-        #   2. grid2grid          (CC[comp] -> CC[model])
-        #
-        # How about the other way around?
-        #   1. grid2grid          (Ex[comp] -> Ex[model])
-        #   1. edges2cellaverages (Ex[model] -> CC[model])
-
         # Map the field to cell centers times volume.
         vol = simulation._dict_grid[src][freq].vol.reshape(vnC, order='F')
         maps.edges2cellaverages(ex=efield.fx, ey=efield.fy, ez=efield.fz,
@@ -221,84 +200,9 @@ def gradient(simulation):
 
     # => Frequency-independent depth-weighting should go here.
 
-    # Apply derivative of property-map
+    # Apply derivative-chain of property-map
     # (in case the property is something else than conductivity).
-    simulation.model.map.derivative(grad_model, simulation.model.property_x)
+    simulation.model.map.derivative_chain(
+            grad_model, simulation.model.property_x)
 
     return grad_model
-
-
-def data_weighting(simulation):
-    r"""Return weighted residual.
-
-    Returns the weighted residual as given in Equation 18 of [PlMu08]_,
-
-    .. math::
-        :label: data-weighting
-
-        W(\textbf{x}_s, \textbf{x}_r, \omega) =
-        \frac{\lVert\textbf{x}_s-\textbf{x}_r\rVert^{\gamma_d}}
-        {\omega^{\beta_f}
-         \lVert E^\text{ref}(\textbf{x}_s, \textbf{x}_r, \omega)
-         \rVert^{\beta_d}}\ .
-
-
-    Parameters
-    ----------
-    simulation : :class:`emg3d.simulations.Simulation`
-        The simulation. The parameters for data weighting are set in the
-        call to `Simulation` through the parameter `data_weight_opts`.
-
-
-    Returns
-    -------
-    wresidual : DataArray
-        The weighted residual (:math:`W^e \Delta^e`).
-
-    """
-    # Get relevant parameters.
-    gamma_d = simulation.data_weight_opts.get('gamma_d', 0.5)
-    beta_d = simulation.data_weight_opts.get('beta_d', 1.0)
-    beta_f = simulation.data_weight_opts.get('beta_f', 0.25)
-    min_off = simulation.data_weight_opts.get('min_off', 1000.0)
-    noise_floor = simulation.data_weight_opts.get('noise_floor', 1e-15)
-    refname = simulation.data_weight_opts.get('reference', 'reference')
-
-    # (A) MUTING.
-
-    # Get all small amplitudes.
-    mute = np.abs(simulation.data.observed.data) < noise_floor
-
-    # Add all near offsets.
-    offsets = sl.norm(
-                np.array(simulation.survey.rec_coords[:3])[:, None, :] -
-                np.array(simulation.survey.src_coords[:3])[:, :, None],
-                axis=0,
-                check_finite=False,
-            )
-    mute += (offsets < min_off)[:, :, None]
-
-    # (B) WEIGHTS.
-
-    # (B.1) First term: Offset weighting (f-indep.).
-    off_weight = offsets**gamma_d
-
-    # (B.2) Second term: Frequency weighting (src-freq-indep.).
-    omega = 2*np.pi*simulation.survey.frequencies
-    data_weight = off_weight[:, :, None]/(omega**beta_f)[None, None, :]
-
-    # (B.3) Third term: Amplitude weighting.
-    if beta_d != 0.0:  # Because of the warn-print check if required.
-        ref_data = simulation.data.get(refname, None)
-        if ref_data is None:
-            if simulation.verb >= 0:
-                print(f"Reference data '{refname}' not found, "
-                      "using 'synthetic'.")
-            ref_data = simulation.data.synthetic
-        data_weight /= np.sqrt(np.real(ref_data.conj()*ref_data))**beta_d
-
-    # (C) APPLY.
-    wresidual = simulation.data.residual * data_weight
-    wresidual.data[mute] = 0.0
-
-    return wresidual

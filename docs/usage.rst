@@ -63,7 +63,7 @@ Basic Example
 Here we show a *very* basic example. To see some more realistic models have a
 look at the `gallery <https://empymod.github.io/emg3d-gallery>`_. This
 particular example is also there, with some further explanations and examples
-to show how to plot the model and the data; see `Minimum working example
+to show how to plot the model and the data; see `«Minimum working example»
 <https://empymod.github.io/emg3d-gallery/gallery/tutorials/minimum_example.html>`_.
 It also contains an example without using ``discretize``.
 
@@ -186,35 +186,35 @@ all), while the actual multigrid solver is :func:`emg3d.solver.multigrid`. Most
 input parameters for :func:`emg3d.solver.solve` are sufficiently described in
 its docstring. Here a few additional information.
 
-- You can input any three-dimensional grid into `emg3d`. However, the
+- You can input any three-dimensional tensor mesh into `emg3d`. However, the
   implemented multigrid technique works with the existing nodes, meaning there
   are no new nodes created as coarsening is done by combining adjacent
   cells. The more times the grid dimension can be divided by two the better it
-  is suited for MG. Ideally, the dimension of the coarsest grid should be a low
-  prime number :math:`p`, for which good sizes can then be computed with
-  :math:`p 2^n`. Good grid sizes (in each direction) up to 1024 are
+  is suited for MG. Ideally, the number should be dividable by two a few times
+  and the dimension of the coarsest grid should be a low prime number
+  :math:`p`, for which good sizes can then be computed with :math:`p 2^n`. Good
+  grid sizes (in each direction) up to 1024 are
 
-  - :math:`2·2^{0, 1, ..., 9}`: 2,  4,  8, 16,  32,  64, 128, 256, 512, 1024,
-  - :math:`3·2^{0, 1, ..., 8}`: 3,  6, 12, 24,  48,  96, 192, 384, 768,
-  - :math:`5·2^{0, 1, ..., 7}`: 5, 10, 20, 40,  80, 160, 320, 640,
-  - :math:`7·2^{0, 1, ..., 7}`: 7, 14, 28, 56, 112, 224, 448, 896,
+  - :math:`2·2^{2, 3, ..., 9}`: 8, 16,  32,  64, 128, 256, 512, 1024,
+  - :math:`3·2^{2, 3, ..., 8}`: 12, 24,  48,  96, 192, 384, 768,
+  - :math:`5·2^{2, 3, ..., 7}`: 20, 40,  80, 160, 320, 640,
+  - :math:`7·2^{2, 3, ..., 7}`: 28, 56, 112, 224, 448, 896,
 
-  and preference decreases from top to bottom row. Good grid sizes in
-  sequential order: 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40,
-  48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640,
-  768, 896, 1024.
+  and preference decreases from top to bottom row (stick to the first two or
+  three rows if possible). Good grid sizes in sequential order: 8, 12, 16, 20,
+  24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384,
+  448, 512, 640, 768, 896, 1024.
 
 - The multigrid method can be used as a solver or as a preconditioner, for
   instance for BiCGSTAB. Using multigrid as a preconditioner for BiCGSTAB
   together with semicoarsening and line relaxation is the most stable version,
   but expensive, and therefore only recommended on highly stretched grids.
   Which combination of solver is best (fastest) depends to a large extent on
-  the grid stretching. As a rule of thumb:
-
-  - No stretching: Multigrid (MG);
-  - Moderate stretching (< 1.04): BiCGSTAB with MG as pre-conditioner;
-  - Strong stretching (> 1.04): BicGSTAB with MG as preconditioner and
-    line relaxation/semicoarsening.
+  the grid stretching, but also on anisotropy and general model complexity.
+  See `«Parameter tests»
+  <https://empymod.github.io/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_
+  in the gallery for an example how to run some tests on your particular
+  problem.
 
 
 Contributing and Roadmap

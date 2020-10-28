@@ -1142,6 +1142,8 @@ class MGParameters:
         Requires at least two cells in each direction (for `nCx`, `nCy`, and
         `nCz`).
         """
+        # Store input clevel for checks.
+        inp_clevel = np.inf if self.clevel < 0 else self.clevel
 
         # Store maximum division-by-two level for each dimension.
         # After that, clevel = [nx, ny, nz], where nx, ny, and nz are the
@@ -1154,7 +1156,6 @@ class MGParameters:
                 n /= 2
 
         # Restrict to max coarsening level provided by user.
-        olevel = self.clevel  # Store user input in olevel for checks below.
         for i in range(3):
             if self.clevel > -1 and self.clevel < clevel[i]:
                 clevel[i] = self.clevel
@@ -1174,25 +1175,24 @@ class MGParameters:
         sz = int(self.vnC[2]/2**clevel[2])
         self.pclevel = {'nC': sx*sy*sz, 'vnC': (sx, sy, sz), 'clevel': clevel}
 
-        # Check some grid characteristics (only if olevel > -1)
-        # Good values up to 1024 are
-        # - 2*2^{0, 1, ..., 9}: 2,  4,  8, 16,  32,  64, 128, 256, 512, 1024,
-        # - 3*2^{1, ..., 8}: 6, 12, 24,  48,  96, 192, 384, 768,
-        # - 5*2^{1, ..., 7}: 10, 20, 40,  80, 160, 320, 640,
-        # - 7*2^{1, ..., 7}: 14, 28, 56, 112, 224, 448, 896,
+        # Check some grid characteristics. Good values up to 1024 are:
+        # - 2*2^{2, ..., 9}: 8, 16,  32,  64, 128, 256, 512, 1024,
+        # - 3*2^{2, ..., 8}: 12, 24,  48,  96, 192, 384, 768,
+        # - 5*2^{2, ..., 7}: 20, 40,  80, 160, 320, 640,
+        # - 7*2^{2, ..., 7}: 28, 56, 112, 224, 448, 896,
         # and preference decreases from top to bottom row.
-        self.pclevel['message'] = ""
-        if olevel > -1:
-            # Check if highest prime is not in {2, 3, 5, 7}.
-            high_prime = np.any(np.array([sx, sy, sz]) > 7)
 
-            # 105 corresponds to 3*5*7, hence coarsest grid of three smallest
-            # primes.
-            big_coarse = sx*sy*sz > 105
-
-            if big_coarse or high_prime:
-                self.pclevel['message'] = "\n\n"+11*" "+"=> Grid is "
-                self.pclevel['message'] += "not optimal for MG solver <="
+        # Check if number on coarsest grid is bigger than 7.
+        # Ignore if clevel was provided and also reached (user wants it).
+        check_inp = zip(clevel, [sx, sy, sz])
+        low_prime = any([cl < inp_clevel and sl > 7 for cl, sl in check_inp])
+        # Check if it can be at least 3 (or inp_clevel) times coarsened.
+        min_div = any(clevel < min(inp_clevel, 3))
+        # Raise warning if necessary.
+        if low_prime or min_div:
+            self.pclevel['message'] = "  :: Grid not optimal for MG solver ::"
+        else:
+            self.pclevel['message'] = ""
 
         # Check at least two cells in each direction
         if np.any(np.array(self.vnC) < 2):

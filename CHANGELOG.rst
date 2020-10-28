@@ -9,6 +9,35 @@ recent versions
 *latest (dev, will become v0.14.0)*
 -----------------------------------
 
+See the API docs for more info of the relevant implementation.
+
+- ``survey``: A ``Survey`` has new attributes ``standard_error``,
+  ``noise_floor``, and ``relative_error``.
+
+- ``optimize``: Completely changed misfit and data-weighting to more sensible
+  functions.
+
+- ``simulation``:
+
+  - ``compute()`` takes a new argument, ``min_offset``. If ``observed=True``,
+    it will add Gaussian random noise according to the standard deviation of
+    the data; it will set receivers responses below the minimum offset to NaN.
+  - There is no longer a ``reference`` model.
+  - ``misfit`` and ``gradient`` can now handle observations with NaN's.
+
+- ``cli``:
+
+  - As a consequence of the changes the ``data_weight_opts`` got removed.
+  - New section ``[data]``  to select the wanted data.
+  - Section ``[simulation]`` has a new parameter ``min_offset`` (for creating
+    observed data).
+  - Output has a new parameter ``n_observations`` if ``misfit`` or ``gradient``
+    were called, which is the number of observations that were used to compute
+    the misfit.
+
+- ``maps``: Fixed the mapping of the gradients (``Conductivity`` is the only
+  mapping that was not affected by this bug).
+
 - ``models.Model``: Removed deprecated parameters ``res_{x;y;z}``.
 
 - ``io.save``:
@@ -18,6 +47,11 @@ recent versions
 
 - ``meshes``: Deprecated the old meshing routines ``get_stretched_h``,
   ``get_domain``, ``get_hx``; will be removed in the future.
+
+- Various:
+
+  - Improve documentation (and verbosity) with regards to «good» number of
+    cells.
 
 
 *v0.13.0* : CLI

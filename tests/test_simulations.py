@@ -19,7 +19,8 @@ class TestSimulation():
         receivers = (np.arange(12)*500, 0, -1000, 0, 0)
         frequencies = (1.0, 2.0)
 
-        survey = surveys.Survey('Test', sources, receivers, frequencies)
+        survey = surveys.Survey('Test', sources, receivers, frequencies,
+                                noise_floor=1e-15, relative_error=0.05)
 
         # Create a simple grid and model
         grid = meshes.TensorMesh(
@@ -36,7 +37,7 @@ class TestSimulation():
 
         # Do first one single and then all together.
         simulation.get_efield('Tx0', 2.0)
-        simulation.compute(reference=True)
+        simulation.compute(observed=True)
 
     def test_derived(self):
 
@@ -211,6 +212,17 @@ class TestSimulation():
         grad = simulation.gradient
 
         assert grad.shape == self.model.shape
+
+    def test_synthetic(self):
+        sim = self.simulation.copy()
+
+        # Switch off noise_floor, relative_error, min_offset => No noise.
+        sim.survey.noise_floor = None
+        sim.survey.relative_error = None
+        sim._dict_efield = sim._dict_initiate  # Reset
+        sim.compute(observed=True)
+        assert_allclose(sim.data.synthetic, sim.data.observed)
+        assert sim.survey.size == sim.data.observed.size
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

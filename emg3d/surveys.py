@@ -132,6 +132,13 @@ class Survey:
         `receivers` supplied must be a multiple of the source positions.
         In this case, the receivers are grouped into offsets.
 
+    noise_floor, relative_error : float
+        Noise floor and relative error of the data. Default to None.
+        See :attr:`Survey.standard_deviation` for more info.
+
+    std : ndarray or None
+        Standard deviation of the data, same shape as data. Default to None.
+        See :attr:`Survey.standard_deviation` for more info.
 
     """
     # Currently, `surveys.data` contains an :class:`xarray.Dataset`. As such,
@@ -141,7 +148,7 @@ class Survey:
     # :func:`xarray.register_dataset_accessor`.
 
     def __init__(self, name, sources, receivers, frequencies, data=None,
-                 fixed=0):
+                 fixed=0, **kwargs):
         """Initiate a new Survey instance."""
 
         # Store survey name and fixed.
@@ -159,6 +166,15 @@ class Survey:
 
         # Initialize xarray dataset.
         self._initiate_dataset(data)
+
+        # Get the optional keywords related to standard deviation.
+        self.noise_floor = kwargs.pop('noise_floor', None)
+        self.relative_error = kwargs.pop('relative_error', None)
+        self.standard_deviation = kwargs.pop('std', None)
+
+        # Ensure no kwargs left.
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
     @utils._requires('xarray')
     def _initiate_dataset(self, data):
@@ -220,11 +236,14 @@ class Survey:
         # Add frequencies.
         out['frequencies'] = self.frequencies
 
-        # Add `observed` and `reference`, if it exist.
-        out['data'] = {}
-        out['data']['observed'] = self.data.observed
-        if 'reference' in self.data.keys():
-            out['data']['reference'] = self.data.reference
+        # Add `observed` and `std`, if it exists.
+        out['data'] = {'observed': self.data.observed.data}
+        if 'std' in self.data.keys():
+            out['data']['std'] = self.data['std'].data
+
+        # Add `noise_floor` and `relative error`.
+        out['noise_floor'] = self.data.noise_floor
+        out['relative_error'] = self.data.relative_error
 
         # Fixed.
         out['fixed'] = int(self.fixed)
@@ -266,11 +285,16 @@ class Survey:
                       frequencies=inp['frequencies'], data=data,
                       fixed=bool(inp['fixed']))
 
-            # Add all data.
+            # Add all data (includes 'std')!
             if new_format:
                 for key, value in inp['data'].items():
                     out._data[key] = out.data.observed*np.nan
                     out._data[key][...] = value
+
+            # v0.14.0 onwards.
+            if 'noise_floor' in inp.keys():
+                out.noise_floor = inp['noise_floor']
+                out.relative_error = inp['relative_error']
 
             return out
 
@@ -413,6 +437,172 @@ class Survey:
     def frequencies(self):
         """Frequency array."""
         return self._frequencies
+
+    @property
+    def observed(self):
+        r"""Returns the observed data."""
+        return self._data.observed
+
+    @observed.setter
+    def observed(self, observed):
+        """Update observed data."""
+        self._data['observed'][...] = observed
+
+    @property
+    def standard_deviation(self):
+        r"""Returns the standard deviation of the data.
+
+        The standard deviation can be set by providing an array of the same
+        dimension as the data itself:
+
+        .. code-block:: python
+
+            survey.standard_deviation = ndarray  # (nsrc, nrec, nfreq)
+
+        Alternatively, one can set the `noise_floor` :math:`\epsilon_\text{nf}`
+        and the `relative_error` :math:`\epsilon_\text{r}`:
+
+        .. code-block:: python
+
+            survey.noise_floor = float or ndarray      # (> 0 or None)
+            survey.relative error = float or ndarray   # (> 0 or None)
+
+        They must be either floats, or three-dimensional arrays of shape
+        ``([nsrc or 1], [nrec or 1], [nfreq or 1])``; dimensions of one will be
+        broadcasted to the corresponding size. E.g., for a dataset of arbitrary
+        amount of sources and receivers with three frequencies you can define
+        a purely frequency-dependent relative error via
+        ``relative_error=np.array([err_f1, err_f2, err_f3])[None, None, :]``.
+
+        The standard deviation :math:`\varsigma_i` of observation :math:`d_i`
+        is then given in terms of the noise floor
+        :math:`\epsilon_{\text{nf};i}` and the relative error
+        :math:`\epsilon_{\text{re};i}` by
+
+        .. math::
+            :label: std
+
+            \varsigma_i = \sqrt{
+                \epsilon_{\text{nf}; i}^2 +
+                \left(\epsilon_{\text{re}; i}|d_i|\right)^2 } \, .
+
+        Note that a set standard deviation is prioritized over potentially also
+        defined noise floor and relative error. To use the noise floor and the
+        relative error after defining standard deviation directly you would
+        have to reset it like
+
+        .. code-block:: python
+
+            survey.standard_deviation = None
+
+        after which Equation :eq:`std` would be used again.
+
+        """
+        # If `std` was set, return it, else compute it from noise_floor and
+        # relative_error.
+        if 'std' in self._data.keys():
+            return self.data['std']
+
+        elif self.noise_floor is not None or self.relative_error is not None:
+
+            # Initiate std (xarray of same type as the observed data)
+            std = self.data.observed.copy(data=np.zeros(self.shape))
+
+            # Add noise floor if given.
+            if self.noise_floor is not None:
+                std += self.noise_floor**2
+
+            # Add relative error if given.
+            if self.relative_error is not None:
+                std += np.abs(self.relative_error*self.data.observed)**2
+
+            # Return.
+            return np.sqrt(std)
+
+        else:
+            # If nothing is defined, return None
+            return None
+
+    @standard_deviation.setter
+    def standard_deviation(self, std):
+        """Update standard deviation."""
+        # If None it means basically to delete it; otherwise set it.
+        if std is None and 'std' in self.data:
+            del self._data['std']
+        elif std is not None:
+            # Ensure all values are bigger than zero.
+            if np.any(std <= 0.0):
+                raise ValueError(
+                    "All values of `std` must be bigger than zero.")
+            self._data['std'] = self.data.observed.copy(data=std)
+
+    @property
+    def noise_floor(self):
+        r"""Returns the noise floor of the data.
+
+        See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
+
+        """
+        return self.data.noise_floor
+
+    @noise_floor.setter
+    def noise_floor(self, noise_floor):
+        """Update noise floor.
+
+        See :attr:`Survey.standard_deviation` for more info.
+        """
+        if noise_floor is not None:
+
+            # Ensure all values are bigger than zero.
+            if np.any(noise_floor <= 0.0):
+                raise ValueError(
+                    "All values of `noise_floor` must be bigger than zero.")
+
+            # Ensure it can be broadcast to data.
+            try:
+                _ = np.ones(self.shape)*noise_floor
+            except ValueError as e:
+                raise ValueError(
+                    "Shape of `noise_floor` is not broadcastable to data.\n"
+                    f"Shape of `noise_floor`: {np.shape(noise_floor)}; "
+                    f"`data`: {self.shape}."
+                ) from e
+
+        self._data.attrs['noise_floor'] = noise_floor
+
+    @property
+    def relative_error(self):
+        r"""Returns the relative error of the data.
+
+        See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
+
+        """
+        return self.data.relative_error
+
+    @relative_error.setter
+    def relative_error(self, relative_error):
+        """Update relative error.
+
+        See :attr:`Survey.standard_deviation` for more info.
+        """
+        if relative_error is not None:
+
+            # Ensure all values are bigger than zero.
+            if np.any(relative_error <= 0.0):
+                raise ValueError(
+                    "All values of `relative_error` must be bigger than zero.")
+
+            # Ensure it can be broadcast to data.
+            try:
+                _ = np.ones(self.shape)*relative_error
+            except ValueError as e:
+                raise ValueError(
+                    "Shape of `relative_error` is not broadcastable to data.\n"
+                    f"Shape of `relative_error`: {np.shape(relative_error)}; "
+                    f"`data`: {self.shape}."
+                ) from e
+
+        self._data.attrs['relative_error'] = relative_error
 
     def _dipole_info_to_dict(self, inp, name):
         """Create dict with provided source/receiver information."""
