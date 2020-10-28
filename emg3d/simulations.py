@@ -107,6 +107,16 @@ class Simulation:
         many cases, but they are the most robust combination at which you can
         throw most things.
 
+    gridding_opts : dict, optional
+        TODO
+
+        Only accepted if `gridding!='same'`.
+
+    expand_opts : dict, optional
+        TODO
+
+        Only accepted if `gridding!='same'`.
+
     verb : int; optional
         Level of verbosity. Default is 0.
 
@@ -137,15 +147,33 @@ class Simulation:
                 'source': 'Source-dependent grids',
                 'both': 'Frequency- and source-dependent grids',
                 }
-        self.gridding_opts = {
-                'type': 'marine',
-                'air_resistivity': 1e8,
-                'res': np.array([0.3, 1, 1e5]),
-                'min_width': np.array([200., 200., 100]),
-                'zval': np.array([-1000, -2000, 0]),
-                **kwargs.pop('gridding_opts', {}),  # Overwrites defaults.
-                }
-        self._initiate_model_grid(model, grid)
+
+        # `gridding_opts` is only used with automatic gridding.
+        self._input_nCz = grid.nCz  # Store original nCz.
+        if self.gridding != 'same':
+            self.gridding_opts = {
+                    # use_input = 'x', 'xyz', '', ... [MUST COVER Ds]
+                    'res': np.array([0.3, 1, 1e5]),
+                    'min_width': np.array([200., 200., 100]),
+                    'zval': np.array([-1000, -2000, 0]),
+                    **kwargs.pop('gridding_opts', {}),  # Overwrites defaults.
+                    }
+
+            # Expand model by water and air if required.
+            expand = kwargs.pop('expand', None)
+            if expand is not None:
+                model, grid = _expand_model_grid(model, grid, expand)
+        else:
+            self.gridding_opts = kwargs.pop('gridding_opts', {})
+
+            # If gridding_opts is not empty, put back to raise warning.
+            # Done so an empty dict does not raise the warning (eg from_dict).
+            if self.gridding_opts:
+                kwargs['gridding_opts'] = self.gridding_opts
+
+        # Store (expanded) input model and grid.
+        self.model = model
+        self.grid = grid
 
         # Get kwargs.
         self.solver_opts = {
@@ -156,7 +184,7 @@ class Simulation:
                 **kwargs.pop('solver_opts', {}),  # Overwrites defaults.
                 }
 
-        # Ensure no kwargs left (currently kwargs is not used).
+        # Ensure no kwargs left.
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
@@ -249,6 +277,9 @@ class Simulation:
         out['max_workers'] = self.max_workers
         out['gridding'] = self.gridding
         out['solver_opts'] = self.solver_opts
+        out['gridding_opts'] = self.gridding_opts
+
+        out['_input_nCz'] = self._input_nCz
 
         # Get required properties.
         store = []
@@ -306,7 +337,12 @@ class Simulation:
                     max_workers=inp['max_workers'],
                     gridding=inp['gridding'],
                     solver_opts=inp['solver_opts'],
+                    gridding_opts=inp.get('gridding_opts', {}),  # backw. comp.
                     )
+
+            # Add _input_nCz, backwards compatible.
+            if '_input_nCz' in inp:
+                out._input_nCz = inp['_input_nCz']
 
             # Add existing derived/computed properties.
             data = ['_dict_grid', '_dict_model', '_dict_sfield',
@@ -451,7 +487,7 @@ class Simulation:
                               self.survey.rec_coords[i]] for i in range(3)]
 
                     # Get grid and store it.
-                    self._grid_frequency[freq] = meshes.marine_csem_mesh(
+                    self._grid_frequency[freq] = meshes.construct_mesh(
                             coords, freq=freq, verb=self.verb,
                             **self.gridding_opts)
 
@@ -476,7 +512,7 @@ class Simulation:
                     mfreq = 10**np.mean(np.log10(self.survey.frequencies))
 
                     # Get grid and store it.
-                    self._grid_source[source] = meshes.marine_csem_mesh(
+                    self._grid_source[source] = meshes.construct_mesh(
                             coords, freq=mfreq, verb=self.verb,
                             **self.gridding_opts)
 
@@ -491,7 +527,7 @@ class Simulation:
                           self.survey.rec_coords[i]] for i in range(3)]
 
                 # Get grid and store it.
-                self._dict_grid[source][freq] = meshes.marine_csem_mesh(
+                self._dict_grid[source][freq] = meshes.construct_mesh(
                         coords, freq=freq, verb=self.verb,
                         **self.gridding_opts)
 
@@ -510,7 +546,7 @@ class Simulation:
                     mfreq = 10**np.mean(np.log10(self.survey.frequencies))
 
                     # Get grid and store it.
-                    self._grid_single = meshes.marine_csem_mesh(
+                    self._grid_single = meshes.construct_mesh(
                             coords, freq=mfreq, verb=self.verb,
                             **self.gridding_opts)
 
@@ -788,90 +824,6 @@ class Simulation:
             min_off = offsets < kwargs.get('min_offset', 0.0)
             self.data['observed'].data[min_off] = np.nan + 1j*np.nan
 
-    # AUTOMATED GRIDDING
-    def _initiate_model_grid(self, model, grid):
-        # In the marine case we assume that the sea-surface is at z=0.
-        #
-        # If the provided model does not reach the surface, we fill it up
-        # to the surface with the resistivities of the last provided layer,
-        # and add a 100 m thick air layer.
-        #
-        # So the model MUST contain at least one layer of sea water, from
-        # where the sea resistivity is deduced.
-        res_air = self.gridding_opts.pop('air_resistivity')
-        property_air = model.map.forward(1.0/res_air)
-        grid_type = self.gridding_opts.pop('type')
-
-        # To return things in the appropriate dimension.
-        self._input_nCz = grid.nCz
-
-        def extend_property(prop, check, add_values, nadd):
-
-            if check is None:
-                prop_ext = None
-
-            else:
-                prop_ext = np.zeros((grid.nCx, grid.nCy, grid.nCz+nadd))
-                prop_ext[:, :, :-nadd] = prop
-                if nadd == 2:
-                    prop_ext[:, :, -nadd] = prop[:, :, -1]
-                prop_ext[:, :, -1] = add_values
-
-            return prop_ext
-
-        if grid_type == 'marine' and grid.vectorNz[-1] < -0.01:
-            # Fill water and add air if highest depth is less then -1 cm.
-
-            # Extend hz.
-            hz_ext = np.r_[grid.hz, -max(grid.vectorNz), 100]
-
-            # Extend properties.
-            property_x = extend_property(
-                    model.property_x, model._property_x, property_air, 2)
-            property_y = extend_property(
-                    model.property_y, model._property_y, property_air, 2)
-            property_z = extend_property(
-                    model.property_z, model._property_z, property_air, 2)
-            mu_r = extend_property(model.mu_r, model._mu_r, 1, 2)
-            epsilon_r = extend_property(
-                    model.epsilon_r, model._epsilon_r, 1, 2)
-
-            # Store grid and model.
-            self.grid = meshes.TensorMesh(
-                    [grid.hx, grid.hy, hz_ext], x0=grid.x0)
-            self.model = models.Model(
-                    self.grid, property_x, property_y, property_z, mu_r,
-                    epsilon_r, mapping=model.map.name)
-
-        elif grid_type == 'marine' and abs(grid.vectorNz[-1]) < 0.01:
-            # Add air if highest depth is less then 1 cm.
-
-            # Extend hz.
-            hz_ext = np.r_[grid.hz, 100]
-
-            # Extend properties.
-            property_x = extend_property(
-                    model.property_x, model._property_x, property_air, 1)
-            property_y = extend_property(
-                    model.property_y, model._property_y, property_air, 1)
-            property_z = extend_property(
-                    model.property_z, model._property_z, property_air, 1)
-            mu_r = extend_property(model.mu_r, model._mu_r, 1, 1)
-            epsilon_r = extend_property(
-                    model.epsilon_r, model._epsilon_r, 1, 1)
-
-            # Store grid and model.
-            self.grid = meshes.TensorMesh(
-                    [grid.hx, grid.hy, hz_ext], x0=grid.x0)
-            self.model = models.Model(
-                    self.grid, property_x, property_y, property_z, mu_r,
-                    epsilon_r, mapping=model.map.name)
-
-        else:
-            # Just store provided grid and model.
-            self.grid = grid
-            self.model = model
-
     # DATA
     @property
     def data(self):
@@ -1051,3 +1003,61 @@ class Simulation:
                 )
 
         return ResidualField
+
+
+# HELPER FUNCTIONS
+def _expand_model_grid(model, grid, air=None, water=None, seasurface=0.0):
+    """Expand model and grid according to provided parameters."""
+
+    # Set default properties.
+    if air is None:
+        air = model.map.forward(1e-8)  # 1e-8 S/m
+    if water is None:
+        # Water default: Average of x-property of last layer.
+        water = np.average(model.property_x[:, :, -1])
+
+    def extend_property(prop, add_values, nadd):
+        """Expand property `model.prop`, IF it is not None."""
+
+        if getattr(model, '_'+prop) is None:
+            prop_ext = None
+
+        else:
+            prop_ext = np.zeros((grid.nCx, grid.nCy, grid.nCz+nadd))
+            prop_ext[:, :, :-nadd] = getattr(model, prop)
+            if nadd == 2:
+                prop_ext[:, :, -nadd] = add_values[0]
+            prop_ext[:, :, -1] = add_values[1]
+
+        return prop_ext
+
+    # Expand by water and air, only air, or nothing, depending on vectorNz.
+    nzadd = 0
+    hz_ext = grid.hz
+
+    # Fill-up water.
+    if grid.vectorNz[-1] < seasurface-0.05:  # At least 5 cm.
+        hz_ext = np.r_[hz_ext, seasurface-grid.vectorNz[-1]]
+        nzadd += 1
+
+    # Add 100 m of air.
+    if grid.vectorNz[-1] <= seasurface+0.001:  # +1mm
+        hz_ext = np.r_[hz_ext, 100]
+        nzadd += 1
+
+    if nzadd > 0:
+        # Extend properties.
+        property_x = extend_property('property_x', [water, air], nzadd)
+        property_y = extend_property('property_y', [water, air], nzadd)
+        property_z = extend_property('property_z', [water, air], nzadd)
+        mu_r = extend_property('mu_r', [1, 1], nzadd)
+        epsilon_r = extend_property('epsilon_r', [1, 1], nzadd)
+
+        # Create extended grid and model.
+        grid = meshes.TensorMesh(
+                [grid.hx, grid.hy, hz_ext], x0=grid.x0)
+        model = models.Model(
+                grid, property_x, property_y, property_z, mu_r,
+                epsilon_r, mapping=model.map.name)
+
+    return model, grid

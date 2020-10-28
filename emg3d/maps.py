@@ -404,7 +404,7 @@ class MapLnResistivity(_Map):
     """Maps `log_e(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(ρ) = log_e(σ^-1)
-    - backward: σ = ρ^-1 = exp(x^-1)
+    - backward: σ = ρ^-1 = exp(-x)
 
     """
 

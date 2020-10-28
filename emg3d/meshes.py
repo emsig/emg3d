@@ -22,6 +22,7 @@ from copy import deepcopy
 
 import numpy as np
 from scipy import optimize
+from scipy.constants import mu_0
 
 try:
     import discretize.TensorMesh as dTensorMesh
@@ -29,12 +30,19 @@ except ImportError:
     class dTensorMesh:
         pass
 
-__all__ = ['TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
-           'get_domain', 'get_hx', 'marine_csem_mesh']
+__all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
+           'wavelength', 'good_mg_cell_nr', 'buffer_width', 'min_cell_width',
+           # Deprecated ones:
+           'get_hx_h0', 'get_cell_numbers', 'get_stretched_h', 'get_domain',
+           'get_hx']
 
 MESHWARNING = (
-    "\n    `get_stretched_h`, `get_domain`, and `get_hx` are"
-    "\n    deprecated and will be removed. Use `get_hx_h0` instead."
+    "\n    `get_hx_h0`, `get_stretched_h`, `get_domain`, and `get_hx` are"
+    "\n    deprecated and will be removed. Use `get_origin_widths`` instead."
+)
+CELLWARNING = (
+    "\n    `get_cell_numbers` is deprecated and will be removed."
+    "\n    Use `good_mg_cell_nr` instead."
 )
 
 
@@ -194,6 +202,174 @@ class TensorMesh(dTensorMesh, _TensorMesh):
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
 
+def construct_mesh(survey, res, min_width, zval, freq, verb):
+    r"""
+    TODO NEEDS IMPROVEMENT, MORE FLEXIBLE
+    Works for current example, but no more.
+
+    TODO list:
+
+    - get_hx_h0:
+      - Takes: src, rec, freq, strength
+
+
+      - max-domain 100k unless provided
+
+        - 2\lambda -> {x/y}_{min/max} (2\lambda except if reaches air)
+                   -> z_min
+                   -> z_max -> 100k (2\lambda except if reaches air)
+
+      - z 1: solve \Delta_min_z \alpha_z^x \ge |max(src_z, rec_z)| => x
+      - z 2: solve \Delta_min_z \y^x \eq |max(src_z, rec_z)| => y
+
+      - survey domain:
+
+        - src_{x;y;z} (one source)
+        - rec_{x;y;z} (all receivers)
+
+      - huge amount of nx by default (and parameter)
+      - \Delta_min, pps, f (with the exc. of z just as nov; one level more)
+      - \alpha_1, \alpha_2
+      - h_x, h_y, h_z: if provided, taken, and then extended if required.
+
+    Fixed:  x: x of middle receiver
+            y: y of middle receiver
+            z: [zval[0], zval[1], 0]
+
+    Domain: x: rec_x.min-100 - rec_x.max+100
+            y: rec_y.min-100 - rec_y.max+100
+            y: zval[1]-0
+
+    """
+
+    # => mapping
+
+    params = {'freq': freq, 'verb': verb-1}
+
+    # Get cell widths and origin in each direction
+    xx, x0 = get_hx_h0(
+        res=[res[0], res[2]],
+        fixed=survey[0].min()+(survey[0].max()-survey[0].min())//2,
+        domain=[survey[0].min()-100, survey[0].max()+100],
+        min_width=min_width[0],
+        **params
+    )
+    yy, y0 = get_hx_h0(
+        res=[res[0], res[2]],
+        fixed=survey[1].min()+(survey[1].max()-survey[1].min())//2,
+        domain=[survey[1].min()-100, survey[1].max()+100],
+        min_width=min_width[1],
+        **params
+    )
+    zz, z0 = get_hx_h0(
+        res=[res[0], res[1], res[2]],
+        fixed=[zval[0], zval[1], 0],
+        domain=[zval[1], 0],
+        min_width=min_width[2],
+        **params
+    )
+
+    # Initialize mesh.
+    grid = TensorMesh([xx, yy, zz], x0=np.array([x0, y0, z0]))
+
+    if verb > 0:
+        print(grid, end='')
+
+    # Return mesh.
+    return grid
+
+
+def get_origin_widths():
+    pass
+
+
+def good_mg_cell_nr(max_nr=1000, max_prime=5, min_div=3):
+    r"""Returns 'good' cell numbers for the multigrid method.
+
+    'Good' cell numbers are numbers which can be divided by 2 as many times as
+    possible. At the end there will be a low prime number.
+
+    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
+    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
+    :math:`M, p_\text{max}, n_\text{min}` correspond to `max_nr`, `max_prime`,
+    and `min_div`, respectively.
+
+
+    Parameters
+    ----------
+    max_nr : int
+        Maximum number of cells.
+
+    max_prime : int
+        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
+        limits in order to avoid too big lowest grids in the multigrid method.
+        Default is 5.
+
+    min_div : int
+        Minimum times the number can be divided by two.
+        Default is 3.
+
+
+    Returns
+    -------
+    numbers : array
+        Array containing all possible cell numbers from lowest to highest.
+
+    """
+    # Primes till 20.
+    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19])
+
+    # Sanity check; 19 is already ridiculously high.
+    if max_prime > primes[-1]:
+        raise ValueError(
+                f"Highest prime is {max_prime}, please use a value < 20.")
+
+    # Restrict to max_prime.
+    primes = primes[primes <= max_prime]
+
+    # Get possible values.
+    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
+    numbers = primes[:, None]*2**np.arange(min_div, 30)
+
+    # Get unique values.
+    numbers = np.unique(numbers)
+
+    # Restrict to max_nr and return.
+    return numbers[numbers <= max_nr]
+
+
+def skin_depth(frequency, conductivity, mu=mu_0):
+    # TODO TEST & DOCUMENT
+    skind = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu)
+    if frequency < 0:  # For Laplace-domain computations.
+        skind /= np.sqrt(2*np.pi)
+    return skind
+
+
+def wavelength(frequency, conductivity, mu=mu_0):
+    # TODO TEST & DOCUMENT
+    return 2*np.pi*skin_depth(frequency, conductivity, mu)
+
+
+def buffer_width(frequency, conductivity, bmax=100000):
+    # TODO TEST & DOCUMENT
+    return min(bmax, wavelength(frequency, conductivity))
+
+
+def min_cell_width(frequency, conductivity, pps=3, limits=None):
+    # TODO TEST & DOCUMENT
+    dmin = skin_depth(frequency, conductivity)/pps
+    if limits is not None:  # Respect user input.
+        limits = np.array(limits, ndmin=1)
+        if limits.size == 1:
+            dmin = limits
+        else:
+            dmin = np.clip(dmin, *limits)
+
+    return dmin
+
+
+# # # DEPRECATED FUNCTIONS # # #
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
               pps=3, alpha=None, max_domain=100000., raise_error=True, verb=1,
               return_info=False):
@@ -263,9 +439,10 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         Default is 0.
 
     possible_nx : list, optional
-        List of possible numbers of cells. See :func:`get_cell_numbers`.
-        Default is ``get_cell_numbers(500, 5, 3)``, which corresponds to
-        [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384].
+        List of possible numbers of cells. See :func:`good_mg_cell_nr`.
+        Default is ``good_mg_cell_nr(1000, 5, 3)``, which corresponds to
+        [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512,
+        640, 768].
 
     min_width : float, list or None, optional
         Minimum cell width restriction:
@@ -329,7 +506,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     if alpha is None:
         alpha = [1, 1.5, 0.01]
     if possible_nx is None:
-        possible_nx = get_cell_numbers(500, 5, 3)
+        possible_nx = good_mg_cell_nr(500, 5, 3)
 
     # Cast resistivity value(s).
     res = np.array(res, ndmin=1)
@@ -359,19 +536,11 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
                     "of the first one.\n"
                     f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
 
-    # Compute skin depth.
-    skind = 503.3*np.sqrt(res_arr/abs(freq))
-    if freq < 0:  # For Laplace-domain computations.
-        skind /= np.sqrt(2*np.pi)
+    # Get skin depth.
+    skind = skin_depth(freq, 1/res_arr)
 
     # Minimum cell width.
-    dmin = skind[0]/pps
-    if min_width is not None:  # Respect user input.
-        min_width = np.array(min_width, ndmin=1)
-        if min_width.size == 1:
-            dmin = min_width
-        else:
-            dmin = np.clip(dmin, *min_width)
+    dmin = min_cell_width(freq, 1/res_arr[0], pps, min_width)
 
     # Survey domain; contains all sources and receivers.
     domain = np.array(domain, dtype=np.float64)
@@ -390,7 +559,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     dist_in_domain = abs(domain - fixed[0])
 
     # (b) Two wavelengths.
-    two_lambda = skind[1:]*4*np.pi
+    two_lambda = 2*wavelength(freq, 1/res_arr[1:])
 
     # (c) Required buffer, additional to domain.
     dist_buff = np.max([np.zeros(2), (two_lambda - dist_in_domain)/2], axis=0)
@@ -545,58 +714,8 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
 
 def get_cell_numbers(max_nr, max_prime=5, min_div=3):
-    r"""Returns 'good' cell numbers for the multigrid method.
-
-    'Good' cell numbers are numbers which can be divided by 2 as many times as
-    possible. At the end there will be a low prime number.
-
-    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
-    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
-    :math:`M, p_\text{max}, n_\text{min}` correspond to `max_nr`, `max_prime`,
-    and `min_div`, respectively.
-
-
-    Parameters
-    ----------
-    max_nr : int
-        Maximum number of cells.
-
-    max_prime : int
-        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
-        limits in order to avoid too big lowest grids in the multigrid method.
-        Default is 5.
-
-    min_div : int
-        Minimum times the number can be divided by two.
-        Default is 3.
-
-
-    Returns
-    -------
-    numbers : array
-        Array containing all possible cell numbers from lowest to highest.
-
-    """
-    # Primes till 20.
-    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19])
-
-    # Sanity check; 19 is already ridiculously high.
-    if max_prime > primes[-1]:
-        raise ValueError(
-                f"Highest prime is {max_prime}, please use a value < 20.")
-
-    # Restrict to max_prime.
-    primes = primes[primes <= max_prime]
-
-    # Get possible values.
-    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
-    numbers = primes[:, None]*2**np.arange(min_div, 30)
-
-    # Get unique values.
-    numbers = np.unique(numbers)
-
-    # Restrict to max_nr and return.
-    return numbers[numbers <= max_nr]
+    warnings.warn(CELLWARNING, DeprecationWarning)
+    return good_mg_cell_nr(max_nr, max_prime, min_div)
 
 
 def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
@@ -819,10 +938,8 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
     if fact_pos is None:
         fact_pos = fact_neg
 
-    # Compute the skin depth.
-    skind = 503.3*np.sqrt(res/abs(freq))
-    if freq < 0:  # For Laplace-domain computations.
-        skind /= np.sqrt(2*np.pi)
+    # Get skin depth.
+    skind = skin_depth(freq, 1/res)
 
     # Estimate minimum cell width.
     h_min = fact_min*skind
@@ -932,78 +1049,3 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
                 #      (min_width, nr, a)]
 
     return hx
-
-
-def marine_csem_mesh(survey, res, min_width, zval, freq, verb):
-    r"""
-    TODO NEEDS IMPROVEMENT, MORE FLEXIBLE
-    Works for current example, but no more.
-
-    TODO list:
-
-    - get_hx_h0:
-      - Takes: src, rec, freq, strength
-
-
-      - max-domain 100k unless provided
-
-        - 2\lambda -> {x/y}_{min/max} (2\lambda except if reaches air)
-                   -> z_min
-                   -> z_max -> 100k (2\lambda except if reaches air)
-
-      - z 1: solve \Delta_min_z \alpha_z^x \ge |max(src_z, rec_z)| => x
-      - z 2: solve \Delta_min_z \y^x \eq |max(src_z, rec_z)| => y
-
-      - survey domain:
-
-        - src_{x;y;z} (one source)
-        - rec_{x;y;z} (all receivers)
-
-      - huge amount of nx by default (and parameter)
-      - \Delta_min, pps, f (with the exc. of z just as nov; one level more)
-      - \alpha_1, \alpha_2
-      - h_x, h_y, h_z: if provided, taken, and then extended if required.
-
-    Fixed:  x: x of middle receiver
-            y: y of middle receiver
-            z: [zval[0], zval[1], 0]
-
-    Domain: x: rec_x.min-100 - rec_x.max+100
-            y: rec_y.min-100 - rec_y.max+100
-            y: zval[1]-0
-
-    """
-
-    params = {'freq': freq, 'verb': verb-1}
-
-    # Get cell widths and origin in each direction
-    xx, x0 = get_hx_h0(
-        res=[res[0], res[2]],
-        fixed=survey[0].min()+(survey[0].max()-survey[0].min())//2,
-        domain=[survey[0].min()-100, survey[0].max()+100],
-        min_width=min_width[0],
-        **params
-    )
-    yy, y0 = get_hx_h0(
-        res=[res[0], res[2]],
-        fixed=survey[1].min()+(survey[1].max()-survey[1].min())//2,
-        domain=[survey[1].min()-100, survey[1].max()+100],
-        min_width=min_width[1],
-        **params
-    )
-    zz, z0 = get_hx_h0(
-        res=[res[0], res[1], res[2]],
-        fixed=[zval[0], zval[1], 0],
-        domain=[zval[1], 0],
-        min_width=min_width[2],
-        **params
-    )
-
-    # Initialize mesh.
-    grid = TensorMesh([xx, yy, zz], x0=np.array([x0, y0, z0]))
-
-    if verb > 0:
-        print(grid, end='')
-
-    # Return mesh.
-    return grid

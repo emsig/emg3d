@@ -28,7 +28,8 @@ See the API docs for more info of the relevant implementation.
 - ``cli``:
 
   - As a consequence of the changes the ``data_weight_opts`` got removed.
-  - New section ``[data]``  to select the wanted data.
+  - New sections ``[data]``  to select the wanted data, ``[expand]`` to expand
+    the model, and ``[gridding_opts]`` for options of the automatic gridding.
   - Section ``[simulation]`` has a new parameter ``min_offset`` (for creating
     observed data).
   - Output has a new parameter ``n_observations`` if ``misfit`` or ``gradient``
@@ -45,8 +46,13 @@ See the API docs for more info of the relevant implementation.
   - Removed deprecated parameter ``backend`` in ``save``.
   - File extension has to be provided in ``save``, no default any longer.
 
-- ``meshes``: Deprecated the old meshing routines ``get_stretched_h``,
-  ``get_domain``, ``get_hx``; will be removed in the future.
+- ``meshes``:
+
+  - New functions ``construct_mesh``, ``get_origin_widths``,
+    ``good_mg_cell_nr`` and other, smaller helper routines.
+  - Deprecated the old meshing routines ``get_hx_h0``, ``get_cell_numbers``,
+    ``get_stretched_h``, ``get_domain``, ``get_hx``; they will be removed in
+    the future.
 
 - Various:
 

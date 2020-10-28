@@ -56,7 +56,7 @@ def test_get_hx_h0(capsys):
     )
 
     # Just check x0 and the output.
-    assert out1[1] == -15698.299823718215
+    assert out1[1] == -15698.039979622565
     assert info in outstr1
 
     # == B == Laplace and verb=0, parameter positions and defaults.
@@ -147,8 +147,8 @@ def test_get_hx_h0(capsys):
 def test_get_domain():
     # Test default values (and therefore skindepth etc)
     h1, d1 = meshes.get_domain()
-    assert_allclose(h1, 55.133753)
-    assert_allclose(d1, [-1378.343816, 1378.343816])
+    assert_allclose(h1, 55.13289)
+    assert_allclose(d1, [-1378.322238, 1378.322238])
 
     # Ensure fact_min/fact_neg/fact_pos
     h2, d2 = meshes.get_domain(fact_min=1, fact_neg=10, fact_pos=20)

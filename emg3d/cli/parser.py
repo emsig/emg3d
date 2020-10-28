@@ -237,30 +237,51 @@ def parse_config_file(args_dict):
     if 'gridding_opts' in cfg.sections():
         grid = {}
 
-        # Int.
-        for key in ['type', ]:
-            if cfg.has_option('gridding_opts', key):
-                grid[key] = cfg.get('gridding_opts', key)
+        all_grid = dict(cfg.items('gridding_opts'))
 
         # Lists of floats.
         for key in ['res', 'min_width', 'zval']:
             if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
                 grid[key] = [float(v) for v in
                              cfg.get('gridding_opts', key).split(',')]
-
-        # Float.
-        for key in ['air_resistivity', ]:
-            if cfg.has_option('gridding_opts', key):
-                grid[key] = cfg.getfloat('gridding_opts', key)
 
         # Int.
         for key in ['verb', ]:
             if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
                 grid[key] = cfg.getint('gridding_opts', key)
+
+        # Ensure no keys are left.
+        if all_grid:
+            raise TypeError(f"Unexpected parameter in [gridding_opts]: "
+                            f"{list(all_grid.keys())}")
 
         # Add to simulation dict if not empty.
         if grid:
             simulation['gridding_opts'] = grid
+
+    # # Model/grid expansion # #
+
+    if 'expand' in cfg.sections():
+        expand = {}
+
+        all_exp = dict(cfg.items('expand'))
+
+        # Float.
+        for key in ['air', 'water', 'seasurface']:
+            if cfg.has_option('expand', key):
+                _ = all_exp.pop(key)
+                expand[key] = cfg.getfloat('expand', key)
+
+        # Ensure no keys are left.
+        if all_exp:
+            raise TypeError(f"Unexpected parameter in [expand]: "
+                            f"{list(all_exp.keys())}")
+
+        # Add to simulation dict if not empty.
+        if expand:
+            simulation['expand_opts'] = expand
 
     # Return.
     out = {'files': files, 'simulation_options': simulation, 'data': data}
