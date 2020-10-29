@@ -251,26 +251,24 @@ def construct_mesh(survey, res, min_width, zval, freq, verb):
 
     """
 
-    # => mapping
-
     params = {'freq': freq, 'verb': verb-1}
 
     # Get cell widths and origin in each direction
-    xx, x0 = get_hx_h0(
+    hx, x0 = get_hx_h0(
         res=[res[0], res[2]],
         fixed=survey[0].min()+(survey[0].max()-survey[0].min())//2,
         domain=[survey[0].min()-100, survey[0].max()+100],
         min_width=min_width[0],
         **params
     )
-    yy, y0 = get_hx_h0(
+    hy, y0 = get_hx_h0(
         res=[res[0], res[2]],
         fixed=survey[1].min()+(survey[1].max()-survey[1].min())//2,
         domain=[survey[1].min()-100, survey[1].max()+100],
         min_width=min_width[1],
         **params
     )
-    zz, z0 = get_hx_h0(
+    hz, z0 = get_hx_h0(
         res=[res[0], res[1], res[2]],
         fixed=[zval[0], zval[1], 0],
         domain=[zval[1], 0],
@@ -278,8 +276,23 @@ def construct_mesh(survey, res, min_width, zval, freq, verb):
         **params
     )
 
+    # params = {'frequency': freq, 'max_buffer': max_buffer, 'mapping':
+    #            mapping, 'verb': verb-1, 'raise_error': raise_error}
+    #
+    # x0, hx = get_origin_widths(
+    #         properties, center, domain, vector, stretching, cell_numbers,
+    #         min_width_limits, min_width_pps, **params)
+    #
+    # y0, hy = get_origin_widths(
+    #         properties, center, domain, vector, stretching, cell_numbers,
+    #         min_width_limits, min_width_pps, **params)
+    #
+    # z0, hz = get_origin_widths(
+    #         properties, center, domain, vector, seasurface, stretching,
+    #         cell_numbers, min_width_limits, min_width_pps, **params)
+
     # Initialize mesh.
-    grid = TensorMesh([xx, yy, zz], x0=np.array([x0, y0, z0]))
+    grid = TensorMesh([hx, hy, hz], x0=np.array([x0, y0, z0]))
 
     if verb > 0:
         print(grid, end='')
@@ -293,7 +306,15 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # TODO TEST & DOCUMENT
     """TODO
 
+    TODO TODO TODO
+    TODO TODO TODO
+    TODO TODO TODO
+
     DESCRIBE IT ALL WITH SKETCHES AND MATHEMATICAL FORMULAE.
+
+    TODO TODO TODO
+    TODO TODO TODO
+    TODO TODO TODO
 
     Parameters
     ----------
@@ -339,7 +360,8 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         Air-sea interface. This has only to be set in the marine case, when
         the mesh in z-direction is sought for (and the interface is not
         contained in ``vector``). If set, it will ensure that at the sea
-        surface is an actual boundary.
+        surface is an actual boundary. It has to be bigger then the lower limit
+        of the survey domain.
         Default is None.
 
     stretching : list, optional
@@ -390,6 +412,11 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         Verbosity, 0 or 1.
         Default = 0.
 
+    raise_error : bool, optional
+        If True, an error is raised if no suitable grid is found. Otherwise it
+        just prints a message and returns None's.
+        Default is True.
+
 
     Returns
     -------
@@ -408,24 +435,24 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     min_width_pps = kwargs.pop('min_width_pps', 3)
     max_buffer = kwargs.pop('max_buffer', 100000)
     pmap = kwargs.pop('mapping', 'Resistivity')
-    verb = kwargs.pop('verb', 0)
+    verb = kwargs.pop('verb', 1)
+    raise_error = kwargs.pop('raise_error', True)
 
     if verb > 2:
-        print("Input and default values")
-        print("========================")
-        print(f" frequency        : {frequency}")
-        print(f" properties       : {properties}")
-        print(f" center           : {center}")
-        print(f" domain           : {domain}")
-        print(f" vector           : {vector}")
-        print(f" seasurface       : {seasurface}")
-        print(f" stretching       : {stretching}")
-        print(f" cell_numbers     : {cell_numbers}")
-        print(f" min_width_limits : {min_width_limits}")
-        print(f" min_width_pps    : {min_width_pps}")
-        print(f" max_buffer       : {max_buffer}")
-        print(f" mapping          : {pmap}")
-        print(f" verb             : {verb}\n")
+        print(f"frequency          [Hz] : {frequency}")
+        print(f"properties              : {properties}")
+        print(f"center              [m] : {center}")
+        print(f"domain              [m] : {domain}")
+        print(f"vector                  : {vector}")
+        print(f"seasurface          [m] : {seasurface}")
+        print(f"stretching              : {stretching}")
+        print(f"cell_numbers            : {cell_numbers}")
+        print(f"min_width_limits    [m] : {min_width_limits}")
+        print(f"min_width_pps           : {min_width_pps}")
+        print(f"max_buffer          [m] : {max_buffer}")
+        print(f"mapping                 : {pmap}")
+        print(f"verb                    : {verb}")
+        print(f"raise_error             : {raise_error}\n")
 
     # Ensure no kwargs left.
     if kwargs:
@@ -443,20 +470,21 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # Get skin depth.
     skind = skin_depth(frequency, cond_arr, precision=0)
     if verb > 1:
-        print("Derived values")
-        print("==============")
-        print(f" Skin depths      : {skind}")
+        print(f"Skin depth          [m] : {skind[0]:.0f}", end="")
+        if cond.size == 2:
+            print(f" / {skind[1]:.0f}  (min width / buffer zone)")
+        elif cond.size == 3:
+            print(f" / {skind[1]:.0f} / {skind[2]:.0f}"
+                  "  [corresponding to `properties`]")
 
     # Minimum cell width.
     dmin = min_cell_width(
             frequency, cond_arr[0], min_width_pps, min_width_limits)
-    if verb > 1:
-        print(f" Min. cell width  : {dmin}")
 
     # Survey domain: if not provided get from vector.
     if domain is None and vector is None:
         raise ValueError(
-                f"At least one of `domain` and `vector` must be provided.")
+                "At least one of `domain` and `vector` must be provided.")
     elif domain is None:
         domain = np.array([vector.min(), vector.max()], dtype=float)
     else:
@@ -464,10 +492,22 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         if vector is not None:
             if domain[0] < vector.min() or domain[1] > vector.max():
                 raise ValueError(
-                        f"Provided vector MUST at least include all of the "
-                         "survey domain.")
+                        "Provided vector MUST at least include all of the "
+                        "survey domain.")
     if verb > 1:
-        print(f" Survey domain    : {domain}")
+        print(f"Survey domain DS    [m] : {domain[0]:.0f} - {domain[1]:.0f}")
+
+    # Seasurface related checks.
+    if seasurface is not None:
+
+        # Check that seasurface > center.
+        if seasurface <= center:
+            raise ValueError(
+                    "The `seasurface` but be bigger then `center`.")
+
+        # If center is close to seasurface, set it to seasurface.
+        if abs(seasurface - center) < dmin:
+            center = seasurface
 
     # Computation domain; big enough to avoid boundary effects.
     # To avoid boundary effects we want the signal to travel two wavelengths
@@ -478,8 +518,8 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     dbuffer = np.min([wlength, np.ones(2)*max_buffer], axis=0)
     comp_domain = np.array([domain[0]-dbuffer[0], domain[1]+dbuffer[1]])
     if verb > 1:
-        print(f" Buffer zone      : {dbuffer}")
-        print(f" Comp. domain     : {comp_domain}")
+        print(f"Comp. domain DC     [m] : {comp_domain[0]:.0f} - "
+              f"{comp_domain[1]:.0f}")
 
     # Initiate flag if terminated.
     finished = False
@@ -489,129 +529,131 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     # Loop over possible cell numbers from small to big.
     for nx in np.unique(cell_numbers):
-        print(nx)
 
         # Loop over possible alphas for domain.
-        for sa in np.linspace(1.0, stretching[0], 101):
-            print(sa)
+        for sa in np.arange(1.0, stretching[0]+0.005, 0.01):
 
-#             # Get current stretched grid cell sizes.
-#             thxl = dmin*sa**np.arange(nx)  # Left of origin.
-#             thxr = dmin*sa**np.arange(nx)  # Right of origin.
-# 
-#             # 0. Adjust stretching for fixed boundaries.
-#             if fixed.size > 1:  # Move mesh to first fixed boundary.
-#                 t_nx = np.r_[fixed[0], fixed[0]+np.cumsum(thxr)]
-#                 ii = np.argmin(abs(t_nx-fixed[1]))
-#                 thxr *= abs(fixed[1]-fixed[0])/np.sum(thxr[:ii])
-# 
-#             if fixed.size > 2:  # Move mesh to second fixed boundary.
-#                 t_nx = np.r_[fixed[0], fixed[0]-np.cumsum(thxl)]
-#                 ii = np.argmin(abs(t_nx-fixed[2]))
-#                 thxl *= abs(fixed[2]-fixed[0])/np.sum(thxl[:ii])
-# 
-#             # 1. Fill from center to left domain.
-#             nl = np.sum((fixed[0]-np.cumsum(thxl)) > domain[0])+1
-# 
-#             # 2. Fill from center to right domain.
-#             nr = np.sum((fixed[0]+np.cumsum(thxr)) < domain[1])+1
-# 
-#             # 3. Get remaining number of cells and check termination criteria.
-#             nsdc = nl+nr  # Number of domain cells.
-#             nx_remain = nx-nsdc
-# 
-#             # Not good, try next.
-#             if nx_remain <= 0:
-#                 continue
-# 
-#             # Create the current hx-array.
-#             hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
-#             hxo = np.r_[thxl[:nl][::-1], thxr[:nr]]
-# 
-#             # Get actual domain:
-#             asurv_domain = [fixed[0]-np.sum(thxl[:nl]),
-#                             fixed[0]+np.sum(thxr[:nr])]
-#             x0 = float(fixed[0]-np.sum(thxl[:nl]))
-# 
-#             # Get actual stretching (differs in case of fixed layers).
-#             sa_adj = np.max([hx[1:]/hx[:-1], hx[:-1]/hx[1:]])
-# 
-#             # Loop over possible alphas for comp_domain.
-#             for ca in np.arange(sa, alpha[1]+alpha[2]/2, alpha[2]):
-# 
-#                 # 4. Fill to left comp_domain.
-#                 thxl = hx[0]*ca**np.arange(1, nx_remain+1)
-#                 nl = np.sum((asurv_domain[0]-np.cumsum(thxl)) >
-#                             comp_domain[0])+1
-# 
-#                 # 5. Fill to right comp_domain.
-#                 thxr = hx[-1]*ca**np.arange(1, nx_remain+1)
-#                 nr = np.sum((asurv_domain[1]+np.cumsum(thxr)) <
-#                             comp_domain[1])+1
-# 
-#                 # 6. Get remaining number of cells and check termination
-#                 # criteria.
-#                 ncdc = nl+nr  # Number of comp_domain cells.
-#                 nx_remain2 = nx-nsdc-ncdc
-# 
-#                 if nx_remain2 < 0:  # Not good, try next.
-#                     continue
-# 
-#                 # Create hx-array.
-#                 nl += int(np.floor(nx_remain2/2))  # If uneven, add one cell
-#                 nr += int(np.ceil(nx_remain2/2))   # more on the right.
-#                 hx = np.r_[thxl[:nl][::-1], hx, thxr[:nr]]
-# 
-#                 # Compute origin.
-#                 x0 = float(asurv_domain[0]-np.sum(thxl[:nl]))
-# 
-#                 # Mark it as finished and break out of the loop.
-#                 finished = True
-#                 break
-# 
-#             if finished:
-#                 break
-# 
-#         if finished:
-#             break
-# 
-#     # Check finished and print info about found grid.
-#     if not finished:
-#         # Throw message if no solution was found.
-#         if raise_error:
-#             raise RuntimeError("No suitable grid found; relax your criteria.")
-#         else:
-#             print("* ERROR   :: No suitable grid found; relax your criteria.")
-#             hx, x0 = None, None
-# 
-#     elif verb > 0:
-#         print("   Skin depth ", end="")
-#         if res.size == 1:
-#             print(f"         [m] : {skind[0]:.0f}")
-#         elif res.size == 2:
-#             print(f"(m/l-r)  [m] : {skind[0]:.0f} / {skind[1]:.0f}")
-#         else:
-#             print(f"(m/l/r)  [m] : {skind[0]:.0f} / {skind[1]:.0f} / "
-#                   f"{skind[2]:.0f}")
-#         print(f"   Survey domain       [m] : {domain[0]:.0f} - "
-#               f"{domain[1]:.0f}")
-#         print(f"   Computation domain  [m] : {comp_domain[0]:.0f} - "
-#               f"{comp_domain[1]:.0f}")
-#         print(f"   Final extent        [m] : {x0:.0f} - "
-#               f"{x0+np.sum(hx):.0f}")
-#         extstr = f"   Min/max cell width  [m] : {min(hx):.0f} / "
-#         alstr = "   Alpha survey"
-#         nrstr = "   Number of cells "
-#         if not np.isclose(sa, sa_adj):
-#             sastr = f"{sa:.3f} ({sa_adj:.3f})"
-#         else:
-#             sastr = f"{sa:.3f}"
-#         print(extstr+f"{max(hxo):.0f} / {max(hx):.0f}")
-#         print(alstr+f"/comp       : {sastr} / {ca:.3f}")
-#         print(nrstr+f"(s/c/r) : {nx} ({nsdc}/{ncdc}/{nx_remain2})")
-#         print()
-# 
-#     return hx, x0
+            if vector is None:
+
+                # Get current stretched grid cell sizes.
+                thxl = dmin*sa**np.arange(nx)  # Left of origin.
+                thxr = dmin*sa**np.arange(nx)  # Right of origin.
+
+                # Adjust stretching for seasurface if required.
+                if seasurface is not None and seasurface > center:
+                    t_nx = np.r_[center, center+np.cumsum(thxr)]
+                    ii = np.argmin(abs(t_nx-seasurface))+1
+                    thxr[:ii] *= abs(seasurface-center)/np.sum(thxr[:ii])
+
+                # Fill from center to left and right domain.
+                nl = np.sum((center-np.cumsum(thxl)) > domain[0]) + 1
+                nr = np.sum((center+np.cumsum(thxr)) < domain[1]) + 1
+
+                # Create the current hx-array.
+                hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
+
+                # Get actual domain:
+                asurv_domain = [center - np.sum(thxl[:nl]),
+                                center + np.sum(thxr[:nr])]
+
+            else:
+                # Store actual domain, current hx-array, and number of cells.
+                asurv_domain = [vector[0], vector[-1]]
+                hx = np.diff(vector)
+
+            # Expand for seasurface if necessary.
+            if seasurface is not None and seasurface > asurv_domain[-1]:
+                thxr = hx[-1]*sa**np.arange(nx)
+                sdepth = seasurface - asurv_domain[-1]
+
+                # Get number of element, round down, and stretch.
+                ii = np.argmax(np.cumsum(thxr) > sdepth)
+                thxr = thxr[:ii]  # Restrict.
+                thxr *= abs(seasurface-asurv_domain[-1])/np.sum(thxr)
+
+                # Adjust actual domain, hx, and count.
+                asurv_domain[1] += sum(thxr)
+                hx = np.r_[hx, thxr]
+
+            # Remaining number of cells
+            nx_remain = nx - hx.size
+
+            # Not good, try next.
+            if nx_remain <= 0:
+                continue
+
+            # Store for verbosity
+            hxo = hx
+
+            # Loop over possible alphas for buffer.
+            for ca in np.arange(sa, stretching[1]+0.005, 0.01):
+
+                # Get current stretched grid cell sizes.
+                thxl = hx[0]*ca**np.arange(1, nx_remain+1)   # Left of survey.
+                thxr = hx[-1]*ca**np.arange(1, nx_remain+1)  # Right of survey.
+
+                # Fill from survey to left and right domain.
+                nl = np.sum((asurv_domain[0] - np.cumsum(thxl)) >
+                            comp_domain[0]) + 1
+                nr = np.sum((asurv_domain[1] + np.cumsum(thxr)) <
+                            comp_domain[1]) + 1
+
+                # Get remaining number of cells.
+                nx_remain2 = nx_remain - nl - nr
+
+                if nx_remain2 < 0:  # Not good, try next.
+                    continue
+
+                # Create hx-array.
+                nl += int(np.floor(nx_remain2/2))  # If uneven, add one cell
+                nr += int(np.ceil(nx_remain2/2))   # more on the right.
+                hx = np.r_[thxl[:nl][::-1], hx, thxr[:nr]]
+
+                # Compute origin.
+                x0 = float(asurv_domain[0]-np.sum(thxl[:nl]))
+
+                # Mark it as finished and break out of the loop.
+                finished = True
+                break
+
+            if finished:
+                break
+
+        if finished:
+            break
+
+    # Check finished and print info about found grid.
+    if not finished:
+        msg = "No suitable grid found; relax your criteria."
+        # Throw message if no solution was found.
+        if raise_error:
+            raise RuntimeError(msg)
+        else:
+            if verb > 1:
+                print()
+                verb = 1
+            print(f"* ERROR   :: {msg}")
+            x0, hx = None, None
+
+    # Check max stretching.
+    sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
+    sa_limit = min(1.5, stretching[0]+0.25)
+    if sa_adj > sa_limit:
+        print(f"* WARNING :: Stretching in DS > {sa_limit}.\nThe reason is "
+              "usually the interplay of center/domain/seasurface.")
+
+    # Print info about final grid.
+    if verb > 1:
+        print(f"Final extent        [m] : {x0:.0f} - {x0+np.sum(hx):.0f}")
+        print(f"Cell widths         [m] : {min(hxo):.0f} / {max(hxo):.0f}"
+              f" / {max(hx):.0f}  [min(DS) / max(DS) / max(DC)]")
+        print(f"Number of cells         : {nx} ({hxo.size} / "
+              f"{nx-hxo.size-nx_remain2} / {nx_remain2})  "
+              "[Total (DS/DC/remain)]")
+        print(f"Max stretching  (DS/DC) : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}")
+
+    return x0, hx
+
 
 def good_mg_cell_nr(max_nr=1000, max_prime=5, min_div=3):
     r"""Returns 'good' cell numbers for the multigrid method.
