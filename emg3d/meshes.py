@@ -204,101 +204,86 @@ class TensorMesh(dTensorMesh, _TensorMesh):
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
 
-def construct_mesh(survey, res, min_width, zval, freq, verb):
+def construct_mesh(frequency, properties, center, domain=None, vector=None,
+                   seasurface=None, **kwargs):
     # TODO TEST & DOCUMENT
-    #
-    # - Ds     : - [min, max] OR
-    #            - [min(vectorNx), max(vectorNx)] OR
-    #            - [min(src_x, rec_x), max(src_x, rec_x)]
-    #            => here [min, max] and or vectorNx; src/rec in simulation
-    #            domain > vector > src/rec
+    # TODO
+    # TODO => Turn it around. Full documentation here, diff-doc in get_o_w().
+    # TODO
     r"""
-    TODO NEEDS IMPROVEMENT, MORE FLEXIBLE
-    Works for current example, but no more.
 
-    TODO list:
+    Same signature as get_origin_widths. See there for a description of the
+    parameters. Described here are only the differences.
 
-    - get_hx_h0:
-      - Takes: src, rec, freq, strength
-
-
-      - max-domain 100k unless provided
-
-        - 2\lambda -> {x/y}_{min/max} (2\lambda except if reaches air)
-                   -> z_min
-                   -> z_max -> 100k (2\lambda except if reaches air)
-
-      - z 1: solve \Delta_min_z \alpha_z^x \ge |max(src_z, rec_z)| => x
-      - z 2: solve \Delta_min_z \y^x \eq |max(src_z, rec_z)| => y
-
-      - survey domain:
-
-        - src_{x;y;z} (one source)
-        - rec_{x;y;z} (all receivers)
-
-      - huge amount of nx by default (and parameter)
-      - \Delta_min, pps, f (with the exc. of z just as nov; one level more)
-      - \alpha_1, \alpha_2
-      - h_x, h_y, h_z: if provided, taken, and then extended if required.
-
-    Fixed:  x: x of middle receiver
-            y: y of middle receiver
-            z: [zval[0], zval[1], 0]
-
-    Domain: x: rec_x.min-100 - rec_x.max+100
-            y: rec_y.min-100 - rec_y.max+100
-            y: zval[1]-0
+    properties:
+        - 1: all the same
+        - 2: source, buffer
+        - 3: source, negative, positive
+        - 4: source, xy-buffer, z-negative, z-positive
+        - 7: source, x-neg, x-pos, y-neg, y-pos, z-neg, z-pos
+    center: three values (list, tuple, array)
+    domain: tuple ([], [], [])
+    vector: tuple (None, None, [])
+    stretching: for all or tuple for each.
+    min_width_limits: for all or tuple for each.
+    min_width_pps: for all or tuple for each.
 
     """
+    verb = kwargs.get('verb', 0)
 
-    params = {'freq': freq, 'verb': verb-1}
+    # Initiate direction-specific dicts, add unambiguous args.
+    kwargs['frequency'] = frequency
+    xparams = {'center': center[0]}
+    yparams = {'center': center[1]}
+    zparams = {'center': center[2], 'seasurface': seasurface}
 
-    # Get cell widths and origin in each direction
-    hx, x0 = get_hx_h0(
-        res=[res[0], res[2]],
-        fixed=survey[0].min()+(survey[0].max()-survey[0].min())//2,
-        domain=[survey[0].min()-100, survey[0].max()+100],
-        min_width=min_width[0],
-        **params
-    )
-    hy, y0 = get_hx_h0(
-        res=[res[0], res[2]],
-        fixed=survey[1].min()+(survey[1].max()-survey[1].min())//2,
-        domain=[survey[1].min()-100, survey[1].max()+100],
-        min_width=min_width[1],
-        **params
-    )
-    hz, z0 = get_hx_h0(
-        res=[res[0], res[1], res[2]],
-        fixed=[zval[0], zval[1], 0],
-        domain=[zval[1], 0],
-        min_width=min_width[2],
-        **params
-    )
+    # Add properties.
+    if isinstance(properties, (int, float)):
+        properties = np.array([properties])
+    if len(properties) == 4:
+        xparams['properties'] = [properties[0], properties[1], properties[1]]
+        yparams['properties'] = [properties[0], properties[1], properties[1]]
+        zparams['properties'] = [properties[0], properties[2], properties[3]]
+    elif len(properties) == 7:
+        xparams['properties'] = [properties[0], properties[1], properties[2]]
+        yparams['properties'] = [properties[0], properties[3], properties[4]]
+        zparams['properties'] = [properties[0], properties[5], properties[6]]
+    else:
+        kwargs['properties'] = properties
 
-    # params = {'frequency': freq, 'max_buffer': max_buffer, 'mapping':
-    #            mapping, 'verb': verb-1, 'raise_error': raise_error}
-    #
-    # x0, hx = get_origin_widths(
-    #         properties, center, domain, vector, stretching, cell_numbers,
-    #         min_width_limits, min_width_pps, **params)
-    #
-    # y0, hy = get_origin_widths(
-    #         properties, center, domain, vector, stretching, cell_numbers,
-    #         min_width_limits, min_width_pps, **params)
-    #
-    # z0, hz = get_origin_widths(
-    #         properties, center, domain, vector, seasurface, stretching,
-    #         cell_numbers, min_width_limits, min_width_pps, **params)
+    # Add optionally direction specific args.
+    for name, value in zip(['domain', 'vector'], [domain, vector]):
+        if value is None:
+            kwargs[name] = value
+        else:
+            xparams[name] = value[0]
+            yparams[name] = value[1]
+            zparams[name] = value[2]
 
-    # Initialize mesh.
-    grid = TensorMesh([hx, hy, hz], x0=np.array([x0, y0, z0]))
+    # Add optionally direction specific kwargs.
+    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
+        value = kwargs.pop(name, None)
+        if value is not None:
+            if len(value) == 3:
+                xparams[name] = value[0]
+                yparams[name] = value[1]
+                zparams[name] = value[2]
+            else:
+                kwargs[name] = value
 
-    if verb > 0:
-        print(grid, end='')
+    # Get origins and widths in all directions.
+    if verb > 1:
+        print("         == GRIDDING IN X ==")
+    x0, hx = get_origin_widths(**kwargs, **xparams)
+    if verb > 1:
+        print("\n         == GRIDDING IN Y ==")
+    y0, hy = get_origin_widths(**kwargs, **yparams)
+    if verb > 1:
+        print("\n         == GRIDDING IN Z ==")
+    z0, hz = get_origin_widths(**kwargs, **zparams)
 
     # Return mesh.
-    return grid
+    return TensorMesh([hx, hy, hz], x0=np.array([x0, y0, z0]))
 
 
 def get_origin_widths(frequency, properties, center, domain=None, vector=None,
@@ -387,7 +372,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
         Default is None.
 
-    min_width_pps : int, optional
+    min_width_pps : float or int, optional
         Points per skin depth; minimum cell width is computed via
         `dmin = skin-depth/pps`.
         Default = 3.
@@ -438,22 +423,6 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     verb = kwargs.pop('verb', 1)
     raise_error = kwargs.pop('raise_error', True)
 
-    if verb > 2:
-        print(f"frequency          [Hz] : {frequency}")
-        print(f"properties              : {properties}")
-        print(f"center              [m] : {center}")
-        print(f"domain              [m] : {domain}")
-        print(f"vector                  : {vector}")
-        print(f"seasurface          [m] : {seasurface}")
-        print(f"stretching              : {stretching}")
-        print(f"cell_numbers            : {cell_numbers}")
-        print(f"min_width_limits    [m] : {min_width_limits}")
-        print(f"min_width_pps           : {min_width_pps}")
-        print(f"max_buffer          [m] : {max_buffer}")
-        print(f"mapping                 : {pmap}")
-        print(f"verb                    : {verb}")
-        print(f"raise_error             : {raise_error}\n")
-
     # Ensure no kwargs left.
     if kwargs:
         raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
@@ -470,12 +439,19 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # Get skin depth.
     skind = skin_depth(frequency, cond_arr, precision=0)
     if verb > 1:
+        if verb > 2:
+            end = ""
+        else:
+            end = "\n"
         print(f"Skin depth          [m] : {skind[0]:.0f}", end="")
         if cond.size == 2:
-            print(f" / {skind[1]:.0f}  (min width / buffer zone)")
+            print(f" / {skind[1]:.0f}", end=end)
         elif cond.size == 3:
-            print(f" / {skind[1]:.0f} / {skind[2]:.0f}"
-                  "  [corresponding to `properties`]")
+            print(f" / {skind[1]:.0f} / {skind[2]:.0f}", end=end)
+        else:
+            print(end=end)
+        if verb > 2:
+            print("  [corresponding to `properties`]")
 
     # Minimum cell width.
     dmin = min_cell_width(
@@ -645,11 +621,14 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # Print info about final grid.
     if verb > 1:
         print(f"Final extent        [m] : {x0:.0f} - {x0+np.sum(hx):.0f}")
-        print(f"Cell widths         [m] : {min(hxo):.0f} / {max(hxo):.0f}"
-              f" / {max(hx):.0f}  [min(DS) / max(DS) / max(DC)]")
+        print(f"Cell widths         [m] : "
+              f"{min(hxo):.0f} / {max(hxo):.0f} / {max(hx):.0f}", end=end)
+        if verb > 2:
+            print("  [min(DS) / max(DS) / max(DC)]")
         print(f"Number of cells         : {nx} ({hxo.size} / "
-              f"{nx-hxo.size-nx_remain2} / {nx_remain2})  "
-              "[Total (DS/DC/remain)]")
+              f"{nx-hxo.size-nx_remain2} / {nx_remain2})", end=end)
+        if verb > 2:
+            print("  [Total (DS/DC/remain)]")
         print(f"Max stretching  (DS/DC) : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}")
 
     return x0, hx
