@@ -37,7 +37,7 @@ except ImportError:
     # `emg3d.simulation.process_map = emg3d.utils._process_map`.
     from emg3d.utils import _process_map as process_map
 
-from emg3d import fields, solver, surveys, models, meshes, optimize
+from emg3d import fields, solver, surveys, maps, models, meshes, optimize
 
 __all__ = ['Simulation']
 
@@ -112,11 +112,6 @@ class Simulation:
 
         Only accepted if `gridding!='same'`.
 
-    expand_opts : dict, optional
-        TODO
-
-        Only accepted if `gridding!='same'`.
-
     verb : int; optional
         Level of verbosity. Default is 0.
 
@@ -124,7 +119,6 @@ class Simulation:
         - 0: Warning.
         - 1: Info.
         - 2: Debug.
-
 
     """
 
@@ -135,47 +129,21 @@ class Simulation:
         # Store inputs.
         self.name = name
         self.survey = survey
+        self.grid = grid
+        self.model = model
         self.max_workers = max_workers
+        self.gridding = gridding
+
+        # Store kwargs.
         self.verb = kwargs.pop('verb', 0)
 
-        # Get gridding options, set to defaults if not provided.
-        self.gridding = gridding
-        self._gridding_descr = {
-                'same': 'Same grid as for model',
-                'single': 'A single grid for all sources and frequencies',
-                'frequency': 'Frequency-dependent grids',
-                'source': 'Source-dependent grids',
-                'both': 'Frequency- and source-dependent grids',
-                }
-
-        # `gridding_opts` is only used with automatic gridding.
-        self._input_nCz = grid.nCz  # Store original nCz.
+        # Get gridding options.
         if self.gridding != 'same':
-            self.gridding_opts = {
-                    # use_input = 'x', 'xyz', '', ... [MUST COVER Ds]
-                    'res': np.array([0.3, 1, 1e5]),
-                    'min_width': np.array([200., 200., 100]),
-                    'zval': np.array([-1000, -2000, 0]),
-                    **kwargs.pop('gridding_opts', {}),  # Overwrites defaults.
-                    }
-
-            # Expand model by water and air if required.
-            expand = kwargs.pop('expand', None)
-            if expand is not None:
-                model, grid = _expand_model_grid(model, grid, expand)
-        else:
             self.gridding_opts = kwargs.pop('gridding_opts', {})
+        else:  # Not popping, to raise error if provided.
+            self.gridding_opts = {}
 
-            # If gridding_opts is not empty, put back to raise warning.
-            # Done so an empty dict does not raise the warning (eg from_dict).
-            if self.gridding_opts:
-                kwargs['gridding_opts'] = self.gridding_opts
-
-        # Store (expanded) input model and grid.
-        self.model = model
-        self.grid = grid
-
-        # Get kwargs.
+        # Get solver options.
         self.solver_opts = {
                 'sslsolver': True,       # Default in solve is False.
                 'semicoarsening': True,  # "
@@ -188,17 +156,18 @@ class Simulation:
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
+        # Fixed surveys are not yet implemented.
         if self.survey.fixed:
             raise NotImplementedError(
                     "Simulation currently only implemented for "
                     "`survey.fixed=False`.")
 
-        # Magnetic sources are not yet implemented in simulation.
+        # Magnetic sources are not yet implemented.
         if sum([not s.electric for s in survey.sources.values()]) > 0:
             raise NotImplementedError(
                     "Simulation not yet implemented for magnetic sources.")
 
-        # Magnetic receivers are not yet implemented in simulation.
+        # Magnetic receivers are not yet implemented.
         if sum([not r.electric for r in survey.receivers.values()]) > 0:
             raise NotImplementedError(
                     "Simulation not yet implemented for magnetic receivers.")
@@ -212,6 +181,9 @@ class Simulation:
         self._dict_efield_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
+
+        # Initiate automatic gridding.
+        self._initiate_gridding()
 
         # Initiate synthetic data with NaN's.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
@@ -230,7 +202,7 @@ class Simulation:
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies\n"
                 f"- {self.model.__repr__()}\n"
-                f"- Gridding: {self._gridding_descr[self.gridding]}")
+                f"- Gridding: {self._gridding_descr}")
 
     def _repr_html_(self):
         return (f"<h3>{self.__class__.__name__} «{self.name}»</h3>"
@@ -241,7 +213,7 @@ class Simulation:
                 f"{self.survey.shape[2]} frequencies</li>"
                 f"<li>{self.model.__repr__()}</li>"
                 f"<li>Gridding: "
-                f"{self._gridding_descr[self.gridding]}</li>"
+                f"{self._gridding_descr}</li>"
                 f"</ul>")
 
     def copy(self, what='computed'):
@@ -463,98 +435,70 @@ class Simulation:
         """Return computational grid of the given source and frequency."""
         freq = float(frequency)
 
-        # Get grid if it is not stored yet.
-        if self._dict_grid[source][freq] is None:
+        # Return grid if 'same' or if it exists already.
+        if self._dict_grid[source][freq] is not None:
+            return self._dict_grid[source][freq]
 
-            # Act depending on gridding:
-            if self.gridding == 'same':  # Same grid as for provided model.
+        # Act depending on gridding:
+        if self.gridding == 'same':  # Same grid as for provided model.
 
-                # Store link to grid.
-                self._dict_grid[source][freq] = self.grid
+            # Store link to grid.
+            self._dict_grid[source][freq] = self.grid
 
-            elif self.gridding == 'frequency':  # Frequency-dependent grids.
+        elif self.gridding == 'frequency':  # Frequency-dependent grids.
 
-                # Initiate dict.
-                if not hasattr(self, '_grid_frequency'):
-                    self._grid_frequency = {}
+            # Initiate dict.
+            if not hasattr(self, '_grid_frequency'):
+                self._grid_frequency = {}
 
-                # Get grid for this frequency if not yet computed.
-                if freq not in self._grid_frequency.keys():
-
-                    # Get grid for this frequency.
-                    # TODO does not work for fixed surveys
-                    coords = [np.r_[self.survey.src_coords[i],
-                              self.survey.rec_coords[i]] for i in range(3)]
-
-                    # Get grid and store it.
-                    self._grid_frequency[freq] = meshes.construct_mesh(
-                            coords, freq=freq, verb=self.verb,
-                            **self.gridding_opts)
-
-                # Store link to grid.
-                self._dict_grid[source][freq] = self._grid_frequency[freq]
-
-            elif self.gridding == 'source':  # Source-dependent grids.
-
-                # Initiate dict.
-                if not hasattr(self, '_grid_source'):
-                    self._grid_source = {}
-
-                # Get grid for this source if not yet computed.
-                if source not in self._grid_source.keys():
-
-                    # Get grid for this frequency.
-                    # TODO does not work for fixed surveys
-                    coords = [np.r_[self.survey.sources[source].coordinates[i],
-                              self.survey.rec_coords[i]] for i in range(3)]
-
-                    # Use average frequency (log10).
-                    mfreq = 10**np.mean(np.log10(self.survey.frequencies))
-
-                    # Get grid and store it.
-                    self._grid_source[source] = meshes.construct_mesh(
-                            coords, freq=mfreq, verb=self.verb,
-                            **self.gridding_opts)
-
-                # Store link to grid.
-                self._dict_grid[source][freq] = self._grid_source[source]
-
-            elif self.gridding == 'both':  # Src- & freq-dependent grids.
-
-                # Get grid for this frequency.
-                # TODO does not work for fixed surveys
-                coords = [np.r_[self.survey.sources[source].coordinates[i],
-                          self.survey.rec_coords[i]] for i in range(3)]
+            # Get grid for this frequency if not yet computed.
+            if freq not in self._grid_frequency.keys():
 
                 # Get grid and store it.
-                self._dict_grid[source][freq] = meshes.construct_mesh(
-                        coords, freq=freq, verb=self.verb,
-                        **self.gridding_opts)
+                inp = {**self._gridding_input, 'frequency': freq}
+                self._grid_frequency[freq] = meshes.construct_mesh(**inp)
 
-            else:  # Use a single grid for all sources and receivers.
-                # Default case; catches 'single' but also anything else.
+            # Store link to grid.
+            self._dict_grid[source][freq] = self._grid_frequency[freq]
 
-                # Get grid if not yet computed.
-                if not hasattr(self, '_grid_single'):
+        elif self.gridding == 'source':  # Source-dependent grids.
 
-                    # Get grid for this frequency.
-                    # TODO does not work for fixed surveys
-                    coords = [np.r_[self.survey.src_coords[i],
-                              self.survey.rec_coords[i]] for i in range(3)]
+            # Initiate dict.
+            if not hasattr(self, '_grid_source'):
+                self._grid_source = {}
 
-                    # Use average frequency (log10).
-                    mfreq = 10**np.mean(np.log10(self.survey.frequencies))
+            # Get grid for this source if not yet computed.
+            if source not in self._grid_source.keys():
 
-                    # Get grid and store it.
-                    self._grid_single = meshes.construct_mesh(
-                            coords, freq=mfreq, verb=self.verb,
-                            **self.gridding_opts)
+                # Get grid and store it.
+                center = self.survey.sources[source].coordinates[:3]
+                inp = {**self._gridding_input, 'center': center}
+                self._grid_source[source] = meshes.construct_mesh(**inp)
 
-                # Store link to grid.
-                self._dict_grid[source][freq] = self._grid_single
+            # Store link to grid.
+            self._dict_grid[source][freq] = self._grid_source[source]
 
-        # Return grid.
-        return self._dict_grid[source][freq]
+        elif self.gridding == 'both':  # Src- & freq-dependent grids.
+
+            # Get grid and store it.
+            center = self.survey.sources[source].coordinates[:3]
+            inp = {**self._gridding_input, 'frequency': freq, 'center': center}
+            self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
+
+        else:  # Use a single grid for all sources and receivers.
+            # Default case; catches 'single' but also anything else.
+
+            # Get grid if not yet computed.
+            if not hasattr(self, '_grid_single'):
+
+                # Get grid and store it.
+                self._grid_single = meshes.construct_mesh(**inp)
+
+            # Store link to grid.
+            self._dict_grid[source][freq] = self._grid_single
+
+        # Use recursion to return grid.
+        return self.get_grid(source, frequency)
 
     def get_model(self, source, frequency):
         """Return model on the grid of the given source and frequency."""
@@ -1004,17 +948,150 @@ class Simulation:
 
         return ResidualField
 
+    def _initiate_gridding(self):
+        # TODO TODO
+
+        # Store original input nCz
+        self._input_nCz = self.grid.nCz
+
+        # Expand model by water and air if required.
+        expand = self.gridding_opts.pop('expand', None)
+
+        # Store gridding description (for reprs).
+        self._gridding_descr = {
+                'same': 'Same grid as for model',
+                'single': 'A single grid for all sources and frequencies',
+                'frequency': 'Frequency-dependent grids',
+                'source': 'Source-dependent grids',
+                'both': 'Frequency- and source-dependent grids',
+                }[self.gridding]
+
+        # gridding_opts is the original input (without `expand`).
+        # _gridding_input is the dict with defaults added.
+        gopts_copy = self.gridding_opts.copy()  # copy to check if all used.
+        ginput = {}
+
+        # Values we just take if provided.
+        for name in ['stretching', 'seasurface', 'cell_numbers', 'max_buffer',
+                     'min_width_limits', 'min_width_pps', 'raise_error']:
+            if name in gopts_copy.keys():
+                ginput[name] = gopts_copy.pop(name)
+
+        # Values with defaults:
+
+        # Verb defaults to 1 (warnings).
+        ginput['verb'] = gopts_copy.pop('verb', 1)
+
+        # Mapping defaults to model map.
+        ginput['mapping'] = gopts_copy.pop('mapping', self.model.map)
+
+        # Frequency defaults to average frequency (log10).
+        freq = 10**np.mean(np.log10(self.survey.frequencies))
+        ginput['frequency'] = gopts_copy.pop('frequency', freq)
+
+        # Center defaults to center of all sources.
+        center = tuple([np.mean(self.survey.src_coords[i]) for i in range(3)])
+        ginput['center'] = gopts_copy.pop('center', center)
+
+        # Vector: convert string into arrays.
+        vector = gopts_copy.pop('vector', None)
+        if vector is not None:
+            vector = tuple([getattr(self.grid, 'vectorN'+n) if n in
+                            vector.lower() else None for n in ['x', 'y', 'z']])
+            ginput['vector'] = vector
+
+        # Expand model if required
+        if expand is not None:
+            seasurface = self.gridding_opts.get('seasurface', 0.0)
+            self.model, self.grid = _expand_model_grid(
+                    self.model, self.grid, expand, seasurface)
+
+        # Properties defaults to model averages (AFTER model expansion).
+        properties = gopts_copy.pop('properties', None)
+
+        # Get from model if not provided.
+        if properties is None:
+
+            # Get map.
+            m = ginput['mapping']
+            if isinstance(m, str):
+                m = getattr(maps, 'Map'+m)()
+
+            # Mean of all values (x, y, z).
+            def get_mean(index):
+                """Get mean; currently based on the averaged property."""
+                data = np.array([
+                    index(getattr(self.model, 'property_'+p)).ravel()
+                    for p in ['x', 'y', 'z'] if
+                    getattr(self.model, '_property_'+p) is not None])
+                return self.model.map.forward(10**np.mean(np.log10(
+                    self.model.map.backward(data))))
+
+            # Buffer properties.
+            xneg = get_mean(lambda x: x[0, :, :])
+            xpos = get_mean(lambda x: x[-1, :, :])
+            yneg = get_mean(lambda x: x[:, 0, :])
+            ypos = get_mean(lambda x: x[:, -1, :])
+            zneg = get_mean(lambda x: x[:, :, 0])
+            zpos = get_mean(lambda x: x[:, :, -1])
+
+            # Source property.
+            ix = np.argmin(abs(self.grid.vectorNx - ginput['center'][0]))
+            iy = np.argmin(abs(self.grid.vectorNy - ginput['center'][1]))
+            iz = np.argmin(abs(self.grid.vectorNz - ginput['center'][2]))
+            source = get_mean(lambda x: x[ix, iy, iz])
+
+            properties = [source, xneg, xpos, yneg, ypos, zneg, zpos]
+
+        ginput['properties'] = properties
+
+        # Domain; default taken from survey.
+        domain = gopts_copy.pop('domain', None)
+
+        # Get from survey if not provided.
+        if domain is None:
+            x, y, z = [np.r_[self.survey.src_coords[i],
+                             self.survey.rec_coords[i]] for i in range(3)]
+
+            xdim = [min(x), max(x)]
+            ydim = [min(y), max(y)]
+            zdim = [min(z), max(z)]
+
+            xdiff = np.diff(xdim)
+            ydiff = np.diff(ydim)
+            zdiff = np.diff(zdim)
+
+            # Ensure the ratio xdim:ydim is at most 3.
+            if xdiff/ydiff > 3:
+                diff = round(float((xdiff/3.0 - ydiff)/2.0))
+                ydim = [ydim[0]-diff, ydim[1]+diff]
+            elif ydiff/xdiff > 3:
+                diff = round(float((ydiff/3.0 - xdiff)/2.0))
+                xdim = [xdim[0]-diff, xdim[1]+diff]
+
+            # Ensure the ratio zdim:horizontal is at most 2.
+            if zdiff/max(xdiff, ydiff) > 2:
+                diff = round(float((max(xdiff, ydiff)/2.0 - zdiff)/10.0))
+                zdim = [zdim[0]-9*diff, zdim[1]+diff]
+
+            # Collect
+            domain = (xdim, ydim, zdim)
+
+        ginput['domain'] = domain
+
+        # Ensure no gridding_opts left.
+        if gopts_copy:
+            raise TypeError(
+                    f"Unexpected gridding_opts: {list(gopts_copy.keys())}")
+
+        # Store on self.
+        self._gridding_input = ginput
+
 
 # HELPER FUNCTIONS
-def _expand_model_grid(model, grid, air=None, water=None, seasurface=0.0):
+def _expand_model_grid(model, grid, expand, seasurface):
+    # TODO TEST & DOCUMENT
     """Expand model and grid according to provided parameters."""
-
-    # Set default properties.
-    if air is None:
-        air = model.map.forward(1e-8)  # 1e-8 S/m
-    if water is None:
-        # Water default: Average of x-property of last layer.
-        water = np.average(model.property_x[:, :, -1])
 
     def extend_property(prop, add_values, nadd):
         """Expand property `model.prop`, IF it is not None."""
@@ -1047,9 +1124,9 @@ def _expand_model_grid(model, grid, air=None, water=None, seasurface=0.0):
 
     if nzadd > 0:
         # Extend properties.
-        property_x = extend_property('property_x', [water, air], nzadd)
-        property_y = extend_property('property_y', [water, air], nzadd)
-        property_z = extend_property('property_z', [water, air], nzadd)
+        property_x = extend_property('property_x', expand, nzadd)
+        property_y = extend_property('property_y', expand, nzadd)
+        property_z = extend_property('property_z', expand, nzadd)
         mu_r = extend_property('mu_r', [1, 1], nzadd)
         epsilon_r = extend_property('epsilon_r', [1, 1], nzadd)
 

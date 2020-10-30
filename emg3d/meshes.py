@@ -210,6 +210,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     # TODO
     # TODO => Turn it around. Full documentation here, diff-doc in get_o_w().
     # TODO
+
     r"""
 
     Same signature as get_origin_widths. See there for a description of the
@@ -629,7 +630,10 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
               f"{nx-hxo.size-nx_remain2} / {nx_remain2})", end=end)
         if verb > 2:
             print("  [Total (DS/DC/remain)]")
-        print(f"Max stretching  (DS/DC) : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}")
+        print(f"Max stretching          : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}",
+              end=end)
+        if verb > 2:
+            print("  [DS (seasurface) / DC]")
 
     return x0, hx
 
