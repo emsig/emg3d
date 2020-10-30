@@ -261,24 +261,25 @@ def parse_config_file(args_dict):
         if grid:
             simulation['gridding_opts'] = grid
 
-#
-# TODO move all docs from parser and example CLI to simulation!
-#
-#frequency : float                      from simulation (this or average)
-#properties : float or list             from model (this and boundary averages)
-#center : float                         from simulation (this or average)
-#domain : list, optional                from source and receiver in horizontal
-#vector : str ('x', 'xz', 'yz', ...)    «optional»
-#seasurface : float                     «optional»
-#stretching : list                      «optional»
-#cell_numbers : list                    «optional»
-#min_width_limits : float, list or None «optional»
-#min_width_pps : float or int           «optional»
-#max_buffer : float                     «optional»
-#mapping : str, optional                from model, can be overwritten
-#verb : int, optional                   from simulation
-#raise_error : bool                     «optional»
-# Expand = [water, air]    ¡ADD!        «optional» - NEEDS seasurface
+    #
+    # TODO move all docs from parser and example CLI to simulation!
+    #
+    # frequency : float                      from simulation (this or average)
+    # properties : float or list             from model (this or boundary avr.)
+    # center : float                         from simulation (this or average)
+    # domain : list, optional                from src and rec in horizontal
+    # vector : str ('x', 'xz', 'yz', ...)    «optional»
+    # seasurface : float                     «optional»
+    # stretching : list                      «optional»
+    # cell_numbers : list                    «optional»
+    # min_width_limits : float, list or None «optional»
+    # min_width_pps : float or int           «optional»
+    # max_buffer : float                     «optional»
+    # lambda_factor : float                  «optional»
+    # mapping : str, optional                from model, can be overwritten
+    # verb : int, optional                   from simulation
+    # raise_error : bool                     «optional»
+    # Expand = [water, air]    ¡ADD!        «optional» - NEEDS seasurface
 
     # # Model/grid expansion # #
 

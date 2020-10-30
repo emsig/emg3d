@@ -360,8 +360,9 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     cell_numbers : list, optional
         List of possible numbers of cells. See :func:`good_mg_cell_nr`.
-        Default is ``good_mg_cell_nr(1000, 5, 4)``, which corresponds to
-        [32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512, 640, 768].
+        Default is ``good_mg_cell_nr(1000, 5, 3)``, which corresponds to
+        [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512,
+         640, 768].
 
     min_width_limits : float, list or None, optional
         Minimum cell width restriction:
@@ -377,6 +378,12 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         Points per skin depth; minimum cell width is computed via
         `dmin = skin-depth/pps`.
         Default = 3.
+
+    lambda_factor : float, optional
+        The buffer is taken as one wavelength form the survey domain. This can
+        be regarded as quite conservative (but safe). The parameter
+        ``lambda_factor`` can be used to reduce (or enhance) this factor.
+        Default is 1.0.
 
     max_buffer : float, optional
         Maximum buffer zone around survey domain.
@@ -416,10 +423,11 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     # Get all kwargs.
     stretching = kwargs.pop('stretching', [1.0, 1.5])
-    cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr(1000, 5, 4))
+    cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
     min_width_limits = kwargs.pop('min_width_limits', None)
     min_width_pps = kwargs.pop('min_width_pps', 3)
     max_buffer = kwargs.pop('max_buffer', 100000)
+    lambda_factor = kwargs.pop('lambda_factor', 1.0)
     pmap = kwargs.pop('mapping', 'Resistivity')
     verb = kwargs.pop('verb', 1)
     raise_error = kwargs.pop('raise_error', True)
@@ -491,7 +499,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # from the source to the boundary and back to the receiver.
     # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
     # Two wavelengths we can safely assume it is zero.
-    wlength = wavelength(frequency, cond_arr[1:], precision=0)
+    wlength = lambda_factor*wavelength(frequency, cond_arr[1:], precision=0)
     dbuffer = np.min([wlength, np.ones(2)*max_buffer], axis=0)
     comp_domain = np.array([domain[0]-dbuffer[0], domain[1]+dbuffer[1]])
     if verb > 1:

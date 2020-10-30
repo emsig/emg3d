@@ -242,6 +242,14 @@ class Simulation:
         # Initiate dict.
         out = {'name': self.name, '__class__': self.__class__.__name__}
 
+        # TODO TEST TODO (Particularly from dict)
+        # v v v v v v v v
+        # Put provided grids back on gridding.
+        if self.gridding == 'provided':
+            self.gridding = self._grid_single
+        elif self.gridding == 'dict':
+            self.gridding = self._dict_grid
+
         # Add initiation parameters.
         out['survey'] = self.survey.to_dict()
         out['grid'] = self.grid.to_dict()
@@ -958,12 +966,23 @@ class Simulation:
         expand = self.gridding_opts.pop('expand', None)
 
         # Store gridding description (for reprs).
+        if isinstance(self.gridding, str):
+            pass
+        elif isinstance(self.gridding, dict):
+            self._dict_grid = self.gridding
+            self.gridding = 'dict'
+        else:
+            self._grid_single = self.gridding
+            self.gridding = 'provided'
+
         self._gridding_descr = {
                 'same': 'Same grid as for model',
                 'single': 'A single grid for all sources and frequencies',
                 'frequency': 'Frequency-dependent grids',
                 'source': 'Source-dependent grids',
                 'both': 'Frequency- and source-dependent grids',
+                'provided': 'A single, provided grid all sources/frequencies',
+                'dict': 'Provided dict of frequency-/source-dependent grids',
                 }[self.gridding]
 
         # gridding_opts is the original input (without `expand`).
@@ -972,8 +991,9 @@ class Simulation:
         ginput = {}
 
         # Values we just take if provided.
-        for name in ['stretching', 'seasurface', 'cell_numbers', 'max_buffer',
-                     'min_width_limits', 'min_width_pps', 'raise_error']:
+        for name in ['stretching', 'seasurface', 'cell_numbers',
+                     'lambda_factor', 'max_buffer', 'min_width_limits',
+                     'min_width_pps', 'raise_error']:
             if name in gopts_copy.keys():
                 ginput[name] = gopts_copy.pop(name)
 
@@ -1020,10 +1040,18 @@ class Simulation:
             # Mean of all values (x, y, z).
             def get_mean(index):
                 """Get mean; currently based on the averaged property."""
+
+                # Get volume factor.
+                vfact = index(self.grid.vol.reshape(self.grid.vnC, order='F'))
+                vfact = vfact.ravel()/vfact.sum()
+
+                # Collect all x (y, z) values.
                 data = np.array([
-                    index(getattr(self.model, 'property_'+p)).ravel()
+                    vfact*index(getattr(self.model, 'property_'+p)).ravel()
                     for p in ['x', 'y', 'z'] if
                     getattr(self.model, '_property_'+p) is not None])
+
+                # Return mean, no a log10-scale.
                 return self.model.map.forward(10**np.mean(np.log10(
                     self.model.map.backward(data))))
 
