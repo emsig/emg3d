@@ -206,28 +206,151 @@ class TensorMesh(dTensorMesh, _TensorMesh):
 
 def construct_mesh(frequency, properties, center, domain=None, vector=None,
                    seasurface=None, **kwargs):
-    # TODO TEST & DOCUMENT
-    # TODO
-    # TODO => Turn it around. Full documentation here, diff-doc in get_o_w().
-    # TODO
+    r"""Return a TensorMesh for given parameters.
 
-    r"""
+    The returned mesh is frequency and property dependent, and takes all other
+    provided parameters into account. The minimum cell width
+    :math:`\Delta_\text{min}`, given in Equation :eq:`mincellwidth`, and the
+    extent of the buffer zone depend on the skin depth :math:`\delta`,
+    given in Equation :eq:`skindepth`, and the wavelength :math:`\lambda`,
+    given in Equation :eq:`wavelength`.
 
-    Same signature as get_origin_widths. See there for a description of the
-    parameters. Described here are only the differences.
+    By default, the buffer zone around the survey domain is one wavelength.
+    This means that the signal has to travel two wavelengths to get from the
+    end of the survey domain to the end of the computational domain and back.
+    This approach is quite conservative and on the safe side. You can reduce
+    the buffer thickness if you know what you are doing. There are three
+    parameters which influence the thickness of the buffer for a given
+    frequency: ``property``, which is used to calculate the skin depth and the
+    wavelength, ``lambda_factor`` (default is 1) which sets how many times the
+    wavelength is the thickness of the buffer (relative factor), and
+    ``max_buffer``, which is an absolute maximum for the buffer thickness.
 
-    properties:
-        - 1: all the same
-        - 2: source, buffer
-        - 3: source, negative, positive
-        - 4: source, xy-buffer, z-negative, z-positive
-        - 7: source, x-neg, x-pos, y-neg, y-pos, z-neg, z-pos
-    center: three values (list, tuple, array)
-    domain: tuple ([], [], [])
-    vector: tuple (None, None, [])
-    stretching: for all or tuple for each.
-    min_width_limits: for all or tuple for each.
-    min_width_pps: for all or tuple for each.
+
+    Parameters
+    ----------
+
+    frequency : float
+        Frequency (Hz) to calculate skin depth; both the minimum cell width and
+        the extent of the computational domain are a function of skin depth.
+
+    properties : float or list
+        Properties to calculate the skin depth. The properties can be either
+        resistivities, conductivities, or the logarithm (natural or base 10)
+        thereof. By default it assumes resistivities, but it can be changed
+        with the parameter ``mapping``.
+
+        A list of up to seven properties can be provided:
+
+        - 1: Same property for everything;
+        - 2: [center, buffer] for all directions;
+        - 3: [center, negative buffer, positive buffer] for all directions;
+        - 4: [center, xy-buffer, z-negative, z-positive];
+        - 7: [center, x-neg, x-pos, y-neg, y-pos, z-neg, z-pos].
+
+        The property at the center (source location) is used to define the
+        minimum cell width. The other properties are used to define the extent
+        of the buffer zone around the survey domain.
+
+    center : tuple
+        Tuple (or list, ndarray) of three floats for (x, y, z). The mesh is
+        centered around this point, which means that here is the smallest cell.
+        Usually this is the source location.
+
+    domain : tuple of lists, list, or None, optional
+        Contains the survey-domain limits. This domain should include all
+        source and receiver positions as well as any important feature of the
+        model. Format: ``[[xmin, xmax], [ymin, ymax], [zmin, zmax]]``.
+
+        It can be None, or individual lists can be None (e.g., ``[None, None,
+        [zmin, zmax]]``), in which case you have to provide a ``vector``, which
+        is then assumed to span exactly the domain. If only one list is
+        provided it is applied to all dimensions.
+
+    vector : tuple of three ndarrays, ndarray, or None, optional
+        Contains vectors of mesh-edges that should be used. If provided, the
+        vector MUST at least include all of the survey domain. If ``domain``
+        is not provided, it is defined as the minimum/maximum of the provided
+        vector. Format: ``[xvector, yvector, zvector]``.
+
+        It can be None, or individual ndarrays can be None (e.g., ``(xvector,
+        yvector, None)``), in which case you have to provide a ``domain``. If
+        only one ndarray is provided it is applied to all dimensions.
+
+    seasurface : float, optional
+        Air-sea interface. This has only to be set in the marine case, when the
+        mesh in z-direction is sought for (and the interface is not contained
+        in ``vector``). If set, it will ensure that at the sea surface is an
+        actual boundary. It has to be bigger then the lower limit of the survey
+        domain.
+        Default is None.
+
+    stretching : list or tuple of lists, optional
+        Maximum stretching factors in the form of ``[max Ds, max Dc]``: the
+        first value is the maximum stretching for the survey domain (default is
+        1.0), the second value is the maximum stretching for the buffer zone
+        (default is 1.5). If a list is provided the same is used for all three
+        dimension. Alternatively a tuple of three lists can be provided, ``(x,
+        y, z)``. Note that the first value has no influence on dimensions where
+        a ``vector`` is provided.
+
+    min_width_limits : float, list or None, optional
+        Passed through :func:`min_cell_width` as ``limits``.
+        A tuple of three can be provided for direction dependent values.
+        Note that this value has no influence on dimensions where a ``vector``
+        is provided.
+
+        Default is None.
+
+    min_width_pps : float or int, optional
+        Passed through :func:`min_cell_width` as ``pps``.
+        A tuple of three can be provided for direction dependent values.
+        Note that this value has no influence on dimensions where a ``vector``
+        is provided.
+
+        Default is 3.
+
+    lambda_factor : float, optional
+        The buffer is taken as one wavelength from the survey domain. This can
+        be regarded as quite conservative (but safe). The parameter
+        ``lambda_factor`` can be used to reduce (or increase) this factor.
+        Default is 1.0.
+
+    max_buffer : float, optional
+        Maximum buffer zone around survey domain.
+        Default is 100,000 (100 km), which is quite conservative.
+
+    mapping : str or map, optional
+        Defines what type the input ``property_{x;y;z}``-values correspond to.
+        By default, they represent resistivities (Ohm.m). The implemented types
+        are:
+
+        - 'Conductivity'; σ (S/m),
+        - 'LgConductivity'; log_10(σ),
+        - 'LnConductivity'; log_e(σ),
+        - 'Resistivity'; ρ (Ohm.m); Default,
+        - 'LgResistivity'; log_10(ρ),
+        - 'LnResistivity'; log_e(ρ).
+
+    cell_numbers : list, optional
+        List of possible numbers of cells. See :func:`good_mg_cell_nr`.
+        Default is ``good_mg_cell_nr(1000, 5, 3)``, which corresponds to
+        numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
+        512, 640, 768.
+
+    verb : int, optional
+        Verbosity, 0 or 1.
+        Default = 0.
+
+
+    Returns
+    -------
+    origin : float
+        Origin of the mesh.
+
+    widths : ndarray
+        Cell widths of mesh.
+
 
     """
     verb = kwargs.get('verb', 0)
@@ -254,12 +377,13 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     # Add optionally direction specific args.
     for name, value in zip(['domain', 'vector'], [domain, vector]):
-        if value is None:
-            kwargs[name] = value
-        else:
+        if (value is not None and len(value) == 3 and not
+                isinstance(value, np.ndarray)):
             xparams[name] = value[0]
             yparams[name] = value[1]
             zparams[name] = value[2]
+        else:
+            kwargs[name] = value
 
     # Add optionally direction specific kwargs.
     for name in ['stretching', 'min_width_limits', 'min_width_pps']:
@@ -289,127 +413,28 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
 def get_origin_widths(frequency, properties, center, domain=None, vector=None,
                       seasurface=None, **kwargs):
-    # TODO TEST & DOCUMENT
-    """TODO
+    r"""Return origin and cell widths for given parameters.
 
-    TODO TODO TODO
-    TODO TODO TODO
-    TODO TODO TODO
+    This function works in one dimension only, and is used by
+    :func:`construct_mesh` once in each direction. It is recommended to use
+    directly function :func:`construct_mesh`, which returns a
+    :class:`TensorMesh`.
 
-    DESCRIBE IT ALL WITH SKETCHES AND MATHEMATICAL FORMULAE.
+    All the parameters are described in :func:`construct_mesh`. Described here
+    are only the differences.
 
-    TODO TODO TODO
-    TODO TODO TODO
-    TODO TODO TODO
 
     Parameters
     ----------
 
-    frequency : float
-        Frequency (Hz), used to define the minimum cell width and the extent
-        of the computational domain through the skin depth.
-
-    properties : float or list
-        Properties to compute the skin depth. The properties can be either
-        resistivities, conductivities, or the logarithm (natural or base 10)
-        thereof. By default it assumes resistivities, but it can be changed
-        with the parameter ``mapping``.
-
-        Up to three properties can be provided:
-
-        - float: Same property for everything;
-        - [center, boundaries];
-        - [center, negative boundary, positive boundary].
-
-        The property at the center (source location) is used to define the
-        minimum cell width. The other properties to define the extent of the
-        computational domain.
-
-    center : float
-        The mesh is centered around this point, which means that here is the
-        smallest cell. Usually this is the source location.
-
-    domain : list, optional
-        Contains the survey-domain limits [min, max]. This domain should
-        include all source and receiver positions as well as any important
-        feature of the model.
-
-        It can be None, in which case you have to provide a ``vector``.
-
-    vector : ndarray, optional
-        A vector of mesh-edges that should be incorporated. If provided, the
-        vector MUST at least include all of the survey domain. If ``domain``
-        is not provided, it is defined as the minimum/maximum of the provided
-        vector.
-
-    seasurface : float, optional
-        Air-sea interface. This has only to be set in the marine case, when
-        the mesh in z-direction is sought for (and the interface is not
-        contained in ``vector``). If set, it will ensure that at the sea
-        surface is an actual boundary. It has to be bigger then the lower limit
-        of the survey domain.
-        Default is None.
-
-    stretching : list, optional
-        Maximum stretching factor. The first value is the maximum stretching of
-        the survey domain, the second value is the maximum stretching for the
-        buffer zone.
-
-        Default = [1.0, 1.5], hence no stretching within the survey domain and
-        a maximum stretching of 1.5 in the buffer zone.
-
-    cell_numbers : list, optional
-        List of possible numbers of cells. See :func:`good_mg_cell_nr`.
-        Default is ``good_mg_cell_nr(1000, 5, 3)``, which corresponds to
-        [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512,
-         640, 768].
-
-    min_width_limits : float, list or None, optional
-        Minimum cell width restriction:
-
-        - None : No restriction;
-        - float : Fixed to this value, ignoring skin depth and
-          ``min_width_pps``.
-        - list [min, max] : Lower and upper bounds.
-
-        Default is None.
-
-    min_width_pps : float or int, optional
-        Points per skin depth; minimum cell width is computed via
-        `dmin = skin-depth/pps`.
-        Default = 3.
-
-    lambda_factor : float, optional
-        The buffer is taken as one wavelength form the survey domain. This can
-        be regarded as quite conservative (but safe). The parameter
-        ``lambda_factor`` can be used to reduce (or enhance) this factor.
-        Default is 1.0.
-
-    max_buffer : float, optional
-        Maximum buffer zone around survey domain.
-        Default is 100,000 (100 km), which is quite conservative.
-
-    mapping : str, optional
-        Defines what type the input ``properties`-values correspond to. By
-        default, they represent resistivities (Ohm.m). The implemented types
-        are:
-
-        - 'Conductivity'; σ (S/m),
-        - 'LgConductivity'; log_10(σ),
-        - 'LnConductivity'; log_e(σ),
-        - 'Resistivity'; ρ (Ohm.m); Default,
-        - 'LgResistivity'; log_10(ρ),
-        - 'LnResistivity'; log_e(ρ).
-
-    verb : int, optional
-        Verbosity, 0 or 1.
-        Default = 0.
+    All : description
+        All parameters are described in :func:`construct_mesh`. The only
+        difference is that here only variables for one direction are accepted.
 
     raise_error : bool, optional
         If True, an error is raised if no suitable grid is found. Otherwise it
         just prints a message and returns None's.
         Default is True.
-
 
     Returns
     -------
@@ -420,17 +445,16 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         Cell widths of mesh.
 
     """
-
     # Get all kwargs.
     stretching = kwargs.pop('stretching', [1.0, 1.5])
-    cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
     min_width_limits = kwargs.pop('min_width_limits', None)
     min_width_pps = kwargs.pop('min_width_pps', 3)
-    max_buffer = kwargs.pop('max_buffer', 100000)
     lambda_factor = kwargs.pop('lambda_factor', 1.0)
+    max_buffer = kwargs.pop('max_buffer', 100000)
     pmap = kwargs.pop('mapping', 'Resistivity')
-    verb = kwargs.pop('verb', 1)
+    cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
     raise_error = kwargs.pop('raise_error', True)
+    verb = kwargs.pop('verb', 1)
 
     # Ensure no kwargs left.
     if kwargs:
@@ -621,11 +645,12 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
             x0, hx = None, None
 
     # Check max stretching.
-    sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
-    sa_limit = min(1.5, stretching[0]+0.25)
-    if sa_adj > sa_limit:
-        print(f"* WARNING :: Stretching in DS > {sa_limit}.\nThe reason is "
-              "usually the interplay of center/domain/seasurface.")
+    if finished:
+        sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
+        sa_limit = min(1.5, stretching[0]+0.25)
+        if sa_adj > sa_limit:
+            print(f"* WARNING :: Stretching in DS >> {sa}.\nThe reason "
+                  "is usually the interplay of center/domain/seasurface.")
 
     # Print info about final grid.
     if verb > 1:
@@ -702,7 +727,42 @@ def good_mg_cell_nr(max_nr=1000, max_prime=5, min_div=3):
 
 
 def skin_depth(frequency, conductivity, mu=mu_0, precision=3):
-    # TODO TEST & DOCUMENT
+    r"""Return skin depth for provided frequency and conductivity.
+
+    The skin depth :math:`\delta` (m) is given by
+
+    .. math::
+        :label: skindepth
+
+        \delta = \frac{2}{\omega\sigma\mu}\ ,
+
+    where :math:`\omega=2\pi f` is angular frequency of frequency :math:`f`
+    (Hz), :math:`\sigma` is conductivity (S/m), and :math:`\mu` is magnetic
+    permeability (H/m).
+
+
+    Parameters
+    ----------
+    frequency : float
+        Frequency (Hz).
+
+    conductivity : float
+        Conductivity (S/m).
+
+    mu : float, optional
+        Magnetic permeability (H/m); default is :math:`\mu_0`.
+
+    precision : int, optional
+        Precision of the return skin depth.
+        Default is 3, hence millimeters.
+
+
+    Returns
+    -------
+    skindepth : float
+        Skin depth (m).
+
+    """
     skind = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu)
     if frequency < 0:  # For Laplace-domain computations.
         skind /= np.sqrt(2*np.pi)
@@ -710,15 +770,91 @@ def skin_depth(frequency, conductivity, mu=mu_0, precision=3):
 
 
 def wavelength(frequency, conductivity, mu=mu_0, precision=3):
-    # TODO TEST & DOCUMENT
-    return np.round(2*np.pi*skin_depth(frequency, conductivity, mu), precision)
+    r"""Return the wavelength for provided frequency and conductivity.
+
+    The wavelength :math:`\lambda` (m) is given by
+
+    .. math::
+        :label: wavelength
+
+        \lambda = 2\pi\delta(f, \sigma)\ ,
+
+    where the skin depth :math:`\delta` is given in Equation :eq:`skindepth`.
+
+
+    Parameters
+    ----------
+    frequency : float
+        Frequency (Hz).
+
+    conductivity : float
+        Conductivity (S/m).
+
+    mu : float, optional
+        Magnetic permeability (H/m); default is :math:`\mu_0`.
+
+    precision : int, optional
+        Precision of the return skin depth.
+        Default is 3, hence millimeters.
+
+
+    Returns
+    -------
+    skindepth : float
+        Skin depth (m).
+
+    """
+    sd = skin_depth(frequency, conductivity, mu, precision+2)
+    return np.round(2*np.pi*sd, precision)
 
 
 def min_cell_width(frequency, conductivity, pps=3, limits=None):
-    # TODO TEST & DOCUMENT
+    r"""Return minimum cell width, frequency and conductivity dependent.
+
+    The minimum cell width is given by
+
+    .. math::
+        :label: mincellwidth
+
+        \Delta_\text{min} = \frac{\delta(f, \sigma)}{\text{pps}}\ ,
+
+    where its value restricted by restricted by ``limits``. The skin depth
+    :math:`\delta` is given in Equation :eq:`skindepth`.
+
+
+    Parameters
+    ----------
+    frequency : float
+        Frequency (Hz).
+
+    conductivity : float
+        Conductivity (S/m).
+
+    pps : int
+        Points per skin depth.
+
+    limits : None, float, or list of two floats
+        Limits on minimum width:
+
+        - None: No limits.
+        - float: Returns limits as dmin.
+        - [min, max]: dmin is limited to this range.
+
+
+    Returns
+    -------
+    dmin : float
+        Minimum cell width (m).
+
+    """
+    # Calculate skin depth and divide by pps.
     dmin = skin_depth(frequency, conductivity, precision=0)/pps
-    if limits is not None:  # Respect user input.
+
+    # Respect user limits.
+    if limits is not None:
+
         limits = np.array(limits, ndmin=1)
+
         if limits.size == 1:
             dmin = limits
         else:
