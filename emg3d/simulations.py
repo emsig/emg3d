@@ -45,8 +45,14 @@ __all__ = ['Simulation']
 class Simulation:
     """Create a simulation for a given survey on a given model.
 
-    The computational grid(s) can be either the same as the provided model
-    grid, or automatic gridding can be used.
+    A simulation can be used to compute responses for an entire survey, hence
+    for an arbitrary amount of sources, receivers, and frequencies. The
+    responses can be computed in parallel over sources and frequencies. It can
+    also be used to compute the misfit with the data and to compute the
+    gradient of the misfit function.
+
+    The computational grid(s) can either be provided, or automatic gridding can
+    be used.
 
     .. note::
 
@@ -54,8 +60,6 @@ class Simulation:
 
         - `survey.fixed`: must be `False`;
         - sources and receivers must be electric;
-        - Anything related to `optimization` is considered experimental/alpha,
-          and might change in the future.
 
 
     Parameters
@@ -86,10 +90,11 @@ class Simulation:
         - 'frequency': Frequency-dependent grids.
         - 'source': Source-dependent grids.
         - 'both': Frequency- and source-dependent grids.
-        - TensorMesh: The provided TensorMesh is used for all sources and
-          frequencies.
-        - dict: The dict must have the form `dict[source][frequency]`,
-          containing a TensorMesh for each source-frequency pair.
+        - 'provided': Same as 'single', but instead of automatically generate
+          the mesh it has to be provided in ``gridding_opts``.
+        - 'dict': Same as 'both', but instead of automatically generate the
+          meshes they have to be provided as a ``dict[source][frequency]``
+          in ``gridding_opts``.
 
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
@@ -107,10 +112,16 @@ class Simulation:
         many cases, but they are the most robust combination at which you can
         throw most things.
 
-    gridding_opts : dict, optional
-        TODO
+    gridding_opts : optional
+        Input format depends on ``gridding``:
+        - 'same': Nothing, ``gridding_opts`` is not permitted.
+        - 'single', 'frequency', 'source', 'both': Described below.
+        - 'provided': A :class:`meshes.TensorMesh` mesh.
+        - 'dict': Dictionary of the format ``dict[source][frequency]``
+          containing a :class:`meshes.TensorMesh` mesh for each
+          source-frequency pair.
 
-        Only accepted if `gridding!='same'`.
+        # TODO TODO TODO describe paramteres.
 
     verb : int; optional
         Level of verbosity. Default is 0.
@@ -139,9 +150,6 @@ class Simulation:
 
         # Get gridding options.
         self.gridding_opts = kwargs.pop('gridding_opts', {})
-        # Put back if 'same', to raise error if provided.
-        if self.gridding == 'same' and self.gridding_opts:
-            kwargs['gridding_opts'] = self.gridding_opts
 
         # Get solver options.
         self.solver_opts = {
@@ -182,8 +190,31 @@ class Simulation:
         self._gradient = None
         self._misfit = None
 
-        # Initiate automatic gridding.
-        self._initiate_gridding()
+        # Store original input nCz.
+        self._input_nCz = self.grid.nCz
+
+        # Store gridding description.
+        self._gridding_descr = {
+                'same': 'Same grid as for model',
+                'single': 'A single grid for all sources and frequencies',
+                'frequency': 'Frequency-dependent grids',
+                'source': 'Source-dependent grids',
+                'both': 'Frequency- and source-dependent grids',
+                'provided': 'A single, provided grid all sources/frequencies',
+                'dict': 'Provided dict of frequency-/source-dependent grids',
+                }[self.gridding]
+
+        # Check gridding_opts depending on gridding and act upon.
+        if self.gridding == 'dict':
+            self._dict_grid = self.gridding_opts
+        elif self.gridding == 'provided':
+            self._grid_single = self.gridding_opts
+        elif self.gridding == 'same':
+            if self.gridding_opts:
+                msg = "`gridding_opts` is not permitted if `gridding='same'`"
+                raise TypeError(msg)
+        else:
+            self._initiate_automatic_gridding()
 
         # Initiate synthetic data with NaN's.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
@@ -957,34 +988,11 @@ class Simulation:
 
         return ResidualField
 
-    def _initiate_gridding(self):
+    def _initiate_automatic_gridding(self):
         # TODO TODO
-
-        # Store original input nCz
-        self._input_nCz = self.grid.nCz
 
         # Expand model by water and air if required.
         expand = self.gridding_opts.pop('expand', None)
-
-        # Store gridding description (for reprs).
-        if isinstance(self.gridding, str):
-            pass
-        elif isinstance(self.gridding, dict):
-            self._dict_grid = self.gridding
-            self.gridding = 'dict'
-        else:
-            self._grid_single = self.gridding
-            self.gridding = 'provided'
-
-        self._gridding_descr = {
-                'same': 'Same grid as for model',
-                'single': 'A single grid for all sources and frequencies',
-                'frequency': 'Frequency-dependent grids',
-                'source': 'Source-dependent grids',
-                'both': 'Frequency- and source-dependent grids',
-                'provided': 'A single, provided grid all sources/frequencies',
-                'dict': 'Provided dict of frequency-/source-dependent grids',
-                }[self.gridding]
 
         # gridding_opts is the original input (without `expand`).
         # _gridding_input is the dict with defaults added.

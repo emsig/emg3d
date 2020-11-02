@@ -122,7 +122,8 @@ class TestSimulation():
 
         # Ensure it works normally
         sim = simulations.Simulation(
-                'Test2', self.survey, self.grid, self.model, gridding=grids)
+                'Test2', self.survey, self.grid, self.model, gridding='dict',
+                gridding_opts=grids)
         sim.get_model('Tx1', 1.0)
 
     def test_reprs(self):
@@ -193,7 +194,7 @@ class TestSimulation():
                 'TestX', self.survey, self.grid, self.model, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
-                gridding=newgrid)
+                gridding='provided', gridding_opts=newgrid)
 
         grad = simulation.gradient
 
