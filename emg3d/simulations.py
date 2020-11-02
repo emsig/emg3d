@@ -138,10 +138,10 @@ class Simulation:
         self.verb = kwargs.pop('verb', 0)
 
         # Get gridding options.
-        if self.gridding != 'same':
-            self.gridding_opts = kwargs.pop('gridding_opts', {})
-        else:  # Not popping, to raise error if provided.
-            self.gridding_opts = {}
+        self.gridding_opts = kwargs.pop('gridding_opts', {})
+        # Put back if 'same', to raise error if provided.
+        if self.gridding == 'same' and self.gridding_opts:
+            kwargs['gridding_opts'] = self.gridding_opts
 
         # Get solver options.
         self.solver_opts = {
@@ -500,7 +500,8 @@ class Simulation:
             if not hasattr(self, '_grid_single'):
 
                 # Get grid and store it.
-                self._grid_single = meshes.construct_mesh(**inp)
+                self._grid_single = meshes.construct_mesh(
+                        **self._gridding_input)
 
             # Store link to grid.
             self._dict_grid[source][freq] = self._grid_single
@@ -1038,36 +1039,41 @@ class Simulation:
                 m = getattr(maps, 'Map'+m)()
 
             # Mean of all values (x, y, z).
-            def get_mean(index):
+            def get_mean(ix, iy, iz):
                 """Get mean; currently based on the averaged property."""
 
                 # Get volume factor.
-                vfact = index(self.grid.vol.reshape(self.grid.vnC, order='F'))
-                vfact = vfact.ravel()/vfact.sum()
+                vfact = self.grid.vol.reshape(self.grid.vnC, order='F')
+                vfact = vfact[ix, iy, iz].ravel()/vfact.sum()
 
                 # Collect all x (y, z) values.
-                data = np.array([
-                    vfact*index(getattr(self.model, 'property_'+p)).ravel()
-                    for p in ['x', 'y', 'z'] if
-                    getattr(self.model, '_property_'+p) is not None])
+                data = np.array([])
+                for p in ['x', 'y', 'z']:
+                    prop = getattr(self.model, 'property_'+p)
+                    if prop is None:
+                        continue
+                    elif prop.ndim == 1:
+                        data = np.r_[data, prop*vfact]
+                    else:
+                        data = np.r_[vfact*prop[ix, iy, iz].ravel()]
 
-                # Return mean, no a log10-scale.
+                # Return mean, on a log10-scale.
                 return self.model.map.forward(10**np.mean(np.log10(
                     self.model.map.backward(data))))
 
             # Buffer properties.
-            xneg = get_mean(lambda x: x[0, :, :])
-            xpos = get_mean(lambda x: x[-1, :, :])
-            yneg = get_mean(lambda x: x[:, 0, :])
-            ypos = get_mean(lambda x: x[:, -1, :])
-            zneg = get_mean(lambda x: x[:, :, 0])
-            zpos = get_mean(lambda x: x[:, :, -1])
+            xneg = get_mean(0, slice(None), slice(None))
+            xpos = get_mean(-1, slice(None), slice(None))
+            yneg = get_mean(slice(None), 0, slice(None))
+            ypos = get_mean(slice(None), -1, slice(None))
+            zneg = get_mean(slice(None), slice(None), 0)
+            zpos = get_mean(slice(None), slice(None), -1)
 
             # Source property.
             ix = np.argmin(abs(self.grid.vectorNx - ginput['center'][0]))
             iy = np.argmin(abs(self.grid.vectorNy - ginput['center'][1]))
             iz = np.argmin(abs(self.grid.vectorNz - ginput['center'][2]))
-            source = get_mean(lambda x: x[ix, iy, iz])
+            source = get_mean(ix, iy, iz)
 
             properties = [source, xneg, xpos, yneg, ypos, zneg, zpos]
 
