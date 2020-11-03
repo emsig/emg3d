@@ -12,7 +12,7 @@ from emg3d import meshes, models, surveys, simulations, fields, solver
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-class TestSimulation():
+class TestSimulationSame():
     if xarray is not None:
         # Create a simple survey
         sources = (0, [1000, 3000, 5000], -950, 0, 0)
@@ -113,7 +113,7 @@ class TestSimulation():
 
         tsurvey.receivers['Rx01'].electric = False
         tsurvey.sources['Tx1'].electric = True
-        with pytest.raises(NotImplementedError, match="or magnetic receivers"):
+        with pytest.raises(NotImplementedError, match="sources and receivers"):
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
 
@@ -241,3 +241,44 @@ def test_source_strength():
 
     data = survey.data['synthetic'].values
     assert_allclose(data[0, :, :]*strength, data[1, :, :])
+
+
+def test_expand_model():
+    grid = meshes.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))
+    model = models.Model(grid, 1, np.ones(grid.vnC)*2, mu_r=3, epsilon_r=5)
+
+    og, om = simulations._expand_model(grid, model, [2, 3], 5)
+
+    # Grid.
+    assert_allclose(grid.vectorNz, og.vectorNz[:-2])
+    assert og.vectorNz[-2] == 5
+    assert og.vectorNz[-1] == 105
+
+    # Property x (from float).
+    assert_allclose(om.property_x[:, :, :-2], 1)
+    assert_allclose(om.property_x[:, :, -2], 2)
+    assert_allclose(om.property_x[:, :, -1], 3)
+
+    # Property y (from vnC).
+    assert_allclose(om.property_y[:, :, :-2], model.property_y)
+    assert_allclose(om.property_y[:, :, -2], 2)
+    assert_allclose(om.property_y[:, :, -1], 3)
+
+    # Property y (from property_x).
+    assert_allclose(om.property_z[:, :, :-2], 1)
+    assert_allclose(om.property_z[:, :, -2], 2)
+    assert_allclose(om.property_z[:, :, -1], 3)
+
+    # Property mu_r (from float).
+    assert_allclose(om.mu_r[:, :, :-2], 3)
+    assert_allclose(om.mu_r[:, :, -2], 1)
+    assert_allclose(om.mu_r[:, :, -1], 1)
+
+    # Property epsilon_r (from float).
+    assert_allclose(om.epsilon_r[:, :, :-2], 5)
+    assert_allclose(om.epsilon_r[:, :, -2], 1)
+    assert_allclose(om.epsilon_r[:, :, -1], 1)
+
+
+def test_get_gridding_opts():
+    pass

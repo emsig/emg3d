@@ -339,8 +339,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         512, 640, 768.
 
     verb : int, optional
-        Verbosity, 0 or 1.
-        Default = 0.
+        Verbosity, 0-3.
+        Default = 1 (Warnings only).
 
 
     Returns
@@ -353,7 +353,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
 
     """
-    verb = kwargs.get('verb', 0)
+    verb = kwargs.get('verb', 1)
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
