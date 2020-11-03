@@ -215,6 +215,10 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     given in Equation :eq:`skindepth`, and the wavelength :math:`\lambda`,
     given in Equation :eq:`wavelength`.
 
+    .. todo::
+
+       Add figure.
+
     By default, the buffer zone around the survey domain is one wavelength.
     This means that the signal has to travel two wavelengths to get from the
     end of the survey domain to the end of the computational domain and back.
@@ -339,8 +343,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         512, 640, 768.
 
     verb : int, optional
-        Verbosity, 0-3.
-        Default = 1 (Warnings only).
+        Verbosity, -1 (error); 0 (warning), 1 (info), 2 (verbose).
+        Default = 0 (Warnings only).
 
 
     Returns
@@ -353,7 +357,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
 
     """
-    verb = kwargs.get('verb', 1)
+    verb = kwargs.get('verb', 0)
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
@@ -397,13 +401,13 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                 kwargs[name] = value
 
     # Get origins and widths in all directions.
-    if verb > 1:
+    if verb > 0:
         print("         == GRIDDING IN X ==")
     x0, hx = get_origin_widths(**kwargs, **xparams)
-    if verb > 1:
+    if verb > 0:
         print("\n         == GRIDDING IN Y ==")
     y0, hy = get_origin_widths(**kwargs, **yparams)
-    if verb > 1:
+    if verb > 0:
         print("\n         == GRIDDING IN Z ==")
     z0, hz = get_origin_widths(**kwargs, **zparams)
 
@@ -454,7 +458,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     pmap = kwargs.pop('mapping', 'Resistivity')
     cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
     raise_error = kwargs.pop('raise_error', True)
-    verb = kwargs.pop('verb', 1)
+    verb = kwargs.pop('verb', 0)
 
     # Ensure no kwargs left.
     if kwargs:
@@ -471,8 +475,8 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     # Get skin depth.
     skind = skin_depth(frequency, cond_arr, precision=0)
-    if verb > 1:
-        if verb > 2:
+    if verb > 0:
+        if verb > 1:
             end = ""
         else:
             end = "\n"
@@ -483,7 +487,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
             print(f" / {skind[1]:.0f} / {skind[2]:.0f}", end=end)
         else:
             print(end=end)
-        if verb > 2:
+        if verb > 1:
             print("  [corresponding to `properties`]")
 
     # Minimum cell width.
@@ -503,7 +507,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
                 raise ValueError(
                         "Provided vector MUST at least include all of the "
                         "survey domain.")
-    if verb > 1:
+    if verb > 0:
         print(f"Survey domain DS    [m] : {domain[0]:.0f} - {domain[1]:.0f}")
 
     # Seasurface related checks.
@@ -526,7 +530,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     wlength = lambda_factor*wavelength(frequency, cond_arr[1:], precision=0)
     dbuffer = np.min([wlength, np.ones(2)*max_buffer], axis=0)
     comp_domain = np.array([domain[0]-dbuffer[0], domain[1]+dbuffer[1]])
-    if verb > 1:
+    if verb > 0:
         print(f"Comp. domain DC     [m] : {comp_domain[0]:.0f} - "
               f"{comp_domain[1]:.0f}")
 
@@ -638,9 +642,9 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         if raise_error:
             raise RuntimeError(msg)
         else:
-            if verb > 1:
+            if verb > 0:
                 print()
-                verb = 1
+                verb = 0
             print(f"* ERROR   :: {msg}")
             x0, hx = None, None
 
@@ -653,19 +657,19 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
                   "is usually the interplay of center/domain/seasurface.")
 
     # Print info about final grid.
-    if verb > 1:
+    if verb > 0:
         print(f"Final extent        [m] : {x0:.0f} - {x0+np.sum(hx):.0f}")
         print(f"Cell widths         [m] : "
               f"{min(hxo):.0f} / {max(hxo):.0f} / {max(hx):.0f}", end=end)
-        if verb > 2:
+        if verb > 1:
             print("  [min(DS) / max(DS) / max(DC)]")
         print(f"Number of cells         : {nx} ({hxo.size} / "
               f"{nx-hxo.size-nx_remain2} / {nx_remain2})", end=end)
-        if verb > 2:
+        if verb > 1:
             print("  [Total (DS/DC/remain)]")
         print(f"Max stretching          : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}",
               end=end)
-        if verb > 2:
+        if verb > 1:
             print("  [DS (seasurface) / DC]")
 
     return x0, hx

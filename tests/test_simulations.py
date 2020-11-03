@@ -8,7 +8,7 @@ try:
 except ImportError:
     xarray = None
 
-from emg3d import meshes, models, surveys, simulations, fields, solver
+from emg3d import meshes, models, surveys, simulations, fields, solver, io
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -117,15 +117,6 @@ class TestSimulationSame():
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
 
-        # Provide grids
-        grids = self.simulation._dict_grid.copy()
-
-        # Ensure it works normally
-        sim = simulations.Simulation(
-                'Test2', self.survey, self.grid, self.model, gridding='dict',
-                gridding_opts=grids)
-        sim.get_model('Tx1', 1.0)
-
     def test_reprs(self):
         test = self.simulation.__repr__()
 
@@ -184,6 +175,74 @@ class TestSimulationSame():
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             self.simulation.clean('nothing')
 
+    def test_synthetic(self):
+        sim = self.simulation.copy()
+
+        # Switch off noise_floor, relative_error, min_offset => No noise.
+        sim.survey.noise_floor = None
+        sim.survey.relative_error = None
+        sim._dict_efield = sim._dict_initiate  # Reset
+        sim.compute(observed=True)
+        assert_allclose(sim.data.synthetic, sim.data.observed)
+        assert sim.survey.size == sim.data.observed.size
+
+
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+class TestSimulationOthers():
+    if xarray is not None:
+        # Create a simple survey
+        sources = (0, [1000, 3000, 5000], -950, 0, 0)
+        receivers = (np.arange(12)*500, 0, -1000, 0, 0)
+        frequencies = (1.0, 2.0)
+
+        survey = surveys.Survey('Test', sources, receivers, frequencies,
+                                noise_floor=1e-15, relative_error=0.05)
+
+        # Create a simple grid and model
+        grid = meshes.TensorMesh(
+                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
+                np.array([-1250, -1250, -2250]))
+        model = models.Model(grid, 1)
+
+        # Create a simulation, compute all fields.
+        simulation = simulations.Simulation(
+                'Test1', survey, grid, model, max_workers=1,
+                solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
+                             'linerelaxation': False, 'semicoarsening': False},
+                gridding='same')
+
+        # Do first one single and then all together.
+        simulation.get_efield('Tx0', 2.0)
+        simulation.compute(observed=True)
+
+    def test_dicts_provided(self):
+        grids = self.simulation._dict_grid.copy()
+
+        # dict
+        sim1 = simulations.Simulation(
+                'Test2', self.survey, self.grid, self.model, gridding='dict',
+                gridding_opts=grids)
+        m1 = sim1.get_model('Tx1', 1.0)
+        g1 = sim1.get_grid('Tx1', 1.0)
+
+        # provide
+        sim2 = simulations.Simulation(
+                'Test2', self.survey, self.grid, self.model,
+                gridding='input', gridding_opts=grids['Tx1'][1.0])
+        m2 = sim2.get_model('Tx1', 1.0)
+        g2 = sim2.get_grid('Tx1', 1.0)
+
+        assert m1 == m2
+        assert g1 == g2
+
+    def test_errors(self):
+
+        # gridding='same' with gridding_opts.
+        with pytest.raises(TypeError, match="`gridding_opts` is not permitt"):
+            simulations.Simulation(
+                    'Test', self.survey, self.grid, self.model,
+                    gridding='same', gridding_opts={'bummer': True})
+
     def test_gradient(self):
         # Create another mesh, so there will be a difference.
         newgrid = meshes.TensorMesh(
@@ -194,7 +253,7 @@ class TestSimulationSame():
                 'TestX', self.survey, self.grid, self.model, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
-                gridding='provided', gridding_opts=newgrid)
+                gridding='input', gridding_opts=newgrid)
 
         grad = simulation.gradient
 
@@ -210,6 +269,13 @@ class TestSimulationSame():
         sim.compute(observed=True)
         assert_allclose(sim.data.synthetic, sim.data.observed)
         assert sim.survey.size == sim.data.observed.size
+
+    def test_gridding(self):
+        pass
+        # (1) expand
+        # (2) to/from_dict: 'input', 'dict', '!=same'
+        # (3) get_grid
+        # (4) get_model
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -243,11 +309,11 @@ def test_source_strength():
     assert_allclose(data[0, :, :]*strength, data[1, :, :])
 
 
-def test_expand_model():
+def test_expand_grid_model():
     grid = meshes.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))
     model = models.Model(grid, 1, np.ones(grid.vnC)*2, mu_r=3, epsilon_r=5)
 
-    og, om = simulations._expand_model(grid, model, [2, 3], 5)
+    og, om = simulations.expand_grid_model(grid, model, [2, 3], 5)
 
     # Grid.
     assert_allclose(grid.vectorNz, og.vectorNz[:-2])
@@ -280,5 +346,97 @@ def test_expand_model():
     assert_allclose(om.epsilon_r[:, :, -1], 1)
 
 
-def test_get_gridding_opts():
-    pass
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+class TestEstimateGriddingOpts():
+    if xarray is not None:
+        # Create a simple survey
+        sources = (0, [1000, 3000, 5000], -950, 0, 0)
+        receivers = (np.arange(11)*500, 2000, -1000, 0, 0)
+        frequencies = (0.1, 10.0)
+
+        survey = surveys.Survey('Test', sources, receivers, frequencies,
+                                noise_floor=1e-15, relative_error=0.05)
+
+        # Create a simple grid and model
+        grid = meshes.TensorMesh(
+                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
+                np.array([-1250, -1250, -2250]))
+        model = models.Model(grid, 0.1, np.ones(grid.vnC)*10)
+        model.property_y[5, 8, 3] = 100000  # Cell at source center
+
+    def test_empty_dict(self):
+        gdict = simulations.estimate_gridding_opts(
+                {}, self.grid, self.model, self.survey)
+
+        assert gdict['frequency'] == 1.0
+        assert gdict['mapping'].name == self.model.map.name
+        assert_allclose(gdict['center'], (0, 3000, -950))
+        assert_allclose(gdict['domain'][0], (-250, 5250))
+        assert_allclose(gdict['domain'][1], (800, 5200))
+        assert_allclose(gdict['domain'][2], (-3432.5, -677.5))
+        assert_allclose(gdict['properties'], [100, 1, 1, 1, 1, 1, 1])
+
+    def test_mapping_vector(self):
+        gridding_opts = {
+            'mapping': "LgConductivity",
+            'vector': 'xZ',
+            }
+        gdict = simulations.estimate_gridding_opts(
+                gridding_opts, self.grid, self.model, self.survey)
+
+        assert_allclose(
+                gdict['properties'],
+                np.log10(1/np.array([100, 1, 1, 1, 1, 1, 1])), atol=1e-15)
+        assert_allclose(gdict['vector'][0], self.grid.vectorNx)
+        assert gdict['vector'][1] is None
+        assert_allclose(gdict['vector'][2], self.grid.vectorNz)
+
+    def test_pass_along(self):
+        gridding_opts = {
+            'vector': (None, 1, None),
+            'stretching': [1.2, 1.3],
+            'seasurface': -500,
+            'cell_numbers': [10, 20, 30],
+            'lambda_factor': 0.8,
+            'max_buffer': 10000,
+            'min_width_limits': [20, 40],
+            'min_width_pps': 4,
+            'verb': 3,
+            }
+
+        gdict = simulations.estimate_gridding_opts(
+                gridding_opts.copy(), self.grid, self.model, self.survey)
+
+        # Check that all parameters passed unchanged.
+        gdict2 = {k: gdict[k] for k, _ in gridding_opts.items()}
+        assert io._compare_dicts(gdict2, gridding_opts)
+
+    def test_factor(self):
+
+        sources = (0, 3000, -950, 0, 0)
+        receivers = (0, 3000, -1000, 0, 0)
+
+        # Adjusted x-domain.
+        survey = surveys.Survey('Test', self.sources, receivers,
+                                self.frequencies, noise_floor=1e-15,
+                                relative_error=0.05)
+
+        gdict = simulations.estimate_gridding_opts(
+                    {}, self.grid, self.model, survey)
+
+        assert_allclose(gdict['domain'][0], (-733, 733))
+
+        # Adjusted x-domain.
+        survey = surveys.Survey('Test', sources, self.receivers,
+                                self.frequencies, noise_floor=1e-15,
+                                relative_error=0.05)
+
+        gdict = simulations.estimate_gridding_opts(
+                    {}, self.grid, self.model, survey)
+
+        assert_allclose(gdict['domain'][1], (1583, 3417))
+
+    def test_error(self):
+        with pytest.raises(TypeError, match='Unexpected gridding_opts'):
+            _ = simulations.estimate_gridding_opts(
+                    {'what': True}, self.grid, self.model, self.survey)

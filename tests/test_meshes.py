@@ -328,7 +328,7 @@ class TestGetOriginWidths:
 
         out = meshes.get_origin_widths(
                 1, 1, 0, [-100, 100], cell_numbers=[1, ], raise_error=False,
-                verb=2)
+                verb=1)
         outstr, _ = capsys.readouterr()
 
         assert out[0] is None
@@ -338,13 +338,13 @@ class TestGetOriginWidths:
         # Stretching warning.
         meshes.get_origin_widths(
                 1/np.pi, 9*mu_0, 0.0, [-1, 2], stretching=[1, 1],
-                seasurface=1.2, verb=3)
+                seasurface=1.2, verb=2)
         out, _ = capsys.readouterr()
         assert "* WARNING :: Stretching in DS >> 1.0.\nThe reason " in out
 
     def test_basics(self, capsys):
         x0, hx = meshes.get_origin_widths(
-                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=3)
+                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=2)
         out, _ = capsys.readouterr()
 
         assert x0 == -20
@@ -360,14 +360,14 @@ class TestGetOriginWidths:
 
         _ = meshes.get_origin_widths(
                 1/np.pi, [8.9*mu_0, 9*mu_0], 0.0, [-1, 1],
-                stretching=[1, 1], verb=3)
+                stretching=[1, 1], verb=2)
         out, _ = capsys.readouterr()
 
         assert "3 / 3  [corresponding to `properties`]" in out
 
         _ = meshes.get_origin_widths(
                 1/np.pi, [8.9*mu_0, 9*mu_0, 9.1*mu_0], 0.0, [-1, 1],
-                stretching=[1, 1], verb=3)
+                stretching=[1, 1], verb=2)
         out, _ = capsys.readouterr()
 
         assert "3 / 3 / 3  [corresponding to `properties`]" in out
@@ -405,7 +405,7 @@ class TestGetOriginWidths:
             max_buffer=10000,
             mapping='Conductivity',
             cell_numbers=[20, 40, 80, 160],
-            verb=2,
+            verb=1,
             raise_error=False,
             )
 
@@ -423,7 +423,7 @@ class TestGetOriginWidths:
 class TestConstructMesh:
 
     def test_verb(self, capsys):
-        _ = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=2)
+        _ = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=1)
         out, _ = capsys.readouterr()
         assert "         == GRIDDING IN X ==" in out
 

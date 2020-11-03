@@ -52,7 +52,8 @@ class Simulation:
     gradient of the misfit function.
 
     The computational grid(s) can either be provided, or automatic gridding can
-    be used.
+    be used; see the description of the parameters ``gridding`` and
+    ``gridding_opts`` for more details.
 
     .. note::
 
@@ -77,11 +78,7 @@ class Simulation:
     model : :class:`emg3d.models.Model`
         The model. See :class:`emg3d.models.Model`.
 
-    max_workers : int
-        The maximum number of processes that can be used to execute the
-        given calls. Default is 4.
-
-    gridding : str, TensorMesh, or dict
+    gridding : str, optional
         Method how the computational grids are computed. Default is 'single'.
         The different methods are:
 
@@ -90,11 +87,43 @@ class Simulation:
         - 'frequency': Frequency-dependent grids.
         - 'source': Source-dependent grids.
         - 'both': Frequency- and source-dependent grids.
-        - 'provided': Same as 'single', but instead of automatically generate
-          the mesh it has to be provided in ``gridding_opts``.
+        - 'input': Same as 'single', but instead of automatically generate
+          the mesh it has to be provided ``gridding_opts``.
         - 'dict': Same as 'both', but instead of automatically generate the
           meshes they have to be provided as a ``dict[source][frequency]``
           in ``gridding_opts``.
+
+        See the parameter ``gridding_opts`` for more details.
+
+    gridding_opts : dict or TensorMesh, optional
+        Input format depends on ``gridding``:
+
+        - 'same': Nothing, ``gridding_opts`` is not permitted.
+        - 'single', 'frequency', 'source', 'both': Described below.
+        - 'input': A :class:`emg3d.meshes.TensorMesh` mesh.
+        - 'dict': Dictionary of the format ``dict[source][frequency]``
+          containing a :class:`emg3d.meshes.TensorMesh` mesh for each
+          source-frequency pair.
+
+        The dict in the case of 'single', 'frequency', 'source', 'both' is
+        passed to :func:`emg3d.meshes.construct_mesh`; consult the
+        corresponding documentation for more information. Parameters that are
+        not provided are estimated from the model, grid, and survey using
+        :func:`estimate_gridding_opts`, which documentation contains more
+        information too.
+
+        There are two notably differences to the parameters described in
+        :func:`emg3d.meshes.construct_mesh`:
+
+        - ``vector``: besides the normal possibility it can also be a string
+          containing one or several of 'x', 'y', and 'z'. In these cases the
+          corresponding dimension of the input mesh is provided as vector.
+          See :func:`estimate_gridding_opts`.
+        - ``expand``, in the format of ``[property_sea, property_air]``; if
+          provided, the input model is expanded up to the seasurface with sea
+          water, and an air layer is added. The actual height of the seasurface
+          can be defined with the key ``seasurface``. See
+          :func:`expand_grid_model`.
 
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
@@ -112,16 +141,9 @@ class Simulation:
         many cases, but they are the most robust combination at which you can
         throw most things.
 
-    gridding_opts : optional
-        Input format depends on ``gridding``:
-        - 'same': Nothing, ``gridding_opts`` is not permitted.
-        - 'single', 'frequency', 'source', 'both': Described below.
-        - 'provided': A :class:`emg3d.meshes.TensorMesh` mesh.
-        - 'dict': Dictionary of the format ``dict[source][frequency]``
-          containing a :class:`emg3d.meshes.TensorMesh` mesh for each
-          source-frequency pair.
-
-        # TODO TODO TODO describe paramteres.
+    max_workers : int
+        The maximum number of processes that can be used to execute the
+        given calls. Default is 4.
 
     verb : int; optional
         Level of verbosity. Default is 0.
@@ -140,7 +162,7 @@ class Simulation:
             'frequency': 'Frequency-dependent grids',
             'source': 'Source-dependent grids',
             'both': 'Frequency- and source-dependent grids',
-            'provided': 'A single, provided grid all sources/frequencies',
+            'input': 'A single, provided grid all sources/frequencies',
             'dict': 'Provided dict of frequency-/source-dependent grids',
             }
 
@@ -199,7 +221,7 @@ class Simulation:
         # Check gridding_opts depending on gridding and act upon.
         if self.gridding == 'dict':
             self._dict_grid = gridding_opts
-        elif self.gridding == 'provided':
+        elif self.gridding == 'input':
             self._grid_single = gridding_opts
         elif self.gridding == 'same':
             if gridding_opts:
@@ -288,10 +310,8 @@ class Simulation:
         out['gridding'] = self.gridding
         out['solver_opts'] = self.solver_opts
 
-        # TODO TEST TODO (Particularly from dict)
-        # v v v v v v v v
         # Put provided grids back on gridding.
-        if self.gridding == 'provided':
+        if self.gridding == 'input':
             out['gridding_opts'] = self._grid_single
         elif self.gridding == 'dict':
             out['gridding_opts'] = self._dict_grid
@@ -1081,23 +1101,69 @@ def expand_grid_model(grid, model, expand, interface):
 def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     """Estimate parameters for automatic gridding.
 
-    Automatically determine required gridding options from the provided grid,
-    model, and survey, if they are not provided in ``gridding_opts``.
+    Automatically determines the required gridding options from the provided
+    grid, model, and survey, if they are not provided in ``gridding_opts``.
 
-    - mapping: taken from model
-    - frequency: average (on log10-scale) of all frequencies.
-    - center: center of all sources.
-    - vector: 'xyz'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    - properties: averages on log10 scale.
-    - domain x/y: extent of sources and receivers, ensuring ratio of 3.
-    - domain z: extent of sources and receivers, ensuring ratio of 2 to
-      horizontal dimension; 1/10 tenth up, 9/10 down.
+    The dict ``gridding_opts`` can contain any input parameter taken by
+    :func:`emg3d.meshes.construct_mesh`, see the corresponding documentation
+    for more details with regards to the possibilities.
+
+    Different keys of ``gridding_opts`` are treated differently:
+
+    - The following parameters are estimated from the ``model`` if not
+      provided:
+
+      - ``mapping``: taken from model
+      - ``properties``: volume averages (of x, y, and z-directed properties) on
+        log10 scale of the outermost layer in a given direction.
+
+    - The following parameters are estimated from the ``survey`` if not
+      provided:
+
+      - ``frequency``: average (on log10-scale) of all frequencies.
+      - ``center``: center of all sources.
+      - ``domain`` in x/y-directions: extent of sources and receivers, ensuring
+        ratio of 3.
+      - ``domain`` in z-direction: extent of sources and receivers, ensuring
+        ratio of 2 to horizontal dimension; 1/10 tenth up, 9/10 down.
+
+      The ratio means that it is enforced that the survey dimension in x or
+      y-direction is not smaller than a third of the survey dimension in the
+      other direction. If not, the smaller dimension is expanded symmetrically.
+      Similarly in the vertical direction, which must be at least half the
+      dimension of the maximum horizontal dimension. Otherwise it is expanded
+      in a ration of 9 parts downwards, one part upwards.
+
+    - The following parameter is taken from the ``grid`` if provided as a
+      string:
+
+      - ``vector``: This is the only real "difference" to the default
+        ``gridding_opts``-dict. The normal input is accepted, but it can also
+        be a string contain any combination of 'x', 'y', and 'z'. All
+        directions contained in this string are then taken from the provided
+        grid. E.g., if ``gridding_opts['vector']='xz'`` it will take the x- and
+        z-directed vectors from the grid.
+
+    - The following parameters are simply passed along if they are provided,
+      nothing is done otherwise:
+
+      - ``vector``
+      - ``stretching``
+      - ``seasurface``
+      - ``cell_numbers``
+      - ``lambda_factor``
+      - ``max_buffer``
+      - ``min_width_limits``
+      - ``min_width_pps``
+      - ``verb``
+
 
     Parameters
     ----------
     gridding_opts : dict
         Containing input parameters to provide to
-        :func:`emg3d.meshes.contsruct_mesh`.
+        :func:`emg3d.meshes.contsruct_mesh`. See the corresponding
+        documentation and the explanations above.
 
     grid : :class:`emg3d.meshes.TensorMesh`
         The grid.
@@ -1122,10 +1188,9 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     # Initiate new gridding_opts.
     gopts = {}
 
-    # Optional values that we only include take if provided.
+    # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
-                 'max_buffer', 'min_width_limits', 'min_width_pps',
-                 'raise_error', 'verb']:
+                 'max_buffer', 'min_width_limits', 'min_width_pps', 'verb']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
 
@@ -1140,23 +1205,23 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     center = tuple([np.mean(survey.src_coords[i]) for i in range(3)])
     gopts['center'] = gridding_opts.pop('center', center)
 
-    # Vector: convert string into arrays.
+    # Vector.
     vector = gridding_opts.pop('vector', None)
-    if vector is not None:
-        if input_nCz is None:
-            input_nCz = grid.nCz
-        vec = vector.lower()
-        vector = tuple(
-                grid.vectorNx if 'x' in vec else None,
-                grid.vectorNy if 'y' in vec else None,
-                grid.vectorNz[input_nCz] if 'z' in vec else None,
+    if isinstance(vector, str):
+        # If vector is a string we take the corresponding vectors from grid.
+        vector = (
+                grid.vectorNx if 'x' in vector.lower() else None,
+                grid.vectorNy if 'y' in vector.lower() else None,
+                grid.vectorNz[:input_nCz] if 'z' in vector.lower() else None,
         )
+        gopts['vector'] = vector
+
+    elif vector is not None:
+        # In this case vector was provided, and we include it like this.
         gopts['vector'] = vector
 
     # Properties defaults to model averages (AFTER model expansion).
     properties = gridding_opts.pop('properties', None)
-
-    # Get from model if not provided.
     if properties is None:
 
         # Get map (in principle the map in gridding_opts could be different
@@ -1171,21 +1236,21 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
             # Get volume factor.
             vfact = grid.vol.reshape(grid.vnC, order='F')
-            vfact = vfact[ix, iy, iz].ravel()/vfact.sum()
+            vfact = vfact[ix, iy, iz].ravel()/vfact[ix, iy, iz].sum()
 
             # Collect all x (y, z) values.
             data = np.array([])
             for p in ['x', 'y', 'z']:
                 prop = getattr(model, 'property_'+p)
-                if prop is None:
+                if getattr(model, '_property_'+p) is None:
                     continue
                 elif prop.ndim == 1:
-                    data = np.r_[data, prop*vfact]
+                    data = np.r_[data, model.map.backward(prop)]
                 else:
-                    data = np.r_[vfact*prop[ix, iy, iz].ravel()]
+                    prop = model.map.backward(prop[ix, iy, iz].ravel())
+                    data = np.r_[data, np.sum(vfact*prop)]
 
             # Return mean, on a log10-scale.
-            data = model.map.backward(data)
             return m.forward(10**np.mean(np.log10(data)))
 
         # Buffer properties.
@@ -1208,31 +1273,31 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     # Domain; default taken from survey.
     domain = gridding_opts.pop('domain', None)
-
-    # Get from survey if not provided.
     if domain is None:
-        x, y, z = [np.r_[survey.src_coords[i],
-                         survey.rec_coords[i]] for i in range(3)]
 
-        xdim = [min(x), max(x)]
-        ydim = [min(y), max(y)]
-        zdim = [min(z), max(z)]
+        def add_ten(i):
+            """Return ([min, max], dim) of inp, adding 5% on each side)."""
+            inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
+            dim = [min(inp), max(inp)]
+            diff = np.diff(dim)[0]
+            dim = [min(inp)-diff/20, max(inp)+diff/20]
+            return dim, np.diff(dim)[0]
 
-        xdiff = np.diff(xdim)
-        ydiff = np.diff(ydim)
-        zdiff = np.diff(zdim)
+        xdim, xdiff = add_ten(0)
+        ydim, ydiff = add_ten(1)
+        zdim, zdiff = add_ten(2)
 
         # Ensure the ratio xdim:ydim is at most 3.
         if xdiff/ydiff > 3:
-            diff = round(float((xdiff/3.0 - ydiff)/2.0))
+            diff = round((xdiff/3.0 - ydiff)/2.0)
             ydim = [ydim[0]-diff, ydim[1]+diff]
         elif ydiff/xdiff > 3:
-            diff = round(float((ydiff/3.0 - xdiff)/2.0))
+            diff = round((ydiff/3.0 - xdiff)/2.0)
             xdim = [xdim[0]-diff, xdim[1]+diff]
 
         # Ensure the ratio zdim:horizontal is at most 2.
-        if zdiff/max(xdiff, ydiff) > 2:
-            diff = round(float((max(xdiff, ydiff)/2.0 - zdiff)/10.0))
+        if max(xdiff, ydiff)/zdiff > 2:
+            diff = round((max(xdiff, ydiff)/2.0 - zdiff)/10.0)
             zdim = [zdim[0]-9*diff, zdim[1]+diff]
 
         # Collect

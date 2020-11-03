@@ -294,6 +294,15 @@ class _Map:
         """Chain rule to map gradient from conductivity to mapping space."""
         raise NotImplementedError("Derivative chain not implemented.")
 
+    def to_dict(self):
+        """Store the map name in a dict for serialization."""
+        return {'name': self.name, '__class__': self.__class__.__name__}
+
+    @classmethod
+    def from_dict(cls, inp):
+        """Get :class:`_Map` instance from name in dict."""
+        return cls()
+
 
 class MapConductivity(_Map):
     """Maps `σ` to computational variable `σ` (conductivity).

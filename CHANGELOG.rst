@@ -9,6 +9,8 @@ recent versions
 *latest (dev, will become v0.14.0)*
 -----------------------------------
 
+Title will be: Automatic gridding and noise
+
 See the API docs for more info of the relevant implementation.
 
 - ``survey``: A ``Survey`` has new attributes ``standard_error``,
@@ -19,6 +21,9 @@ See the API docs for more info of the relevant implementation.
 
 - ``simulation``:
 
+  - ``Simulation``: New default gridding option ``'single'``. The simulation
+    class comes now with an automatic gridding functionality, wich should make
+    it much easier to compute CSEM data.
   - ``compute()`` takes a new argument, ``min_offset``. If ``observed=True``,
     it will add Gaussian random noise according to the standard deviation of
     the data; it will set receivers responses below the minimum offset to NaN.

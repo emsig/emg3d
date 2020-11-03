@@ -422,6 +422,12 @@ class TestMaps:
         model.map.derivative_chain(gradient, model.property_x)
         assert_allclose(gradient, -derivative*np.exp(-model.property_x))
 
+    def test_to_from_dict(self):
+        m = maps.MapLgResistivity()
+        d = m.to_dict()
+        n = maps.MapLgResistivity.from_dict(d)
+        assert m.name == n.name
+
 
 @pytest.mark.parametrize("njit", [True, False])
 def test_edges2cellaverages(njit):
