@@ -200,7 +200,6 @@ def parse_config_file(args_dict):
         solver = {}
 
         all_solver = dict(cfg.items('solver_opts'))
-        print(all_solver)
 
         # Check for bools.
         for key in ['sslsolver', 'semicoarsening', 'linerelaxation']:
