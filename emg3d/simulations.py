@@ -131,10 +131,10 @@ class Simulation:
         `grid`, `model`, `sfield`, and `efield`.
         If not provided the following defaults are used:
 
-        - `sslsolver = True`;
-        - `semicoarsening = True`;
-        - `linerelaxation = True`;
-        - `verb = 0` (yet warnings are capture and shown).
+        - `sslsolver=True`;
+        - `semicoarsening=True`;
+        - `linerelaxation=True`;
+        - `verb=0` (yet warnings are capture and shown).
 
         Note that these defaults are different from the defaults in
         :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
@@ -146,7 +146,7 @@ class Simulation:
         given calls. Default is 4.
 
     verb : int; optional
-        Level of verbosity. Default is 0.
+        Level of verbosity. Default is 1.
 
         - -1: Error.
         - 0: Warning.
@@ -266,7 +266,8 @@ class Simulation:
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies\n"
                 f"- {self.model.__repr__()}\n"
-                f"- Gridding: {self._gridding_descr[self.gridding]}")
+                f"- Gridding: {self._gridding_descr[self.gridding]}; "
+                f"{self._info_grids}")
 
     def _repr_html_(self):
         return (f"<h3>{self.__class__.__name__} «{self.name}»</h3>"
@@ -276,8 +277,8 @@ class Simulation:
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies</li>"
                 f"<li>{self.model.__repr__()}</li>"
-                f"<li>Gridding: "
-                f"{self._gridding_descr[self.gridding]}</li>"
+                f"<li>Gridding: {self._gridding_descr[self.gridding]}; "
+                f"{self._info_grids}</li>"
                 f"</ul>")
 
     def copy(self, what='computed'):
@@ -932,6 +933,35 @@ class Simulation:
 
         return self.__srcfreq
 
+    @property
+    def _info_grids(self):
+        """Return a string with "min {- max}" grid size."""
+        if self.gridding == 'same':
+            min_nC = self.grid.nC
+            min_vC = self.grid.vnC
+            has_minmax = False
+        elif self.gridding in ['single', 'input']:
+            grid = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
+            min_nC = grid.nC
+            min_vC = grid.vnC
+            has_minmax = False
+        else:
+            min_nC = 1e100
+            max_nC = 0
+            for src, freq in self._srcfreq:
+                grid = self.get_grid(src, freq)
+                if grid.nC > max_nC:
+                    max_nC = grid.nC
+                    max_vC = grid.vnC
+                if grid.nC < min_nC:
+                    min_nC = grid.nC
+                    min_vC = grid.vnC
+            has_minmax = min_nC != max_nC
+        info = f"{min_vC[0]} x {min_vC[1]} x {min_vC[2]} ({min_nC:,})"
+        if has_minmax:
+            info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
+        return info
+
     # BACKWARDS PROPAGATING FIELD
     def _get_bfields(self, inp):
         """Return back-propagated electric field for given inp (src, freq)."""
@@ -1126,17 +1156,19 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
       - ``frequency``: average (on log10-scale) of all frequencies.
       - ``center``: center of all sources.
-      - ``domain`` in x/y-directions: extent of sources and receivers, ensuring
-        ratio of 3.
-      - ``domain`` in z-direction: extent of sources and receivers, ensuring
-        ratio of 2 to horizontal dimension; 1/10 tenth up, 9/10 down.
+      - ``domain`` from ``vector`` if provided, or in x/y-directions: extent of
+        sources and receivers, ensuring ratio of 3.
+      - ``domain`` from ``vector`` if provided, or in z-direction: extent of
+        sources and receivers, ensuring ratio of 2 to horizontal dimension;
+        1/10 tenth up, 9/10 down.
 
       The ratio means that it is enforced that the survey dimension in x or
       y-direction is not smaller than a third of the survey dimension in the
       other direction. If not, the smaller dimension is expanded symmetrically.
       Similarly in the vertical direction, which must be at least half the
-      dimension of the maximum horizontal dimension. Otherwise it is expanded
-      in a ration of 9 parts downwards, one part upwards.
+      dimension of the maximum horizontal dimension or 5 km, whatever is
+      smaller. Otherwise it is expanded in a ration of 9 parts downwards, one
+      part upwards.
 
     - The following parameter is taken from the ``grid`` if provided as a
       string:
@@ -1280,28 +1312,40 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     if domain is None:
 
         def add_ten(i):
-            """Return ([min, max], dim) of inp, adding 5% on each side)."""
-            inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
-            dim = [min(inp), max(inp)]
-            diff = np.diff(dim)[0]
-            dim = [min(inp)-diff/20, max(inp)+diff/20]
-            return dim, np.diff(dim)[0]
+            """Return ([min, max], dim) of inp.
 
-        xdim, xdiff = add_ten(0)
-        ydim, ydiff = add_ten(1)
-        zdim, zdiff = add_ten(2)
+            Take it from vector if provided, else from survey, adding 5% on
+            each side).
+            """
+            if vector is not None and vector[i] is not None:
+                dim = [np.min(vector[i]), np.max(vector[i])]
+                diff = np.diff(dim)[0]
+                get_it = False
+            else:
+                inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
+                dim = [min(inp), max(inp)]
+                diff = np.diff(dim)[0]
+                dim = [min(inp)-diff/20, max(inp)+diff/20]
+                diff = np.diff(dim)[0]
+                get_it = True
+            return dim, diff, get_it
+
+        xdim, xdiff, get_x = add_ten(0)
+        ydim, ydiff, get_y = add_ten(1)
+        zdim, zdiff, get_z = add_ten(2)
 
         # Ensure the ratio xdim:ydim is at most 3.
-        if xdiff/ydiff > 3:
+        if get_y and xdiff/ydiff > 3:
             diff = round((xdiff/3.0 - ydiff)/2.0)
             ydim = [ydim[0]-diff, ydim[1]+diff]
-        elif ydiff/xdiff > 3:
+        elif get_x and ydiff/xdiff > 3:
             diff = round((ydiff/3.0 - xdiff)/2.0)
             xdim = [xdim[0]-diff, xdim[1]+diff]
 
         # Ensure the ratio zdim:horizontal is at most 2.
-        if max(xdiff, ydiff)/zdiff > 2:
-            diff = round((max(xdiff, ydiff)/2.0 - zdiff)/10.0)
+        hdist = min(10000, max(xdiff, ydiff))
+        if get_z and hdist/zdiff > 2:
+            diff = round((hdist/2.0 - zdiff)/10.0)
             zdim = [zdim[0]-9*diff, zdim[1]+diff]
 
         # Collect

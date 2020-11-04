@@ -340,7 +340,7 @@ class TestGetOriginWidths:
                 1/np.pi, 9*mu_0, 0.0, [-1, 2], stretching=[1, 1],
                 seasurface=1.2, verb=2)
         out, _ = capsys.readouterr()
-        assert "* WARNING :: Stretching in DS >> 1.0.\nThe reason " in out
+        assert "Note: Stretching in DS >> 1.0.\nThe reason " in out
 
     def test_basics(self, capsys):
         x0, hx = meshes.get_origin_widths(

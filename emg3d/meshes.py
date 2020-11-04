@@ -652,8 +652,8 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     if finished:
         sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
         sa_limit = min(1.5, stretching[0]+0.25)
-        if sa_adj > sa_limit:
-            print(f"* WARNING :: Stretching in DS >> {sa}.\nThe reason "
+        if verb > 0 and sa_adj > sa_limit:
+            print(f"Note: Stretching in DS >> {sa}.\nThe reason "
                   "is usually the interplay of center/domain/seasurface.")
 
     # Print info about final grid.
