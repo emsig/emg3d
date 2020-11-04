@@ -321,7 +321,19 @@ class Simulation:
         elif self.gridding == 'dict':
             out['gridding_opts'] = self._dict_grid
         elif self.gridding != 'same':
-            out['gridding_opts'] = self.gridding_opts
+
+            gopts = self.gridding_opts
+
+            # Take care of tuples and lists for h5/npz.
+            # Ideally, this should be dealt with in emg3d.io.
+            for key in ['domain', 'vector', 'stretching', 'min_width_limits']:
+                if (key in gopts.keys() and
+                        isinstance(gopts[key], (list, tuple))):
+                    this_type = type(gopts[key]).__name__
+                    gopts[key] = {i: v for i, v in enumerate(gopts[key])}
+                    gopts[key]['__type__'] = this_type
+
+            out['gridding_opts'] = gopts
 
         out['_input_nCz'] = self._input_nCz
 
@@ -372,6 +384,24 @@ class Simulation:
         from emg3d import io
 
         try:
+
+            # gridding options, backwards compatible.
+            gridding = inp['gridding']
+            gridding_opts = inp.get('gridding_opts', {})
+
+            # De-serialize lists and tuples.
+            # Ideally, this should be dealt with in emg3d.io.
+            if gridding not in ['input', 'dict', 'same']:
+                props = ['domain', 'vector', 'stretching', 'min_width_limits']
+                for key in props:
+                    if key in gridding_opts.keys():
+                        if '__type__' in gridding_opts[key].keys():
+                            this_type = gridding_opts[key].pop('__type__')
+                            out = [d for d in gridding_opts[key].values()]
+                            if this_type == 'tuple':
+                                out = tuple(out)
+                            gridding_opts[key] = out
+
             # Initiate class.
             out = cls(
                     name=inp['name'],
@@ -379,9 +409,9 @@ class Simulation:
                     grid=meshes.TensorMesh.from_dict(inp['grid']),
                     model=models.Model.from_dict(inp['model']),
                     max_workers=inp['max_workers'],
-                    gridding=inp['gridding'],
+                    gridding=gridding,
                     solver_opts=inp['solver_opts'],
-                    gridding_opts=inp.get('gridding_opts', {}),  # backw. comp.
+                    gridding_opts=gridding_opts,
                     _input_nCz=inp.get('_input_nCz', len(inp['grid']['hz']))
                     )
 

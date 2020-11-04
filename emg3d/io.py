@@ -116,7 +116,7 @@ def save(fname, **kwargs):
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
     kwargs['_version'] = 'emg3d v' + utils.__version__
-    kwargs['_format'] = '0.14.0'  # File format; version of emg3d when changed.
+    kwargs['_format'] = '0.13.0'  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
@@ -339,12 +339,6 @@ def _dict_serialize(inp, out=None, collect_classes=False):
             else:
                 value = to_dict
 
-        elif (isinstance(value, (list, tuple)) and
-                np.array(value).dtype.name == 'object'):
-            this_type = type(value).__name__
-            value = {i: v for i, v in enumerate(value)}
-            value['__type__'] = this_type
-
         elif collect_classes:
             # `collect_classes` can only be True in root-directory, as it is
             # set to False in recursion.
@@ -403,8 +397,6 @@ def _dict_deserialize(inp, first_call=True):
             # If it has a __class__-key, de-serialize.
             if '__class__' in value.keys():
 
-                # _dict_deserialize(value, False)
-
                 # De-serialize, overwriting all the existing entries.
                 try:
                     inst = KNOWN_CLASSES[value['__class__']]
@@ -415,15 +407,6 @@ def _dict_deserialize(inp, first_call=True):
                     # Gracefully fail.
                     print(f"* WARNING :: Could not de-serialize <{key}>.\n"
                           f"             {e}")
-
-            # De-serialize lists and tuples.
-            elif '__type__' in value.keys():
-
-                this_type = value.pop('__type__')
-                inp[key] = [v for v in value.values()]
-
-                if this_type == 'tuple':
-                    inp[key] = tuple(inp[key])
 
             # In no __class__-key or de-serialization fails, use recursion.
             _dict_deserialize(value, False)
