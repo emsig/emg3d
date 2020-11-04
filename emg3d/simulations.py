@@ -1309,47 +1309,56 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     # Domain; default taken from survey.
     domain = gridding_opts.pop('domain', None)
-    if domain is None:
 
-        def add_ten(i):
-            """Return ([min, max], dim) of inp.
+    def get_dim_diff(i):
+        """Return ([min, max], dim) of inp.
 
-            Take it from vector if provided, else from survey, adding 5% on
-            each side).
-            """
-            if vector is not None and vector[i] is not None:
-                dim = [np.min(vector[i]), np.max(vector[i])]
-                diff = np.diff(dim)[0]
-                get_it = False
-            else:
-                inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
-                dim = [min(inp), max(inp)]
-                diff = np.diff(dim)[0]
-                dim = [min(inp)-diff/20, max(inp)+diff/20]
-                diff = np.diff(dim)[0]
-                get_it = True
-            return dim, diff, get_it
+        Take it from domain if provided, else from vector if provided, else
+        from survey, adding 5% on each side).
+        """
+        if domain is not None and domain[i] is not None:
+            # domain is provided.
+            dim = domain[i]
+            diff = np.diff(dim)[0]
+            get_it = False
 
-        xdim, xdiff, get_x = add_ten(0)
-        ydim, ydiff, get_y = add_ten(1)
-        zdim, zdiff, get_z = add_ten(2)
+        elif vector is not None and vector[i] is not None:
+            # vector is provided.
+            dim = [np.min(vector[i]), np.max(vector[i])]
+            diff = np.diff(dim)[0]
+            get_it = False
 
-        # Ensure the ratio xdim:ydim is at most 3.
-        if get_y and xdiff/ydiff > 3:
-            diff = round((xdiff/3.0 - ydiff)/2.0)
-            ydim = [ydim[0]-diff, ydim[1]+diff]
-        elif get_x and ydiff/xdiff > 3:
-            diff = round((ydiff/3.0 - xdiff)/2.0)
-            xdim = [xdim[0]-diff, xdim[1]+diff]
+        else:
+            # Get it from survey, add 5 % on each side.
+            inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
+            dim = [min(inp), max(inp)]
+            diff = np.diff(dim)[0]
+            dim = [min(inp)-diff/20, max(inp)+diff/20]
+            diff = np.diff(dim)[0]
+            get_it = True
 
-        # Ensure the ratio zdim:horizontal is at most 2.
-        hdist = min(10000, max(xdiff, ydiff))
-        if get_z and hdist/zdiff > 2:
-            diff = round((hdist/2.0 - zdiff)/10.0)
-            zdim = [zdim[0]-9*diff, zdim[1]+diff]
+        return dim, diff, get_it
 
-        # Collect
-        domain = (xdim, ydim, zdim)
+    xdim, xdiff, get_x = get_dim_diff(0)
+    ydim, ydiff, get_y = get_dim_diff(1)
+    zdim, zdiff, get_z = get_dim_diff(2)
+
+    # Ensure the ratio xdim:ydim is at most 3.
+    if get_y and xdiff/ydiff > 3:
+        diff = round((xdiff/3.0 - ydiff)/2.0)
+        ydim = [ydim[0]-diff, ydim[1]+diff]
+    elif get_x and ydiff/xdiff > 3:
+        diff = round((ydiff/3.0 - xdiff)/2.0)
+        xdim = [xdim[0]-diff, xdim[1]+diff]
+
+    # Ensure the ratio zdim:horizontal is at most 2.
+    hdist = min(10000, max(xdiff, ydiff))
+    if get_z and hdist/zdiff > 2:
+        diff = round((hdist/2.0 - zdiff)/10.0)
+        zdim = [zdim[0]-9*diff, zdim[1]+diff]
+
+    # Collect
+    domain = (xdim, ydim, zdim)
 
     gopts['domain'] = domain
 
