@@ -12,7 +12,7 @@ from emg3d import meshes, models, surveys, simulations, fields, solver, io
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-class TestSimulationSame():
+class TestSimulationOne():
     if xarray is not None:
         # Create a simple survey
         sources = (0, [1000, 3000, 5000], -950, 0, 0)
@@ -117,6 +117,12 @@ class TestSimulationSame():
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
 
+        # gridding='same' with gridding_opts.
+        with pytest.raises(TypeError, match="`gridding_opts` is not permitt"):
+            simulations.Simulation(
+                    'Test', self.survey, self.grid, self.model,
+                    gridding='same', gridding_opts={'bummer': True})
+
     def test_reprs(self):
         test = self.simulation.__repr__()
 
@@ -168,52 +174,13 @@ class TestSimulationSame():
         assert self.simulation.model == sim2.model
 
         # Clean and ensure it is empty
-        self.simulation.clean('all')
-        assert self.simulation._dict_efield['Tx1'][1.0] is None
-        assert self.simulation._dict_hfield['Tx1'][1.0] is None
-        assert self.simulation._dict_efield_info['Tx1'][1.0] is None
+        sim3 = self.simulation.copy()
+        sim3.clean('all')
+        assert sim3._dict_efield['Tx1'][1.0] is None
+        assert sim3._dict_hfield['Tx1'][1.0] is None
+        assert sim3._dict_efield_info['Tx1'][1.0] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
-            self.simulation.clean('nothing')
-
-    def test_synthetic(self):
-        sim = self.simulation.copy()
-
-        # Switch off noise_floor, relative_error, min_offset => No noise.
-        sim.survey.noise_floor = None
-        sim.survey.relative_error = None
-        sim._dict_efield = sim._dict_initiate  # Reset
-        sim.compute(observed=True)
-        assert_allclose(sim.data.synthetic, sim.data.observed)
-        assert sim.survey.size == sim.data.observed.size
-
-
-@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-class TestSimulationOthers():
-    if xarray is not None:
-        # Create a simple survey
-        sources = (0, [1000, 3000, 5000], -950, 0, 0)
-        receivers = (np.arange(12)*500, 0, -1000, 0, 0)
-        frequencies = (1.0, 2.0)
-
-        survey = surveys.Survey('Test', sources, receivers, frequencies,
-                                noise_floor=1e-15, relative_error=0.05)
-
-        # Create a simple grid and model
-        grid = meshes.TensorMesh(
-                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
-                np.array([-1250, -1250, -2250]))
-        model = models.Model(grid, 1)
-
-        # Create a simulation, compute all fields.
-        simulation = simulations.Simulation(
-                'Test1', survey, grid, model, max_workers=1,
-                solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
-                             'linerelaxation': False, 'semicoarsening': False},
-                gridding='same')
-
-        # Do first one single and then all together.
-        simulation.get_efield('Tx0', 2.0)
-        simulation.compute(observed=True)
+            sim3.clean('nothing')
 
     def test_dicts_provided(self):
         grids = self.simulation._dict_grid.copy()
@@ -235,15 +202,30 @@ class TestSimulationOthers():
         assert m1 == m2
         assert g1 == g2
 
-    def test_errors(self):
+        # to/from_dict
+        sim1copy = sim1.copy()
+        sim2copy = sim2.copy()
+        m1c = sim1copy.get_model('Tx1', 1.0)
+        g1c = sim1copy.get_grid('Tx1', 1.0)
+        m2c = sim2copy.get_model('Tx1', 1.0)
+        g2c = sim2copy.get_grid('Tx1', 1.0)
+        assert m1 == m1c
+        assert g1 == g1c
+        assert m2 == m2c
+        assert g2 == g2c
 
-        # gridding='same' with gridding_opts.
-        with pytest.raises(TypeError, match="`gridding_opts` is not permitt"):
-            simulations.Simulation(
-                    'Test', self.survey, self.grid, self.model,
-                    gridding='same', gridding_opts={'bummer': True})
+    def test_synthetic(self):
+        sim = self.simulation.copy()
 
-    def test_gradient(self):
+        # Switch off noise_floor, relative_error, min_offset => No noise.
+        sim.survey.noise_floor = None
+        sim.survey.relative_error = None
+        sim._dict_efield = sim._dict_initiate  # Reset
+        sim.compute(observed=True)
+        assert_allclose(sim.data.synthetic, sim.data.observed)
+        assert sim.survey.size == sim.data.observed.size
+
+    def test_input_gradient(self):
         # Create another mesh, so there will be a difference.
         newgrid = meshes.TensorMesh(
                 [np.ones(16)*500, np.ones(8)*1000, np.ones(8)*1000],
@@ -257,25 +239,55 @@ class TestSimulationOthers():
 
         grad = simulation.gradient
 
+        # Ensure the gradient has the shape of the model, not of the input.
         assert grad.shape == self.model.shape
 
-    def test_synthetic(self):
-        sim = self.simulation.copy()
 
-        # Switch off noise_floor, relative_error, min_offset => No noise.
-        sim.survey.noise_floor = None
-        sim.survey.relative_error = None
-        sim._dict_efield = sim._dict_initiate  # Reset
-        sim.compute(observed=True)
-        assert_allclose(sim.data.synthetic, sim.data.observed)
-        assert sim.survey.size == sim.data.observed.size
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+def test_simulation_automatic():
+    # Create a simple survey
+    sources = (0, [1000, 3000, 5000], -950, 0, 0)
+    receivers = ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0)
+    frequencies = (0.1, 1.0, 10.0)
 
-    def test_gridding(self):
-        pass
-        # (1) expand
-        # (2) to/from_dict: 'input', 'dict', '!=same'
-        # (3) get_grid
-        # (4) get_model
+    survey = surveys.Survey('Test', sources, receivers, frequencies,
+                            noise_floor=1e-15, relative_error=0.05)
+
+    # Create a simple grid and model
+    grid = meshes.TensorMesh(
+            [np.ones(32)*250, np.ones(16)*500, np.ones(4)*500],
+            np.array([-1250, -1250, -2250]))
+    model = models.Model(grid, 1)
+
+    # Create a simulation, compute all fields.
+    inp = {'survey': survey, 'grid': grid, 'model': model,
+           'gridding_opts': {'expand': [1, 0.5]}}
+    b_sim = simulations.Simulation('both', gridding='both', **inp)
+    f_sim = simulations.Simulation('freq', gridding='frequency', **inp)
+    t_sim = simulations.Simulation('src', gridding='source', **inp)
+    s_sim = simulations.Simulation('single', gridding='single', **inp)
+
+    # Grids: Middle source / middle frequency should be the same in all.
+    assert f_sim.get_grid('Tx1', 1.0) == t_sim.get_grid('Tx1', 1.0)
+    assert f_sim.get_grid('Tx1', 1.0) == s_sim.get_grid('Tx1', 1.0)
+    assert f_sim.get_grid('Tx1', 1.0) == b_sim.get_grid('Tx1', 1.0)
+    assert f_sim.get_model('Tx1', 1.0) == t_sim.get_model('Tx1', 1.0)
+    assert f_sim.get_model('Tx1', 1.0) == s_sim.get_model('Tx1', 1.0)
+    assert f_sim.get_model('Tx1', 1.0) == b_sim.get_model('Tx1', 1.0)
+
+    # Copy:
+    f_sim_copy = f_sim.copy()
+    assert f_sim.get_grid('Tx1', 1.0) == f_sim_copy.get_grid('Tx1', 1.0)
+    assert 'expand' not in f_sim.gridding_opts.keys()
+    assert 'expand' not in f_sim_copy.gridding_opts.keys()
+    s_sim_copy = s_sim.copy()
+    assert s_sim.get_grid('Tx1', 1.0) == s_sim_copy.get_grid('Tx1', 1.0)
+    assert 'expand' not in s_sim.gridding_opts.keys()
+    assert 'expand' not in s_sim_copy.gridding_opts.keys()
+    t_sim_copy = t_sim.copy()
+    assert t_sim.get_grid('Tx1', 1.0) == t_sim_copy.get_grid('Tx1', 1.0)
+    assert 'expand' not in t_sim.gridding_opts.keys()
+    assert 'expand' not in t_sim_copy.gridding_opts.keys()
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

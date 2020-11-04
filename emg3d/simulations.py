@@ -178,7 +178,7 @@ class Simulation:
 
         # Store optional inputs with defaults.
         self.verb = kwargs.pop('verb', 1)
-        gridding_opts = kwargs.pop('gridding_opts', {})
+        gridding_opts = kwargs.pop('gridding_opts', {}).copy()
 
         # Store solver options with defaults.
         # The slowest but most robust setting is used; also, verbosity is
@@ -599,7 +599,7 @@ class Simulation:
 
                 # Get model for this source if not yet computed.
                 if source not in self._model_source.keys():
-                    self._model_source[freq] = self.model.interpolate2grid(
+                    self._model_source[source] = self.model.interpolate2grid(
                             self.grid, self.get_grid(source, freq))
 
                 # Store link to model.
