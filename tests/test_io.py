@@ -5,10 +5,15 @@ from numpy.testing import assert_allclose
 
 from emg3d import meshes, models, fields, utils, io, surveys, simulations, maps
 
+# Soft dependencies
 try:
     import h5py
 except ImportError:
     h5py = False
+try:
+    import xarray
+except ImportError:
+    xarray = None
 
 
 def create_dummy(nx, ny, nz, imag=True):
@@ -238,19 +243,13 @@ def test_known_classes(tmpdir):
     sfield = fields.SourceField(grid, freq=frequency)
     model = models.Model(grid, 1)
     pointdip = surveys.Dipole('dip', (0, 1000, -950, 0, 0))
-    survey = surveys.Survey('Test', (0, 1000, -950, 0, 0),
-                            (-0.5, 0.5, 1000, 1000, -950, -950), frequency)
-    simulation = simulations.Simulation(
-            'Test1', survey, grid, model, gridding='same')
 
     out = {
         'TensorMesh': grid,
         'Model': model,
         'Field': field,
         'SourceField': sfield,
-        'Survey': survey,
         'Dipole': pointdip,
-        'Simulation': simulation,
         'MapConductivity': maps.MapConductivity(),
         'MapLgConductivity': maps.MapLgConductivity(),
         'MapLnConductivity': maps.MapLnConductivity(),
@@ -258,6 +257,14 @@ def test_known_classes(tmpdir):
         'MapLgResistivity': maps.MapLgResistivity(),
         'MapLnResistivity': maps.MapLnResistivity(),
     }
+
+    if xarray:
+        survey = surveys.Survey('Test', (0, 1000, -950, 0, 0),
+                                (-0.5, 0.5, 1000, 1000, -950, -950), frequency)
+        simulation = simulations.Simulation(
+                'Test1', survey, grid, model, gridding='same')
+        out['Survey'] = survey
+        out['Simulation'] = simulation
 
     # Simple primitive test to see if it can (de)serialize all known classes.
     def test_it(ext):
