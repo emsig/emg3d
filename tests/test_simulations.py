@@ -12,7 +12,7 @@ from emg3d import meshes, models, surveys, simulations, fields, solver, io
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-class TestSimulationOne():
+class TestSimulation():
     if xarray is not None:
         # Create a simple survey
         sources = (0, [1000, 3000, 5000], -950, 0, 0)
@@ -122,6 +122,12 @@ class TestSimulationOne():
             simulations.Simulation(
                     'Test', self.survey, self.grid, self.model,
                     gridding='same', gridding_opts={'bummer': True})
+
+        # expand without seasurface
+        with pytest.raises(KeyError, match="is required if"):
+            simulations.Simulation(
+                    'Test', self.survey, self.grid, self.model,
+                    gridding='single', gridding_opts={'expand': [1, 2]})
 
     def test_reprs(self):
         test = self.simulation.__repr__()
@@ -261,7 +267,7 @@ def test_simulation_automatic():
 
     # Create a simulation, compute all fields.
     inp = {'survey': survey, 'grid': grid, 'model': model,
-           'gridding_opts': {'expand': [1, 0.5]}}
+           'gridding_opts': {'expand': [1, 0.5], 'seasurface': 0}}
     b_sim = simulations.Simulation('both', gridding='both', **inp)
     f_sim = simulations.Simulation('freq', gridding='frequency', **inp)
     t_sim = simulations.Simulation('src', gridding='source', **inp)

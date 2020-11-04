@@ -232,9 +232,13 @@ class Simulation:
             # Expand model by water and air if required.
             expand = gridding_opts.pop('expand', None)
             if expand is not None:
-                seasurface = gridding_opts.get('seasurface', 0.0)
-                grid, model = expand_grid_model(
-                        grid, model, expand, seasurface)
+                try:
+                    interface = gridding_opts['seasurface']
+                except KeyError as e:
+                    msg = ("`gridding_opts['seasurface']` is required if "
+                           "`gridding_opts['expand']` is provided.")
+                    raise KeyError(msg) from e
+                grid, model = expand_grid_model(grid, model, expand, interface)
 
             # Get automatic gridding input.
             # Estimate the parameters from survey and model if not provided.
