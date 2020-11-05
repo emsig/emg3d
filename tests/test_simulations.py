@@ -274,8 +274,8 @@ def test_simulation_automatic():
     s_sim = simulations.Simulation('single', gridding='single', **inp)
 
     # Quick repr test.
-    assert " 24 x 24 (13,824) - 160 x 160 x 96 (2,457,600)" in b_sim.__repr__()
-    assert " 24 x 24 (13,824) - 160 x 160 x 96 (2,457,600)" in f_sim.__repr__()
+    assert " 24 x 24 (13,824) - 160 x 160 x 80 (2,048,000)" in b_sim.__repr__()
+    assert " 24 x 24 (13,824) - 160 x 160 x 80 (2,048,000)" in f_sim.__repr__()
     assert "Source-dependent grids; 64 x 64 x 40 (163,840)" in t_sim.__repr__()
     assert "ources and frequencies; 64 x 64 x 40 (163,840)" in s_sim.__repr__()
 

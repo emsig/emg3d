@@ -383,9 +383,12 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     for name, value in zip(['domain', 'vector'], [domain, vector]):
         if (value is not None and len(value) == 3 and not
                 isinstance(value, np.ndarray)):
-            xparams[name] = value[0]
-            yparams[name] = value[1]
-            zparams[name] = value[2]
+            if value[0] is not None:
+                xparams[name] = value[0]
+            if value[1] is not None:
+                yparams[name] = value[1]
+            if value[2] is not None:
+                zparams[name] = value[2]
         else:
             kwargs[name] = value
 
@@ -394,9 +397,12 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         value = kwargs.pop(name, None)
         if value is not None:
             if len(value) == 3:
-                xparams[name] = value[0]
-                yparams[name] = value[1]
-                zparams[name] = value[2]
+                if value[0] is not None:
+                    xparams[name] = value[0]
+                if value[1] is not None:
+                    yparams[name] = value[1]
+                if value[2] is not None:
+                    zparams[name] = value[2]
             else:
                 kwargs[name] = value
 
@@ -555,7 +561,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
                 # Adjust stretching for seasurface if required.
                 if seasurface is not None and seasurface > center:
                     t_nx = np.r_[center, center+np.cumsum(thxr)]
-                    ii = np.argmin(abs(t_nx-seasurface))+1
+                    ii = np.argmin(abs(t_nx-seasurface))
                     thxr[:ii] *= abs(seasurface-center)/np.sum(thxr[:ii])
 
                 # Fill from center to left and right domain.
