@@ -405,7 +405,6 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     for name in ['stretching', 'min_width_limits', 'min_width_pps']:
         value = kwargs.pop(name, None)
         if value is not None:
-            print(value, type(value))
             if isinstance(value, (int, float)):
                 kwargs[name] = np.array([value])
             elif len(value) == 3:
