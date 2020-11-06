@@ -972,8 +972,8 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     possible_nx : list, optional
         List of possible numbers of cells. See :func:`good_mg_cell_nr`.
         Default is ``good_mg_cell_nr(1000, 5, 3)``, which corresponds to
-        [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512,
-        640, 768].
+        numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
+        512, 640, 768.
 
     min_width : float, list or None, optional
         Minimum cell width restriction:
@@ -1037,7 +1037,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     if alpha is None:
         alpha = [1, 1.5, 0.01]
     if possible_nx is None:
-        possible_nx = good_mg_cell_nr(500, 5, 3)
+        possible_nx = good_mg_cell_nr()
 
     # Cast resistivity value(s).
     res = np.array(res, ndmin=1)
