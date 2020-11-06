@@ -324,6 +324,15 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         Maximum buffer zone around survey domain.
         Default is 100,000 (100 km), which is quite conservative.
 
+    lambda_from_center : bool, optional
+        Flag how to compute the extent of the computational mesh as a function
+        of wavelength:
+
+        - False (default): The distance from the edge of the survey domain to
+          the edge of the computational domain is one wavelength.
+        - True: The distance from the center to the edge of the computational
+          domain and back to the end of the survey domain is two wavelengths.
+
     mapping : str or map, optional
         Defines what type the input ``property_{x;y;z}``-values correspond to.
         By default, they represent resistivities (Ohm.m). The implemented types
@@ -461,6 +470,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     min_width_pps = kwargs.pop('min_width_pps', 3)
     lambda_factor = kwargs.pop('lambda_factor', 1.0)
     max_buffer = kwargs.pop('max_buffer', 100000)
+    lambda_from_center = kwargs.pop('lambda_from_center', False)
     pmap = kwargs.pop('mapping', 'Resistivity')
     cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
     raise_error = kwargs.pop('raise_error', True)
@@ -481,20 +491,6 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     # Get skin depth.
     skind = skin_depth(frequency, cond_arr, precision=0)
-    if verb > 0:
-        if verb > 1:
-            end = ""
-        else:
-            end = "\n"
-        print(f"Skin depth          [m] : {skind[0]:.0f}", end="")
-        if cond.size == 2:
-            print(f" / {skind[1]:.0f}", end=end)
-        elif cond.size == 3:
-            print(f" / {skind[1]:.0f} / {skind[2]:.0f}", end=end)
-        else:
-            print(end=end)
-        if verb > 1:
-            print("  [corresponding to `properties`]")
 
     # Minimum cell width.
     dmin = min_cell_width(
@@ -513,8 +509,6 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
                 raise ValueError(
                         "Provided vector MUST at least include all of the "
                         "survey domain.")
-    if verb > 0:
-        print(f"Survey domain DS    [m] : {domain[0]:.0f} - {domain[1]:.0f}")
 
     # Seasurface related checks.
     if seasurface is not None:
@@ -534,11 +528,24 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
     # Two wavelengths we can safely assume it is zero.
     wlength = lambda_factor*wavelength(frequency, cond_arr[1:], precision=0)
-    dbuffer = np.min([wlength, np.ones(2)*max_buffer], axis=0)
-    comp_domain = np.array([domain[0]-dbuffer[0], domain[1]+dbuffer[1]])
-    if verb > 0:
-        print(f"Comp. domain DC     [m] : {comp_domain[0]:.0f} - "
-              f"{comp_domain[1]:.0f}")
+
+    if lambda_from_center:
+        # Center to edges of domain.
+        in_domain = abs(domain - center)
+
+        # Required buffer, additional to domain.
+        d_buff = np.max([np.zeros(2), (2*wlength - in_domain)/2], axis=0)
+
+        # Add buffer to domain.
+        comp_domain = np.array([domain[0]-d_buff[0], domain[1]+d_buff[1]])
+
+        # Restrict total domain to max_buffer.
+        comp_domain[0] = max(comp_domain[0], center-max_buffer)
+        comp_domain[1] = min(comp_domain[1], center+max_buffer)
+
+    else:
+        dbuffer = np.min([wlength, np.ones(2)*max_buffer], axis=0)
+        comp_domain = np.array([domain[0]-dbuffer[0], domain[1]+dbuffer[1]])
 
     # Initiate flag if terminated.
     finished = False
@@ -641,42 +648,62 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         if finished:
             break
 
-    # Check finished and print info about found grid.
+    # Raise Error or return Nones if not finish.
     if not finished:
         msg = "No suitable grid found; relax your criteria."
         # Throw message if no solution was found.
         if raise_error:
             raise RuntimeError(msg)
         else:
-            if verb > 0:
-                print()
-                verb = 0
             print(f"* ERROR   :: {msg}")
-            x0, hx = None, None
-
-    # Check max stretching.
-    if finished:
-        sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
-        sa_limit = min(1.5, stretching[0]+0.25)
-        if verb > 0 and sa_adj > sa_limit:
-            print(f"Note: Stretching in DS >> {sa}.\nThe reason "
-                  "is usually the interplay of center/domain/seasurface.")
+            return None, None
 
     # Print info about final grid.
     if verb > 0:
+
+        # Check max stretching.
+        sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
+        sa_limit = min(1.5, stretching[0]+0.25)
+
+        if verb > 1:
+            end = ""
+        else:
+            end = "\n"
+
+        print(f"Skin depth          [m] : {skind[0]:.0f}", end="")
+        if cond.size == 2:
+            print(f" / {skind[1]:.0f}", end=end)
+        elif cond.size == 3:
+            print(f" / {skind[1]:.0f} / {skind[2]:.0f}", end=end)
+        else:
+            print(end=end)
+        if verb > 1:
+            print("  [corresponding to `properties`]")
+
+        print(f"Survey domain DS    [m] : {domain[0]:.0f} - {domain[1]:.0f}")
+
+        print(f"Comp. domain DC     [m] : {comp_domain[0]:.0f} - "
+              f"{comp_domain[1]:.0f}")
+
         print(f"Final extent        [m] : {x0:.0f} - {x0+np.sum(hx):.0f}")
+
         print(f"Cell widths         [m] : "
               f"{min(hxo):.0f} / {max(hxo):.0f} / {max(hx):.0f}", end=end)
         if verb > 1:
             print("  [min(DS) / max(DS) / max(DC)]")
+
         print(f"Number of cells         : {nx} ({hxo.size} / "
               f"{nx-hxo.size-nx_remain2} / {nx_remain2})", end=end)
         if verb > 1:
             print("  [Total (DS/DC/remain)]")
+
         print(f"Max stretching          : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}",
               end=end)
         if verb > 1:
             print("  [DS (seasurface) / DC]")
+        if sa_adj > sa_limit:
+            print(f"Note: Stretching in DS >> {sa}.\nThe reason "
+                  "is usually the interplay of center/domain/seasurface.")
 
     return x0, hx
 

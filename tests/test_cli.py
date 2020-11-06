@@ -264,6 +264,7 @@ class TestParser:
             f.write("seasurface=-200\n")
             f.write("max_buffer=5000\n")
             f.write("lambda_factor=0.8\n")
+            f.write("lambda_from_center=True\n")
             f.write("mapping=LnResistivity\n")
             f.write("vector=yz\n")
             f.write("domain=-2000, 2000; None; -4000, 1.111\n")
@@ -286,6 +287,7 @@ class TestParser:
         assert check['seasurface'] == -200
         assert check['max_buffer'] == 5000
         assert check['lambda_factor'] == 0.8
+        assert check['lambda_from_center']
         assert check['mapping'] == 'LnResistivity'
         assert check['vector'] == 'yz'
         assert check['domain'] == ([-2000.0, 2000.0], None, [-4000.0, 1.111])

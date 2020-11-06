@@ -391,6 +391,26 @@ class TestGetOriginWidths:
         assert_allclose(hx1, hx2)
 
     def test_status_quo_with_all(self, capsys):
+        # Defaults.
+        meshes.get_origin_widths(
+            frequency=0.2,
+            properties=[0.3, 1, 50],
+            center=-950,
+            domain=[-2000, -1000],
+            verb=1,
+            )
+
+        out, _ = capsys.readouterr()
+
+        assert "Skin depth          [m] : 616 / 1125 / 7958" in out
+        assert "Survey domain DS    [m] : -2000 - -1000" in out
+        assert "Comp. domain DC     [m] : -9071 - 49000" in out
+        assert "Final extent        [m] : -10304 - 52056" in out
+        assert "Cell widths         [m] : 205 / 205 / 12075" in out
+        assert "Number of cells         : 32 (7 / 25 / 0)" in out
+        assert "Max stretching          : 1.000 (1.000) / 1.290" in out
+
+        # All set.
         meshes.get_origin_widths(
             frequency=0.2,
             properties=[3.3, 1, 500],
@@ -402,6 +422,7 @@ class TestGetOriginWidths:
             min_width_limits=[20, 500],
             min_width_pps=5,
             lambda_factor=20,
+            lambda_from_center=True,
             max_buffer=10000,
             mapping='Conductivity',
             cell_numbers=[20, 40, 80, 160],
@@ -413,7 +434,7 @@ class TestGetOriginWidths:
 
         assert "Skin depth          [m] : 620 / 1125 / 50" in out
         assert "Survey domain DS    [m] : -2000 - -1000" in out
-        assert "Comp. domain DC     [m] : -12000 - 5320" in out
+        assert "Comp. domain DC     [m] : -10950 - 5295" in out
         assert "Final extent        [m] : -13945 - 5425" in out
         assert "Cell widths         [m] : 100 / 100 / 3191" in out
         assert "Number of cells         : 40 (20 / 20 / 0)" in out

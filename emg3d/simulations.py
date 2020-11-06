@@ -1218,6 +1218,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
       - ``seasurface``
       - ``cell_numbers``
       - ``lambda_factor``
+      - ``lambda_from_center``
       - ``max_buffer``
       - ``min_width_limits``
       - ``min_width_pps``
@@ -1256,7 +1257,8 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
-                 'max_buffer', 'min_width_limits', 'min_width_pps', 'verb']:
+                 'lambda_from_center', 'max_buffer', 'min_width_limits',
+                 'min_width_pps', 'verb']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
 

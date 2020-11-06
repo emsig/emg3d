@@ -303,6 +303,12 @@ def parse_config_file(args_dict):
                 _ = all_grid.pop(key)
                 grid[key] = cfg.getint('gridding_opts', key)
 
+        # Check for bools.
+        for key in ['lambda_from_center', ]:
+            if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
+                grid[key] = cfg.getboolean('gridding_opts', key)
+
         # Ensure no keys are left.
         if all_grid:
             raise TypeError(f"Unexpected parameter in [gridding_opts]: "
