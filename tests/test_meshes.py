@@ -454,18 +454,21 @@ class TestConstructMesh:
         c = (1, 2, 3)
         d = [-1, 1]
         x0, hx = meshes.get_origin_widths(f, p, c[0], d, stretching=[1, 1.3])
-        y0, hz = meshes.get_origin_widths(f, p, c[1], d, stretching=[1.5, 1])
+        y0, hy = meshes.get_origin_widths(f, p, c[1], d, stretching=[1.5, 1])
         z0, hz = meshes.get_origin_widths(f, p, c[2], d, stretching=[1, 1])
         m = meshes.construct_mesh(
                 f, [p, p, p, p], c, d, stretching=([1, 1.3], [1.5, 1], [1, 1]))
 
         assert_allclose(m.x0, (x0, y0, z0))
+        assert_allclose(m.hx, hx)
+        assert_allclose(m.hy, hy)
+        assert_allclose(m.hz, hz)
 
     def test_compare_to_gow2(self):
         vz = np.arange(100)[::-1]*-20
         x0, hx = meshes.get_origin_widths(
                 0.77, [0.3, 1, 2], 0, [-1000, 1000], min_width_limits=[20, 40])
-        y0, hz = meshes.get_origin_widths(
+        y0, hy = meshes.get_origin_widths(
                 0.77, [0.3, 2, 1], 0, [-2000, 2000], min_width_limits=[20, 40])
         z0, hz = meshes.get_origin_widths(
                 0.77, [0.3, 2, 1e8], 0, vector=vz, min_width_limits=[20, 40])
@@ -479,3 +482,26 @@ class TestConstructMesh:
                 )
 
         assert_allclose(m.x0, (x0, y0, z0))
+        assert_allclose(m.hx, hx)
+        assert_allclose(m.hy, hy)
+        assert_allclose(m.hz, hz)
+
+    def test_compare_to_gow3(self):
+        x0, hx = meshes.get_origin_widths(
+                0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
+        y0, hy = meshes.get_origin_widths(
+                0.2, [1.0, 2.0], 16, [-1234, 8956], min_width_limits=20)
+        z0, hz = meshes.get_origin_widths(
+                0.2, [1.0, 3.0], -33.3333, [-100, 100], min_width_limits=20)
+        m = meshes.construct_mesh(
+                frequency=0.2,
+                properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
+                center=(-423, 16, -33.3333),
+                domain=([-3333, 222], [-1234, 8956], [-100, 100]),
+                min_width_limits=20,
+                )
+
+        assert_allclose(m.x0, (x0, y0, z0), atol=1e-3)
+        assert_allclose(m.hx, hx)
+        assert_allclose(m.hy, hy)
+        assert_allclose(m.hz, hz)

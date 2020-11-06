@@ -274,8 +274,8 @@ def test_simulation_automatic():
     s_sim = simulations.Simulation('single', gridding='single', **inp)
 
     # Quick repr test.
-    assert " 24 x 24 (13,824) - 160 x 160 x 80 (2,048,000)" in b_sim.__repr__()
-    assert " 24 x 24 (13,824) - 160 x 160 x 80 (2,048,000)" in f_sim.__repr__()
+    assert " 24 x 24 (13,824) - 160 x 160 x 96 (2,457,600)" in b_sim.__repr__()
+    assert " 24 x 24 (13,824) - 160 x 160 x 96 (2,457,600)" in f_sim.__repr__()
     assert "Source-dependent grids; 64 x 64 x 40 (163,840)" in t_sim.__repr__()
     assert "ources and frequencies; 64 x 64 x 40 (163,840)" in s_sim.__repr__()
 
@@ -395,9 +395,9 @@ class TestEstimateGriddingOpts():
         assert gdict['frequency'] == 1.0
         assert gdict['mapping'].name == self.model.map.name
         assert_allclose(gdict['center'], (0, 3000, -950))
-        assert_allclose(gdict['domain'][0], (-250, 5250))
-        assert_allclose(gdict['domain'][1], (800, 5200))
-        assert_allclose(gdict['domain'][2], (-3432.5, -677.5))
+        assert_allclose(gdict['domain'][0], (-500, 5500))
+        assert_allclose(gdict['domain'][1], (600, 5400))
+        assert_allclose(gdict['domain'][2], (-3651, -651))
         assert_allclose(gdict['properties'], [100, 1, 1, 1, 1, 1, 1])
 
     def test_mapping_vector(self):
@@ -448,7 +448,7 @@ class TestEstimateGriddingOpts():
         gdict = simulations.estimate_gridding_opts(
                     {}, self.grid, self.model, survey)
 
-        assert_allclose(gdict['domain'][0], (-733, 733))
+        assert_allclose(gdict['domain'][0], (-800, 800))
 
         # Adjusted x-domain.
         survey = surveys.Survey('Test', sources, self.receivers,
@@ -458,7 +458,7 @@ class TestEstimateGriddingOpts():
         gdict = simulations.estimate_gridding_opts(
                     {}, self.grid, self.model, survey)
 
-        assert_allclose(gdict['domain'][1], (1583, 3417))
+        assert_allclose(gdict['domain'][1], (1500, 3500))
 
     def test_error(self):
         with pytest.raises(TypeError, match='Unexpected gridding_opts'):

@@ -40,7 +40,7 @@ __all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
 
 MESHWARNING = (
     "\n    `get_hx_h0`, `get_stretched_h`, `get_domain`, and `get_hx` are"
-    "\n    deprecated and will be removed. Use `get_origin_widths`` instead."
+    "\n    deprecated and will be removed. Use `construct_mesh`` instead."
 )
 CELLWARNING = (
     "\n    `get_cell_numbers` is deprecated and will be removed."
@@ -405,7 +405,10 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     for name in ['stretching', 'min_width_limits', 'min_width_pps']:
         value = kwargs.pop(name, None)
         if value is not None:
-            if len(value) == 3:
+            print(value, type(value))
+            if isinstance(value, (int, float)):
+                kwargs[name] = np.array([value])
+            elif len(value) == 3:
                 if value[0] is not None:
                     xparams[name] = value[0]
                 if value[1] is not None:
@@ -1033,6 +1036,8 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         - `amax`: Maximum alpha.
 
     """
+    warnings.warn(MESHWARNING, DeprecationWarning)
+
     # Get variables with default lists:
     if alpha is None:
         alpha = [1, 1.5, 0.01]

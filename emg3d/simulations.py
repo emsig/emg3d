@@ -1187,7 +1187,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
       - ``frequency``: average (on log10-scale) of all frequencies.
       - ``center``: center of all sources.
       - ``domain`` from ``vector`` if provided, or in x/y-directions: extent of
-        sources and receivers, ensuring ratio of 3.
+        sources and receivers plus 10% on each side, ensuring ratio of 3.
       - ``domain`` from ``vector`` if provided, or in z-direction: extent of
         sources and receivers, ensuring ratio of 2 to horizontal dimension;
         1/10 tenth up, 9/10 down.
@@ -1346,7 +1346,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
         """Return ([min, max], dim) of inp.
 
         Take it from domain if provided, else from vector if provided, else
-        from survey, adding 5% on each side).
+        from survey, adding 10% on each side).
         """
         if domain is not None and domain[i] is not None:
             # domain is provided.
@@ -1365,7 +1365,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
             inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
             dim = [min(inp), max(inp)]
             diff = np.diff(dim)[0]
-            dim = [min(inp)-diff/20, max(inp)+diff/20]
+            dim = [min(inp)-diff/10, max(inp)+diff/10]
             diff = np.diff(dim)[0]
             get_it = True
 
