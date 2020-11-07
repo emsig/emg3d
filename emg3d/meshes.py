@@ -215,10 +215,6 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     given in Equation :eq:`skindepth`, and the wavelength :math:`\lambda`,
     given in Equation :eq:`wavelength`.
 
-    .. todo::
-
-       Add figure.
-
     By default, the buffer zone around the survey domain is one wavelength.
     This means that the signal has to travel two wavelengths to get from the
     end of the survey domain to the end of the computational domain and back.
@@ -264,10 +260,10 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     domain : tuple of lists, list, or None, optional
         Contains the survey-domain limits. This domain should include all
         source and receiver positions as well as any important feature of the
-        model. Format: ``[[xmin, xmax], [ymin, ymax], [zmin, zmax]]``.
+        model. Format: ``([xmin, xmax], [ymin, ymax], [zmin, zmax])``.
 
-        It can be None, or individual lists can be None (e.g., ``[None, None,
-        [zmin, zmax]]``), in which case you have to provide a ``vector``, which
+        It can be None, or individual lists can be None (e.g., ``(None, None,
+        [zmin, zmax])``), in which case you have to provide a ``vector``, which
         is then assumed to span exactly the domain. If only one list is
         provided it is applied to all dimensions.
 
@@ -275,7 +271,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         Contains vectors of mesh-edges that should be used. If provided, the
         vector MUST at least include all of the survey domain. If ``domain``
         is not provided, it is defined as the minimum/maximum of the provided
-        vector. Format: ``[xvector, yvector, zvector]``.
+        vector. Format: ``(xvector, yvector, zvector)``.
 
         It can be None, or individual ndarrays can be None (e.g., ``(xvector,
         yvector, None)``), in which case you have to provide a ``domain``. If
@@ -322,7 +318,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     max_buffer : float, optional
         Maximum buffer zone around survey domain.
-        Default is 100,000 (100 km), which is quite conservative.
+        Default is 100,000 (100 km).
 
     lambda_from_center : bool, optional
         Flag how to compute the extent of the computational mesh as a function
@@ -335,8 +331,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     mapping : str or map, optional
         Defines what type the input ``property_{x;y;z}``-values correspond to.
-        By default, they represent resistivities (Ohm.m). The implemented types
-        are:
+        By default, they represent resistivities (Ohm.m). The implemented
+        mappings are:
 
         - 'Conductivity'; σ (S/m),
         - 'LgConductivity'; log_10(σ),
@@ -347,9 +343,9 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     cell_numbers : list, optional
         List of possible numbers of cells. See :func:`good_mg_cell_nr`.
-        Default is ``good_mg_cell_nr(1000, 5, 3)``, which corresponds to
+        Default is ``good_mg_cell_nr(1024, 5, 3)``, which corresponds to
         numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
-        512, 640, 768.
+        512, 640, 768, 1024.
 
     verb : int, optional
         Verbosity, -1 (error); 0 (warning), 1 (info), 2 (verbose).
@@ -495,8 +491,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     skind = skin_depth(frequency, cond_arr, precision=0)
 
     # Minimum cell width.
-    dmin = min_cell_width(
-            frequency, cond_arr[0], min_width_pps, min_width_limits)
+    dmin = min_cell_width(skind[0], min_width_pps, min_width_limits)
 
     # Survey domain: if not provided get from vector.
     if domain is None and vector is None:
@@ -529,7 +524,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # from the source to the boundary and back to the receiver.
     # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
     # Two wavelengths we can safely assume it is zero.
-    wlength = lambda_factor*wavelength(frequency, cond_arr[1:], precision=0)
+    wlength = lambda_factor*wavelength(skind[1:])
 
     if lambda_from_center:
         # Center to edges of domain.
@@ -710,7 +705,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     return x0, hx
 
 
-def good_mg_cell_nr(max_nr=1000, max_prime=5, min_div=3):
+def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
     r"""Returns 'good' cell numbers for the multigrid method.
 
     'Good' cell numbers are numbers which can be divided by 2 as many times as
@@ -724,15 +719,16 @@ def good_mg_cell_nr(max_nr=1000, max_prime=5, min_div=3):
 
     Parameters
     ----------
-    max_nr : int
+    max_nr : int, optional
         Maximum number of cells.
+        Default is 1024.
 
-    max_prime : int
+    max_prime : int, optional
         Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
         limits in order to avoid too big lowest grids in the multigrid method.
         Default is 5.
 
-    min_div : int
+    min_div : int, optional
         Minimum times the number can be divided by two.
         Default is 3.
 
@@ -765,7 +761,7 @@ def good_mg_cell_nr(max_nr=1000, max_prime=5, min_div=3):
     return numbers[numbers <= max_nr]
 
 
-def skin_depth(frequency, conductivity, mu=mu_0, precision=3):
+def skin_depth(frequency, conductivity, mu=mu_0, precision=0):
     r"""Return skin depth for provided frequency and conductivity.
 
     The skin depth :math:`\delta` (m) is given by
@@ -793,7 +789,7 @@ def skin_depth(frequency, conductivity, mu=mu_0, precision=3):
 
     precision : int, optional
         Precision of the return skin depth.
-        Default is 3, hence millimeters.
+        Default is 0, hence meters.
 
 
     Returns
@@ -808,66 +804,57 @@ def skin_depth(frequency, conductivity, mu=mu_0, precision=3):
     return np.round(skind, precision)
 
 
-def wavelength(frequency, conductivity, mu=mu_0, precision=3):
-    r"""Return the wavelength for provided frequency and conductivity.
+def wavelength(skin_depth, precision=0):
+    r"""Return the wavelength.
 
     The wavelength :math:`\lambda` (m) is given by
 
     .. math::
         :label: wavelength
 
-        \lambda = 2\pi\delta(f, \sigma)\ ,
+        \lambda = 2\pi\delta\ ,
 
-    where the skin depth :math:`\delta` is given in Equation :eq:`skindepth`.
+    where the skin depth :math:`\delta` is given by :func:`skin_depth`,
+    Equation :eq:`skindepth`.
 
 
     Parameters
     ----------
-    frequency : float
-        Frequency (Hz).
-
-    conductivity : float
-        Conductivity (S/m).
-
-    mu : float, optional
-        Magnetic permeability (H/m); default is :math:`\mu_0`.
+    skin_depth : float or ndarray.
+        Skin depth (m).
 
     precision : int, optional
-        Precision of the return skin depth.
-        Default is 3, hence millimeters.
+        Precision of the returned wave length.
+        Default is 0, hence meters.
 
 
     Returns
     -------
-    skindepth : float
-        Skin depth (m).
+    wavelength : float or ndarray
+        Wavelength (m).
 
     """
-    sd = skin_depth(frequency, conductivity, mu, precision+2)
-    return np.round(2*np.pi*sd, precision)
+    return np.round(2*np.pi*skin_depth, precision)
 
 
-def min_cell_width(frequency, conductivity, pps=3, limits=None):
-    r"""Return minimum cell width, frequency and conductivity dependent.
+def min_cell_width(skin_depth, pps=3, limits=None, precision=0):
+    r"""Return the minimum cell width.
 
-    The minimum cell width is given by
+    The minimum cell width is defined by the desired points per skin depth,
 
     .. math::
         :label: mincellwidth
 
-        \Delta_\text{min} = \frac{\delta(f, \sigma)}{\text{pps}}\ ,
+        \Delta_\text{min} = \frac{\delta}{\text{pps}}\ ,
 
-    where its value restricted by restricted by ``limits``. The skin depth
-    :math:`\delta` is given in Equation :eq:`skindepth`.
+    where its value is restricted by ``limits``. The skin depth :math:`\delta`
+    is given by :func:`skin_depth`, Equation :eq:`skindepth`.
 
 
     Parameters
     ----------
-    frequency : float
-        Frequency (Hz).
-
-    conductivity : float
-        Conductivity (S/m).
+    skin_depth : float
+        Skin depth (m).
 
     pps : int
         Points per skin depth.
@@ -879,6 +866,10 @@ def min_cell_width(frequency, conductivity, pps=3, limits=None):
         - float: Returns limits as dmin.
         - [min, max]: dmin is limited to this range.
 
+    precision : int, optional
+        Precision of the cell width. Provided limits are not rounded.
+        Default is 0, hence meters.
+
 
     Returns
     -------
@@ -886,8 +877,8 @@ def min_cell_width(frequency, conductivity, pps=3, limits=None):
         Minimum cell width (m).
 
     """
-    # Calculate skin depth and divide by pps.
-    dmin = skin_depth(frequency, conductivity, precision=0)/pps
+    # Calculate min cell width.
+    dmin = np.round(skin_depth/pps, precision)
 
     # Respect user limits.
     if limits is not None:
@@ -895,9 +886,9 @@ def min_cell_width(frequency, conductivity, pps=3, limits=None):
         limits = np.array(limits, ndmin=1)
 
         if limits.size == 1:
-            dmin = limits
+            dmin = limits  # Ignores skin depth and pps.
         else:
-            dmin = np.clip(dmin, *limits)
+            dmin = np.clip(dmin, *limits)  # Restrict.
 
     return dmin
 
@@ -973,9 +964,9 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
     possible_nx : list, optional
         List of possible numbers of cells. See :func:`good_mg_cell_nr`.
-        Default is ``good_mg_cell_nr(1000, 5, 3)``, which corresponds to
+        Default is ``good_mg_cell_nr(1024, 5, 3)``, which corresponds to
         numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
-        512, 640, 768.
+        512, 640, 768, 1024.
 
     min_width : float, list or None, optional
         Minimum cell width restriction:
@@ -1072,10 +1063,10 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
                     f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
 
     # Get skin depth.
-    skind = skin_depth(freq, 1/res_arr)
+    skind = skin_depth(freq, 1/res_arr, precision=3)
 
     # Minimum cell width.
-    dmin = min_cell_width(freq, 1/res_arr[0], pps, min_width)
+    dmin = min_cell_width(skind[0], pps, min_width)
 
     # Survey domain; contains all sources and receivers.
     domain = np.array(domain, dtype=np.float64)
@@ -1094,7 +1085,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     dist_in_domain = abs(domain - fixed[0])
 
     # (b) Two wavelengths.
-    two_lambda = 2*wavelength(freq, 1/res_arr[1:])
+    two_lambda = 2*wavelength(skind[1:], precision=3)
 
     # (c) Required buffer, additional to domain.
     dist_buff = np.max([np.zeros(2), (two_lambda - dist_in_domain)/2], axis=0)
@@ -1474,7 +1465,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         fact_pos = fact_neg
 
     # Get skin depth.
-    skind = skin_depth(freq, 1/res)
+    skind = skin_depth(freq, 1/res, precision=3)
 
     # Estimate minimum cell width.
     h_min = fact_min*skind

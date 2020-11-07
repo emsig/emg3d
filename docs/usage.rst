@@ -195,15 +195,15 @@ its docstring. Here a few additional information.
   :math:`p`, for which good sizes can then be computed with :math:`p 2^n`. Good
   grid sizes (in each direction) up to 1024 are
 
-  - :math:`2·2^{2, 3, ..., 9}`: 8, 16,  32,  64, 128, 256, 512, 1024,
-  - :math:`3·2^{2, 3, ..., 8}`: 12, 24,  48,  96, 192, 384, 768,
-  - :math:`5·2^{2, 3, ..., 7}`: 20, 40,  80, 160, 320, 640,
-  - :math:`7·2^{2, 3, ..., 7}`: 28, 56, 112, 224, 448, 896,
+  - :math:`2·2^{3, 4, ..., 9}`: 16,  32,  64, 128, 256, 512, 1024,
+  - :math:`3·2^{3, 4, ..., 8}`: 24,  48,  96, 192, 384, 768,
+  - :math:`5·2^{3, 4, ..., 7}`: 40,  80, 160, 320, 640,
+  - :math:`7·2^{3, 4, ..., 7}`: 56, 112, 224, 448, 896,
 
   and preference decreases from top to bottom row (stick to the first two or
-  three rows if possible). Good grid sizes in sequential order: 8, 12, 16, 20,
-  24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384,
-  448, 512, 640, 768, 896, 1024.
+  three rows if possible). Good grid sizes in sequential order, excluding p=7:
+  16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512, 640, 768,
+  1024. You can get this list via :func:`emg3d.meshes.good_mg_cell_nr()`.
 
 - The multigrid method can be used as a solver or as a preconditioner, for
   instance for BiCGSTAB. Using multigrid as a preconditioner for BiCGSTAB

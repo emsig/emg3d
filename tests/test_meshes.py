@@ -50,15 +50,15 @@ def test_get_hx_h0(capsys):
         "   Skin depth          [m] : 2251\n"
         "   Survey domain       [m] : -2000 - 2000\n"
         "   Computation domain  [m] : -14692 - 15592\n"
-        "   Final extent        [m] : -15700 - 15999\n"
-        f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3382\n"
+        "   Final extent        [m] : -15692 - 15992\n"
+        f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3381\n"
         "   Alpha survey/comp       : "
         f"{out1[2]['amin']:.3f} / {out1[2]['amax']:.3f}\n"
         "   Number of cells (s/c/r) : 20 (6/14/0)\n"
     )
 
     # Just check x0 and the output.
-    assert out1[1] == -15699.582761656933
+    assert out1[1] == -15692.20844679169
     assert info in outstr1
 
     # == B == Laplace and verb=0, parameter positions and defaults.
@@ -280,30 +280,30 @@ def test_skin_depth():
 
 
 def test_wavelength():
-    t1 = meshes.wavelength(1/np.pi, 2.0, 2.0, 20)
+    t1 = meshes.wavelength(0.5, precision=20)
     assert t1 == np.round(np.pi, 20)
 
-    t2 = meshes.wavelength(1/np.pi, 2.0, 3.0, 0)
+    t2 = meshes.wavelength(0.4, 0)
     assert t2 == 3
 
-    t3 = meshes.wavelength(1/np.pi, 1/mu_0)
+    t3 = meshes.wavelength(1.0, precision=3)
     assert t3 == 6.283
 
-    t4 = meshes.wavelength(-1/(2*np.pi**2), 2.0, 2.0, 20)
+    t4 = meshes.wavelength(0.5, 20)
     assert t4 == np.round(np.pi, 20)
 
 
 def test_min_width_cell():
-    t1 = meshes.min_cell_width(1/np.pi, 1/mu_0, pps=1)
+    t1 = meshes.min_cell_width(1, pps=1)
     assert t1 == 1
 
-    t2 = meshes.min_cell_width(1/np.pi, 1/mu_0)
-    assert t2 == 1/3
+    t2 = meshes.min_cell_width(1, precision=3)
+    assert t2 == 0.333
 
-    t3 = meshes.min_cell_width(1, 1, limits=10)
+    t3 = meshes.min_cell_width(503.0, limits=10)
     assert t3 == 10
 
-    t3 = meshes.min_cell_width(1, 1, limits=[100, 120])
+    t3 = meshes.min_cell_width(503.0, limits=[100, 120])
     assert t3 == 120
 
 
@@ -404,9 +404,9 @@ class TestGetOriginWidths:
 
         assert "Skin depth          [m] : 616 / 1125 / 7958" in out
         assert "Survey domain DS    [m] : -2000 - -1000" in out
-        assert "Comp. domain DC     [m] : -9071 - 49000" in out
-        assert "Final extent        [m] : -10304 - 52056" in out
-        assert "Cell widths         [m] : 205 / 205 / 12075" in out
+        assert "Comp. domain DC     [m] : -9069 - 49002" in out
+        assert "Final extent        [m] : -10289 - 51970" in out
+        assert "Cell widths         [m] : 205 / 205 / 12056" in out
         assert "Number of cells         : 32 (7 / 25 / 0)" in out
         assert "Max stretching          : 1.000 (1.000) / 1.290" in out
 
@@ -434,7 +434,7 @@ class TestGetOriginWidths:
 
         assert "Skin depth          [m] : 620 / 1125 / 50" in out
         assert "Survey domain DS    [m] : -2000 - -1000" in out
-        assert "Comp. domain DC     [m] : -10950 - 5295" in out
+        assert "Comp. domain DC     [m] : -10950 - 5255" in out
         assert "Final extent        [m] : -13945 - 5425" in out
         assert "Cell widths         [m] : 100 / 100 / 3191" in out
         assert "Number of cells         : 40 (20 / 20 / 0)" in out
