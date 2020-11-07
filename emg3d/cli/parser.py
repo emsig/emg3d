@@ -86,7 +86,7 @@ def parse_config_file(args_dict):
 
     # Ensure no keys are left.
     if args_dict:
-        raise TypeError(f"Unexpected key in **args_dict: "
+        raise TypeError(f"Unexpected parameter in **args_dict: "
                         f"{list(args_dict.keys())}")
 
     # Enforce some limits.
@@ -156,9 +156,11 @@ def parse_config_file(args_dict):
     # Check if parameter-file has a simulation-section, add it otherwise.
     if 'simulation' not in cfg.sections():
         cfg.add_section('simulation')
+    all_sim = dict(cfg.items('simulation'))
 
     # Check max_workers.
     key = 'max_workers'
+    _ = all_sim.pop(key, None)
     if term['nproc'] is not None:
         simulation[key] = term['nproc']
     elif cfg.has_option('simulation', key):
@@ -168,18 +170,26 @@ def parse_config_file(args_dict):
     # Check gridding.
     key = 'gridding'
     if cfg.has_option('simulation', key):
+        _ = all_sim.pop(key)
         simulation[key] = cfg.get('simulation', key)
 
     # Check name.
     key = 'name'
     if cfg.has_option('simulation', key):
+        _ = all_sim.pop(key)
         simulation[key] = cfg.get('simulation', key)
     else:
         simulation[key] = "emg3d CLI run"
 
     key = 'min_offset'
     if cfg.has_option('simulation', key):
+        _ = all_sim.pop(key)
         simulation[key] = cfg.getfloat('simulation', key)
+
+    # Ensure no keys are left.
+    if all_sim:
+        raise TypeError(f"Unexpected parameter in [simulation]: "
+                        f"{list(all_sim.keys())}")
 
     # # Solver parameters  # #
 
@@ -189,19 +199,24 @@ def parse_config_file(args_dict):
         # Initiate solver-dict.
         solver = {}
 
+        all_solver = dict(cfg.items('solver_opts'))
+
         # Check for bools.
         for key in ['sslsolver', 'semicoarsening', 'linerelaxation']:
             if cfg.has_option('solver_opts', key):
+                _ = all_solver.pop(key)
                 solver[key] = cfg.getboolean('solver_opts', key)
 
         # Check for strings.
         for key in ['cycle', ]:
             if cfg.has_option('solver_opts', key):
+                _ = all_solver.pop(key)
                 solver[key] = cfg.get('solver_opts', key)
 
         # Check for floats.
         for key in ['tol', ]:
             if cfg.has_option('solver_opts', key):
+                _ = all_solver.pop(key)
                 solver[key] = float(cfg.get('solver_opts', key))
 
         # Check for ints.
@@ -209,7 +224,13 @@ def parse_config_file(args_dict):
                     'nu_post', 'clevel']
         for key in int_keys:
             if cfg.has_option('solver_opts', key):
+                _ = all_solver.pop(key)
                 solver[key] = cfg.getint('solver_opts', key)
+
+        # Ensure no keys are left.
+        if all_solver:
+            raise TypeError(f"Unexpected parameter in [solver_opts]: "
+                            f"{list(all_solver.keys())}")
 
         # Add to simulation dict if not empty.
         if solver:
@@ -231,6 +252,71 @@ def parse_config_file(args_dict):
         if all_data:
             raise TypeError(f"Unexpected parameter in [data]: "
                             f"{list(all_data.keys())}")
+
+    # # Gridding # #
+
+    if 'gridding_opts' in cfg.sections():
+        grid = {}
+
+        all_grid = dict(cfg.items('gridding_opts'))
+
+        # Check for lists.
+        list_keys = ['properties', 'center', 'cell_number', 'min_width_pps',
+                     'expand']
+        for key in list_keys:
+            if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
+                grid[key] = [float(v) for v in
+                             cfg.get('gridding_opts', key).split(',')]
+
+        # Check for list of lists.
+        for key in ['domain', 'stretching', 'min_width_limits']:
+            if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
+                out = []
+                for p in cfg.get('gridding_opts', key).split(';'):
+                    if 'none' in p.lower():
+                        out.append(None)
+                    else:
+                        out.append([float(v) for v in p.split(',')])
+                if len(out) == 1:
+                    out = out[0]
+                else:
+                    out = tuple(out)
+                grid[key] = out
+
+        # Check for strings.
+        for key in ['mapping', 'vector']:
+            if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
+                grid[key] = cfg.get('gridding_opts', key)
+
+        # Check for floats.
+        for key in ['frequency', 'seasurface', 'max_buffer', 'lambda_factor']:
+            if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
+                grid[key] = float(cfg.get('gridding_opts', key))
+
+        # Check for ints.
+        for key in ['verb', ]:
+            if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
+                grid[key] = cfg.getint('gridding_opts', key)
+
+        # Check for bools.
+        for key in ['lambda_from_center', ]:
+            if cfg.has_option('gridding_opts', key):
+                _ = all_grid.pop(key)
+                grid[key] = cfg.getboolean('gridding_opts', key)
+
+        # Ensure no keys are left.
+        if all_grid:
+            raise TypeError(f"Unexpected parameter in [gridding_opts]: "
+                            f"{list(all_grid.keys())}")
+
+        # Add to simulation dict if not empty.
+        if grid:
+            simulation['gridding_opts'] = grid
 
     # Return.
     out = {'files': files, 'simulation_options': simulation, 'data': data}

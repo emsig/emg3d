@@ -6,10 +6,25 @@ recent versions
 """""""""""""""
 
 
-*latest (dev, will become v0.14.0)*
------------------------------------
+*v0.14.0* : Automatic gridding
+------------------------------
 
-See the API docs for more info of the relevant implementation.
+**2020-11-07**
+
+The simulation class comes new with an automatic gridding functionality, which
+should make it much easier to compute CSEM data. With that the entire
+optimization routine was improved too. See the API docs for more info of the
+relevant implementation.
+
+- ``simulation``:
+
+  - ``Simulation``: New gridding options ``'single'``, ``'frequency'``
+    ``'source'``, and ``'both'``; new default is ``'single'``.
+  - ``compute()`` takes a new argument, ``min_offset``. If ``observed=True``,
+    it will add Gaussian random noise according to the standard deviation of
+    the data; it will set receivers responses below the minimum offset to NaN.
+  - There is no longer a ``reference`` model.
+  - ``misfit`` and ``gradient`` can now handle observations with NaN's.
 
 - ``survey``: A ``Survey`` has new attributes ``standard_error``,
   ``noise_floor``, and ``relative_error``.
@@ -17,48 +32,43 @@ See the API docs for more info of the relevant implementation.
 - ``optimize``: Completely changed misfit and data-weighting to more sensible
   functions.
 
-- ``simulation``:
-
-  - ``compute()`` takes a new argument, ``min_offset``. If ``observed=True``,
-    it will add Gaussian random noise according to the standard deviation of
-    the data; it will set receivers responses below the minimum offset to NaN.
-  - There is no longer a ``reference`` model.
-  - ``misfit`` and ``gradient`` can now handle observations with NaN's.
-
 - ``cli``:
 
   - As a consequence of the changes the ``data_weight_opts`` got removed.
-  - New section ``[data]``  to select the wanted data.
+  - New sections ``[data]`` to select the wanted data and ``[gridding_opts]``
+    for options of the automatic gridding.
   - Section ``[simulation]`` has a new parameter ``min_offset`` (for creating
     observed data).
   - Output has a new parameter ``n_observations`` if ``misfit`` or ``gradient``
     were called, which is the number of observations that were used to compute
     the misfit.
 
-- ``maps``: Fixed the mapping of the gradients (``Conductivity`` is the only
-  mapping that was not affected by this bug).
+- ``meshes``:
 
-- ``models.Model``: Removed deprecated parameters ``res_{x;y;z}``.
+  - New functions ``construct_mesh``, ``get_origin_widths``,
+    ``good_mg_cell_nr`` and other, smaller helper routines.
+  - Deprecated the old meshing routines ``get_hx_h0``, ``get_cell_numbers``,
+    ``get_stretched_h``, ``get_domain``, ``get_hx``; they will be removed in
+    the future.
+  - Default of ``good_mg_cell_nr`` changed, and the documentation (and
+    verbosity) with regards to «good» number of cells was improved.
 
-- ``io.save``:
+- Bug fixes:
 
-  - Removed deprecated parameter ``backend`` in ``save``.
-  - File extension has to be provided in ``save``, no default any longer.
+  - ``maps``: Fixed the mapping of the gradients (``Conductivity`` is the only
+    mapping that was not affected by this bug).
 
-- ``meshes``: Deprecated the old meshing routines ``get_stretched_h``,
-  ``get_domain``, ``get_hx``; will be removed in the future.
+- Removed deprecated features:
 
-- Various:
-
-  - Improve documentation (and verbosity) with regards to «good» number of
-    cells.
+  - ``models.Model``: Removed parameters ``res_{x;y;z}``.
+  - ``io.save``: Removed deprecated parameter ``backend``.
+  - ``io.save``: Removed default, file extension has to be provided.
 
 
 *v0.13.0* : CLI
 ---------------
 
 **2020-09-22**
-
 
 - New Module ``cli`` for command-line interaction:
 
@@ -272,7 +282,6 @@ v0.8.0 - v0.10.x
 -----------------------
 
 **2020-04-29**
-
 
 - Bug fixes:
 

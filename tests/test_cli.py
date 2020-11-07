@@ -135,7 +135,7 @@ class TestParser:
         assert cfg['files']['output'] == tmpdir+'/output.npz'
         assert cfg['files']['log'] == tmpdir+'/output.log'
 
-        with pytest.raises(TypeError, match="Unexpected key in"):
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
             args_dict = self.args_dict.copy()
             args_dict['unknown'] = True
             _ = cli.parser.parse_config_file(args_dict)
@@ -191,6 +191,13 @@ class TestParser:
         assert cfg['simulation_options']['name'] == "PyTest simulation"
         assert cfg['simulation_options']['min_offset'] == 1320.0
 
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            with open(config, 'a') as f:
+                f.write("\nanother=True")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            _ = cli.parser.parse_config_file(args_dict)
+
     def test_solver(self, tmpdir):
 
         # Write a config file.
@@ -210,6 +217,13 @@ class TestParser:
         assert test['cycle'] == 'V'
         assert test['tol'] == 0.0001
         assert test['nu_init'] == 2
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            with open(config, 'a') as f:
+                f.write("\nanother=True")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            _ = cli.parser.parse_config_file(args_dict)
 
     def test_data(self, tmpdir):
 
@@ -238,6 +252,59 @@ class TestParser:
             args_dict = self.args_dict.copy()
             args_dict['config'] = config
             cfg, term = cli.parser.parse_config_file(args_dict)
+
+    def test_gridding(self, tmpdir):
+
+        # Write a config file.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[gridding_opts]\n")
+            f.write("verb=3\n")
+            f.write("frequency=7.77\n")
+            f.write("seasurface=-200\n")
+            f.write("max_buffer=5000\n")
+            f.write("lambda_factor=0.8\n")
+            f.write("lambda_from_center=True\n")
+            f.write("mapping=LnResistivity\n")
+            f.write("vector=yz\n")
+            f.write("domain=-2000, 2000; None; -4000, 1.111\n")
+            f.write("stretching=1.1, 2.0\n")
+            f.write("min_width_limits=20, 40; 30, 60; None\n")
+            f.write("properties=0.3, 1, 2, 3, 4, 5, 6\n")
+            f.write("center=0, 0, -500\n")
+            f.write("cell_number=20, 40, 80, 100\n")
+            f.write("min_width_pps=2, 3, 4\n")
+            f.write("expand=1, 2")
+
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = config
+        cfg, term = cli.parser.parse_config_file(args_dict)
+
+        check = cfg['simulation_options']['gridding_opts']
+
+        assert check['verb'] == 3
+        assert check['frequency'] == 7.77
+        assert check['seasurface'] == -200
+        assert check['max_buffer'] == 5000
+        assert check['lambda_factor'] == 0.8
+        assert check['lambda_from_center']
+        assert check['mapping'] == 'LnResistivity'
+        assert check['vector'] == 'yz'
+        assert check['domain'] == ([-2000.0, 2000.0], None, [-4000.0, 1.111])
+        assert check['stretching'] == [1.1, 2.0]
+        assert check['min_width_limits'] == ([20, 40], [30, 60], None)
+        assert check['properties'] == [0.3, 1, 2, 3, 4, 5, 6]
+        assert check['center'] == [0, 0, -500]
+        assert check['cell_number'] == [20, 40, 80, 100]
+        assert check['min_width_pps'] == [2, 3, 4]
+        assert check['expand'] == [1, 2]
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            with open(config, 'a') as f:
+                f.write("\nanother=True")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            _ = cli.parser.parse_config_file(args_dict)
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

@@ -22,6 +22,9 @@ from copy import deepcopy
 
 import numpy as np
 from scipy import optimize
+from scipy.constants import mu_0
+
+from emg3d import maps
 
 try:
     import discretize.TensorMesh as dTensorMesh
@@ -29,12 +32,19 @@ except ImportError:
     class dTensorMesh:
         pass
 
-__all__ = ['TensorMesh', 'get_hx_h0', 'get_cell_numbers', 'get_stretched_h',
-           'get_domain', 'get_hx']
+__all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
+           'wavelength', 'good_mg_cell_nr', 'min_cell_width',
+           # Deprecated ones:
+           'get_hx_h0', 'get_cell_numbers', 'get_stretched_h', 'get_domain',
+           'get_hx']
 
 MESHWARNING = (
-    "\n    `get_stretched_h`, `get_domain`, and `get_hx` are"
-    "\n    deprecated and will be removed. Use `get_hx_h0` instead."
+    "\n    `get_hx_h0`, `get_stretched_h`, `get_domain`, and `get_hx` are"
+    "\n    deprecated and will be removed. Use `construct_mesh`` instead."
+)
+CELLWARNING = (
+    "\n    `get_cell_numbers` is deprecated and will be removed."
+    "\n    Use `good_mg_cell_nr` instead."
 )
 
 
@@ -194,6 +204,696 @@ class TensorMesh(dTensorMesh, _TensorMesh):
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
 
+def construct_mesh(frequency, properties, center, domain=None, vector=None,
+                   seasurface=None, **kwargs):
+    r"""Return a TensorMesh for given parameters.
+
+    The returned mesh is frequency and property dependent, and takes all other
+    provided parameters into account. The minimum cell width
+    :math:`\Delta_\text{min}`, given in Equation :eq:`mincellwidth`, and the
+    extent of the buffer zone depend on the skin depth :math:`\delta`,
+    given in Equation :eq:`skindepth`, and the wavelength :math:`\lambda`,
+    given in Equation :eq:`wavelength`.
+
+    By default, the buffer zone around the survey domain is one wavelength.
+    This means that the signal has to travel two wavelengths to get from the
+    end of the survey domain to the end of the computational domain and back.
+    This approach is quite conservative and on the safe side. You can reduce
+    the buffer thickness if you know what you are doing. There are three
+    parameters which influence the thickness of the buffer for a given
+    frequency: ``property``, which is used to calculate the skin depth and the
+    wavelength, ``lambda_factor`` (default is 1) which sets how many times the
+    wavelength is the thickness of the buffer (relative factor), and
+    ``max_buffer``, which is an absolute maximum for the buffer thickness.
+
+
+    Parameters
+    ----------
+
+    frequency : float
+        Frequency (Hz) to calculate skin depth; both the minimum cell width and
+        the extent of the computational domain are a function of skin depth.
+
+    properties : float or list
+        Properties to calculate the skin depth. The properties can be either
+        resistivities, conductivities, or the logarithm (natural or base 10)
+        thereof. By default it assumes resistivities, but it can be changed
+        with the parameter ``mapping``.
+
+        A list of up to seven properties can be provided:
+
+        - 1: Same property for everything;
+        - 2: [center, buffer] for all directions;
+        - 3: [center, negative buffer, positive buffer] for all directions;
+        - 4: [center, xy-buffer, z-negative, z-positive];
+        - 7: [center, x-neg, x-pos, y-neg, y-pos, z-neg, z-pos].
+
+        The property at the center (source location) is used to define the
+        minimum cell width. The other properties are used to define the extent
+        of the buffer zone around the survey domain.
+
+    center : tuple
+        Tuple (or list, ndarray) of three floats for (x, y, z). The mesh is
+        centered around this point, which means that here is the smallest cell.
+        Usually this is the source location.
+
+    domain : tuple of lists, list, or None, optional
+        Contains the survey-domain limits. This domain should include all
+        source and receiver positions as well as any important feature of the
+        model. Format: ``([xmin, xmax], [ymin, ymax], [zmin, zmax])``.
+
+        It can be None, or individual lists can be None (e.g., ``(None, None,
+        [zmin, zmax])``), in which case you have to provide a ``vector``, which
+        is then assumed to span exactly the domain. If only one list is
+        provided it is applied to all dimensions.
+
+    vector : tuple of three ndarrays, ndarray, or None, optional
+        Contains vectors of mesh-edges that should be used. If provided, the
+        vector MUST at least include all of the survey domain. If ``domain``
+        is not provided, it is defined as the minimum/maximum of the provided
+        vector. Format: ``(xvector, yvector, zvector)``.
+
+        It can be None, or individual ndarrays can be None (e.g., ``(xvector,
+        yvector, None)``), in which case you have to provide a ``domain``. If
+        only one ndarray is provided it is applied to all dimensions.
+
+    seasurface : float, optional
+        Air-sea interface. This has only to be set in the marine case, when the
+        mesh in z-direction is sought for (and the interface is not contained
+        in ``vector``). If set, it will ensure that at the sea surface is an
+        actual boundary. It has to be bigger then the lower limit of the survey
+        domain.
+        Default is None.
+
+    stretching : list or tuple of lists, optional
+        Maximum stretching factors in the form of ``[max Ds, max Dc]``: the
+        first value is the maximum stretching for the survey domain (default is
+        1.0), the second value is the maximum stretching for the buffer zone
+        (default is 1.5). If a list is provided the same is used for all three
+        dimension. Alternatively a tuple of three lists can be provided, ``(x,
+        y, z)``. Note that the first value has no influence on dimensions where
+        a ``vector`` is provided.
+
+    min_width_limits : float, list or None, optional
+        Passed through :func:`min_cell_width` as ``limits``.
+        A tuple of three can be provided for direction dependent values.
+        Note that this value has no influence on dimensions where a ``vector``
+        is provided.
+
+        Default is None.
+
+    min_width_pps : float or int, optional
+        Passed through :func:`min_cell_width` as ``pps``.
+        A tuple of three can be provided for direction dependent values.
+        Note that this value has no influence on dimensions where a ``vector``
+        is provided.
+
+        Default is 3.
+
+    lambda_factor : float, optional
+        The buffer is taken as one wavelength from the survey domain. This can
+        be regarded as quite conservative (but safe). The parameter
+        ``lambda_factor`` can be used to reduce (or increase) this factor.
+        Default is 1.0.
+
+    max_buffer : float, optional
+        Maximum buffer zone around survey domain.
+        Default is 100,000 (100 km).
+
+    lambda_from_center : bool, optional
+        Flag how to compute the extent of the computational mesh as a function
+        of wavelength:
+
+        - False (default): The distance from the edge of the survey domain to
+          the edge of the computational domain is one wavelength.
+        - True: The distance from the center to the edge of the computational
+          domain and back to the end of the survey domain is two wavelengths.
+
+    mapping : str or map, optional
+        Defines what type the input ``property_{x;y;z}``-values correspond to.
+        By default, they represent resistivities (Ohm.m). The implemented
+        mappings are:
+
+        - 'Conductivity'; σ (S/m),
+        - 'LgConductivity'; log_10(σ),
+        - 'LnConductivity'; log_e(σ),
+        - 'Resistivity'; ρ (Ohm.m); Default,
+        - 'LgResistivity'; log_10(ρ),
+        - 'LnResistivity'; log_e(ρ).
+
+    cell_numbers : list, optional
+        List of possible numbers of cells. See :func:`good_mg_cell_nr`.
+        Default is ``good_mg_cell_nr(1024, 5, 3)``, which corresponds to
+        numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
+        512, 640, 768, 1024.
+
+    verb : int, optional
+        Verbosity, -1 (error); 0 (warning), 1 (info), 2 (verbose).
+        Default = 0 (Warnings only).
+
+
+    Returns
+    -------
+    origin : float
+        Origin of the mesh.
+
+    widths : ndarray
+        Cell widths of mesh.
+
+
+    """
+    verb = kwargs.get('verb', 0)
+
+    # Initiate direction-specific dicts, add unambiguous args.
+    kwargs['frequency'] = frequency
+    xparams = {'center': center[0]}
+    yparams = {'center': center[1]}
+    zparams = {'center': center[2], 'seasurface': seasurface}
+
+    # Add properties.
+    if isinstance(properties, (int, float)):
+        properties = np.array([properties])
+    if len(properties) == 4:
+        xparams['properties'] = [properties[0], properties[1], properties[1]]
+        yparams['properties'] = [properties[0], properties[1], properties[1]]
+        zparams['properties'] = [properties[0], properties[2], properties[3]]
+    elif len(properties) == 7:
+        xparams['properties'] = [properties[0], properties[1], properties[2]]
+        yparams['properties'] = [properties[0], properties[3], properties[4]]
+        zparams['properties'] = [properties[0], properties[5], properties[6]]
+    else:
+        kwargs['properties'] = properties
+
+    # Add optionally direction specific args.
+    for name, value in zip(['domain', 'vector'], [domain, vector]):
+        if (value is not None and len(value) == 3 and not
+                isinstance(value, np.ndarray)):
+            if value[0] is not None:
+                xparams[name] = value[0]
+            if value[1] is not None:
+                yparams[name] = value[1]
+            if value[2] is not None:
+                zparams[name] = value[2]
+        else:
+            kwargs[name] = value
+
+    # Add optionally direction specific kwargs.
+    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
+        value = kwargs.pop(name, None)
+        if value is not None:
+            if isinstance(value, (int, float)):
+                kwargs[name] = np.array([value])
+            elif len(value) == 3:
+                if value[0] is not None:
+                    xparams[name] = value[0]
+                if value[1] is not None:
+                    yparams[name] = value[1]
+                if value[2] is not None:
+                    zparams[name] = value[2]
+            else:
+                kwargs[name] = value
+
+    # Get origins and widths in all directions.
+    if verb > 0:
+        print("         == GRIDDING IN X ==")
+    x0, hx = get_origin_widths(**kwargs, **xparams)
+    if verb > 0:
+        print("\n         == GRIDDING IN Y ==")
+    y0, hy = get_origin_widths(**kwargs, **yparams)
+    if verb > 0:
+        print("\n         == GRIDDING IN Z ==")
+    z0, hz = get_origin_widths(**kwargs, **zparams)
+
+    # Return mesh.
+    return TensorMesh([hx, hy, hz], x0=np.array([x0, y0, z0]))
+
+
+def get_origin_widths(frequency, properties, center, domain=None, vector=None,
+                      seasurface=None, **kwargs):
+    r"""Return origin and cell widths for given parameters.
+
+    This function works in one dimension only, and is used by
+    :func:`construct_mesh` once in each direction. It is recommended to use
+    directly function :func:`construct_mesh`, which returns a
+    :class:`TensorMesh`.
+
+    All the parameters are described in :func:`construct_mesh`. Described here
+    are only the differences.
+
+
+    Parameters
+    ----------
+
+    All : description
+        All parameters are described in :func:`construct_mesh`. The only
+        difference is that here only variables for one direction are accepted.
+
+    raise_error : bool, optional
+        If True, an error is raised if no suitable grid is found. Otherwise it
+        just prints a message and returns None's.
+        Default is True.
+
+    Returns
+    -------
+    origin : float
+        Origin of the mesh.
+
+    widths : ndarray
+        Cell widths of mesh.
+
+    """
+    # Get all kwargs.
+    stretching = kwargs.pop('stretching', [1.0, 1.5])
+    min_width_limits = kwargs.pop('min_width_limits', None)
+    min_width_pps = kwargs.pop('min_width_pps', 3)
+    lambda_factor = kwargs.pop('lambda_factor', 1.0)
+    max_buffer = kwargs.pop('max_buffer', 100000)
+    lambda_from_center = kwargs.pop('lambda_from_center', False)
+    pmap = kwargs.pop('mapping', 'Resistivity')
+    cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
+    raise_error = kwargs.pop('raise_error', True)
+    verb = kwargs.pop('verb', 0)
+
+    # Ensure no kwargs left.
+    if kwargs:
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+
+    # Get property map from string.
+    if isinstance(pmap, str):
+        pmap = getattr(maps, 'Map'+pmap)()
+
+    # Properties.
+    cond = pmap.backward(np.array(properties, ndmin=1, dtype=float))
+    cond_arr = np.array([
+        cond[0], cond[min(cond.size-1, 1)], cond[min(cond.size-1, 2)]])
+
+    # Get skin depth.
+    skind = skin_depth(frequency, cond_arr, precision=0)
+
+    # Minimum cell width.
+    dmin = min_cell_width(skind[0], min_width_pps, min_width_limits)
+
+    # Survey domain: if not provided get from vector.
+    if domain is None and vector is None:
+        raise ValueError(
+                "At least one of `domain` and `vector` must be provided.")
+    elif domain is None:
+        domain = np.array([vector.min(), vector.max()], dtype=float)
+    else:
+        domain = np.array(domain, dtype=np.float64)
+        if vector is not None:
+            if domain[0] < vector.min() or domain[1] > vector.max():
+                raise ValueError(
+                        "Provided vector MUST at least include all of the "
+                        "survey domain.")
+
+    # Seasurface related checks.
+    if seasurface is not None:
+
+        # Check that seasurface > center.
+        if seasurface <= center:
+            raise ValueError(
+                    "The `seasurface` but be bigger then `center`.")
+
+        # If center is close to seasurface, set it to seasurface.
+        if abs(seasurface - center) < dmin:
+            center = seasurface
+
+    # Computation domain; big enough to avoid boundary effects.
+    # To avoid boundary effects we want the signal to travel two wavelengths
+    # from the source to the boundary and back to the receiver.
+    # => 2*pi*sd ~ 6.3*sd = one wavelength => signal is ~ 0.2 %.
+    # Two wavelengths we can safely assume it is zero.
+    wlength = lambda_factor*wavelength(skind[1:])
+
+    if lambda_from_center:
+        # Center to edges of domain.
+        in_domain = abs(domain - center)
+
+        # Required buffer, additional to domain.
+        d_buff = np.max([np.zeros(2), (2*wlength - in_domain)/2], axis=0)
+
+        # Add buffer to domain.
+        comp_domain = np.array([domain[0]-d_buff[0], domain[1]+d_buff[1]])
+
+        # Restrict total domain to max_buffer.
+        comp_domain[0] = max(comp_domain[0], center-max_buffer)
+        comp_domain[1] = min(comp_domain[1], center+max_buffer)
+
+    else:
+        dbuffer = np.min([wlength, np.ones(2)*max_buffer], axis=0)
+        comp_domain = np.array([domain[0]-dbuffer[0], domain[1]+dbuffer[1]])
+
+    # Initiate flag if terminated.
+    finished = False
+
+    # Initiate alpha variables for survey and computation domains.
+    sa, ca = 1.0, 1.0
+
+    # Loop over possible cell numbers from small to big.
+    for nx in np.unique(cell_numbers):
+
+        # Loop over possible alphas for domain.
+        for sa in np.arange(1.0, stretching[0]+0.005, 0.01):
+
+            if vector is None:
+
+                # Get current stretched grid cell sizes.
+                thxl = dmin*sa**np.arange(nx)  # Left of origin.
+                thxr = dmin*sa**np.arange(nx)  # Right of origin.
+
+                # Adjust stretching for seasurface if required.
+                if seasurface is not None and seasurface > center:
+                    t_nx = np.r_[center, center+np.cumsum(thxr)]
+                    ii = np.argmin(abs(t_nx-seasurface))
+                    thxr[:ii] *= abs(seasurface-center)/np.sum(thxr[:ii])
+
+                # Fill from center to left and right domain.
+                nl = np.sum((center-np.cumsum(thxl)) > domain[0]) + 1
+                nr = np.sum((center+np.cumsum(thxr)) < domain[1]) + 1
+
+                # Create the current hx-array.
+                hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
+
+                # Get actual domain:
+                asurv_domain = [center - np.sum(thxl[:nl]),
+                                center + np.sum(thxr[:nr])]
+
+            else:
+                # Store actual domain, current hx-array, and number of cells.
+                asurv_domain = [vector[0], vector[-1]]
+                hx = np.diff(vector)
+
+            # Expand for seasurface if necessary.
+            if seasurface is not None and seasurface > asurv_domain[-1]:
+                thxr = hx[-1]*sa**np.arange(nx)
+                sdepth = seasurface - asurv_domain[-1]
+
+                # Get number of element, round down, and stretch.
+                ii = np.argmax(np.cumsum(thxr) > sdepth)
+                thxr = thxr[:ii]  # Restrict.
+                thxr *= abs(seasurface-asurv_domain[-1])/np.sum(thxr)
+
+                # Adjust actual domain, hx, and count.
+                asurv_domain[1] += sum(thxr)
+                hx = np.r_[hx, thxr]
+
+            # Remaining number of cells
+            nx_remain = nx - hx.size
+
+            # Not good, try next.
+            if nx_remain <= 0:
+                continue
+
+            # Store for verbosity
+            hxo = hx
+
+            # Loop over possible alphas for buffer.
+            for ca in np.arange(sa, stretching[1]+0.005, 0.01):
+
+                # Get current stretched grid cell sizes.
+                thxl = hx[0]*ca**np.arange(1, nx_remain+1)   # Left of survey.
+                thxr = hx[-1]*ca**np.arange(1, nx_remain+1)  # Right of survey.
+
+                # Fill from survey to left and right domain.
+                nl = np.sum((asurv_domain[0] - np.cumsum(thxl)) >
+                            comp_domain[0]) + 1
+                nr = np.sum((asurv_domain[1] + np.cumsum(thxr)) <
+                            comp_domain[1]) + 1
+
+                # Get remaining number of cells.
+                nx_remain2 = nx_remain - nl - nr
+
+                if nx_remain2 < 0:  # Not good, try next.
+                    continue
+
+                # Create hx-array.
+                nl += int(np.floor(nx_remain2/2))  # If uneven, add one cell
+                nr += int(np.ceil(nx_remain2/2))   # more on the right.
+                hx = np.r_[thxl[:nl][::-1], hx, thxr[:nr]]
+
+                # Compute origin.
+                x0 = float(asurv_domain[0]-np.sum(thxl[:nl]))
+
+                # Mark it as finished and break out of the loop.
+                finished = True
+                break
+
+            if finished:
+                break
+
+        if finished:
+            break
+
+    # Raise Error or return Nones if not finish.
+    if not finished:
+        msg = "No suitable grid found; relax your criteria."
+        # Throw message if no solution was found.
+        if raise_error:
+            raise RuntimeError(msg)
+        else:
+            print(f"* ERROR   :: {msg}")
+            return None, None
+
+    # Print info about final grid.
+    if verb > 0:
+
+        # Check max stretching.
+        sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
+        sa_limit = min(1.5, stretching[0]+0.25)
+
+        if verb > 1:
+            end = ""
+        else:
+            end = "\n"
+
+        print(f"Skin depth          [m] : {skind[0]:.0f}", end="")
+        if cond.size == 2:
+            print(f" / {skind[1]:.0f}", end=end)
+        elif cond.size == 3:
+            print(f" / {skind[1]:.0f} / {skind[2]:.0f}", end=end)
+        else:
+            print(end=end)
+        if verb > 1:
+            print("  [corresponding to `properties`]")
+
+        print(f"Survey domain DS    [m] : {domain[0]:.0f} - {domain[1]:.0f}")
+
+        print(f"Comp. domain DC     [m] : {comp_domain[0]:.0f} - "
+              f"{comp_domain[1]:.0f}")
+
+        print(f"Final extent        [m] : {x0:.0f} - {x0+np.sum(hx):.0f}")
+
+        print(f"Cell widths         [m] : "
+              f"{min(hxo):.0f} / {max(hxo):.0f} / {max(hx):.0f}", end=end)
+        if verb > 1:
+            print("  [min(DS) / max(DS) / max(DC)]")
+
+        print(f"Number of cells         : {nx} ({hxo.size} / "
+              f"{nx-hxo.size-nx_remain2} / {nx_remain2})", end=end)
+        if verb > 1:
+            print("  [Total (DS/DC/remain)]")
+
+        print(f"Max stretching          : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}",
+              end=end)
+        if verb > 1:
+            print("  [DS (seasurface) / DC]")
+        if sa_adj > sa_limit:
+            print(f"Note: Stretching in DS >> {sa}.\nThe reason "
+                  "is usually the interplay of center/domain/seasurface.")
+
+    return x0, hx
+
+
+def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
+    r"""Returns 'good' cell numbers for the multigrid method.
+
+    'Good' cell numbers are numbers which can be divided by 2 as many times as
+    possible. At the end there will be a low prime number.
+
+    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
+    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
+    :math:`M, p_\text{max}, n_\text{min}` correspond to `max_nr`, `max_prime`,
+    and `min_div`, respectively.
+
+
+    Parameters
+    ----------
+    max_nr : int, optional
+        Maximum number of cells.
+        Default is 1024.
+
+    max_prime : int, optional
+        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
+        limits in order to avoid too big lowest grids in the multigrid method.
+        Default is 5.
+
+    min_div : int, optional
+        Minimum times the number can be divided by two.
+        Default is 3.
+
+
+    Returns
+    -------
+    numbers : array
+        Array containing all possible cell numbers from lowest to highest.
+
+    """
+    # Primes till 20.
+    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19])
+
+    # Sanity check; 19 is already ridiculously high.
+    if max_prime > primes[-1]:
+        raise ValueError(
+                f"Highest prime is {max_prime}, please use a value < 20.")
+
+    # Restrict to max_prime.
+    primes = primes[primes <= max_prime]
+
+    # Get possible values.
+    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
+    numbers = primes[:, None]*2**np.arange(min_div, 30)
+
+    # Get unique values.
+    numbers = np.unique(numbers)
+
+    # Restrict to max_nr and return.
+    return numbers[numbers <= max_nr]
+
+
+def skin_depth(frequency, conductivity, mu=mu_0, precision=0):
+    r"""Return skin depth for provided frequency and conductivity.
+
+    The skin depth :math:`\delta` (m) is given by
+
+    .. math::
+        :label: skindepth
+
+        \delta = \frac{2}{\omega\sigma\mu}\ ,
+
+    where :math:`\omega=2\pi f` is angular frequency of frequency :math:`f`
+    (Hz), :math:`\sigma` is conductivity (S/m), and :math:`\mu` is magnetic
+    permeability (H/m).
+
+
+    Parameters
+    ----------
+    frequency : float
+        Frequency (Hz).
+
+    conductivity : float
+        Conductivity (S/m).
+
+    mu : float, optional
+        Magnetic permeability (H/m); default is :math:`\mu_0`.
+
+    precision : int, optional
+        Precision of the return skin depth.
+        Default is 0, hence meters.
+
+
+    Returns
+    -------
+    skindepth : float
+        Skin depth (m).
+
+    """
+    skind = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu)
+    if frequency < 0:  # For Laplace-domain computations.
+        skind /= np.sqrt(2*np.pi)
+    return np.round(skind, precision)
+
+
+def wavelength(skin_depth, precision=0):
+    r"""Return the wavelength.
+
+    The wavelength :math:`\lambda` (m) is given by
+
+    .. math::
+        :label: wavelength
+
+        \lambda = 2\pi\delta\ ,
+
+    where the skin depth :math:`\delta` is given by :func:`skin_depth`,
+    Equation :eq:`skindepth`.
+
+
+    Parameters
+    ----------
+    skin_depth : float or ndarray.
+        Skin depth (m).
+
+    precision : int, optional
+        Precision of the returned wave length.
+        Default is 0, hence meters.
+
+
+    Returns
+    -------
+    wavelength : float or ndarray
+        Wavelength (m).
+
+    """
+    return np.round(2*np.pi*skin_depth, precision)
+
+
+def min_cell_width(skin_depth, pps=3, limits=None, precision=0):
+    r"""Return the minimum cell width.
+
+    The minimum cell width is defined by the desired points per skin depth,
+
+    .. math::
+        :label: mincellwidth
+
+        \Delta_\text{min} = \frac{\delta}{\text{pps}}\ ,
+
+    where its value is restricted by ``limits``. The skin depth :math:`\delta`
+    is given by :func:`skin_depth`, Equation :eq:`skindepth`.
+
+
+    Parameters
+    ----------
+    skin_depth : float
+        Skin depth (m).
+
+    pps : int
+        Points per skin depth.
+
+    limits : None, float, or list of two floats
+        Limits on minimum width:
+
+        - None: No limits.
+        - float: Returns limits as dmin.
+        - [min, max]: dmin is limited to this range.
+
+    precision : int, optional
+        Precision of the cell width. Provided limits are not rounded.
+        Default is 0, hence meters.
+
+
+    Returns
+    -------
+    dmin : float
+        Minimum cell width (m).
+
+    """
+    # Calculate min cell width.
+    dmin = np.round(skin_depth/pps, precision)
+
+    # Respect user limits.
+    if limits is not None:
+
+        limits = np.array(limits, ndmin=1)
+
+        if limits.size == 1:
+            dmin = limits  # Ignores skin depth and pps.
+        else:
+            dmin = np.clip(dmin, *limits)  # Restrict.
+
+    return dmin
+
+
+# # # DEPRECATED FUNCTIONS # # #
 def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
               pps=3, alpha=None, max_domain=100000., raise_error=True, verb=1,
               return_info=False):
@@ -263,9 +963,10 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         Default is 0.
 
     possible_nx : list, optional
-        List of possible numbers of cells. See :func:`get_cell_numbers`.
-        Default is ``get_cell_numbers(500, 5, 3)``, which corresponds to
-        [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384].
+        List of possible numbers of cells. See :func:`good_mg_cell_nr`.
+        Default is ``good_mg_cell_nr(1024, 5, 3)``, which corresponds to
+        numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
+        512, 640, 768, 1024.
 
     min_width : float, list or None, optional
         Minimum cell width restriction:
@@ -325,11 +1026,13 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         - `amax`: Maximum alpha.
 
     """
+    warnings.warn(MESHWARNING, DeprecationWarning)
+
     # Get variables with default lists:
     if alpha is None:
         alpha = [1, 1.5, 0.01]
     if possible_nx is None:
-        possible_nx = get_cell_numbers(500, 5, 3)
+        possible_nx = good_mg_cell_nr()
 
     # Cast resistivity value(s).
     res = np.array(res, ndmin=1)
@@ -359,19 +1062,11 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
                     "of the first one.\n"
                     f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
 
-    # Compute skin depth.
-    skind = 503.3*np.sqrt(res_arr/abs(freq))
-    if freq < 0:  # For Laplace-domain computations.
-        skind /= np.sqrt(2*np.pi)
+    # Get skin depth.
+    skind = skin_depth(freq, 1/res_arr, precision=3)
 
     # Minimum cell width.
-    dmin = skind[0]/pps
-    if min_width is not None:  # Respect user input.
-        min_width = np.array(min_width, ndmin=1)
-        if min_width.size == 1:
-            dmin = min_width
-        else:
-            dmin = np.clip(dmin, *min_width)
+    dmin = min_cell_width(skind[0], pps, min_width)
 
     # Survey domain; contains all sources and receivers.
     domain = np.array(domain, dtype=np.float64)
@@ -390,7 +1085,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     dist_in_domain = abs(domain - fixed[0])
 
     # (b) Two wavelengths.
-    two_lambda = skind[1:]*4*np.pi
+    two_lambda = 2*wavelength(skind[1:], precision=3)
 
     # (c) Required buffer, additional to domain.
     dist_buff = np.max([np.zeros(2), (two_lambda - dist_in_domain)/2], axis=0)
@@ -545,58 +1240,8 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
 
 def get_cell_numbers(max_nr, max_prime=5, min_div=3):
-    r"""Returns 'good' cell numbers for the multigrid method.
-
-    'Good' cell numbers are numbers which can be divided by 2 as many times as
-    possible. At the end there will be a low prime number.
-
-    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
-    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
-    :math:`M, p_\text{max}, n_\text{min}` correspond to `max_nr`, `max_prime`,
-    and `min_div`, respectively.
-
-
-    Parameters
-    ----------
-    max_nr : int
-        Maximum number of cells.
-
-    max_prime : int
-        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
-        limits in order to avoid too big lowest grids in the multigrid method.
-        Default is 5.
-
-    min_div : int
-        Minimum times the number can be divided by two.
-        Default is 3.
-
-
-    Returns
-    -------
-    numbers : array
-        Array containing all possible cell numbers from lowest to highest.
-
-    """
-    # Primes till 20.
-    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19])
-
-    # Sanity check; 19 is already ridiculously high.
-    if max_prime > primes[-1]:
-        raise ValueError(
-                f"Highest prime is {max_prime}, please use a value < 20.")
-
-    # Restrict to max_prime.
-    primes = primes[primes <= max_prime]
-
-    # Get possible values.
-    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
-    numbers = primes[:, None]*2**np.arange(min_div, 30)
-
-    # Get unique values.
-    numbers = np.unique(numbers)
-
-    # Restrict to max_nr and return.
-    return numbers[numbers <= max_nr]
+    warnings.warn(CELLWARNING, DeprecationWarning)
+    return good_mg_cell_nr(max_nr, max_prime, min_div)
 
 
 def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
@@ -819,10 +1464,8 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
     if fact_pos is None:
         fact_pos = fact_neg
 
-    # Compute the skin depth.
-    skind = 503.3*np.sqrt(res/abs(freq))
-    if freq < 0:  # For Laplace-domain computations.
-        skind /= np.sqrt(2*np.pi)
+    # Get skin depth.
+    skind = skin_depth(freq, 1/res, precision=3)
 
     # Estimate minimum cell width.
     h_min = fact_min*skind

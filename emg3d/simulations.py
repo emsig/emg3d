@@ -37,26 +37,42 @@ except ImportError:
     # `emg3d.simulation.process_map = emg3d.utils._process_map`.
     from emg3d.utils import _process_map as process_map
 
-from emg3d import fields, solver, surveys, models, meshes, optimize
+from emg3d import fields, solver, surveys, maps, models, meshes, optimize
 
-__all__ = ['Simulation']
+__all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
 
 
 class Simulation:
     """Create a simulation for a given survey on a given model.
 
-    The computational grid(s) can be either the same as the provided model
-    grid, or automatic gridding can be used.
+    A simulation can be used to compute responses for an entire survey, hence
+    for an arbitrary amount of sources, receivers, and frequencies. The
+    responses can be computed in parallel over sources and frequencies. It can
+    also be used to compute the misfit with the data and to compute the
+    gradient of the misfit function.
+
+    The computational grid(s) can either be provided, or automatic gridding can
+    be used; see the description of the parameters ``gridding`` and
+    ``gridding_opts`` for more details.
+
+    .. warning::
+
+        The automatic gridding does its best to generate meshes that are
+        suitable for the provided model and survey. However, CSEM spans a wide
+        range of acquisition layouts, and frequencies as well as conductivities
+        or resistivities span many orders of magnitude. This makes it hard to
+        have a function that fits all purposes. Check the meshes with your
+        expert knowledge. Also, the automatic gridding is conservative in its
+        estimate, in order to be on the save side (correct results over speed).
+        This means, however, that often smaller grids could be used by
+        providing the appropriate options in ``gridding_opts``.
 
     .. note::
 
         The Simulation-class has currently a few limitations:
 
-        - `gridding` must be `'same'`;
         - `survey.fixed`: must be `False`;
         - sources and receivers must be electric;
-        - Anything related to `optimization` is considered experimental/alpha,
-          and might change in the future.
 
 
     Parameters
@@ -68,26 +84,58 @@ class Simulation:
         The survey-data will be modified in place. Provide survey.copy() if you
         want to avoid this.
 
-    grid : :class:`meshes.TensorMesh`
-        The grid. See :class:`meshes.TensorMesh`.
+    grid : :class:`emg3d.meshes.TensorMesh`
+        The grid. See :class:`emg3d.meshes.TensorMesh`.
 
     model : :class:`emg3d.models.Model`
         The model. See :class:`emg3d.models.Model`.
 
-    max_workers : int
-        The maximum number of processes that can be used to execute the
-        given calls. Default is 4.
-
-    gridding : str, TensorMesh, or dict
-        Method how the computational grids are computed. The default is
-        currently 'same', the only supported string-method so far (automatic
-        gridding will be implemented in the future).
+    gridding : str, optional
+        Method how the computational grids are computed. Default is 'single'.
+        The different methods are:
 
         - 'same': Same grid as for the input model.
-        - TensorMesh: The provided TensorMesh is used for all sources and
-          frequencies.
-        - dict: The dict must have the form `dict[source][frequency]`,
-          containing a TensorMesh for each source-frequency pair.
+        - 'single': A single grid for all sources and frequencies.
+        - 'frequency': Frequency-dependent grids.
+        - 'source': Source-dependent grids.
+        - 'both': Frequency- and source-dependent grids.
+        - 'input': Same as 'single', but instead of automatically generate
+          the mesh it has to be provided in ``gridding_opts``.
+        - 'dict': Same as 'both', but instead of automatically generate the
+          meshes they have to be provided as a ``dict[source][frequency]``
+          in ``gridding_opts``.
+
+        See the parameter ``gridding_opts`` for more details.
+
+    gridding_opts : dict or TensorMesh, optional
+        Input format depends on ``gridding``:
+
+        - 'same': Nothing, ``gridding_opts`` is not permitted.
+        - 'single', 'frequency', 'source', 'both': Described below.
+        - 'input': A :class:`emg3d.meshes.TensorMesh`.
+        - 'dict': Dictionary of the format ``dict[source][frequency]``
+          containing a :class:`emg3d.meshes.TensorMesh` for each
+          source-frequency pair.
+
+        The dict in the case of 'single', 'frequency', 'source', 'both' is
+        passed to :func:`emg3d.meshes.construct_mesh`; consult the
+        corresponding documentation for more information. Parameters that are
+        not provided are estimated from the model, grid, and survey using
+        :func:`estimate_gridding_opts`, which documentation contains more
+        information too.
+
+        There are two notably differences to the parameters described in
+        :func:`emg3d.meshes.construct_mesh`:
+
+        - ``vector``: besides the normal possibility it can also be a string
+          containing one or several of 'x', 'y', and 'z'. In these cases the
+          corresponding dimension of the input mesh is provided as vector.
+          See :func:`estimate_gridding_opts`.
+        - ``expand``: in the format of ``[property_sea, property_air]``; if
+          provided, the input model is expanded up to the seasurface with sea
+          water, and an air layer is added. The actual height of the seasurface
+          can be defined with the key ``seasurface``. See
+          :func:`expand_grid_model`.
 
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
@@ -95,86 +143,123 @@ class Simulation:
         `grid`, `model`, `sfield`, and `efield`.
         If not provided the following defaults are used:
 
-        - `sslsolver = True`;
-        - `semicoarsening = True`;
-        - `linerelaxation = True`;
-        - `verb = 0` (yet warnings are capture and shown).
+        - `sslsolver=True`;
+        - `semicoarsening=True`;
+        - `linerelaxation=True`;
+        - `verb=0` (yet warnings are capture and shown).
 
         Note that these defaults are different from the defaults in
         :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
         many cases, but they are the most robust combination at which you can
         throw most things.
 
+    max_workers : int
+        The maximum number of processes that can be used to execute the
+        given calls. Default is 4.
+
     verb : int; optional
-        Level of verbosity. Default is 0.
+        Level of verbosity. Default is 1.
 
         - -1: Error.
         - 0: Warning.
         - 1: Info.
         - 2: Debug.
 
-
     """
 
+    # Gridding descriptions (for repr's).
+    _gridding_descr = {
+            'same': 'Same grid as for model',
+            'single': 'A single grid for all sources and frequencies',
+            'frequency': 'Frequency-dependent grids',
+            'source': 'Source-dependent grids',
+            'both': 'Frequency- and source-dependent grids',
+            'input': 'A single, provided grid all sources/frequencies',
+            'dict': 'Provided dict of frequency-/source-dependent grids',
+            }
+
     def __init__(self, name, survey, grid, model, max_workers=4,
-                 gridding='same', **kwargs):
+                 gridding='single', **kwargs):
         """Initiate a new Simulation instance."""
 
-        # Store inputs.
+        # Store mandatory inputs (grid and model later).
         self.name = name
         self.survey = survey
-        self.grid = grid
-        self.model = model
         self.max_workers = max_workers
-        self.verb = kwargs.pop('verb', 0)
+        self.gridding = gridding
 
-        # Get gridding options, set to defaults if not provided.
-        self._gridding_descr = {
-                'same': 'Same grid as for model',
-                'single': 'A single grid for all sources and frequencies',
-                'frequency': 'Frequency-dependent grids',
-                'source': 'Source-dependent grids',
-                'both': 'Frequency- and source-dependent grids',
-                }
-        # gridding_opts will be used for the automatic gridding.
-        self.gridding_opts = kwargs.pop('gridding_opts', {})
-        self._initiate_model_grid(gridding)
+        # Store optional inputs with defaults.
+        self.verb = kwargs.pop('verb', 1)
+        gridding_opts = kwargs.pop('gridding_opts', {}).copy()
 
-        # Get kwargs.
-        self.solver_opts = {
-                'sslsolver': True,       # Default in solve is False.
-                'semicoarsening': True,  # "
-                'linerelaxation': True,  # "
-                'verb': 0,
-                **kwargs.pop('solver_opts', {}),  # Overwrites defaults.
-                }
+        # Store solver options with defaults.
+        # The slowest but most robust setting is used; also, verbosity is
+        # switched off entirely, as warnings are captured differently.
+        # Input overwrites all defaults if provided.
+        self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
+                            'linerelaxation': True,  'verb': 0,
+                            **kwargs.pop('solver_opts', {})}
 
-        # Ensure no kwargs left (currently kwargs is not used).
+        # Store original input nCz.
+        self._input_nCz = kwargs.pop('_input_nCz', grid.nCz)
+
+        # Ensure no kwargs left.
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
+        # Fixed surveys are not yet implemented.
         if self.survey.fixed:
             raise NotImplementedError(
                     "Simulation currently only implemented for "
                     "`survey.fixed=False`.")
 
-        # Magnetic sources are not yet implemented in simulation.
-        if sum([not s.electric for s in survey.sources.values()]) > 0:
-            raise NotImplementedError(
-                    "Simulation not yet implemented for magnetic sources.")
-
-        # Magnetic receivers are not yet implemented in simulation.
-        if sum([not r.electric for r in survey.receivers.values()]) > 0:
-            raise NotImplementedError(
-                    "Simulation not yet implemented for magnetic receivers.")
+        # Magnetic sources and receivers are not yet implemented.
+        msrc = sum([not s.electric for s in survey.sources.values()]) > 0
+        mrec = sum([not r.electric for r in survey.receivers.values()]) > 0
+        if msrc or mrec:
+            raise NotImplementedError("Simulation not yet implemented for "
+                                      "magnetic sources and receivers.")
 
         # Initiate dictionaries and other values with None's.
+        self._dict_grid = self._dict_initiate
+        self._dict_model = self._dict_initiate
         self._dict_sfield = self._dict_initiate
         self._dict_efield = self._dict_initiate
         self._dict_hfield = self._dict_initiate
         self._dict_efield_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
+
+        # Check gridding_opts depending on gridding and act upon.
+        if self.gridding == 'dict':
+            self._dict_grid = gridding_opts
+        elif self.gridding == 'input':
+            self._grid_single = gridding_opts
+        elif self.gridding == 'same':
+            if gridding_opts:
+                msg = "`gridding_opts` is not permitted if `gridding='same'`"
+                raise TypeError(msg)
+        else:
+
+            # Expand model by water and air if required.
+            expand = gridding_opts.pop('expand', None)
+            if expand is not None:
+                try:
+                    interface = gridding_opts['seasurface']
+                except KeyError as e:
+                    msg = ("`gridding_opts['seasurface']` is required if "
+                           "`gridding_opts['expand']` is provided.")
+                    raise KeyError(msg) from e
+                grid, model = expand_grid_model(grid, model, expand, interface)
+
+            # Get automatic gridding input.
+            # Estimate the parameters from survey and model if not provided.
+            self.gridding_opts = estimate_gridding_opts(
+                    gridding_opts, grid, model, survey, self._input_nCz)
+
+        # Store grid and model.
+        self.grid = grid
+        self.model = model
 
         # Initiate synthetic data with NaN's.
         self.survey._data['synthetic'] = self.survey.data.observed*np.nan
@@ -193,7 +278,8 @@ class Simulation:
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies\n"
                 f"- {self.model.__repr__()}\n"
-                f"- Gridding: {self._gridding_descr[self.gridding]}")
+                f"- Gridding: {self._gridding_descr[self.gridding]}; "
+                f"{self._info_grids}")
 
     def _repr_html_(self):
         return (f"<h3>{self.__class__.__name__} «{self.name}»</h3>"
@@ -203,8 +289,8 @@ class Simulation:
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies</li>"
                 f"<li>{self.model.__repr__()}</li>"
-                f"<li>Gridding: "
-                f"{self._gridding_descr[self.gridding]}</li>"
+                f"<li>Gridding: {self._gridding_descr[self.gridding]}; "
+                f"{self._info_grids}</li>"
                 f"</ul>")
 
     def copy(self, what='computed'):
@@ -240,6 +326,33 @@ class Simulation:
         out['max_workers'] = self.max_workers
         out['gridding'] = self.gridding
         out['solver_opts'] = self.solver_opts
+
+        # Put provided grids back on gridding.
+        if self.gridding == 'input':
+            out['gridding_opts'] = self._grid_single
+        elif self.gridding == 'dict':
+            out['gridding_opts'] = self._dict_grid
+        elif self.gridding != 'same':
+
+            gopts = self.gridding_opts
+
+            # Take care of map.
+            if 'mapping' in gopts.keys():
+                if not isinstance(gopts['mapping'], str):
+                    gopts['mapping'] = gopts['mapping'].name
+
+            # Take care of tuples and lists for h5/npz.
+            # Ideally, this should be dealt with in emg3d.io.
+            for key in ['domain', 'vector', 'stretching', 'min_width_limits']:
+                if (key in gopts.keys() and
+                        isinstance(gopts[key], (list, tuple))):
+                    this_type = type(gopts[key]).__name__
+                    gopts[key] = {i: v for i, v in enumerate(gopts[key])}
+                    gopts[key]['__type__'] = this_type
+
+            out['gridding_opts'] = gopts
+
+        out['_input_nCz'] = self._input_nCz
 
         # Get required properties.
         store = []
@@ -288,6 +401,24 @@ class Simulation:
         from emg3d import io
 
         try:
+
+            # gridding options, backwards compatible.
+            gridding = inp['gridding']
+            gridding_opts = inp.get('gridding_opts', {})
+
+            # De-serialize lists and tuples.
+            # Ideally, this should be dealt with in emg3d.io.
+            if gridding not in ['input', 'dict', 'same']:
+                props = ['domain', 'vector', 'stretching', 'min_width_limits']
+                for key in props:
+                    if key in gridding_opts.keys():
+                        if '__type__' in gridding_opts[key].keys():
+                            this_type = gridding_opts[key].pop('__type__')
+                            out = [d for d in gridding_opts[key].values()]
+                            if this_type == 'tuple':
+                                out = tuple(out)
+                            gridding_opts[key] = out
+
             # Initiate class.
             out = cls(
                     name=inp['name'],
@@ -295,8 +426,10 @@ class Simulation:
                     grid=meshes.TensorMesh.from_dict(inp['grid']),
                     model=models.Model.from_dict(inp['model']),
                     max_workers=inp['max_workers'],
-                    gridding=inp['gridding'],
+                    gridding=gridding,
                     solver_opts=inp['solver_opts'],
+                    gridding_opts=gridding_opts,
+                    _input_nCz=inp.get('_input_nCz', len(inp['grid']['hz']))
                     )
 
             # Add existing derived/computed properties.
@@ -368,7 +501,7 @@ class Simulation:
             Name under which the survey is stored within the file.
 
         kwargs : Keyword arguments, optional
-            Passed through to :func:`io.save`.
+            Passed through to :func:`emg3d.io.save`.
 
         """
         from emg3d import io
@@ -402,7 +535,7 @@ class Simulation:
             Name under which the simulation is stored within the file.
 
         kwargs : Keyword arguments, optional
-            Passed through to :func:`io.load`.
+            Passed through to :func:`emg3d.io.load`.
 
         Returns
         -------
@@ -418,46 +551,132 @@ class Simulation:
         """Return computational grid of the given source and frequency."""
         freq = float(frequency)
 
-        # Get grid if it is not stored yet.
-        if self._dict_grid[source][freq] is None:
+        # Return grid if it exists already.
+        if self._dict_grid[source][freq] is not None:
+            return self._dict_grid[source][freq]
 
-            # Act depending on gridding:
-            if self.gridding in ['same', 'single']:
+        # Act depending on gridding:
+        if self.gridding == 'same':  # Same grid as for provided model.
 
-                # Store link to grid.
-                self._dict_grid[source][freq] = self._grid_comp
+            # Store link to grid.
+            self._dict_grid[source][freq] = self.grid
 
-            else:  # self.gridding == 'both'
+        elif self.gridding == 'frequency':  # Frequency-dependent grids.
 
-                raise TypeError(
-                        "Provided grid-dict misses the following "
-                        "source-frequency pair: {source}, {freq} Hz.")
+            # Initiate dict.
+            if not hasattr(self, '_grid_frequency'):
+                self._grid_frequency = {}
 
-        # Return grid.
-        return self._dict_grid[source][freq]
+            # Get grid for this frequency if not yet computed.
+            if freq not in self._grid_frequency.keys():
+
+                # Get grid and store it.
+                inp = {**self.gridding_opts, 'frequency': freq}
+                self._grid_frequency[freq] = meshes.construct_mesh(**inp)
+
+            # Store link to grid.
+            self._dict_grid[source][freq] = self._grid_frequency[freq]
+
+        elif self.gridding == 'source':  # Source-dependent grids.
+
+            # Initiate dict.
+            if not hasattr(self, '_grid_source'):
+                self._grid_source = {}
+
+            # Get grid for this source if not yet computed.
+            if source not in self._grid_source.keys():
+
+                # Get grid and store it.
+                center = self.survey.sources[source].coordinates[:3]
+                inp = {**self.gridding_opts, 'center': center}
+                self._grid_source[source] = meshes.construct_mesh(**inp)
+
+            # Store link to grid.
+            self._dict_grid[source][freq] = self._grid_source[source]
+
+        elif self.gridding == 'both':  # Src- & freq-dependent grids.
+
+            # Get grid and store it.
+            center = self.survey.sources[source].coordinates[:3]
+            inp = {**self.gridding_opts, 'frequency': freq, 'center': center}
+            self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
+
+        else:  # Use a single grid for all sources and receivers.
+            # Default case; catches 'single' but also anything else.
+
+            # Get grid if not yet computed.
+            if not hasattr(self, '_grid_single'):
+
+                # Get grid and store it.
+                self._grid_single = meshes.construct_mesh(**self.gridding_opts)
+
+            # Store link to grid.
+            self._dict_grid[source][freq] = self._grid_single
+
+        # Use recursion to return grid.
+        return self.get_grid(source, frequency)
 
     def get_model(self, source, frequency):
         """Return model on the grid of the given source and frequency."""
         freq = float(frequency)
 
-        # Get model if it is not stored yet.
-        if self._dict_model[source][freq] is None:
+        # Return model if it exists already.
+        if self._dict_model[source][freq] is not None:
+            return self._dict_model[source][freq]
 
-            # Act depending on gridding:
-            if self.gridding in ['same', 'single']:
+        # Act depending on gridding:
+        if self.gridding == 'same':  # Same grid as for provided model.
 
-                # Store link to model.
-                self._dict_model[source][freq] = self._model_comp
+            # Store link to model.
+            self._dict_model[source][freq] = self.model
 
-            elif self.gridding == 'both':  # Src- & freq-dependent grids.
+        elif self.gridding == 'frequency':  # Frequency-dependent grids.
 
-                # Get model and store it.
-                model = self._model_comp.interpolate2grid(
-                            self._grid_comp, self.get_grid(source, freq))
-                self._dict_model[source][freq] = model
+            # Initiate dict.
+            if not hasattr(self, '_model_frequency'):
+                self._model_frequency = {}
 
-        # Return model.
-        return self._dict_model[source][freq]
+            # Get model for this frequency if not yet computed.
+            if freq not in self._model_frequency.keys():
+                self._model_frequency[freq] = self.model.interpolate2grid(
+                        self.grid, self.get_grid(source, freq))
+
+            # Store link to model.
+            self._dict_model[source][freq] = self._model_frequency[freq]
+
+        elif self.gridding == 'source':  # Source-dependent grids.
+
+            # Initiate dict.
+            if not hasattr(self, '_model_source'):
+                self._model_source = {}
+
+            # Get model for this source if not yet computed.
+            if source not in self._model_source.keys():
+                self._model_source[source] = self.model.interpolate2grid(
+                        self.grid, self.get_grid(source, freq))
+
+            # Store link to model.
+            self._dict_model[source][freq] = self._model_source[source]
+
+        elif self.gridding == 'both':  # Src- & freq-dependent grids.
+
+            # Get model and store it.
+            self._dict_model[source][freq] = self.model.interpolate2grid(
+                        self.grid, self.get_grid(source, freq))
+
+        else:  # Use a single grid for all sources and receivers.
+            # Default case; catches 'single' but also anything else.
+
+            # Get model if not yet computed.
+            if not hasattr(self, '_model_single'):
+                self._model_single = self.model.interpolate2grid(
+                        self.grid, self.get_grid(source, freq))
+
+            # Store link to model.
+            self._dict_model[source][freq] = self._model_single
+
+        # Use recursion to return model.
+        return self.get_model(source, frequency)
 
     def get_sfield(self, source, frequency):
         """Return source field for given source and frequency."""
@@ -666,35 +885,6 @@ class Simulation:
             min_off = offsets < kwargs.get('min_offset', 0.0)
             self.data['observed'].data[min_off] = np.nan + 1j*np.nan
 
-    # GRIDDING
-    def _initiate_model_grid(self, gridding):
-        """Initiate the computational grids and models."""
-
-        # Initiate grid- and model-dicts.
-        self._dict_grid = self._dict_initiate
-        self._dict_model = self._dict_initiate
-
-        if isinstance(gridding, str):
-            if gridding not in ['single', 'same']:
-                raise TypeError(f"Unknown `gridding`-option: '{gridding}'.")
-
-            self._grid_comp = self.grid
-            self._model_comp = self.model
-            self.gridding = gridding
-
-        elif isinstance(gridding, meshes.TensorMesh):
-            self._grid_comp = gridding
-            self._model_comp = self.model.interpolate2grid(self.grid, gridding)
-            self.gridding = 'single'
-
-        elif isinstance(gridding, dict):
-            for src, freq in self._srcfreq:
-                self._dict_grid[src][freq] = gridding.get(
-                        src, {}).get(freq, None)
-            self._grid_comp = self.grid
-            self._model_comp = self.model
-            self.gridding = 'both'
-
     # DATA
     @property
     def data(self):
@@ -713,7 +903,7 @@ class Simulation:
         if self._gradient is None:
             self._gradient = optimize.gradient(self)
 
-        return self._gradient
+        return self._gradient[:, :, :self._input_nCz]
 
     @property
     def misfit(self):
@@ -791,9 +981,36 @@ class Simulation:
 
         return self.__srcfreq
 
-    # BACKWARDS PROPAGATING FIELD
-    # This stuff would probably be better at home in `optimize`.
+    @property
+    def _info_grids(self):
+        """Return a string with "min {- max}" grid size."""
+        if self.gridding == 'same':
+            min_nC = self.grid.nC
+            min_vC = self.grid.vnC
+            has_minmax = False
+        elif self.gridding in ['single', 'input']:
+            grid = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
+            min_nC = grid.nC
+            min_vC = grid.vnC
+            has_minmax = False
+        else:
+            min_nC = 1e100
+            max_nC = 0
+            for src, freq in self._srcfreq:
+                grid = self.get_grid(src, freq)
+                if grid.nC > max_nC:
+                    max_nC = grid.nC
+                    max_vC = grid.vnC
+                if grid.nC < min_nC:
+                    min_nC = grid.nC
+                    min_vC = grid.vnC
+            has_minmax = min_nC != max_nC
+        info = f"{min_vC[0]} x {min_vC[1]} x {min_vC[2]} ({min_nC:,})"
+        if has_minmax:
+            info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
+        return info
 
+    # BACKWARDS PROPAGATING FIELD
     def _get_bfields(self, inp):
         """Return back-propagated electric field for given inp (src, freq)."""
 
@@ -874,3 +1091,332 @@ class Simulation:
                 )
 
         return ResidualField
+
+
+# HELPER FUNCTIONS
+def expand_grid_model(grid, model, expand, interface):
+    """Expand model and grid according to provided parameters.
+
+    Expand the grid and corresponding model in positive z-direction from the
+    end of the grid to the interface with ``expand[0]``, and a 100 m thick
+    layer above the interface with ``expand[1]``.
+
+    The provided properties are taken as isotropic; ``mu_r`` and ``epsilon_r``
+    are expanded with ones, if necessary.
+
+    The ``interface`` is usually the sea-surface, and ``expand`` is therefore
+    ``[property_sea, property_air]``.
+
+    Parameters
+    ----------
+    grid : :class:`emg3d.meshes.TensorMesh`
+        The grid.
+
+    model : :class:`emg3d.models.Model`
+        The model.
+
+    expand : list
+        The two properties below and above the interface:
+        ``[below_interface, above_interface]``.
+
+    interface : float
+        Interface between the two properties in ``expand``.
+
+
+    Returns
+    -------
+    grid : :class:`emg3d.meshes.TensorMesh`
+        Expanded grid.
+
+    model : :class:`emg3d.models.Model`
+        Expanded model.
+
+    """
+
+    def extend_property(prop, add_values, nadd):
+        """Expand property `model.prop`, IF it is not None."""
+
+        if getattr(model, '_'+prop) is None:
+            prop_ext = None
+
+        else:
+            prop_ext = np.zeros((grid.nCx, grid.nCy, grid.nCz+nadd))
+            prop_ext[:, :, :-nadd] = getattr(model, prop)
+            if nadd == 2:
+                prop_ext[:, :, -2] = add_values[0]
+            prop_ext[:, :, -1] = add_values[1]
+
+        return prop_ext
+
+    # Initiate.
+    nzadd = 0
+    hz_ext = grid.hz
+
+    # Fill-up property_below.
+    if grid.vectorNz[-1] < interface-0.05:  # At least 5 cm.
+        hz_ext = np.r_[hz_ext, interface-grid.vectorNz[-1]]
+        nzadd += 1
+
+    # Add 100 m of property_above.
+    if grid.vectorNz[-1] <= interface+0.001:  # +1mm
+        hz_ext = np.r_[hz_ext, 100]
+        nzadd += 1
+
+    if nzadd > 0:
+        # Extend properties.
+        property_x = extend_property('property_x', expand, nzadd)
+        property_y = extend_property('property_y', expand, nzadd)
+        property_z = extend_property('property_z', expand, nzadd)
+        mu_r = extend_property('mu_r', [1, 1], nzadd)
+        epsilon_r = extend_property('epsilon_r', [1, 1], nzadd)
+
+        # Create extended grid and model.
+        grid = meshes.TensorMesh(
+                [grid.hx, grid.hy, hz_ext], x0=grid.x0)
+        model = models.Model(
+                grid, property_x, property_y, property_z, mu_r,
+                epsilon_r, mapping=model.map.name)
+
+    return grid, model
+
+
+def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
+    """Estimate parameters for automatic gridding.
+
+    Automatically determines the required gridding options from the provided
+    grid, model, and survey, if they are not provided in ``gridding_opts``.
+
+    The dict ``gridding_opts`` can contain any input parameter taken by
+    :func:`emg3d.meshes.construct_mesh`, see the corresponding documentation
+    for more details with regards to the possibilities.
+
+    Different keys of ``gridding_opts`` are treated differently:
+
+    - The following parameters are estimated from the ``model`` if not
+      provided:
+
+      - ``properties``: volume averages (of x, y, and z-directed properties) on
+        log10 scale of the outermost layer in a given direction.
+      - ``mapping``: taken from model.
+
+    - The following parameters are estimated from the ``survey`` if not
+      provided:
+
+      - ``frequency``: average (on log10-scale) of all frequencies.
+      - ``center``: center of all sources.
+      - ``domain``: from ``vector``, if provided, or
+
+        - in x/y-directions: extent of sources and receivers plus 10% on each
+          side, ensuring ratio of 3.
+        - in z-direction: extent of sources and receivers, ensuring ratio of 2
+          to horizontal dimension; 1/10 tenth up, 9/10 down.
+
+        The ratio means that it is enforced that the survey dimension in x or
+        y-direction is not smaller than a third of the survey dimension in the
+        other direction. If not, the smaller dimension is expanded
+        symmetrically. Similarly in the vertical direction, which must be at
+        least half the dimension of the maximum horizontal dimension or 5 km,
+        whatever is smaller. Otherwise it is expanded in a ratio of 9 parts
+        downwards, one part upwards.
+
+    - The following parameter is taken from the ``grid`` if provided as a
+      string:
+
+      - ``vector``: This is the only real "difference" to the inputs of
+        :func:`emg3d.meshes.construct_mesh`. The normal input is accepted, but
+        it can also be a string contain any combination of 'x', 'y', and 'z'.
+        All directions contained in this string are then taken from the
+        provided grid. E.g., if ``gridding_opts['vector']='xz'`` it will take
+        the x- and z-directed vectors from the grid.
+
+    - The following parameters are simply passed along if they are provided,
+      nothing is done otherwise:
+
+      - ``vector``
+      - ``stretching``
+      - ``seasurface``
+      - ``cell_numbers``
+      - ``lambda_factor``
+      - ``lambda_from_center``
+      - ``max_buffer``
+      - ``min_width_limits``
+      - ``min_width_pps``
+      - ``verb``
+
+
+    Parameters
+    ----------
+    gridding_opts : dict
+        Containing input parameters to provide to
+        :func:`emg3d.meshes.construct_mesh`. See the corresponding
+        documentation and the explanations above.
+
+    grid : :class:`emg3d.meshes.TensorMesh`
+        The grid.
+
+    model : :class:`emg3d.models.Model`
+        The model.
+
+    survey : :class:`emg3d.surveys.Survey`
+        The survey.
+
+    input_nCz : int, optional
+        If :func:`expand_grid_model` was used, `input_nCz` corresponds to the
+        original ``grid.nCz``.
+
+
+    Returns
+    -------
+    gridding_opts : dict
+        Dict to provide to :func:`emg3d.meshes.construct_mesh`.
+
+    """
+    # Initiate new gridding_opts.
+    gopts = {}
+
+    # Optional values that we only include if provided.
+    for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
+                 'lambda_from_center', 'max_buffer', 'min_width_limits',
+                 'min_width_pps', 'verb']:
+        if name in gridding_opts.keys():
+            gopts[name] = gridding_opts.pop(name)
+
+    # Mapping defaults to model map.
+    gopts['mapping'] = gridding_opts.pop('mapping', model.map)
+
+    # Frequency defaults to average frequency (log10).
+    freq = 10**np.mean(np.log10(survey.frequencies))
+    gopts['frequency'] = gridding_opts.pop('frequency', freq)
+
+    # Center defaults to center of all sources.
+    center = tuple([np.mean(survey.src_coords[i]) for i in range(3)])
+    gopts['center'] = gridding_opts.pop('center', center)
+
+    # Vector.
+    vector = gridding_opts.pop('vector', None)
+    if isinstance(vector, str):
+        # If vector is a string we take the corresponding vectors from grid.
+        vector = (
+                grid.vectorNx if 'x' in vector.lower() else None,
+                grid.vectorNy if 'y' in vector.lower() else None,
+                grid.vectorNz[:input_nCz] if 'z' in vector.lower() else None,
+        )
+        gopts['vector'] = vector
+
+    elif vector is not None:
+        # In this case vector was provided, and we include it like this.
+        gopts['vector'] = vector
+
+    # Properties defaults to model averages (AFTER model expansion).
+    properties = gridding_opts.pop('properties', None)
+    if properties is None:
+
+        # Get map (in principle the map in gridding_opts could be different
+        # from the map in the model).
+        m = gopts['mapping']
+        if isinstance(m, str):
+            m = getattr(maps, 'Map'+m)()
+
+        # Mean of all values (x, y, z).
+        def get_mean(ix, iy, iz):
+            """Get mean; currently based on the averaged property."""
+
+            # Get volume factor.
+            vfact = grid.vol.reshape(grid.vnC, order='F')
+            vfact = vfact[ix, iy, iz].ravel()/vfact[ix, iy, iz].sum()
+
+            # Collect all x (y, z) values.
+            data = np.array([])
+            for p in ['x', 'y', 'z']:
+                prop = getattr(model, 'property_'+p)
+                if getattr(model, '_property_'+p) is None:
+                    continue
+                elif prop.ndim == 1:
+                    data = np.r_[data, model.map.backward(prop)]
+                else:
+                    prop = model.map.backward(prop[ix, iy, iz].ravel())
+                    data = np.r_[data, np.sum(vfact*prop)]
+
+            # Return mean, on a log10-scale.
+            return m.forward(10**np.mean(np.log10(data)))
+
+        # Buffer properties.
+        xneg = get_mean(0, slice(None), slice(None))
+        xpos = get_mean(-1, slice(None), slice(None))
+        yneg = get_mean(slice(None), 0, slice(None))
+        ypos = get_mean(slice(None), -1, slice(None))
+        zneg = get_mean(slice(None), slice(None), 0)
+        zpos = get_mean(slice(None), slice(None), -1)
+
+        # Source property.
+        ix = np.argmin(abs(grid.vectorNx - gopts['center'][0]))
+        iy = np.argmin(abs(grid.vectorNy - gopts['center'][1]))
+        iz = np.argmin(abs(grid.vectorNz - gopts['center'][2]))
+        source = get_mean(ix, iy, iz)
+
+        properties = [source, xneg, xpos, yneg, ypos, zneg, zpos]
+
+    gopts['properties'] = properties
+
+    # Domain; default taken from survey.
+    domain = gridding_opts.pop('domain', None)
+
+    def get_dim_diff(i):
+        """Return ([min, max], dim) of inp.
+
+        Take it from domain if provided, else from vector if provided, else
+        from survey, adding 10% on each side).
+        """
+        if domain is not None and domain[i] is not None:
+            # domain is provided.
+            dim = domain[i]
+            diff = np.diff(dim)[0]
+            get_it = False
+
+        elif vector is not None and vector[i] is not None:
+            # vector is provided.
+            dim = [np.min(vector[i]), np.max(vector[i])]
+            diff = np.diff(dim)[0]
+            get_it = False
+
+        else:
+            # Get it from survey, add 5 % on each side.
+            inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
+            dim = [min(inp), max(inp)]
+            diff = np.diff(dim)[0]
+            dim = [min(inp)-diff/10, max(inp)+diff/10]
+            diff = np.diff(dim)[0]
+            get_it = True
+
+        return dim, diff, get_it
+
+    xdim, xdiff, get_x = get_dim_diff(0)
+    ydim, ydiff, get_y = get_dim_diff(1)
+    zdim, zdiff, get_z = get_dim_diff(2)
+
+    # Ensure the ratio xdim:ydim is at most 3.
+    if get_y and xdiff/ydiff > 3:
+        diff = round((xdiff/3.0 - ydiff)/2.0)
+        ydim = [ydim[0]-diff, ydim[1]+diff]
+    elif get_x and ydiff/xdiff > 3:
+        diff = round((ydiff/3.0 - xdiff)/2.0)
+        xdim = [xdim[0]-diff, xdim[1]+diff]
+
+    # Ensure the ratio zdim:horizontal is at most 2.
+    hdist = min(10000, max(xdiff, ydiff))
+    if get_z and hdist/zdiff > 2:
+        diff = round((hdist/2.0 - zdiff)/10.0)
+        zdim = [zdim[0]-9*diff, zdim[1]+diff]
+
+    # Collect
+    domain = (xdim, ydim, zdim)
+
+    gopts['domain'] = domain
+
+    # Ensure no gridding_opts left.
+    if gridding_opts:
+        raise TypeError(
+                f"Unexpected gridding_opts: {list(gridding_opts.keys())}")
+
+    # Return gridding_opts.
+    return gopts
