@@ -324,6 +324,11 @@ class Simulation:
 
             gopts = self.gridding_opts
 
+            # Take care of map.
+            if 'mapping' in gopts.keys():
+                if not isinstance(gopts['mapping'], str):
+                    gopts['mapping'] = gopts['mapping'].name
+
             # Take care of tuples and lists for h5/npz.
             # Ideally, this should be dealt with in emg3d.io.
             for key in ['domain', 'vector', 'stretching', 'min_width_limits']:
