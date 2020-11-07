@@ -6,10 +6,11 @@ recent versions
 """""""""""""""
 
 
-*latest (dev, will become v0.14.0)*
------------------------------------
+*v0.14.0* : Automatic gridding
+------------------------------
 
-Title will be: Automatic gridding and noise
+**2020-11-07**
+
 
 See the API docs for more info of the relevant implementation.
 
@@ -69,7 +70,6 @@ See the API docs for more info of the relevant implementation.
 ---------------
 
 **2020-09-22**
-
 
 - New Module ``cli`` for command-line interaction:
 
@@ -283,7 +283,6 @@ v0.8.0 - v0.10.x
 -----------------------
 
 **2020-04-29**
-
 
 - Bug fixes:
 

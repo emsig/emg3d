@@ -35,6 +35,7 @@ __all__ = ['save', 'load']
 
 # Known classes to serialize and de-serialize.
 KNOWN_CLASSES = {
+    '_Map': maps._Map,
     'Model': models.Model,
     'Field': fields.Field,
     'Survey': surveys.Survey,
@@ -42,12 +43,6 @@ KNOWN_CLASSES = {
     'TensorMesh': meshes.TensorMesh,
     'SourceField': fields.SourceField,
     'Simulation': simulations.Simulation,
-    'MapConductivity': maps.MapConductivity,
-    'MapLgConductivity': maps.MapLgConductivity,
-    'MapLnConductivity': maps.MapLnConductivity,
-    'MapResistivity': maps.MapResistivity,
-    'MapLgResistivity': maps.MapLgResistivity,
-    'MapLnResistivity': maps.MapLnResistivity,
 }
 
 

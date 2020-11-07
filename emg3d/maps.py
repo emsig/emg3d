@@ -269,6 +269,14 @@ def interp3d(points, values, new_points, method, fill_value, mode):
 
 
 # MAPS
+MAPLIST = {}
+
+
+def register_map(func):
+    MAPLIST[func.__name__] = func
+    return func
+
+
 class _Map:
     """Maps variable `x` to computational variable `σ` (conductivity)."""
 
@@ -296,14 +304,15 @@ class _Map:
 
     def to_dict(self):
         """Store the map name in a dict for serialization."""
-        return {'name': self.name, '__class__': self.__class__.__name__}
+        return {'name': self.name, '__class__': '_Map'}
 
     @classmethod
     def from_dict(cls, inp):
         """Get :class:`_Map` instance from name in dict."""
-        return cls()
+        return MAPLIST['Map'+inp['name']]()
 
 
+@register_map
 class MapConductivity(_Map):
     """Maps `σ` to computational variable `σ` (conductivity).
 
@@ -325,6 +334,7 @@ class MapConductivity(_Map):
         pass
 
 
+@register_map
 class MapLgConductivity(_Map):
     """Maps `log_10(σ)` to computational variable `σ` (conductivity).
 
@@ -346,6 +356,7 @@ class MapLgConductivity(_Map):
         gradient *= self.backward(mapped)*np.log(10)
 
 
+@register_map
 class MapLnConductivity(_Map):
     """Maps `log_e(σ)` to computational variable `σ` (conductivity).
 
@@ -367,6 +378,7 @@ class MapLnConductivity(_Map):
         gradient *= self.backward(mapped)
 
 
+@register_map
 class MapResistivity(_Map):
     """Maps `ρ` to computational variable `σ` (conductivity).
 
@@ -388,6 +400,7 @@ class MapResistivity(_Map):
         gradient *= -self.backward(mapped)**2
 
 
+@register_map
 class MapLgResistivity(_Map):
     """Maps `log_10(ρ)` to computational variable `σ` (conductivity).
 
@@ -409,6 +422,7 @@ class MapLgResistivity(_Map):
         gradient *= -self.backward(mapped)*np.log(10)
 
 
+@register_map
 class MapLnResistivity(_Map):
     """Maps `log_e(ρ)` to computational variable `σ` (conductivity).
 
