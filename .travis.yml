@@ -9,9 +9,9 @@ matrix:
     - python: 3.7  # => 3.7; deploy
       env: PYTHON=3.7 DEPLOY_PYPI=true
     - python: 3.7  # => 3.7; ALL soft dependencies
-      env: PYTHON=3.7 SOFT="xarray tqdm empymod h5py scooby discretize matplotlib"
+      env: PYTHON=3.7 SOFT="xarray tqdm empymod 'h5py<3' scooby discretize matplotlib"
     - python: 3.8  # => 3.8; SOME soft dependencies
-      env: PYTHON=3.8 SOFT="xarray tqdm empymod h5py scooby"
+      env: PYTHON=3.8 SOFT="xarray tqdm empymod 'h5py<3' scooby"
     - python: 3.7  # just linkcheck
       env: PYTHON=3.7 CHCKLNKS=true
 
