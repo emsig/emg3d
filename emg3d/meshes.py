@@ -208,12 +208,34 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                    seasurface=None, **kwargs):
     r"""Return a TensorMesh for given parameters.
 
-    The returned mesh is frequency and property dependent, and takes all other
-    provided parameters into account. The minimum cell width
-    :math:`\Delta_\text{min}`, given in Equation :eq:`mincellwidth`, and the
-    extent of the buffer zone depend on the skin depth :math:`\delta`,
-    given in Equation :eq:`skindepth`, and the wavelength :math:`\lambda`,
-    given in Equation :eq:`wavelength`.
+    The constructed mesh is frequency- and conductivity-dependent, where
+    ``properties`` are turned into conductivities through the provided
+    ``mapping``, which is ``'Resistivity'`` by default. Some details are
+    explained in other functions:
+
+    - The minimum cell width :math:`\Delta_\text{min}` is a function of
+      ``frequency``, ``properties[0]``, ``min_width_pps``, and
+      ``min_width_limits``, see Equation :eq:`mincellwidth`.
+    - The skin depth :math:`\delta` is a function of ``frequency`` and
+      ``properties``, see Equation :eq:`skindepth`.
+    - The wavelength :math:`\lambda` is a function of ``frequency`` and
+      ``properties``, see Equation :eq:`wavelength`.
+
+    The relation of the survey domain, computational domain, and buffer zone is
+    shown in  :numref:`Figure %s <AutoGrid>` for a x-z-section; the y-direction
+    behaves the same as the x-direction (the figures are only visible in the
+    web version on https://emg3d.rtfd.io).
+
+    .. figure:: ../_static/construct_mesh.png
+       :align: center
+       :alt: Sketch for automatic gridding.
+       :name: AutoGrid
+
+       Relation between survey domain (Ds, ``domain``), computational domain
+       (Dc), and buffer zone. The survey domain should contain all sources and
+       receivers as well as any important feature that should be represented in
+       the data. The buffer zone is calculated as a function of wavelength with
+       the provided property in the given direction.
 
     By default, the buffer zone around the survey domain is one wavelength.
     This means that the signal has to travel two wavelengths to get from the
@@ -221,10 +243,22 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     This approach is quite conservative and on the safe side. You can reduce
     the buffer thickness if you know what you are doing. There are three
     parameters which influence the thickness of the buffer for a given
-    frequency: ``property``, which is used to calculate the skin depth and the
-    wavelength, ``lambda_factor`` (default is 1) which sets how many times the
-    wavelength is the thickness of the buffer (relative factor), and
-    ``max_buffer``, which is an absolute maximum for the buffer thickness.
+    frequency: ``properties``, which is used to calculate the skin depth and
+    the wavelength, ``lambda_factor`` (default is 1) which sets how many times
+    the wavelength is the thickness of the buffer (relative factor), and
+    ``max_buffer``, which is an absolute maximum for the buffer thickness. A
+    graphical illustration is given in :numref:`Figure %s <Buffer>`.
+
+    .. figure:: ../_static/construct_mesh2.png
+       :align: center
+       :alt: Sketch for the buffer zone.
+       :name: Buffer
+
+       The thickness of the buffer zone (B) for (I)
+       ``lambda_from_center=False`` (default) and for (II)
+       ``lambda_from_center=True``. The ``lambda_factor``
+       (:math:`\lambda_{fact}`) is a simple scaling factor for the wavelength
+       :math:`\lambda`. The ``max_buffer`` is an absolute limitation.
 
 
     Parameters
@@ -232,25 +266,26 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     frequency : float
         Frequency (Hz) to calculate skin depth; both the minimum cell width and
-        the extent of the computational domain are a function of skin depth.
+        the extent of the buffer zone, and therefore of the computational
+        domain, are a function of skin depth.
 
     properties : float or list
-        Properties to calculate the skin depth. The properties can be either
+        Properties to calculate the skin depths. The properties can be either
         resistivities, conductivities, or the logarithm (natural or base 10)
         thereof. By default it assumes resistivities, but it can be changed
         with the parameter ``mapping``.
 
-        A list of up to seven properties can be provided:
+        Four formats are recognized:
 
         - 1: Same property for everything;
-        - 2: [center, buffer] for all directions;
-        - 3: [center, negative buffer, positive buffer] for all directions;
-        - 4: [center, xy-buffer, z-negative, z-positive];
-        - 7: [center, x-neg, x-pos, y-neg, y-pos, z-neg, z-pos].
+        - 2: [min_width, buffer (+/-)] for all directions;
+        - 4: [min_width, xy-buffer (+/-), z-, z+];
+        - 7: [min_width, x-, x+, y-, y+, z-, z+].
 
-        The property at the center (source location) is used to define the
-        minimum cell width. The other properties are used to define the extent
-        of the buffer zone around the survey domain.
+        The property ``min_width`` is usually the property at the center,
+        hence at the source location. The other properties are used to define
+        the extent of the buffer zone around the survey domain in the
+        respective directions.
 
     center : tuple
         Tuple (or list, ndarray) of three floats for (x, y, z). The mesh is
@@ -317,7 +352,9 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         Default is 1.0.
 
     max_buffer : float, optional
-        Maximum buffer zone around survey domain.
+        Maximum thickness of the buffer zone around survey domain. If
+        ``lambda_from_center=True``, this is the maximum distance from the
+        center to the end of the computational domain.
         Default is 100,000 (100 km).
 
     lambda_from_center : bool, optional
@@ -812,10 +849,10 @@ def wavelength(skin_depth, precision=0):
     .. math::
         :label: wavelength
 
-        \lambda = 2\pi\delta\ ,
+        \lambda = 2\pi\delta\ .
 
-    where the skin depth :math:`\delta` is given by :func:`skin_depth`,
-    Equation :eq:`skindepth`.
+    The skin depth :math:`\delta` is a function of frequency and conductivity
+    and is given by :func:`skin_depth`, Equation :eq:`skindepth`.
 
 
     Parameters
@@ -845,10 +882,11 @@ def min_cell_width(skin_depth, pps=3, limits=None, precision=0):
     .. math::
         :label: mincellwidth
 
-        \Delta_\text{min} = \frac{\delta}{\text{pps}}\ ,
+        \Delta_\text{min} =
+        \text{limits[0]} \le \frac{\delta}{\text{pps}} \le \text{limits[1]} \ .
 
-    where its value is restricted by ``limits``. The skin depth :math:`\delta`
-    is given by :func:`skin_depth`, Equation :eq:`skindepth`.
+    The skin depth :math:`\delta` is a function of frequency and conductivity
+    and is given by :func:`skin_depth`, Equation :eq:`skindepth`.
 
 
     Parameters
