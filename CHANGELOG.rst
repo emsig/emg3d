@@ -6,6 +6,15 @@ recent versions
 """""""""""""""
 
 
+*v0.14.1* : Bug fix
+-------------------
+
+**2020-11-14**
+
+- Fix for h5py>3.0.
+- Improved docs re automatic gridding.
+
+
 *v0.14.0* : Automatic gridding
 ------------------------------
 
