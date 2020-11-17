@@ -806,7 +806,7 @@ def skin_depth(frequency, conductivity, mu=mu_0, precision=0):
     .. math::
         :label: skindepth
 
-        \delta = \frac{2}{\omega\sigma\mu}\ ,
+        \delta = \sqrt{\frac{2}{\omega\sigma\mu}}\ ,
 
     where :math:`\omega=2\pi f` is angular frequency of frequency :math:`f`
     (Hz), :math:`\sigma` is conductivity (S/m), and :math:`\mu` is magnetic
