@@ -131,16 +131,10 @@ class TensorMesh(dTensorMesh, _TensorMesh):
     h : list of three ndarrays
         Cell widths in [x, y, z] directions.
 
-    x0 : ndarray of dimension (3, )
+    x0 : tuple of length 3
         Origin (x, y, z).
 
     """
-
-    def __init__(self, h, x0):
-        """Initiate TensorMesh."""
-        # Cast `h` to list, as `discretize.TensorMesh`
-        # fails if `h` is an # ndarray.
-        super().__init__(h=list(h), x0=x0)
 
     def __eq__(self, mesh):
         """Compare two meshes.
