@@ -5,6 +5,13 @@ Changelog
 recent versions
 """""""""""""""
 
+*v0.14.2* : Bug fix
+-------------------
+
+**2020-11-18**
+
+- Bug fix for Windows affecting ``good_mg_cell_nr`` (int32 issue).
+
 
 *v0.14.1* : Bug fix
 -------------------
