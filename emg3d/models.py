@@ -162,7 +162,7 @@ class Model:
         kwargs = self._apply_operator(model, np.add)
 
         # Return new Model instance.
-        return Model(grid=self.vnC, **kwargs)
+        return Model(grid=np.array(self.vnC), **kwargs)
 
     def __sub__(self, model):
         """Subtract two models."""
@@ -178,7 +178,7 @@ class Model:
         kwargs = self._apply_operator(model, np.subtract)
 
         # Return new Model instance.
-        return Model(grid=self.vnC, **kwargs)
+        return Model(grid=np.array(self.vnC), **kwargs)
 
     def __eq__(self, model):
         """Compare two models.
@@ -245,7 +245,7 @@ class Model:
             out['epsilon_r'] = None
 
         # vnC.
-        out['vnC'] = self.vnC
+        out['vnC'] = np.array(self.vnC)
 
         # Map.
         out['mapping'] = self.map.name

@@ -27,7 +27,7 @@ from scipy.constants import mu_0
 from emg3d import maps
 
 try:
-    import discretize.TensorMesh as dTensorMesh
+    from discretize import TensorMesh as dTensorMesh
 except ImportError:
     class dTensorMesh:
         pass
@@ -155,7 +155,7 @@ class TensorMesh(dTensorMesh, _TensorMesh):
 
         # Check dimensions.
         if equal:
-            equal *= mesh.vnC.size == self.vnC.size
+            equal *= len(mesh.vnC) == len(self.vnC)
 
         # Check shape.
         if equal:

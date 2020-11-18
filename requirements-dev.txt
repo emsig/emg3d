@@ -6,7 +6,7 @@ h5py
 scooby
 xarray
 empymod
-discretize<0.6.0
+discretize
 matplotlib
 
 # SETUP RELATED
