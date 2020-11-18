@@ -155,7 +155,7 @@ class TensorMesh(dTensorMesh, _TensorMesh):
 
         # Check dimensions.
         if equal:
-            equal *= mesh.vnC.size == self.vnC.size
+            equal *= len(mesh.vnC) == len(self.vnC)
 
         # Check shape.
         if equal:
