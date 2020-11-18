@@ -245,7 +245,7 @@ class Model:
             out['epsilon_r'] = None
 
         # vnC.
-        out['vnC'] = self.vnC
+        out['vnC'] = np.array(self.vnC)
 
         # Map.
         out['mapping'] = self.map.name
