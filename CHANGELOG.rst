@@ -5,6 +5,15 @@ Changelog
 recent versions
 """""""""""""""
 
+
+*v0.14.3* : Bug fix
+-------------------
+
+**2020-11-19**
+
+- Bug fix for ``discretize>=0.6.0``.
+
+
 *v0.14.2* : Bug fix
 -------------------
 
@@ -18,7 +27,7 @@ recent versions
 
 **2020-11-14**
 
-- Fix for h5py>3.0.
+- Fix for ``h5py>=3.0``.
 - Improved docs re automatic gridding.
 
 

@@ -29,7 +29,8 @@ def test_solver_homogeneous(capsys):
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res']
 
-    grid = meshes.TensorMesh(**dat['input_grid'])
+    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
+                             dat['input_grid']['x0'])
     model = models.Model(**dat['input_model'])
     sfield = fields.get_source_field(**dat['input_source'])
 
@@ -240,7 +241,8 @@ def test_solver_homogeneous_laplace():
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['lap']
 
-    grid = meshes.TensorMesh(**dat['input_grid'])
+    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
+                             dat['input_grid']['x0'])
     model = models.Model(**dat['input_model'])
     sfield = fields.get_source_field(**dat['input_source'])
 
@@ -439,7 +441,8 @@ def test_krylov(capsys):
 
     # Load any case.
     dat = REGRES['res']
-    grid = meshes.TensorMesh(**dat['input_grid'])
+    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
+                             dat['input_grid']['x0'])
     model = models.Model(**dat['input_model'])
     model.property_x /= 100000  # Set stupid input to make bicgstab fail.
     model.property_y *= 100000  # Set stupid input to make bicgstab fail.
