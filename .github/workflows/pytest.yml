@@ -30,7 +30,7 @@ jobs:
         os: [ubuntu, ]  # macos, windows]  # Only Linux currently.
         case:
           - python-version: 3.7
-            name: plain
+            name: minimal
             os: ubuntu
             conda: "'scipy=1.4' 'numba=0.45'"
           - python-version: 3.7
