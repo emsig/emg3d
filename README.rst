@@ -10,11 +10,6 @@
 .. image:: https://github.com/empymod/emg3d/workflows/pytest/badge.svg?branch=master
    :target: https://github.com/empymod/emg3d/actions
    :alt: GitHub Actions
-
-.. image:: https://travis-ci.org/empymod/emg3d.svg?branch=master
-   :target: https://travis-ci.org/empymod/emg3d
-   :alt: Travis-CI
-
 .. image:: https://coveralls.io/repos/github/empymod/emg3d/badge.svg?branch=master
    :target: https://coveralls.io/github/empymod/emg3d?branch=master
    :alt: Coveralls

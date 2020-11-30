@@ -62,9 +62,49 @@ class _TensorMesh:
 
     """
 
-    def __init__(self, h, x0):
+    _aliases = {
+        "nC": "n_cells",
+        "nN": "n_nodes",
+        "nEx": "n_edges_x",
+        "nEy": "n_edges_y",
+        "nEz": "n_edges_z",
+        "nE": "n_edges",
+        "vnE": "n_edges_per_direction",
+    }
+
+#     self.origin
+#     self.hx
+#     self.hy
+#     self.hz
+#
+#     self.nCx
+#     self.nCy
+#     self.nCz
+#     self.vnC
+#     self.vectorCCx
+#     self.vectorCCy
+#     self.vectorCCz
+#
+#     self.nNx
+#     self.nNy
+#     self.nNz
+#     self.vnN
+#     self.vectorNx
+#     self.vectorNy
+#     self.vectorNz
+#
+#     self.vnEx
+#     self.vnEy
+#     self.vnEz
+
+    def __init__(self, h, origin=None, **kwargs):
         """Initialize the mesh."""
+
         self.x0 = x0
+
+        if origin is None:
+            origin = kwargs.pop('x0')
+        self.origin = origin
 
         # Width of cells.
         self.hx = np.array(h[0])
@@ -76,7 +116,7 @@ class _TensorMesh:
         self.nCy = int(self.hy.size)
         self.nCz = int(self.hz.size)
         self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
-        self.nC = int(self.vnC.prod())
+        self.n_cells = int(self.vnC.prod())
         self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
         self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
         self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
@@ -86,7 +126,7 @@ class _TensorMesh:
         self.nNy = self.nCy + 1
         self.nNz = self.nCz + 1
         self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=np.int_)
-        self.nN = int(self.vnN.prod())
+        self.n_nodes = int(self.vnN.prod())
         self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
         self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
         self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
@@ -95,16 +135,17 @@ class _TensorMesh:
         self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=np.int_)
         self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=np.int_)
         self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=np.int_)
-        self.nEx = int(self.vnEx.prod())
-        self.nEy = int(self.vnEy.prod())
-        self.nEz = int(self.vnEz.prod())
-        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
-        self.nE = int(self.vnE.sum())
+        self.n_edges_x = int(self.vnEx.prod())
+        self.n_edges_y = int(self.vnEy.prod())
+        self.n_edges_z = int(self.vnEz.prod())
+        self.n_edges_per_direction = np.array([
+            self.n_edges_x, self.n_edges_y, self.n_edges_z], dtype=int)
+        self.n_edges = int(self.n_edges_per_direction.sum())
 
     def __repr__(self):
         """Simple representation."""
         return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
-                f"({self.nC:,})")
+                f"({self.n_cells:,})")
 
     @property
     def vol(self):

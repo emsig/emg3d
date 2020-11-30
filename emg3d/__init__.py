@@ -23,8 +23,6 @@ sped-up through jitted ``numba``-functions.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import warnings
-
 # Import modules
 from emg3d import io
 from emg3d import maps
@@ -55,9 +53,6 @@ from emg3d.fields import (Field, get_source_field, get_receiver,  # noqa
 __all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
            'models', 'Report', 'save', 'load', 'surveys', 'simulations',
            'optimize']
-
-# Ensure users see Deprecation Warnings, but just once.
-warnings.filterwarnings("once", module='emg3d', category=DeprecationWarning)
 
 # Version defined in utils, so we can easier use it within the package itself.
 __version__ = utils.__version__

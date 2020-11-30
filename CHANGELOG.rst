@@ -13,6 +13,7 @@ recent versions
 
 - Maintenance:
 
+  - Update for ``discretize>=0.6.0``.
   - Moved from Travis CI to GitHub Actions.
 
 
