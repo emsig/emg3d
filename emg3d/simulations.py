@@ -459,7 +459,7 @@ class Simulation:
 
             # Add stored data (synthetic, residual, etc).
             for name in inp['data'].keys():
-                out.data[name] = out.data.observed*inp['data'][name]
+                out.data[name] = out.data.observed*0+inp['data'][name]
 
             return out
 
