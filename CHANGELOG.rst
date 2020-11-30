@@ -6,6 +6,16 @@ recent versions
 """""""""""""""
 
 
+*latest*
+--------
+
+- Bug fix re storing/loading synthetics
+
+- Maintenance:
+
+  - Moved from Travis CI to GitHub Actions.
+
+
 *v0.14.3* : Bug fix
 -------------------
 

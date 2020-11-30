@@ -5,4 +5,4 @@ exclude requirements.txt
 exclude requirements-dev.txt
 exclude runtests.sh
 exclude .gitignore
-exclude .travis.yml
+exclude .coveragerc
