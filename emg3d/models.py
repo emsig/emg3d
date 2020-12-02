@@ -214,7 +214,7 @@ class Model:
 
     def copy(self):
         """Return a copy of the Model."""
-        return Model.from_dict(self.to_dict(True))
+        return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
         """Store the necessary information of the Model in a dict."""
