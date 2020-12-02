@@ -75,7 +75,7 @@ def test_get_source_field(capsys):
     assert_allclose(sfield.smu0, -iomegamu)
 
     # Put source on final node, should still work.
-    src = [grid.vectorNx[-1], grid.vectorNy[-1], grid.vectorNz[-1],
+    src = [grid.nodes_x[-1], grid.nodes_y[-1], grid.nodes_z[-1],
            src[3], src[4]]
     sfield = fields.get_source_field(grid, src, freq)
     tot_field = np.linalg.norm(
@@ -183,8 +183,8 @@ def test_get_source_field_point_vs_finite(capsys):
     h1 = get_h(4, 2, 200, 1.1)
     h2 = get_h(4, 2, 200, 1.2)
     h3 = get_h(4, 2, 200, 1.2)
-    x0 = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
-    grid3 = meshes.TensorMesh([h1, h2, h3], x0)
+    origin = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
+    grid3 = meshes.TensorMesh([h1, h2, h3], origin)
     slen = 333
     strength = np.pi
     d_src, f_src = get_f_src([0, 0., 0., 50, 33], slen)
@@ -467,7 +467,7 @@ def test_get_receiver_response():
 
     hx, x0 = meshes.get_hx_h0(freq, res, [0, 1000], min_width=20, verb=0)
     hyz, yz0 = meshes.get_hx_h0(freq, res, [-25, 25], min_width=20, verb=0)
-    grid = meshes.TensorMesh([hx, hyz, hyz], x0=np.array([x0, yz0, yz0]))
+    grid = meshes.TensorMesh([hx, hyz, hyz], origin=np.array([x0, yz0, yz0]))
 
     model = models.Model(grid, res)
     sfield = fields.get_source_field(grid, src, freq)

@@ -115,10 +115,10 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         raise ValueError("``method='volume'`` not implemented for fields.")
 
     if method == 'volume':
-        points = (grid.vectorNx, grid.vectorNy, grid.vectorNz)
-        new_points = (new_grid.vectorNx, new_grid.vectorNy, new_grid.vectorNz)
+        points = (grid.nodes_x, grid.nodes_y, grid.nodes_z)
+        new_points = (new_grid.nodes_x, new_grid.nodes_y, new_grid.nodes_z)
         new_values = np.zeros(new_grid.vnC, dtype=values.dtype)
-        vol = new_grid.vol.reshape(new_grid.vnC, order='F')
+        vol = new_grid.cell_volumes.reshape(new_grid.vnC, order='F')
 
         # Get values from `volume_average`.
         if log:
@@ -134,8 +134,8 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         shape = tuple()
         for i, coord in enumerate(['x', 'y', 'z']):
             if values.shape[i] == getattr(grid, 'nN'+coord):
-                pts = getattr(grid, 'vectorN'+coord)
-                new_pts = getattr(new_grid, 'vectorN'+coord)
+                pts = getattr(grid, 'nodes_'+coord)
+                new_pts = getattr(new_grid, 'nodes_'+coord)
             else:
                 pts = getattr(grid, 'vectorCC'+coord)
                 new_pts = getattr(new_grid, 'vectorCC'+coord)

@@ -249,7 +249,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>> # starting at the origin.
     >>> grid = emg3d.TensorMesh(
     >>>         [np.ones(8), np.ones(8), np.ones(8)],
-    >>>         x0=np.array([0, 0, 0]))
+    >>>         origin=np.array([0, 0, 0]))
     >>> # The model is a fullspace with tri-axial anisotropy.
     >>> model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
     >>>                     property_z=3.3, mapping='Resistivity')
@@ -653,7 +653,7 @@ def krylov(grid, model, sfield, efield, var):
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz)
+                model.eta_z, model.zeta, grid.h[0], grid.h[1], grid.h[2])
 
         # Return Field instance.
         return -rfield
@@ -779,7 +779,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Collect Gauss-Seidel input (same for all routines)
     inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, model.zeta, grid.hx, grid.hy, grid.hz, nu)
+           model.eta_z, model.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
     lr_dir = _current_lr_dir(lr_dir, grid)
@@ -855,12 +855,12 @@ def restriction(grid, model, sfield, residual, sc_dir):
         rz = 1
 
     # Compute distances of coarse grid.
-    ch = [np.diff(grid.vectorNx[::rx]),
-          np.diff(grid.vectorNy[::ry]),
-          np.diff(grid.vectorNz[::rz])]
+    ch = [np.diff(grid.nodes_x[::rx]),
+          np.diff(grid.nodes_y[::ry]),
+          np.diff(grid.nodes_z[::rz])]
 
     # Create new `TensorMesh` instance for coarse grid
-    cgrid = meshes._TensorMesh(ch, grid.x0)
+    cgrid = meshes._TensorMesh(ch, grid.origin)
 
     # 2. RESTRICT MODEL
 
@@ -930,8 +930,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
     # Interpolate ex in y-z-slices.
     yz_points = _get_prolongation_coordinates(grid, 'y', 'z')
-    fn = RegularGridProlongator(cgrid.vectorNy, cgrid.vectorNz, yz_points)
-    for ixc in range(cgrid.nCx):
+    fn = RegularGridProlongator(cgrid.nodes_y, cgrid.nodes_z, yz_points)
+    for ixc in range(cgrid.vnC[0]):
         # Bilinear interpolation in the y-z plane
         hh = fn(cefield.fx[ixc, :, :]).reshape(grid.vnEx[1:], order='F')
 
@@ -944,8 +944,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
     # Interpolate ey in x-z-slices.
     xz_points = _get_prolongation_coordinates(grid, 'x', 'z')
-    fn = RegularGridProlongator(cgrid.vectorNx, cgrid.vectorNz, xz_points)
-    for iyc in range(cgrid.nCy):
+    fn = RegularGridProlongator(cgrid.nodes_x, cgrid.nodes_z, xz_points)
+    for iyc in range(cgrid.vnC[1]):
 
         # Bilinear interpolation in the x-z plane
         hh = fn(cefield.fy[:, iyc, :]).reshape(grid.vnEy[::2], order='F')
@@ -959,8 +959,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
     # Interpolate ez in x-y-slices.
     xy_points = _get_prolongation_coordinates(grid, 'x', 'y')
-    fn = RegularGridProlongator(cgrid.vectorNx, cgrid.vectorNy, xy_points)
-    for izc in range(cgrid.nCz):
+    fn = RegularGridProlongator(cgrid.nodes_x, cgrid.nodes_y, xy_points)
+    for izc in range(cgrid.vnC[2]):
 
         # Bilinear interpolation in the x-y plane
         hh = fn(cefield.fz[:, :, izc]).reshape(grid.vnEz[:-1], order='F')
@@ -1030,7 +1030,7 @@ def residual(grid, model, sfield, efield, norm=False):
     rfield = sfield.copy()
     core.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                 efield.fz, model.eta_x, model.eta_y, model.eta_z, model.zeta,
-                grid.hx, grid.hy, grid.hz)
+                grid.h[0], grid.h[1], grid.h[2])
 
     if norm:  # Return its error.
         return sl.norm(rfield, check_finite=False)
@@ -1482,9 +1482,9 @@ def _current_sc_dir(sc_dir, grid):
     # Find out in which direction we want to half the number of cells.
     # This depends on an (optional) direction of semicoarsening, and
     # if the number of cells in a direction can still be halved.
-    xsc_dir = grid.nCx % 2 != 0 or grid.nCx < 3 or sc_dir == 1
-    ysc_dir = grid.nCy % 2 != 0 or grid.nCy < 3 or sc_dir == 2
-    zsc_dir = grid.nCz % 2 != 0 or grid.nCz < 3 or sc_dir == 3
+    xsc_dir = grid.vnC[0] % 2 != 0 or grid.vnC[0] < 3 or sc_dir == 1
+    ysc_dir = grid.vnC[1] % 2 != 0 or grid.vnC[1] < 3 or sc_dir == 2
+    zsc_dir = grid.vnC[2] % 2 != 0 or grid.vnC[2] < 3 or sc_dir == 3
 
     # Set current sc_dir depending on the above outcome.
     if xsc_dir:
@@ -1532,7 +1532,7 @@ def _current_lr_dir(lr_dir, grid):
     """
     lr_dir = np.copy(lr_dir)
 
-    if grid.nCx == 2:  # Check x-direction.
+    if grid.vnC[0] == 2:  # Check x-direction.
         if lr_dir == 1:
             lr_dir = 0
         elif lr_dir == 5:
@@ -1542,7 +1542,7 @@ def _current_lr_dir(lr_dir, grid):
         elif lr_dir == 7:
             lr_dir = 4
 
-    if grid.nCy == 2:  # Check y-direction.
+    if grid.vnC[1] == 2:  # Check y-direction.
         if lr_dir == 2:
             lr_dir = 0
         elif lr_dir == 4:
@@ -1552,7 +1552,7 @@ def _current_lr_dir(lr_dir, grid):
         elif lr_dir == 7:
             lr_dir = 5
 
-    if grid.nCz == 2:  # Check z-direction.
+    if grid.vnC[2] == 2:  # Check z-direction.
         if lr_dir == 3:
             lr_dir = 0
         elif lr_dir == 4:
@@ -1666,8 +1666,8 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
 
     """
 
-    info = f"     {it:2} {level} {cycmax} [{grid.nCx:3}, {grid.nCy:3}, "
-    info += f"{grid.nCz:3}]: {norm:.3e} {text}"
+    info = f"     {it:2} {level} {cycmax} [{grid.vnC[0]:3}, {grid.vnC[1]:3}, "
+    info += f"{grid.vnC[2]:3}]: {norm:.3e} {text}"
     print(info)
 
 
@@ -1802,29 +1802,29 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
     """
     if sc_dir not in [1, 5, 6]:
         wx = core.restrict_weights(
-                grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
-                cgrid.vectorCCx, cgrid.hx)
+                grid.nodes_x, grid.cell_centers_x, grid.h[0], cgrid.nodes_x,
+                cgrid.cell_centers_x, cgrid.h[0])
     else:
-        wxlr = np.zeros(grid.nNx, dtype=np.float64)
-        wx0 = np.ones(grid.nNx, dtype=np.float64)
+        wxlr = np.zeros(grid.vnN[0], dtype=np.float64)
+        wx0 = np.ones(grid.vnN[0], dtype=np.float64)
         wx = (wxlr, wx0, wxlr)
 
     if sc_dir not in [2, 4, 6]:
         wy = core.restrict_weights(
-                grid.vectorNy, grid.vectorCCy, grid.hy, cgrid.vectorNy,
-                cgrid.vectorCCy, cgrid.hy)
+                grid.nodes_y, grid.cell_centers_y, grid.h[1], cgrid.nodes_y,
+                cgrid.cell_centers_y, cgrid.h[1])
     else:
-        wylr = np.zeros(grid.nNy, dtype=np.float64)
-        wy0 = np.ones(grid.nNy, dtype=np.float64)
+        wylr = np.zeros(grid.vnN[1], dtype=np.float64)
+        wy0 = np.ones(grid.vnN[1], dtype=np.float64)
         wy = (wylr, wy0, wylr)
 
     if sc_dir not in [3, 4, 5]:
         wz = core.restrict_weights(
-                grid.vectorNz, grid.vectorCCz, grid.hz, cgrid.vectorNz,
-                cgrid.vectorCCz, cgrid.hz)
+                grid.nodes_z, grid.cell_centers_z, grid.h[2], cgrid.nodes_z,
+                cgrid.cell_centers_z, cgrid.h[2])
     else:
-        wzlr = np.zeros(grid.nNz, dtype=np.float64)
-        wz0 = np.ones(grid.nNz, dtype=np.float64)
+        wzlr = np.zeros(grid.vnN[2], dtype=np.float64)
+        wz0 = np.ones(grid.vnN[2], dtype=np.float64)
         wz = (wzlr, wz0, wzlr)
 
     return wx, wy, wz
@@ -1833,7 +1833,7 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
 def _get_prolongation_coordinates(grid, d1, d2):
     """Compute required coordinates of finer grid for prolongation."""
     D2, D1 = np.broadcast_arrays(
-            getattr(grid, 'vectorN'+d2), getattr(grid, 'vectorN'+d1)[:, None])
+            getattr(grid, 'nodes_'+d2), getattr(grid, 'nodes_'+d1)[:, None])
     return np.r_[D1.ravel('F'), D2.ravel('F')].reshape(-1, 2, order='F')
 
 

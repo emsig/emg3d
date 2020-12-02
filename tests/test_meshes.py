@@ -241,10 +241,10 @@ def test_TensorMesh():
 
     # Copy
     cgrid = emg3dgrid.copy()
-    assert_allclose(cgrid.vol, emg3dgrid.vol)
+    assert_allclose(cgrid.cell_volumes, emg3dgrid.cell_volumes)
     dgrid = emg3dgrid.to_dict()
     cdgrid = meshes.TensorMesh.from_dict(dgrid)
-    assert_allclose(cdgrid.vol, emg3dgrid.vol)
+    assert_allclose(cdgrid.cell_volumes, emg3dgrid.cell_volumes)
     del dgrid['hx']
     with pytest.raises(KeyError, match="Variable 'hx' missing in `inp`"):
         meshes.TensorMesh.from_dict(dgrid)
@@ -463,10 +463,10 @@ class TestConstructMesh:
         m = meshes.construct_mesh(
                 f, [p, p, p, p], c, d, stretching=([1, 1.3], [1.5, 1], [1, 1]))
 
-        assert_allclose(m.x0, (x0, y0, z0))
-        assert_allclose(m.hx, hx)
-        assert_allclose(m.hy, hy)
-        assert_allclose(m.hz, hz)
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
 
     def test_compare_to_gow2(self):
         vz = np.arange(100)[::-1]*-20
@@ -485,10 +485,10 @@ class TestConstructMesh:
                 min_width_limits=[20, 40],
                 )
 
-        assert_allclose(m.x0, (x0, y0, z0))
-        assert_allclose(m.hx, hx)
-        assert_allclose(m.hy, hy)
-        assert_allclose(m.hz, hz)
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
 
     def test_compare_to_gow3(self):
         x0, hx = meshes.get_origin_widths(
@@ -505,7 +505,7 @@ class TestConstructMesh:
                 min_width_limits=20,
                 )
 
-        assert_allclose(m.x0, (x0, y0, z0), atol=1e-3)
-        assert_allclose(m.hx, hx)
-        assert_allclose(m.hy, hy)
-        assert_allclose(m.hz, hz)
+        assert_allclose(m.origin, (x0, y0, z0), atol=1e-3)
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)

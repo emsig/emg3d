@@ -182,7 +182,8 @@ def gradient(simulation):
         grad_z = np.zeros(vnC, order='F')
 
         # Map the field to cell centers times volume.
-        vol = simulation._dict_grid[src][freq].vol.reshape(vnC, order='F')
+        vol = simulation._dict_grid[src][freq].cell_volumes.reshape(
+                vnC, order='F')
         maps.edges2cellaverages(ex=efield.fx, ey=efield.fy, ez=efield.fz,
                                 vol=vol,
                                 out_x=grad_x, out_y=grad_y, out_z=grad_z)

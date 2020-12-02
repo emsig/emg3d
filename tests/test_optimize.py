@@ -101,7 +101,7 @@ class TestOptimize():
 def test_derivative(capsys):
     # Create a simple mesh.
     hx = np.ones(64)*100
-    mesh = meshes.TensorMesh([hx, hx, hx], x0=[0, 0, 0])
+    mesh = meshes.TensorMesh([hx, hx, hx], origin=[0, 0, 0])
 
     # Define a simple survey.
     survey = surveys.Survey(

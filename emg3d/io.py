@@ -318,8 +318,9 @@ def _dict_serialize(inp, out=None, collect_classes=False):
             else:
 
                 try:
-                    to_dict = {'hx': value.hx, 'hy': value.hy, 'hz': value.hz,
-                               'x0': value.x0, '__class__': name}
+                    to_dict = {'hx': value.h[0], 'hy': value.h[1],
+                               'hz': value.h[2],
+                               'origin': value.origin, '__class__': name}
                 except AttributeError as e:  # Gracefully fail.
                     print(f"* WARNING :: Could not serialize <{key}>.\n"
                           f"             {e}")

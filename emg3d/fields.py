@@ -523,12 +523,12 @@ def get_source_field(grid, src, freq, strength=0):
     else:
         ii = [0, 0, 1, 1, 2, 2]
 
-    source_in = np.any(src[ii[0]] >= grid.vectorNx[0])
-    source_in *= np.any(src[ii[1]] <= grid.vectorNx[-1])
-    source_in *= np.any(src[ii[2]] >= grid.vectorNy[0])
-    source_in *= np.any(src[ii[3]] <= grid.vectorNy[-1])
-    source_in *= np.any(src[ii[4]] >= grid.vectorNz[0])
-    source_in *= np.any(src[ii[5]] <= grid.vectorNz[-1])
+    source_in = np.any(src[ii[0]] >= grid.nodes_x[0])
+    source_in *= np.any(src[ii[1]] <= grid.nodes_x[-1])
+    source_in *= np.any(src[ii[2]] >= grid.nodes_y[0])
+    source_in *= np.any(src[ii[3]] <= grid.nodes_y[-1])
+    source_in *= np.any(src[ii[4]] >= grid.nodes_z[0])
+    source_in *= np.any(src[ii[5]] <= grid.nodes_z[-1])
 
     if not source_in:
         raise ValueError(f"Provided source outside grid: {src}.")
@@ -562,9 +562,9 @@ def get_source_field(grid, src, freq, strength=0):
         sfield = SourceField(grid, freq=freq)
 
         # Return source-field depending if point or finite dipole.
-        vec1 = (grid.vectorCCx, grid.vectorNy, grid.vectorNz)
-        vec2 = (grid.vectorNx, grid.vectorCCy, grid.vectorNz)
-        vec3 = (grid.vectorNx, grid.vectorNy, grid.vectorCCz)
+        vec1 = (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)
+        vec2 = (grid.nodes_x, grid.cell_centers_y, grid.nodes_z)
+        vec3 = (grid.nodes_x, grid.nodes_y, grid.cell_centers_z)
         if finite:
             finite_source(*vec1, src, sfield.fx, 0, grid)
             finite_source(*vec2, src, sfield.fy, 1, grid)
@@ -629,9 +629,9 @@ def get_source_field(grid, src, freq, strength=0):
         id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
 
         # Cell fractions.
-        a1 = (grid.vectorNx-src[0])*id_xyz[0]
-        a2 = (grid.vectorNy-src[2])*id_xyz[1]
-        a3 = (grid.vectorNz-src[4])*id_xyz[2]
+        a1 = (grid.nodes_x-src[0])*id_xyz[0]
+        a2 = (grid.nodes_y-src[2])*id_xyz[1]
+        a3 = (grid.nodes_z-src[4])*id_xyz[2]
 
         # Get range of indices of cells in which source resides.
         def min_max_ind(vector, i):
@@ -641,9 +641,9 @@ def get_source_field(grid, src, freq, strength=0):
             return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
                     max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
 
-        rix = min_max_ind(grid.vectorNx, 0)
-        riy = min_max_ind(grid.vectorNy, 1)
-        riz = min_max_ind(grid.vectorNz, 2)
+        rix = min_max_ind(grid.nodes_x, 0)
+        riy = min_max_ind(grid.nodes_y, 1)
+        riz = min_max_ind(grid.nodes_z, 2)
 
         # Loop over these indices.
         for iz in range(riz[0], riz[1]+1):
@@ -665,11 +665,11 @@ def get_source_field(grid, src, freq, strength=0):
                     x_len = np.linalg.norm(xmax-xmin)/slen
 
                     # Contribution to edge (coordinate idir)
-                    rx = (x_c[0]-grid.vectorNx[ix])/grid.hx[ix]
+                    rx = (x_c[0]-grid.nodes_x[ix])/grid.h[0][ix]
                     ex = 1-rx
-                    ry = (x_c[1]-grid.vectorNy[iy])/grid.hy[iy]
+                    ry = (x_c[1]-grid.nodes_y[iy])/grid.h[1][iy]
                     ey = 1-ry
-                    rz = (x_c[2]-grid.vectorNz[iz])/grid.hz[iz]
+                    rz = (x_c[2]-grid.nodes_z[iz])/grid.h[2][iz]
                     ez = 1-rz
 
                     # Add to field (only if segment inside cell).
@@ -774,9 +774,9 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     points = tuple()
     for i, coord in enumerate(['x', 'y', 'z']):
         if values.shape[i] == getattr(grid, 'nN'+coord):
-            pts = (getattr(grid, 'vectorN'+coord), )
+            pts = (getattr(grid, 'nodes_'+coord), )
         else:
-            pts = (getattr(grid, 'vectorCC'+coord), )
+            pts = (getattr(grid, 'cell_centers_'+coord), )
 
         # Add to points.
         points += pts
@@ -850,13 +850,13 @@ def get_receiver_response(grid, field, rec):
 
     # Get the vectors corresponding to input data.
     if field.is_electric:
-        points = ((grid.vectorCCx, grid.vectorNy, grid.vectorNz),
-                  (grid.vectorNx, grid.vectorCCy, grid.vectorNz),
-                  (grid.vectorNx, grid.vectorNy, grid.vectorCCz))
+        points = ((grid.cell_centers_x, grid.nodes_y, grid.nodes_z),
+                  (grid.nodes_x, grid.cell_centers_y, grid.nodes_z),
+                  (grid.nodes_x, grid.nodes_y, grid.cell_centers_z))
     else:
-        points = ((grid.vectorNx, grid.vectorCCy, grid.vectorCCz),
-                  (grid.vectorCCx, grid.vectorNy, grid.vectorCCz),
-                  (grid.vectorCCx, grid.vectorCCy, grid.vectorNz))
+        points = ((grid.nodes_x, grid.cell_centers_y, grid.cell_centers_z),
+                  (grid.cell_centers_x, grid.nodes_y, grid.cell_centers_z),
+                  (grid.cell_centers_x, grid.cell_centers_y, grid.nodes_z))
 
     # Get azimuth and dip in radians.
     azm = np.deg2rad(rec[3])
@@ -896,13 +896,13 @@ def get_h_field(grid, model, field):
     the other field directions. This means that the provided electric field and
     the returned magnetic field have different dimensions::
 
-       E-field:  x: [grid.vectorCCx,  grid.vectorNy,  grid.vectorNz]
-                 y: [ grid.vectorNx, grid.vectorCCy,  grid.vectorNz]
-                 z: [ grid.vectorNx,  grid.vectorNy, grid.vectorCCz]
+       E-field:  x: [grid.cell_centers_x,  grid.nodes_y,  grid.nodes_z]
+                 y: [ grid.nodes_x, grid.cell_centers_y,  grid.nodes_z]
+                 z: [ grid.nodes_x,  grid.nodes_y, grid.cell_centers_z]
 
-       H-field:  x: [ grid.vectorNx, grid.vectorCCy, grid.vectorCCz]
-                 y: [grid.vectorCCx,  grid.vectorNy, grid.vectorCCz]
-                 z: [grid.vectorCCx, grid.vectorCCy,  grid.vectorNz]
+       H-field:  x: [ grid.nodes_x, grid.cell_centers_y, grid.cell_centers_z]
+                 y: [grid.cell_centers_x,  grid.nodes_y, grid.cell_centers_z]
+                 z: [grid.cell_centers_x, grid.cell_centers_y,  grid.nodes_z]
 
 
     Parameters
@@ -926,16 +926,16 @@ def get_h_field(grid, model, field):
 
     # Carry out the curl (^ corresponds to differentiation axis):
     # H_x = (E_z^1 - E_y^2)
-    e3d_hx = (np.diff(field.fz, axis=1)/grid.hy[None, :, None] -
-              np.diff(field.fy, axis=2)/grid.hz[None, None, :])
+    e3d_hx = (np.diff(field.fz, axis=1)/grid.h[1][None, :, None] -
+              np.diff(field.fy, axis=2)/grid.h[2][None, None, :])
 
     # H_y = (E_x^2 - E_z^0)
-    e3d_hy = (np.diff(field.fx, axis=2)/grid.hz[None, None, :] -
-              np.diff(field.fz, axis=0)/grid.hx[:, None, None])
+    e3d_hy = (np.diff(field.fx, axis=2)/grid.h[2][None, None, :] -
+              np.diff(field.fz, axis=0)/grid.h[0][:, None, None])
 
     # H_z = (E_y^0 - E_x^1)
-    e3d_hz = (np.diff(field.fy, axis=0)/grid.hx[:, None, None] -
-              np.diff(field.fx, axis=1)/grid.hy[None, :, None])
+    e3d_hz = (np.diff(field.fy, axis=0)/grid.h[0][:, None, None] -
+              np.diff(field.fx, axis=1)/grid.h[1][None, :, None])
 
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
@@ -945,26 +945,26 @@ def get_h_field(grid, model, field):
         vmodel = models.VolumeModel(grid, model, field)
 
         # Plus and minus indices.
-        ixm = np.r_[0, np.arange(grid.nCx)]
-        ixp = np.r_[np.arange(grid.nCx), grid.nCx-1]
-        iym = np.r_[0, np.arange(grid.nCy)]
-        iyp = np.r_[np.arange(grid.nCy), grid.nCy-1]
-        izm = np.r_[0, np.arange(grid.nCz)]
-        izp = np.r_[np.arange(grid.nCz), grid.nCz-1]
+        ixm = np.r_[0, np.arange(grid.vnC[0])]
+        ixp = np.r_[np.arange(grid.vnC[0]), grid.vnC[0]-1]
+        iym = np.r_[0, np.arange(grid.vnC[1])]
+        iyp = np.r_[np.arange(grid.vnC[1]), grid.vnC[1]-1]
+        izm = np.r_[0, np.arange(grid.vnC[2])]
+        izp = np.r_[np.arange(grid.vnC[2]), grid.vnC[2]-1]
 
         # Average mu_r for dual-grid.
         zeta_x = (vmodel.zeta[ixm, :, :] + vmodel.zeta[ixp, :, :])/2.
         zeta_y = (vmodel.zeta[:, iym, :] + vmodel.zeta[:, iyp, :])/2.
         zeta_z = (vmodel.zeta[:, :, izm] + vmodel.zeta[:, :, izp])/2.
 
-        hvx = grid.hx[:, None, None]
-        hvy = grid.hy[None, :, None]
-        hvz = grid.hz[None, None, :]
+        hvx = grid.h[0][:, None, None]
+        hvy = grid.h[1][None, :, None]
+        hvz = grid.h[2][None, None, :]
 
         # Define the widths of the dual grid.
-        dx = (np.r_[0., grid.hx] + np.r_[grid.hx, 0.])/2.
-        dy = (np.r_[0., grid.hy] + np.r_[grid.hy, 0.])/2.
-        dz = (np.r_[0., grid.hz] + np.r_[grid.hz, 0.])/2.
+        dx = (np.r_[0., grid.h[0]] + np.r_[grid.h[0], 0.])/2.
+        dy = (np.r_[0., grid.h[1]] + np.r_[grid.h[1], 0.])/2.
+        dz = (np.r_[0., grid.h[2]] + np.r_[grid.h[2], 0.])/2.
 
         # Multiply fields by mu_r.
         e3d_hx *= zeta_x/(dx[:, None, None]*hvy*hvz)

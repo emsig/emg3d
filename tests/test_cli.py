@@ -341,7 +341,7 @@ class TestRun:
 
     # Create a dummy grid and model.
     xx = np.ones(16)*500
-    grid = emg3d.TensorMesh([xx, xx, xx], x0=np.array([0, 0, 0]))
+    grid = emg3d.TensorMesh([xx, xx, xx], origin=np.array([0, 0, 0]))
     model = emg3d.Model(grid, 1.)
 
     def test_basic(self, tmpdir, capsys):

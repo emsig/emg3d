@@ -13,7 +13,8 @@ recent versions
 
 - Maintenance:
 
-  - Update for ``discretize>=0.6.0``.
+  - Update for ``discretize>=0.6.0``, with v0.6.0 being now the minimum version
+    to work with ``emg3d``.
   - Moved from Travis CI to GitHub Actions.
 
 

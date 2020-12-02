@@ -528,7 +528,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     z0, hz = get_origin_widths(**kwargs, **zparams)
 
     # Return mesh.
-    return TensorMesh([hx, hy, hz], x0=np.array([x0, y0, z0]))
+    return TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
 
 
 def get_origin_widths(frequency, properties, center, domain=None, vector=None,

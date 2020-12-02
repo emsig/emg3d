@@ -15,7 +15,7 @@ hz, hz0 = meshes.get_hx_h0(
         freq=freq, res=3.3, domain=[200, 300], max_domain=1500,
         possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
 
-input_grid = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
+input_grid = {'h': [hxy, hxy, hz], 'origin': (hxy0, hxy0, hz0)}
 grid = meshes.TensorMesh(**input_grid)
 
 input_model = {
@@ -74,7 +74,7 @@ hz, hz0 = meshes.get_hx_h0(
         freq=freq, res=3.3, domain=[src[2]-20, src[2]+20], max_domain=5000,
         possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
 
-input_grid = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
+input_grid = {'h': [hxy, hxy, hz], 'origin': (hxy0, hxy0, hz0)}
 grid = meshes.TensorMesh(**input_grid)
 
 # Initialize model
@@ -134,19 +134,33 @@ grid = TensorMesh(
         [[(10, 10, -1.1), (10, 20, 1), (10, 10, 1.1)],
          [(33, 20, 1), (33, 10, 1.5)],
          [20]],
-        x0='CN0')
+        origin='CN0')
 
 # List of all attributes in emg3d-grid.
 all_attr = [
-    'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx', 'nE',
-    'vectorCCy', 'vectorCCz', 'nEx', 'nEy', 'nEz', 'nCx', 'nCy', 'nCz', 'vnC',
-    'nNx', 'nNy', 'nNz', 'vnN', 'vnEx', 'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'x0'
+    'origin',
+    'shape_cells', 'shape_nodes',
+    'n_nodes', 'n_edges', 'n_cells',
+    'n_edges_x', 'n_edges_y', 'n_edges_z',
+    'n_edges_per_direction',
+    'nodes_x', 'nodes_y', 'nodes_z',
+    'cell_centers_x', 'cell_centers_y', 'cell_centers_z',
+    'shape_edges_x', 'shape_edges_y', 'shape_edges_z',
+    # aliases
+    'x0',
+    'nC', 'vnC',
+    'nN', 'vnN',
+    'nE', 'nEx', 'nEy', 'nEz',
+    'vnE', 'vnEx', 'vnEy', 'vnEz',
 ]
 
 mesh = {}
 
 for attr in all_attr:
     mesh[attr] = getattr(grid, attr)
+mesh['hx'] = grid.h[0]
+mesh['hy'] = grid.h[1]
+mesh['hz'] = grid.h[2]
 
 
 # # # # # # # # # # 4. Homogeneous VTI fullspace LAPLACE # # # # # # # # # #
@@ -159,7 +173,7 @@ hz, hz0 = meshes.get_hx_h0(
         freq=freq, res=3.3, domain=[240, 260], max_domain=1500,
         possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
 
-input_grid_l = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
+input_grid_l = {'h': [hxy, hxy, hz], 'origin': (hxy0, hxy0, hz0)}
 grid_l = meshes.TensorMesh(**input_grid_l)
 
 input_model_l = {

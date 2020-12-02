@@ -111,7 +111,7 @@ class TestModel:
             models.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
         # Check with all inputs
-        gridvol = grid.vol.reshape(grid.vnC, order='F')
+        gridvol = grid.cell_volumes.reshape(grid.vnC, order='F')
         model3 = models.Model(
             grid, property_x, property_y, property_z, mu_r=mu_r)
         vmodel3 = models.VolumeModel(grid, model3, sfield)
@@ -153,10 +153,12 @@ class TestModel:
         assert_allclose(vmodel3.eta_z, eta_z)
 
         # Check volume
-        assert_allclose(grid.vol.reshape(grid.vnC, order='F'), vmodel2.zeta)
+        assert_allclose(grid.cell_volumes.reshape(grid.vnC, order='F'),
+                        vmodel2.zeta)
         model4 = models.Model(grid, 1)
         vmodel4 = models.VolumeModel(grid, model4, sfield)
-        assert_allclose(vmodel4.zeta, grid.vol.reshape(grid.vnC, order='F'))
+        assert_allclose(vmodel4.zeta,
+                        grid.cell_volumes.reshape(grid.vnC, order='F'))
 
         # Check a couple of out-of-range failures
         with pytest.raises(ValueError, match='`property_x` must be all'):
@@ -266,9 +268,9 @@ class TestModelOperators:
 
     # Define two different sized meshes.
     mesh_base = meshes.TensorMesh(
-            [np.ones(3), np.ones(4), np.ones(5)], x0=np.array([0, 0, 0]))
+            [np.ones(3), np.ones(4), np.ones(5)], origin=np.array([0, 0, 0]))
     mesh_diff = meshes.TensorMesh(
-            [np.ones(3), np.ones(4), np.ones(6)], x0=np.array([0, 0, 0]))
+            [np.ones(3), np.ones(4), np.ones(6)], origin=np.array([0, 0, 0]))
 
     # Define a couple of models.
     model_int = models.Model(mesh_base, 1.)
