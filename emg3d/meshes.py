@@ -28,9 +28,10 @@ from emg3d import maps
 
 try:
     import discretize
+    # Backwards compatibility; remove latest for version 1.0.0.
     dv = discretize.__version__.split('.')
-    if dv[0] == 0 and dv[1] < 6:
-        print('WARNING TODO discretize version')
+    if int(dv[0]) == 0 and int(dv[1]) < 6:
+        print('\n             =====> WARNING TODO discretize version <=====\n')
         dv = None
 except ImportError:
     dv = None
@@ -48,12 +49,12 @@ __all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
            'get_hx']
 
 MESHWARNING = (
-    "\n    `get_hx_h0`, `get_stretched_h`, `get_domain`, and `get_hx` are"
-    "\n    deprecated and will be removed. Use `construct_mesh`` instead."
+    "`get_hx_h0`, `get_stretched_h`, `get_domain`, and `get_hx` are "
+    "deprecated and will be removed. Use `construct_mesh`` instead."
 )
 CELLWARNING = (
-    "\n    `get_cell_numbers` is deprecated and will be removed."
-    "\n    Use `good_mg_cell_nr` instead."
+    "`get_cell_numbers` is deprecated and will be removed. "
+    "Use `good_mg_cell_nr` instead."
 )
 
 
@@ -73,71 +74,32 @@ class _TensorMesh:
 
     """
 
-    # Aliases to old names.
-    _aliases = {
-        "nC": "n_cells",
-        "nN": "n_nodes",
-        "nE": "n_edges",
-        "nEx": "n_edges_x",
-        "nEy": "n_edges_y",
-        "nEz": "n_edges_z",
-        "vnE": "n_edges_per_direction",
-        "vnC": "shape_cells",
-        "vnN": "shape_nodes",
-        "vnEx": "shape_edges_x",
-        "vnEy": "shape_edges_y",
-        "vnEz": "shape_edges_z",
-    }
-
-    # Deprecations
-    # "nCx": "shape_cells[0]",
-    # "nCy": "shape_cells[1]",
-    # "nCz": "shape_cells[2]",
-    # "nNx": "shape_nodes[0]",
-    # "nNy": "shape_nodes[1]",
-    # "nNz": "shape_nodes[2]",
-    # "hx": "h[0]",
-    # "hy": "h[1]",
-    # "hz": "h[2]",
-    # "vectorNx": "nodes_x",
-    # "vectorNy": "nodes_y",
-    # "vectorNz": "nodes_z",
-    # "vectorCCx": "cell_centers_x",
-    # "vectorCCy": "cell_centers_y",
-    # "vectorCCz": "cell_centers_z",
-    # "vol": "cell_volumes",
-
     def __init__(self, h, origin=None, **kwargs):
         """Initialize the mesh."""
 
         # Store origin.
-        if origin is None:
+        if origin is None:  # Backwards compatibility.
             origin = kwargs.pop('x0')
-            warnings.warn(
-                "\n    `x0` is deprecated and will be removed. Use `origin`.",
-                DeprecationWarning)
-        origin = np.array(origin)  # Cast to array.
-        self.origin = origin
+        self.origin = np.array(origin)
 
         # Width of cells, cast to arrays.
-        h = [np.array(h[0]), np.array(h[1]), np.array(h[2])]
-        self.h = h
+        self.h = [np.array(h[0]), np.array(h[1]), np.array(h[2])]
 
         # Node related properties.
-        shape_nodes = (h[0].size+1, h[1].size+1, h[2].size+1)
+        shape_nodes = (self.h[0].size+1, self.h[1].size+1, self.h[2].size+1)
         self.shape_nodes = shape_nodes
         self.n_nodes = np.prod(shape_nodes)
-        self.nodes_x = np.r_[0., h[0].cumsum()] + origin[0]
-        self.nodes_y = np.r_[0., h[1].cumsum()] + origin[1]
-        self.nodes_z = np.r_[0., h[2].cumsum()] + origin[2]
+        self.nodes_x = np.r_[0., self.h[0].cumsum()] + self.origin[0]
+        self.nodes_y = np.r_[0., self.h[1].cumsum()] + self.origin[1]
+        self.nodes_z = np.r_[0., self.h[2].cumsum()] + self.origin[2]
 
         # Cell related properties.
-        shape_cells = (h[0].size, h[1].size, h[2].size)
+        shape_cells = (self.h[0].size, self.h[1].size, self.h[2].size)
         self.shape_cells = shape_cells
         self.n_cells = np.prod(shape_cells)
-        self.cell_centers_x = origin[0] + np.diff(self.nodes_x)/2.0
-        self.cell_centers_y = origin[1] + np.diff(self.nodes_y)/2.0
-        self.cell_centers_z = origin[2] + np.diff(self.nodes_z)/2.0
+        self.cell_centers_x = (self.nodes_x[1:] + self.nodes_x[:-1])/2
+        self.cell_centers_y = (self.nodes_y[1:] + self.nodes_y[:-1])/2
+        self.cell_centers_z = (self.nodes_z[1:] + self.nodes_z[:-1])/2
 
         # Edge related properties.
         self.shape_edges_x = (shape_cells[0], shape_nodes[1], shape_nodes[2])
@@ -149,6 +111,21 @@ class _TensorMesh:
         self.n_edges_per_direction = (
             self.n_edges_x, self.n_edges_y, self.n_edges_z)
         self.n_edges = np.sum(self.n_edges_per_direction)
+
+        # Aliases (in line with `discretize`).
+        self.x0 = self.origin
+        self.nC = self.n_cells
+        self.nN = self.n_nodes
+        self.nE = self.n_edges
+        self.nEx = self.n_edges_x
+        self.nEy = self.n_edges_y
+        self.nEz = self.n_edges_z
+        self.vnE = self.n_edges_per_direction
+        self.vnC = self.shape_cells
+        self.vnN = self.shape_nodes
+        self.vnEx = self.shape_edges_x
+        self.vnEy = self.shape_edges_y
+        self.vnEz = self.shape_edges_z
 
     def __repr__(self):
         """Simple representation."""
@@ -164,75 +141,43 @@ class _TensorMesh:
                     self.h[2][:, None, None]).ravel()
         return self._cell_volumes
 
-    # Getter for old-name aliases.
-    def __getattr__(self, name):
-        """Get aliased property."""
-        # nedbatchelder.com/blog/201010/surprising_getattr_recursion.html
-        if name == "_aliases":
-            raise AttributeError
-        name = self._aliases.get(name, name)
-        return object.__getattribute__(self, name)
+    # # DEPRECATED FUNCTIONS - Remove in v0.16.0 # #
+    def _warn(new_name, old_name, index=None):
+        """Temporary deprecation function."""
 
-    # Get and set x0 (alias for origin).
-    @property
-    def x0(self):
-        """Backwards compatible alias for old name of `origin`."""
-        return self.origin
+        def get_dep(self):
+            cname = type(self).__name__
+            ind = f"[{index}]" if index is not None else ""
+            message = (
+                f"`{cname}.{old_name}` has been deprecated (will be removed "
+                f"in v0.16.0); please use `{cname}.{new_name}{ind}`."
+            )
+            warnings.warn(message, DeprecationWarning)
+            if index is None:
+                return getattr(self, new_name)
+            else:
+                return getattr(self, new_name)[index]
 
-    @x0.setter
-    def x0(self, x0):
-        """Backwards compatible alias for old name of `origin`."""
-        self.origin = x0
+        doc = f"`{old_name}` has been deprecated, use `{new_name}`."
 
-    # Deprecations
-    @property
-    def nCx(self):
-        return self.shape_cells[0]
-    @property
-    def nCy(self):
-        return self.shape_cells[1]
-    @property
-    def nCz(self):
-        return self.shape_cells[2]
-    @property
-    def nNx(self):
-        return self.shape_nodes[0]
-    @property
-    def nNy(self):
-        return self.shape_nodes[1]
-    @property
-    def nNz(self):
-        return self.shape_nodes[2]
-    @property
-    def hx(self):
-        return self.h[0]
-    @property
-    def hy(self):
-        return self.h[1]
-    @property
-    def hz(self):
-        return self.h[2]
-    @property
-    def vectorNx(self):
-        return self.nodes_x
-    @property
-    def vectorNy(self):
-        return self.nodes_y
-    @property
-    def vectorNz(self):
-        return self.nodes_z
-    @property
-    def vectorCCx(self):
-        return self.cell_centers_x
-    @property
-    def vectorCCy(self):
-        return self.cell_centers_y
-    @property
-    def vectorCCz(self):
-        return self.cell_centers_z
-    @property
-    def vol(self):
-        return self.cell_volumes
+        return property(get_dep, None, None, doc)
+
+    hx = _warn('h', 'hx', 0)
+    hy = _warn('h', 'hy', 1)
+    hz = _warn('h', 'hz', 2)
+    nCx = _warn('shape_cells', 'nCx', 0)
+    nCy = _warn('shape_cells', 'nCy', 1)
+    nCz = _warn('shape_cells', 'nCz', 2)
+    nNx = _warn('shape_nodes', 'nNx', 0)
+    nNy = _warn('shape_nodes', 'nNy', 1)
+    nNz = _warn('shape_nodes', 'nNz', 2)
+    vectorNx = _warn('nodes_x', 'vectorNx')
+    vectorNy = _warn('nodes_y', 'vectorNy')
+    vectorNz = _warn('nodes_z', 'vectorNz')
+    vectorCCx = _warn('cell_centers_x', 'vectorCCx')
+    vectorCCy = _warn('cell_centers_y', 'vectorCCy')
+    vectorCCz = _warn('cell_centers_z', 'vectorCCz')
+    vol = _warn('cell_volumes', 'vol')
 
 
 class TensorMesh(dTensorMesh, _TensorMesh):
@@ -320,7 +265,7 @@ class TensorMesh(dTensorMesh, _TensorMesh):
                 origin = inp['x0']
             else:
                 origin = inp['origin']
-            return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=origin)
+            return cls(h=[inp['hx'], inp['hy'], inp['hz']], origin=origin)
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
