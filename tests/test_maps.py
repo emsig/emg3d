@@ -8,6 +8,10 @@ from emg3d import fields, maps, meshes, models
 # Import soft dependencies.
 try:
     import discretize
+    # Backwards compatibility; remove latest for version 1.0.0.
+    dv = discretize.__version__.split('.')
+    if int(dv[0]) == 0 and int(dv[1]) < 6:
+        discretize = None
 except ImportError:
     discretize = None
 
@@ -16,10 +20,10 @@ def test_grid2grid_volume():
     # == X == Simple 1D model
     grid_in = meshes.TensorMesh(
             [np.ones(5)*10, np.array([1, ]), np.array([1, ])],
-            x0=np.array([0, 0, 0]))
+            origin=np.array([0, 0, 0]))
     grid_out = meshes.TensorMesh(
             [np.array([10, 25, 10, 5, 2]), np.array([1, ]), np.array([1, ])],
-            x0=np.array([-5, 0, 0]))
+            origin=np.array([-5, 0, 0]))
     values_in = np.array([1., 5., 3, 7, 2])[:, None, None]
     values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
 
@@ -36,10 +40,10 @@ def test_grid2grid_volume():
     # == Y ==  Reverse it
     grid_out = meshes.TensorMesh(
             [np.array([1, ]), np.ones(5)*10, np.array([1, ])],
-            x0=np.array([0, 0, 0]))
+            origin=np.array([0, 0, 0]))
     grid_in = meshes.TensorMesh(
             [np.array([1, ]), np.array([10, 25, 10, 5, 2]), np.array([1, ])],
-            x0=np.array([0, -5, 0]))
+            origin=np.array([0, -5, 0]))
     values_in = np.array([1, 3.4, 7, 2, 2])[None, :, None]
     values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
 
@@ -49,10 +53,10 @@ def test_grid2grid_volume():
     # == Z == Another 1D test
     grid_in = meshes.TensorMesh(
             [np.array([1, ]), np.array([1, ]), np.ones(9)*10],
-            x0=np.array([0, 0, 0]))
+            origin=np.array([0, 0, 0]))
     grid_out = meshes.TensorMesh(
             [np.array([1, ]), np.array([1, ]), np.array([20, 41, 9, 30])],
-            x0=np.array([0, 0, 0]))
+            origin=np.array([0, 0, 0]))
     values_in = np.arange(1., 10)[None, None, :]
     values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
 
@@ -61,10 +65,10 @@ def test_grid2grid_volume():
     # == 3D ==
     grid_in = meshes.TensorMesh(
             [np.array([1, 1, 1]), np.array([10, 10, 10, 10, 10]),
-             np.array([10, 2, 10])], x0=np.array([0, 0, 0]))
+             np.array([10, 2, 10])], origin=np.array([0, 0, 0]))
     grid_out = meshes.TensorMesh(
             [np.array([1, 2, ]), np.array([10, 25, 10, 5, 2]),
-             np.array([4, 4, 4])], x0=np.array([0, -5, 6]))
+             np.array([4, 4, 4])], origin=np.array([0, -5, 6]))
     create = np.array([[1, 2., 1]])
     create = np.array([create, 2*create, create])
     values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
@@ -79,19 +83,20 @@ def test_grid2grid_volume():
     # == If the extent is the same, volume*values must remain constant. ==
     grid_in = meshes.TensorMesh(
             [np.array([1, 1, 1]), np.array([10, 10, 10, 10, 10]),
-             np.array([10, 2, 10])], x0=np.array([0, 0, 0]))
+             np.array([10, 2, 10])], origin=np.array([0, 0, 0]))
     grid_out = meshes.TensorMesh(
             [np.array([1, 2, ]), np.array([5, 25, 10, 5, 5]),
-             np.array([9, 4, 9])], x0=np.array([0, 0, 0]))
+             np.array([9, 4, 9])], origin=np.array([0, 0, 0]))
     create = np.array([[1, 2., 1]])
     create = np.array([create, 2*create, create])
     values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
-    vol_in = np.outer(np.outer(grid_in.hx, grid_in.hy).ravel('F'), grid_in.hz)
+    vol_in = np.outer(np.outer(
+        grid_in.h[0], grid_in.h[1]).ravel('F'), grid_in.h[2])
     vol_in = vol_in.ravel('F').reshape(grid_in.vnC, order='F')
 
     values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
-    vol_out = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'),
-                       grid_out.hz)
+    vol_out = np.outer(np.outer(grid_out.h[0], grid_out.h[1]).ravel('F'),
+                       grid_out.h[2])
     vol_out = vol_out.ravel('F').reshape(grid_out.vnC, order='F')
 
     assert_allclose(np.sum(values_out*vol_out), np.sum(values_in*vol_in))
@@ -128,7 +133,7 @@ class TestGrid2grid():
         # Fine grid.
         fgrid = meshes.TensorMesh(
             [np.ones(2**6)*10, np.ones(2**5)*100, np.ones(2**4)*1000],
-            x0=np.array([-320., -1600, -8000]))
+            origin=np.array([-320., -1600, -8000]))
 
         # Smoothly changing model for fine grid.
         cmodel = np.arange(1, fgrid.nC+1).reshape(fgrid.vnC, order='F')
@@ -136,7 +141,7 @@ class TestGrid2grid():
         # Coarser grid.
         cgrid = meshes.TensorMesh(
             [np.ones(2**5)*15, np.ones(2**4)*150, np.ones(2**3)*1500],
-            x0=np.array([-240., -1200, -6000]))
+            origin=np.array([-240., -1200, -6000]))
 
         # Interpolate linearly and cubic spline.
         lin_model = maps.grid2grid(fgrid, cmodel, cgrid, 'linear')
@@ -149,12 +154,12 @@ class TestGrid2grid():
         # Assert it is 'nearest' or extrapolate if points are outside.
         tgrid = meshes.TensorMesh(
                 [np.array([1, 1, 1, 1]), np.array([1, 1, 1, 1]),
-                 np.array([1, 1, 1, 1])], x0=np.array([0., 0, 0]))
+                 np.array([1, 1, 1, 1])], origin=np.array([0., 0, 0]))
         tmodel = np.ones(tgrid.nC).reshape(tgrid.vnC, order='F')
         tmodel[:, 0, :] = 2
         t2grid = meshes.TensorMesh(
                 [np.array([1]), np.array([1]), np.array([1])],
-                x0=np.array([2, -1, 2]))
+                origin=np.array([2, -1, 2]))
 
         # Nearest with cubic.
         out = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic')
@@ -226,19 +231,20 @@ def test_volume_average(njit):
     # Comparison to alt_version.
     grid_in = meshes.TensorMesh(
             [np.ones(30), np.ones(20)*5, np.ones(10)*10],
-            x0=np.array([0, 0, 0]))
+            origin=np.array([0, 0, 0]))
     grid_out = meshes.TensorMesh(
             [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
-            x0=np.array([0.5, 3.33, 5]))
+            origin=np.array([0.5, 3.33, 5]))
 
     values = np.arange(grid_in.nC, dtype=np.float_).reshape(
             grid_in.vnC, order='F')
 
-    points = (grid_in.vectorNx, grid_in.vectorNy, grid_in.vectorNz)
-    new_points = (grid_out.vectorNx, grid_out.vectorNy, grid_out.vectorNz)
+    points = (grid_in.nodes_x, grid_in.nodes_y, grid_in.nodes_z)
+    new_points = (grid_out.nodes_x, grid_out.nodes_y, grid_out.nodes_z)
 
     # Compute volume.
-    vol = np.outer(np.outer(grid_out.hx, grid_out.hy).ravel('F'), grid_out.hz)
+    vol = np.outer(np.outer(
+        grid_out.h[0], grid_out.h[1]).ravel('F'), grid_out.h[2])
     vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
 
     # New solution.
@@ -262,24 +268,24 @@ def test_volume_average_weights(njit):
 
     grid_in = meshes.TensorMesh(
             [np.ones(11), np.ones(10)*2, np.ones(3)*10],
-            x0=np.array([0, 0, 0]))
+            origin=np.array([0, 0, 0]))
     grid_out = meshes.TensorMesh(
             [np.arange(4)+1, np.arange(5)+1, np.arange(6)+1],
-            x0=np.array([0.5, 3.33, 5]))
+            origin=np.array([0.5, 3.33, 5]))
 
-    wx, ix_in, ix_out = volume_avg_weights(grid_in.vectorNx, grid_out.vectorNx)
+    wx, ix_in, ix_out = volume_avg_weights(grid_in.nodes_x, grid_out.nodes_x)
     assert_allclose(wx,
                     [0.5, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 0.5, 0.5, 1, 1, 1, 0.5])
     assert_allclose(ix_in, [0, 1, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 10])
     assert_allclose(ix_out, [0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3])
 
-    wy, iy_in, iy_out = volume_avg_weights(grid_in.vectorNy, grid_out.vectorNy)
+    wy, iy_in, iy_out = volume_avg_weights(grid_in.nodes_y, grid_out.nodes_y)
     assert_allclose(wy, [0.67, 0.33, 1.67, 0.33, 1.67, 1.33, 0.67, 2.,
                          1.33, 0.67, 2, 2, 0.33])
     assert_allclose(iy_in, [1, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 9])
     assert_allclose(iy_out, [0, 0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 4, 4])
 
-    wz, iz_in, iz_out = volume_avg_weights(grid_in.vectorNz, grid_out.vectorNz)
+    wz, iz_in, iz_out = volume_avg_weights(grid_in.nodes_z, grid_out.nodes_z)
     assert_allclose(wz, [1, 2, 2, 1, 4, 5, 6])
     assert_allclose(iz_in, [0, 0, 0, 1, 1, 1, 2])
     assert_allclose(iz_out, [0, 1, 2, 2, 3, 4, 5])
@@ -459,7 +465,7 @@ def test_edges2cellaverages(njit):
     grad_z = np.zeros(grid.vnC, order='F', dtype=complex)
 
     # Call function.
-    vol = grid.vol.reshape(grid.vnC, order='F')
+    vol = grid.cell_volumes.reshape(grid.vnC, order='F')
     edges2cellaverages(field.fx, field.fy, field.fz,
                        vol, grad_x, grad_y, grad_z)
     grad = grad_x + grad_y + grad_z
@@ -492,16 +498,16 @@ def test_edges2cellaverages(njit):
 
     if discretize is not None:
         def volume_disc(grid, field):
-            out = grid.aveE2CC*field*grid.vol
+            out = grid.aveE2CC*field*grid.cell_volumes
             return out.reshape(grid.vnC, order='F')
 
         assert_allclose(grad, 3*volume_disc(grid, field))
 
     if discretize is not None:
 
-        out_x = grid.aveEx2CC*field.fx.ravel('F')*grid.vol
-        out_y = grid.aveEy2CC*field.fy.ravel('F')*grid.vol
-        out_z = grid.aveEz2CC*field.fz.ravel('F')*grid.vol
+        out_x = grid.aveEx2CC*field.fx.ravel('F')*grid.cell_volumes
+        out_y = grid.aveEy2CC*field.fy.ravel('F')*grid.cell_volumes
+        out_z = grid.aveEz2CC*field.fz.ravel('F')*grid.cell_volumes
 
         assert_allclose(grad_x, out_x.reshape(grid.vnC, order='F'))
         assert_allclose(grad_y, out_y.reshape(grid.vnC, order='F'))

@@ -340,9 +340,9 @@ def test_expand_grid_model():
     og, om = simulations.expand_grid_model(grid, model, [2, 3], 5)
 
     # Grid.
-    assert_allclose(grid.vectorNz, og.vectorNz[:-2])
-    assert og.vectorNz[-2] == 5
-    assert og.vectorNz[-1] == 105
+    assert_allclose(grid.nodes_z, og.nodes_z[:-2])
+    assert og.nodes_z[-2] == 5
+    assert og.nodes_z[-1] == 105
 
     # Property x (from float).
     assert_allclose(om.property_x[:, :, :-2], 1)
@@ -411,9 +411,9 @@ class TestEstimateGriddingOpts():
         assert_allclose(
                 gdict['properties'],
                 np.log10(1/np.array([100, 1, 1, 1, 1, 1, 1])), atol=1e-15)
-        assert_allclose(gdict['vector'][0], self.grid.vectorNx)
+        assert_allclose(gdict['vector'][0], self.grid.nodes_x)
         assert gdict['vector'][1] is None
-        assert_allclose(gdict['vector'][2], self.grid.vectorNz)
+        assert_allclose(gdict['vector'][2], self.grid.nodes_z)
 
     def test_pass_along(self):
         gridding_opts = {

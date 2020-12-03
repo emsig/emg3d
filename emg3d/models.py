@@ -214,7 +214,7 @@ class Model:
 
     def copy(self):
         """Return a copy of the Model."""
-        return Model.from_dict(self.to_dict(True))
+        return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
         """Store the necessary information of the Model in a dict."""
@@ -633,7 +633,7 @@ class VolumeModel:
         r"""eta: volume multiplied with conductivity."""
 
         # Initiate eta
-        eta = field.smu0*grid.vol.reshape(grid.vnC, order='F')
+        eta = field.smu0*grid.cell_volumes.reshape(grid.vnC, order='F')
 
         # Compute eta depending on epsilon.
         if model.epsilon_r is None:  # Diffusive approximation.
@@ -650,8 +650,9 @@ class VolumeModel:
     def calculate_zeta(name, grid, model):
         r"""zeta: volume divided by mu_r."""
 
+        zeta = grid.cell_volumes.reshape(grid.vnC, order='F')
         if getattr(model, name, None) is None:
-            return grid.vol.reshape(grid.vnC, order='F')
+            return zeta
 
         else:
-            return grid.vol.reshape(grid.vnC, order='F')/getattr(model, name)
+            return zeta/getattr(model, name)

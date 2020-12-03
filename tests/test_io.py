@@ -42,14 +42,11 @@ def test_save_and_load(tmpdir, capsys):
         pass
 
     grid2 = TensorMesh()
-    grid2.hx = grid.hx
-    grid2.hy = grid.hy
-    grid2.hz = grid.hz
-    grid2.x0 = grid.x0
+    grid2.h = grid.h
+    grid2.origin = grid.origin
 
     grid3 = TensorMesh()  # "Broken" mesh
-    grid3.hx = grid.hx
-    grid3.x0 = grid.x0
+    grid3.origin = grid.origin
 
     # Some field.
     field = fields.Field(grid)
@@ -81,8 +78,10 @@ def test_save_and_load(tmpdir, capsys):
 
     assert out_npz['Model']['model'] == model
     assert_allclose(field.fx, out_npz['Field']['field'].fx)
-    assert_allclose(grid.vol, out_npz['TensorMesh']['emg3d'].vol)
-    assert_allclose(grid.vol, out_npz['TensorMesh']['discretize'].vol)
+    assert_allclose(grid.cell_volumes,
+                    out_npz['TensorMesh']['emg3d'].cell_volumes)
+    assert_allclose(grid.cell_volumes,
+                    out_npz['TensorMesh']['discretize'].cell_volumes)
     assert_allclose(out_npz['Data']['what']['f'], field.fx)
     assert out_npz['Data']['b'] is True
 
@@ -120,8 +119,10 @@ def test_save_and_load(tmpdir, capsys):
         assert out_h5['Data']['b'] == 1+1j
         assert out_h5['Data']['c'] is True
         assert_allclose(field.fx, out_h5['Field']['field'].fx)
-        assert_allclose(grid.vol, out_h5['TensorMesh']['emg3d'].vol)
-        assert_allclose(grid.vol, out_h5['TensorMesh']['discretize'].vol)
+        assert_allclose(grid.cell_volumes,
+                        out_h5['TensorMesh']['emg3d'].cell_volumes)
+        assert_allclose(grid.cell_volumes,
+                        out_h5['TensorMesh']['discretize'].cell_volumes)
         assert_allclose(out_h5['Data']['what']['f'], field.fx)
 
         assert io._compare_dicts(out_h5, out_npz) is True
@@ -141,8 +142,10 @@ def test_save_and_load(tmpdir, capsys):
     assert out_json['Data']['a'] == 1.0
     assert out_json['Data']['b'] == 1+1j
     assert_allclose(field.fx, out_json['Field']['field'].fx)
-    assert_allclose(grid.vol, out_json['TensorMesh']['emg3d'].vol)
-    assert_allclose(grid.vol, out_json['TensorMesh']['discretize'].vol)
+    assert_allclose(grid.cell_volumes,
+                    out_json['TensorMesh']['emg3d'].cell_volumes)
+    assert_allclose(grid.cell_volumes,
+                    out_json['TensorMesh']['discretize'].cell_volumes)
     assert_allclose(out_json['Data']['what']['f'], field.fx)
 
     assert io._compare_dicts(out_json, out_npz) is True

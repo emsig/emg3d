@@ -6,13 +6,60 @@ recent versions
 """""""""""""""
 
 
-*latest*
---------
+*v0.15.0* : discretize restructure
+----------------------------------
 
-- Bug fix re storing/loading synthetics
+**2020-12-04**
 
-- Maintenance:
 
+The package discretize went through a major restructuring with many name
+changes and consequent deprecations. This version updates ``emg3d`` to be
+compatible with ``discretize>=0.6.0`` in the long run. It also means that emg3d
+will, from ``emg3d>=0.15.0`` onwards, only work with ``discretize>=0.6.0``.
+
+The relevant aliases and deprecations for ``emg3d`` are (consult the release
+notes of ``discretize`` for all changes):
+
+**Aliases:** Aliases (left) remain valid pointers to the new names (right).
+
+- ``x0`` => ``origin``
+- ``nC`` => ``n_cells``
+- ``vnC`` => ``shape_cells``
+- ``nN`` => ``n_nodes``
+- ``vnN`` => ``shape_nodes``
+- ``nE`` => ``n_edges``
+- ``nEx`` => ``n_edges_x``
+- ``nEy`` => ``n_edges_y``
+- ``nEz`` => ``n_edges_z``
+- ``vnE`` => ``n_edges_per_direction``
+- ``vnEx`` => ``shape_edges_x``
+- ``vnEy`` => ``shape_edges_y``
+- ``vnEz`` => ``shape_edges_z``
+
+**Deprecations:** Deprecated properties (left) raise a deprecation warning and
+will be removed in the future. Currently, they still work and point to the new
+names (right).
+
+- ``hx`` => ``h[0]``
+- ``hy`` => ``h[1]``
+- ``hz`` => ``h[2]``
+- ``nCx`` => ``shape_cells[0]``
+- ``nCy`` => ``shape_cells[1]``
+- ``nCz`` => ``shape_cells[2]``
+- ``nNx`` => ``shape_nodes[0]``
+- ``nNy`` => ``shape_nodes[1]``
+- ``nNz`` => ``shape_nodes[2]``
+- ``vectorNx`` => ``nodes_x``
+- ``vectorNy`` => ``nodes_y``
+- ``vectorNz`` => ``nodes_z``
+- ``vectorCCx`` => ``cell_centers_x``
+- ``vectorCCy`` => ``cell_centers_y``
+- ``vectorCCz`` => ``cell_centers_z``
+- ``vol`` => ``cell_volumes``
+
+- Other changes:
+
+  - Bug fix re storing/loading synthetics
   - Moved from Travis CI to GitHub Actions.
 
 

@@ -27,10 +27,23 @@ from scipy.constants import mu_0
 from emg3d import maps
 
 try:
-    from discretize import TensorMesh as dTensorMesh
+    import discretize
+    # Backwards compatibility; remove latest for version 1.0.0.
+    dv = discretize.__version__.split('.')
+    if int(dv[0]) == 0 and int(dv[1]) < 6:
+        msg = ("\n`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`;"
+               "\n`emg3d.TensorMesh` will return a basic mesh, not a "
+               "`discretize.TensorMesh`.")
+        warnings.warn(msg, UserWarning)
+        dv = None
 except ImportError:
-    class dTensorMesh:
-        pass
+    dv = None
+finally:
+    if dv is None:
+        class dTensorMesh:
+            pass
+    else:
+        from discretize import TensorMesh as dTensorMesh
 
 __all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
            'wavelength', 'good_mg_cell_nr', 'min_cell_width',
@@ -39,12 +52,12 @@ __all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
            'get_hx']
 
 MESHWARNING = (
-    "\n    `get_hx_h0`, `get_stretched_h`, `get_domain`, and `get_hx` are"
-    "\n    deprecated and will be removed. Use `construct_mesh`` instead."
+    "`get_hx_h0`, `get_stretched_h`, `get_domain`, and `get_hx` are "
+    "deprecated and will be removed. Use `construct_mesh`` instead."
 )
 CELLWARNING = (
-    "\n    `get_cell_numbers` is deprecated and will be removed."
-    "\n    Use `good_mg_cell_nr` instead."
+    "`get_cell_numbers` is deprecated and will be removed. "
+    "Use `good_mg_cell_nr` instead."
 )
 
 
@@ -57,62 +70,117 @@ class _TensorMesh:
     h : list of three ndarrays
         Cell widths in [x, y, z] directions.
 
-    x0 : ndarray of dimension (3, )
+    origin : ndarray of dimension (3, )
         Origin (x, y, z).
+        (For backwards compatibility one can also provide ``x0`` instead of
+        ``origin``, but this will be removed in the future.)
 
     """
 
-    def __init__(self, h, x0):
+    def __init__(self, h, origin=None, **kwargs):
         """Initialize the mesh."""
-        self.x0 = x0
 
-        # Width of cells.
-        self.hx = np.array(h[0])
-        self.hy = np.array(h[1])
-        self.hz = np.array(h[2])
+        # Store origin.
+        if origin is None:  # Backwards compatibility.
+            origin = kwargs.pop('x0')
+        self.origin = np.array(origin)
 
-        # Cell related properties.
-        self.nCx = int(self.hx.size)
-        self.nCy = int(self.hy.size)
-        self.nCz = int(self.hz.size)
-        self.vnC = np.array([self.hx.size, self.hy.size, self.hz.size])
-        self.nC = int(self.vnC.prod())
-        self.vectorCCx = np.r_[0, self.hx[:-1].cumsum()]+self.hx*0.5+self.x0[0]
-        self.vectorCCy = np.r_[0, self.hy[:-1].cumsum()]+self.hy*0.5+self.x0[1]
-        self.vectorCCz = np.r_[0, self.hz[:-1].cumsum()]+self.hz*0.5+self.x0[2]
+        # Width of cells, cast to arrays.
+        self.h = [np.array(h[0]), np.array(h[1]), np.array(h[2])]
 
         # Node related properties.
-        self.nNx = self.nCx + 1
-        self.nNy = self.nCy + 1
-        self.nNz = self.nCz + 1
-        self.vnN = np.array([self.nNx, self.nNy, self.nNz], dtype=np.int_)
-        self.nN = int(self.vnN.prod())
-        self.vectorNx = np.r_[0., self.hx.cumsum()] + self.x0[0]
-        self.vectorNy = np.r_[0., self.hy.cumsum()] + self.x0[1]
-        self.vectorNz = np.r_[0., self.hz.cumsum()] + self.x0[2]
+        shape_nodes = (self.h[0].size+1, self.h[1].size+1, self.h[2].size+1)
+        self.shape_nodes = shape_nodes
+        self.n_nodes = np.prod(shape_nodes)
+        self.nodes_x = np.r_[0., self.h[0].cumsum()] + self.origin[0]
+        self.nodes_y = np.r_[0., self.h[1].cumsum()] + self.origin[1]
+        self.nodes_z = np.r_[0., self.h[2].cumsum()] + self.origin[2]
+
+        # Cell related properties.
+        shape_cells = (self.h[0].size, self.h[1].size, self.h[2].size)
+        self.shape_cells = shape_cells
+        self.n_cells = np.prod(shape_cells)
+        self.cell_centers_x = (self.nodes_x[1:] + self.nodes_x[:-1])/2
+        self.cell_centers_y = (self.nodes_y[1:] + self.nodes_y[:-1])/2
+        self.cell_centers_z = (self.nodes_z[1:] + self.nodes_z[:-1])/2
 
         # Edge related properties.
-        self.vnEx = np.array([self.nCx, self.nNy, self.nNz], dtype=np.int_)
-        self.vnEy = np.array([self.nNx, self.nCy, self.nNz], dtype=np.int_)
-        self.vnEz = np.array([self.nNx, self.nNy, self.nCz], dtype=np.int_)
-        self.nEx = int(self.vnEx.prod())
-        self.nEy = int(self.vnEy.prod())
-        self.nEz = int(self.vnEz.prod())
-        self.vnE = np.array([self.nEx, self.nEy, self.nEz], dtype=int)
-        self.nE = int(self.vnE.sum())
+        self.shape_edges_x = (shape_cells[0], shape_nodes[1], shape_nodes[2])
+        self.shape_edges_y = (shape_nodes[0], shape_cells[1], shape_nodes[2])
+        self.shape_edges_z = (shape_nodes[0], shape_nodes[1], shape_cells[2])
+        self.n_edges_x = np.prod(self.shape_edges_x)
+        self.n_edges_y = np.prod(self.shape_edges_y)
+        self.n_edges_z = np.prod(self.shape_edges_z)
+        self.n_edges_per_direction = (
+            self.n_edges_x, self.n_edges_y, self.n_edges_z)
+        self.n_edges = np.sum(self.n_edges_per_direction)
+
+        # Aliases (in line with `discretize`).
+        self.x0 = self.origin
+        self.nC = self.n_cells
+        self.vnC = self.shape_cells
+        self.nN = self.n_nodes
+        self.vnN = self.shape_nodes
+        self.nE = self.n_edges
+        self.nEx = self.n_edges_x
+        self.nEy = self.n_edges_y
+        self.nEz = self.n_edges_z
+        self.vnE = self.n_edges_per_direction
+        self.vnEx = self.shape_edges_x
+        self.vnEy = self.shape_edges_y
+        self.vnEz = self.shape_edges_z
 
     def __repr__(self):
         """Simple representation."""
-        return (f"TensorMesh: {self.nCx} x {self.nCy} x {self.nCz} "
-                f"({self.nC:,})")
+        return (f"TensorMesh: {self.shape_cells[0]} x {self.shape_cells[1]} x "
+                f"{self.shape_cells[2]} ({self.n_cells:,})")
 
     @property
-    def vol(self):
+    def cell_volumes(self):
         """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '_vol', None) is None:
-            self._vol = (self.hx[None, None, :]*self.hy[None, :, None] *
-                         self.hz[:, None, None]).ravel()
-        return self._vol
+        if getattr(self, '_cell_volumes', None) is None:
+            self._cell_volumes = (
+                    self.h[0][None, None, :]*self.h[1][None, :, None] *
+                    self.h[2][:, None, None]).ravel()
+        return self._cell_volumes
+
+    # # DEPRECATED FUNCTIONS - Remove in v0.17.0 # #
+    def _warn(new_name, old_name, index=None):
+        """Temporary deprecation function."""
+
+        def get_dep(self):
+            cname = type(self).__name__
+            ind = f"[{index}]" if index is not None else ""
+            message = (
+                f"`{cname}.{old_name}` has been deprecated (will be removed "
+                f"in v0.17.0); please use `{cname}.{new_name}{ind}`."
+            )
+            warnings.warn(message, DeprecationWarning)
+            if index is None:
+                return getattr(self, new_name)
+            else:
+                return getattr(self, new_name)[index]
+
+        doc = f"`{old_name}` has been deprecated, use `{new_name}`."
+
+        return property(get_dep, None, None, doc)
+
+    hx = _warn('h', 'hx', 0)
+    hy = _warn('h', 'hy', 1)
+    hz = _warn('h', 'hz', 2)
+    nCx = _warn('shape_cells', 'nCx', 0)
+    nCy = _warn('shape_cells', 'nCy', 1)
+    nCz = _warn('shape_cells', 'nCz', 2)
+    nNx = _warn('shape_nodes', 'nNx', 0)
+    nNy = _warn('shape_nodes', 'nNy', 1)
+    nNz = _warn('shape_nodes', 'nNz', 2)
+    vectorNx = _warn('nodes_x', 'vectorNx')
+    vectorNy = _warn('nodes_y', 'vectorNy')
+    vectorNz = _warn('nodes_z', 'vectorNz')
+    vectorCCx = _warn('cell_centers_x', 'vectorCCx')
+    vectorCCy = _warn('cell_centers_y', 'vectorCCy')
+    vectorCCz = _warn('cell_centers_z', 'vectorCCz')
+    vol = _warn('cell_volumes', 'vol')
 
 
 class TensorMesh(dTensorMesh, _TensorMesh):
@@ -131,8 +199,10 @@ class TensorMesh(dTensorMesh, _TensorMesh):
     h : list of three ndarrays
         Cell widths in [x, y, z] directions.
 
-    x0 : tuple of length 3
+    origin : ndarray of dimension (3, )
         Origin (x, y, z).
+        (For backwards compatibility one can also provide ``x0`` instead of
+        ``origin``, but this will be removed in the future.)
 
     """
 
@@ -149,29 +219,29 @@ class TensorMesh(dTensorMesh, _TensorMesh):
 
         # Check dimensions.
         if equal:
-            equal *= len(mesh.vnC) == len(self.vnC)
+            equal *= len(mesh.shape_cells) == len(self.shape_cells)
 
         # Check shape.
         if equal:
-            equal *= np.all(self.vnC == mesh.vnC)
+            equal *= np.all(self.shape_cells == mesh.shape_cells)
 
         # Check distances and origin.
         if equal:
-            equal *= np.allclose(self.hx, mesh.hx, atol=0)
-            equal *= np.allclose(self.hy, mesh.hy, atol=0)
-            equal *= np.allclose(self.hz, mesh.hz, atol=0)
-            equal *= np.allclose(self.x0, mesh.x0, atol=0)
+            equal *= np.allclose(self.h[0], mesh.h[0], atol=0)
+            equal *= np.allclose(self.h[1], mesh.h[1], atol=0)
+            equal *= np.allclose(self.h[2], mesh.h[2], atol=0)
+            equal *= np.allclose(self.origin, mesh.origin, atol=0)
 
         return bool(equal)
 
     def copy(self):
         """Return a copy of the TensorMesh."""
-        return TensorMesh.from_dict(self.to_dict(True))
+        return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
         """Store the necessary information of the TensorMesh in a dict."""
-        out = {'hx': self.hx, 'hy': self.hy, 'hz': self.hz, 'x0': self.x0,
-               '__class__': self.__class__.__name__}
+        out = {'hx': self.h[0], 'hy': self.h[1], 'hz': self.h[2],
+               'origin': self.origin, '__class__': self.__class__.__name__}
         if copy:
             return deepcopy(out)
         else:
@@ -185,7 +255,7 @@ class TensorMesh(dTensorMesh, _TensorMesh):
         ----------
         inp : dict
             Dictionary as obtained from :func:`TensorMesh.to_dict`.
-            The dictionary needs the keys `hx`, `hy`, `hz`, and `x0`.
+            The dictionary needs the keys `hx`, `hy`, `hz`, and `origin`.
 
         Returns
         -------
@@ -193,7 +263,12 @@ class TensorMesh(dTensorMesh, _TensorMesh):
 
         """
         try:
-            return cls(h=[inp['hx'], inp['hy'], inp['hz']], x0=inp['x0'])
+            # Backwards compatibility
+            if 'x0' in inp.keys():
+                origin = inp['x0']
+            else:
+                origin = inp['origin']
+            return cls(h=[inp['hx'], inp['hy'], inp['hz']], origin=origin)
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
@@ -456,7 +531,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     z0, hz = get_origin_widths(**kwargs, **zparams)
 
     # Return mesh.
-    return TensorMesh([hx, hy, hz], x0=np.array([x0, y0, z0]))
+    return TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
 
 
 def get_origin_widths(frequency, properties, center, domain=None, vector=None,

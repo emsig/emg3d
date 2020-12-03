@@ -36,20 +36,19 @@ jobs:
           - python-version: 3.7
             name: full
             os: ubuntu
-            conda: ""
+            conda: "xarray empymod h5py scooby discretize matplotlib"  # tqdm
           - python-version: 3.7
             name: plain
             os: ubuntu
-            conda: "xarray tqdm empymod h5py scooby discretize matplotlib"
+            conda: ""
+          - python-version: 3.8
+            name: plain
+            os: ubuntu
+            conda: "'discretize<0.6'"  # Check discretize backwards comp.
           - python-version: 3.8
             name: full
             os: ubuntu
-            conda: "xarray tqdm empymod h5py scooby"
-
-    env:
-      # Used to for coveralls flag
-      OS: ${{ matrix.case.os }}
-      PYTHON: ${{ matrix.case.python-version }}
+            conda: "xarray tqdm empymod h5py scooby discretize matplotlib"
 
     steps:
 
@@ -110,7 +109,8 @@ jobs:
         uses: AndreMiras/coveralls-python-action@f5fd5c309b39d01599fb92c72d4f7409ea78aec9
         with:
           parallel: true
-          flag-name: OS,PYTHON
+          flag-name: ${{ matrix.case.python-version }} ${{ matrix.case.name }} (${{ matrix.case.os }})
+
 
   coveralls_finish:
     needs: test

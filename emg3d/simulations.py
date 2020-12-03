@@ -201,7 +201,7 @@ class Simulation:
                             **kwargs.pop('solver_opts', {})}
 
         # Store original input nCz.
-        self._input_nCz = kwargs.pop('_input_nCz', grid.nCz)
+        self._input_nCz = kwargs.pop('_input_nCz', grid.vnC[2])
 
         # Ensure no kwargs left.
         if kwargs:
@@ -1140,7 +1140,7 @@ def expand_grid_model(grid, model, expand, interface):
             prop_ext = None
 
         else:
-            prop_ext = np.zeros((grid.nCx, grid.nCy, grid.nCz+nadd))
+            prop_ext = np.zeros((grid.vnC[0], grid.vnC[1], grid.vnC[2]+nadd))
             prop_ext[:, :, :-nadd] = getattr(model, prop)
             if nadd == 2:
                 prop_ext[:, :, -2] = add_values[0]
@@ -1150,15 +1150,15 @@ def expand_grid_model(grid, model, expand, interface):
 
     # Initiate.
     nzadd = 0
-    hz_ext = grid.hz
+    hz_ext = grid.h[2]
 
     # Fill-up property_below.
-    if grid.vectorNz[-1] < interface-0.05:  # At least 5 cm.
-        hz_ext = np.r_[hz_ext, interface-grid.vectorNz[-1]]
+    if grid.nodes_z[-1] < interface-0.05:  # At least 5 cm.
+        hz_ext = np.r_[hz_ext, interface-grid.nodes_z[-1]]
         nzadd += 1
 
     # Add 100 m of property_above.
-    if grid.vectorNz[-1] <= interface+0.001:  # +1mm
+    if grid.nodes_z[-1] <= interface+0.001:  # +1mm
         hz_ext = np.r_[hz_ext, 100]
         nzadd += 1
 
@@ -1172,7 +1172,7 @@ def expand_grid_model(grid, model, expand, interface):
 
         # Create extended grid and model.
         grid = meshes.TensorMesh(
-                [grid.hx, grid.hy, hz_ext], x0=grid.x0)
+                [grid.h[0], grid.h[1], hz_ext], origin=grid.origin)
         model = models.Model(
                 grid, property_x, property_y, property_z, mu_r,
                 epsilon_r, mapping=model.map.name)
@@ -1262,7 +1262,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     input_nCz : int, optional
         If :func:`expand_grid_model` was used, `input_nCz` corresponds to the
-        original ``grid.nCz``.
+        original ``grid.vnC[2]``.
 
 
     Returns
@@ -1297,9 +1297,9 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     if isinstance(vector, str):
         # If vector is a string we take the corresponding vectors from grid.
         vector = (
-                grid.vectorNx if 'x' in vector.lower() else None,
-                grid.vectorNy if 'y' in vector.lower() else None,
-                grid.vectorNz[:input_nCz] if 'z' in vector.lower() else None,
+                grid.nodes_x if 'x' in vector.lower() else None,
+                grid.nodes_y if 'y' in vector.lower() else None,
+                grid.nodes_z[:input_nCz] if 'z' in vector.lower() else None,
         )
         gopts['vector'] = vector
 
@@ -1322,7 +1322,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
             """Get mean; currently based on the averaged property."""
 
             # Get volume factor.
-            vfact = grid.vol.reshape(grid.vnC, order='F')
+            vfact = grid.cell_volumes.reshape(grid.vnC, order='F')
             vfact = vfact[ix, iy, iz].ravel()/vfact[ix, iy, iz].sum()
 
             # Collect all x (y, z) values.
@@ -1349,9 +1349,9 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
         zpos = get_mean(slice(None), slice(None), -1)
 
         # Source property.
-        ix = np.argmin(abs(grid.vectorNx - gopts['center'][0]))
-        iy = np.argmin(abs(grid.vectorNy - gopts['center'][1]))
-        iz = np.argmin(abs(grid.vectorNz - gopts['center'][2]))
+        ix = np.argmin(abs(grid.nodes_x - gopts['center'][0]))
+        iy = np.argmin(abs(grid.nodes_y - gopts['center'][1]))
+        iz = np.argmin(abs(grid.nodes_z - gopts['center'][2]))
         source = get_mean(ix, iy, iz)
 
         properties = [source, xneg, xpos, yneg, ypos, zneg, zpos]

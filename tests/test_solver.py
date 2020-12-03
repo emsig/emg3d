@@ -29,8 +29,9 @@ def test_solver_homogeneous(capsys):
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res']
 
-    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
-                             dat['input_grid']['x0'])
+    grid = meshes.TensorMesh(
+            [dat['input_grid']['hx'], dat['input_grid']['hy'],
+             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
     sfield = fields.get_source_field(**dat['input_source'])
 
@@ -46,8 +47,8 @@ def test_solver_homogeneous(capsys):
 
     # Experimental:
     # Check if norms are also the same, at least for first two cycles.
-    assert "4.091e-02  after   1 F-cycles   [1.937e-07, 0.041]   0 0" in out
-    assert "4.529e-03  after   2 F-cycles   [2.144e-08, 0.111]   0 0" in out
+    assert "3.417e-02  after   1 F-cycles   [1.809e-07, 0.034]   0 0" in out
+    assert "3.528e-03  after   2 F-cycles   [1.868e-08, 0.103]   0 0" in out
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['Fresult'], efield)
@@ -200,7 +201,7 @@ def test_solver_heterogeneous(capsys):
     # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
     mesh = meshes.TensorMesh(
             [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
-            x0=np.array([-0.5, -1, -1]))
+            origin=np.array([-0.5, -1, -1]))
     sfield = fields.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
     model = models.Model(mesh)
     _ = solver.solve(mesh, model, sfield, verb=4, nu_pre=0)
@@ -211,7 +212,7 @@ def test_solver_heterogeneous(capsys):
 
 def test_one_liner(capsys):
     grid = meshes.TensorMesh(
-            [np.ones(8), np.ones(8), np.ones(8)], x0=np.array([0, 0, 0]))
+            [np.ones(8), np.ones(8), np.ones(8)], origin=np.array([0, 0, 0]))
     model = models.Model(grid, property_x=1.5, property_y=1.8, property_z=3.3)
     sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
 
@@ -241,8 +242,9 @@ def test_solver_homogeneous_laplace():
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['lap']
 
-    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
-                             dat['input_grid']['x0'])
+    grid = meshes.TensorMesh(
+            [dat['input_grid']['hx'], dat['input_grid']['hy'],
+             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
     sfield = fields.get_source_field(**dat['input_source'])
 
@@ -278,7 +280,7 @@ def test_smoothing():
     nu = 2
 
     widths = [np.ones(2)*100, get_h(10, 27, 10, 1.1), get_h(2, 1, 50, 1.2)]
-    x0 = [-w.sum()/2 for w in widths]
+    origin = [-w.sum()/2 for w in widths]
     src = [0, -10, -10, 43, 13]
 
     # Loop and move the 2-cell dimension (100, 2) from x to y to z.
@@ -289,13 +291,14 @@ def test_smoothing():
             [widths[xyz % 3],
              widths[(xyz+1) % 3],
              widths[(xyz+2) % 3]],
-            x0=np.array([x0[xyz % 3], x0[(xyz+1) % 3], x0[(xyz+2) % 3]])
+            origin=np.array(
+                [origin[xyz % 3], origin[(xyz+1) % 3], origin[(xyz+2) % 3]])
         )
 
         # Create some resistivity model
-        x = np.arange(1, grid.nCx+1)*2
-        y = 1/np.arange(1, grid.nCy+1)
-        z = np.arange(1, grid.nCz+1)[::-1]/10
+        x = np.arange(1, grid.vnC[0]+1)*2
+        y = 1/np.arange(1, grid.vnC[1]+1)
+        z = np.arange(1, grid.vnC[2]+1)[::-1]/10
         property_x = np.outer(np.outer(x, y), z).ravel()
         freq = 0.319
         model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
@@ -311,7 +314,7 @@ def test_smoothing():
 
         # Collect Gauss-Seidel input (same for all routines)
         inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
-               vmodel.eta_z, vmodel.zeta, grid.hx, grid.hy, grid.hz, nu)
+               vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
 
         func = ['', '_x', '_y', '_z']
         for lr_dir in range(8):
@@ -347,7 +350,8 @@ def test_restriction():
     # Simple test with restriction followed by prolongation.
     src = [0, 0, 0, 0, 45]
     grid = meshes.TensorMesh(
-            [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100], x0=np.zeros(3))
+            [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
+            origin=np.zeros(3))
 
     # Create dummy model and fields, parameters don't matter.
     model = models.Model(grid, 1, 1, 1, 1)
@@ -369,11 +373,11 @@ def test_restriction():
     assert_allclose(csfield.fy[1:-1, :, 1], np.array([[356.+0.j, 436.+0.j]]))
     assert_allclose(csfield.fz[1:-1, 1:-1, :],
                     np.array([[[388.+0.j, 404.+0.j]]]))
-    assert cgrid.nNx == cgrid.nNy == cgrid.nNz == 3
+    assert cgrid.vnN[0] == cgrid.vnN[1] == cgrid.vnN[2] == 3
     assert cmodel.eta_x[0, 0, 0]/8. == vmodel.eta_x[0, 0, 0]
-    assert np.sum(grid.hx) == np.sum(cgrid.hx)
-    assert np.sum(grid.hy) == np.sum(cgrid.hy)
-    assert np.sum(grid.hz) == np.sum(cgrid.hz)
+    assert np.sum(grid.h[0]) == np.sum(cgrid.h[0])
+    assert np.sum(grid.h[1]) == np.sum(cgrid.h[1])
+    assert np.sum(grid.h[2]) == np.sum(cgrid.h[2])
 
     # Add pi to the coarse e-field
     efield = fields.Field(grid)
@@ -399,12 +403,13 @@ def test_residual():
     # Create a grid
     src = [90, 1600, 25., 45, 45]
     grid = meshes.TensorMesh(
-        [get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25], x0=np.zeros(3))
+        [get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
+        origin=np.zeros(3))
 
     # Create some resistivity model
-    x = np.arange(1, grid.nCx+1)*2
-    y = 1/np.arange(1, grid.nCy+1)
-    z = np.arange(1, grid.nCz+1)[::-1]/10
+    x = np.arange(1, grid.vnC[0]+1)*2
+    y = 1/np.arange(1, grid.vnC[1]+1)
+    z = np.arange(1, grid.vnC[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
     model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
@@ -422,8 +427,8 @@ def test_residual():
     rfield = sfield.copy()
     core.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
-            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
-            grid.hy, grid.hz)
+            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
+            grid.h[1], grid.h[2])
 
     # Compute residual
     out = solver.residual(grid, vmodel, sfield, efield)
@@ -441,8 +446,9 @@ def test_krylov(capsys):
 
     # Load any case.
     dat = REGRES['res']
-    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
-                             dat['input_grid']['x0'])
+    grid = meshes.TensorMesh(
+            [dat['input_grid']['hx'], dat['input_grid']['hy'],
+             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
     model.property_x /= 100000  # Set stupid input to make bicgstab fail.
     model.property_y *= 100000  # Set stupid input to make bicgstab fail.
@@ -545,10 +551,10 @@ def test_RegularGridProlongator():
 
     def prolon_scipy(grid, cgrid, efield, cefield, yz_points):
         """Compute SciPy alternative."""
-        for ixc in range(cgrid.nCx):
+        for ixc in range(cgrid.vnC[0]):
             # Bilinear interpolation in the y-z plane
             fn = si.RegularGridInterpolator(
-                    (cgrid.vectorNy, cgrid.vectorNz), cefield.fx[ixc, :, :],
+                    (cgrid.nodes_y, cgrid.nodes_z), cefield.fx[ixc, :, :],
                     bounds_error=False, fill_value=None)
             hh = fn(yz_points).reshape(grid.vnEx[1:], order='F')
 
@@ -561,9 +567,9 @@ def test_RegularGridProlongator():
     def prolon_emg3d(grid, cgrid, efield, cefield, yz_points):
         """Compute emg3d alternative."""
         fn = solver.RegularGridProlongator(
-                cgrid.vectorNy, cgrid.vectorNz, yz_points)
+                cgrid.nodes_y, cgrid.nodes_z, yz_points)
 
-        for ixc in range(cgrid.nCx):
+        for ixc in range(cgrid.vnC[0]):
             # Bilinear interpolation in the y-z plane
             hh = fn(cefield.fx[ixc, :, :]).reshape(grid.vnEx[1:], order='F')
 
@@ -579,11 +585,11 @@ def test_RegularGridProlongator():
     hx = np.array([4, 1.1, 2, 3])
     hy = np.array([2, 0.1, 20, np.pi])
     hz = np.array([1, 2, 5, 1])
-    grid = meshes.TensorMesh([hx, hy, hz], x0=np.array([0, 0, 0]))
+    grid = meshes.TensorMesh([hx, hy, hz], origin=np.array([0, 0, 0]))
 
     # Create coarse grid.
-    chx = np.diff(grid.vectorNx[::2])
-    cgrid = meshes.TensorMesh([chx, chx, chx], x0=np.array([0, 0, 0]))
+    chx = np.diff(grid.nodes_x[::2])
+    cgrid = meshes.TensorMesh([chx, chx, chx], origin=np.array([0, 0, 0]))
 
     # Create empty fine grid fields.
     efield1 = fields.Field(grid)

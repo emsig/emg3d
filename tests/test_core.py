@@ -26,9 +26,9 @@ def test_amat_x(njit):
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
     # Create some resistivity model
-    x = np.arange(1, grid.nCx+1)*2
-    y = 1/np.arange(1, grid.nCy+1)
-    z = np.arange(1, grid.nCz+1)[::-1]/10
+    x = np.arange(1, grid.vnC[0]+1)*2
+    y = 1/np.arange(1, grid.vnC[1]+1)
+    z = np.arange(1, grid.vnC[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
     model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
@@ -45,15 +45,15 @@ def test_amat_x(njit):
     # amat_x
     rr1 = fields.Field(grid)
     amat_x(rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
-           vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
-           grid.hy, grid.hz)
+           vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
+           grid.h[1], grid.h[2])
 
     # amat_x - alternative
     rr2 = fields.Field(grid)
     alternatives.alt_amat_x(
             rr2.fx, rr2.fy, rr2.fz, efield.fx, efield.fy, efield.fz,
-            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.hx,
-            grid.hy, grid.hz)
+            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
+            grid.h[1], grid.h[2])
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(-rr1, rr2, atol=1e-23)
@@ -135,7 +135,7 @@ def test_gauss_seidel(njit):
         efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
 
         inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
-               vmodel.eta_z, vmodel.zeta, grid.hx, grid.hy, grid.hz, nu)
+               vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
 
         # Get result from `gauss_seidel`.
         cfield = fields.Field(grid, efield.copy())
@@ -235,7 +235,7 @@ def test_restrict(njit):
     h = np.array([1, 1, 1, 1, 1, 1])
 
     # Fine grid.
-    fgrid = meshes.TensorMesh([h, h, h], x0=np.array([-3, -3, -3]))
+    fgrid = meshes.TensorMesh([h, h, h], origin=np.array([-3, -3, -3]))
 
     # Create fine field.
     ffield = fields.Field(fgrid)
@@ -249,21 +249,21 @@ def test_restrict(njit):
     ffield.ensure_pec
 
     # Get weigths
-    wlr = np.zeros(fgrid.nNx, dtype=np.float_)
-    w0 = np.ones(fgrid.nNx, dtype=np.float_)
+    wlr = np.zeros(fgrid.vnN[0], dtype=np.float_)
+    w0 = np.ones(fgrid.vnN[0], dtype=np.float_)
     fw = (wlr, w0, wlr)
 
     # # CASE 0 -- regular # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([np.diff(fgrid.vectorNx[::2]),
-                               np.diff(fgrid.vectorNy[::2]),
-                               np.diff(fgrid.vectorNz[::2])],
-                              fgrid.x0)
+    cgrid = meshes.TensorMesh([np.diff(fgrid.nodes_x[::2]),
+                               np.diff(fgrid.nodes_y[::2]),
+                               np.diff(fgrid.nodes_z[::2])],
+                              fgrid.origin)
 
     # Regular grid, so all weights (wx, wy, wz) are the same...
-    w = restrict_weights(fgrid.vectorNx, fgrid.vectorCCx, fgrid.hx,
-                         cgrid.vectorNx, cgrid.vectorCCx, cgrid.hx)
+    w = restrict_weights(fgrid.nodes_x, fgrid.cell_centers_x, fgrid.h[0],
+                         cgrid.nodes_x, cgrid.cell_centers_x, cgrid.h[0])
 
     # Create coarse field.
     cfield = fields.Field(cgrid)
@@ -284,8 +284,8 @@ def test_restrict(njit):
     # # CASE 1 -- y & z # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([fgrid.hx, np.diff(fgrid.vectorNy[::2]),
-                              np.diff(fgrid.vectorNz[::2])], fgrid.x0)
+    cgrid = meshes.TensorMesh([fgrid.h[0], np.diff(fgrid.nodes_y[::2]),
+                              np.diff(fgrid.nodes_z[::2])], fgrid.origin)
 
     # Create coarse field.
     cfield = fields.Field(cgrid)
@@ -305,8 +305,8 @@ def test_restrict(njit):
     # # CASE 2 -- x & z # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([np.diff(fgrid.vectorNx[::2]), fgrid.hy,
-                              np.diff(fgrid.vectorNz[::2])], fgrid.x0)
+    cgrid = meshes.TensorMesh([np.diff(fgrid.nodes_x[::2]), fgrid.h[1],
+                              np.diff(fgrid.nodes_z[::2])], fgrid.origin)
 
     # Create coarse field.
     cfield = fields.Field(cgrid)
@@ -326,9 +326,9 @@ def test_restrict(njit):
     # # CASE 3 -- x & y # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([np.diff(fgrid.vectorNx[::2]),
-                               np.diff(fgrid.vectorNy[::2]), fgrid.hz],
-                              fgrid.x0)
+    cgrid = meshes.TensorMesh([np.diff(fgrid.nodes_x[::2]),
+                               np.diff(fgrid.nodes_y[::2]), fgrid.h[2]],
+                              fgrid.origin)
 
     # Create coarse field.
     cfield = fields.Field(cgrid)
@@ -349,7 +349,8 @@ def test_restrict(njit):
 
     # Coarse grid.
     cgrid = meshes.TensorMesh(
-            [np.diff(fgrid.vectorNx[::2]), fgrid.hy, fgrid.hz], fgrid.x0)
+            [np.diff(fgrid.nodes_x[::2]), fgrid.h[1], fgrid.h[2]],
+            fgrid.origin)
 
     # Create coarse field.
     cfield = fields.Field(cgrid)
@@ -370,7 +371,8 @@ def test_restrict(njit):
 
     # Coarse grid.
     cgrid = meshes.TensorMesh(
-            [fgrid.hx, np.diff(fgrid.vectorNy[::2]), fgrid.hz], fgrid.x0)
+            [fgrid.h[0], np.diff(fgrid.nodes_y[::2]), fgrid.h[2]],
+            fgrid.origin)
 
     # Create coarse field.
     cfield = fields.Field(cgrid)
@@ -391,7 +393,8 @@ def test_restrict(njit):
 
     # Coarse grid.
     cgrid = meshes.TensorMesh(
-            [fgrid.hx, fgrid.hy, np.diff(fgrid.vectorNz[::2])], fgrid.x0)
+            [fgrid.h[0], fgrid.h[1], np.diff(fgrid.nodes_z[::2])],
+            fgrid.origin)
 
     # Create coarse field.
     cfield = fields.Field(cgrid)
@@ -447,19 +450,19 @@ def test_restrict_weights(njit):
             [hx, hy, hz], np.array([-100000, 3000, 100]))
 
     # Create coarse grid thereof
-    ch = [np.diff(grid.vectorNx[::2]), np.diff(grid.vectorNy[::2]),
-          np.diff(grid.vectorNz[::2])]
-    cgrid = meshes.TensorMesh(ch, x0=grid.x0)
+    ch = [np.diff(grid.nodes_x[::2]), np.diff(grid.nodes_y[::2]),
+          np.diff(grid.nodes_z[::2])]
+    cgrid = meshes.TensorMesh(ch, origin=grid.origin)
 
     # Compute the weights in a numpy-way, instead of numba-way
     wl, w0, wr = alternatives.alt_restrict_weights(
-            grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
-            cgrid.vectorCCx, cgrid.hx)
+            grid.nodes_x, grid.cell_centers_x, grid.h[0], cgrid.nodes_x,
+            cgrid.cell_centers_x, cgrid.h[0])
 
     # Get the implemented numba-result
     wxl, wx0, wxr = restrict_weights(
-            grid.vectorNx, grid.vectorCCx, grid.hx, cgrid.vectorNx,
-            cgrid.vectorCCx, cgrid.hx)
+            grid.nodes_x, grid.cell_centers_x, grid.h[0], cgrid.nodes_x,
+            cgrid.cell_centers_x, cgrid.h[0])
 
     # Compare
     assert_allclose(wxl, wl)

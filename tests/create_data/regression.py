@@ -8,15 +8,18 @@ from emg3d import solver, meshes, models, fields, io
 # # # # # # # # # # 1. Homogeneous VTI fullspace # # # # # # # # # #
 
 freq = 1.
-hxy, hxy0 = meshes.get_hx_h0(
-        freq=freq, res=2, domain=[-50, 50], max_domain=1500,
-        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
-hz, hz0 = meshes.get_hx_h0(
-        freq=freq, res=3.3, domain=[200, 300], max_domain=1500,
-        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
+grid = meshes.construct_mesh(
+        frequency=freq,
+        center=(0, 0, 0),
+        properties=[2, 2, 3.3, 3.3],
+        domain=[[-50, 50], [-50, 50], [200, 300]],
+        max_buffer=1500,
+        lambda_from_center=True,
+        cell_numbers=meshes.good_mg_cell_nr(100, 2, 1),
+)
 
-input_grid = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
-grid = meshes.TensorMesh(**input_grid)
+input_grid = {'hx': grid.h[0], 'hy': grid.h[1], 'hz': grid.h[2],
+              'origin': grid.origin}
 
 input_model = {
     'grid': grid,
@@ -67,15 +70,18 @@ out = {
 src = [50., 110., 250., 25, 15]
 freq = 0.375
 
-hxy, hxy0 = meshes.get_hx_h0(
-        freq=freq, res=50, domain=[src[0], src[1]], max_domain=5000,
-        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
-hz, hz0 = meshes.get_hx_h0(
-        freq=freq, res=3.3, domain=[src[2]-20, src[2]+20], max_domain=5000,
-        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
+grid = meshes.construct_mesh(
+        frequency=freq,
+        center=(0, 0, 0),
+        properties=[50, 50, 3.3, 3.3],
+        domain=[[src[0], src[1]], [src[0], src[1]], [src[2]-20, src[2]+20]],
+        max_buffer=5000,
+        lambda_from_center=True,
+        cell_numbers=meshes.good_mg_cell_nr(100, 2, 1),
+)
 
-input_grid = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
-grid = meshes.TensorMesh(**input_grid)
+input_grid = {'hx': grid.h[0], 'hy': grid.h[1], 'hz': grid.h[2],
+              'origin': grid.origin}
 
 # Initialize model
 # Create a model with random resistivities between [0, 50)
@@ -134,33 +140,51 @@ grid = TensorMesh(
         [[(10, 10, -1.1), (10, 20, 1), (10, 10, 1.1)],
          [(33, 20, 1), (33, 10, 1.5)],
          [20]],
-        x0='CN0')
+        origin='CN0')
 
 # List of all attributes in emg3d-grid.
 all_attr = [
-    'hx', 'hy', 'hz', 'vectorNx', 'vectorNy', 'vectorNz', 'vectorCCx', 'nE',
-    'vectorCCy', 'vectorCCz', 'nEx', 'nEy', 'nEz', 'nCx', 'nCy', 'nCz', 'vnC',
-    'nNx', 'nNy', 'nNz', 'vnN', 'vnEx', 'vnEy', 'vnEz', 'vnE', 'nC', 'nN', 'x0'
+    'origin',
+    'shape_cells', 'shape_nodes',
+    'n_nodes', 'n_edges', 'n_cells',
+    'n_edges_x', 'n_edges_y', 'n_edges_z',
+    'n_edges_per_direction',
+    'nodes_x', 'nodes_y', 'nodes_z',
+    'cell_centers_x', 'cell_centers_y', 'cell_centers_z',
+    'shape_edges_x', 'shape_edges_y', 'shape_edges_z',
+    # aliases
+    'x0',
+    'nC', 'vnC',
+    'nN', 'vnN',
+    'nE', 'nEx', 'nEy', 'nEz',
+    'vnE', 'vnEx', 'vnEy', 'vnEz',
 ]
 
 mesh = {}
 
 for attr in all_attr:
     mesh[attr] = getattr(grid, attr)
+mesh['hx'] = grid.h[0]
+mesh['hy'] = grid.h[1]
+mesh['hz'] = grid.h[2]
 
 
 # # # # # # # # # # 4. Homogeneous VTI fullspace LAPLACE # # # # # # # # # #
 
 freq = -2*np.pi
-hxy, hxy0 = meshes.get_hx_h0(
-        freq=freq, res=2, domain=[-1, 1], max_domain=1500,
-        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
-hz, hz0 = meshes.get_hx_h0(
-        freq=freq, res=3.3, domain=[240, 260], max_domain=1500,
-        possible_nx=meshes.get_cell_numbers(100, 2, 1), verb=0)
 
-input_grid_l = {'h': [hxy, hxy, hz], 'x0': (hxy0, hxy0, hz0)}
-grid_l = meshes.TensorMesh(**input_grid_l)
+grid_l = meshes.construct_mesh(
+        frequency=freq,
+        center=(0, 0, 0),
+        properties=[3.3, 2, 3.3, 3.3],
+        domain=[[-1, 1], [-1, 1], [240, 260]],
+        max_buffer=1500,
+        lambda_from_center=True,
+        cell_numbers=meshes.good_mg_cell_nr(100, 2, 1),
+)
+
+input_grid_l = {'hx': grid_l.h[0], 'hy': grid_l.h[1], 'hz': grid_l.h[2],
+                'origin': grid_l.origin}
 
 input_model_l = {
     'grid': grid_l,
