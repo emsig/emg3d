@@ -31,7 +31,10 @@ try:
     # Backwards compatibility; remove latest for version 1.0.0.
     dv = discretize.__version__.split('.')
     if int(dv[0]) == 0 and int(dv[1]) < 6:
-        print('\n             =====> WARNING TODO discretize version <=====\n')
+        msg = ("\n`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`;"
+               "\n`emg3d.TensorMesh` will return a basic mesh, not a "
+               "`discretize.Tensormesh`.")
+        warnings.warn(msg, UserWarning)
         dv = None
 except ImportError:
     dv = None
@@ -141,7 +144,7 @@ class _TensorMesh:
                     self.h[2][:, None, None]).ravel()
         return self._cell_volumes
 
-    # # DEPRECATED FUNCTIONS - Remove in v0.16.0 # #
+    # # DEPRECATED FUNCTIONS - Remove in v0.17.0 # #
     def _warn(new_name, old_name, index=None):
         """Temporary deprecation function."""
 
@@ -150,7 +153,7 @@ class _TensorMesh:
             ind = f"[{index}]" if index is not None else ""
             message = (
                 f"`{cname}.{old_name}` has been deprecated (will be removed "
-                f"in v0.16.0); please use `{cname}.{new_name}{ind}`."
+                f"in v0.17.0); please use `{cname}.{new_name}{ind}`."
             )
             warnings.warn(message, DeprecationWarning)
             if index is None:

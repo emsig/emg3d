@@ -773,7 +773,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     #
     points = tuple()
     for i, coord in enumerate(['x', 'y', 'z']):
-        if values.shape[i] == getattr(grid, 'nN'+coord):
+        if values.shape[i] == getattr(grid, 'shape_nodes')[i]:
             pts = (getattr(grid, 'nodes_'+coord), )
         else:
             pts = (getattr(grid, 'cell_centers_'+coord), )

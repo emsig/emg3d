@@ -29,8 +29,9 @@ def test_solver_homogeneous(capsys):
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res']
 
-    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
-                             dat['input_grid']['origin'])
+    grid = meshes.TensorMesh(
+            [dat['input_grid']['hx'], dat['input_grid']['hy'],
+             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
     sfield = fields.get_source_field(**dat['input_source'])
 
@@ -46,8 +47,8 @@ def test_solver_homogeneous(capsys):
 
     # Experimental:
     # Check if norms are also the same, at least for first two cycles.
-    assert "4.075e-02  after   1 F-cycles   [1.928e-07, 0.041]   0 0" in out
-    assert "4.477e-03  after   2 F-cycles   [2.118e-08, 0.110]   0 0" in out
+    assert "3.417e-02  after   1 F-cycles   [1.809e-07, 0.034]   0 0" in out
+    assert "3.528e-03  after   2 F-cycles   [1.868e-08, 0.103]   0 0" in out
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['Fresult'], efield)
@@ -241,8 +242,9 @@ def test_solver_homogeneous_laplace():
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['lap']
 
-    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
-                             dat['input_grid']['origin'])
+    grid = meshes.TensorMesh(
+            [dat['input_grid']['hx'], dat['input_grid']['hy'],
+             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
     sfield = fields.get_source_field(**dat['input_source'])
 
@@ -444,8 +446,9 @@ def test_krylov(capsys):
 
     # Load any case.
     dat = REGRES['res']
-    grid = meshes.TensorMesh(list(dat['input_grid']['h']),
-                             dat['input_grid']['origin'])
+    grid = meshes.TensorMesh(
+            [dat['input_grid']['hx'], dat['input_grid']['hy'],
+             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
     model.property_x /= 100000  # Set stupid input to make bicgstab fail.
     model.property_y *= 100000  # Set stupid input to make bicgstab fail.

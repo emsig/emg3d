@@ -133,12 +133,12 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         new_points = tuple()
         shape = tuple()
         for i, coord in enumerate(['x', 'y', 'z']):
-            if values.shape[i] == getattr(grid, 'nN'+coord):
+            if values.shape[i] == getattr(grid, 'shape_nodes')[i]:
                 pts = getattr(grid, 'nodes_'+coord)
                 new_pts = getattr(new_grid, 'nodes_'+coord)
             else:
-                pts = getattr(grid, 'vectorCC'+coord)
-                new_pts = getattr(new_grid, 'vectorCC'+coord)
+                pts = getattr(grid, 'cell_centers_'+coord)
+                new_pts = getattr(new_grid, 'cell_centers_'+coord)
 
             # Add to points.
             points += (pts, )

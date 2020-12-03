@@ -465,9 +465,13 @@ def test_get_receiver_response():
     src = (0, 0, 0, 0, 0)
     freq = 10
 
-    hx, x0 = meshes.get_hx_h0(freq, res, [0, 1000], min_width=20, verb=0)
-    hyz, yz0 = meshes.get_hx_h0(freq, res, [-25, 25], min_width=20, verb=0)
-    grid = meshes.TensorMesh([hx, hyz, hyz], origin=np.array([x0, yz0, yz0]))
+    grid = meshes.construct_mesh(
+            frequency=freq,
+            center=(0, 0, 0),
+            properties=res,
+            domain=[[0, 1000], [-25, 25], [-25, 25]],
+            min_width_limits=20,
+    )
 
     model = models.Model(grid, res)
     sfield = fields.get_source_field(grid, src, freq)
