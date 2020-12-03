@@ -109,6 +109,8 @@ jobs:
         uses: AndreMiras/coveralls-python-action@f5fd5c309b39d01599fb92c72d4f7409ea78aec9
         with:
           parallel: true
+          flag-name: ${{ matrix.case.python-version }} ${{ matrix.case.name }} (${{ matrix.case.os }})
+
 
   coveralls_finish:
     needs: test

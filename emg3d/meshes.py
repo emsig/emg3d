@@ -118,14 +118,14 @@ class _TensorMesh:
         # Aliases (in line with `discretize`).
         self.x0 = self.origin
         self.nC = self.n_cells
+        self.vnC = self.shape_cells
         self.nN = self.n_nodes
+        self.vnN = self.shape_nodes
         self.nE = self.n_edges
         self.nEx = self.n_edges_x
         self.nEy = self.n_edges_y
         self.nEz = self.n_edges_z
         self.vnE = self.n_edges_per_direction
-        self.vnC = self.shape_cells
-        self.vnN = self.shape_nodes
         self.vnEx = self.shape_edges_x
         self.vnEy = self.shape_edges_y
         self.vnEz = self.shape_edges_z

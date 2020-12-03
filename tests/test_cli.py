@@ -66,6 +66,9 @@ def test_basic(script_runner):
 
     os.environ["NUMBA_DISABLE_JIT"] = "0"
 
+    # Clean up
+    os.remove('emg3d_out.log')
+
 
 class TestParser:
 
