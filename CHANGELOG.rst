@@ -9,7 +9,7 @@ recent versions
 *v0.15.0* : discretize restructure
 ----------------------------------
 
-**2020-12-03**
+**2020-12-04**
 
 
 The package discretize went through a major restructuring with many name

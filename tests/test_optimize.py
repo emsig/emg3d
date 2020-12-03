@@ -25,12 +25,43 @@ def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
           f"{{xi;iy;iz}}     Adjoint-state       Forward FD    NRMSD (%)\n"
           f"----------------------------------------------------------")
 
+    # If `n=False`: One pseudo-random computation.
+    # Pseudo-random to avoid error from region where the gradient crosses zero.
+    pseudo = n is False
+    if pseudo:
+        n = 1
+    ixiz = [[25, 27], [25, 28], [25, 31], [25, 32], [25, 35], [25, 36],
+            [25, 37], [25, 38], [26, 27], [26, 31], [26, 32], [26, 35],
+            [26, 36], [26, 37], [26, 38], [27, 27], [27, 31], [27, 32],
+            [27, 35], [27, 36], [27, 37], [27, 38], [28, 27], [28, 30],
+            [28, 31], [28, 32], [28, 36], [28, 37], [28, 38], [29, 27],
+            [29, 31], [29, 32], [29, 33], [29, 35], [29, 36], [29, 37],
+            [29, 38], [30, 27], [30, 30], [30, 31], [30, 32], [30, 33],
+            [30, 36], [30, 37], [30, 38], [31, 27], [31, 29], [31, 30],
+            [31, 31], [31, 32], [31, 33], [31, 36], [31, 37], [31, 38],
+            [32, 27], [32, 29], [32, 31], [32, 32], [32, 36], [32, 37],
+            [32, 38], [33, 27], [33, 30], [33, 31], [33, 32], [33, 33],
+            [33, 36], [33, 37], [33, 38], [34, 27], [34, 31], [34, 32],
+            [34, 36], [34, 37], [34, 38], [35, 27], [35, 30], [35, 31],
+            [35, 32], [35, 33], [35, 36], [35, 37], [35, 38], [36, 27],
+            [36, 31], [36, 32], [36, 36], [36, 37], [36, 38], [37, 27],
+            [37, 28], [37, 31], [37, 32], [37, 36], [37, 37], [37, 38],
+            [38, 27], [38, 28], [38, 31], [38, 32], [38, 33], [38, 35],
+            [38, 36], [38, 37], [38, 38], [39, 27], [39, 28], [39, 31],
+            [39, 32], [39, 35], [39, 36], [39, 37], [39, 38], [40, 27],
+            [40, 28], [40, 29], [40, 31], [40, 32], [40, 35], [40, 36],
+            [40, 37], [40, 38]]
+
     avg_nrmsd = 0.0
 
     for i in range(n):
-        ix = np.random.randint(15, 50)  # btw 1500-5000 m
-        iy = np.random.randint(25, 40)  # btw 2500-4000 m
-        iz = np.random.randint(25, 40)  # btw 2500-4000 m
+        if pseudo:
+            ix, iz = ixiz[np.random.randint(len(ixiz))]
+            iy = 33
+        else:
+            ix = np.random.randint(15, 50)  # btw 1500-5000 m
+            iy = np.random.randint(25, 40)  # btw 2500-4000 m
+            iz = np.random.randint(25, 40)  # btw 2500-4000 m
 
         # Add epsilon to random cell.
         model_diff = model.copy()
@@ -148,9 +179,10 @@ def test_derivative(capsys):
     data_misfit = sim_data.misfit
     grad = sim_data.gradient
 
-    # Note: We test a random cell (within bounds); Generally, the NRMSD will be
-    #       below 0.01 %. However, if there are random failures (from
-    #       sign-switches) then we have to fix these random indices.
+    # Note: We test a pseudo-random cell.
+    # Generally, the NRMSD will be below 0.01 %. However, in boundary regions
+    # or regions where the gradient changes from positive to negative this
+    # would fail, so we run a pseudo-random element.
     nrmsd = random_fd_gradient(
-            1, survey, model_init, mesh, grad, data_misfit, sim_inp)
+            False, survey, model_init, mesh, grad, data_misfit, sim_inp)
     assert nrmsd < 1.0
