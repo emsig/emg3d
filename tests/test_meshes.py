@@ -572,3 +572,8 @@ def test_deprecations(capsys):
 
     with pytest.warns(DeprecationWarning):
         assert_allclose(mesh.vol, mesh.cell_volumes)
+
+    dmesh = mesh.to_dict()
+    dmesh['x0'] = dmesh.pop('origin')
+    mesh2 = meshes.TensorMesh.from_dict(dmesh)
+    assert mesh == mesh2
