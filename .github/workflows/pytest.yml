@@ -50,11 +50,6 @@ jobs:
             os: ubuntu
             conda: "xarray tqdm empymod h5py scooby discretize matplotlib"
 
-    env:
-      # Used to for coveralls flag
-      OS: ${{ matrix.case.os }}
-      PYTHON: ${{ matrix.case.python-version }}
-
     steps:
 
       # Cancel any previous run of the test job; [pin v0.6.0]
@@ -114,7 +109,6 @@ jobs:
         uses: AndreMiras/coveralls-python-action@f5fd5c309b39d01599fb92c72d4f7409ea78aec9
         with:
           parallel: true
-          flag-name: OS,PYTHON
 
   coveralls_finish:
     needs: test
