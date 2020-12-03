@@ -307,7 +307,7 @@ def _dict_serialize(inp, out=None, collect_classes=False):
         # Take care of the following instances
         # (if we are in the root-directory they get their own category):
         if (isinstance(value, tuple(KNOWN_CLASSES.values())) or
-                hasattr(value, 'x0') or hasattr(value, 'origin')):
+                hasattr(value, 'origin')):
 
             # Name of the instance
             name = value.__class__.__name__

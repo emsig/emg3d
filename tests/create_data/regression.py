@@ -4,10 +4,6 @@ from discretize import TensorMesh
 
 from emg3d import solver, meshes, models, fields, io
 
-import warnings
-warnings.filterwarnings('always', module='emg3d', category=FutureWarning)
-warnings.filterwarnings('always', module='emg3d', category=DeprecationWarning)
-
 
 # # # # # # # # # # 1. Homogeneous VTI fullspace # # # # # # # # # #
 

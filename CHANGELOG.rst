@@ -38,7 +38,7 @@ notes of ``discretize`` for all changes):
 
 **Deprecations:** Deprecated properties (left) raise a deprecation warning and
 will be removed in the future. Currently, they still work and point to the new
-names.
+names (right).
 
 - ``hx`` => ``h[0]``
 - ``hy`` => ``h[1]``

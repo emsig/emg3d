@@ -33,7 +33,7 @@ try:
     if int(dv[0]) == 0 and int(dv[1]) < 6:
         msg = ("\n`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`;"
                "\n`emg3d.TensorMesh` will return a basic mesh, not a "
-               "`discretize.Tensormesh`.")
+               "`discretize.TensorMesh`.")
         warnings.warn(msg, UserWarning)
         dv = None
 except ImportError:
