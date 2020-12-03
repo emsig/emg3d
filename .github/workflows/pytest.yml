@@ -33,27 +33,22 @@ jobs:
             name: minimal
             os: ubuntu
             conda: "'scipy=1.4' 'numba=0.45'"
-            uninstall: "tqdm"  # Seems to be install from another requirement
           - python-version: 3.7
             name: full
             os: ubuntu
-            conda: "xarray tqdm empymod h5py scooby discretize matplotlib"
-            uninstall: "none"
+            conda: "xarray empymod h5py scooby discretize matplotlib"  # tqdm
           - python-version: 3.7
             name: plain
             os: ubuntu
             conda: ""
-            uninstall: "tqdm"
           - python-version: 3.8
             name: plain
             os: ubuntu
             conda: "'discretize<0.6'"  # Check discretize backwards comp.
-            uninstall: "tqdm"
           - python-version: 3.8
             name: full
             os: ubuntu
             conda: "xarray tqdm empymod h5py scooby discretize matplotlib"
-            uninstall: "none"
 
     steps:
 
@@ -100,7 +95,6 @@ jobs:
           conda config --show
           mamba install ${{ matrix.case.conda }} numpy pytest pytest-cov pytest-console-scripts pip
           pip install setuptools_scm coveralls pytest-flake8
-          pip uninstall ${{ matrix.case.uninstall }}
           conda info -a
           conda list
 
