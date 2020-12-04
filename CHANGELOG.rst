@@ -6,6 +6,14 @@ recent versions
 """""""""""""""
 
 
+*v0.15.2* : Bugfix deploy II
+----------------------------
+
+**2020-12-04**
+
+- Fixing deploy script with GHA.
+
+
 *v0.15.1* : Bugfix deploy
 -------------------------
 
