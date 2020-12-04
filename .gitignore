@@ -8,10 +8,7 @@ docs/api/
 # Pytest and coverage related
 htmlcov
 .coverage
-.coverage.*
 .pytest_cache/
-tests/create_data/tmp/
-*.log
 
 # setuptools_scm
 emg3d/version.py
