@@ -13,9 +13,15 @@ recent versions
 
 
 The package discretize went through a major restructuring with many name
-changes and consequent deprecations. This version updates ``emg3d`` to be
-compatible with ``discretize>=0.6.0`` in the long run. It also means that emg3d
-will, from ``emg3d>=0.15.0`` onwards, only work with ``discretize>=0.6.0``.
+changes and consequent deprecations (see below for a list of affected
+mesh-properties for ``emg3d``). This version updates ``emg3d`` to be compatible
+with ``discretize>=0.6.0`` in the long run. It also means that emg3d will, from
+``emg3d>=0.15.0`` onwards, only work with ``discretize>=0.6.0``.
+
+Other notable changes:
+
+- Bug fix re storing/loading synthetics
+- Moved from Travis CI to GitHub Actions.
 
 The relevant aliases and deprecations for ``emg3d`` are (consult the release
 notes of ``discretize`` for all changes):
@@ -56,11 +62,6 @@ names (right).
 - ``vectorCCy`` => ``cell_centers_y``
 - ``vectorCCz`` => ``cell_centers_z``
 - ``vol`` => ``cell_volumes``
-
-- Other changes:
-
-  - Bug fix re storing/loading synthetics
-  - Moved from Travis CI to GitHub Actions.
 
 
 *v0.14.3* : Bug fix
