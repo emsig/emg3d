@@ -5,8 +5,8 @@ help:
 	@echo "  dev-install  install in editable mode with dev requirements"
 	@echo "  pytest       run the test suite and report coverage"
 	@echo "  flake8       style check with flake8"
-	@echo "  docs         build docs (new, removing any existing)"
-	@echo "  docs-update  build docs (update existing)"
+	@echo "  doc          build docs (new, removing any existing)"
+	@echo "  doc-update   build docs (update existing)"
 	@echo "  linkcheck    check all links in docs"
 	@echo "  clean        clean up all generated files"
 	@echo ""
@@ -18,22 +18,22 @@ dev-install:
 	pip install -r requirements-dev.txt && pip install -e .
 
 pytest:
-	pytest --cov=emg3d tests/ --flake && coverage html
+	pytest --cov=emg3d tests/ --flake8 && coverage html
 
 flake8:
 	flake8 docs/conf.py setup.py emg3d/ tests/
 
-docs:
+doc:
 	cd docs && rm -rf api/ && rm -rf _build/ && make html && cd ..
 
-docs-update:
+doc-update:
 	cd docs && make html && cd ..
 
 linkcheck:
 	cd docs && make html -b linkcheck && cd ..
 
 clean:
-	rm -rf build/ dist/ .eggs/ emg3d.egg-info/
-	rm -rf emg3d/__pycache__/ emg3d/cli/__pycache__/ tests/__pycache__/
-	rm -rf .coverage pytest_cache htmlcov/ .pytest_cache/
-	rm -rf docs/api/ docs/_build/
+	rm -rf build/ dist/ .eggs/ emg3d.egg-info/  # build
+	rm -rf */__pycache__/ */*/__pycache__/      # python cache
+	rm -rf .coverage htmlcov/ .pytest_cache/    # tests and coverage
+	rm -rf docs/api/ docs/_build/               # docs
