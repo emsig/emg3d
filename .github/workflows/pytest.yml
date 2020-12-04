@@ -127,8 +127,8 @@ jobs:
     needs: test
     name: Deploy to PyPI
     runs-on: ubuntu-latest
-    # Only from the origin repository, not forks; only master.
-    if: github.repository_owner == 'empymod' && github.ref == 'refs/heads/master'
+    # Only from the origin repository, not forks; only master and tags.
+    if: github.repository == 'empymod/emg3d' && (github.ref == 'refs/heads/master' || github.ref == 'refs/tags')
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE
