@@ -2,6 +2,7 @@ import os
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
+from contextlib import suppress, ContextDecorator
 
 import emg3d
 from emg3d import cli
@@ -23,10 +24,23 @@ except ImportError:
     pass
 
 
+class disable_numba(ContextDecorator):
+    """Context decorator to disable-enable JIT and remove log file."""
+    def __enter__(self):
+        os.environ["NUMBA_DISABLE_JIT"] = "1"
+        return self
+
+    def __exit__(self, *exc):
+        os.environ["NUMBA_DISABLE_JIT"] = "0"
+        # Clean up
+        with suppress(FileNotFoundError):
+            os.remove('emg3d_out.log')
+        return False
+
+
+@disable_numba()
 @pytest.mark.script_launch_mode('subprocess')
 def test_basic(script_runner):
-
-    os.environ["NUMBA_DISABLE_JIT"] = "1"
 
     # Test the installed version runs by -h.
     ret = script_runner.run('emg3d', '-h')
@@ -46,28 +60,25 @@ def test_basic(script_runner):
     ret = script_runner.run('python', 'emg3d', '--report')
     assert ret.success
     # Exclude time to avoid errors.
-    assert emg3d.utils.Report().__repr__()[115:] in ret.stdout
+    # Exclude empymod-version (after 475), because if run locally without
+    # having emg3d installed it will be "unknown" for the __main__ one.
+    assert emg3d.utils.Report().__repr__()[115:475] in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - I.
     ret = script_runner.run('python', 'emg3d/cli/main.py', '--version')
     assert ret.success
-    assert emg3d.utils.__version__ in ret.stdout
+    assert "emg3d v" in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - II.
     ret = script_runner.run('python', 'emg3d/cli/main.py', '--report')
     assert ret.success
     # Exclude time to avoid errors.
-    assert emg3d.utils.Report().__repr__()[115:] in ret.stdout
+    assert emg3d.utils.Report().__repr__()[115:475] in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - III.
     ret = script_runner.run('python', 'emg3d/cli/main.py', '-d')
     assert not ret.success
     assert "CONFIGURATION FILE NOT FOUND" in ret.stderr
-
-    os.environ["NUMBA_DISABLE_JIT"] = "0"
-
-    # Clean up
-    os.remove('emg3d_out.log')
 
 
 class TestParser:
