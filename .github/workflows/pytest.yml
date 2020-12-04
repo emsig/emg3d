@@ -76,7 +76,8 @@ jobs:
         run: git fetch origin 'refs/tags/*:refs/tags/*'
 
       - name: Setup miniconda
-        uses: conda-incubator/setup-miniconda@v2
+        # [pin v2.0.1]
+        uses: conda-incubator/setup-miniconda@73b9a8098aade40363e43af145303c23542ccb97
         with:
           auto-update-conda: true
           miniconda-version: "latest"
