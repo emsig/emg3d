@@ -5,8 +5,8 @@ help:
 	@echo "  dev-install  install in editable mode with dev requirements"
 	@echo "  pytest       run the test suite and report coverage"
 	@echo "  flake8       style check with flake8"
-	@echo "  doc          build docs (new, removing any existing)"
-	@echo "  doc-update   build docs (update existing)"
+	@echo "  doc          build docs (update existing)"
+	@echo "  doc-clean    build docs (new, removing any existing)"
 	@echo "  linkcheck    check all links in docs"
 	@echo "  clean        clean up all generated files"
 	@echo ""
@@ -24,10 +24,10 @@ flake8:
 	flake8 docs/conf.py setup.py emg3d/ tests/
 
 doc:
-	cd docs && rm -rf api/ && rm -rf _build/ && make html && cd ..
-
-doc-update:
 	cd docs && make html && cd ..
+
+doc-clean:
+	cd docs && rm -rf api/ && rm -rf _build/ && make html && cd ..
 
 linkcheck:
 	cd docs && make html -b linkcheck && cd ..
