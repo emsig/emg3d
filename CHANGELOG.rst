@@ -6,6 +6,18 @@ recent versions
 """""""""""""""
 
 
+*v0.15.1* : discretize restructure
+----------------------------------
+
+**2020-12-04**
+
+
+Small bugfix release, as ``v0.15.0`` never got deployed.
+
+- Fix CI deploy script.
+- Makefile for the most common dev-tasks.
+
+
 *v0.15.0* : discretize restructure
 ----------------------------------
 
