@@ -6,6 +6,14 @@ recent versions
 """""""""""""""
 
 
+*latest*
+--------
+
+- Removed ``precision`` from ``skin_depth``, ``wavelength``,
+  ``min_cell_width``; all in ``meshes``. It caused problems for high
+  frequencies.
+
+
 *v0.15.2* : Bugfix deploy II
 ----------------------------
 

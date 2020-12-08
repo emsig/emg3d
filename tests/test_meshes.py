@@ -55,15 +55,15 @@ def test_get_hx_h0(capsys):
         "   Skin depth          [m] : 2251\n"
         "   Survey domain       [m] : -2000 - 2000\n"
         "   Computation domain  [m] : -14692 - 15592\n"
-        "   Final extent        [m] : -15692 - 15992\n"
-        f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3381\n"
+        "   Final extent        [m] : -15698 - 15998\n"
+        f"   Min/max cell width  [m] : {out1[2]['dmin']:.0f} / 750 / 3382\n"
         "   Alpha survey/comp       : "
         f"{out1[2]['amin']:.3f} / {out1[2]['amax']:.3f}\n"
         "   Number of cells (s/c/r) : 20 (6/14/0)\n"
     )
 
     # Just check x0 and the output.
-    assert out1[1] == -15692.20844679169
+    assert out1[1] == -15698.039979622565
     assert info in outstr1
 
     # == B == Laplace and verb=0, parameter positions and defaults.
@@ -167,8 +167,8 @@ def test_get_domain():
     # Test default values (and therefore skindepth etc)
     with pytest.warns(DeprecationWarning):
         h1, d1 = meshes.get_domain()
-    assert_allclose(h1, 55.1328)
-    assert_allclose(d1, [-1378.32, 1378.32])
+    assert_allclose(h1, 55.13289)
+    assert_allclose(d1, [-1378.322238, 1378.322238])
 
     # Ensure fact_min/fact_neg/fact_pos
     with pytest.warns(DeprecationWarning):
@@ -301,39 +301,27 @@ def test_TensorMesh_repr():
 
 
 def test_skin_depth():
-    t1 = meshes.skin_depth(1/np.pi, 2.0, 2.0, 20)
+    t1 = meshes.skin_depth(1/np.pi, 2.0, 2.0)
     assert t1 == 0.5
 
-    t2 = meshes.skin_depth(1/np.pi, 2.0, 1.0, 0)
+    t2 = meshes.skin_depth(1/np.pi, 1/mu_0)
     assert t2 == 1
 
-    t3 = meshes.skin_depth(1/np.pi, 1/mu_0)
-    assert t3 == 1
-
-    t4 = meshes.skin_depth(-1/(2*np.pi**2), 2.0, 2.0, 20)
-    assert t4 == 0.5
+    t3 = meshes.skin_depth(-1/(2*np.pi**2), 2.0, 2.0)
+    assert t3 == 0.5
 
 
 def test_wavelength():
-    t1 = meshes.wavelength(0.5, precision=20)
-    assert t1 == np.round(np.pi, 20)
-
-    t2 = meshes.wavelength(0.4, 0)
-    assert t2 == 3
-
-    t3 = meshes.wavelength(1.0, precision=3)
-    assert t3 == 6.283
-
-    t4 = meshes.wavelength(0.5, 20)
-    assert t4 == np.round(np.pi, 20)
+    t1 = meshes.wavelength(0.5)
+    assert_allclose(t1, np.pi)
 
 
-def test_min_width_cell():
+def test_min_cell_width():
     t1 = meshes.min_cell_width(1, pps=1)
     assert t1 == 1
 
-    t2 = meshes.min_cell_width(1, precision=3)
-    assert t2 == 0.333
+    t2 = meshes.min_cell_width(1)
+    assert np.round(t2, 3) == 0.333
 
     t3 = meshes.min_cell_width(503.0, limits=10)
     assert t3 == 10
@@ -382,15 +370,15 @@ class TestGetOriginWidths:
                 1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=2)
         out, _ = capsys.readouterr()
 
-        assert x0 == -20
+        assert_allclose(x0, -20)
         assert_allclose(np.ones(40), hx)
 
-        assert "Skin depth          [m] : 3  [correspond" in out
-        assert "Survey domain DS    [m] : -1 - 1" in out
-        assert "Comp. domain DC     [m] : -20 - 20" in out
-        assert "Final extent        [m] : -20 - 20" in out
-        assert "Cell widths         [m] : 1 / 1 / 1  [min(DS) / max(DS" in out
-        assert "Number of cells         : 40 (2 / 38 / 0)  [Total (DS/" in out
+        assert "Skin depth          [m] : 3.0  [correspond" in out
+        assert "Survey domain DS    [m] : -1.0 - 1.0" in out
+        assert "Comp. domain DC     [m] : -19.8 - 19.8" in out
+        assert "Final extent        [m] : -20.0 - 20.0" in out
+        assert "Cell widths         [m] : 1.0 / 1.0 / 1.0  [min(DS) / m" in out
+        assert "Number of cells         : 40 (4 / 36 / 0)  [Total (DS/" in out
         assert "Max stretching          : 1.000 (1.000) / 1.000  [DS (" in out
 
         _ = meshes.get_origin_widths(
@@ -398,14 +386,14 @@ class TestGetOriginWidths:
                 stretching=[1, 1], verb=2)
         out, _ = capsys.readouterr()
 
-        assert "3 / 3  [corresponding to `properties`]" in out
+        assert "2.98 / 3.00  [corresponding to `properties`]" in out
 
         _ = meshes.get_origin_widths(
                 1/np.pi, [8.9*mu_0, 9*mu_0, 9.1*mu_0], 0.0, [-1, 1],
                 stretching=[1, 1], verb=2)
         out, _ = capsys.readouterr()
 
-        assert "3 / 3 / 3  [corresponding to `properties`]" in out
+        assert "2.98 / 3.00 / 3.02  [corresponding to `properties`]" in out
 
     def test_domain_vector(self):
         x01, hx1 = meshes.get_origin_widths(
@@ -439,9 +427,9 @@ class TestGetOriginWidths:
 
         assert "Skin depth          [m] : 616 / 1125 / 7958" in out
         assert "Survey domain DS    [m] : -2000 - -1000" in out
-        assert "Comp. domain DC     [m] : -9069 - 49002" in out
-        assert "Final extent        [m] : -10289 - 51970" in out
-        assert "Cell widths         [m] : 205 / 205 / 12056" in out
+        assert "Comp. domain DC     [m] : -9071 - 49000" in out
+        assert "Final extent        [m] : -10310 - 52091" in out
+        assert "Cell widths         [m] : 205 / 205 / 12083" in out
         assert "Number of cells         : 32 (7 / 25 / 0)" in out
         assert "Max stretching          : 1.000 (1.000) / 1.290" in out
 
@@ -469,11 +457,30 @@ class TestGetOriginWidths:
 
         assert "Skin depth          [m] : 620 / 1125 / 50" in out
         assert "Survey domain DS    [m] : -2000 - -1000" in out
-        assert "Comp. domain DC     [m] : -10950 - 5255" in out
+        assert "Comp. domain DC     [m] : -10950 - 5300" in out
         assert "Final extent        [m] : -13945 - 5425" in out
         assert "Cell widths         [m] : 100 / 100 / 3191" in out
         assert "Number of cells         : 40 (20 / 20 / 0)" in out
         assert "Max stretching          : 1.000 (1.000) / 1.370" in out
+
+        # High frequencies.
+        meshes.get_origin_widths(
+            frequency=1e8,
+            properties=[5, 1, 50],
+            center=0,
+            domain=[-1, 1],
+            verb=1,
+            )
+
+        out, _ = capsys.readouterr()
+
+        assert "Skin depth          [m] : 0.113 / 0.050 / 0.356" in out
+        assert "Survey domain DS    [m] : -1.000 - 1.000" in out
+        assert "Comp. domain DC     [m] : -1.316 - 3.236" in out
+        assert "Final extent        [m] : -1.331 - 3.376" in out
+        assert "Cell widths         [m] : 0.038 / 0.038 / 0.252" in out
+        assert "Number of cells         : 80 (54 / 26 / 0)" in out
+        assert "Max stretching          : 1.000 (1.000) / 1.100" in out
 
 
 class TestConstructMesh:

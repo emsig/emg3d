@@ -47,8 +47,8 @@ def test_solver_homogeneous(capsys):
 
     # Experimental:
     # Check if norms are also the same, at least for first two cycles.
-    assert "3.417e-02  after   1 F-cycles   [1.809e-07, 0.034]   0 0" in out
-    assert "3.528e-03  after   2 F-cycles   [1.868e-08, 0.103]   0 0" in out
+    assert "3.414e-02  after   1 F-cycles   [1.810e-07, 0.034]   0 0" in out
+    assert "3.523e-03  after   2 F-cycles   [1.868e-08, 0.103]   0 0" in out
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['Fresult'], efield)

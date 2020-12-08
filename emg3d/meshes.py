@@ -594,7 +594,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         cond[0], cond[min(cond.size-1, 1)], cond[min(cond.size-1, 2)]])
 
     # Get skin depth.
-    skind = skin_depth(frequency, cond_arr, precision=0)
+    skind = skin_depth(frequency, cond_arr)
 
     # Minimum cell width.
     dmin = min_cell_width(skind[0], min_width_pps, min_width_limits)
@@ -768,30 +768,36 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
         sa_limit = min(1.5, stretching[0]+0.25)
 
+        # Display precision.
+        prec = int(np.ceil(max(0, -np.log10(min(hx))+1)))
+
         if verb > 1:
             end = ""
         else:
             end = "\n"
 
-        print(f"Skin depth          [m] : {skind[0]:.0f}", end="")
+        print(f"Skin depth          [m] : {skind[0]:.{prec}f}", end="")
         if cond.size == 2:
-            print(f" / {skind[1]:.0f}", end=end)
+            print(f" / {skind[1]:.{prec}f}", end=end)
         elif cond.size == 3:
-            print(f" / {skind[1]:.0f} / {skind[2]:.0f}", end=end)
+            print(f" / {skind[1]:.{prec}f} / {skind[2]:.{prec}f}", end=end)
         else:
             print(end=end)
         if verb > 1:
             print("  [corresponding to `properties`]")
 
-        print(f"Survey domain DS    [m] : {domain[0]:.0f} - {domain[1]:.0f}")
+        print(f"Survey domain DS    [m] : {domain[0]:.{prec}f} - "
+              f"{domain[1]:.{prec}f}")
 
-        print(f"Comp. domain DC     [m] : {comp_domain[0]:.0f} - "
-              f"{comp_domain[1]:.0f}")
+        print(f"Comp. domain DC     [m] : {comp_domain[0]:.{prec}f} - "
+              f"{comp_domain[1]:.{prec}f}")
 
-        print(f"Final extent        [m] : {x0:.0f} - {x0+np.sum(hx):.0f}")
+        print(f"Final extent        [m] : {x0:.{prec}f} - "
+              f"{x0+np.sum(hx):.{prec}f}")
 
         print(f"Cell widths         [m] : "
-              f"{min(hxo):.0f} / {max(hxo):.0f} / {max(hx):.0f}", end=end)
+              f"{min(hxo):.{prec}f} / {max(hxo):.{prec}f} / "
+              f"{max(hx):.{prec}f}", end=end)
         if verb > 1:
             print("  [min(DS) / max(DS) / max(DC)]")
 
@@ -867,7 +873,7 @@ def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
     return numbers[numbers <= max_nr]
 
 
-def skin_depth(frequency, conductivity, mu=mu_0, precision=0):
+def skin_depth(frequency, conductivity, mu=mu_0):
     r"""Return skin depth for provided frequency and conductivity.
 
     The skin depth :math:`\delta` (m) is given by
@@ -893,10 +899,6 @@ def skin_depth(frequency, conductivity, mu=mu_0, precision=0):
     mu : float, optional
         Magnetic permeability (H/m); default is :math:`\mu_0`.
 
-    precision : int, optional
-        Precision of the return skin depth.
-        Default is 0, hence meters.
-
 
     Returns
     -------
@@ -907,10 +909,11 @@ def skin_depth(frequency, conductivity, mu=mu_0, precision=0):
     skind = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu)
     if frequency < 0:  # For Laplace-domain computations.
         skind /= np.sqrt(2*np.pi)
-    return np.round(skind, precision)
+
+    return skind
 
 
-def wavelength(skin_depth, precision=0):
+def wavelength(skin_depth):
     r"""Return the wavelength.
 
     The wavelength :math:`\lambda` (m) is given by
@@ -929,10 +932,6 @@ def wavelength(skin_depth, precision=0):
     skin_depth : float or ndarray.
         Skin depth (m).
 
-    precision : int, optional
-        Precision of the returned wave length.
-        Default is 0, hence meters.
-
 
     Returns
     -------
@@ -940,10 +939,10 @@ def wavelength(skin_depth, precision=0):
         Wavelength (m).
 
     """
-    return np.round(2*np.pi*skin_depth, precision)
+    return 2*np.pi*skin_depth
 
 
-def min_cell_width(skin_depth, pps=3, limits=None, precision=0):
+def min_cell_width(skin_depth, pps=3, limits=None):
     r"""Return the minimum cell width.
 
     The minimum cell width is defined by the desired points per skin depth,
@@ -973,10 +972,6 @@ def min_cell_width(skin_depth, pps=3, limits=None, precision=0):
         - float: Returns limits as dmin.
         - [min, max]: dmin is limited to this range.
 
-    precision : int, optional
-        Precision of the cell width. Provided limits are not rounded.
-        Default is 0, hence meters.
-
 
     Returns
     -------
@@ -985,7 +980,7 @@ def min_cell_width(skin_depth, pps=3, limits=None, precision=0):
 
     """
     # Calculate min cell width.
-    dmin = np.round(skin_depth/pps, precision)
+    dmin = skin_depth/pps
 
     # Respect user limits.
     if limits is not None:
@@ -1170,7 +1165,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
                     f"Provided: [{fixed[0]}, {fixed[1]}, {fixed[2]}]")
 
     # Get skin depth.
-    skind = skin_depth(freq, 1/res_arr, precision=3)
+    skind = skin_depth(freq, 1/res_arr)
 
     # Minimum cell width.
     dmin = min_cell_width(skind[0], pps, min_width)
@@ -1192,7 +1187,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
     dist_in_domain = abs(domain - fixed[0])
 
     # (b) Two wavelengths.
-    two_lambda = 2*wavelength(skind[1:], precision=3)
+    two_lambda = 2*wavelength(skind[1:])
 
     # (c) Required buffer, additional to domain.
     dist_buff = np.max([np.zeros(2), (two_lambda - dist_in_domain)/2], axis=0)
@@ -1572,7 +1567,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         fact_pos = fact_neg
 
     # Get skin depth.
-    skind = skin_depth(freq, 1/res, precision=3)
+    skind = skin_depth(freq, 1/res)
 
     # Estimate minimum cell width.
     h_min = fact_min*skind
