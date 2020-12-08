@@ -17,6 +17,7 @@ A survey stores a set of sources, receivers, and the measured data.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 
@@ -236,10 +237,10 @@ class Survey:
         # Add frequencies.
         out['frequencies'] = self.frequencies
 
-        # Add `observed` and `std`, if it exists.
-        out['data'] = {'observed': self.data.observed.data}
-        if 'std' in self.data.keys():
-            out['data']['std'] = self.data['std'].data
+        # Add data.
+        out['data'] = {}
+        for key in self.data.keys():
+            out['data'][key] = self.data[key].data
 
         # Add `noise_floor` and `relative error`.
         out['noise_floor'] = self.data.noise_floor
@@ -271,25 +272,22 @@ class Survey:
 
         """
         try:
-            # Backwards compatibility (emg3d < 0.13); remove eventually.
-            if 'observed' in inp.keys():
-                data = inp['observed']
-                new_format = False
-            else:
-                data = None
-                new_format = True
-
             # Initiate survey.
             out = cls(name=inp['name'], sources=inp['sources'],
                       receivers=inp['receivers'],
-                      frequencies=inp['frequencies'], data=data,
+                      frequencies=inp['frequencies'],
                       fixed=bool(inp['fixed']))
 
-            # Add all data (includes 'std')!
-            if new_format:
-                for key, value in inp['data'].items():
-                    out._data[key] = out.data.observed*np.nan
-                    out._data[key][...] = value
+            # Backwards compatibility (emg3d < 0.13); remove eventually.
+            if 'observed' in inp.keys():
+                inp['data'] = {'observed': inp['observed']}
+                warnings.warn("Survey-dict is outdated; store with new "
+                              "version of `emg3d`.", FutureWarning)
+
+            # Add all data.
+            for key, value in inp['data'].items():
+                out._data[key] = out.data.observed*np.nan
+                out._data[key][...] = value
 
             # v0.14.0 onwards.
             if 'noise_floor' in inp.keys():

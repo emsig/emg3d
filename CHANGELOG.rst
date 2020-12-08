@@ -9,10 +9,14 @@ recent versions
 *latest*
 --------
 
+- All data is stored in the ``Survey``, not partly in ``Survey`` and partly
+  in ``Simulation``.
 - Removed ``precision`` from ``skin_depth``, ``wavelength``,
   ``min_cell_width``; all in ``meshes``. It caused problems for high
   frequencies.
 - Deprecated ``collect_classes`` in ``io``.
+- Expanded the ``what``-parameter in the ``Simulation``-class to include
+  properties related to the gradient.
 
 
 *v0.15.2* : Bugfix deploy II

@@ -223,11 +223,12 @@ class TestSurvey():
         assert_allclose(srvy4.standard_deviation, srvy5.standard_deviation)
 
         # Test backwards compatibility.
-        srvy5 = srvy5.to_dict()
-        srvy5['observed'] = srvy5['data']['observed']
-        del srvy5['data']
-        srvy6 = surveys.Survey.from_dict(srvy5)
-        assert_allclose(srvy5['observed'], srvy6.observed)
+        with pytest.warns(FutureWarning):
+            srvy5 = srvy5.to_dict()
+            srvy5['observed'] = srvy5['data']['observed']
+            del srvy5['data']
+            srvy6 = surveys.Survey.from_dict(srvy5)
+            assert_allclose(srvy5['observed'], srvy6.observed)
 
 
 def test_PointDipole():
