@@ -613,7 +613,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # Priority: domain > vector > distance.
     if domain is None and vector is None and distance is None:
         raise ValueError(
-                "At least one of `domain`, `distance, and `vector` "
+                "At least one of `domain`, `distance`, and `vector` "
                 "must be provided.")
     elif domain is None:
         if vector is None:
