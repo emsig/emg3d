@@ -63,7 +63,7 @@ def test_get_hx_h0(capsys):
     )
 
     # Just check x0 and the output.
-    assert out1[1] == -15698.039979622565
+    assert np.round(out1[1], 4) == -15698.0400
     assert info in outstr1
 
     # == B == Laplace and verb=0, parameter positions and defaults.
