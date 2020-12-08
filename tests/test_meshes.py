@@ -336,7 +336,7 @@ class TestGetOriginWidths:
         with pytest.raises(TypeError, match='Unexpected '):
             meshes.get_origin_widths(1, 1, 0, [-1, 1], unknown=True)
 
-        with pytest.raises(ValueError, match="At least one of `domain` and"):
+        with pytest.raises(ValueError, match="At least one of `domain`, `d"):
             meshes.get_origin_widths(1, 1, 0)
 
         with pytest.raises(ValueError, match="Provided vector MUST at least"):
@@ -403,6 +403,11 @@ class TestGetOriginWidths:
                 stretching=[1, 1])
         assert_allclose(x01, x02)
         assert_allclose(hx1, hx2)
+
+        x03, hx3 = meshes.get_origin_widths(
+                1/np.pi, 9*mu_0, 0.0, distance=[1, 1], stretching=[1, 1])
+        assert_allclose(x01, x03)
+        assert_allclose(hx1, hx3)
 
     def test_seasurface(self):
         x01, hx1 = meshes.get_origin_widths(

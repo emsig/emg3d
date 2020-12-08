@@ -1244,6 +1244,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
       nothing is done otherwise:
 
       - ``vector``
+      - ``distance``
       - ``stretching``
       - ``seasurface``
       - ``cell_numbers``
@@ -1318,6 +1319,11 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
         # In this case vector was provided, and we include it like this.
         gopts['vector'] = vector
 
+    # Distance.
+    distance = gridding_opts.pop('distance', None)
+    if distance is not None:
+        gopts['distance'] = distance
+
     # Properties defaults to model averages (AFTER model expansion).
     properties = gridding_opts.pop('properties', None)
     if properties is None:
@@ -1388,6 +1394,12 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
             # vector is provided.
             dim = [np.min(vector[i]), np.max(vector[i])]
             diff = np.diff(dim)[0]
+            get_it = False
+
+        elif distance is not None and distance[i] is not None:
+            # distance is provided.
+            dim = None
+            diff = abs(distance[i][0]) + abs(distance[i][1])
             get_it = False
 
         else:

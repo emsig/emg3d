@@ -371,6 +371,13 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         is then assumed to span exactly the domain. If only one list is
         provided it is applied to all dimensions.
 
+    distance : tuple of lists, list, or None, optional
+        An alternative to ``domain``: Instead of defining the domain in
+        absolute values, they are defined here as distance from the center.
+        Format: ``([xl, xr], [yl, yr], [zd, zu])``. From this the domain is
+        given as ``([cx-xl, cx+xr], [cy-yl, cy+yr], [cz-zd, cz+zu])``, where
+        ``center=(cx, cy, cz)``.
+
     vector : tuple of three ndarrays, ndarray, or None, optional
         Contains vectors of mesh-edges that should be used. If provided, the
         vector MUST at least include all of the survey domain. If ``domain``
@@ -469,6 +476,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     """
     verb = kwargs.get('verb', 0)
+    distance = kwargs.pop('distance', None)
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
@@ -491,7 +499,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         kwargs['properties'] = properties
 
     # Add optionally direction specific args.
-    for name, value in zip(['domain', 'vector'], [domain, vector]):
+    for name, value in zip(['domain', 'vector', 'distance'],
+                           [domain, vector, distance]):
         if (value is not None and len(value) == 3 and not
                 isinstance(value, np.ndarray)):
             if value[0] is not None:
@@ -569,6 +578,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     """
     # Get all kwargs.
+    distance = kwargs.pop('distance', None)
     stretching = kwargs.pop('stretching', [1.0, 1.5])
     min_width_limits = kwargs.pop('min_width_limits', None)
     min_width_pps = kwargs.pop('min_width_pps', 3)
@@ -599,12 +609,18 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # Minimum cell width.
     dmin = min_cell_width(skind[0], min_width_pps, min_width_limits)
 
-    # Survey domain: if not provided get from vector.
-    if domain is None and vector is None:
+    # Survey domain: if not provided get from vector or distance.
+    # Priority: domain > vector > distance.
+    if domain is None and vector is None and distance is None:
         raise ValueError(
-                "At least one of `domain` and `vector` must be provided.")
+                "At least one of `domain`, `distance`, and `vector` "
+                "must be provided.")
     elif domain is None:
-        domain = np.array([vector.min(), vector.max()], dtype=float)
+        if vector is None:
+            domain = np.array([center-abs(distance[0]),
+                               center+abs(distance[1])])
+        else:
+            domain = np.array([vector.min(), vector.max()], dtype=float)
     else:
         domain = np.array(domain, dtype=np.float64)
         if vector is not None:

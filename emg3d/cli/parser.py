@@ -270,7 +270,7 @@ def parse_config_file(args_dict):
                              cfg.get('gridding_opts', key).split(',')]
 
         # Check for list of lists.
-        for key in ['domain', 'stretching', 'min_width_limits']:
+        for key in ['domain', 'distance', 'stretching', 'min_width_limits']:
             if cfg.has_option('gridding_opts', key):
                 _ = all_grid.pop(key)
                 out = []

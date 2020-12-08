@@ -9,11 +9,15 @@ recent versions
 *latest*
 --------
 
-- All data is stored in the ``Survey``, not partly in ``Survey`` and partly
-  in ``Simulation``.
+- New parameter ``distance`` for ``get_origin_widths``, as an alternative for
+  ``domain`` and ``vector``: distance defines the survey domain as distance
+  from the center. This is then also available in ``construct_mesh`` and
+  ``Simulation``, including the CLI.
 - Removed ``precision`` from ``skin_depth``, ``wavelength``,
   ``min_cell_width``; all in ``meshes``. It caused problems for high
   frequencies.
+- All data is stored in the ``Survey``, not partly in ``Survey`` and partly
+  in ``Simulation``.
 - Deprecated ``collect_classes`` in ``io``.
 - Expanded the ``what``-parameter in the ``Simulation``-class to include
   properties related to the gradient.
