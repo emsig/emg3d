@@ -431,6 +431,14 @@ class TestEstimateGriddingOpts():
         assert gdict['vector'][1] is None
         assert_allclose(gdict['vector'][2], self.grid.nodes_z)
 
+    def test_vector_distance(self):
+        gridding_opts = {'vector': 'Z', 'distance': [[5, 10], None, None]}
+        gdict = simulations.estimate_gridding_opts(
+                gridding_opts, self.grid, self.model, self.survey)
+
+        assert gdict['distance'][0] == [5, 10]
+        assert gdict['distance'][1] is None
+
     def test_pass_along(self):
         gridding_opts = {
             'vector': (None, 1, None),
