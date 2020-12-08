@@ -361,20 +361,17 @@ class Simulation:
 
         out['_input_nCz'] = self._input_nCz
 
-        # Get required properties.
-        store = []
-
-        if what == 'all':
-            store += ['_dict_grid', '_dict_model', '_dict_sfield']
-
+        # Store wanted dicts.
         if what in ['computed', 'all']:
-            store += ['_dict_efield', '_dict_efield_info', '_dict_hfield',
-                      '_dict_bfield', '_dict_bfield_info']
+            for name in ['_dict_efield', '_dict_efield_info', '_dict_hfield',
+                         '_dict_bfield', '_dict_bfield_info']:
+                if hasattr(self, name):
+                    out[name] = getattr(self, name)
 
-        # Store dicts.
-        for name in store:
-            if hasattr(self, name):
-                out[name] = getattr(self, name)
+            if what == 'all':
+                for name in ['_dict_grid', '_dict_model', '_dict_sfield']:
+                    if hasattr(self, name):
+                        out[name] = getattr(self, name)
 
         # Store gradient and misfit.
         if what in ['computed', 'results', 'all']:
