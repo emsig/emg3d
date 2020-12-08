@@ -12,6 +12,7 @@ recent versions
 - Removed ``precision`` from ``skin_depth``, ``wavelength``,
   ``min_cell_width``; all in ``meshes``. It caused problems for high
   frequencies.
+- Deprecated ``collect_classes`` in ``io``.
 
 
 *v0.15.2* : Bugfix deploy II
