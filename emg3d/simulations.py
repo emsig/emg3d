@@ -24,6 +24,7 @@ high-level, specialised modelling routines.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 import itertools
 from copy import deepcopy
 
@@ -327,6 +328,12 @@ class Simulation:
         out['gridding'] = self.gridding
         out['solver_opts'] = self.solver_opts
 
+        # Clean unwanted data if plain.
+        if what == 'plain':
+            for key in ['synthetic', 'residual', 'weights']:
+                if key in out['survey']['data'].keys():
+                    del out['survey']['data'][key]
+
         # Put provided grids back on gridding.
         if self.gridding == 'input':
             out['gridding_opts'] = self._grid_single
@@ -358,23 +365,19 @@ class Simulation:
         store = []
 
         if what == 'all':
-            store += ['_dict_grid', '_dict_model', '_dict_sfield',
-                      '_dict_hfield']
+            store += ['_dict_grid', '_dict_model', '_dict_sfield']
 
         if what in ['computed', 'all']:
-            store += ['_dict_efield', '_dict_efield_info']
+            store += ['_dict_efield', '_dict_efield_info', '_dict_hfield',
+                      '_dict_bfield', '_dict_bfield_info']
 
-        # store dicts.
+        # Store dicts.
         for name in store:
-            out[name] = getattr(self, name)
+            if hasattr(self, name):
+                out[name] = getattr(self, name)
 
-        # store data.
-        out['data'] = {}
+        # Store gradient and misfit.
         if what in ['computed', 'results', 'all']:
-            for name in list(self.data.data_vars):
-                # These two are stored in the Survey instance.
-                if name not in ['observed', 'std']:
-                    out['data'][name] = self.data.get(name)
             out['gradient'] = self._gradient
             out['misfit'] = self._misfit
 
@@ -434,7 +437,8 @@ class Simulation:
 
             # Add existing derived/computed properties.
             data = ['_dict_grid', '_dict_model', '_dict_sfield',
-                    '_dict_hfield', '_dict_efield', '_dict_efield_info']
+                    '_dict_hfield', '_dict_efield', '_dict_efield_info',
+                    '_dict_bfield', '_dict_bfield_info']
             for name in data:
                 if name in inp.keys():
                     values = inp.get(name)
@@ -457,9 +461,13 @@ class Simulation:
                 if name in inp.keys():
                     setattr(out, '_'+name, inp.get(name))
 
-            # Add stored data (synthetic, residual, etc).
-            for name in inp['data'].keys():
-                out.data[name] = out.data.observed*0+inp['data'][name]
+            # For backwards compatibility < v0.16.0; remove eventually.
+            if 'data' in inp.keys():
+                warnings.warn("Simulation-dict is outdated; store with new "
+                              "version of `emg3d`.", FutureWarning)
+                for name in inp['data'].keys():
+                    out.data[name] = out.data.observed*np.nan
+                    out.data[name][...] = inp['data'][name]
 
             return out
 
@@ -941,24 +949,30 @@ class Simulation:
         if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}")
 
-        clean = []
-
+        # Clean data/model/sfield-dicts.
         if what in ['keepresults', 'all']:
-            clean += ['_dict_grid', '_dict_model', '_dict_sfield']
+            for name in ['_dict_grid', '_dict_model', '_dict_sfield']:
+                delattr(self, name)
+                setattr(self, name, self._dict_initiate)
 
+        # Clean field-dicts.
         if what in ['computed', 'keepresults', 'all']:
-            clean += ['_dict_efield', '_dict_efield_info', '_dict_hfield']
 
-        # Clean dicts.
-        for name in clean:
-            delattr(self, name)
-            setattr(self, name, self._dict_initiate)
+            # These exist always and have to be initiated.
+            for name in ['_dict_efield', '_dict_efield_info', '_dict_hfield']:
+                delattr(self, name)
+                setattr(self, name, self._dict_initiate)
+
+            # These only exist with gradient; don't initiate them.
+            for name in ['_dict_bfield', '_dict_bfield_info']:
+                if hasattr(self, name):
+                    delattr(self, name)
 
         # Clean data.
         if what in ['computed', 'all']:
-            for name in list(self.data.data_vars):
-                if name not in ['observed', 'std']:
-                    del self.data[name]
+            for key in ['residual', 'weight']:
+                if key in self.data.keys():
+                    del self.data[key]
             self.data['synthetic'] = self.data.observed*np.nan
             for name in ['_gradient', '_misfit']:
                 delattr(self, name)

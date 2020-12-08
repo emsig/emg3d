@@ -248,6 +248,22 @@ class TestSimulation():
         # Ensure the gradient has the shape of the model, not of the input.
         assert grad.shape == self.model.shape
 
+        sim2 = simulation.to_dict(what='all', copy=True)
+        sim3 = simulation.to_dict(what='plain', copy=True)
+        assert 'residual' in sim2['survey']['data'].keys()
+        assert 'residual' not in sim3['survey']['data'].keys()
+
+        # Backwards compatibility
+        with pytest.warns(FutureWarning):
+            sim4 = simulation.to_dict()
+            sim4['data'] = {'synthetic': sim4['survey']['data']['observed']}
+            simulations.Simulation.from_dict(sim4)
+
+        simulation.clean('all')  # Should remove 'residual', 'bfield-dicts'
+        sim5 = simulation.to_dict('all')
+        assert 'residual' not in sim5['survey']['data'].keys()
+        assert '_dict_bfield' not in sim5.keys()
+
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_simulation_automatic():
