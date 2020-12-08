@@ -61,9 +61,11 @@ def test_save_and_load(tmpdir, capsys):
     model = models.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
 
     # Save it.
-    io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
-            broken=grid3, a=None, b=True,
-            field=field, what={'f': field.fx, 12: 12}, collect_classes=True)
+    with pytest.warns(DeprecationWarning):
+        io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
+                broken=grid3, a=None, b=True,
+                field=field, what={'f': field.fx, 12: 12},
+                collect_classes=True)
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
     assert utils.__version__ in outstr
@@ -109,10 +111,11 @@ def test_save_and_load(tmpdir, capsys):
 
     # Test h5py.
     if h5py:
-        io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
-                a=1.0, b=1+1j, c=True,
-                model=model, field=field, what={'f': field.fx},
-                collect_classes=True)
+        with pytest.warns(DeprecationWarning):
+            io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
+                    a=1.0, b=1+1j, c=True,
+                    model=model, field=field, what={'f': field.fx},
+                    collect_classes=True)
         out_h5 = io.load(str(tmpdir+'/test.h5'))
         assert out_h5['Model']['model'] == model
         assert out_h5['Data']['a'] == 1.0
@@ -133,10 +136,11 @@ def test_save_and_load(tmpdir, capsys):
             io.load(str(tmpdir+'/test-h5.h5'))
 
     # Test json.
-    io.save(tmpdir+'/test.json', emg3d=grid, discretize=grid2,
-            a=1.0, b=1+1j,
-            model=model, field=field, what={'f': field.fx},
-            collect_classes=True)
+    with pytest.warns(DeprecationWarning):
+        io.save(tmpdir+'/test.json', emg3d=grid, discretize=grid2,
+                a=1.0, b=1+1j,
+                model=model, field=field, what={'f': field.fx},
+                collect_classes=True)
     out_json = io.load(str(tmpdir+'/test.json'))
     assert out_json['Model']['model'] == model
     assert out_json['Data']['a'] == 1.0

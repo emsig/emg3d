@@ -19,6 +19,7 @@ Utility functions for writing and reading data.
 
 import os
 import json
+import warnings
 from datetime import datetime
 
 import numpy as np
@@ -50,9 +51,7 @@ def save(fname, **kwargs):
     """Save surveys, meshes, models, fields, and more to disk.
 
     Serialize and save data to disk in different formats (see parameter
-    description of `fname` for the supported file formats). The main
-    emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) can be
-    collected in corresponding root-folders by setting `collect_classes=True`.
+    description of `fname` for the supported file formats).
 
     Any other (non-emg3d) object can be added too, as long as it knows how to
     serialize itself.
@@ -80,11 +79,6 @@ def save(fname, **kwargs):
     json_indent : int or None
         Passed through to json, default is 2.
 
-    collect_classes : bool
-        If True, input data is collected in folders for the principal
-        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
-        everything else collected in a `Data`-folder. Defaults to False.
-
     verb : int
         If 1 (default) verbose, if 0 silent.
 
@@ -104,6 +98,12 @@ def save(fname, **kwargs):
     json_indent = kwargs.pop('json_indent', 2)
     collect_classes = kwargs.pop('collect_classes', False)
     verb = kwargs.pop('verb', 1)
+
+    # Throw deprecation warning for collect_classes.
+    if collect_classes:
+        warnings.warn(
+            "`collect_classes` is deprecated and will be removed "
+            "in the future.", DeprecationWarning)
 
     # Get absolute path.
     full_path = os.path.abspath(fname)
