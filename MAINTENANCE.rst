@@ -47,14 +47,14 @@ CI
 Automatic bits
 ``````````````
 
-- Testing on `Travis <https://travis-ci.org/empymod/emg3d>`_, includes:
+- Testing on Github Actions includes:
 
   - Tests using ``pytest``
   - Linting / code style with ``pytest-flake8``
   - Ensure all http(s)-links work (``sphinx linkcheck``)
 
 - Line-coverage with ``pytest-cov`` on `Coveralls
-  <https://coveralls.io/github/empymod/emg3d>`_
+  <https://coveralls.io/github/emsig/emg3d>`_
 - Code-quality on `Codacy
   <https://app.codacy.com/manual/prisae/emg3d/dashboard>`_
 - Manual on `ReadTheDocs <https://emg3d.readthedocs.io/en/latest>`_
@@ -63,9 +63,9 @@ Automatic bits
 Manual things
 `````````````
 
-- Benchmarks with `Airspeed Velocity <https://empymod.github.io/emg3d-asv>`_
+- Benchmarks with `Airspeed Velocity <https://emsig.github.io/emg3d-asv>`_
   (``asv``)
-- Gallery in `emg3d-gallery <https://empymod.github.io/emg3d-gallery>`_
+- Gallery in `emg3d-gallery <https://emsig.github.io/emg3d-gallery>`_
   (``sphinx-gallery``)
 
 Automatically deploys if tagged

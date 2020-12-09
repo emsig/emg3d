@@ -61,10 +61,10 @@ Basic Example
 -------------
 
 Here we show a *very* basic example. To see some more realistic models have a
-look at the `gallery <https://empymod.github.io/emg3d-gallery>`_. This
+look at the `gallery <https://emsig.github.io/emg3d-gallery>`_. This
 particular example is also there, with some further explanations and examples
 to show how to plot the model and the data; see `«Minimum working example»
-<https://empymod.github.io/emg3d-gallery/gallery/tutorials/minimum_example.html>`_.
+<https://emsig.github.io/emg3d-gallery/gallery/tutorials/minimum_example.html>`_.
 It also contains an example without using ``discretize``.
 
 First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
@@ -167,12 +167,12 @@ fields. Furthermore, it can serve as a link to use `PyVista
 <https://docs.pyvista.org>`_ to create nice 3D plots even within a notebook.
 
 Projects which can be used to compare or validate the results are, e.g.,
-`empymod <https://empymod.github.io>`_ for layered models or `SimPEG
+`empymod <https://emsig.github.io>`_ for layered models or `SimPEG
 <https://simpeg.xyz>`_ for 3D models. It is also possible to create a
 geological model with `GemPy <https://www.gempy.org>`_ and, again via
 discretize, move it to emg3d to compute CSEM responses for it.
 
-Have a look at the `gallery <https://empymod.github.io/emg3d-gallery>`_ for
+Have a look at the `gallery <https://emsig.github.io/emg3d-gallery>`_ for
 many examples of how to use emg3d together with the mentioned projects and
 more!
 
@@ -212,7 +212,7 @@ its docstring. Here a few additional information.
   Which combination of solver is best (fastest) depends to a large extent on
   the grid stretching, but also on anisotropy and general model complexity.
   See `«Parameter tests»
-  <https://empymod.github.io/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_
+  <https://emsig.github.io/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_
   in the gallery for an example how to run some tests on your particular
   problem.
 
@@ -222,11 +222,11 @@ Contributing and Roadmap
 
 New contributions, bug reports, or any kind of feedback is always welcomed!
 Have a look at the `Roadmap-project
-<https://github.com/empymod/emg3d/projects/1>`_ to get an idea of things that
+<https://github.com/emsig/emg3d/projects/1>`_ to get an idea of things that
 could be implemented. The GitHub `issues
-<https://github.com/empymod/emg3d/issues>`_ and
-`PR's <https://github.com/empymod/emg3d/pulls>`_ are also a good starting
-point. The best way for interaction is at https://github.com/empymod or by
+<https://github.com/emsig/emg3d/issues>`_ and
+`PR's <https://github.com/emsig/emg3d/pulls>`_ are also a good starting
+point. The best way for interaction is at https://github.com/emsig or by
 joining the `Slack channel <http://slack.simpeg.xyz>`_ «em-x-d» of SimPEG. If
 you prefer to get in touch outside of GitHub/Slack use the contact form on
 https://werthmuller.org.
@@ -260,10 +260,10 @@ test-suite included. To run the test-suite you must download ``emg3d`` from
 GitHub.
 
 There is also a benchmark suite using *airspeed velocity*, located in the
-`empymod/emg3d-asv <https://github.com/empymod/emg3d-asv>`_-repository. The
+`empymod/emg3d-asv <https://github.com/emsig/emg3d-asv>`_-repository. The
 results of my machine can be found in the `empymod/emg3d-bench
-<https://github.com/empymod/emg3d-bench>`_, its rendered version at
-`empymod.github.io/emg3d-asv <https://empymod.github.io/emg3d-asv>`_.
+<https://github.com/emsig/emg3d-bench>`_, its rendered version at
+`emsig.github.io/emg3d-asv <https://emsig.github.io/emg3d-asv>`_.
 
 
 License

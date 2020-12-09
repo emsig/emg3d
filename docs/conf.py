@@ -84,9 +84,9 @@ html_context = {
     'menu_links_name': 'Links',
     'menu_links': [
         ('<i class="fa fa-link fa-fw"></i> Website',
-         'https://empymod.github.io'),
+         'https://emsig.github.io'),
         ('<i class="fa fa-github fa-fw"></i> Source Code',
-         'https://github.com/empymod/emg3d'),
+         'https://github.com/emsig/emg3d'),
     ],
 }
 

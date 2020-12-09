@@ -9,7 +9,7 @@ plt.rcParams['savefig.dpi'] = 300
 plt.rcParams['font.size'] = 8
 
 # Data is from the notebooks `4a_RAM-requirements.ipynb` and `4b_Runtime.ipynb`
-# in the repo https://github.com/empymod/emg3d-examples at commit 1a1a658c23
+# in the repo https://github.com/emsig/emg3d-examples at commit 1a1a658c23
 # (2019-06-05). It was run at the TU Delft server Texel on one thread. From
 # `cat /proc/cpuinfo`: Intel(R) Xeon(R) CPU E5-2680 v3 @ 2.50GHz
 nsizes_mem = np.array([64, 96, 128, 192, 256, 384, 512, 768, 1024])
