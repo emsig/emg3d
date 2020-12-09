@@ -6,8 +6,12 @@ recent versions
 """""""""""""""
 
 
-*latest*
---------
+v0.15.3: Move to EMSiG
+----------------------
+
+**2020-12-09**
+
+Various small things, mostly related to the automatic meshing.
 
 - New parameter ``distance`` for ``get_origin_widths``, as an alternative for
   ``domain`` and ``vector``: distance defines the survey domain as distance
@@ -21,6 +25,7 @@ recent versions
 - Deprecated ``collect_classes`` in ``io``.
 - Expanded the ``what``-parameter in the ``Simulation``-class to include
   properties related to the gradient.
+- Moved from github.com/empymod to github.com/emsig.
 
 
 *v0.15.2* : Bugfix deploy II

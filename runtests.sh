@@ -4,8 +4,8 @@
 usage="
 $(basename "$0") [-hpdnw] [-v VERSION(S)]
 
-Run pytest for emg3d locally in an isolated venv before submitting to
-GitHub/Travis-CI; by default for all supported python versions of emg3d.
+Run pytest for emg3d locally in an isolated venv before submitting to GitHub;
+by default for all supported python versions of emg3d.
 
 where:
     -h : Show this help text.

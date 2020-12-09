@@ -1,5 +1,5 @@
 Gallery
 #######
 
-The gallery with many examples can be found at `empymod.github.io/emg3d-gallery
-<https://empymod.github.io/emg3d-gallery/gallery>`_.
+The gallery with many examples can be found at `emsig.github.io/emg3d-gallery
+<https://emsig.github.io/emg3d-gallery/gallery>`_.

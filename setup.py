@@ -20,7 +20,7 @@ setup(
     long_description=readme,
     author='The emg3d Developers',
     author_email='dieter@werthmuller.org',
-    url='https://empymod.github.io',
+    url='https://emsig.github.io',
     license='Apache License V2.0',
     packages=['emg3d', 'emg3d.cli'],
     classifiers=[
