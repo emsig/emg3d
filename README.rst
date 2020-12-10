@@ -1,4 +1,4 @@
-.. image:: https://raw.githubusercontent.com/emsig/emg3d-logo/master/logo-emg3d-cut.png
+.. image:: https://raw.githubusercontent.com/emsig/emg3d-logo/master/logo-emg3d-transp-web250px.png
    :target: https://emsig.github.io
    :alt: emg3d logo
    
