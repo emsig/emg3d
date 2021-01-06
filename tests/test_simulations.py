@@ -295,6 +295,16 @@ def test_simulation_automatic():
     assert "Source-dependent grids; 64 x 64 x 40 (163,840)" in t_sim.__repr__()
     assert "ources and frequencies; 64 x 64 x 40 (163,840)" in s_sim.__repr__()
 
+    # Quick print_grid test:
+    assert "Source: Tx1; Frequency: 10.0 Hz" in b_sim.print_grids
+    assert b_sim.get_grid('Tx0', 1.0).__repr__() in b_sim.print_grids
+    assert "Source: all" in f_sim.print_grids
+    assert f_sim.get_grid('Tx2', 1.0).__repr__() in f_sim.print_grids
+    assert "Frequency: all" in t_sim.print_grids
+    assert t_sim.get_grid('Tx1', 10.0).__repr__() in t_sim.print_grids
+    assert "Source: all; Frequency: all" in s_sim.print_grids
+    assert s_sim.get_grid('Tx2', 0.1).__repr__() in s_sim.print_grids
+
     # Grids: Middle source / middle frequency should be the same in all.
     assert f_sim.get_grid('Tx1', 1.0) == t_sim.get_grid('Tx1', 1.0)
     assert f_sim.get_grid('Tx1', 1.0) == s_sim.get_grid('Tx1', 1.0)

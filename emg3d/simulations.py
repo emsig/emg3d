@@ -1021,6 +1021,41 @@ class Simulation:
             info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
         return info
 
+    @property
+    def print_grids(self):
+        """Print info for all generated grids."""
+
+        # Act depending on gridding:
+        out = ""
+        if self.gridding == 'frequency':
+
+            # Loop over frequencies.
+            for freq in self.survey.frequencies:
+                out += f"Source: all; Frequency: {freq} Hz\n"
+                out += self.get_grid(self._srcfreq[0][0], freq).__repr__()
+
+        elif self.gridding == 'source':
+
+            # Loop over sources.
+            for src in self.survey.sources.keys():
+                out += f"= Source: {src}; Frequency: all =\n"
+                out += self.get_grid(src, self._srcfreq[0][1]).__repr__()
+
+        elif self.gridding == 'both':
+
+            # Loop over sources, frequencies.
+            for src, freq in self._srcfreq:
+                out += f"Source: {src}; Frequency: {freq} Hz\n"
+                out += self.get_grid(src, freq).__repr__()
+
+        else:  # same, input, single
+
+            out += "Source: all; Frequency: all\n"
+            out += self.get_grid(self._srcfreq[0][0],
+                                 self._srcfreq[0][1]).__repr__()
+
+        return out
+
     # BACKWARDS PROPAGATING FIELD
     def _get_bfields(self, inp):
         """Return back-propagated electric field for given inp (src, freq)."""

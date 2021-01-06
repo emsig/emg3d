@@ -6,6 +6,14 @@ recent versions
 """""""""""""""
 
 
+*latest*
+--------
+
+- The ``Simulation`` class has a new method ``print_grids``, which prints the
+  info of all created grids. This is also used for logging in the CLI
+  interface.
+
+
 v0.15.3: Move to EMSiG
 ----------------------
 
