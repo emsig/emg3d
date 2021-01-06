@@ -424,7 +424,7 @@ class TestEstimateGriddingOpts():
         assert_allclose(gdict['domain'][0], (-500, 5500))
         assert_allclose(gdict['domain'][1], (600, 5400))
         assert_allclose(gdict['domain'][2], (-3651, -651))
-        assert_allclose(gdict['properties'], [100, 1, 1, 1, 1, 1, 1])
+        assert_allclose(gdict['properties'], [100000, 10, 10, 10, 10, 10, 10])
 
     def test_mapping_vector(self):
         gridding_opts = {
@@ -436,7 +436,8 @@ class TestEstimateGriddingOpts():
 
         assert_allclose(
                 gdict['properties'],
-                np.log10(1/np.array([100, 1, 1, 1, 1, 1, 1])), atol=1e-15)
+                np.log10(1/np.array([100000, 10, 10, 10, 10, 10, 10])),
+                atol=1e-15)
         assert_allclose(gdict['vector'][0], self.grid.nodes_x)
         assert gdict['vector'][1] is None
         assert_allclose(gdict['vector'][2], self.grid.nodes_z)

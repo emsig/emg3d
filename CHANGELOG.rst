@@ -9,9 +9,18 @@ recent versions
 *latest*
 --------
 
-- The ``Simulation`` class has a new method ``print_grids``, which prints the
-  info of all created grids. This is also used for logging in the CLI
-  interface.
+- ``Simulation`` class:
+
+  - Within the automatic gridding the ``properties`` are estimated much more
+    conservative now, if not provided: before the log10-average of the last
+    slice in a given direction was used; now it uses the minimum conductivity /
+    maximum resistivity. This is usually the air value for x/y and positive z.
+    This is very conservative, but avoids that users use too small
+    computational domains in the case of land and shallow marine surveys. The
+    downside is that heavily over-estimates the required domain in the deep
+    marine case. However, slower but safe is better in this case.
+  - New method ``print_grids``, which prints the info of all created grids.
+    This is also used for logging in the CLI interface.
 
 
 v0.15.3: Move to EMSiG
