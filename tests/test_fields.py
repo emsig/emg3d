@@ -86,7 +86,7 @@ def test_get_source_field(capsys):
 
     # Provide wrong source definition. Ensure it fails.
     with pytest.raises(ValueError, match='Source is wrong defined'):
-        sfield = fields.get_source_field(grid, [0, 0, 0], 1)
+        sfield = fields.get_source_field(grid, [0, 0, 0, 0], 1)
 
     # Put source way out. Ensure it fails.
     with pytest.raises(ValueError, match='Provided source outside grid'):
@@ -125,6 +125,43 @@ def test_get_source_field(capsys):
     assert sfield._freq == -freq
     assert sfield.freq == freq
     assert_allclose(sfield.smu0, -freq*constants.mu_0)
+
+
+def test_arbitrarily_shaped_source():
+    h = np.ones(4)
+    grid = meshes.TensorMesh([h*200, h*400, h*800], [-400, -800, -1600])
+    freq = 1.11
+    strength = np.pi
+    src = (0, 0, 0, 0, 90)
+
+    with pytest.raises(ValueError, match='All source coordinates must have'):
+        fields.get_source_field(grid, ([1, 2], 1, 1), freq, strength)
+
+    # Manually
+    sman = fields.SourceField(grid, freq=freq)
+    src4xxyyzz = [
+        np.r_[src[0]-0.5, src[0]+0.5, src[1]-0.5, src[1]-0.5, src[2], src[2]],
+        np.r_[src[0]+0.5, src[0]+0.5, src[1]-0.5, src[1]+0.5, src[2], src[2]],
+        np.r_[src[0]+0.5, src[0]-0.5, src[1]+0.5, src[1]+0.5, src[2], src[2]],
+        np.r_[src[0]-0.5, src[0]-0.5, src[1]+0.5, src[1]-0.5, src[2], src[2]],
+    ]
+    for srcl in src4xxyyzz:
+        sman += fields.get_source_field(grid, srcl, freq, strength)
+
+    # Computed
+    src5xyz = ([src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5, src[0]-0.5],
+               [src[1]-0.5, src[1]-0.5, src[1]+0.5, src[1]+0.5, src[1]-0.5],
+               [src[2], src[2], src[2], src[2], src[2]])
+    scomp = fields.get_source_field(grid, src5xyz, freq, strength)
+
+    assert_allclose(sman.field, scomp.field)
+
+    # Normalized
+    sman = fields.SourceField(grid, freq=freq)
+    for srcl in src4xxyyzz:
+        sman += fields.get_source_field(grid, srcl, freq, 0.25)
+    scomp = fields.get_source_field(grid, src5xyz, freq)
+    assert_allclose(sman.field, scomp.field)
 
 
 def test_get_source_field_point_vs_finite(capsys):

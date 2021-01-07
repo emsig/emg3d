@@ -450,10 +450,11 @@ def get_source_field(grid, src, freq, strength=0):
 
         s \mu_0 \mathbf{J}_\mathrm{s} ,
 
-    where :math:`s = \mathrm{i} \omega`. Either finite length dipoles or
-    infinitesimal small point dipoles can be defined, whereas the return source
-    field corresponds to a normalized (1 Am) source distributed within the
-    cell(s) it resides (can be changed with the `strength`-parameter).
+    where :math:`s = \mathrm{i} \omega`. Either finite length dipoles,
+    infinitesimal small point dipoles, or arbitrarily shaped segments can be
+    defined, whereas the returned source field corresponds to a normalized
+    (1 Am) source distributed within the cell(s) it resides (can be changed
+    with the `strength`-parameter).
 
     The adjoint of the trilinear interpolation is used to distribute the
     point(s) to the grid edges, which corresponds to the discretization of a
@@ -466,10 +467,11 @@ def get_source_field(grid, src, freq, strength=0):
         Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     src : list of floats
-        Source coordinates (m). There are two formats:
+        Source coordinates (m). There are three formats:
 
           - Finite length dipole: ``[x0, x1, y0, y1, z0, z1]``.
           - Point dipole: ``[x, y, z, azimuth, dip]``.
+          - Arbitrarily shaped source: ``[[x-coo], [y-coo], [z-coo]]``.
 
     freq : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
@@ -497,15 +499,43 @@ def get_source_field(grid, src, freq, strength=0):
 
     """
     # Cast some parameters.
+    if not np.allclose(np.size(src[0]), [np.size(c) for c in src]):
+        raise ValueError(
+                "All source coordinates must have the same dimension."
+                f"Provided source: {src}.")
     src = np.asarray(src, dtype=np.float64)
     strength = np.asarray(strength)
 
     # Ensure source is a point or a finite dipole.
-    if len(src) not in [5, 6]:
+    if len(src) not in [3, 5, 6]:
         raise ValueError(
                 "Source is wrong defined. Must be either a point,"
                 "[x, y, z, azimuth, dip],\nor a finite dipole,"
                 f"[x1, x2, y1, y2, z1, z2].\nProvided source: {src}.")
+    elif len(src) == 3:  # Arbitrarily shaped dipole source.
+        sx, sy, sz = src
+
+        # Get normalized segment lengths.
+        lengths = np.sqrt(np.sum((src[:, :-1] - src[:, 1:])**2, axis=0))
+        if strength == 0:
+            lengths /= lengths.sum()
+        else:
+            lengths *= strength
+
+        # Initiate a zero-valued source field and loop over segments.
+        sfield = SourceField(grid, freq=freq)
+        for i in range(sx.size-1):
+            sfield += get_source_field(
+                    grid, (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1]),
+                    freq, lengths[i])
+
+        # Add src and moment information.
+        sfield.src = src
+        sfield.strength = strength
+        sfield.moment = np.nan  # Not implemented.
+
+        return sfield
+
     elif len(src) == 5:
         finite = False  # Infinitesimal small dipole.
     else:

@@ -6,6 +6,16 @@ recent versions
 """""""""""""""
 
 
+*latest*: Arbitrarily shaped sources
+------------------------------------
+
+- ``fields``:
+
+  - Arbitrarily shaped sources (and therefore also loops) can now be created
+    with ``get_source_field`` providing a ``src`` that consists of x-, y-,
+    and z-coordinates of all endpoints of the individual segments.
+
+
 v0.15.3: Move to EMSiG
 ----------------------
 
