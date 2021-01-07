@@ -708,6 +708,10 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     Works for electric fields as well as magnetic fields obtained with
     :func:`get_h_field`, and for model parameters.
 
+    Note that in order to avoid boundary effects the first and last value in
+    each direction is neglected. Values for coordinates outside of the grid
+    are set to NaN's, unless extrapolate is set.
+
 
     Parameters
     ----------
@@ -730,7 +734,7 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     extrapolate : bool
         If True, points on `new_grid` which are outside of `grid` are
         filled by the nearest value (if ``method='cubic'``) or by extrapolation
-        (if ``method='linear'``). If False, points outside are set to zero.
+        (if ``method='linear'``). If False, points outside are set to NaN's.
 
         Default is False.
 
@@ -774,9 +778,9 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
     points = tuple()
     for i, coord in enumerate(['x', 'y', 'z']):
         if values.shape[i] == getattr(grid, 'shape_nodes')[i]:
-            pts = (getattr(grid, 'nodes_'+coord), )
+            pts = (getattr(grid, 'nodes_'+coord)[1:-1], )
         else:
-            pts = (getattr(grid, 'cell_centers_'+coord), )
+            pts = (getattr(grid, 'cell_centers_'+coord)[1:-1], )
 
         # Add to points.
         points += pts
@@ -785,9 +789,10 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
         fill_value = None
         mode = 'nearest'
     else:
-        fill_value = 0.0
+        fill_value = np.array(0, values.dtype)*np.nan
         mode = 'constant'
-    out = maps.interp3d(points, values, coordinates, method, fill_value, mode)
+    out = maps.interp3d(points, values[1:-1, 1:-1, 1:-1], coordinates,
+                        method, fill_value, mode, cval=np.nan)
 
     # Return an EMArray if input is a field, else simply the values.
     if values.size == grid.nC:
@@ -798,6 +803,11 @@ def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
 
 def get_receiver_response(grid, field, rec):
     """Return the field (response) at receiver coordinates.
+
+    Note that in order to avoid boundary effects the first and last value in
+    each direction is neglected. Field values for coordinates outside of the
+    grid are set to NaN's.
+
 
     Parameters
     ----------
@@ -858,6 +868,9 @@ def get_receiver_response(grid, field, rec):
                   (grid.cell_centers_x, grid.nodes_y, grid.cell_centers_z),
                   (grid.cell_centers_x, grid.cell_centers_y, grid.nodes_z))
 
+    # Remove first and last value in each direction.
+    points = tuple([tuple([p[1:-1] for p in pp]) for pp in points])
+
     # Get azimuth and dip in radians.
     azm = np.deg2rad(rec[3])
     dip = np.deg2rad(rec[4])
@@ -872,10 +885,12 @@ def get_receiver_response(grid, field, rec):
                     dtype=field.dtype)
 
     # Add the required responses.
-    inp = {'method': 'cubic', 'fill_value': 0.0, 'mode': 'constant'}
+    inp = {'method': 'cubic', 'fill_value': 0.0, 'mode': 'constant',
+           'cval': np.nan}
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
-            resp += factors[i]*maps.interp3d(points[i], ff, rec[:3], **inp)
+            resp += factors[i]*maps.interp3d(
+                       points[i], ff[1:-1, 1:-1, 1:-1], rec[:3], **inp)
 
     # Return response.
     return utils.EMArray(resp)

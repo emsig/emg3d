@@ -9,7 +9,7 @@ recent versions
 *latest*
 --------
 
-- ``Simulation`` class:
+- ``simulations``:
 
   - Within the automatic gridding the ``properties`` are estimated much more
     conservative now, if not provided: before the log10-average of the last
@@ -21,6 +21,15 @@ recent versions
     marine case. However, slower but safe is better in this case.
   - New method ``print_grids``, which prints the info of all created grids.
     This is also used for logging in the CLI interface.
+
+- ``fields``: Values outside the grid in ``get_receiver`` and
+  ``get_receiver_response`` are new set to NaN's instead of zeroes.
+  Additionally, the first and last values in each direction of the fields are
+  ignored, to avoid effects form the boundary condition (receivers should not
+  be placed that close to the boundary anyway).
+
+- ``maps``: ``interp3d`` takes a new keyword ``cval``, which is passed to
+  ``map_coordinates``.
 
 
 v0.15.3: Move to EMSiG

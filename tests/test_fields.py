@@ -336,8 +336,7 @@ def test_get_h_field():
 
 def test_get_receiver():
     grid = meshes.TensorMesh(
-            [np.array([1, 2]), np.array([1]), np.array([1])],
-            [0, 0, 0])
+            [np.array([1, 1, 2, 1]), np.ones(4), np.ones(4)], [-1, -2, -2])
     field = fields.Field(grid)
 
     # Provide wrong rec_loc input:
@@ -348,7 +347,7 @@ def test_get_receiver():
     field.fx = np.arange(1, field.fx.size+1)
     field = field.real  # For simplicity
     out1 = fields.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0), 'linear')
-    assert_allclose(out1, [1., 1+1/3, 2])
+    assert_allclose(out1, [50., 50+1/3, 51])
     out1a, out1b, out1c = fields.get_receiver(  # Check recursion
             grid, field, ([0.5, 1, 2], 0, 0), 'linear')
     assert_allclose(out1, out1a)
@@ -358,7 +357,7 @@ def test_get_receiver():
 
     out2 = fields.get_receiver(
             grid, field.fx, ([0.5, 1, 2], 1/3, 0.25), 'linear')
-    assert_allclose(out2, [2+2/3., 3, 3+2/3])
+    assert_allclose(out2, [56+1/3., 56+2/3, 57+1/3])
 
     # Check 'cubic' is re-set to 'linear for tiny grids.
     out3 = fields.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0), 'cubic')
@@ -366,7 +365,7 @@ def test_get_receiver():
 
     # Check cubic spline runs fine (NOT CHECKING ACTUAL VALUES!.
     grid = meshes.TensorMesh(
-            [np.ones(4), np.array([1, 2, 3]), np.array([2, 1, 1])],
+            [np.ones(4), np.array([1, 2, 3, 1]), np.array([2, 1, 1, 1])],
             [0, 0, 0])
     field = fields.Field(grid)
     field.field = np.ones(field.size) + 1j*np.ones(field.size)
@@ -387,10 +386,10 @@ def test_get_receiver():
     out6 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'linear')
     out7 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'cubic')
 
-    assert_allclose(out6, 0.+0j)
-    assert_allclose(out7, 0.+0j)
+    assert_allclose(out6, np.nan+0j*np.nan)
+    assert_allclose(out7, np.nan+0j*np.nan)
 
-    # Check it does not return 0 if outside.
+    # Check it does not return 0 if inside.
     out8 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'linear', True)
     out9 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'cubic', True)
 
@@ -407,8 +406,8 @@ def test_get_receiver():
 
 def test_get_receiver_response():
     grid = meshes.TensorMesh(
-            [np.ones(4), np.array([1, 2, 3]), np.array([2, 1, 1])],
-            [0, 0, 0])
+            [np.ones(6), np.array([1, 1, 2, 3, 1]), np.array([1, 2, 1, 1, 1])],
+            [-1, -1, -1])
     efield = fields.Field(grid, freq=1)
     efield.field = np.ones(efield.size) + 1j*np.ones(efield.size)
 
@@ -437,7 +436,7 @@ def test_get_receiver_response():
 
     # Check it returns 0 if outside.
     out3 = fields.get_receiver_response(grid, efield, (-10, -10, -10, 0, 0))
-    assert_allclose(out3, 0.+0j)
+    assert_allclose(out3, np.nan+1j*np.nan)
 
     # Same for magnetic field.
     model = models.Model(grid)
