@@ -22,6 +22,7 @@ from copy import deepcopy
 
 import numpy as np
 from scipy.constants import mu_0
+from scipy.special import sindg, cosdg
 
 from emg3d import maps, models, utils
 
@@ -441,7 +442,7 @@ class SourceField(Field):
         return np.real(self.field.fz/self.smu0)
 
 
-def get_source_field(grid, src, freq, strength=0):
+def get_source_field(grid, src, freq, strength=0, msrc=False):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -450,10 +451,11 @@ def get_source_field(grid, src, freq, strength=0):
 
         s \mu_0 \mathbf{J}_\mathrm{s} ,
 
-    where :math:`s = \mathrm{i} \omega`. Either finite length dipoles or
-    infinitesimal small point dipoles can be defined, whereas the return source
-    field corresponds to a normalized (1 Am) source distributed within the
-    cell(s) it resides (can be changed with the `strength`-parameter).
+    where :math:`s = \mathrm{i} \omega`. Either finite length dipoles,
+    infinitesimal small point dipoles, or arbitrarily shaped segments can be
+    defined, whereas the returned source field corresponds to a normalized
+    (1 Am) source distributed within the cell(s) it resides (can be changed
+    with the `strength`-parameter).
 
     The adjoint of the trilinear interpolation is used to distribute the
     point(s) to the grid edges, which corresponds to the discretization of a
@@ -466,10 +468,14 @@ def get_source_field(grid, src, freq, strength=0):
         Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     src : list of floats
-        Source coordinates (m). There are two formats:
+        Source coordinates (m). There are three formats:
 
           - Finite length dipole: ``[x0, x1, y0, y1, z0, z1]``.
           - Point dipole: ``[x, y, z, azimuth, dip]``.
+          - Arbitrarily shaped source: ``[[x-coo], [y-coo], [z-coo]]``.
+
+        In the case of a point dipole one can set ``msrc=True``, which will
+        create a loop perpendicular to the dipole.
 
     freq : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
@@ -489,6 +495,12 @@ def get_source_field(grid, src, freq, strength=0):
 
         Default is 0.
 
+    msrc : bool, optional
+        Shortcut to create a magnetic source. If True, the format of ``src``
+        must be that of a point dipole: ``[x, y, z, azimuth, dip]`` (for the
+        other formats setting ``msrc`` has no effect). It then creates a square
+        loop perpendicular to this dipole, with side-length 1.
+
 
     Returns
     -------
@@ -497,17 +509,53 @@ def get_source_field(grid, src, freq, strength=0):
 
     """
     # Cast some parameters.
+    if not np.allclose(np.size(src[0]), [np.size(c) for c in src]):
+        raise ValueError(
+                "All source coordinates must have the same dimension."
+                f"Provided source: {src}.")
     src = np.asarray(src, dtype=np.float64)
     strength = np.asarray(strength)
 
     # Ensure source is a point or a finite dipole.
-    if len(src) not in [5, 6]:
+    if len(src) not in [3, 5, 6]:
         raise ValueError(
                 "Source is wrong defined. Must be either a point,"
                 "[x, y, z, azimuth, dip],\nor a finite dipole,"
                 f"[x1, x2, y1, y2, z1, z2].\nProvided source: {src}.")
+
+    elif len(src) == 3 or (msrc and len(src) == 5):
+        # Arbitrarily shaped dipole source.
+
+        # Get points of square loop in case of msrc.
+        if len(src) == 5:
+            src = _square_loop(src)
+
+        sx, sy, sz = src
+
+        # Get normalized segment lengths.
+        lengths = np.sqrt(np.sum((src[:, :-1] - src[:, 1:])**2, axis=0))
+        if strength == 0:
+            lengths /= lengths.sum()
+        else:
+            lengths *= strength
+
+        # Initiate a zero-valued source field and loop over segments.
+        sfield = SourceField(grid, freq=freq)
+        for i in range(sx.size-1):
+            sfield += get_source_field(
+                    grid, (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1]),
+                    freq, lengths[i])
+
+        # Add src and moment information.
+        sfield.src = src
+        sfield.strength = strength
+        sfield.moment = np.nan  # Not implemented.
+
+        return sfield
+
     elif len(src) == 5:
         finite = False  # Infinitesimal small dipole.
+
     else:
         finite = True   # Finite length dipole.
 
@@ -535,10 +583,10 @@ def get_source_field(grid, src, freq, strength=0):
 
     # Get source orientation (dxs, dys, dzs)
     if not finite:  # Point dipole: convert azimuth/dip to weights.
-        h = np.cos(np.deg2rad(src[4]))
-        dys = np.sin(np.deg2rad(src[3]))*h
-        dxs = np.cos(np.deg2rad(src[3]))*h
-        dzs = np.sin(np.deg2rad(src[4]))
+        h = cosdg(src[4])
+        dys = sindg(src[3])*h
+        dxs = cosdg(src[3])*h
+        dzs = sindg(src[4])
         srcdir = np.array([dxs, dys, dzs])
         src = src[:3]
 
@@ -628,22 +676,27 @@ def get_source_field(grid, src, freq, strength=0):
         id_xyz = d_xyz.copy()
         id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
 
+        # Round nodes to nano-meters (to avoid floating point issues).
+        nodes_x = np.round(grid.nodes_x, 9)
+        nodes_y = np.round(grid.nodes_y, 9)
+        nodes_z = np.round(grid.nodes_z, 9)
+
         # Cell fractions.
-        a1 = (grid.nodes_x-src[0])*id_xyz[0]
-        a2 = (grid.nodes_y-src[2])*id_xyz[1]
-        a3 = (grid.nodes_z-src[4])*id_xyz[2]
+        a1 = (nodes_x-src[0])*id_xyz[0]
+        a2 = (nodes_y-src[2])*id_xyz[1]
+        a3 = (nodes_z-src[4])*id_xyz[2]
 
         # Get range of indices of cells in which source resides.
         def min_max_ind(vector, i):
             """Return [min, max]-index of cells in which source resides."""
-            vmin = min(src[2*i:2*i+2])
-            vmax = max(src[2*i:2*i+2])
+            vmin = min(np.round(src[2*i:2*i+2], 9))
+            vmax = max(np.round(src[2*i:2*i+2], 9))
             return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
                     max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
 
-        rix = min_max_ind(grid.nodes_x, 0)
-        riy = min_max_ind(grid.nodes_y, 1)
-        riz = min_max_ind(grid.nodes_z, 2)
+        rix = min_max_ind(nodes_x, 0)
+        riy = min_max_ind(nodes_y, 1)
+        riz = min_max_ind(nodes_z, 2)
 
         # Loop over these indices.
         for iz in range(riz[0], riz[1]+1):
@@ -665,11 +718,11 @@ def get_source_field(grid, src, freq, strength=0):
                     x_len = np.linalg.norm(xmax-xmin)/slen
 
                     # Contribution to edge (coordinate idir)
-                    rx = (x_c[0]-grid.nodes_x[ix])/grid.h[0][ix]
+                    rx = (x_c[0]-nodes_x[ix])/grid.h[0][ix]
                     ex = 1-rx
-                    ry = (x_c[1]-grid.nodes_y[iy])/grid.h[1][iy]
+                    ry = (x_c[1]-nodes_y[iy])/grid.h[1][iy]
                     ey = 1-ry
-                    rz = (x_c[2]-grid.nodes_z[iz])/grid.h[2][iz]
+                    rz = (x_c[2]-nodes_z[iz])/grid.h[2][iz]
                     ez = 1-rz
 
                     # Add to field (only if segment inside cell).
@@ -871,14 +924,10 @@ def get_receiver_response(grid, field, rec):
     # Remove first and last value in each direction.
     points = tuple([tuple([p[1:-1] for p in pp]) for pp in points])
 
-    # Get azimuth and dip in radians.
-    azm = np.deg2rad(rec[3])
-    dip = np.deg2rad(rec[4])
-
     # Get factors in the different directions.
-    factors = (np.cos(azm)*np.cos(dip),  # x
-               np.sin(azm)*np.cos(dip),  # y
-               np.sin(dip))  # z
+    factors = (cosdg(rec[3])*cosdg(rec[4]),  # x
+               sindg(rec[3])*cosdg(rec[4]),  # y
+               sindg(rec[4]))  # z
 
     # Pre-allocate the response.
     resp = np.zeros(max([np.atleast_1d(x).size for x in rec]),
@@ -988,3 +1037,46 @@ def get_h_field(grid, model, field):
 
     # Create a Field instance and divide by s*mu_0 and return.
     return -Field(e3d_hx, e3d_hy, e3d_hz)/field.smu0
+
+
+def _square_loop(src, diag=np.sqrt(2)/2):
+    """Create a square loop perpendicular to src.
+
+
+    Parameters
+    ----------
+    src : list of floats
+        Source coordinates of a point dipole (m): ``[x, y, z, azimuth, dip]``.
+
+    diag : float
+        Length of the diagonal of the square. Default is sqrt(2)/2, which
+        creates a 1x1 m square.
+
+
+    Returns
+    -------
+    points : ndarray (3, 5)
+        x-, y-, and z-coordinates of the square loop, containing five points as
+        the first point is repeated at the end.
+
+    """
+
+    # Compute the angles.
+    azm = src[3]
+    dip = 90-src[4]
+    sin_azm, cos_azm = np.sin(np.deg2rad(azm)), np.cos(np.deg2rad(azm))
+    sin_dip, cos_dip = np.sin(np.deg2rad(dip)), np.cos(np.deg2rad(dip))
+
+    # Rotation matrix.
+    rot_matrix = np.array([
+        [sin_azm, -cos_azm, 0],
+        [cos_azm*cos_dip, sin_azm*cos_dip, -sin_dip],
+        [-sin_azm, cos_azm, 0],
+        [-cos_azm*cos_dip, -sin_azm*cos_dip, sin_dip],
+        [sin_azm, -cos_azm, 0],
+    ])
+
+    # Shift and expand.
+    points = src[:3] + diag*rot_matrix
+
+    return points.T

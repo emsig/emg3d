@@ -6,8 +6,30 @@ recent versions
 """""""""""""""
 
 
-*latest*
---------
+*latest*: Arbitrarily shaped sources
+------------------------------------
+
+- ``fields.get_source_field``:
+
+  - Arbitrarily shaped sources (and therefore also loops) can now be created by
+    providing a ``src`` that consists of x-, y-, and z-coordinates of all
+    endpoints of the individual segments.
+
+  - Simple magnetic "dipole" sources can now be created by providing a point
+    dipole (``[x, y, z, azm, dip]``) and set ``msrc=True`` (new fct-keyword).
+    This will create a square loop of 1x1 m perpendicular to the defined point
+    dipole, hence simulating a magnetic source.
+
+  - Bugfix: Fix floating point issue when the smaller coordinate of a finite
+    length dipole source was very close to a node, but not exactly (in the
+    order of much less than nanometers. It then overestimated that source by
+    putting it in twice as many cells, but not normalizing for it.
+
+- ``fields``: Values outside the grid in ``get_receiver`` and
+  ``get_receiver_response`` are new set to NaN's instead of zeroes.
+  Additionally, the first and last values in each direction of the fields are
+  ignored, to avoid effects form the boundary condition (receivers should not
+  be placed that close to the boundary anyway).
 
 - ``simulations``:
 
@@ -21,12 +43,6 @@ recent versions
     marine case. However, slower but safe is better in this case.
   - New method ``print_grids``, which prints the info of all created grids.
     This is also used for logging in the CLI interface.
-
-- ``fields``: Values outside the grid in ``get_receiver`` and
-  ``get_receiver_response`` are new set to NaN's instead of zeroes.
-  Additionally, the first and last values in each direction of the fields are
-  ignored, to avoid effects form the boundary condition (receivers should not
-  be placed that close to the boundary anyway).
 
 - ``maps``: ``interp3d`` takes a new keyword ``cval``, which is passed to
   ``map_coordinates``.
