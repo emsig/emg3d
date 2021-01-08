@@ -676,22 +676,27 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
         id_xyz = d_xyz.copy()
         id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
 
+        # Round nodes to nano-meters (to avoid floating point issues).
+        nodes_x = np.round(grid.nodes_x, 9)
+        nodes_y = np.round(grid.nodes_y, 9)
+        nodes_z = np.round(grid.nodes_z, 9)
+
         # Cell fractions.
-        a1 = (grid.nodes_x-src[0])*id_xyz[0]
-        a2 = (grid.nodes_y-src[2])*id_xyz[1]
-        a3 = (grid.nodes_z-src[4])*id_xyz[2]
+        a1 = (nodes_x-src[0])*id_xyz[0]
+        a2 = (nodes_y-src[2])*id_xyz[1]
+        a3 = (nodes_z-src[4])*id_xyz[2]
 
         # Get range of indices of cells in which source resides.
         def min_max_ind(vector, i):
             """Return [min, max]-index of cells in which source resides."""
-            vmin = min(src[2*i:2*i+2])
-            vmax = max(src[2*i:2*i+2])
+            vmin = min(np.round(src[2*i:2*i+2], 9))
+            vmax = max(np.round(src[2*i:2*i+2], 9))
             return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
                     max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
 
-        rix = min_max_ind(grid.nodes_x, 0)
-        riy = min_max_ind(grid.nodes_y, 1)
-        riz = min_max_ind(grid.nodes_z, 2)
+        rix = min_max_ind(nodes_x, 0)
+        riy = min_max_ind(nodes_y, 1)
+        riz = min_max_ind(nodes_z, 2)
 
         # Loop over these indices.
         for iz in range(riz[0], riz[1]+1):
@@ -713,11 +718,11 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
                     x_len = np.linalg.norm(xmax-xmin)/slen
 
                     # Contribution to edge (coordinate idir)
-                    rx = (x_c[0]-grid.nodes_x[ix])/grid.h[0][ix]
+                    rx = (x_c[0]-nodes_x[ix])/grid.h[0][ix]
                     ex = 1-rx
-                    ry = (x_c[1]-grid.nodes_y[iy])/grid.h[1][iy]
+                    ry = (x_c[1]-nodes_y[iy])/grid.h[1][iy]
                     ey = 1-ry
-                    rz = (x_c[2]-grid.nodes_z[iz])/grid.h[2][iz]
+                    rz = (x_c[2]-nodes_z[iz])/grid.h[2][iz]
                     ez = 1-rz
 
                     # Add to field (only if segment inside cell).
@@ -1044,12 +1049,6 @@ def _square_loop(src, diag=np.sqrt(2)/2):
     # Compute the angles.
     azm = src[3]
     dip = 90-src[4]
-
-    # To work it needs a tiny azimuth.
-    # (Why? Code-smell in get_source_field, to be checked.)
-    if azm % 90 == 0:
-        azm += 1e-9
-
     sin_azm, cos_azm = np.sin(np.deg2rad(azm)), np.cos(np.deg2rad(azm))
     sin_dip, cos_dip = np.sin(np.deg2rad(dip)), np.cos(np.deg2rad(dip))
 
