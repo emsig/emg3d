@@ -6,6 +6,26 @@ recent versions
 """""""""""""""
 
 
+*latest*: Arbitrarily shaped sources
+------------------------------------
+
+- ``fields.get_source_field``:
+
+  - Arbitrarily shaped sources (and therefore also loops) can now be created by
+    providing a ``src`` that consists of x-, y-, and z-coordinates of all
+    endpoints of the individual segments.
+
+  - Simple magnetic "dipole" sources can now be created by providing a point
+    dipole (``[x, y, z, azm, dip]``) and set ``msrc=True`` (new fct-keyword).
+    This will create a square loop of 1x1 m perpendicular to the defined point
+    dipole, hence simulating a magnetic source.
+
+  - Bugfix: Fix floating point issue when the smaller coordinate of a finite
+    length dipole source was very close to a node, but not exactly (in the
+    order of much less than nanometers. It then overestimated that source by
+    putting it in twice as many cells, but not normalizing for it.
+
+
 v0.15.3: Move to EMSiG
 ----------------------
 
