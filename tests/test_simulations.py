@@ -295,6 +295,16 @@ def test_simulation_automatic():
     assert "Source-dependent grids; 64 x 64 x 40 (163,840)" in t_sim.__repr__()
     assert "ources and frequencies; 64 x 64 x 40 (163,840)" in s_sim.__repr__()
 
+    # Quick print_grid test:
+    assert "Source: Tx1; Frequency: 10.0 Hz" in b_sim.print_grids
+    assert b_sim.get_grid('Tx0', 1.0).__repr__() in b_sim.print_grids
+    assert "Source: all" in f_sim.print_grids
+    assert f_sim.get_grid('Tx2', 1.0).__repr__() in f_sim.print_grids
+    assert "Frequency: all" in t_sim.print_grids
+    assert t_sim.get_grid('Tx1', 10.0).__repr__() in t_sim.print_grids
+    assert "Source: all; Frequency: all" in s_sim.print_grids
+    assert s_sim.get_grid('Tx2', 0.1).__repr__() in s_sim.print_grids
+
     # Grids: Middle source / middle frequency should be the same in all.
     assert f_sim.get_grid('Tx1', 1.0) == t_sim.get_grid('Tx1', 1.0)
     assert f_sim.get_grid('Tx1', 1.0) == s_sim.get_grid('Tx1', 1.0)
@@ -414,7 +424,7 @@ class TestEstimateGriddingOpts():
         assert_allclose(gdict['domain'][0], (-500, 5500))
         assert_allclose(gdict['domain'][1], (600, 5400))
         assert_allclose(gdict['domain'][2], (-3651, -651))
-        assert_allclose(gdict['properties'], [100, 1, 1, 1, 1, 1, 1])
+        assert_allclose(gdict['properties'], [100000, 10, 10, 10, 10, 10, 10])
 
     def test_mapping_vector(self):
         gridding_opts = {
@@ -426,7 +436,8 @@ class TestEstimateGriddingOpts():
 
         assert_allclose(
                 gdict['properties'],
-                np.log10(1/np.array([100, 1, 1, 1, 1, 1, 1])), atol=1e-15)
+                np.log10(1/np.array([100000, 10, 10, 10, 10, 10, 10])),
+                atol=1e-15)
         assert_allclose(gdict['vector'][0], self.grid.nodes_x)
         assert gdict['vector'][1] is None
         assert_allclose(gdict['vector'][2], self.grid.nodes_z)

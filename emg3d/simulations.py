@@ -1021,6 +1021,41 @@ class Simulation:
             info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
         return info
 
+    @property
+    def print_grids(self):
+        """Print info for all generated grids."""
+
+        # Act depending on gridding:
+        out = ""
+        if self.gridding == 'frequency':
+
+            # Loop over frequencies.
+            for freq in self.survey.frequencies:
+                out += f"Source: all; Frequency: {freq} Hz\n"
+                out += self.get_grid(self._srcfreq[0][0], freq).__repr__()
+
+        elif self.gridding == 'source':
+
+            # Loop over sources.
+            for src in self.survey.sources.keys():
+                out += f"= Source: {src}; Frequency: all =\n"
+                out += self.get_grid(src, self._srcfreq[0][1]).__repr__()
+
+        elif self.gridding == 'both':
+
+            # Loop over sources, frequencies.
+            for src, freq in self._srcfreq:
+                out += f"Source: {src}; Frequency: {freq} Hz\n"
+                out += self.get_grid(src, freq).__repr__()
+
+        else:  # same, input, single
+
+            out += "Source: all; Frequency: all\n"
+            out += self.get_grid(self._srcfreq[0][0],
+                                 self._srcfreq[0][1]).__repr__()
+
+        return out
+
     # BACKWARDS PROPAGATING FIELD
     def _get_bfields(self, inp):
         """Return back-propagated electric field for given inp (src, freq)."""
@@ -1206,8 +1241,10 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     - The following parameters are estimated from the ``model`` if not
       provided:
 
-      - ``properties``: volume averages (of x, y, and z-directed properties) on
-        log10 scale of the outermost layer in a given direction.
+      - ``properties``: lowest conductivity / highest resistivity in the
+        outermost layer in a given direction. This is usually air in x/y and
+        positive z. Note: This is very conservative. If you go into deeper
+        water you could provide less conservative values.
       - ``mapping``: taken from model.
 
     - The following parameters are estimated from the ``survey`` if not
@@ -1324,7 +1361,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     if distance is not None:
         gopts['distance'] = distance
 
-    # Properties defaults to model averages (AFTER model expansion).
+    # Properties defaults to lowest conductivities (AFTER model expansion).
     properties = gridding_opts.pop('properties', None)
     if properties is None:
 
@@ -1334,13 +1371,9 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
         if isinstance(m, str):
             m = getattr(maps, 'Map'+m)()
 
-        # Mean of all values (x, y, z).
-        def get_mean(ix, iy, iz):
-            """Get mean; currently based on the averaged property."""
-
-            # Get volume factor.
-            vfact = grid.cell_volumes.reshape(grid.vnC, order='F')
-            vfact = vfact[ix, iy, iz].ravel()/vfact[ix, iy, iz].sum()
+        # Minimum conductivity of all values (x, y, z).
+        def get_min(ix, iy, iz):
+            """Get minimum: very conservative/costly, but avoiding problems."""
 
             # Collect all x (y, z) values.
             data = np.array([])
@@ -1351,25 +1384,25 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
                 elif prop.ndim == 1:
                     data = np.r_[data, model.map.backward(prop)]
                 else:
-                    prop = model.map.backward(prop[ix, iy, iz].ravel())
-                    data = np.r_[data, np.sum(vfact*prop)]
+                    prop = model.map.backward(prop[ix, iy, iz])
+                    data = np.r_[data, np.min(prop)]
 
-            # Return mean, on a log10-scale.
-            return m.forward(10**np.mean(np.log10(data)))
+            # Return minimum conductivity (on mapping).
+            return m.forward(min(data))
 
         # Buffer properties.
-        xneg = get_mean(0, slice(None), slice(None))
-        xpos = get_mean(-1, slice(None), slice(None))
-        yneg = get_mean(slice(None), 0, slice(None))
-        ypos = get_mean(slice(None), -1, slice(None))
-        zneg = get_mean(slice(None), slice(None), 0)
-        zpos = get_mean(slice(None), slice(None), -1)
+        xneg = get_min(0, slice(None), slice(None))
+        xpos = get_min(-1, slice(None), slice(None))
+        yneg = get_min(slice(None), 0, slice(None))
+        ypos = get_min(slice(None), -1, slice(None))
+        zneg = get_min(slice(None), slice(None), 0)
+        zpos = get_min(slice(None), slice(None), -1)
 
         # Source property.
         ix = np.argmin(abs(grid.nodes_x - gopts['center'][0]))
         iy = np.argmin(abs(grid.nodes_y - gopts['center'][1]))
         iz = np.argmin(abs(grid.nodes_z - gopts['center'][2]))
-        source = get_mean(ix, iy, iz)
+        source = get_min(ix, iy, iz)
 
         properties = [source, xneg, xpos, yneg, ypos, zneg, zpos]
 

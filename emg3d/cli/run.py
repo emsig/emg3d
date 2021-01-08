@@ -120,6 +120,9 @@ def simulation(args_dict):
     # Print simulation info.
     logger.info(f"\n{sim}\n")
 
+    # Print meshes.
+    logger.debug(sim.print_grids)
+
     # Initiate output dict.
     output = {}
 

@@ -176,7 +176,7 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         return new_values
 
 
-def interp3d(points, values, new_points, method, fill_value, mode):
+def interp3d(points, values, new_points, method, fill_value, mode, cval=0.0):
     """Interpolate values in 3D either linearly or with a cubic spline.
 
     Return `values` corresponding to a regular 3D grid defined by `points` on
@@ -215,6 +215,10 @@ def interp3d(points, values, new_points, method, fill_value, mode):
         Passed to :func:`scipy.ndimage.map_coordinates` if ``method='cubic'``:
         Determines how the input array is extended beyond its boundaries.
 
+    cval : float or np.nan
+        Passed to :func:`scipy.ndimage.map_coordinates` if ``method='cubic'``:
+        it is the value to fill past edges of input if ``mode='constant'``.
+        Default is 0.0
 
     Returns
     -------
@@ -255,7 +259,7 @@ def interp3d(points, values, new_points, method, fill_value, mode):
                     bounds_error=False, fill_value='extrapolate',)(xi[:, i])
 
         # map_coordinates only works for real data; split it up if complex.
-        params3d = {'order': 3, 'mode': mode, 'cval': 0.0}
+        params3d = {'order': 3, 'mode': mode, 'cval': cval}
         if 'complex' in values.dtype.name:
             real = ndimage.map_coordinates(values.real, coords, **params3d)
             imag = ndimage.map_coordinates(values.imag, coords, **params3d)

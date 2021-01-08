@@ -25,6 +25,28 @@ recent versions
     order of much less than nanometers. It then overestimated that source by
     putting it in twice as many cells, but not normalizing for it.
 
+- ``fields``: Values outside the grid in ``get_receiver`` and
+  ``get_receiver_response`` are new set to NaN's instead of zeroes.
+  Additionally, the first and last values in each direction of the fields are
+  ignored, to avoid effects form the boundary condition (receivers should not
+  be placed that close to the boundary anyway).
+
+- ``simulations``:
+
+  - Within the automatic gridding the ``properties`` are estimated much more
+    conservative now, if not provided: before the log10-average of the last
+    slice in a given direction was used; now it uses the minimum conductivity /
+    maximum resistivity. This is usually the air value for x/y and positive z.
+    This is very conservative, but avoids that users use too small
+    computational domains in the case of land and shallow marine surveys. The
+    downside is that heavily over-estimates the required domain in the deep
+    marine case. However, slower but safe is better in this case.
+  - New method ``print_grids``, which prints the info of all created grids.
+    This is also used for logging in the CLI interface.
+
+- ``maps``: ``interp3d`` takes a new keyword ``cval``, which is passed to
+  ``map_coordinates``.
+
 
 v0.15.3: Move to EMSiG
 ----------------------
