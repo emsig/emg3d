@@ -22,6 +22,7 @@ from copy import deepcopy
 
 import numpy as np
 from scipy.constants import mu_0
+from scipy.special import sindg, cosdg
 
 from emg3d import maps, models, utils
 
@@ -441,7 +442,7 @@ class SourceField(Field):
         return np.real(self.field.fz/self.smu0)
 
 
-def get_source_field(grid, src, freq, strength=0):
+def get_source_field(grid, src, freq, strength=0, msrc=False):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -473,6 +474,9 @@ def get_source_field(grid, src, freq, strength=0):
           - Point dipole: ``[x, y, z, azimuth, dip]``.
           - Arbitrarily shaped source: ``[[x-coo], [y-coo], [z-coo]]``.
 
+        In the case of a point dipole one can set ``msrc=True``, which will
+        create a loop perpendicular to the dipole.
+
     freq : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
@@ -490,6 +494,12 @@ def get_source_field(grid, src, freq, strength=0):
           - If != 0, output is returned for given source length and strength.
 
         Default is 0.
+
+    msrc : bool, optional
+        Shortcut to create a magnetic source. If True, the format of ``src``
+        must be that of a point dipole: ``[x, y, z, azimuth, dip]`` (for the
+        other formats setting ``msrc`` has no effect). It then creates a square
+        loop perpendicular to this dipole, with side-length 1.
 
 
     Returns
@@ -512,7 +522,14 @@ def get_source_field(grid, src, freq, strength=0):
                 "Source is wrong defined. Must be either a point,"
                 "[x, y, z, azimuth, dip],\nor a finite dipole,"
                 f"[x1, x2, y1, y2, z1, z2].\nProvided source: {src}.")
-    elif len(src) == 3:  # Arbitrarily shaped dipole source.
+
+    elif len(src) == 3 or (msrc and len(src) == 5):
+        # Arbitrarily shaped dipole source.
+
+        # Get points of square loop in case of msrc.
+        if len(src) == 5:
+            src = _square_loop(src)
+
         sx, sy, sz = src
 
         # Get normalized segment lengths.
@@ -538,6 +555,7 @@ def get_source_field(grid, src, freq, strength=0):
 
     elif len(src) == 5:
         finite = False  # Infinitesimal small dipole.
+
     else:
         finite = True   # Finite length dipole.
 
@@ -565,10 +583,10 @@ def get_source_field(grid, src, freq, strength=0):
 
     # Get source orientation (dxs, dys, dzs)
     if not finite:  # Point dipole: convert azimuth/dip to weights.
-        h = np.cos(np.deg2rad(src[4]))
-        dys = np.sin(np.deg2rad(src[3]))*h
-        dxs = np.cos(np.deg2rad(src[3]))*h
-        dzs = np.sin(np.deg2rad(src[4]))
+        h = cosdg(src[4])
+        dys = sindg(src[3])*h
+        dxs = cosdg(src[3])*h
+        dzs = sindg(src[4])
         srcdir = np.array([dxs, dys, dzs])
         src = src[:3]
 
@@ -888,14 +906,10 @@ def get_receiver_response(grid, field, rec):
                   (grid.cell_centers_x, grid.nodes_y, grid.cell_centers_z),
                   (grid.cell_centers_x, grid.cell_centers_y, grid.nodes_z))
 
-    # Get azimuth and dip in radians.
-    azm = np.deg2rad(rec[3])
-    dip = np.deg2rad(rec[4])
-
     # Get factors in the different directions.
-    factors = (np.cos(azm)*np.cos(dip),  # x
-               np.sin(azm)*np.cos(dip),  # y
-               np.sin(dip))  # z
+    factors = (cosdg(rec[3])*cosdg(rec[4]),  # x
+               sindg(rec[3])*cosdg(rec[4]),  # y
+               sindg(rec[4]))  # z
 
     # Pre-allocate the response.
     resp = np.zeros(max([np.atleast_1d(x).size for x in rec]),
@@ -1003,3 +1017,52 @@ def get_h_field(grid, model, field):
 
     # Create a Field instance and divide by s*mu_0 and return.
     return -Field(e3d_hx, e3d_hy, e3d_hz)/field.smu0
+
+
+def _square_loop(src, diag=np.sqrt(2)/2):
+    """Create a square loop perpendicular to src.
+
+
+    Parameters
+    ----------
+    src : list of floats
+        Source coordinates of a point dipole (m): ``[x, y, z, azimuth, dip]``.
+
+    diag : float
+        Length of the diagonal of the square. Default is sqrt(2)/2, which
+        creates a 1x1 m square.
+
+
+    Returns
+    -------
+    points : ndarray (3, 5)
+        x-, y-, and z-coordinates of the square loop, containing five points as
+        the first point is repeated at the end.
+
+    """
+
+    # Compute the angles.
+    azm = src[3]
+    dip = 90-src[4]
+
+    # To work it needs a tiny azimuth.
+    # (Why? Code-smell in get_source_field, to be checked.)
+    if azm % 90 == 0:
+        azm += 1e-9
+
+    sin_azm, cos_azm = np.sin(np.deg2rad(azm)), np.cos(np.deg2rad(azm))
+    sin_dip, cos_dip = np.sin(np.deg2rad(dip)), np.cos(np.deg2rad(dip))
+
+    # Rotation matrix.
+    rot_matrix = np.array([
+        [sin_azm, -cos_azm, 0],
+        [cos_azm*cos_dip, sin_azm*cos_dip, -sin_dip],
+        [-sin_azm, cos_azm, 0],
+        [-cos_azm*cos_dip, -sin_azm*cos_dip, sin_dip],
+        [sin_azm, -cos_azm, 0],
+    ])
+
+    # Shift and expand.
+    points = src[:3] + diag*rot_matrix
+
+    return points.T

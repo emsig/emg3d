@@ -154,7 +154,11 @@ def test_arbitrarily_shaped_source():
                [src[2], src[2], src[2], src[2], src[2]])
     scomp = fields.get_source_field(grid, src5xyz, freq, strength)
 
+    # Computed 2
+    scomp2 = fields.get_source_field(grid, src, freq, strength, msrc=True)
+
     assert_allclose(sman.field, scomp.field)
+    assert_allclose(scomp2.vector, scomp.vector, atol=1e-15)
 
     # Normalized
     sman = fields.SourceField(grid, freq=freq)
@@ -524,3 +528,26 @@ def test_get_receiver_response():
 
     # 10 % is still OK, grid is very coarse for fast comp (2s)
     assert_allclose(epm, e3d, rtol=0.1)
+
+
+def test_square_loop():
+    src = fields._square_loop((0, 0, 0, 0, 90), 1)
+    assert_allclose(np.ones(5), np.sum(abs(src), axis=0))
+
+    src = fields._square_loop((0, 0, 0, 45, 90))
+    assert_allclose(np.ones(5)*0.5, abs(src[0, :]))
+    assert_allclose(np.ones(5)*0.5, abs(src[1, :]))
+    assert_allclose(np.zeros(5), abs(src[2, :]))
+
+    # Status Quo.
+    d = np.sqrt(2)/2
+    x, y, z = 10, 20, 30
+    azm, dip = 30, -60
+    sazm, sdip = np.sin(np.deg2rad(azm)), np.sin(np.deg2rad(90-dip))
+    cazm, cdip = np.cos(np.deg2rad(azm)), np.cos(np.deg2rad(90-dip))
+    src = fields._square_loop((x, y, z, azm, dip))
+    assert_allclose(src[:, 0], [x+d*sazm, y-d*cazm, z])
+    assert_allclose(src[:, 1], [x+d*cazm*cdip, y+d*sazm*cdip, z-d*sdip])
+    assert_allclose(src[:, 2], [x-d*sazm, y+d*cazm, z])
+    assert_allclose(src[:, 3], [x-d*cazm*cdip, y-d*sazm*cdip, z+d*sdip])
+    assert_allclose(src[:, 4], src[:, 0])
