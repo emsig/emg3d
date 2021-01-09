@@ -622,6 +622,16 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
             point_source(*vec2, src, sfield.fy)
             point_source(*vec3, src, sfield.fz)
 
+        # Ensure unity of each sfield direction (should not be necessary).
+        # TODO: - Test all gallery.
+        #       - Write test for it.
+        #       - Decide: should it raise a warning?
+        for sf in [sfield.fx, sfield.fy, sfield.fz]:
+            sum_sf = abs(sf.sum())
+            if abs(sum_sf-1) > 1e-6:
+                print("* WARNING :: Normalizing Source: {sum_sf:.10f}.")
+                sf /= sum_sf
+
         # Multiply by moment*s*mu in per direction.
         sfield.fx *= moment[0]*sfield.smu0
         sfield.fy *= moment[1]*sfield.smu0
@@ -743,12 +753,6 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
                             s[ix+1, iy, iz] += rx*ey*x_len
                             s[ix, iy+1, iz] += ex*ry*x_len
                             s[ix+1, iy+1, iz] += rx*ry*x_len
-
-        if not np.isclose(1.0, abs(s.sum()), rtol=1e-9, atol=0):
-            # TODO: - Test all gallery.
-            #       - Write test for it
-            print(f"TODO: Normalizing Source: {abs(s.sum()):.10f}")
-            s /= s.sum()
 
     # Get the source field.
     sfield = set_source(grid, moment, finite)
