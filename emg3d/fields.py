@@ -744,6 +744,12 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
                             s[ix, iy+1, iz] += ex*ry*x_len
                             s[ix+1, iy+1, iz] += rx*ry*x_len
 
+        if not np.isclose(1.0, abs(s.sum()), rtol=1e-9, atol=0):
+            # TODO: - Test all gallery.
+            #       - Write test for it
+            print(f"TODO: Normalizing Source: {abs(s.sum()):.10f}")
+            s /= s.sum()
+
     # Get the source field.
     sfield = set_source(grid, moment, finite)
 
