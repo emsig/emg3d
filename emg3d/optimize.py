@@ -10,7 +10,7 @@ Currently it follows the implementation of [PlMu08]_, using the adjoint-state
 technique for the gradient.
 
 """
-# Copyright 2018-2020 The emg3d Developers.
+# Copyright 2018-2021 The emg3d Developers.
 #
 # This file is part of emg3d.
 #

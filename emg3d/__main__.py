@@ -1,4 +1,4 @@
-# Copyright 2018-2020 The emg3d Developers.
+# Copyright 2018-2021 The emg3d Developers.
 #
 # This file is part of emg3d.
 #
