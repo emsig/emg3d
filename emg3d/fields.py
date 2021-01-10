@@ -442,7 +442,7 @@ class SourceField(Field):
         return np.real(self.field.fz/self.smu0)
 
 
-def get_source_field(grid, src, freq, strength=0, msrc=False):
+def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -500,6 +500,10 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
         must be that of a point dipole: ``[x, y, z, azimuth, dip]`` (for the
         other formats setting ``msrc`` has no effect). It then creates a square
         loop perpendicular to this dipole, with side-length 1.
+
+    decimals: int
+        Grid nodes and source coordinates are rounded to given number of
+        decimals.
 
 
     Returns
@@ -571,6 +575,7 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
     else:
         ii = [0, 0, 1, 1, 2, 2]
 
+    # TODO simplify this
     source_in = np.any(src[ii[0]] >= grid.nodes_x[0])
     source_in *= np.any(src[ii[1]] <= grid.nodes_x[-1])
     source_in *= np.any(src[ii[2]] >= grid.nodes_y[0])
@@ -603,44 +608,47 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
     else:              # Multiply source length with source strength
         moment = strength*srcdir
 
-    def set_source(grid, moment, finite):
+    def set_source(grid, moment, finite):  # TODO get fct out to parent
         """Set the source-field in idir."""
 
         # Initiate zero source field.
         sfield = SourceField(grid, freq=freq)
 
         # Return source-field depending if point or finite dipole.
-        vec1 = (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)
-        vec2 = (grid.nodes_x, grid.cell_centers_y, grid.nodes_z)
-        vec3 = (grid.nodes_x, grid.nodes_y, grid.cell_centers_z)
-        if finite:
-            finite_source(*vec1, src, sfield.fx, 0, grid)
-            finite_source(*vec2, src, sfield.fy, 1, grid)
-            finite_source(*vec3, src, sfield.fz, 2, grid)
-        else:
-            point_source(*vec1, src, sfield.fx)
-            point_source(*vec2, src, sfield.fy)
-            point_source(*vec3, src, sfield.fz)
+        for i, sf in enumerate([sfield.fx, sfield.fy, sfield.fz]):
+            if finite:
+                finite_source(grid, src, sf, i)
+            else:
+                point_source(grid, src, sf, i)
 
-        # Ensure unity of each sfield direction (should not be necessary).
-        # TODO: - Test all gallery.
-        #       - Write test for it.
-        #       - Decide: should it raise a warning?
-        for sf in [sfield.fx, sfield.fy, sfield.fz]:
+            # Ensure unity of each sfield direction (should not be necessary).
+            # TODO make a fct and factor out
             sum_sf = abs(sf.sum())
             if abs(sum_sf-1) > 1e-6:
-                print("* WARNING :: Normalizing Source: {sum_sf:.10f}.")
+                print(f"* WARNING :: Normalizing Source: {sum_sf:.10f}.")
                 sf /= sum_sf
 
-        # Multiply by moment*s*mu in per direction.
-        sfield.fx *= moment[0]*sfield.smu0
-        sfield.fy *= moment[1]*sfield.smu0
-        sfield.fz *= moment[2]*sfield.smu0
+            # Multiply by moment*s*mu
+            sf *= moment[i]*sfield.smu0
 
         return sfield
 
-    def point_source(xx, yy, zz, src, s):
+    def point_source(grid, src, s, idir):  # TODO factor out
         """Set point dipole source."""
+        if idir == 1:
+            xx, yy, zz = grid.nodes_x, grid.cell_centers_y, grid.nodes_z
+        elif idir == 2:
+            xx, yy, zz = grid.nodes_x, grid.nodes_y, grid.cell_centers_z
+        else:
+            xx, yy, zz = grid.cell_centers_x, grid.nodes_y, grid.nodes_z
+
+        # Round nodes and src coordinates (to avoid floating point issues etc).
+        # TODO: move out to parent
+        xx = np.round(xx, decimals)
+        yy = np.round(yy, decimals)
+        zz = np.round(zz, decimals)
+        src = np.round(src, decimals)
+
         nx, ny, nz = s.shape
 
         # Get indices of cells in which source resides.
@@ -673,23 +681,25 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
         s[ix, iy1, iz1] = ex*ry*rz
         s[ix1, iy1, iz1] = rx*ry*rz
 
-    def finite_source(xx, yy, zz, src, s, idir, grid):
+    def finite_source(grid, src, s, idir):  # TODO factor out
         """Set finite dipole source.
 
         Using adjoint interpolation method, probably not the most efficient
         implementation.
         """
+        # Round nodes and src coordinates (to avoid floating point issues etc).
+        # TODO: move out to parent
+        nodes_x = np.round(grid.nodes_x, decimals)
+        nodes_y = np.round(grid.nodes_y, decimals)
+        nodes_z = np.round(grid.nodes_z, decimals)
+        src = np.round(src, decimals)
+
         # Source lengths in x-, y-, and z-directions.
         d_xyz = src[1::2]-src[::2]
 
         # Inverse source lengths.
         id_xyz = d_xyz.copy()
         id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
-
-        # Round nodes to nano-meters (to avoid floating point issues).
-        nodes_x = np.round(grid.nodes_x, 9)
-        nodes_y = np.round(grid.nodes_y, 9)
-        nodes_z = np.round(grid.nodes_z, 9)
 
         # Cell fractions.
         a1 = (nodes_x-src[0])*id_xyz[0]
@@ -699,8 +709,8 @@ def get_source_field(grid, src, freq, strength=0, msrc=False):
         # Get range of indices of cells in which source resides.
         def min_max_ind(vector, i):
             """Return [min, max]-index of cells in which source resides."""
-            vmin = min(np.round(src[2*i:2*i+2], 9))
-            vmax = max(np.round(src[2*i:2*i+2], 9))
+            vmin = min(src[2*i:2*i+2])
+            vmax = max(src[2*i:2*i+2])
             return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
                     max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
 
