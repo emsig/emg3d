@@ -252,13 +252,13 @@ def test_solver_homogeneous_laplace():
     efield = solver.solve(grid, model, sfield, verb=1)
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['Fresult'], efield, rtol=5e-6)
+    assert_allclose(dat['Fresult'], efield, atol=1e-14)
 
     # BiCGSTAB with some print checking.
     efield = solver.solve(grid, model, sfield, verb=1, sslsolver=True)
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['bicresult'], efield, rtol=5e-6)
+    assert_allclose(dat['bicresult'], efield, atol=1e-14)
 
     # If efield is complex, assert it fails.
     efield = fields.Field(grid, dtype=np.complex_)
