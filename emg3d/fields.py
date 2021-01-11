@@ -523,9 +523,11 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
     # Ensure source is a point or a finite dipole.
     if len(src) not in [3, 5, 6]:
         raise ValueError(
-                "Source is wrong defined. Must be either a point,"
-                "[x, y, z, azimuth, dip],\nor a finite dipole,"
-                f"[x1, x2, y1, y2, z1, z2].\nProvided source: {src}.")
+                "Source is wrong defined. It must be either\n- a point, "
+                "[x, y, z, azimuth, dip],\n- a finite dipole, "
+                "[x1, x2, y1, y2, z1, z2], or\n- an arbitrarily shaped "
+                "dipole, [[x-coo], [y-coo], [z-coo]].\n"
+                f"Provided source: {src}.")
 
     elif len(src) == 3 or (msrc and len(src) == 5):
         # Arbitrarily shaped dipole source.
@@ -569,13 +571,8 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
                     "Provided source is a point dipole, "
                     "use the format [x, y, z, azimuth, dip] instead.")
 
-    # Ensure source is within grid.
-    if finite:
-        ii = [0, 1, 2, 3, 4, 5]
-    else:
-        ii = [0, 0, 1, 1, 2, 2]
-
     # TODO simplify this
+    ii = [[0, 0, 1, 1, 2, 2], [0, 1, 2, 3, 4, 5]][finite]
     source_in = np.any(src[ii[0]] >= grid.nodes_x[0])
     source_in *= np.any(src[ii[1]] <= grid.nodes_x[-1])
     source_in *= np.any(src[ii[2]] >= grid.nodes_y[0])
@@ -608,164 +605,25 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
     else:              # Multiply source length with source strength
         moment = strength*srcdir
 
-    def set_source(grid, moment, finite):  # TODO get fct out to parent
-        """Set the source-field in idir."""
+    # Initiate zero source field.
+    sfield = SourceField(grid, freq=freq)
 
-        # Initiate zero source field.
-        sfield = SourceField(grid, freq=freq)
+    # Return source-field depending if point or finite dipole.
+    source_function = [_point_source, _finite_source][finite]
+    for idir, sf in enumerate([sfield.fx, sfield.fy, sfield.fz]):
 
-        # Return source-field depending if point or finite dipole.
-        for i, sf in enumerate([sfield.fx, sfield.fy, sfield.fz]):
-            if finite:
-                finite_source(grid, src, sf, i)
-            else:
-                point_source(grid, src, sf, i)
+        # Get source field for this direction.
+        source_function(grid, src, sf, idir, decimals)
 
-            # Ensure unity of each sfield direction (should not be necessary).
-            # TODO make a fct and factor out
-            sum_sf = abs(sf.sum())
-            if abs(sum_sf-1) > 1e-6:
-                print(f"* WARNING :: Normalizing Source: {sum_sf:.10f}.")
-                sf /= sum_sf
+        # Ensure unity of each sfield direction (should not be necessary).
+        # TODO make a fct and factor out
+        sum_sf = abs(sf.sum())
+        if abs(sum_sf-1) > 1e-6:
+            print(f"* WARNING :: Normalizing Source: {sum_sf:.10f}.")
+            sf /= sum_sf
 
-            # Multiply by moment*s*mu
-            sf *= moment[i]*sfield.smu0
-
-        return sfield
-
-    def point_source(grid, src, s, idir):  # TODO factor out
-        """Set point dipole source."""
-        if idir == 1:
-            xx, yy, zz = grid.nodes_x, grid.cell_centers_y, grid.nodes_z
-        elif idir == 2:
-            xx, yy, zz = grid.nodes_x, grid.nodes_y, grid.cell_centers_z
-        else:
-            xx, yy, zz = grid.cell_centers_x, grid.nodes_y, grid.nodes_z
-
-        # Round nodes and src coordinates (to avoid floating point issues etc).
-        # TODO: move out to parent
-        xx = np.round(xx, decimals)
-        yy = np.round(yy, decimals)
-        zz = np.round(zz, decimals)
-        src = np.round(src, decimals)
-
-        nx, ny, nz = s.shape
-
-        # Get indices of cells in which source resides.
-        ix = max(0, np.where(src[0] < np.r_[xx, np.infty])[0][0]-1)
-        iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
-        iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
-
-        def get_index_and_strength(ic, nc, csrc, cc):
-            """Return index and field strength in c-direction."""
-            if ic == nc-1:
-                ic1 = ic
-                rc = 1.0
-                ec = 1.0
-            else:
-                ic1 = ic+1
-                rc = (csrc-cc[ic])/(cc[ic1]-cc[ic])
-                ec = 1.0-rc
-            return rc, ec, ic1
-
-        rx, ex, ix1 = get_index_and_strength(ix, nx, src[0], xx)
-        ry, ey, iy1 = get_index_and_strength(iy, ny, src[1], yy)
-        rz, ez, iz1 = get_index_and_strength(iz, nz, src[2], zz)
-
-        s[ix, iy, iz] = ex*ey*ez
-        s[ix1, iy, iz] = rx*ey*ez
-        s[ix, iy1, iz] = ex*ry*ez
-        s[ix1, iy1, iz] = rx*ry*ez
-        s[ix, iy, iz1] = ex*ey*rz
-        s[ix1, iy, iz1] = rx*ey*rz
-        s[ix, iy1, iz1] = ex*ry*rz
-        s[ix1, iy1, iz1] = rx*ry*rz
-
-    def finite_source(grid, src, s, idir):  # TODO factor out
-        """Set finite dipole source.
-
-        Using adjoint interpolation method, probably not the most efficient
-        implementation.
-        """
-        # Round nodes and src coordinates (to avoid floating point issues etc).
-        # TODO: move out to parent
-        nodes_x = np.round(grid.nodes_x, decimals)
-        nodes_y = np.round(grid.nodes_y, decimals)
-        nodes_z = np.round(grid.nodes_z, decimals)
-        src = np.round(src, decimals)
-
-        # Source lengths in x-, y-, and z-directions.
-        d_xyz = src[1::2]-src[::2]
-
-        # Inverse source lengths.
-        id_xyz = d_xyz.copy()
-        id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
-
-        # Cell fractions.
-        a1 = (nodes_x-src[0])*id_xyz[0]
-        a2 = (nodes_y-src[2])*id_xyz[1]
-        a3 = (nodes_z-src[4])*id_xyz[2]
-
-        # Get range of indices of cells in which source resides.
-        def min_max_ind(vector, i):
-            """Return [min, max]-index of cells in which source resides."""
-            vmin = min(src[2*i:2*i+2])
-            vmax = max(src[2*i:2*i+2])
-            return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
-                    max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
-
-        rix = min_max_ind(nodes_x, 0)
-        riy = min_max_ind(nodes_y, 1)
-        riz = min_max_ind(nodes_z, 2)
-
-        # Loop over these indices.
-        for iz in range(riz[0], riz[1]+1):
-            for iy in range(riy[0], riy[1]+1):
-                for ix in range(rix[0], rix[1]+1):
-
-                    # Determine centre of gravity of line segment in cell.
-                    aa = np.vstack([[a1[ix], a1[ix+1]], [a2[iy], a2[iy+1]],
-                                   [a3[iz], a3[iz+1]]])
-                    aa = np.sort(aa[d_xyz != 0, :], 1)
-                    al = max(0, aa[:, 0].max())  # Left and right
-                    ar = min(1, aa[:, 1].min())  # elements.
-
-                    # Characteristics of this cell.
-                    xmin = src[::2]+al*d_xyz
-                    xmax = src[::2]+ar*d_xyz
-                    x_c = (xmin+xmax)/2.0
-                    slen = np.linalg.norm(src[1::2]-src[::2])
-                    x_len = np.linalg.norm(xmax-xmin)/slen
-
-                    # Contribution to edge (coordinate idir)
-                    rx = (x_c[0]-nodes_x[ix])/grid.h[0][ix]
-                    ex = 1-rx
-                    ry = (x_c[1]-nodes_y[iy])/grid.h[1][iy]
-                    ey = 1-ry
-                    rz = (x_c[2]-nodes_z[iz])/grid.h[2][iz]
-                    ez = 1-rz
-
-                    # Add to field (only if segment inside cell).
-                    if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
-
-                        if idir == 0:
-                            s[ix, iy, iz] += ey*ez*x_len
-                            s[ix, iy+1, iz] += ry*ez*x_len
-                            s[ix, iy, iz+1] += ey*rz*x_len
-                            s[ix, iy+1, iz+1] += ry*rz*x_len
-                        if idir == 1:
-                            s[ix, iy, iz] += ex*ez*x_len
-                            s[ix+1, iy, iz] += rx*ez*x_len
-                            s[ix, iy, iz+1] += ex*rz*x_len
-                            s[ix+1, iy, iz+1] += rx*rz*x_len
-                        if idir == 2:
-                            s[ix, iy, iz] += ex*ey*x_len
-                            s[ix+1, iy, iz] += rx*ey*x_len
-                            s[ix, iy+1, iz] += ex*ry*x_len
-                            s[ix+1, iy+1, iz] += rx*ry*x_len
-
-    # Get the source field.
-    sfield = set_source(grid, moment, finite)
+        # Multiply by moment*s*mu
+        sf *= moment[idir]*sfield.smu0
 
     # Add src and moment information.
     sfield.src = src
@@ -1057,6 +915,139 @@ def get_h_field(grid, model, field):
 
     # Create a Field instance and divide by s*mu_0 and return.
     return -Field(e3d_hx, e3d_hy, e3d_hz)/field.smu0
+
+
+def _point_source(grid, src, s, idir, decimals):  # TODO DOCUMENT & TEST
+    """Set point dipole source."""
+    if idir == 1:
+        xx, yy, zz = grid.nodes_x, grid.cell_centers_y, grid.nodes_z
+    elif idir == 2:
+        xx, yy, zz = grid.nodes_x, grid.nodes_y, grid.cell_centers_z
+    else:
+        xx, yy, zz = grid.cell_centers_x, grid.nodes_y, grid.nodes_z
+
+    # Round nodes and src coordinates (to avoid floating point issues etc).
+    # TODO: move out to parent
+    xx = np.round(xx, decimals)
+    yy = np.round(yy, decimals)
+    zz = np.round(zz, decimals)
+    src = np.round(src, decimals)
+
+    nx, ny, nz = s.shape
+
+    # Get indices of cells in which source resides.
+    ix = max(0, np.where(src[0] < np.r_[xx, np.infty])[0][0]-1)
+    iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
+    iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
+
+    def get_index_and_strength(ic, nc, csrc, cc):
+        """Return index and field strength in c-direction."""
+        if ic == nc-1:
+            ic1 = ic
+            rc = 1.0
+            ec = 1.0
+        else:
+            ic1 = ic+1
+            rc = (csrc-cc[ic])/(cc[ic1]-cc[ic])
+            ec = 1.0-rc
+        return rc, ec, ic1
+
+    rx, ex, ix1 = get_index_and_strength(ix, nx, src[0], xx)
+    ry, ey, iy1 = get_index_and_strength(iy, ny, src[1], yy)
+    rz, ez, iz1 = get_index_and_strength(iz, nz, src[2], zz)
+
+    s[ix, iy, iz] = ex*ey*ez
+    s[ix1, iy, iz] = rx*ey*ez
+    s[ix, iy1, iz] = ex*ry*ez
+    s[ix1, iy1, iz] = rx*ry*ez
+    s[ix, iy, iz1] = ex*ey*rz
+    s[ix1, iy, iz1] = rx*ey*rz
+    s[ix, iy1, iz1] = ex*ry*rz
+    s[ix1, iy1, iz1] = rx*ry*rz
+
+
+def _finite_source(grid, src, s, idir, decimals):  # TODO DOCUMENT & TEST
+    """Set finite dipole source.
+
+    Using adjoint interpolation method, probably not the most efficient
+    implementation.
+    """
+    # Round nodes and src coordinates (to avoid floating point issues etc).
+    # TODO: move out to parent
+    nodes_x = np.round(grid.nodes_x, decimals)
+    nodes_y = np.round(grid.nodes_y, decimals)
+    nodes_z = np.round(grid.nodes_z, decimals)
+    src = np.round(src, decimals)
+
+    # Source lengths in x-, y-, and z-directions.
+    d_xyz = src[1::2]-src[::2]
+
+    # Inverse source lengths.
+    id_xyz = d_xyz.copy()
+    id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
+
+    # Cell fractions.
+    a1 = (nodes_x-src[0])*id_xyz[0]
+    a2 = (nodes_y-src[2])*id_xyz[1]
+    a3 = (nodes_z-src[4])*id_xyz[2]
+
+    # Get range of indices of cells in which source resides.
+    def min_max_ind(vector, i):
+        """Return [min, max]-index of cells in which source resides."""
+        vmin = min(src[2*i:2*i+2])
+        vmax = max(src[2*i:2*i+2])
+        return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
+                max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
+
+    rix = min_max_ind(nodes_x, 0)
+    riy = min_max_ind(nodes_y, 1)
+    riz = min_max_ind(nodes_z, 2)
+
+    # Loop over these indices.
+    for iz in range(riz[0], riz[1]+1):
+        for iy in range(riy[0], riy[1]+1):
+            for ix in range(rix[0], rix[1]+1):
+
+                # Determine centre of gravity of line segment in cell.
+                aa = np.vstack([[a1[ix], a1[ix+1]], [a2[iy], a2[iy+1]],
+                                [a3[iz], a3[iz+1]]])
+                aa = np.sort(aa[d_xyz != 0, :], 1)
+                al = max(0, aa[:, 0].max())  # Left and right
+                ar = min(1, aa[:, 1].min())  # elements.
+
+                # Characteristics of this cell.
+                xmin = src[::2]+al*d_xyz
+                xmax = src[::2]+ar*d_xyz
+                x_c = (xmin+xmax)/2.0
+                slen = np.linalg.norm(src[1::2]-src[::2])
+                x_len = np.linalg.norm(xmax-xmin)/slen
+
+                # Contribution to edge (coordinate idir)
+                rx = (x_c[0]-nodes_x[ix])/grid.h[0][ix]
+                ex = 1-rx
+                ry = (x_c[1]-nodes_y[iy])/grid.h[1][iy]
+                ey = 1-ry
+                rz = (x_c[2]-nodes_z[iz])/grid.h[2][iz]
+                ez = 1-rz
+
+                # Add to field (only if segment inside cell).
+                if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
+
+                    if idir == 0:
+                        s[ix, iy, iz] += ey*ez*x_len
+                        s[ix, iy+1, iz] += ry*ez*x_len
+                        s[ix, iy, iz+1] += ey*rz*x_len
+                        s[ix, iy+1, iz+1] += ry*rz*x_len
+                    if idir == 1:
+                        s[ix, iy, iz] += ex*ez*x_len
+                        s[ix+1, iy, iz] += rx*ez*x_len
+                        s[ix, iy, iz+1] += ex*rz*x_len
+                        s[ix+1, iy, iz+1] += rx*rz*x_len
+                    if idir == 2:
+                        s[ix, iy, iz] += ex*ey*x_len
+                        s[ix+1, iy, iz] += rx*ey*x_len
+                        s[ix, iy+1, iz] += ex*ry*x_len
+                        s[ix+1, iy+1, iz] += rx*ry*x_len
 
 
 def _square_loop(src, diag=np.sqrt(2)/2):
