@@ -29,7 +29,7 @@ not) be easier to understand.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-
+import emg3d
 import numba as nb
 import numpy as np
 
@@ -315,3 +315,92 @@ def alt_volume_average(edges_x, edges_y, edges_z, values,
 
                 # Normalize by new_grid-cell volume.
                 new_values[ix, iy, iz] /= hxyz
+
+
+def get_source_field(grid, src, freq, strength=0):
+    r"""Return the source field for point dipole sources."""
+    # Cast some parameters.
+    src = np.asarray(src, dtype=np.float64)
+    strength = np.asarray(strength)
+
+    # Ensure source is a point or a finite dipole.
+    if len(src) != 5:
+        raise ValueError("Source is wrong defined.")
+
+    # Ensure source is within grid.
+    outside = (src[0] < grid.nodes_x[0] or src[0] > grid.nodes_x[-1] or
+               src[1] < grid.nodes_y[0] or src[1] > grid.nodes_y[-1] or
+               src[2] < grid.nodes_z[0] or src[2] > grid.nodes_z[-1])
+    if outside:
+        raise ValueError(f"Provided source outside grid: {src}.")
+
+    # Get source orientation (dxs, dys, dzs)
+    h = np.cos(np.deg2rad(src[4]))
+    dys = np.sin(np.deg2rad(src[3]))*h
+    dxs = np.cos(np.deg2rad(src[3]))*h
+    dzs = np.sin(np.deg2rad(src[4]))
+    srcdir = np.array([dxs, dys, dzs])
+    src = src[:3]
+
+    # Set source strength.
+    if strength == 0:  # 1 A m
+        moment = srcdir
+    else:              # Multiply source length with source strength
+        moment = strength*srcdir
+
+    def point_source(xx, yy, zz, src, s):
+        """Set point dipole source."""
+        nx, ny, nz = s.shape
+
+        # Get indices of cells in which source resides.
+        ix = max(0, np.where(src[0] < np.r_[xx, np.infty])[0][0]-1)
+        iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
+        iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
+
+        def get_index_and_strength(ic, nc, csrc, cc):
+            """Return index and field strength in c-direction."""
+            if ic == nc-1:
+                ic1 = ic
+                rc = 1.0
+                ec = 1.0
+            else:
+                ic1 = ic+1
+                rc = (csrc-cc[ic])/(cc[ic1]-cc[ic])
+                ec = 1.0-rc
+            return rc, ec, ic1
+
+        rx, ex, ix1 = get_index_and_strength(ix, nx, src[0], xx)
+        ry, ey, iy1 = get_index_and_strength(iy, ny, src[1], yy)
+        rz, ez, iz1 = get_index_and_strength(iz, nz, src[2], zz)
+
+        s[ix, iy, iz] = ex*ey*ez
+        s[ix1, iy, iz] = rx*ey*ez
+        s[ix, iy1, iz] = ex*ry*ez
+        s[ix1, iy1, iz] = rx*ry*ez
+        s[ix, iy, iz1] = ex*ey*rz
+        s[ix1, iy, iz1] = rx*ey*rz
+        s[ix, iy1, iz1] = ex*ry*rz
+        s[ix1, iy1, iz1] = rx*ry*rz
+
+    # Initiate zero source field.
+    sfield = emg3d.fields.SourceField(grid, freq=freq)
+
+    # Return source-field depending if point or finite dipole.
+    vec1 = (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)
+    vec2 = (grid.nodes_x, grid.cell_centers_y, grid.nodes_z)
+    vec3 = (grid.nodes_x, grid.nodes_y, grid.cell_centers_z)
+    point_source(*vec1, src, sfield.fx)
+    point_source(*vec2, src, sfield.fy)
+    point_source(*vec3, src, sfield.fz)
+
+    # Multiply by moment*s*mu in per direction.
+    sfield.fx *= moment[0]*sfield.smu0
+    sfield.fy *= moment[1]*sfield.smu0
+    sfield.fz *= moment[2]*sfield.smu0
+
+    # Add src and moment information.
+    sfield.src = src
+    sfield.strength = strength
+    sfield.moment = moment
+
+    return sfield

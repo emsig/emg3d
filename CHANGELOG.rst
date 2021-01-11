@@ -20,6 +20,13 @@ recent versions
     This will create a square loop of 1x1 m perpendicular to the defined point
     dipole, hence simulating a magnetic source.
 
+  - Point dipoles and finite length dipoles were before treated differently.
+    Now point dipoles are converted into finite length dipoles of 1 m length,
+    and treated the same. This is backwards incompatible and means that the
+    source field for point dipoles might not be exactly the same as before.
+    However, in any properly set-up grid this should have no influence on the
+    result.
+
   - Bugfix: Fix floating point issue when the smaller coordinate of a finite
     length dipole source was very close to a node, but not exactly (in the
     order of much less than nanometers. It then overestimated that source by
