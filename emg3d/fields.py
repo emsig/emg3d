@@ -519,22 +519,17 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
                 f"Provided source: {src}.")
 
     src = np.asarray(src, dtype=np.float64)
-    ncoord = len(src)
     strength = np.asarray(strength)
 
-    # Check input source and convert all types into finite length dipoles.
-    if ncoord == 6:  # Finite length dipole.
+    # Convert arbitrary shapes and point dipoles to finite length dipoles.
+    if len(src) == 5 and not msrc:  # Point dipole: convert to finite length.
 
-        # Ensure finite length dipole is not a point dipole.
-        if np.allclose(np.linalg.norm(src[1::2]-src[::2]), 0):
-            raise ValueError(
-                    "Provided finite dipole has no length; "
-                    "use the format [x, y, z, azimuth, dip] instead.")
+        src = _finite_dipole_from_point_dipole(src)
 
-    elif ncoord == 3 or (msrc and ncoord == 5):  # Arbitrary shapes.
+    elif len(src) in [3, 5]:  # Arbitrary shapes.
 
         # Get points of square loop perp. to dipole in case of msrc.
-        if ncoord == 5:
+        if len(src) == 5:
             src = _square_loop_from_point_dipole(src)
 
         # Get arbitrarily shaped dipole source using recursion.
@@ -561,12 +556,9 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
 
         return sfield
 
-    elif ncoord == 5:  # Point dipole: convert to finite length.
-
-        src = _finite_dipole_from_point_dipole(src)
-
-    else:
-
+    # From here onwards `src` has to be a finite length dipole  of format
+    # [x1, x2, y1, y2, z1, z2]. Ensure that:
+    if src.shape != (6, ):
         raise ValueError(
                 "Source is wrong defined. It must be either\n- a point, "
                 "[x, y, z, azimuth, dip],\n- a finite dipole, "
@@ -574,10 +566,15 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
                 "dipole, [[x-coo], [y-coo], [z-coo]].\n"
                 f"Provided source: {src}.")
 
-    # Now the source is always a finite length dipole [x1, x2, y1, y2, z1, z2].
+    # Get length in each direction.
+    length = src[1::2]-src[::2]
 
-    # Get source length and moment (individually for x, y, z).
-    length = np.diff(src.reshape(3, 2)).ravel()
+    # Ensure finite length dipole is not a point dipole.
+    if np.allclose(length, 0, atol=1e-15):
+        raise ValueError("Provided finite dipole has no length; use "
+                         "the format [x, y, z, azimuth, dip] instead.")
+
+    # Get source moment (individually for x, y, z).
     if strength == 0:  # 1 A m
         length /= np.linalg.norm(length)
         moment = length
