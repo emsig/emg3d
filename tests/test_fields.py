@@ -44,7 +44,7 @@ def create_dummy(nx, ny, nz, imag=True):
 def test_get_source_field(capsys):
     src = [100, 200, 300, 27, 31]
     h = np.ones(4)
-    grid = meshes.TensorMesh([h*200, h*400, h*800], -np.array(src[:3]))
+    grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
     freq = 1.2458
 
     sfield = fields.get_source_field(grid, src, freq, strength=1+1j)
@@ -54,29 +54,30 @@ def test_get_source_field(capsys):
     assert_array_equal(sfield.strength, float(0))
     iomegamu = 2j*np.pi*freq*constants.mu_0
 
-    # Check zeros
-    assert 0 == np.sum(np.r_[sfield.fx[:, 2:, :].ravel(),
-                             sfield.fy[:, 2:, :].ravel(),
-                             sfield.fz[:, 2:, :].ravel()])
+    # Check number of edges
+    assert 4 == sfield.fx[sfield.fx != 0].size
+    assert 4 == sfield.fy[sfield.fy != 0].size
+    assert 4 == sfield.fz[sfield.fz != 0].size
 
     # Check source cells
     h = np.cos(np.deg2rad(src[4]))
     y = np.sin(np.deg2rad(src[3]))*h
     x = np.cos(np.deg2rad(src[3]))*h
     z = np.sin(np.deg2rad(src[4]))
-    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/iomegamu).real, -1)
-    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/iomegamu).real, -1)
-    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/iomegamu).real, -1)
-    assert_allclose(np.sum(sfield.vx[:2, 1, :2]/x), 1)
-    assert_allclose(np.sum(sfield.vy[1, :2, :2]/y), 1)
-    assert_allclose(np.sum(sfield.vz[1, 1:2, :2]/z), 1)
+    assert_allclose(np.sum(sfield.fx/x/iomegamu).real, -1)
+    assert_allclose(np.sum(sfield.fy/y/iomegamu).real, -1)
+    assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
+    assert_allclose(np.sum(sfield.vx/x), 1)
+    assert_allclose(np.sum(sfield.vy/y), 1)
+    assert_allclose(np.sum(sfield.vz/z), 1)
     assert sfield._freq == freq
     assert sfield.freq == freq
     assert_allclose(sfield.smu0, -iomegamu)
 
     # Put source on final node, should still work.
-    src = [grid.nodes_x[-1], grid.nodes_y[-1], grid.nodes_z[-1],
-           src[3], src[4]]
+    src = [grid.nodes_x[0], grid.nodes_x[0]+1,
+           grid.nodes_y[-1]-1, grid.nodes_y[-1],
+           grid.nodes_z[0], grid.nodes_z[0]+1]
     sfield = fields.get_source_field(grid, src, freq)
     tot_field = np.linalg.norm(
             [np.sum(sfield.fx), np.sum(sfield.fy), np.sum(sfield.fz)])
@@ -94,34 +95,34 @@ def test_get_source_field(capsys):
         sfield = fields.get_source_field(grid, src, 1)
 
     # Put finite dipole of zero length. Ensure it fails.
-    with pytest.raises(ValueError, match='Provided source is a point dipole'):
+    with pytest.raises(ValueError, match='Provided finite dipole has no leng'):
         src = [0, 0, 100, 100, -200, -200]
         sfield = fields.get_source_field(grid, src, 1)
 
     # Same for Laplace domain
     src = [100, 200, 300, 27, 31]
     h = np.ones(4)
-    grid = meshes.TensorMesh([h*200, h*400, h*800], -np.array(src[:3]))
+    grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
     freq = 1.2458
     sfield = fields.get_source_field(grid, src, -freq)
     smu = freq*constants.mu_0
 
-    # Check zeros
-    assert 0 == np.sum(np.r_[sfield.fx[:, 2:, :].ravel(),
-                             sfield.fy[:, 2:, :].ravel(),
-                             sfield.fz[:, 2:, :].ravel()])
+    # Check number of edges
+    assert 4 == sfield.fx[sfield.fx != 0].size
+    assert 4 == sfield.fy[sfield.fy != 0].size
+    assert 4 == sfield.fz[sfield.fz != 0].size
 
     # Check source cells
     h = np.cos(np.deg2rad(src[4]))
     y = np.sin(np.deg2rad(src[3]))*h
     x = np.cos(np.deg2rad(src[3]))*h
     z = np.sin(np.deg2rad(src[4]))
-    assert_allclose(np.sum(sfield.fx[:2, 1, :2]/x/smu), -1)
-    assert_allclose(np.sum(sfield.fy[1, :2, :2]/y/smu), -1)
-    assert_allclose(np.sum(sfield.fz[1, 1:2, :2]/z/smu), -1)
-    assert_allclose(np.sum(sfield.vx[:2, 1, :2]/x), 1)
-    assert_allclose(np.sum(sfield.vy[1, :2, :2]/y), 1)
-    assert_allclose(np.sum(sfield.vz[1, 1:2, :2]/z), 1)
+    assert_allclose(np.sum(sfield.fx/x/smu), -1)
+    assert_allclose(np.sum(sfield.fy/y/smu), -1)
+    assert_allclose(np.sum(sfield.fz/z/smu), -1)
+    assert_allclose(np.sum(sfield.vx/x), 1)
+    assert_allclose(np.sum(sfield.vy/y), 1)
+    assert_allclose(np.sum(sfield.vz/z), 1)
     assert sfield._freq == -freq
     assert sfield.freq == freq
     assert_allclose(sfield.smu0, -freq*constants.mu_0)
@@ -158,7 +159,7 @@ def test_arbitrarily_shaped_source():
     scomp2 = fields.get_source_field(grid, src, freq, strength, msrc=True)
 
     assert_allclose(sman.field, scomp.field)
-    assert_allclose(scomp2.vector, scomp.vector, atol=1e-15)
+    assert_allclose(scomp2.vector, scomp.vector, rtol=1e-6, atol=1e-15)
 
     # Normalized
     sman = fields.SourceField(grid, freq=freq)
@@ -529,24 +530,13 @@ def test_get_receiver_response():
     assert_allclose(epm, e3d, rtol=0.1)
 
 
-def test_square_loop():
-    src = fields._square_loop((0, 0, 0, 0, 90), 1)
-    assert_allclose(np.ones(5), np.sum(abs(src), axis=0))
-
-    src = fields._square_loop((0, 0, 0, 45, 90))
-    assert_allclose(np.ones(5)*0.5, abs(src[0, :]))
-    assert_allclose(np.ones(5)*0.5, abs(src[1, :]))
-    assert_allclose(np.zeros(5), abs(src[2, :]))
-
-    # Status Quo.
-    d = np.sqrt(2)/2
-    x, y, z = 10, 20, 30
-    azm, dip = 30, -60
-    sazm, sdip = np.sin(np.deg2rad(azm)), np.sin(np.deg2rad(90-dip))
-    cazm, cdip = np.cos(np.deg2rad(azm)), np.cos(np.deg2rad(90-dip))
-    src = fields._square_loop((x, y, z, azm, dip))
-    assert_allclose(src[:, 0], [x+d*sazm, y-d*cazm, z])
-    assert_allclose(src[:, 1], [x+d*cazm*cdip, y+d*sazm*cdip, z-d*sdip])
-    assert_allclose(src[:, 2], [x-d*sazm, y+d*cazm, z])
-    assert_allclose(src[:, 3], [x-d*cazm*cdip, y-d*sazm*cdip, z+d*sdip])
-    assert_allclose(src[:, 4], src[:, 0])
+def test_source_norm_warning(capsys):
+    # This is a warning that should never be raised...
+    hx, x0 = np.ones(4), -2
+    mesh = meshes.TensorMesh([hx, hx, hx], (x0, x0, x0))
+    sfield = fields.SourceField(mesh, freq=1)
+    sfield.fx += 1  # Add something to the field.
+    _ = fields._finite_source_xyz(
+            mesh, (-0.5, 0.5, 0, 0, 0, 0), sfield.fx, 0, 30)
+    out, _ = capsys.readouterr()
+    assert "* WARNING :: Normalizing Source: 101.0000000000." in out

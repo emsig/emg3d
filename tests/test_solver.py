@@ -7,6 +7,7 @@ from numpy.testing import assert_allclose
 
 from emg3d import solver, core, meshes, models, fields, io
 
+from . import alternatives
 from .test_meshes import get_h
 
 # Data generated with tests/create_data/regression.py
@@ -33,7 +34,7 @@ def test_solver_homogeneous(capsys):
             [dat['input_grid']['hx'], dat['input_grid']['hy'],
              dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
-    sfield = fields.get_source_field(**dat['input_source'])
+    sfield = alternatives.get_source_field(**dat['input_source'])
 
     # F-cycle
     efield = solver.solve(grid, model, sfield, verb=4)
@@ -202,7 +203,7 @@ def test_solver_heterogeneous(capsys):
     mesh = meshes.TensorMesh(
             [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
             origin=np.array([-0.5, -1, -1]))
-    sfield = fields.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
+    sfield = alternatives.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
     model = models.Model(mesh)
     _ = solver.solve(mesh, model, sfield, verb=4, nu_pre=0)
     out, _ = capsys.readouterr()
@@ -246,19 +247,19 @@ def test_solver_homogeneous_laplace():
             [dat['input_grid']['hx'], dat['input_grid']['hy'],
              dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
-    sfield = fields.get_source_field(**dat['input_source'])
+    sfield = alternatives.get_source_field(**dat['input_source'])
 
     # F-cycle
     efield = solver.solve(grid, model, sfield, verb=1)
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['Fresult'], efield, rtol=5e-6)
+    assert_allclose(dat['Fresult'], efield, atol=1e-14)
 
     # BiCGSTAB with some print checking.
     efield = solver.solve(grid, model, sfield, verb=1, sslsolver=True)
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['bicresult'], efield, rtol=5e-6)
+    assert_allclose(dat['bicresult'], efield, atol=1e-14)
 
     # If efield is complex, assert it fails.
     efield = fields.Field(grid, dtype=np.complex_)
@@ -348,7 +349,7 @@ def test_smoothing():
 def test_restriction():
 
     # Simple test with restriction followed by prolongation.
-    src = [0, 0, 0, 0, 45]
+    src = [150, 150, 150, 0, 45]
     grid = meshes.TensorMesh(
             [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
             origin=np.zeros(3))
