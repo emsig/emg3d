@@ -18,7 +18,7 @@ dev-install:
 	pip install -r requirements-dev.txt && pip install -e .
 
 pytest:
-	pytest --cov=emg3d tests/ --flake8 && coverage html
+	pytest --cov=emg3d --flake8 && coverage html
 
 flake8:
 	flake8 docs/conf.py setup.py emg3d/ tests/
