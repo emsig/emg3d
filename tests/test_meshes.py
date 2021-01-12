@@ -553,6 +553,17 @@ class TestConstructMesh:
         assert_allclose(m.h[1], hy)
         assert_allclose(m.h[2], hz)
 
+    def test_compare_to_gow4(self):
+        inp = {'frequency': 1.234, 'center': (0, 0, 0),
+               'domain': ([-100, 100], [-100, 100], [-100, 100])}
+        m3 = meshes.construct_mesh(properties=[0.3, 1.0, 1e8], **inp)
+        m4 = meshes.construct_mesh(properties=[0.3, 1e8, 1.0, 1e8], **inp)
+
+        assert_allclose(m3.origin, m4.origin)
+        assert_allclose(m3.h[0], m4.h[0])
+        assert_allclose(m3.h[1], m4.h[1])
+        assert_allclose(m3.h[2], m4.h[2])
+
 
 def test_deprecations(capsys):
     mesh = meshes.TensorMesh([[2, 2], [2, 2], [2, 2]], x0=(0, 0, 0))

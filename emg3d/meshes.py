@@ -277,9 +277,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                    seasurface=None, **kwargs):
     r"""Return a TensorMesh for given parameters.
 
-    The constructed mesh is frequency- and conductivity-dependent, where
-    ``properties`` are turned into conductivities through the provided
-    ``mapping``, which is ``'Resistivity'`` by default. Some details are
+    The constructed mesh is frequency- and property-dependent. Some details are
     explained in other functions:
 
     - The minimum cell width :math:`\Delta_\text{min}` is a function of
@@ -339,22 +337,42 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         domain, are a function of skin depth.
 
     properties : float or list
-        Properties to calculate the skin depths. The properties can be either
-        resistivities, conductivities, or the logarithm (natural or base 10)
-        thereof. By default it assumes resistivities, but it can be changed
+        Properties to calculate the skin depths, which in turn are used to
+        calculate the minimum cell width (usually at source location) and the
+        extent of the buffer around the survey domain. The properties can be
+        either resistivities, conductivities, or the logarithm (natural or base
+        10) thereof. By default it assumes resistivities, but it can be changed
         with the parameter ``mapping``.
 
-        Four formats are recognized:
+        Five formats are recognized for properties: it can either be a float or
+        a list of 2, 3, 4, or 7 floats. Depending on the format these
+        properties are used to calculate the following parameters:
 
-        - 1: Same property for everything;
-        - 2: [min_width, buffer (+/-)] for all directions;
-        - 4: [min_width, xy-buffer (+/-), z-, z+];
-        - 7: [min_width, x-, x+, y-, y+, z-, z+].
+        - ``p``: min_width and buffer in all directions;
 
-        The property ``min_width`` is usually the property at the center,
-        hence at the source location. The other properties are used to define
-        the extent of the buffer zone around the survey domain in the
-        respective directions.
+        - ``[p1, p2]``:
+
+          - 1 : min_width,
+          - 2 : buffer in all directions;
+
+        - ``[p1, p2, p3]``:
+
+          - 1 : min_width,
+          - 2 : buffer in negative z-direction,
+          - 3 : buffer in all other directions;
+
+        - ``[p1, p2, p3, p4]``:
+
+          - 1 : min_width,
+          - 2 : buffer in horizontal directions,
+          - 3; 4 : buffer in negative; positive z-direction.
+
+        - ``[p1, p2, p3, p4, p5, p6, p7]``:
+
+          - 1 : min_width,
+          - 2; 3 : buffer in negative; positive x-direction,
+          - 4; 5 : buffer in negative; positive y-direction,
+          - 6; 7 : buffer in negative; positive z-direction.
 
     center : tuple
         Tuple (or list, ndarray) of three floats for (x, y, z). The mesh is
@@ -487,7 +505,11 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     # Add properties.
     if isinstance(properties, (int, float)):
         properties = np.array([properties])
-    if len(properties) == 4:
+    if len(properties) == 3:
+        xparams['properties'] = [properties[0], properties[2], properties[2]]
+        yparams['properties'] = [properties[0], properties[2], properties[2]]
+        zparams['properties'] = [properties[0], properties[1], properties[2]]
+    elif len(properties) == 4:
         xparams['properties'] = [properties[0], properties[1], properties[1]]
         yparams['properties'] = [properties[0], properties[1], properties[1]]
         zparams['properties'] = [properties[0], properties[2], properties[3]]
