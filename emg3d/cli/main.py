@@ -17,6 +17,7 @@ Entry point for the command-line interface (CLI).
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import os
 import sys
 import argparse
 
@@ -155,13 +156,22 @@ def main(args=None):
     # Get command line arguments.
     args_dict = vars(parser.parse_args(args))
 
-    # If --version or --report, print and return.
-    if args_dict.pop('version'):
+    # Exits without simulation.
+    if args_dict.pop('version'):  # emg3d version info.
+
         print(f"emg3d v{utils.__version__}")
         return
 
-    if args_dict.pop('report'):
+    elif args_dict.pop('report'):  # emg3d report.
         print(utils.Report())
+        return
+
+    elif len(sys.argv) == 1 and not os.path.isfile('emg3d.cfg'):
+
+        # If no arguments provided, and ./emg3d.cfg does not exist, print info.
+        print(parser.description)
+        print("=> Type `emg3d --help` for more info "
+              f"(emg3d v{utils.__version__}).")
         return
 
     # Run simulation with given command line inputs.

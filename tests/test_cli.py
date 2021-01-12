@@ -52,9 +52,11 @@ def test_basic(script_runner):
     else:
         assert ret.stderr == ""
 
-    # Test the installed version fails if called without anything.
+    # Test the info printed if called without anything.
     ret = script_runner.run('emg3d')
-    assert not ret.success
+    assert ret.success
+    assert "emg3d is a multigrid solver for 3D EM diffusion" in ret.stdout
+    assert "emg3d v" in ret.stdout
 
     # Test emg3d/__main__.py by calling the folder emg3d.
     ret = script_runner.run('python', 'emg3d', '--report')
