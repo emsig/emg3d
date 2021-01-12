@@ -13,7 +13,7 @@ can use them for cross-checking with the main code. Also, they might (or might
 not) be easier to understand.
 
 """
-# Copyright 2018-2020 The emg3d Developers.
+# Copyright 2018-2021 The emg3d Developers.
 #
 # This file is part of emg3d.
 #
