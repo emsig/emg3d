@@ -535,15 +535,7 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
 
         # Get points of square loop perp. to dipole in case of msrc.
         if ncoord == 5:
-
-            # Put a square perpendicular to dipole: The diagonal is np.sqrt(2),
-            # so the sides are 1x1 m. Two points (hor) stay in the xy-plane,
-            # the other two points dip.
-            diag = np.sqrt(2)/2
-            rot_hor = _rotation(src[3]+90, 0)*diag
-            rot_ver = _rotation(src[3], src[4]+90)*diag
-            src = np.transpose(src[:3] + np.stack([
-                               rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor]))
+            src = _square_loop_from_point_dipole(src)
 
         # Get arbitrarily shaped dipole source using recursion.
         sx, sy, sz = src
@@ -571,11 +563,7 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
 
     elif ncoord == 5:  # Point dipole: convert to finite length.
 
-        # Get rotation factors.
-        factors = _rotation(*src[3:])
-
-        # Rotate to +/- 0.5.
-        src = np.ravel(src[:3] + np.stack([-factors, factors])/2, 'F')
+        src = _finite_dipole_from_point_dipole(src)
 
     else:
 
@@ -1014,3 +1002,21 @@ def _rotation(azm, dip):
 
     """
     return np.array([cosdg(azm)*cosdg(dip), sindg(azm)*cosdg(dip), sindg(dip)])
+
+
+def _finite_dipole_from_point_dipole(src, length=1):
+    """Return finite dipole of length given a point dipole."""
+    factors = _rotation(*src[3:])*length/2
+    return np.ravel(src[:3] + np.stack([-factors, factors]), 'F')
+
+
+def _square_loop_from_point_dipole(src, diag=np.sqrt(2)):
+    """Return points of a square loop perpendicular to dipole.
+
+    Default diagonal is sqrt(2), so the sides are 1x1 m. Two points (hor) stay
+    in the xy-plane, the other two points dip.
+    """
+    rot_hor = _rotation(src[3]+90, 0)*diag/2
+    rot_ver = _rotation(src[3], src[4]+90)*diag/2
+    points = src[:3]+np.stack([rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
+    return points.T
