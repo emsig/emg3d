@@ -5,9 +5,10 @@ Changelog
 recent versions
 """""""""""""""
 
+v0.16.0: Arbitrarily shaped sources
+-----------------------------------
 
-*latest*: Arbitrarily shaped sources
-------------------------------------
+**2021-01-13**
 
 - ``fields.get_source_field``:
 
@@ -15,22 +16,22 @@ recent versions
     providing a ``src`` that consists of x-, y-, and z-coordinates of all
     endpoints of the individual segments.
 
-  - Simple magnetic "dipole" sources can now be created by providing a point
-    dipole (``[x, y, z, azm, dip]``) and set ``msrc=True`` (new fct-keyword).
-    This will create a square loop of 1x1 m perpendicular to the defined point
-    dipole, hence simulating a magnetic source.
+  - Simple "magnetic dipole" sources can now be created by providing a point
+    dipole (``[x, y, z, azm, dip]``) and set ``msrc=True``. This will create a
+    square loop of ``length``x``length`` m perpendicular to the defined point
+    dipole, hence simulating a magnetic source. Default length is 1 meter.
 
   - Point dipoles and finite length dipoles were before treated differently.
-    Now point dipoles are converted into finite length dipoles of 1 m length,
-    and treated the same. This is backwards incompatible and means that the
-    source field for point dipoles might not be exactly the same as before.
-    However, in any properly set-up grid this should have no influence on the
-    result.
+    Point dipoles are new converted into finite length dipoles of provided
+    length (default is 1 meter), and treated as finite length dipoles. This is
+    backwards incompatible and means that the source field for point dipoles
+    might not be exactly the same as before. However, in any properly set-up
+    simulation this should have no influence on the result.
 
   - Bugfix: Fix floating point issue when the smaller coordinate of a finite
-    length dipole source was very close to a node, but not exactly (in the
-    order of much less than nanometers. It then overestimated that source by
-    putting it in twice as many cells, but not normalizing for it.
+    length dipole source was very close to a node, but not exactly. This is
+    done by rounding the grid locations and source position, and the precision
+    can be controlled via ``decimals``; default is micrometer.
 
 - ``fields``: Values outside the grid in ``get_receiver`` and
   ``get_receiver_response`` are new set to NaN's instead of zeroes.
@@ -42,18 +43,21 @@ recent versions
 
   - Within the automatic gridding the ``properties`` are estimated much more
     conservative now, if not provided: before the log10-average of the last
-    slice in a given direction was used; now it uses the minimum conductivity /
-    maximum resistivity. This is usually the air value for x/y and positive z.
-    This is very conservative, but avoids that users use too small
-    computational domains in the case of land and shallow marine surveys. The
-    downside is that heavily over-estimates the required domain in the deep
-    marine case. However, slower but safe is better in this case.
+    slice in a given direction was used; now it uses the maximum resistivity.
+    This is usually the air value for x/y and positive z. This is very
+    conservative, but avoids that users use too small computational domains in
+    the case of land and shallow marine surveys. The downside is that it
+    heavily over-estimates the required domain in the deep marine case.
+    However, slower but safe is better in this case.
   - New method ``print_grids``, which prints the info of all created grids.
     This is also used for logging in the CLI interface.
 
 - ``maps``: ``interp3d`` takes a new keyword ``cval``, which is passed to
   ``map_coordinates``.
 
+
+v0.11.0 - v0.15.3
+"""""""""""""""""
 
 v0.15.3: Move to EMSiG
 ----------------------
@@ -449,7 +453,7 @@ were removed, however.
   - Fixed ``io`` for ``SourceField``, that was not implemented properly.
 
 
-v0.8.0 - v0.10.x
+v0.8.0 - v0.10.1
 """"""""""""""""
 
 *v0.10.1* : Zero Source
@@ -686,7 +690,7 @@ v0.8.0 - v0.10.x
     ``utils.get_stretched_h``.
 
 
-v0.1.0 - v0.7.x
+v0.1.0 - v0.7.1
 """""""""""""""
 
 *v0.7.1* : JOSS article
