@@ -260,8 +260,8 @@ test-suite included. To run the test-suite you must download ``emg3d`` from
 GitHub.
 
 There is also a benchmark suite using *airspeed velocity*, located in the
-`empymod/emg3d-asv <https://github.com/emsig/emg3d-asv>`_-repository. The
-results of my machine can be found in the `empymod/emg3d-bench
+`emsig/emg3d-asv <https://github.com/emsig/emg3d-asv>`_-repository. The results
+of my machine can be found in the `emsig/emg3d-bench
 <https://github.com/emsig/emg3d-bench>`_, its rendered version at
 `emsig.github.io/emg3d-asv <https://emsig.github.io/emg3d-asv>`_.
 

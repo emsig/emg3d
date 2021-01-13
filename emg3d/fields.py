@@ -442,7 +442,8 @@ class SourceField(Field):
         return np.real(self.field.fz/self.smu0)
 
 
-def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
+def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
+                     decimals=6):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -474,8 +475,10 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
           - Point dipole: ``[x, y, z, azimuth, dip]``.
           - Arbitrarily shaped source: ``[[x-coo], [y-coo], [z-coo]]``.
 
-        In the case of a point dipole one can set ``msrc=True``, which will
-        create a loop perpendicular to the dipole.
+        Point dipoles will be converted internally to finite length dipoles
+        of ``length``. In the case of a point dipole one can set ``msrc=True``,
+        which will create a square loop of ``length``x``length`` perpendicular
+        to the dipole.
 
     freq : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
@@ -501,9 +504,14 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
         other formats setting ``msrc`` has no effect). It then creates a square
         loop perpendicular to this dipole, with side-length 1.
 
-    decimals: int
+    length : float, optional
+        Length (m) of the point dipole when converted to a finite length
+        dipole, or edge-length (m) of the square loop if ``msrc=True``.
+        Default is 1.0.
+
+    decimals: int, optional
         Grid nodes and source coordinates are rounded to given number of
-        decimals.
+        decimals. Default is 6 (micrometer).
 
 
     Returns
@@ -524,13 +532,13 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
     # Convert arbitrary shapes and point dipoles to finite length dipoles.
     if len(src) == 5 and not msrc:  # Point dipole: convert to finite length.
 
-        src = _finite_dipole_from_point_dipole(src)
+        src = _finite_dipole_from_point_dipole(src, length)
 
     elif len(src) in [3, 5]:  # Arbitrary shapes.
 
         # Get points of square loop perp. to dipole in case of msrc.
         if len(src) == 5:
-            src = _square_loop_from_point_dipole(src)
+            src = _square_loop_from_point_dipole(src, length)
 
         # Get arbitrarily shaped dipole source using recursion.
         sx, sy, sz = src
@@ -544,15 +552,16 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, decimals=6):
 
         # Initiate a zero-valued source field and loop over segments.
         sfield = SourceField(grid, freq=freq)
-        for i in range(sx.size-1):
-            sfield += get_source_field(
-                    grid, (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1]),
-                    freq, lengths[i])
-
-        # Add src and moment information.
         sfield.src = src
         sfield.strength = strength
-        sfield.moment = np.nan  # Not implemented.
+        sfield.moment = np.array([0., 0, 0])
+
+        # Loop over elements.
+        for i in range(sx.size-1):
+            segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
+            seg_field = get_source_field(grid, segment, freq, lengths[i])
+            sfield += seg_field
+            sfield.moment += seg_field.moment
 
         return sfield
 
@@ -1001,19 +1010,16 @@ def _rotation(azm, dip):
     return np.array([cosdg(azm)*cosdg(dip), sindg(azm)*cosdg(dip), sindg(dip)])
 
 
-def _finite_dipole_from_point_dipole(src, length=1):
+def _finite_dipole_from_point_dipole(src, length):
     """Return finite dipole of length given a point dipole."""
     factors = _rotation(*src[3:])*length/2
     return np.ravel(src[:3] + np.stack([-factors, factors]), 'F')
 
 
-def _square_loop_from_point_dipole(src, diag=np.sqrt(2)):
-    """Return points of a square loop perpendicular to dipole.
-
-    Default diagonal is sqrt(2), so the sides are 1x1 m. Two points (hor) stay
-    in the xy-plane, the other two points dip.
-    """
-    rot_hor = _rotation(src[3]+90, 0)*diag/2
-    rot_ver = _rotation(src[3], src[4]+90)*diag/2
+def _square_loop_from_point_dipole(src, length):
+    """Return points of a square loop of length x length m perp. to dipole."""
+    half_diagonal = np.sqrt(2)*length/2
+    rot_hor = _rotation(src[3]+90, 0)*half_diagonal
+    rot_ver = _rotation(src[3], src[4]+90)*half_diagonal
     points = src[:3]+np.stack([rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
     return points.T
