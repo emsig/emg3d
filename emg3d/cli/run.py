@@ -17,6 +17,8 @@ Functions that actually call emg3d within the CLI interface.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import os
+import sys
 import json
 import time
 import logging
@@ -50,6 +52,7 @@ def simulation(args_dict):
 
     # Parse configuration file.
     cfg, term = parser.parse_config_file(args_dict)
+    check_files(cfg, term)  # Check all files and directories exist.
     function, verb = term['function'], term['verbosity']
     dry_run = term.get('dry_run', False)
     verb_io = max(0, verb-1)  # io-verbosity only when debug (verbosity=2).
@@ -62,8 +65,6 @@ def simulation(args_dict):
                 f"v{utils.__version__}\n")
 
     # Dump the configuration.
-    if not term['config_file']:
-        logger.warning("* WARNING :: CONFIGURATION FILE NOT FOUND.\n")
     paramdump = json.dumps(cfg, sort_keys=True, indent=4)
     logger.debug(f"** CONFIGURATION: {term['config_file']}\n{paramdump}\n")
 
@@ -153,16 +154,21 @@ def simulation(args_dict):
 
     # Add solver exit messages to log.
     if not dry_run:
-        infostr = "\nSolver exit messages:\n"
+        ### TODO - This is now double, in Simulation and here.            TODO #
+        ### TODO - Get Simulation ready for logging and remove from here. TODO #
+        infostr = "\n** SOLVER LOGS:\n\n"
         for src, values in sim._dict_efield_info.items():
-            for freq, info in values.items():
-                infostr += f"- Src {src}; {freq} Hz : {info['exit_message']}"
+            for freq, finfo in values.items():
+                if finfo['log']:
+                    infostr += f"= Src {src}; {freq} Hz : FORWARD =\n"
+                    infostr += finfo['log']
                 if function == 'gradient':
-                    binfo = sim._dict_efield_info[src][freq]['exit_message']
-                    infostr += f"; back: : {binfo}\n"
-                else:
-                    infostr += "\n"
-        logger.debug(infostr)
+                    binfo = sim._dict_bfield_info[src][freq]
+                    if binfo['log']:
+                        infostr += f"= Src {src}; {freq} Hz : BACK    =\n"
+                        infostr += binfo['log']
+        if len(infostr) > 30:
+            logger.debug(infostr)
 
     # Store output to disk.
     if cfg['files']['store_simulation']:
@@ -172,6 +178,26 @@ def simulation(args_dict):
     # Goodbye
     logger.info(f"\n:: emg3d {function} END   :: {time.asctime()} :: "
                 f"runtime = {runtime.runtime}\n")
+
+
+def check_files(cfg, term):
+    """Ensure all paths and files exist."""
+
+    # First check if config file exists.
+    fname = term['config_file']
+    if not os.path.isfile(fname) and fname != '.':  # '.' => no config file.
+        sys.exit(f"* ERROR   :: Config file not found: {fname}")
+
+    # Check Survey and Model.
+    for name in ['Survey', 'Model']:
+        fname = cfg['files'][name.lower()]
+        if not os.path.isfile(fname):
+            sys.exit(f"* ERROR   :: {name} file not found: {fname}")
+
+    # Finally check output directory.
+    dname = os.path.split(cfg['files']['log'])[0]
+    if not os.path.isdir(dname):
+        sys.exit(f"* ERROR   :: Output directory does not exist: {dname}")
 
 
 def initiate_logger(cfg, runtime, verb):

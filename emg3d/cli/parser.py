@@ -56,11 +56,6 @@ def parse_config_file(args_dict):
         # warning when one does not want to provide a config file.
         configfile = config
 
-    else:
-
-        # Throw a warning that the parameter file was not found.
-        configfile = False
-
     # # Check the terminal arguments # #
 
     # Initiate terminal dict.

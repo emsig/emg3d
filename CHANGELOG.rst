@@ -5,6 +5,25 @@ Changelog
 recent versions
 """""""""""""""
 
+*latest*
+--------
+
+- Solver:
+
+  - ``solver.solve`` has a new keyword ``log``: it enables to log the solver
+    messages in the returned info dictionary instead of printing them to
+    screen. This is utilized in the CLI and in the ``Simulation`` class to log
+    the solver info.
+
+- CLI:
+
+  - Checks now first if all required files and directories exist, and exits
+    gracefully otherwise informing the user. (The default thrown Python errors
+    would be good enough; but user of the CLI interface might not be familiar
+    with Python, so it is better to throw a very simple, clear message.)
+  - Log is more verbose with regards to solver (rel. error, time, nr of it.).
+
+
 v0.16.0: Arbitrarily shaped sources
 -----------------------------------
 

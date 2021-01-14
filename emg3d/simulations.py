@@ -147,7 +147,7 @@ class Simulation:
         - `sslsolver=True`;
         - `semicoarsening=True`;
         - `linerelaxation=True`;
-        - `verb=0` (yet warnings are capture and shown).
+        - `verb=2`.
 
         Note that these defaults are different from the defaults in
         :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
@@ -198,7 +198,7 @@ class Simulation:
         # switched off entirely, as warnings are captured differently.
         # Input overwrites all defaults if provided.
         self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
-                            'linerelaxation': True,  'verb': 0,
+                            'linerelaxation': True,  'verb': 2,
                             **kwargs.pop('solver_opts', {})}
 
         # Store original input nCz.
@@ -727,6 +727,7 @@ class Simulation:
                 'model': self.get_model(source, freq),
                 'sfield': self.get_sfield(source, freq),
                 'return_info': True,
+                'log': -1,
             }
 
             # Compute electric field.
@@ -1067,6 +1068,7 @@ class Simulation:
             'model': self.get_model(*inp),
             'sfield': self._get_rfield(*inp),  # Residual field.
             'return_info': True,
+            'log': -1,
         }
 
         # Compute and return back-propagated electric field.

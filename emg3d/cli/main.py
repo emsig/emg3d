@@ -170,8 +170,8 @@ def main(args=None):
 
         # If no arguments provided, and ./emg3d.cfg does not exist, print info.
         print(parser.description)
-        print("=> Type `emg3d --help` for more info "
-              f"(emg3d v{utils.__version__}).")
+        version = utils.__version__
+        print(f"=> Type `emg3d --help` for more info (emg3d v{version}).")
         return
 
     # Run simulation with given command line inputs.
