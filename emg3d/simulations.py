@@ -1339,14 +1339,15 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     """
     # Initiate new gridding_opts.
-    gopts = {'return_info': True}
+    gopts = {}
 
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
                  'lambda_from_center', 'max_buffer', 'min_width_limits',
-                 'min_width_pps', 'verb']:
+                 'min_width_pps', 'verb', 'return_info']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
+    gopts['return_info'] = True  # return_info is forced to True
 
     # Mapping defaults to model map.
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)
@@ -1489,6 +1490,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     # Ensure no gridding_opts left.
     if gridding_opts:
+        print(gridding_opts)
         raise TypeError(
                 f"Unexpected gridding_opts: {list(gridding_opts.keys())}")
 
