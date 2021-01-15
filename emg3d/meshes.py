@@ -499,8 +499,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
-    kwargs['return_info'] = True  # Run x/y/z first, print/collect
-    kwargs['raise_error'] = False # info, then raise if necessary.
+    kwargs['return_info'] = True   # Run x/y/z first, print/collect
+    kwargs['raise_error'] = False  # info, then raise if necessary.
     xparams = {'center': center[0]}
     yparams = {'center': center[1]}
     zparams = {'center': center[2], 'seasurface': seasurface}
