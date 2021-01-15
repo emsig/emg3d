@@ -841,23 +841,17 @@ class Simulation:
         self._dict_hfield = self._dict_initiate
 
         # Loop over src-freq combinations to extract and store.
-        warned = False  # Flag for warnings.
         for i, (src, freq) in enumerate(srcfreq):
 
-            # Store efield.
+            # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
-
-            # Store solver info.
-            info = out[i][1]
-            self._dict_efield_info[src][freq] = info
-            if info['exit'] != 0 and self.verb >= 0:
-                if not warned:
-                    print("Solver warnings:")
-                    warned = True
-                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+            self._dict_efield_info[src][freq] = out[i][1]
 
             # Store responses at receivers.
             self.data['synthetic'].loc[src, :, freq] = out[i][2]
+
+        # Print solver warnings.
+        self._print_warnings('efield', self.verb)
 
         # If it shall be used as observed data save a copy.
         if observed:
@@ -1026,7 +1020,7 @@ class Simulation:
     def print_grids(self):
         """Print info for all generated grids."""
 
-        ## TODO   Add tests for the gridding info strings                   TODO
+        ## TODO   Add tests for the gridding info strings
 
         # Act depending on gridding:
         out = ""
@@ -1100,20 +1094,14 @@ class Simulation:
             self._dict_bfield_info = self._dict_initiate
 
         # Loop over src-freq combinations to extract and store.
-        warned = False  # Flag for warnings.
         for i, (src, freq) in enumerate(self._srcfreq):
 
-            # Store bfield.
+            # Store bfield and solver info.
             self._dict_bfield[src][freq] = out[i][0]
+            self._dict_bfield_info[src][freq] = out[i][1]
 
-            # Store solver info.
-            info = out[i][1]
-            self._dict_bfield_info[src][freq] = info
-            if info['exit'] != 0 and self.verb >= 0:
-                if not warned:
-                    print("Solver warnings:")
-                    warned = True
-                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+        # Print solver warnings.
+        self._print_warnings('bfield', self.verb)
 
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
@@ -1148,6 +1136,25 @@ class Simulation:
                 )
 
         return ResidualField
+
+    def _print_warnings(self, field, verb=1):
+        """Print solver warnings."""
+        info = getattr(self, f"_dict_{field}_info")
+        warned = False  # Flag for warnings.
+        msg = ''
+        for i, (src, freq) in enumerate(self._srcfreq):
+            cinfo = info[src][freq]
+            if cinfo['exit'] != 0 and self.verb >= 0:
+                msg += "\n"
+                if not warned:
+                    msg += f"Solver warnings {field}:\n"
+                    warned = True
+                msg += f"- Src {src}; {freq} Hz : {cinfo['exit_message']}"
+
+        if verb > 0:
+            print(msg)
+        elif verb < 0:
+            return msg
 
 
 # HELPER FUNCTIONS

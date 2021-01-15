@@ -557,7 +557,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     y0, hy, yinfo = get_origin_widths(**kwargs, **yparams)
     z0, hz, zinfo = get_origin_widths(**kwargs, **zparams)
 
-    ## TODO : Add tests for all the changes!                                TODO
+    ## TODO : Add tests for all the changes!
 
     # Collect info.
     if verb > 0:

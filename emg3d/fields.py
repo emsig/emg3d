@@ -983,7 +983,7 @@ def _finite_source_xyz(grid, src, s, xyz, decimals):
     # Ensure unity (should not be necessary).
     sum_s = abs(s.sum())
     if abs(sum_s-1) > 1e-6:
-        ## TODO Adjust Test!                                                TODO
+        ## TODO Adjust Test!
         warnings.warn(f"Normalizing Source: {sum_s:.10f}.", UserWarning)
         s /= sum_s
 

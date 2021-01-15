@@ -55,7 +55,6 @@ def simulation(args_dict):
     check_files(cfg, term)  # Check all files and directories exist.
     function, verb = term['function'], term['verbosity']
     dry_run = term.get('dry_run', False)
-    verb_io = max(0, verb-1)  # io-verbosity only when debug (verbosity=2).
 
     # Start this task: start timing.
     logger = initiate_logger(cfg, runtime, verb)
@@ -112,7 +111,7 @@ def simulation(args_dict):
             survey=sdata['survey'],
             grid=mdata['mesh'],
             model=mdata['model'],
-            verb=verb,
+            verb=0,
             **cfg['simulation_options']
             )
 
@@ -132,12 +131,31 @@ def simulation(args_dict):
     # Compute forward model (all calls).
     if dry_run:
         output['data'] = np.zeros_like(sim.data.synthetic)
-    elif function == 'forward':
-        sim.compute(observed=True, min_offset=min_offset)
-        output['data'] = sim.data.observed
     else:
-        sim.compute()
-        output['data'] = sim.data.synthetic
+        logger.info("\n** FORWARD COMPUTATION")
+
+        if function == 'forward':
+            sim.compute(observed=True, min_offset=min_offset)
+            output['data'] = sim.data.observed
+        else:
+            sim.compute()
+            output['data'] = sim.data.synthetic
+
+        # Print Solver Warnings (only if not successful).
+        logger.warning(sim._print_warnings('efield', -1))
+
+        # Print Solver Logs.
+        ## TODO - This is now double, in Simulation and here.
+        ## TODO - Get Simulation ready for logging and remove from here.
+        infostr = "\nSolver logs:\n\n"
+        for src, values in sim._dict_efield_info.items():
+            for freq, info in values.items():
+                if info['log']:
+                    infostr += f"= Src {src}; {freq} Hz =\n"
+                    infostr += info['log']
+
+        if len(infostr) > 30:
+            logger.debug(infostr)
 
     # Compute the misfit.
     if function in ['misfit', 'gradient']:
@@ -152,25 +170,25 @@ def simulation(args_dict):
         if dry_run:
             output['gradient'] = np.zeros(mdata['mesh'].vnC)
         else:
+            logger.info("\n** BACKWARD COMPUTATION")
+
             output['gradient'] = sim.gradient
 
-    # Add solver exit messages to log.
-    if not dry_run:
-        ## TODO - This is now double, in Simulation and here.               TODO
-        ## TODO - Get Simulation ready for logging and remove from here.    TODO
-        infostr = "\n** SOLVER LOGS:\n\n"
-        for src, values in sim._dict_efield_info.items():
-            for freq, finfo in values.items():
-                if finfo['log']:
-                    infostr += f"= Src {src}; {freq} Hz : FORWARD =\n"
-                    infostr += finfo['log']
-                if function == 'gradient':
-                    binfo = sim._dict_bfield_info[src][freq]
-                    if binfo['log']:
-                        infostr += f"= Src {src}; {freq} Hz : BACK    =\n"
-                        infostr += binfo['log']
-        if len(infostr) > 30:
-            logger.debug(infostr)
+            # Print Solver Warnings (only if not successful).
+            logger.warning(sim._print_warnings('bfield', -1))
+
+            # Print Solver Logs.
+            ## TODO - This is now double, in Simulation and here.
+            ## TODO - Get Simulation ready for logging and remove from here.
+            infostr = "\nSolver logs:\n\n"
+            for src, values in sim._dict_bfield_info.items():
+                for freq, info in values.items():
+                    if info['log']:
+                        infostr += f"= Src {src}; {freq} Hz =\n"
+                        infostr += info['log']
+
+            if len(infostr) > 30:
+                logger.debug(infostr)
 
     # Store output to disk.
     if cfg['files']['store_simulation']:
@@ -233,7 +251,7 @@ def initiate_logger(cfg, runtime, verb):
     ch.set_name('emg3d_ch')  # Add name to easy remove them.
     logger.addHandler(ch)
 
-    # Add handlers to Python Warnings. ## TODO test this!                   TODO
+    # Add handlers to Python Warnings. ## TODO test this!
     logging.captureWarnings(True)
     logger_warnings = logging.getLogger("py.warnings")
     logger_warnings.setLevel(logging.DEBUG)
