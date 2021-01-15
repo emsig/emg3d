@@ -230,4 +230,11 @@ def initiate_logger(cfg, runtime, verb):
     ch.set_name('emg3d_ch')  # Add name to easy remove them.
     logger.addHandler(ch)
 
+    # Add handlers to Python Warnings. ## TODO test this!                   TODO
+    logging.captureWarnings(True)
+    logger_warnings = logging.getLogger("py.warnings")
+    logger_warnings.setLevel(logging.DEBUG)
+    logger_warnings.addHandler(ch)
+    logger_warnings.addHandler(fh)
+
     return logger

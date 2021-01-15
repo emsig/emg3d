@@ -18,6 +18,7 @@ electric and magnetic fields, and fields at receivers.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -982,7 +983,8 @@ def _finite_source_xyz(grid, src, s, xyz, decimals):
     # Ensure unity (should not be necessary).
     sum_s = abs(s.sum())
     if abs(sum_s-1) > 1e-6:
-        print(f"* WARNING :: Normalizing Source: {sum_s:.10f}.")
+        ## TODO Adjust Test!                                                TODO
+        warnings.warn(f"Normalizing Source: {sum_s:.10f}.", UserWarning)
         s /= sum_s
 
 

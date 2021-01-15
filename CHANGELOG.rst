@@ -26,6 +26,8 @@ recent versions
 - ``Dipole`` throws new an error instead of a warning if it received an unknown
   keyword.
 
+- Various small things with regard how things are logged or shown on screen.
+
 
 v0.16.0: Arbitrarily shaped sources
 -----------------------------------
