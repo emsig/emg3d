@@ -158,7 +158,6 @@ def save(fname, **kwargs):
     # Print file info.
     info = (f"Data saved to «{full_path}»\n[{kwargs['_version']} "
             f"(format {kwargs['_format']}) on {kwargs['_date']}].")
-    ## TODO TEST THIS
     if verb > 0:
         print(info)
     elif verb < 0:
@@ -261,13 +260,12 @@ def load(fname, **kwargs):
         if verb != 0:
             info += "[version/format/date unknown; not created by emg3d].\n"
 
-    ## TODO TEST THIS
     if verb > 0:
         print(info[:-1])
 
     if verb < 0:
         return data, info[:-1]
-    elif verb < 0:
+    else:
         return data
 
 
@@ -343,7 +341,6 @@ def _dict_serialize(inp, out=None, collect_classes=False):
                                'hz': value.h[2],
                                'origin': value.origin, '__class__': name}
                 except AttributeError as e:  # Gracefully fail.
-                    ## TODO TEST THIS
                     warnings.warn(f"Could not serialize <{key}>: {e}",
                                   UserWarning)
                     continue
@@ -423,7 +420,6 @@ def _dict_deserialize(inp, first_call=True):
 
                 except (NotImplementedError, AttributeError, KeyError) as e:
                     # Gracefully fail.
-                    ## TODO TEST THIS
                     warnings.warn(f"Could not de-serialize <{key}>: {e}",
                                   UserWarning)
 

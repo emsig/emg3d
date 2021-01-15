@@ -103,7 +103,6 @@ def _requires(*args, **kwargs):
                                if not available[i]]
                     msg = ("=> This feature of `emg3d` requires the following,"
                            f" missing soft dependencies: {missing}.")
-                    ## TODO TEST THIS
                     warnings.warn(msg)
                 else:
                     pass
@@ -581,7 +580,6 @@ class Fourier:
                 msg += "`freq_inp=None`."
                 self._freq_inp = None
 
-            ## TODO TEST THIS
             warnings.warn(msg, UserWarning)
 
     # PRINTING ROUTINES

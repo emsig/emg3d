@@ -102,30 +102,27 @@ class TestFourier:
         assert_allclose(freq_inp, Fourier1.freq_calc, 0, 0)
 
         # freq_inp AND every_x_freq => re-sets every_x_freq.
-        Fourier2 = utils.Fourier(time, fmin, fmax, every_x_freq=xfreq,
-                                 freq_inp=freq_inp, verb=1)
-        out, _ = capsys.readouterr()
-        assert 'Re-setting `every_x_freq=None`' in out
-        assert_allclose(freq_inp, Fourier2.freq_calc, 0, 0)
-        assert_allclose(Fourier1.freq_calc, Fourier2.freq_calc)
+        with pytest.warns(UserWarning, match='are mutually exclusive'):
+            Fourier2 = utils.Fourier(time, fmin, fmax, every_x_freq=xfreq,
+                                     freq_inp=freq_inp, verb=1)
+            assert_allclose(freq_inp, Fourier2.freq_calc, 0, 0)
+            assert_allclose(Fourier1.freq_calc, Fourier2.freq_calc)
 
         # Now set every_x_freq again => re-sets freq_inp.
-        Fourier2.every_x_freq = xfreq
-        out, _ = capsys.readouterr()
-        assert 'Re-setting `freq_inp=None`' in out
-        assert_allclose(Fourier2.freq_coarse, Fourier2.freq_req[::xfreq])
-        assert Fourier2.freq_inp is None
-        test = Fourier2.freq_req[::xfreq][
-                (Fourier2.freq_req[::xfreq] >= fmin) &
-                (Fourier2.freq_req[::xfreq] <= fmax)]
-        assert_allclose(Fourier2.freq_calc, test)
+        with pytest.warns(UserWarning, match='freq_inp=None'):
+            Fourier2.every_x_freq = xfreq
+            assert_allclose(Fourier2.freq_coarse, Fourier2.freq_req[::xfreq])
+            assert Fourier2.freq_inp is None
+            test = Fourier2.freq_req[::xfreq][
+                    (Fourier2.freq_req[::xfreq] >= fmin) &
+                    (Fourier2.freq_req[::xfreq] <= fmax)]
+            assert_allclose(Fourier2.freq_calc, test)
 
         # And back
-        Fourier2.freq_inp = freq_inp
-        out, _ = capsys.readouterr()
-        assert 'Re-setting `every_x_freq=None`' in out
-        assert_allclose(Fourier2.freq_calc, freq_inp)
-        assert Fourier2.every_x_freq is None
+        with pytest.warns(UserWarning, match='every_x_freq=None'):
+            Fourier2.freq_inp = freq_inp
+            assert_allclose(Fourier2.freq_calc, freq_inp)
+            assert Fourier2.every_x_freq is None
 
         # Unknown argument, must fail with TypeError.
         with pytest.raises(TypeError):
