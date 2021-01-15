@@ -154,8 +154,8 @@ def simulation(args_dict):
 
     # Add solver exit messages to log.
     if not dry_run:
-        ### TODO - This is now double, in Simulation and here.            TODO #
-        ### TODO - Get Simulation ready for logging and remove from here. TODO #
+        ## TODO - This is now double, in Simulation and here.               TODO
+        ## TODO - Get Simulation ready for logging and remove from here.    TODO
         infostr = "\n** SOLVER LOGS:\n\n"
         for src, values in sim._dict_efield_info.items():
             for freq, finfo in values.items():

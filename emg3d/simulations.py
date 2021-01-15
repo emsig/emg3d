@@ -1026,7 +1026,7 @@ class Simulation:
     def print_grids(self):
         """Print info for all generated grids."""
 
-        # TODO   Add gridding info if it exist to the string              TODO #
+        ## TODO   Add tests for the gridding info strings                   TODO
 
         # Act depending on gridding:
         out = ""
@@ -1035,27 +1035,34 @@ class Simulation:
             # Loop over frequencies.
             for freq in self.survey.frequencies:
                 out += f"Source: all; Frequency: {freq} Hz\n"
-                out += self.get_grid(self._srcfreq[0][0], freq).__repr__()
+                mesh = self.get_grid(self._srcfreq[0][0], freq)
+                out += mesh.info
+                out += mesh.__repr__()
 
         elif self.gridding == 'source':
 
             # Loop over sources.
             for src in self.survey.sources.keys():
                 out += f"= Source: {src}; Frequency: all =\n"
-                out += self.get_grid(src, self._srcfreq[0][1]).__repr__()
+                mesh = self.get_grid(src, self._srcfreq[0][1])
+                out += mesh.info
+                out += mesh.__repr__()
 
         elif self.gridding == 'both':
 
             # Loop over sources, frequencies.
             for src, freq in self._srcfreq:
                 out += f"Source: {src}; Frequency: {freq} Hz\n"
-                out += self.get_grid(src, freq).__repr__()
+                mesh = self.get_grid(src, freq)
+                out += mesh.info
+                out += mesh.__repr__()
 
         else:  # same, input, single
 
             out += "Source: all; Frequency: all\n"
-            out += self.get_grid(self._srcfreq[0][0],
-                                 self._srcfreq[0][1]).__repr__()
+            mesh = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
+            out += mesh.info
+            out += mesh.__repr__()
 
         return out
 
@@ -1325,7 +1332,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     """
     # Initiate new gridding_opts.
-    gopts = {}
+    gopts = {'return_info': True}
 
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',

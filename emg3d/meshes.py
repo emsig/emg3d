@@ -494,10 +494,12 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     """
     verb = kwargs.get('verb', 0)
+    return_info = kwargs.get('return_info', False)
     distance = kwargs.pop('distance', None)
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
+    kwargs['raise_error'] = False  # Run x/y/z; print info; then raise.
     xparams = {'center': center[0]}
     yparams = {'center': center[1]}
     zparams = {'center': center[2], 'seasurface': seasurface}
@@ -551,22 +553,30 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                 kwargs[name] = value
 
     # Get origins and widths in all directions.
-    if verb > 0:
-        print("         == GRIDDING IN X ==")
-    x0, hx = get_origin_widths(**kwargs, **xparams)
-    if verb > 0:
-        print("\n         == GRIDDING IN Y ==")
-    y0, hy = get_origin_widths(**kwargs, **yparams)
-    if verb > 0:
-        print("\n         == GRIDDING IN Z ==")
-    z0, hz = get_origin_widths(**kwargs, **zparams)
+    x0, hx, xinfo = get_origin_widths(**kwargs, **xparams)
+    y0, hy, yinfo = get_origin_widths(**kwargs, **yparams)
+    z0, hz, zinfo = get_origin_widths(**kwargs, **zparams)
 
-    # TODO : Replace all prints by string to be returned or printed.
-    # TODO : Add `return_info` to `get_origin_widths`; attach to mesh.    TODO #
-    # TODO : Adjust `Simulation` and `cli.run` to use it.
+    ## TODO : Add tests for all the changes!                                TODO
+
+    # Collect info.
+    if verb > 0:
+        info = (f"\n         == GRIDDING IN X ==\n{xinfo}\n"
+                f"\n         == GRIDDING IN Y ==\n{yinfo}\n"
+                f"\n         == GRIDDING IN Z ==\n{zinfo}\n")
+        if not return_info:
+            print(info)
+    else:
+        info = ""
+
+    # Throw message if no solution was found.
+    if any([out is None for out in [x0, y0, z0]]):
+        raise RuntimeError("No suitable grid found; relax your criteria.")
 
     # Return mesh.
-    return TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
+    mesh = TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
+    mesh.info = info
+    return mesh
 
 
 def get_origin_widths(frequency, properties, center, domain=None, vector=None,
@@ -589,6 +599,11 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         All parameters are described in :func:`construct_mesh`. The only
         difference is that here only variables for one direction are accepted.
 
+    return_info : bool, optional
+        If True, it returns the info as a string instead of printing it to the
+        screen (that means it will be an empty string if ``verb=0``).
+        Default is False.
+
     raise_error : bool, optional
         If True, an error is raised if no suitable grid is found. Otherwise it
         just prints a message and returns None's.
@@ -601,6 +616,9 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     widths : ndarray
         Cell widths of mesh.
+
+    info : str
+        Info, only if ``return_info=True`.
 
     """
     # Get all kwargs.
@@ -615,6 +633,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
     raise_error = kwargs.pop('raise_error', True)
     verb = kwargs.pop('verb', 0)
+    return_info = kwargs.pop('return_info', False)
 
     # Ensure no kwargs left.
     if kwargs:
@@ -803,7 +822,8 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
             print(f"* ERROR   :: {msg}")
             return None, None
 
-    # Print info about final grid.
+    # Collect info about final grid.
+    info = ""
     if verb > 0:
 
         # Check max stretching.
@@ -813,50 +833,48 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         # Display precision.
         prec = int(np.ceil(max(0, -np.log10(min(hx))+1)))
 
+        info = f"Skin depth          [m] : {skind[0]:.{prec}f}"
+        if cond.size > 1:
+            info += f" / {skind[1]:.{prec}f}"
+        if cond.size > 2:
+            info += f" / {skind[2]:.{prec}f}"
         if verb > 1:
-            end = ""
-        else:
-            end = "\n"
+            info += "  [corresponding to `properties`]"
 
-        print(f"Skin depth          [m] : {skind[0]:.{prec}f}", end="")
-        if cond.size == 2:
-            print(f" / {skind[1]:.{prec}f}", end=end)
-        elif cond.size == 3:
-            print(f" / {skind[1]:.{prec}f} / {skind[2]:.{prec}f}", end=end)
-        else:
-            print(end=end)
+        info += (f"\nSurvey domain DS    [m] : {domain[0]:.{prec}f} - "
+                 f"{domain[1]:.{prec}f}\n"
+                 f"Comp. domain DC     [m] : {comp_domain[0]:.{prec}f} - "
+                 f"{comp_domain[1]:.{prec}f}\n"
+                 f"Final extent        [m] : {x0:.{prec}f} - "
+                 f"{x0+np.sum(hx):.{prec}f}\n"
+                 f"Cell widths         [m] : "
+                 f"{min(hxo):.{prec}f} / {max(hxo):.{prec}f} / "
+                 f"{max(hx):.{prec}f}")
+
         if verb > 1:
-            print("  [corresponding to `properties`]")
+            info += "  [min(DS) / max(DS) / max(DC)]"
 
-        print(f"Survey domain DS    [m] : {domain[0]:.{prec}f} - "
-              f"{domain[1]:.{prec}f}")
-
-        print(f"Comp. domain DC     [m] : {comp_domain[0]:.{prec}f} - "
-              f"{comp_domain[1]:.{prec}f}")
-
-        print(f"Final extent        [m] : {x0:.{prec}f} - "
-              f"{x0+np.sum(hx):.{prec}f}")
-
-        print(f"Cell widths         [m] : "
-              f"{min(hxo):.{prec}f} / {max(hxo):.{prec}f} / "
-              f"{max(hx):.{prec}f}", end=end)
+        info += (f"\nNumber of cells         : {nx} ({hxo.size} / "
+                 f"{nx-hxo.size-nx_remain2} / {nx_remain2})")
         if verb > 1:
-            print("  [min(DS) / max(DS) / max(DC)]")
+            info += "  [Total (DS/DC/remain)]"
 
-        print(f"Number of cells         : {nx} ({hxo.size} / "
-              f"{nx-hxo.size-nx_remain2} / {nx_remain2})", end=end)
+        info += (f"\nMax stretching          : "
+                 f"{sa:.3f} ({sa_adj:.3f}) / {ca:.3f}")
         if verb > 1:
-            print("  [Total (DS/DC/remain)]")
-
-        print(f"Max stretching          : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}",
-              end=end)
-        if verb > 1:
-            print("  [DS (seasurface) / DC]")
+            info += "  [DS (seasurface) / DC]"
         if sa_adj > sa_limit:
-            print(f"Note: Stretching in DS >> {sa}.\nThe reason "
-                  "is usually the interplay of center/domain/seasurface.")
+            info += (f"\nNote: Stretching in DS >> {sa}.\nThe reason "
+                     "is usually the interplay of center/domain/seasurface.")
 
-    return x0, hx
+        if not return_info:
+            print(info)
+
+    # Return required info.
+    if return_info:
+        return x0, hx, info
+    else:
+        return x0, hx
 
 
 def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
