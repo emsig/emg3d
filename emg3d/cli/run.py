@@ -69,8 +69,10 @@ def simulation(args_dict):
     logger.debug(f"** CONFIGURATION: {term['config_file']}\n{paramdump}\n")
 
     # Load input.
-    sdata = io.load(cfg['files']['survey'], verb=verb_io)
-    mdata = io.load(cfg['files']['model'], verb=verb_io)
+    sdata, sinfo = io.load(cfg['files']['survey'], verb=-1)
+    logger.debug(sinfo)
+    mdata, minfo = io.load(cfg['files']['model'], verb=-1)
+    logger.debug(minfo)
     min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
 
     # Select data.
@@ -173,7 +175,8 @@ def simulation(args_dict):
     # Store output to disk.
     if cfg['files']['store_simulation']:
         output['simulation'] = sim
-    io.save(cfg['files']['output'], **output, verb=verb_io)
+    oinfo = io.save(cfg['files']['output'], **output, verb=-1)
+    logger.debug(oinfo)
 
     # Goodbye
     logger.info(f"\n:: emg3d {function} END   :: {time.asctime()} :: "

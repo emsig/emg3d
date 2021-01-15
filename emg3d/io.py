@@ -80,17 +80,23 @@ def save(fname, **kwargs):
         Passed through to json, default is 2.
 
     verb : int
-        If 1 (default) verbose, if 0 silent.
+        If 1 (default) verbose, if 0 silent; if -1 it returns the info as
+        string instead of printing it.
 
     kwargs : Keyword arguments, optional
-        Data to save using its key as name. The following instances will be
-        properly serialized: :class:`emg3d.meshes.TensorMesh`,
-        :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` and
-        serialized again if loaded with :func:`load`. These instances are
-        collected in their own group if h5py is used.
+        Data to save using its key as name. The classes listed in
+        `emg3d.io.KNOWN_CLASSES will be properly serialized: and de-serialized
+        again if loaded with :func:`load`. These instances are collected in
+        their own group if h5py is used.
 
         Note that the provided data cannot contain the before described
         parameters as keys.
+
+
+    Returns
+    -------
+    info : str
+        Info-string if ``verb<0``.
 
     """
     # Get and remove optional kwargs.
@@ -103,7 +109,7 @@ def save(fname, **kwargs):
     if collect_classes:
         warnings.warn(
             "`collect_classes` is deprecated and will be removed "
-            "in the future.", DeprecationWarning)
+            "in the future.", FutureWarning)
 
     # Get absolute path.
     full_path = os.path.abspath(fname)
@@ -150,17 +156,20 @@ def save(fname, **kwargs):
         raise ValueError(f"Unknown extension '.{ext}'.")
 
     # Print file info.
+    info = (f"Data saved to «{full_path}»\n[{kwargs['_version']} "
+            f"(format {kwargs['_format']}) on {kwargs['_date']}].")
+    ## TODO TEST THIS                                                       TODO
     if verb > 0:
-        print(f"Data saved to «{full_path}»\n[{kwargs['_version']} "
-              f"(format {kwargs['_format']}) on {kwargs['_date']}].")
+        print(info)
+    elif verb < 0:
+        return info
 
 
 def load(fname, **kwargs):
     """Load meshes, models, fields, and other data from disk.
 
-    Load and de-serialize :class:`emg3d.meshes.TensorMesh`,
-    :class:`emg3d.fields.Field`, and :class:`emg3d.models.Model` instances and
-    add arbitrary other data that were saved with :func:`save`.
+    Load and de-serialize classes listed in `emg3d.io.KNOWN_CLASSES`
+    and add arbitrary other data that were saved with :func:`save`.
 
 
     Parameters
@@ -173,7 +182,8 @@ def load(fname, **kwargs):
         - '.json': json
 
     verb : int
-        If 1 (default) verbose, if 0 silent.
+        If 1 (default) verbose, if 0 silent; if -1 it returns the info as
+        string instead of printing it.
 
 
     Returns
@@ -183,6 +193,9 @@ def load(fname, **kwargs):
         :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
         :class:`emg3d.models.Model` instances are de-serialized and returned as
         instances.
+
+    info : str
+        Info-string if ``verb<0``.
 
     """
     # Get kwargs.
@@ -232,22 +245,30 @@ def load(fname, **kwargs):
     _dict_deserialize(data)
 
     # Check if file was (supposedly) created by emg3d.
-    if verb > 0:
-        print(f"Data loaded from «{full_path}»")
+    info = '\n'
+    if verb != 0:
+        info += f"Data loaded from «{full_path}»\n"
     try:
         version = data['_version']
         date = data['_date']
         form = data['_format']
 
         # Print file info.
-        if verb > 0:
-            print(f"[{version} (format {form}) on {date}].")
+        if verb != 0:
+            info += f"[{version} (format {form}) on {date}].\n"
 
     except KeyError:
-        if verb > 0:
-            print("[version/format/date unknown; not created by emg3d].")
+        if verb != 0:
+            info += "[version/format/date unknown; not created by emg3d].\n"
 
-    return data
+    ## TODO TEST THIS                                                       TODO
+    if verb > 0:
+        print(info[:-1])
+
+    if verb < 0:
+        return data, info[:-1]
+    elif verb < 0:
+        return data
 
 
 def _dict_serialize(inp, out=None, collect_classes=False):
@@ -322,8 +343,9 @@ def _dict_serialize(inp, out=None, collect_classes=False):
                                'hz': value.h[2],
                                'origin': value.origin, '__class__': name}
                 except AttributeError as e:  # Gracefully fail.
-                    print(f"* WARNING :: Could not serialize <{key}>.\n"
-                          f"             {e}")
+                    ## TODO TEST THIS                                       TODO
+                    warnings.warn(f"Could not serialize <{key}>: {e}",
+                                  UserWarning)
                     continue
 
             # If we are in the root-directory put them in their own category.
@@ -401,8 +423,9 @@ def _dict_deserialize(inp, first_call=True):
 
                 except (NotImplementedError, AttributeError, KeyError) as e:
                     # Gracefully fail.
-                    print(f"* WARNING :: Could not de-serialize <{key}>.\n"
-                          f"             {e}")
+                    ## TODO TEST THIS                                       TODO
+                    warnings.warn(f"Could not de-serialize <{key}>: {e}",
+                                  UserWarning)
 
             # In no __class__-key or de-serialization fails, use recursion.
             _dict_deserialize(value, False)
