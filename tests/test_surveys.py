@@ -301,15 +301,12 @@ def test_Dipole(capsys):
     with pytest.raises(ValueError, match='The two poles are identical'):
         surveys.Dipole('dip', (0, 0, 0, 0, 0, 0))
 
-    # Check adding various attributs.
+    # Check adding various attributes.
     _, _ = capsys.readouterr()
-    source = surveys.Dipole(
-            'dip', (0.0, 1000.0, -950.0, 0.0, 0.0), strength=75, foo='bar')
+    source = surveys.Dipole('dip', (0.0, 1000.0, -950.0, 0.0, 0.0), strength=7)
     out, _ = capsys.readouterr()
-
-    assert source.strength == 75
-    assert source.foo == 'bar'
-    assert out == "* WARNING :: Unknown kwargs {foo: bar}\n"
+    with pytest.raises(TypeError, match='Unexpected '):
+        source = surveys.Dipole('dip', (0, 1, 5, 0, 0), foo='bar')
 
     reprstr = "pole(dip, E, {0.0m; 1,000.0m; -950.0m}, θ=0.0°, φ=0.0°, l=1.0m)"
     assert reprstr in source.__repr__()

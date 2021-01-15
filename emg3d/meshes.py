@@ -561,6 +561,10 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         print("\n         == GRIDDING IN Z ==")
     z0, hz = get_origin_widths(**kwargs, **zparams)
 
+    # TODO : Replace all prints by string to be returned or printed.
+    # TODO : Add `return_info` to `get_origin_widths`; attach to mesh.    TODO #
+    # TODO : Adjust `Simulation` and `cli.run` to use it.
+
     # Return mesh.
     return TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
 

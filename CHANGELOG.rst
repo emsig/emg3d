@@ -5,8 +5,8 @@ Changelog
 recent versions
 """""""""""""""
 
-*latest*
---------
+*latest*: Verbosity & Logging
+-----------------------------
 
 - Solver:
 
@@ -22,6 +22,9 @@ recent versions
     would be good enough; but user of the CLI interface might not be familiar
     with Python, so it is better to throw a very simple, clear message.)
   - Log is more verbose with regards to solver (rel. error, time, nr of it.).
+
+- ``Dipole`` throws new an error instead of a warning if it received an unknown
+  keyword.
 
 
 v0.16.0: Arbitrarily shaped sources

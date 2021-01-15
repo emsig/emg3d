@@ -1026,6 +1026,8 @@ class Simulation:
     def print_grids(self):
         """Print info for all generated grids."""
 
+        # TODO   Add gridding info if it exist to the string              TODO #
+
         # Act depending on gridding:
         out = ""
         if self.gridding == 'frequency':

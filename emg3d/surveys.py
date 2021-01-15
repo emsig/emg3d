@@ -809,10 +809,11 @@ class Dipole(PointDipole):
         """Check coordinates and kwargs."""
 
         # Add additional info to the dipole.
-        for key, value in kwargs.items():
-            if key not in self.accepted_keys:
-                print(f"* WARNING :: Unknown kwargs {{{key}: {value}}}")
-            setattr(self, key, value)
+        for key in self.accepted_keys:
+            if key in kwargs:
+                setattr(self, key, kwargs.pop(key))
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Conversion to float-array fails if there are lists and tuples within
         # the tuple, or similar. This should also catch many wrong inputs.
