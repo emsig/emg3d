@@ -148,15 +148,9 @@ def simulation(args_dict):
             output['data'] = sim.data.synthetic
 
         # Print Solver Logs.
-        infostr = "\nSolver logs:\n\n"
         for src, values in sim._dict_efield_info.items():
             for freq, info in values.items():
-                if info['log']:
-                    infostr += f"= Src {src}; {freq} Hz =\n"
-                    infostr += info['log']
-
-        if len(infostr) > 30:
-            logger.debug(infostr)
+                logger.debug(f"= Src {src}; {freq} Hz =\n{info['log']}")
 
     # Compute the misfit.
     if function in ['misfit', 'gradient']:
@@ -176,15 +170,9 @@ def simulation(args_dict):
             output['gradient'] = sim.gradient
 
             # Print Solver Logs.
-            infostr = "\nSolver logs:\n\n"
             for src, values in sim._dict_bfield_info.items():
                 for freq, info in values.items():
-                    if info['log']:
-                        infostr += f"= Src {src}; {freq} Hz =\n"
-                        infostr += info['log']
-
-            if len(infostr) > 30:
-                logger.debug(infostr)
+                    logger.debug(f"= Src {src}; {freq} Hz =\n{info['log']}")
 
     # Store output to disk.
     logger.info("    :: SAVE RESULTS ::\n")

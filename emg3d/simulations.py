@@ -123,7 +123,7 @@ class Simulation:
         corresponding documentation for more information. Parameters that are
         not provided are estimated from the model, grid, and survey using
         :func:`estimate_gridding_opts`, which documentation contains more
-        information too.1 if self.verb == 2 else 0
+        information too.
 
         There are two notably differences to the parameters described in
         :func:`emg3d.meshes.construct_mesh`:
@@ -1154,11 +1154,10 @@ class Simulation:
         for i, (src, freq) in enumerate(self._srcfreq):
             cinfo = info[src][freq]
             if cinfo['exit'] != 0 and self.verb >= 0:
-                msg += "\n"
                 if not warned:
-                    msg += f"Solver warnings {field}:\n"
+                    msg += f"\nSolver warnings {field}:\n"
                     warned = True
-                msg += f"- Src {src}; {freq} Hz : {cinfo['exit_message']}"
+                msg += f"- Src {src}; {freq} Hz : {cinfo['exit_message']}\n"
 
         if self.verb > -1:
             print(msg)

@@ -83,8 +83,6 @@ jobs:
           miniconda-version: "latest"
           mamba-version: "*"
           python-version: ${{ matrix.case.python-version }}
-          activate-environment: tenv
-          auto-activate-base: false
           channels: conda-forge,defaults
           channel-priority: strict
 
