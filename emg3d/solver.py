@@ -1084,7 +1084,6 @@ class MGParameters:
     # Log verbosity.
     log: int = 1
     log_message: str = ''
-    ## TODO : log/log_message has no tests yet
 
     def __post_init__(self):
         """Set and check some of the parameters."""

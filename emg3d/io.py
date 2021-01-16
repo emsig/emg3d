@@ -244,27 +244,23 @@ def load(fname, **kwargs):
     _dict_deserialize(data)
 
     # Check if file was (supposedly) created by emg3d.
-    info = '\n'
-    if verb != 0:
-        info += f"Data loaded from «{full_path}»\n"
+    info = f"Data loaded from «{full_path}»"
     try:
         version = data['_version']
         date = data['_date']
         form = data['_format']
 
         # Print file info.
-        if verb != 0:
-            info += f"[{version} (format {form}) on {date}].\n"
+        info += f"\n[{version} (format {form}) on {date}]."
 
     except KeyError:
-        if verb != 0:
-            info += "[version/format/date unknown; not created by emg3d].\n"
+        info += "\n[version/format/date unknown; not created by emg3d]."
 
     if verb > 0:
-        print(info[:-1])
+        print(info)
 
     if verb < 0:
-        return data, info[:-1]
+        return data, info
     else:
         return data
 

@@ -1020,8 +1020,6 @@ class Simulation:
     def print_grids(self):
         """Print info for all generated grids."""
 
-        ## TODO   Add tests for the gridding info strings
-
         # Act depending on gridding:
         out = ""
         if self.gridding == 'frequency':
@@ -1030,7 +1028,8 @@ class Simulation:
             for freq in self.survey.frequencies:
                 out += f"Source: all; Frequency: {freq} Hz\n"
                 mesh = self.get_grid(self._srcfreq[0][0], freq)
-                out += mesh.info
+                if self.gridding_opts['verb'] != 0:
+                    out += mesh.construct_mesh_info
                 out += mesh.__repr__()
 
         elif self.gridding == 'source':
@@ -1039,7 +1038,8 @@ class Simulation:
             for src in self.survey.sources.keys():
                 out += f"= Source: {src}; Frequency: all =\n"
                 mesh = self.get_grid(src, self._srcfreq[0][1])
-                out += mesh.info
+                if self.gridding_opts['verb'] != 0:
+                    out += mesh.construct_mesh_info
                 out += mesh.__repr__()
 
         elif self.gridding == 'both':
@@ -1048,14 +1048,16 @@ class Simulation:
             for src, freq in self._srcfreq:
                 out += f"Source: {src}; Frequency: {freq} Hz\n"
                 mesh = self.get_grid(src, freq)
-                out += mesh.info
+                if self.gridding_opts['verb'] != 0:
+                    out += mesh.construct_mesh_info
                 out += mesh.__repr__()
 
         else:  # same, input, single
 
             out += "Source: all; Frequency: all\n"
             mesh = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
-            out += mesh.info
+            if self.gridding_opts['verb'] != 0:
+                out += mesh.construct_mesh_info
             out += mesh.__repr__()
 
         return out
@@ -1344,10 +1346,10 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
                  'lambda_from_center', 'max_buffer', 'min_width_limits',
-                 'min_width_pps', 'verb', 'return_info']:
+                 'min_width_pps']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
-    gopts['return_info'] = True  # return_info is forced to True
+    gopts['verb'] = -abs(gridding_opts.pop('verb', -1))
 
     # Mapping defaults to model map.
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)

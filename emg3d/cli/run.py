@@ -112,7 +112,7 @@ def simulation(args_dict):
             grid=mdata['mesh'],
             model=mdata['model'],
             verb=0,
-            **cfg['simulation_options']
+            **cfg['simulation_options'].copy()
             )
 
     # Switch-off tqdm if verbosity is zero.
@@ -145,8 +145,6 @@ def simulation(args_dict):
         logger.warning(sim._print_warnings('efield', -1))
 
         # Print Solver Logs.
-        ## TODO - This is now double, in Simulation and here.
-        ## TODO - Get Simulation ready for logging and remove from here.
         infostr = "\nSolver logs:\n\n"
         for src, values in sim._dict_efield_info.items():
             for freq, info in values.items():
@@ -178,8 +176,6 @@ def simulation(args_dict):
             logger.warning(sim._print_warnings('bfield', -1))
 
             # Print Solver Logs.
-            ## TODO - This is now double, in Simulation and here.
-            ## TODO - Get Simulation ready for logging and remove from here.
             infostr = "\nSolver logs:\n\n"
             for src, values in sim._dict_bfield_info.items():
                 for freq, info in values.items():
@@ -251,7 +247,7 @@ def initiate_logger(cfg, runtime, verb):
     ch.set_name('emg3d_ch')  # Add name to easy remove them.
     logger.addHandler(ch)
 
-    # Add handlers to Python Warnings. ## TODO test this!
+    # Add handlers to Python Warnings.
     logging.captureWarnings(True)
     logger_warnings = logging.getLogger("py.warnings")
     logger_warnings.setLevel(logging.DEBUG)

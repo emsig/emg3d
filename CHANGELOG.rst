@@ -28,6 +28,9 @@ recent versions
 
 - Various small things with regard how things are logged or shown on screen.
 
+- Changed all DeprecationWarnings to FutureWarnings, meaning they will be
+  removed in the next release.
+
 
 v0.16.0: Arbitrarily shaped sources
 -----------------------------------

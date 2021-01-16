@@ -16,6 +16,10 @@ try:
         discretize = None
 except ImportError:
     discretize = None
+if discretize is None:
+    VarWarning = FutureWarning
+else:
+    VarWarning = DeprecationWarning
 
 # Data generated with create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
@@ -44,7 +48,7 @@ def create_dummy(nx, ny, nz, imag=True):
 def test_get_hx_h0(capsys):
 
     # == A == Just the defaults, no big thing (regression).
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out1 = meshes.get_hx_h0(
                 freq=.5, res=10, fixed=900, domain=[-2000, 2000],
                 possible_nx=[20, 32], return_info=True)
@@ -67,7 +71,7 @@ def test_get_hx_h0(capsys):
     assert info in outstr1
 
     # == B == Laplace and verb=0, parameter positions and defaults.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out2 = meshes.get_hx_h0(
             -.5/np.pi/2, 10, [-2000, 2000], 900, [20, 32], None, 3,
             [1.05, 1.5, 0.01], 100000., False, 0, True)
@@ -80,7 +84,7 @@ def test_get_hx_h0(capsys):
     assert outstr2 == ""
 
     # == C == User limits.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out3 = meshes.get_hx_h0(
                 freq=.5, res=10, fixed=900, domain=[-11000, 14000],
                 possible_nx=[20, 32, 64, 128], min_width=[20, 600],
@@ -96,13 +100,13 @@ def test_get_hx_h0(capsys):
     # == D == Check failure.
     # (a) With raise.
     with pytest.raises(RuntimeError, match='No suitable grid found; '):
-        with pytest.warns(DeprecationWarning):
+        with pytest.warns(FutureWarning):
             meshes.get_hx_h0(
                 freq=.5, res=[10., 12.], fixed=900, domain=[-10000, 10000],
                 possible_nx=[20])
 
     # (b) With raise=False.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out4 = meshes.get_hx_h0(
                 freq=.5, res=10, fixed=900, domain=[-500, 500],
                 possible_nx=[32, 40], min_width=40.,
@@ -117,19 +121,19 @@ def test_get_hx_h0(capsys):
     # == E == Fixed boundaries
     # Too many values.
     with pytest.raises(ValueError, match='Maximum three fixed boundaries'):
-        with pytest.warns(DeprecationWarning):
+        with pytest.warns(FutureWarning):
             meshes.get_hx_h0(
                 freq=1, res=1, fixed=[-900, -1000, 0, 5], domain=[-2000, 0],
                 possible_nx=[64, 128])
     # Two additional values, but both on same side.
     with pytest.raises(ValueError, match='2nd and 3rd fixed boundaries'):
-        with pytest.warns(DeprecationWarning):
+        with pytest.warns(FutureWarning):
             meshes.get_hx_h0(
                 freq=1, res=1, fixed=[900, -1000, -1200], domain=[-2000, 0],
                 possible_nx=[64, 128])
 
     # One additional fixed.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out5 = meshes.get_hx_h0(
             freq=1, res=1, fixed=[-900, 0], domain=[-2000, 0],
             possible_nx=[64, 128], min_width=[50, 100],
@@ -141,7 +145,7 @@ def test_get_hx_h0(capsys):
     assert out5[2]['amax'] < 1.02
 
     # Two additional fixed.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out6 = meshes.get_hx_h0(
             freq=1, res=1, fixed=[-890, 0, -1000], domain=[-2000, 0],
             possible_nx=[64, 128], min_width=[60, 70])
@@ -151,12 +155,12 @@ def test_get_hx_h0(capsys):
     assert_allclose(0.0, min(abs(nodes6+1000)), atol=1e-8)  # Check seafloor.
 
     # == F == Several resistivities
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out7 = meshes.get_hx_h0(1, [0.3, 10], [-1000, 1000], alpha=[1, 1, 1])
     assert out7[1] < -10000
     assert out7[1]+np.sum(out7[0]) > 10000
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         out8 = meshes.get_hx_h0(1, [0.3, 1, 90], [-1000, 1000],
                                 alpha=[1, 1, 1])
     assert out8[1] > -5000                  # Left buffer much smaller than
@@ -165,31 +169,31 @@ def test_get_hx_h0(capsys):
 
 def test_get_domain():
     # Test default values (and therefore skindepth etc)
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h1, d1 = meshes.get_domain()
     assert_allclose(h1, 55.13289)
     assert_allclose(d1, [-1378.322238, 1378.322238])
 
     # Ensure fact_min/fact_neg/fact_pos
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h2, d2 = meshes.get_domain(fact_min=1, fact_neg=10, fact_pos=20)
     assert h2 == 5*h1
     assert 2*d1[0] == d2[0]
     assert -2*d2[0] == d2[1]
 
     # Check limits and min_width
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h3, d3 = meshes.get_domain(limits=[-10000, 10000], min_width=[1, 10])
     assert h3 == 10
     assert np.sum(d3) == 0
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h4, d4 = meshes.get_domain(limits=[-10000, 10000], min_width=5.5)
     assert h4 == 5.5
     assert np.sum(d4) == 0
 
     # Ensure Laplace and frequency
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h5a, d5a = meshes.get_domain(freq=1.)
         h5b, d5b = meshes.get_domain(freq=-1./2/np.pi)
     assert h5a == h5b
@@ -198,61 +202,61 @@ def test_get_domain():
 
 def test_get_stretched_h(capsys):
     # Test min_space bigger (11) then required (10)
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h1 = meshes.get_stretched_h(11, [0, 100], nx=10)
     assert_allclose(np.ones(10)*10, h1)
 
     # Test with range, wont end at 100
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h2 = meshes.get_stretched_h(10, [-100, 100], nx=10, x0=20, x1=60)
     assert_allclose(np.ones(4)*10, h2[5:9])
     assert -100+np.sum(h2) != 100
 
     # Now ensure 100
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         h3 = meshes.get_stretched_h(10, [-100, 100], nx=10, x0=20, x1=60,
                                     resp_domain=True)
     assert -100+np.sum(h3) == 100
 
     out, _ = capsys.readouterr()  # Empty capsys
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         _ = meshes.get_stretched_h(10, [-100, 100], nx=5, x0=20, x1=60)
     out, _ = capsys.readouterr()
     assert "Warning :: Not enough points for non-stretched part" in out
 
 
 def test_get_cell_numbers(capsys):
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         numbers = meshes.get_cell_numbers(max_nr=128, max_prime=5, min_div=3)
     assert_allclose([16, 24, 32, 40, 48, 64, 80, 96, 128], numbers)
 
     with pytest.raises(ValueError, match='Highest prime is 25, '):
-        with pytest.warns(DeprecationWarning):
+        with pytest.warns(FutureWarning):
             numbers = meshes.get_cell_numbers(max_nr=128, max_prime=25,
                                               min_div=3)
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         numbers = meshes.get_cell_numbers(max_nr=50, max_prime=3, min_div=5)
     assert len(numbers) == 0
 
 
 def test_get_hx():
     # Test alpha <= 0
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         hx1 = meshes.get_hx(-.5, [0, 10], 5, 3.33)
     assert_allclose(np.ones(5)*2, hx1)
 
     # Test x0 on domain
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         hx2a = meshes.get_hx(0.1, [0, 10], 5, 0)
     assert_allclose(np.ones(4)*1.1, hx2a[1:]/hx2a[:-1])
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         hx2b = meshes.get_hx(0.1, [0, 10], 5, 10)
     assert_allclose(np.ones(4)/1.1, hx2b[1:]/hx2b[:-1])
     assert np.sum(hx2b) == 10.0
 
     # Test resp_domain
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         hx3 = meshes.get_hx(0.1, [0, 10], 3, 8, False)
     assert np.sum(hx3) != 10.0
 
@@ -266,7 +270,7 @@ def test_TensorMesh():
             [grid['hx'], grid['hy'], grid['hz']], grid['x0'])
 
     # Ensure they are the same (also compares deprecated properties).
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(VarWarning):
         for key, value in grid.items():
             assert_allclose(value, getattr(emg3dgrid, key))
 
@@ -285,6 +289,30 @@ def test_TensorMesh():
     newgrid = meshes.TensorMesh(
             [np.ones(3), np.ones(3), np.ones(3)], np.zeros(3))
     assert emg3dgrid != newgrid
+
+
+def test__TensorMesh():
+    grid = REGRES['grid']
+    mesh = meshes._TensorMesh(
+            [grid['hx'], grid['hy'], grid['hz']],
+            x0=grid['x0']
+            )
+
+    # Ensure they are the same (also compares deprecated properties).
+    with pytest.warns(FutureWarning, match='will be removed'):
+        for key, value in grid.items():
+            assert_allclose(value, getattr(mesh, key))
+
+    assert 'TensorMesh: 40 x 30 x 1 (1,200)' in mesh.__repr__()
+    assert not hasattr(mesh, '_repr_html_')
+
+    assert mesh.cell_volumes.sum() > 69046392
+
+#     # Check __eq__.
+#     assert mesh == cgrid
+#     newgrid = meshes._TensorMesh(
+#             [np.ones(3), np.ones(3), np.ones(3)], origin=np.zeros(3))
+#     assert mesh != newgrid
 
 
 def test_TensorMesh_repr():
@@ -356,7 +384,7 @@ class TestGetOriginWidths:
 
         assert out[0] is None
         assert out[1] is None
-        assert "* ERROR   :: No suitable grid found; relax your" in outstr
+        assert "No suitable grid found; relax your criteria." in outstr
 
         # Stretching warning.
         meshes.get_origin_widths(
@@ -367,33 +395,33 @@ class TestGetOriginWidths:
 
     def test_basics(self, capsys):
         x0, hx = meshes.get_origin_widths(
-                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=2)
+                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
         assert_allclose(x0, -20)
         assert_allclose(np.ones(40), hx)
 
-        assert "Skin depth          [m] : 3.0  [correspond" in out
-        assert "Survey domain DS    [m] : -1.0 - 1.0" in out
-        assert "Comp. domain DC     [m] : -19.8 - 19.8" in out
-        assert "Final extent        [m] : -20.0 - 20.0" in out
-        assert "Cell widths         [m] : 1.0 / 1.0 / 1.0  [min(DS) / m" in out
-        assert "Number of cells         : 40 (4 / 36 / 0)  [Total (DS/" in out
-        assert "Max stretching          : 1.000 (1.000) / 1.000  [DS (" in out
+        assert "Skin depth     [m] : 3.0  [corr." in out
+        assert "Survey dom. DS [m] : -1.0 - 1.0" in out
+        assert "Comp. dom. DC  [m] : -19.8 - 19.8" in out
+        assert "Final extent   [m] : -20.0 - 20.0" in out
+        assert "Cell widths    [m] : 1.0 / 1.0 / 1.0  [min(DS) / m" in out
+        assert "Number of cells    : 40 (4 / 36 / 0)  [Total (DS/" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.000  [DS (" in out
 
         _ = meshes.get_origin_widths(
                 1/np.pi, [8.9*mu_0, 9*mu_0], 0.0, [-1, 1],
-                stretching=[1, 1], verb=2)
+                stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
-        assert "2.98 / 3.00  [corresponding to `properties`]" in out
+        assert "2.98 / 3.00  [corr. to `properties`]" in out
 
         _ = meshes.get_origin_widths(
                 1/np.pi, [8.9*mu_0, 9*mu_0, 9.1*mu_0], 0.0, [-1, 1],
-                stretching=[1, 1], verb=2)
+                stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
-        assert "2.98 / 3.00 / 3.02  [corresponding to `properties`]" in out
+        assert "2.98 / 3.00 / 3.02  [corr. to `properties`]" in out
 
     def test_domain_vector(self):
         x01, hx1 = meshes.get_origin_widths(
@@ -430,13 +458,13 @@ class TestGetOriginWidths:
 
         out, _ = capsys.readouterr()
 
-        assert "Skin depth          [m] : 616 / 1125 / 7958" in out
-        assert "Survey domain DS    [m] : -2000 - -1000" in out
-        assert "Comp. domain DC     [m] : -9071 - 49000" in out
-        assert "Final extent        [m] : -10310 - 52091" in out
-        assert "Cell widths         [m] : 205 / 205 / 12083" in out
-        assert "Number of cells         : 32 (7 / 25 / 0)" in out
-        assert "Max stretching          : 1.000 (1.000) / 1.290" in out
+        assert "Skin depth     [m] : 616 / 1125 / 7958" in out
+        assert "Survey dom. DS [m] : -2000 - -1000" in out
+        assert "Comp. dom. DC  [m] : -9071 - 49000" in out
+        assert "Final extent   [m] : -10310 - 52091" in out
+        assert "Cell widths    [m] : 205 / 205 / 12083" in out
+        assert "Number of cells    : 32 (7 / 25 / 0)" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.290" in out
 
         # All set.
         meshes.get_origin_widths(
@@ -460,13 +488,13 @@ class TestGetOriginWidths:
 
         out, _ = capsys.readouterr()
 
-        assert "Skin depth          [m] : 620 / 1125 / 50" in out
-        assert "Survey domain DS    [m] : -2000 - -1000" in out
-        assert "Comp. domain DC     [m] : -10950 - 5300" in out
-        assert "Final extent        [m] : -13945 - 5425" in out
-        assert "Cell widths         [m] : 100 / 100 / 3191" in out
-        assert "Number of cells         : 40 (20 / 20 / 0)" in out
-        assert "Max stretching          : 1.000 (1.000) / 1.370" in out
+        assert "Skin depth     [m] : 620 / 1125 / 50" in out
+        assert "Survey dom. DS [m] : -2000 - -1000" in out
+        assert "Comp. dom. DC  [m] : -10950 - 5300" in out
+        assert "Final extent   [m] : -13945 - 5425" in out
+        assert "Cell widths    [m] : 100 / 100 / 3191" in out
+        assert "Number of cells    : 40 (20 / 20 / 0)" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.370" in out
 
         # High frequencies.
         meshes.get_origin_widths(
@@ -479,21 +507,36 @@ class TestGetOriginWidths:
 
         out, _ = capsys.readouterr()
 
-        assert "Skin depth          [m] : 0.113 / 0.050 / 0.356" in out
-        assert "Survey domain DS    [m] : -1.000 - 1.000" in out
-        assert "Comp. domain DC     [m] : -1.316 - 3.236" in out
-        assert "Final extent        [m] : -1.331 - 3.376" in out
-        assert "Cell widths         [m] : 0.038 / 0.038 / 0.252" in out
-        assert "Number of cells         : 80 (54 / 26 / 0)" in out
-        assert "Max stretching          : 1.000 (1.000) / 1.100" in out
+        assert "Skin depth     [m] : 0.113 / 0.050 / 0.356" in out
+        assert "Survey dom. DS [m] : -1.000 - 1.000" in out
+        assert "Comp. dom. DC  [m] : -1.316 - 3.236" in out
+        assert "Final extent   [m] : -1.331 - 3.376" in out
+        assert "Cell widths    [m] : 0.038 / 0.038 / 0.252" in out
+        assert "Number of cells    : 80 (54 / 26 / 0)" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.100" in out
 
 
 class TestConstructMesh:
 
     def test_verb(self, capsys):
-        _ = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=1)
+        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=1)
         out, _ = capsys.readouterr()
         assert "         == GRIDDING IN X ==" in out
+        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
+
+        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=0)
+        out, _ = capsys.readouterr()
+        assert "" == out
+        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
+
+        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=-1)
+        out, _ = capsys.readouterr()
+        assert "" == out
+        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
+
+        # No suitable grid warning.
+        with pytest.raises(RuntimeError, match="No suitable grid found; "):
+            meshes.construct_mesh(1, 1, (0, 0, 0), [-1, 1], cell_numbers=[1, ])
 
     def test_compare_to_gow1(self):
         f = 1/np.pi
@@ -568,32 +611,32 @@ class TestConstructMesh:
 def test_deprecations(capsys):
     mesh = meshes.TensorMesh([[2, 2], [2, 2], [2, 2]], x0=(0, 0, 0))
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(VarWarning):
         assert_allclose(mesh.hx, mesh.h[0])
         assert_allclose(mesh.hy, mesh.h[1])
         assert_allclose(mesh.hz, mesh.h[2])
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(VarWarning):
         assert mesh.nCx, mesh.shape_cells[0]
         assert mesh.nCy, mesh.shape_cells[1]
         assert mesh.nCz, mesh.shape_cells[2]
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(VarWarning):
         assert mesh.nNx, mesh.shape_nodes[0]
         assert mesh.nNy, mesh.shape_nodes[1]
         assert mesh.nNz, mesh.shape_nodes[2]
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(VarWarning):
         assert_allclose(mesh.vectorNx, mesh.nodes_x)
         assert_allclose(mesh.vectorNy, mesh.nodes_y)
         assert_allclose(mesh.vectorNz, mesh.nodes_z)
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(VarWarning):
         assert_allclose(mesh.vectorCCx, mesh.cell_centers_x)
         assert_allclose(mesh.vectorCCy, mesh.cell_centers_y)
         assert_allclose(mesh.vectorCCz, mesh.cell_centers_z)
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(VarWarning):
         assert_allclose(mesh.vol, mesh.cell_volumes)
 
     dmesh = mesh.to_dict()

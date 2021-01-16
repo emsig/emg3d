@@ -283,7 +283,7 @@ def test_simulation_automatic():
 
     # Create a simulation, compute all fields.
     inp = {'survey': survey, 'grid': grid, 'model': model,
-           'gridding_opts': {'expand': [1, 0.5], 'seasurface': 0}}
+           'gridding_opts': {'expand': [1, 0.5], 'seasurface': 0, 'verb': 1}}
     b_sim = simulations.Simulation('both', gridding='both', **inp)
     f_sim = simulations.Simulation('freq', gridding='frequency', **inp)
     t_sim = simulations.Simulation('src', gridding='source', **inp)
@@ -297,12 +297,16 @@ def test_simulation_automatic():
 
     # Quick print_grid test:
     assert "Source: Tx1; Frequency: 10.0 Hz" in b_sim.print_grids
+    assert "== GRIDDING IN X ==" in b_sim.print_grids
     assert b_sim.get_grid('Tx0', 1.0).__repr__() in b_sim.print_grids
     assert "Source: all" in f_sim.print_grids
+    assert "== GRIDDING IN X ==" in f_sim.print_grids
     assert f_sim.get_grid('Tx2', 1.0).__repr__() in f_sim.print_grids
     assert "Frequency: all" in t_sim.print_grids
+    assert "== GRIDDING IN X ==" in t_sim.print_grids
     assert t_sim.get_grid('Tx1', 10.0).__repr__() in t_sim.print_grids
     assert "Source: all; Frequency: all" in s_sim.print_grids
+    assert "== GRIDDING IN X ==" in s_sim.print_grids
     assert s_sim.get_grid('Tx2', 0.1).__repr__() in s_sim.print_grids
 
     # Grids: Middle source / middle frequency should be the same in all.
@@ -460,7 +464,7 @@ class TestEstimateGriddingOpts():
             'max_buffer': 10000,
             'min_width_limits': [20, 40],
             'min_width_pps': 4,
-            'verb': 3,
+            'verb': -1,
             }
 
         gdict = simulations.estimate_gridding_opts(
