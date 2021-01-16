@@ -123,7 +123,7 @@ class Simulation:
         corresponding documentation for more information. Parameters that are
         not provided are estimated from the model, grid, and survey using
         :func:`estimate_gridding_opts`, which documentation contains more
-        information too.
+        information too.1 if self.verb == 2 else 0
 
         There are two notably differences to the parameters described in
         :func:`emg3d.meshes.construct_mesh`:
@@ -147,12 +147,12 @@ class Simulation:
         - `sslsolver=True`;
         - `semicoarsening=True`;
         - `linerelaxation=True`;
-        - `verb=2`.
 
-        Note that these defaults are different from the defaults in
-        :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
-        many cases, but they are the most robust combination at which you can
-        throw most things.
+        The verbosity is set at least to two, but it can be increased by
+        providing it. Note that these defaults are different from the defaults
+        in :func:`emg3d.solver.solve`. The defaults chosen here will be slower
+        in many cases, but they are the most robust combination at which you
+        can throw most things.
 
     max_workers : int
         The maximum number of processes that can be used to execute the
@@ -189,17 +189,21 @@ class Simulation:
         self.max_workers = max_workers
         self.gridding = gridding
 
-        # Store optional inputs with defaults.
-        self.verb = kwargs.pop('verb', 1)
+        # Get optional inputs with defaults.
         gridding_opts = kwargs.pop('gridding_opts', {}).copy()
+        solver_opts = kwargs.pop('solver_opts', {})
+
+        # Check verbosity for different parts.
+        self.verb = kwargs.pop('verb', 1)
+        solver_verb = max(solver_opts.get('verb', 2), self.verb+1, 2)
 
         # Store solver options with defaults.
         # The slowest but most robust setting is used; also, verbosity is
         # switched off entirely, as warnings are captured differently.
         # Input overwrites all defaults if provided.
         self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
-                            'linerelaxation': True,  'verb': 2,
-                            **kwargs.pop('solver_opts', {})}
+                            'linerelaxation': True, 'verb': solver_verb,
+                            **solver_opts}
 
         # Store original input nCz.
         self._input_nCz = kwargs.pop('_input_nCz', grid.vnC[2])
@@ -255,6 +259,9 @@ class Simulation:
 
             # Get automatic gridding input.
             # Estimate the parameters from survey and model if not provided.
+            gridding_verb = gridding_opts.get(
+                    'verb', 1 if self.verb == 2 else 0)
+            gridding_opts['verb'] = -abs(gridding_verb)
             self.gridding_opts = estimate_gridding_opts(
                     gridding_opts, grid, model, survey, self._input_nCz)
 
@@ -518,7 +525,7 @@ class Simulation:
         kwargs['collect_classes'] = False  # Ensure classes are not collected.
         # If verb is not defined, use verbosity of simulation.
         if 'verb' not in kwargs:
-            kwargs['verb'] = self.verb
+            kwargs['verb'] = max(0, self.verb)
 
         io.save(fname, **kwargs)
 
@@ -851,7 +858,7 @@ class Simulation:
             self.data['synthetic'].loc[src, :, freq] = out[i][2]
 
         # Print solver warnings.
-        self._print_warnings('efield', self.verb)
+        self._print_warnings('efield')
 
         # If it shall be used as observed data save a copy.
         if observed:
@@ -1103,7 +1110,7 @@ class Simulation:
             self._dict_bfield_info[src][freq] = out[i][1]
 
         # Print solver warnings.
-        self._print_warnings('bfield', self.verb)
+        self._print_warnings('bfield')
 
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
@@ -1139,7 +1146,7 @@ class Simulation:
 
         return ResidualField
 
-    def _print_warnings(self, field, verb=1):
+    def _print_warnings(self, field):
         """Print solver warnings."""
         info = getattr(self, f"_dict_{field}_info")
         warned = False  # Flag for warnings.
@@ -1153,10 +1160,8 @@ class Simulation:
                     warned = True
                 msg += f"- Src {src}; {freq} Hz : {cinfo['exit_message']}"
 
-        if verb > 0:
+        if self.verb > -1:
             print(msg)
-        elif verb < 0:
-            return msg
 
 
 # HELPER FUNCTIONS
@@ -1346,10 +1351,9 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
                  'lambda_from_center', 'max_buffer', 'min_width_limits',
-                 'min_width_pps']:
+                 'min_width_pps', 'verb']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
-    gopts['verb'] = -abs(gridding_opts.pop('verb', -1))
 
     # Mapping defaults to model map.
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)

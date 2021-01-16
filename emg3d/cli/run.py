@@ -60,18 +60,22 @@ def simulation(args_dict):
     logger = initiate_logger(cfg, runtime, verb)
 
     # Log start info, python and emg3d version, and python path.
-    logger.info(f"\n:: emg3d {function} START :: {time.asctime()} :: "
+    logger.info(f":: emg3d CLI {function} START :: {time.asctime()} :: "
                 f"v{utils.__version__}\n")
 
     # Dump the configuration.
     paramdump = json.dumps(cfg, sort_keys=True, indent=4)
-    logger.debug(f"** CONFIGURATION: {term['config_file']}\n{paramdump}\n")
+    logger.debug("    :: CONFIGURATION ::\n")
+    logger.debug(f"{term['config_file']}\n{paramdump}\n")
 
     # Load input.
+    logger.info("    :: LOAD SURVEY AND MODEL ::\n")
     sdata, sinfo = io.load(cfg['files']['survey'], verb=-1)
-    logger.debug(sinfo)
+    logger.info(sinfo.split('\n')[0])
+    logger.debug(sinfo.split('\n')[1])
     mdata, minfo = io.load(cfg['files']['model'], verb=-1)
-    logger.debug(minfo)
+    logger.info(minfo.split('\n')[0])
+    logger.debug(minfo.split('\n')[1])
     min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
 
     # Select data.
@@ -111,8 +115,8 @@ def simulation(args_dict):
             survey=sdata['survey'],
             grid=mdata['mesh'],
             model=mdata['model'],
-            verb=0,
-            **cfg['simulation_options'].copy()
+            verb=verb,
+            **cfg['simulation_options']
             )
 
     # Switch-off tqdm if verbosity is zero.
@@ -120,9 +124,11 @@ def simulation(args_dict):
         sim._tqdm_opts['disable'] = True
 
     # Print simulation info.
+    logger.info("\n    :: SIMULATION ::")
     logger.info(f"\n{sim}\n")
 
     # Print meshes.
+    logger.debug("    :: MESHES ::\n")
     logger.debug(sim.print_grids)
 
     # Initiate output dict.
@@ -132,7 +138,7 @@ def simulation(args_dict):
     if dry_run:
         output['data'] = np.zeros_like(sim.data.synthetic)
     else:
-        logger.info("\n** FORWARD COMPUTATION")
+        logger.info("    :: FORWARD COMPUTATION ::\n")
 
         if function == 'forward':
             sim.compute(observed=True, min_offset=min_offset)
@@ -140,9 +146,6 @@ def simulation(args_dict):
         else:
             sim.compute()
             output['data'] = sim.data.synthetic
-
-        # Print Solver Warnings (only if not successful).
-        logger.warning(sim._print_warnings('efield', -1))
 
         # Print Solver Logs.
         infostr = "\nSolver logs:\n\n"
@@ -168,12 +171,9 @@ def simulation(args_dict):
         if dry_run:
             output['gradient'] = np.zeros(mdata['mesh'].vnC)
         else:
-            logger.info("\n** BACKWARD COMPUTATION")
+            logger.info("\n    :: BACKWARD COMPUTATION ::\n")
 
             output['gradient'] = sim.gradient
-
-            # Print Solver Warnings (only if not successful).
-            logger.warning(sim._print_warnings('bfield', -1))
 
             # Print Solver Logs.
             infostr = "\nSolver logs:\n\n"
@@ -187,34 +187,41 @@ def simulation(args_dict):
                 logger.debug(infostr)
 
     # Store output to disk.
+    logger.info("    :: SAVE RESULTS ::\n")
     if cfg['files']['store_simulation']:
         output['simulation'] = sim
     oinfo = io.save(cfg['files']['output'], **output, verb=-1)
-    logger.debug(oinfo)
+    logger.info(oinfo.split('\n')[0])
+    logger.debug(oinfo.split('\n')[1])
 
     # Goodbye
-    logger.info(f"\n:: emg3d {function} END   :: {time.asctime()} :: "
-                f"runtime = {runtime.runtime}\n")
+    logger.info(f"\n:: emg3d CLI {function} END   :: {time.asctime()} :: "
+                f"runtime = {runtime.runtime}")
 
 
 def check_files(cfg, term):
     """Ensure all paths and files exist."""
+    error = ""
 
     # First check if config file exists.
     fname = term['config_file']
     if not os.path.isfile(fname) and fname != '.':  # '.' => no config file.
-        sys.exit(f"* ERROR   :: Config file not found: {fname}")
+        error += f"* ERROR   :: Config file not found: {fname}\n"
 
     # Check Survey and Model.
     for name in ['Survey', 'Model']:
         fname = cfg['files'][name.lower()]
         if not os.path.isfile(fname):
-            sys.exit(f"* ERROR   :: {name} file not found: {fname}")
+            error += f"* ERROR   :: {name} file not found: {fname}\n"
 
     # Finally check output directory.
     dname = os.path.split(cfg['files']['log'])[0]
     if not os.path.isdir(dname):
-        sys.exit(f"* ERROR   :: Output directory does not exist: {dname}")
+        error += f"* ERROR   :: Output directory does not exist: {dname}\n"
+
+    # If any was not found, exit with error.
+    if len(error) > 10:
+        sys.exit(error[:-1])
 
 
 def initiate_logger(cfg, runtime, verb):
