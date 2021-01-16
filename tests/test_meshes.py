@@ -308,12 +308,6 @@ def test__TensorMesh():
 
     assert mesh.cell_volumes.sum() > 69046392
 
-#     # Check __eq__.
-#     assert mesh == cgrid
-#     newgrid = meshes._TensorMesh(
-#             [np.ones(3), np.ones(3), np.ones(3)], origin=np.zeros(3))
-#     assert mesh != newgrid
-
 
 def test_TensorMesh_repr():
     # Create some dummy data
