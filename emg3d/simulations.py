@@ -259,9 +259,6 @@ class Simulation:
 
             # Get automatic gridding input.
             # Estimate the parameters from survey and model if not provided.
-            gridding_verb = gridding_opts.get(
-                    'verb', 1 if self.verb == 2 else 0)
-            gridding_opts['verb'] = -abs(gridding_verb)
             self.gridding_opts = estimate_gridding_opts(
                     gridding_opts, grid, model, survey, self._input_nCz)
 
@@ -1023,9 +1020,10 @@ class Simulation:
             info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
         return info
 
-    @property
-    def print_grids(self):
+    def print_grids(self, verb=None):
         """Print info for all generated grids."""
+        if verb is None:
+            verb = self.gridding_opts['verb']
 
         # Act depending on gridding:
         out = ""
@@ -1035,7 +1033,7 @@ class Simulation:
             for freq in self.survey.frequencies:
                 out += f"Source: all; Frequency: {freq} Hz\n"
                 mesh = self.get_grid(self._srcfreq[0][0], freq)
-                if self.gridding_opts['verb'] != 0:
+                if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
                     out += mesh.construct_mesh_info
                 out += mesh.__repr__()
 
@@ -1045,7 +1043,7 @@ class Simulation:
             for src in self.survey.sources.keys():
                 out += f"= Source: {src}; Frequency: all =\n"
                 mesh = self.get_grid(src, self._srcfreq[0][1])
-                if self.gridding_opts['verb'] != 0:
+                if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
                     out += mesh.construct_mesh_info
                 out += mesh.__repr__()
 
@@ -1055,7 +1053,7 @@ class Simulation:
             for src, freq in self._srcfreq:
                 out += f"Source: {src}; Frequency: {freq} Hz\n"
                 mesh = self.get_grid(src, freq)
-                if self.gridding_opts['verb'] != 0:
+                if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
                     out += mesh.construct_mesh_info
                 out += mesh.__repr__()
 
@@ -1063,7 +1061,7 @@ class Simulation:
 
             out += "Source: all; Frequency: all\n"
             mesh = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
-            if self.gridding_opts['verb'] != 0:
+            if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
                 out += mesh.construct_mesh_info
             out += mesh.__repr__()
 
@@ -1314,7 +1312,8 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
       - ``max_buffer``
       - ``min_width_limits``
       - ``min_width_pps``
-      - ``verb``
+
+    Verbosity (``verb``) is set to 0 if not provided.
 
 
     Parameters
@@ -1350,9 +1349,12 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
                  'lambda_from_center', 'max_buffer', 'min_width_limits',
-                 'min_width_pps', 'verb']:
+                 'min_width_pps']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
+
+    # Verbosity.
+    gopts['verb'] = gridding_opts.pop('verb', 0)
 
     # Mapping defaults to model map.
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)

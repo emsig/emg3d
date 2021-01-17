@@ -983,7 +983,10 @@ def _finite_source_xyz(grid, src, s, xyz, decimals):
     # Ensure unity (should not be necessary).
     sum_s = abs(s.sum())
     if abs(sum_s-1) > 1e-6:
-        warnings.warn(f"Normalizing Source: {sum_s:.10f}.", UserWarning)
+        # Print is always shown and simpler, warn for the logs.
+        msg = f"Normalizing Source: {sum_s:.10f}."
+        print(f"* WARNING :: {msg}")
+        warnings.warn(msg, UserWarning)
         s /= sum_s
 
 

@@ -61,15 +61,16 @@ def simulation(args_dict):
 
     # Log start info, python and emg3d version, and python path.
     logger.info(f":: emg3d CLI {function} START :: {time.asctime()} :: "
-                f"v{utils.__version__}\n")
+                f"v{utils.__version__}")
+    logger.debug(f"{utils.Report()}")
 
     # Dump the configuration.
     paramdump = json.dumps(cfg, sort_keys=True, indent=4)
-    logger.debug("    :: CONFIGURATION ::\n")
-    logger.debug(f"{term['config_file']}\n{paramdump}\n")
+    logger.debug("\n    :: CONFIGURATION ::\n")
+    logger.debug(f"{term['config_file']}\n{paramdump}")
 
     # Load input.
-    logger.info("    :: LOAD SURVEY AND MODEL ::\n")
+    logger.info("\n    :: LOAD SURVEY AND MODEL ::\n")
     sdata, sinfo = io.load(cfg['files']['survey'], verb=-1)
     logger.info(sinfo.split('\n')[0])
     logger.debug(sinfo.split('\n')[1])
@@ -129,7 +130,7 @@ def simulation(args_dict):
 
     # Print meshes.
     logger.debug("    :: MESHES ::\n")
-    logger.debug(sim.print_grids)
+    logger.debug(sim.print_grids(verb=1))
 
     # Initiate output dict.
     output = {}

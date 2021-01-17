@@ -337,8 +337,10 @@ def _dict_serialize(inp, out=None, collect_classes=False):
                                'hz': value.h[2],
                                'origin': value.origin, '__class__': name}
                 except AttributeError as e:  # Gracefully fail.
-                    warnings.warn(f"Could not serialize <{key}>: {e}",
-                                  UserWarning)
+                    # Print is always shown and simpler, warn for the logs.
+                    msg = f"Could not serialize <{key}>: {e}"
+                    print(f"* WARNING :: {msg}")
+                    warnings.warn(msg, UserWarning)
                     continue
 
             # If we are in the root-directory put them in their own category.
@@ -416,8 +418,10 @@ def _dict_deserialize(inp, first_call=True):
 
                 except (NotImplementedError, AttributeError, KeyError) as e:
                     # Gracefully fail.
-                    warnings.warn(f"Could not de-serialize <{key}>: {e}",
-                                  UserWarning)
+                    # Print is always shown and simpler, warn for the logs.
+                    msg = f"Could not de-serialize <{key}>: {e}"
+                    print(f"* WARNING :: {msg}")
+                    warnings.warn(msg, UserWarning)
 
             # In no __class__-key or de-serialization fails, use recursion.
             _dict_deserialize(value, False)
