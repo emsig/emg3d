@@ -116,7 +116,7 @@ def simulation(args_dict):
             survey=sdata['survey'],
             grid=mdata['mesh'],
             model=mdata['model'],
-            verb=verb,
+            verb=2,
             **cfg['simulation_options']
             )
 
@@ -149,9 +149,7 @@ def simulation(args_dict):
             output['data'] = sim.data.synthetic
 
         # Print Solver Logs.
-        for src, values in sim._dict_efield_info.items():
-            for freq, info in values.items():
-                logger.debug(f"= Src {src}; {freq} Hz =\n{info['log']}")
+        logger.debug(sim.print_solver_info('efield', 2))
 
     # Compute the misfit.
     if function in ['misfit', 'gradient']:
@@ -171,9 +169,7 @@ def simulation(args_dict):
             output['gradient'] = sim.gradient
 
             # Print Solver Logs.
-            for src, values in sim._dict_bfield_info.items():
-                for freq, info in values.items():
-                    logger.debug(f"= Src {src}; {freq} Hz =\n{info['log']}")
+            logger.debug(sim.print_solver_info('bfield', 2))
 
     # Store output to disk.
     logger.info("    :: SAVE RESULTS ::\n")

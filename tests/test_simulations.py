@@ -55,8 +55,9 @@ class TestSimulation():
         assert_allclose(self.simulation.get_sfield('Tx1', 1.0), sfield)
 
         # Check efield
+        print(self.simulation.solver_opts)
         efield, info = solver.solve(
-                self.grid, self.model, sfield, return_info=True,
+                self.grid, self.model, sfield,
                 **self.simulation.solver_opts)
         assert_allclose(self.simulation.get_efield('Tx1', 1.0), efield)
 

@@ -147,24 +147,24 @@ class Simulation:
         - `sslsolver=True`;
         - `semicoarsening=True`;
         - `linerelaxation=True`;
+        - `verb=simulation.verb+1`;
 
-        The verbosity is set at least to two, but it can be increased by
-        providing it. Note that these defaults are different from the defaults
-        in :func:`emg3d.solver.solve`. The defaults chosen here will be slower
-        in many cases, but they are the most robust combination at which you
-        can throw most things.
+        Note that these defaults are different from the defaults in
+        :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
+        many cases, but they are the most robust combination at which you can
+        throw most things.
 
     max_workers : int
         The maximum number of processes that can be used to execute the
         given calls. Default is 4.
 
     verb : int; optional
-        Level of verbosity. Default is 1.
+        Level of verbosity. Default is 0. These are propagated to the called
+        function if not defined above in the possible options.
 
         - -1: Error.
         - 0: Warning.
-        - 1: Info.
-        - 2: Debug.
+        - 1+: More and more info.
 
     """
 
@@ -192,18 +192,15 @@ class Simulation:
         # Get optional inputs with defaults.
         gridding_opts = kwargs.pop('gridding_opts', {}).copy()
         solver_opts = kwargs.pop('solver_opts', {})
-
-        # Check verbosity for different parts.
-        self.verb = kwargs.pop('verb', 1)
-        solver_verb = max(solver_opts.get('verb', 2), self.verb+1, 2)
+        self.verb = kwargs.pop('verb', 0)
 
         # Store solver options with defaults.
         # The slowest but most robust setting is used; also, verbosity is
         # switched off entirely, as warnings are captured differently.
         # Input overwrites all defaults if provided.
         self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
-                            'linerelaxation': True, 'verb': solver_verb,
-                            **solver_opts}
+                            'linerelaxation': True, 'verb': self.verb+1,
+                            **solver_opts, 'return_info': True, 'log': -1}
 
         # Store original input nCz.
         self._input_nCz = kwargs.pop('_input_nCz', grid.vnC[2])
@@ -730,8 +727,6 @@ class Simulation:
                 'grid': self.get_grid(source, freq),
                 'model': self.get_model(source, freq),
                 'sfield': self.get_sfield(source, freq),
-                'return_info': True,
-                'log': -1,
             }
 
             # Compute electric field.
@@ -854,8 +849,8 @@ class Simulation:
             # Store responses at receivers.
             self.data['synthetic'].loc[src, :, freq] = out[i][2]
 
-        # Print solver warnings.
-        self._print_warnings('efield')
+        # Print solver info.
+        print(self.print_solver_info('efield'))
 
         # If it shall be used as observed data save a copy.
         if observed:
@@ -1023,7 +1018,15 @@ class Simulation:
     def print_grids(self, verb=None):
         """Print info for all generated grids."""
         if verb is None:
-            verb = self.gridding_opts['verb']
+            verb = self.gridding_opts.get('verb', max(self.verb, 0))
+
+        def get_grid_info(src, freq):
+            grid = self.get_grid(src, freq)
+            out = ''
+            if verb != 0 and hasattr(grid, 'construct_mesh_info'):
+                out += grid.construct_mesh_info
+            out += grid.__repr__()
+            return out
 
         # Act depending on gridding:
         out = ""
@@ -1032,40 +1035,49 @@ class Simulation:
             # Loop over frequencies.
             for freq in self.survey.frequencies:
                 out += f"Source: all; Frequency: {freq} Hz\n"
-                mesh = self.get_grid(self._srcfreq[0][0], freq)
-                if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
-                    out += mesh.construct_mesh_info
-                out += mesh.__repr__()
+                out += get_grid_info(self._srcfreq[0][0], freq)
 
         elif self.gridding == 'source':
 
             # Loop over sources.
             for src in self.survey.sources.keys():
                 out += f"= Source: {src}; Frequency: all =\n"
-                mesh = self.get_grid(src, self._srcfreq[0][1])
-                if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
-                    out += mesh.construct_mesh_info
-                out += mesh.__repr__()
+                out += get_grid_info(src, self._srcfreq[0][1])
 
         elif self.gridding == 'both':
 
             # Loop over sources, frequencies.
             for src, freq in self._srcfreq:
                 out += f"Source: {src}; Frequency: {freq} Hz\n"
-                mesh = self.get_grid(src, freq)
-                if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
-                    out += mesh.construct_mesh_info
-                out += mesh.__repr__()
+                out += get_grid_info(src, freq)
 
         else:  # same, input, single
 
             out += "Source: all; Frequency: all\n"
-            mesh = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
-            if verb != 0 and hasattr(mesh, 'construct_mesh_info'):
-                out += mesh.construct_mesh_info
-            out += mesh.__repr__()
+            out += get_grid_info(self._srcfreq[0][0], self._srcfreq[0][1])
 
         return out
+
+    def print_solver_info(self, field, verb=None):
+        """Print solver info."""
+        if verb is None:
+            verb = self.verb
+        msg = ''
+        if verb > -1:
+            info = getattr(self, f"_dict_{field}_info")
+            printed = False
+            for src, freq in self._srcfreq:
+                cinfo = info[src][freq]
+                if verb > 0 or cinfo['exit'] != 0:
+                    if verb > 0 and not printed:
+                        msg += f"\nSolver info {field}:\n"
+                        printed = True
+                    msg += f"= Src {src}; {freq} Hz ="
+                    if verb == 0:
+                        msg += f" {cinfo['exit_message']}\n"
+                    else:
+                        msg += f"\n{cinfo['log']}\n"
+        return msg
 
     # BACKWARDS PROPAGATING FIELD
     def _get_bfields(self, inp):
@@ -1077,8 +1089,6 @@ class Simulation:
             'grid': self.get_grid(*inp),
             'model': self.get_model(*inp),
             'sfield': self._get_rfield(*inp),  # Residual field.
-            'return_info': True,
-            'log': -1,
         }
 
         # Compute and return back-propagated electric field.
@@ -1107,8 +1117,8 @@ class Simulation:
             self._dict_bfield[src][freq] = out[i][0]
             self._dict_bfield_info[src][freq] = out[i][1]
 
-        # Print solver warnings.
-        self._print_warnings('bfield')
+        # Print solver info.
+        print(self.print_solver_info('bfield'))
 
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
@@ -1143,22 +1153,6 @@ class Simulation:
                 )
 
         return ResidualField
-
-    def _print_warnings(self, field):
-        """Print solver warnings."""
-        info = getattr(self, f"_dict_{field}_info")
-        warned = False  # Flag for warnings.
-        msg = ''
-        for i, (src, freq) in enumerate(self._srcfreq):
-            cinfo = info[src][freq]
-            if cinfo['exit'] != 0 and self.verb >= 0:
-                if not warned:
-                    msg += f"\nSolver warnings {field}:\n"
-                    warned = True
-                msg += f"- Src {src}; {freq} Hz : {cinfo['exit_message']}\n"
-
-        if self.verb > -1:
-            print(msg)
 
 
 # HELPER FUNCTIONS
@@ -1312,8 +1306,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
       - ``max_buffer``
       - ``min_width_limits``
       - ``min_width_pps``
-
-    Verbosity (``verb``) is set to 0 if not provided.
+      - ``verb``
 
 
     Parameters
@@ -1349,12 +1342,9 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
                  'lambda_from_center', 'max_buffer', 'min_width_limits',
-                 'min_width_pps']:
+                 'min_width_pps', 'verb']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
-
-    # Verbosity.
-    gopts['verb'] = gridding_opts.pop('verb', 0)
 
     # Mapping defaults to model map.
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)
