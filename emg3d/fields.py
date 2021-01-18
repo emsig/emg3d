@@ -529,16 +529,19 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
     src = np.asarray(src, dtype=np.float64)
     strength = np.asarray(strength)
 
-    # Convert arbitrary shapes and point dipoles to finite length dipoles.
-    if len(src) == 5 and not msrc:  # Point dipole: convert to finite length.
+    # Convert point dipole sources to finite dipoles or loops (msrc).
+    if src.shape == (5, ):  # Point dipole
 
-        src = _finite_dipole_from_point_dipole(src, length)
-
-    elif len(src) in [3, 5]:  # Arbitrary shapes.
-
-        # Get points of square loop perp. to dipole in case of msrc.
-        if len(src) == 5:
+        if msrc:  # Magnetic: convert to square loop perp. to dipole.
             src = _square_loop_from_point_dipole(src, length)
+            # src.shape = (3, 5)
+
+        else:  # Electric: convert to finite length.
+            src = _finite_dipole_from_point_dipole(src, length)
+            # src.shape = (6, )
+
+    # Get arbitrary shaped sources recursively.
+    if src.shape[0] == 3 and src.ndim > 1:
 
         # Get arbitrarily shaped dipole source using recursion.
         sx, sy, sz = src
