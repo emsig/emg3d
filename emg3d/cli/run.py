@@ -116,9 +116,10 @@ def simulation(args_dict):
             survey=sdata['survey'],
             grid=mdata['mesh'],
             model=mdata['model'],
-            verb=2,
+            verb=min(verb, 0),  # # TODO : harmonize simulation/solver-verb.
             **cfg['simulation_options']
             )
+    sim.solver_opts['verb'] = 2  # TODO : harmonize simulation/solver-verb.
 
     # Switch-off tqdm if verbosity is zero.
     if verb < 1:
@@ -137,7 +138,7 @@ def simulation(args_dict):
 
     # Compute forward model (all calls).
     if dry_run:
-        output['data'] = np.zeros_like(sim.data.synthetic)
+        output['data'] = np.zeros(sim.survey.shape, dtype=complex)
     else:
         logger.info("    :: FORWARD COMPUTATION ::\n")
 
