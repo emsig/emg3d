@@ -137,10 +137,10 @@ def simulation(args_dict):
     output = {}
 
     # Compute forward model (all calls).
+    logger.info("    :: FORWARD COMPUTATION ::\n")
     if dry_run:
         output['data'] = np.zeros(sim.survey.shape, dtype=complex)
     else:
-        logger.info("    :: FORWARD COMPUTATION ::\n")
 
         if function == 'forward':
             sim.compute(observed=True, min_offset=min_offset)
@@ -162,11 +162,11 @@ def simulation(args_dict):
 
     # Compute the gradient.
     if function == 'gradient':
+        logger.info("\n    :: BACKWARD COMPUTATION ::\n")
+
         if dry_run:
             output['gradient'] = np.zeros(mdata['mesh'].vnC)
         else:
-            logger.info("\n    :: BACKWARD COMPUTATION ::\n")
-
             output['gradient'] = sim.gradient
 
             # Print Solver Logs.
