@@ -80,11 +80,21 @@ def simulation(args_dict):
         tdata = sdata['survey']
         tdict = tdata.to_dict()
 
+        # Get noise floor and relative error
+        noise_floor = np.atleast_3d(tdata.noise_floor)
+        relative_error = np.atleast_3d(tdata.relative_error)
+
         # Select sources.
         if 'sources' in data.keys():
             tdata._data = tdata.data.sel(src=data['sources'])
             tdict['sources'] = {
                     k: tdict['sources'][k] for k in data['sources']}
+
+            ind = [list(tdata.sources).index(s) for s in data['sources']]
+            if noise_floor.shape[0] > 1:
+                noise_floor = noise_floor[ind, :, :]
+            if relative_error.shape[0] > 1:
+                relative_error = relative_error[ind, :, :]
 
         # Select receivers.
         if 'receivers' in data.keys():
@@ -92,14 +102,28 @@ def simulation(args_dict):
             tdict['receivers'] = {
                     k: tdict['receivers'][k] for k in data['receivers']}
 
+            ind = [list(tdata.receivers).index(r) for r in data['receivers']]
+            if noise_floor.shape[1] > 1:
+                noise_floor = noise_floor[:, ind, :]
+            if relative_error.shape[1] > 1:
+                relative_error = relative_error[:, ind, :]
+
         # Select frequencies.
         if 'frequencies' in data.keys():
             tdata._data = tdata.data.sel(freq=data['frequencies'])
             tdict['frequencies'] = data['frequencies']
 
+            ind = np.isin(tdata.frequencies, data['frequencies'])
+            if noise_floor.shape[2] > 1:
+                noise_floor = noise_floor[:, :, ind]
+            if relative_error.shape[2] > 1:
+                relative_error = relative_error[:, :, ind]
+
         # Replace with selected data.
         for key in tdict['data'].keys():
             tdict['data'][key] = tdata.data[key].data
+        tdict['noise_floor'] = noise_floor
+        tdict['relative_error'] = relative_error
 
         # Get new survey from reduced dict.
         sdata['survey'] = surveys.Survey.from_dict(tdict)
