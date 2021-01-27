@@ -92,6 +92,14 @@ class Survey:
     used for airborne EM.
 
 
+    .. warning::
+
+        The Survey class has mainly been used and tested with ``fixed=False``,
+        which is the default. It is very likely that there are things which are
+        not yet implemented for ``fixed=True``. Please do report problems if
+        you encounter them.
+
+
     Parameters
     ----------
     name : str
@@ -359,6 +367,79 @@ class Survey:
         """
         from emg3d import io
         return io.load(fname, **kwargs)[name]
+
+    def select(self, sources=None, receivers=None, frequencies=None):
+        """Return a survey with selectod sources, receivers, and frequencies.
+
+
+        Parameters
+        ----------
+        sources, receivers, frequencies : list
+            Lists containing the wanted sources, receivers, and frequencies.
+
+
+        Returns
+        -------
+        subsurvey : :class:`emg3d.surveys.Survey`
+            Survey with selected data.
+
+        """
+
+        # Get a dict of the survey
+        survey = self.to_dict()
+        isrc, irec, ifreq = slice(None), slice(None), slice(None)
+
+        # Replace noise floor and relative error.
+        noise_floor = np.atleast_3d(self.noise_floor)
+        relative_error = np.atleast_3d(self.relative_error)
+
+        # Select sources.
+        if sources is not None:
+            if isinstance(sources, str):
+                sources = [sources, ]
+            isrc = [list(self.sources).index(s) for s in sources]
+            survey['sources'] = {s: survey['sources'][s] for s in sources}
+
+            # Adjust noise floor and relative error.
+            if noise_floor.shape[0] > 1:
+                noise_floor = noise_floor[isrc, :, :]
+            if relative_error.shape[0] > 1:
+                relative_error = relative_error[isrc, :, :]
+
+        # Select receivers.
+        if receivers is not None:
+            if isinstance(receivers, str):
+                receivers = [receivers, ]
+            irec = [list(self.receivers).index(r) for r in receivers]
+            survey['receivers'] = {
+                    r: survey['receivers'][r] for r in receivers}
+
+            # Adjust noise floor and relative error.
+            if noise_floor.shape[1] > 1:
+                noise_floor = noise_floor[:, irec, :]
+            if relative_error.shape[1] > 1:
+                relative_error = relative_error[:, irec, :]
+
+        # Select frequencies.
+        if frequencies is not None:
+            ifreq = np.isin(self.frequencies, frequencies)
+            survey['frequencies'] = self.frequencies[ifreq]
+
+            # Adjust noise floor and relative error.
+            if noise_floor.shape[2] > 1:
+                noise_floor = noise_floor[:, :, ifreq]
+            if relative_error.shape[2] > 1:
+                relative_error = relative_error[:, :, ifreq]
+
+        # Replace data with selected data.
+        for key in survey['data'].keys():
+            data = self.data[key].data[isrc, :, :][:, irec, :][:, :, ifreq]
+            survey['data'][key] = data
+        survey['noise_floor'] = noise_floor
+        survey['relative_error'] = relative_error
+
+        # Return reduced survey.
+        return Survey.from_dict(survey)
 
     @property
     def shape(self):

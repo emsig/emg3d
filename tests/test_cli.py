@@ -271,7 +271,7 @@ class TestParser:
         test = cfg['data']
         assert test['sources'] == ['Tx11']
         assert test['receivers'] == ['Rx1', 'Rx2']
-        assert test['frequencies'] == ['1']
+        assert test['frequencies'] == [1.0]
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             # Write a config file.
