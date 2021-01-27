@@ -241,7 +241,10 @@ def parse_config_file(args_dict):
         for key in ['sources', 'receivers', 'frequencies']:
             value = all_data.pop(key, False)
             if value:
-                data[key] = [v.strip() for v in value.split(',')]
+                if key == 'frequencies':
+                    data[key] = [float(v) for v in value.split(',')]
+                else:
+                    data[key] = [v.strip() for v in value.split(',')]
 
         # Ensure no keys are left.
         if all_data:

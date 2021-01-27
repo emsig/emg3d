@@ -15,6 +15,9 @@ recent versions
     screen. This is utilized in the CLI and in the ``Simulation`` class to log
     the solver info.
 
+- ``Survey``: New attribute ``select``, which returns a reduced survey
+  containing the selected sources, receivers, and frequencies.
+
 - CLI:
 
   - Checks now first if all required files and directories exist, and exits
@@ -30,6 +33,9 @@ recent versions
 
 - Changed all DeprecationWarnings to FutureWarnings, meaning they will be
   removed in the next release.
+
+- Bug fix with regards to data selection in the CLI; moved to ``Survey`` (see
+  above).
 
 
 v0.16.0: Arbitrarily shaped sources

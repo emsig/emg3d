@@ -25,7 +25,7 @@ import logging
 
 import numpy as np
 
-from emg3d import io, utils, surveys, simulations
+from emg3d import io, utils, simulations
 from emg3d.cli import parser
 
 
@@ -72,9 +72,10 @@ def simulation(args_dict):
     # Load input.
     logger.info("\n    :: LOAD SURVEY AND MODEL ::\n")
     sdata, sinfo = io.load(cfg['files']['survey'], verb=-1)
+    survey = sdata['survey']
     logger.info(sinfo.split('\n')[0])
     logger.debug(sinfo.split('\n')[1])
-    mdata, minfo = io.load(cfg['files']['model'], verb=-1)
+    model, minfo = io.load(cfg['files']['model'], verb=-1)
     logger.info(minfo.split('\n')[0])
     logger.debug(minfo.split('\n')[1])
     min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
@@ -82,40 +83,15 @@ def simulation(args_dict):
     # Select data.
     data = cfg['data']
     if data:
-
-        # Get a dict.
-        tdata = sdata['survey']
-        tdict = tdata.to_dict()
-
-        # Select sources.
-        if 'sources' in data.keys():
-            tdata._data = tdata.data.sel(src=data['sources'])
-            tdict['sources'] = {
-                    k: tdict['sources'][k] for k in data['sources']}
-
-        # Select receivers.
-        if 'receivers' in data.keys():
-            tdata._data = tdata.data.sel(rec=data['receivers'])
-            tdict['receivers'] = {
-                    k: tdict['receivers'][k] for k in data['receivers']}
-
-        # Select frequencies.
-        if 'frequencies' in data.keys():
-            tdata._data = tdata.data.sel(freq=data['frequencies'])
-            tdict['frequencies'] = data['frequencies']
-
-        # Replace with selected data.
-        for key in tdict['data'].keys():
-            tdict['data'][key] = tdata.data[key].data
-
-        # Get new survey from reduced dict.
-        sdata['survey'] = surveys.Survey.from_dict(tdict)
+        survey = survey.select(sources=data.get('sources', None),
+                               receivers=data.get('receivers', None),
+                               frequencies=data.get('frequencies', None))
 
     # Create simulation.
     sim = simulations.Simulation(
-            survey=sdata['survey'],
-            grid=mdata['mesh'],
-            model=mdata['model'],
+            survey=survey,
+            grid=model['mesh'],
+            model=model['model'],
             verb=min(verb, 0),  # # TODO : harmonize simulation/solver-verb.
             **cfg['simulation_options']
             )
@@ -165,7 +141,7 @@ def simulation(args_dict):
         logger.info("\n    :: BACKWARD COMPUTATION ::\n")
 
         if dry_run:
-            output['gradient'] = np.zeros(mdata['mesh'].vnC)
+            output['gradient'] = np.zeros(model['mesh'].vnC)
         else:
             output['gradient'] = sim.gradient
 

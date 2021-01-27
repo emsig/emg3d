@@ -230,6 +230,23 @@ class TestSurvey():
             srvy6 = surveys.Survey.from_dict(srvy5)
             assert_allclose(srvy5['observed'], srvy6.observed)
 
+    def test_select(self):
+        survey = surveys.Survey(
+            'Test',
+            ((0, 50, 100), 0, 0, 0, 0),
+            ((1000, 1100, 1200, 1300, 1400), 0, 0, 0, 0),
+            frequencies=(1.0, 2.0, 3.4, 4.0),
+            data=np.arange(3*5*4).reshape((3, 5, 4)),
+            noise_floor=np.ones((3, 5, 4)),
+            relative_error=np.ones((3, 5, 4)),
+        )
+
+        t1 = survey.select('Tx0', ['Rx0', 'Rx4'], np.array(1.0))
+        assert t1.shape == (1, 2, 1)
+
+        t2 = survey.select(frequencies=3.0, receivers='Rx0')
+        assert t2.shape == (3, 1, 0)
+
 
 def test_PointDipole():
     # Define a few point dipoles
