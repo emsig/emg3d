@@ -5,6 +5,17 @@ Changelog
 recent versions
 """""""""""""""
 
+
+latest
+------
+
+- ``Survey``: New attribute ``select``, which returns a reduced survey
+  containing the selected sources, receivers, and frequencies.
+
+- Bug fix with regards to data selection in the CLI; moved to ``Survey`` (see
+  above).
+
+
 v0.16.0: Arbitrarily shaped sources
 -----------------------------------
 

@@ -23,7 +23,7 @@ import logging
 
 import numpy as np
 
-from emg3d import io, utils, surveys, simulations
+from emg3d import io, utils, simulations
 from emg3d.cli import parser
 
 
@@ -68,71 +68,22 @@ def simulation(args_dict):
     logger.debug(f"** CONFIGURATION: {term['config_file']}\n{paramdump}\n")
 
     # Load input.
-    sdata = io.load(cfg['files']['survey'], verb=verb_io)
-    mdata = io.load(cfg['files']['model'], verb=verb_io)
+    survey = io.load(cfg['files']['survey'], verb=verb_io)['survey']
+    model = io.load(cfg['files']['model'], verb=verb_io)
     min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
 
     # Select data.
     data = cfg['data']
     if data:
-
-        # Get a dict.
-        tdata = sdata['survey']
-        tdict = tdata.to_dict()
-
-        # Get noise floor and relative error
-        noise_floor = np.atleast_3d(tdata.noise_floor)
-        relative_error = np.atleast_3d(tdata.relative_error)
-
-        # Select sources.
-        if 'sources' in data.keys():
-            tdata._data = tdata.data.sel(src=data['sources'])
-            tdict['sources'] = {
-                    k: tdict['sources'][k] for k in data['sources']}
-
-            ind = [list(tdata.sources).index(s) for s in data['sources']]
-            if noise_floor.shape[0] > 1:
-                noise_floor = noise_floor[ind, :, :]
-            if relative_error.shape[0] > 1:
-                relative_error = relative_error[ind, :, :]
-
-        # Select receivers.
-        if 'receivers' in data.keys():
-            tdata._data = tdata.data.sel(rec=data['receivers'])
-            tdict['receivers'] = {
-                    k: tdict['receivers'][k] for k in data['receivers']}
-
-            ind = [list(tdata.receivers).index(r) for r in data['receivers']]
-            if noise_floor.shape[1] > 1:
-                noise_floor = noise_floor[:, ind, :]
-            if relative_error.shape[1] > 1:
-                relative_error = relative_error[:, ind, :]
-
-        # Select frequencies.
-        if 'frequencies' in data.keys():
-            tdata._data = tdata.data.sel(freq=data['frequencies'])
-            tdict['frequencies'] = data['frequencies']
-
-            ind = np.isin(tdata.frequencies, data['frequencies'])
-            if noise_floor.shape[2] > 1:
-                noise_floor = noise_floor[:, :, ind]
-            if relative_error.shape[2] > 1:
-                relative_error = relative_error[:, :, ind]
-
-        # Replace with selected data.
-        for key in tdict['data'].keys():
-            tdict['data'][key] = tdata.data[key].data
-        tdict['noise_floor'] = noise_floor
-        tdict['relative_error'] = relative_error
-
-        # Get new survey from reduced dict.
-        sdata['survey'] = surveys.Survey.from_dict(tdict)
+        survey = survey.select(sources=data.get('sources', None),
+                               receivers=data.get('receivers', None),
+                               frequencies=data.get('frequencies', None))
 
     # Create simulation.
     sim = simulations.Simulation(
-            survey=sdata['survey'],
-            grid=mdata['mesh'],
-            model=mdata['model'],
+            survey=survey,
+            grid=model['mesh'],
+            model=model['model'],
             verb=verb,
             **cfg['simulation_options']
             )
@@ -171,7 +122,7 @@ def simulation(args_dict):
     # Compute the gradient.
     if function == 'gradient':
         if dry_run:
-            output['gradient'] = np.zeros(mdata['mesh'].vnC)
+            output['gradient'] = np.zeros(model['mesh'].vnC)
         else:
             output['gradient'] = sim.gradient
 
