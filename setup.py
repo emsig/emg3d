@@ -36,6 +36,7 @@ setup(
     },
     python_requires='>=3.7',
     install_requires=[
+        'numpy!=1.20.0',
         'scipy>=1.4.0',
         'numba>=0.45.0',
     ],
