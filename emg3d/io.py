@@ -659,6 +659,10 @@ def _hdf5_get_from(h5file):
             # h5py>=3.0 changed strings to byte strings.
             if isinstance(data[key], bytes):
                 data[key] = data[key].decode("utf-8")
+            elif (isinstance(data[key], np.ndarray) and
+                  data[key].dtype == 'object'):
+                if isinstance(data[key][0], bytes):
+                    data[key] = [x.decode("utf-8") for x in data[key]]
 
         elif isinstance(value, h5py._hl.group.Group):
             data[key] = _hdf5_get_from(value)

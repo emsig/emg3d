@@ -12,6 +12,8 @@ latest
 - ``Survey``: New attribute ``select``, which returns a reduced survey
   containing the selected sources, receivers, and frequencies.
 
+- ``CLI``: Configuration info is added to output data.
+
 - Bug fix with regards to data selection in the CLI; moved to ``Survey`` (see
   above).
 
