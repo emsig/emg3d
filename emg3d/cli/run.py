@@ -109,8 +109,8 @@ def simulation(args_dict):
     logger.debug("    :: MESHES ::\n")
     logger.debug(sim.print_grids(verb=1))
 
-    # Initiate output dict.
-    output = {}
+    # Initiate output dict, add configuration.
+    output = {'configuration': cfg}
 
     # Compute forward model (all calls).
     logger.info("    :: FORWARD COMPUTATION ::\n")

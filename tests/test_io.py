@@ -129,6 +129,7 @@ def test_save_and_load(tmpdir, capsys):
         with pytest.warns(FutureWarning):
             io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
                     a=1.0, b=1+1j, c=True,
+                    d=['1', '2', '3'],
                     model=model, field=field, what={'f': field.fx},
                     collect_classes=True)
         out_h5 = io.load(str(tmpdir+'/test.h5'))
@@ -136,6 +137,7 @@ def test_save_and_load(tmpdir, capsys):
         assert out_h5['Data']['a'] == 1.0
         assert out_h5['Data']['b'] == 1+1j
         assert out_h5['Data']['c'] is True
+        assert out_h5['Data']['d'] == ['1', '2', '3']
         assert_allclose(field.fx, out_h5['Field']['field'].fx)
         assert_allclose(grid.cell_volumes,
                         out_h5['TensorMesh']['emg3d'].cell_volumes)

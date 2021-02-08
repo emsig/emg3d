@@ -20,6 +20,7 @@ recent versions
 
 - CLI:
 
+  - Configuration info is added to output data.
   - Checks now first if all required files and directories exist, and exits
     gracefully otherwise informing the user. (The default thrown Python errors
     would be good enough; but user of the CLI interface might not be familiar
