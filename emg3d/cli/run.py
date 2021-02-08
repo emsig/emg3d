@@ -98,8 +98,8 @@ def simulation(args_dict):
     # Print meshes.
     logger.debug(sim.print_grids)
 
-    # Initiate output dict.
-    output = {}
+    # Initiate output dict, add configuration.
+    output = {'configuration': cfg}
 
     # Compute forward model (all calls).
     if dry_run:
