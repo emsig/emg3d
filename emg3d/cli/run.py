@@ -106,7 +106,7 @@ def simulation(args_dict):
 
     # Print meshes.
     logger.debug("    :: MESHES ::\n")
-    logger.debug(sim.print_grids(verb=1))
+    logger.debug(sim.print_grid_info(return_info=True))
 
     # Initiate output dict, add configuration.
     output = {'configuration': cfg}
@@ -126,8 +126,8 @@ def simulation(args_dict):
 
         # Print Solver Logs.
         if verb in [0, 1]:
-            print(sim.print_solver_info('efield', verb=0))
-        logger.debug(sim.print_solver_info('efield', verb=1))
+            sim.print_solver_info('efield', 0)
+        logger.debug(sim.print_solver_info('efield', 1, True))
 
     # Compute the misfit.
     if function in ['misfit', 'gradient']:
@@ -148,8 +148,8 @@ def simulation(args_dict):
 
             # Print Solver Logs.
             if verb in [0, 1]:
-                print(sim.print_solver_info('bfield', verb=0))
-            logger.debug(sim.print_solver_info('bfield', verb=1))
+                sim.print_solver_info('bfield', 0)
+            logger.debug(sim.print_solver_info('bfield', 1, True))
 
     # Store output to disk.
     logger.info("    :: SAVE RESULTS ::\n")

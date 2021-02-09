@@ -853,7 +853,7 @@ class Simulation:
             self.data['synthetic'].loc[src, :, freq] = out[i][2]
 
         # Print solver info.
-        print(self.print_solver_info('efield'), end='\r')
+        self.print_solver_info('efield', verb=self.verb)
 
         # If it shall be used as observed data save a copy.
         if observed:
@@ -1018,16 +1018,8 @@ class Simulation:
             info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
         return info
 
-    def print_grids(self, verb=None):
+    def print_grid_info(self, verb=1, return_info=False):
         """Print info for all generated grids."""
-
-        # Provided verb > gridding_opts > Simulation.verb
-        if verb is None:
-            verb = getattr(self, 'gridding_opts', {}).get('verb', self.verb)
-
-        # Return if not verbose.
-        if verb < 0:
-            return ''
 
         def get_grid_info(src, freq):
             """Return grid info for given source and frequency."""
@@ -1044,7 +1036,7 @@ class Simulation:
 
             # Loop over frequencies.
             for freq in self.survey.frequencies:
-                out += f"Source: all; Frequency: {freq} Hz\n"
+                out += f"= Source: all; Frequency: {freq} Hz =\n"
                 out += get_grid_info(self._srcfreq[0][0], freq)
 
         elif self.gridding == 'source':
@@ -1058,58 +1050,57 @@ class Simulation:
 
             # Loop over sources, frequencies.
             for src, freq in self._srcfreq:
-                out += f"Source: {src}; Frequency: {freq} Hz\n"
+                out += f"= Source: {src}; Frequency: {freq} Hz =\n"
                 out += get_grid_info(src, freq)
 
         else:  # same, input, single
 
-            out += "Source: all; Frequency: all\n"
+            out += "= Source: all; Frequency: all =\n"
             out += get_grid_info(self._srcfreq[0][0], self._srcfreq[0][1])
 
-        return out
+        if return_info:
+            return out
+        elif out:
+            print(out)
 
-    def print_solver_info(self, field, verb=None):
+    def print_solver_info(self, field='efield', verb=1, return_info=False):
         """Print solver info."""
-
-        # Get verbosity from simulation if not provided.
-        if verb is None:
-            verb = self.verb
 
         # Get info dict.
         info = getattr(self, f"_dict_{field}_info", {})
-        msg = ''
-
-        # Return if not verbose.
-        if verb < 0 or not info:
-            return msg
+        out = ""
 
         # Loop over sources and frequencies.
-        for src, freq in self._srcfreq:
-            cinfo = info[src][freq]
+        if verb > -1:
+            for src, freq in self._srcfreq:
+                cinfo = info[src][freq]
 
-            # Print if verbose or not converged.
-            if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
+                # Print if verbose or not converged.
+                if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
 
-                # Initial message.
-                if not msg:
-                    msg += '\n'
-                    if verb > 0:
-                        msg += f"    - SOLVER INFO <{field}> -\n\n"
+                    # Initial message.
+                    if not out:
+                        out += "\n"
+                        if verb > 0:
+                            out += f"    - SOLVER INFO <{field}> -\n\n"
 
-                # Source and frequency info.
-                msg += f"= Src {src}; {freq} Hz ="
+                    # Source and frequency info.
+                    out += f"= Source {src}; Frequency {freq} Hz ="
 
-                # Print log depending on solver and simulation verbosities.
-                if verb == 0 or self.solver_opts['verb'] not in [1, 2]:
-                    msg += f" {cinfo['exit_message']}\n"
+                    # Print log depending on solver and simulation verbosities.
+                    if verb == 0 or self.solver_opts['verb'] not in [1, 2]:
+                        out += f" {cinfo['exit_message']}\n"
 
-                if verb > 0 and self.solver_opts['verb'] > 2:
-                    msg += f"\n{cinfo['log']}\n"
+                    if verb > 0 and self.solver_opts['verb'] > 2:
+                        out += f"\n{cinfo['log']}\n"
 
-                if verb > 0 and self.solver_opts['verb'] in [1, 2]:
-                    msg += f" {cinfo['log'][12:]}"
+                    if verb > 0 and self.solver_opts['verb'] in [1, 2]:
+                        out += f" {cinfo['log'][12:]}"
 
-        return msg
+        if return_info:
+            return out
+        elif out:
+            print(out)
 
     # BACKWARDS PROPAGATING FIELD
     def _get_bfields(self, inp):
@@ -1150,7 +1141,7 @@ class Simulation:
             self._dict_bfield_info[src][freq] = out[i][1]
 
         # Print solver info.
-        print(self.print_solver_info('bfield'))
+        self.print_solver_info('bfield', verb=self.verb)
 
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
