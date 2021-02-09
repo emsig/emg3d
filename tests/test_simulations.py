@@ -271,7 +271,7 @@ class TestSimulation():
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-def test_simulation_automatic():
+def test_simulation_automatic(capsys):
     # Create a simple survey
     sources = (0, [1000, 3000, 5000], -950, 0, 0)
     receivers = ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0)
@@ -301,19 +301,36 @@ def test_simulation_automatic():
     assert "ources and frequencies; 64 x 64 x 40 (163,840)" in s_sim.__repr__()
 
     # Quick print_grid test:
-    assert "Source: Tx1; Frequency: 10.0 Hz" in b_sim.print_grids()
-    assert "== GRIDDING IN X ==" in b_sim.print_grids()
-    assert b_sim.get_grid('Tx0', 1.0).__repr__() in b_sim.print_grids()
-    assert "Source: all" in f_sim.print_grids()
-    assert "== GRIDDING IN X ==" in f_sim.print_grids()
-    assert f_sim.get_grid('Tx2', 1.0).__repr__() in f_sim.print_grids()
-    assert "Frequency: all" in t_sim.print_grids()
-    assert "== GRIDDING IN X ==" in t_sim.print_grids()
-    assert t_sim.get_grid('Tx1', 10.0).__repr__() in t_sim.print_grids()
-    assert "Source: all; Frequency: all" in s_sim.print_grids()
-    assert "== GRIDDING IN X ==" in s_sim.print_grids()
-    assert s_sim.get_grid('Tx2', 0.1).__repr__() in s_sim.print_grids()
-    assert s_sim.print_grids(verb=-1) == ""
+    _, _ = capsys.readouterr()  # empty
+    b_sim.print_grid_info()
+    out, _ = capsys.readouterr()
+    assert "= Source: Tx1; Frequency: 10.0 Hz =" in out
+    assert "== GRIDDING IN X ==" in out
+    assert b_sim.get_grid('Tx0', 1.0).__repr__() in out
+
+    _, _ = capsys.readouterr()  # empty
+    out = f_sim.print_grid_info(return_info=True)
+    out2, _ = capsys.readouterr()
+    assert out2 == ""
+    assert "= Source: all" in out
+    assert "== GRIDDING IN X ==" in out
+    assert f_sim.get_grid('Tx2', 1.0).__repr__() in out
+
+    t_sim.print_grid_info()
+    out, _ = capsys.readouterr()
+    assert "; Frequency: all" in out
+    assert "== GRIDDING IN X ==" in out
+    assert t_sim.get_grid('Tx1', 10.0).__repr__() in out
+
+    _, _ = capsys.readouterr()  # empty
+    out = s_sim.print_grid_info(return_info=True)
+    out2, _ = capsys.readouterr()
+    assert out2 == ""
+    assert "= Source: all; Frequency: all =" in out
+    assert "== GRIDDING IN X ==" in out
+    assert s_sim.get_grid('Tx2', 0.1).__repr__() in out
+
+    assert s_sim.print_grid_info(verb=-1) is None
 
     # Grids: Middle source / middle frequency should be the same in all.
     assert f_sim.get_grid('Tx1', 1.0) == t_sim.get_grid('Tx1', 1.0)
@@ -339,7 +356,7 @@ def test_simulation_automatic():
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-def test_simulation_print_solver(capsys):
+def test_print_solver(capsys):
     grid = meshes.TensorMesh(
             [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
              [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
@@ -360,21 +377,22 @@ def test_simulation_print_solver(capsys):
     sol = {'sslsolver': False, 'semicoarsening': False,
            'linerelaxation': False, 'maxit': 1}
 
-    _, _ = capsys.readouterr()  # empty
-
     # Errors but verb=-1.
+    _, _ = capsys.readouterr()  # empty
     simulation = simulations.Simulation(verb=-1, **inp, solver_opts=sol)
     simulation.compute()
     out, _ = capsys.readouterr()
-    assert out == '\r'
+    assert out == ""
 
     # Errors with verb=0.
-    out = simulation.print_solver_info('efield', verb=0)
-    assert "= Src Tx0; 1.0 Hz = MAX. ITERATION REACHED, NOT CONVERGED" in out
+    out = simulation.print_solver_info('efield', verb=0, return_info=True)
+    assert "= Source Tx0; Frequency 1.0 Hz = MAX. ITERATION REACHED" in out
 
     # Errors with verb=1.
-    out = simulation.print_solver_info('efield', verb=1)
-    assert "= Src Tx0; 1.0 Hz = 2.6e-02; 1; 0:00:00; MAX. ITERATION" in out
+    _, _ = capsys.readouterr()  # empty
+    simulation.print_solver_info('efield', verb=1)
+    out, _ = capsys.readouterr()
+    assert "= Source Tx0; Frequency 1.0 Hz = 2.6e-02; 1; 0:00:" in out
 
     # No errors; solver-verb 3.
     simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 3})
@@ -387,7 +405,7 @@ def test_simulation_print_solver(capsys):
     simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 0})
     simulation.compute()
     out, _ = capsys.readouterr()
-    assert "= Src Tx0; 1.0 Hz = CONVERGED" in out
+    assert "= Source Tx0; Frequency 1.0 Hz = CONVERGED" in out
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
