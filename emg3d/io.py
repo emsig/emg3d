@@ -337,7 +337,7 @@ def _dict_serialize(inp, out=None, collect_classes=False):
                                'hz': value.h[2],
                                'origin': value.origin, '__class__': name}
                 except AttributeError as e:  # Gracefully fail.
-                    # Print is always shown and simpler, warn for the logs.
+                    # Print is always shown and simpler, warn for the CLI logs.
                     msg = f"Could not serialize <{key}>: {e}"
                     print(f"* WARNING :: {msg}")
                     warnings.warn(msg, UserWarning)
@@ -418,7 +418,7 @@ def _dict_deserialize(inp, first_call=True):
 
                 except (NotImplementedError, AttributeError, KeyError) as e:
                     # Gracefully fail.
-                    # Print is always shown and simpler, warn for the logs.
+                    # Print is always shown and simpler, warn for the CLI logs.
                     msg = f"Could not de-serialize <{key}>: {e}"
                     print(f"* WARNING :: {msg}")
                     warnings.warn(msg, UserWarning)

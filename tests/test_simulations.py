@@ -180,6 +180,10 @@ class TestSimulation():
         assert self.simulation.grid == sim2.grid
         assert self.simulation.model == sim2.model
 
+        sim9 = simulations.Simulation.from_file(tmpdir+'/test.npz', verb=-1)
+        assert sim2.name == sim9[0].name
+        assert 'Data loaded from' in sim9[1]
+
         # Clean and ensure it is empty
         sim3 = self.simulation.copy()
         sim3.clean('all')

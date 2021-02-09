@@ -101,7 +101,7 @@ def _requires(*args, **kwargs):
                 if v:
                     missing = [arg for i, arg in enumerate(wanted)
                                if not available[i]]
-                    # Print is always shown and simpler, warn for the logs.
+                    # Print is always shown and simpler, warn for the CLI logs.
                     msg = ("This feature of `emg3d` requires the following,"
                            f" missing soft dependencies: {missing}.")
                     print(f"* WARNING :: {msg}")
@@ -582,7 +582,7 @@ class Fourier:
                 msg += "`freq_inp=None`."
                 self._freq_inp = None
 
-            # Print is always shown and simpler, warn for the logs.
+            # Print is always shown and simpler, warn for the CLI logs.
             print(f"* WARNING :: {msg}")
             warnings.warn(msg, UserWarning)
 

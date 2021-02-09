@@ -335,7 +335,7 @@ class Survey:
         from emg3d import io
         kwargs[name] = self                # Add survey to dict.
         kwargs['collect_classes'] = False  # Ensure classes are not collected.
-        io.save(fname, **kwargs)
+        return io.save(fname, **kwargs)
 
     @classmethod
     @utils._requires('xarray')
@@ -366,7 +366,11 @@ class Survey:
 
         """
         from emg3d import io
-        return io.load(fname, **kwargs)[name]
+        out = io.load(fname, **kwargs)
+        if 'verb' in kwargs and kwargs['verb'] < 0:
+            return out[0][name], out[1]
+        else:
+            return out[name]
 
     def select(self, sources=None, receivers=None, frequencies=None):
         """Return a survey with selectod sources, receivers, and frequencies.

@@ -92,10 +92,9 @@ def simulation(args_dict):
             survey=survey,
             grid=model['mesh'],
             model=model['model'],
-            verb=min(verb, 0),  # # TODO : harmonize simulation/solver-verb.
+            verb=-1,  # Only errors.
             **cfg['simulation_options']
             )
-    sim.solver_opts['verb'] = 2  # TODO : harmonize simulation/solver-verb.
 
     # Switch-off tqdm if verbosity is zero.
     if verb < 1:
@@ -126,7 +125,9 @@ def simulation(args_dict):
             output['data'] = sim.data.synthetic
 
         # Print Solver Logs.
-        logger.debug(sim.print_solver_info('efield', 2))
+        if verb in [0, 1]:
+            print(sim.print_solver_info('efield', verb=0))
+        logger.debug(sim.print_solver_info('efield', verb=1))
 
     # Compute the misfit.
     if function in ['misfit', 'gradient']:
@@ -146,7 +147,9 @@ def simulation(args_dict):
             output['gradient'] = sim.gradient
 
             # Print Solver Logs.
-            logger.debug(sim.print_solver_info('bfield', 2))
+            if verb in [0, 1]:
+                print(sim.print_solver_info('bfield', verb=0))
+            logger.debug(sim.print_solver_info('bfield', verb=1))
 
     # Store output to disk.
     logger.info("    :: SAVE RESULTS ::\n")

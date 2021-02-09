@@ -222,6 +222,10 @@ class TestSurvey():
         assert_allclose(srvy4.observed, srvy5.observed)
         assert_allclose(srvy4.standard_deviation, srvy5.standard_deviation)
 
+        srvy7 = surveys.Survey.from_file(tmpdir+'/test.npz', verb=-1)
+        assert srvy5.name == srvy7[0].name
+        assert 'Data loaded from' in srvy7[1]
+
         # Test backwards compatibility.
         with pytest.warns(FutureWarning):
             srvy5 = srvy5.to_dict()

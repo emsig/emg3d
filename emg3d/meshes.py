@@ -31,7 +31,7 @@ try:
     # Backwards compatibility; remove latest for version 1.0.0.
     dv = discretize.__version__.split('.')
     if int(dv[0]) == 0 and int(dv[1]) < 6:
-        # Print is always shown and simpler, warn for the logs.
+        # Print is always shown and simpler, warn for the CLI logs.
         msg = ("`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`; "
                "`emg3d.TensorMesh` will return a basic mesh, not a "
                "`discretize.TensorMesh`.")

@@ -147,7 +147,7 @@ class Simulation:
         - `sslsolver=True`;
         - `semicoarsening=True`;
         - `linerelaxation=True`;
-        - `verb=simulation.verb+1`;
+        - `verb=2`;
 
         Note that these defaults are different from the defaults in
         :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
@@ -194,12 +194,11 @@ class Simulation:
         solver_opts = kwargs.pop('solver_opts', {})
         self.verb = kwargs.pop('verb', 0)
 
-        # Store solver options with defaults.
-        # The slowest but most robust setting is used; also, verbosity is
-        # switched off entirely, as warnings are captured differently.
-        # Input overwrites all defaults if provided.
+        # Store solver options with defaults: The slowest but most robust
+        # setting is used, but user-input overwrites defaults if provided.
+        # However, verbosity is turned into a log, not real-time verbosity.
         self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
-                            'linerelaxation': True, 'verb': self.verb+1,
+                            'linerelaxation': True, 'verb': 2,
                             **solver_opts, 'return_info': True, 'log': -1}
 
         # Store original input nCz.
@@ -519,9 +518,9 @@ class Simulation:
         kwargs['collect_classes'] = False  # Ensure classes are not collected.
         # If verb is not defined, use verbosity of simulation.
         if 'verb' not in kwargs:
-            kwargs['verb'] = max(0, self.verb)
+            kwargs['verb'] = self.verb
 
-        io.save(fname, **kwargs)
+        return io.save(fname, **kwargs)
 
     @classmethod
     def from_file(cls, fname, name='simulation', **kwargs):
@@ -550,7 +549,11 @@ class Simulation:
 
         """
         from emg3d import io
-        return io.load(fname, **kwargs)[name]
+        out = io.load(fname, **kwargs)
+        if 'verb' in kwargs and kwargs['verb'] < 0:
+            return out[0][name], out[1]
+        else:
+            return out[name]
 
     # GET FUNCTIONS
     def get_grid(self, source, frequency):
@@ -850,7 +853,7 @@ class Simulation:
             self.data['synthetic'].loc[src, :, freq] = out[i][2]
 
         # Print solver info.
-        print(self.print_solver_info('efield'))
+        print(self.print_solver_info('efield'), end='\r')
 
         # If it shall be used as observed data save a copy.
         if observed:
@@ -1017,10 +1020,17 @@ class Simulation:
 
     def print_grids(self, verb=None):
         """Print info for all generated grids."""
+
+        # Provided verb > gridding_opts > Simulation.verb
         if verb is None:
-            verb = self.gridding_opts.get('verb', max(self.verb, 0))
+            verb = getattr(self, 'gridding_opts', {}).get('verb', self.verb)
+
+        # Return if not verbose.
+        if verb < 0:
+            return ''
 
         def get_grid_info(src, freq):
+            """Return grid info for given source and frequency."""
             grid = self.get_grid(src, freq)
             out = ''
             if verb != 0 and hasattr(grid, 'construct_mesh_info'):
@@ -1060,23 +1070,45 @@ class Simulation:
 
     def print_solver_info(self, field, verb=None):
         """Print solver info."""
+
+        # Get verbosity from simulation if not provided.
         if verb is None:
             verb = self.verb
+
+        # Get info dict.
+        info = getattr(self, f"_dict_{field}_info", {})
         msg = ''
-        if verb > -1:
-            info = getattr(self, f"_dict_{field}_info")
-            printed = False
-            for src, freq in self._srcfreq:
-                cinfo = info[src][freq]
-                if verb > 0 or cinfo['exit'] != 0:
-                    if verb > 0 and not printed:
-                        msg += f"\nSolver info {field}:\n"
-                        printed = True
-                    msg += f"= Src {src}; {freq} Hz ="
-                    if verb == 0:
-                        msg += f" {cinfo['exit_message']}\n"
-                    else:
-                        msg += f"\n{cinfo['log']}\n"
+
+        # Return if not verbose.
+        if verb < 0 or not info:
+            return msg
+
+        # Loop over sources and frequencies.
+        for src, freq in self._srcfreq:
+            cinfo = info[src][freq]
+
+            # Print if verbose or not converged.
+            if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
+
+                # Initial message.
+                if not msg:
+                    msg += '\n'
+                    if verb > 0:
+                        msg += f"    - SOLVER INFO <{field}> -\n\n"
+
+                # Source and frequency info.
+                msg += f"= Src {src}; {freq} Hz ="
+
+                # Print log depending on solver and simulation verbosities.
+                if verb == 0 or self.solver_opts['verb'] not in [1, 2]:
+                    msg += f" {cinfo['exit_message']}\n"
+
+                if verb > 0 and self.solver_opts['verb'] > 2:
+                    msg += f"\n{cinfo['log']}\n"
+
+                if verb > 0 and self.solver_opts['verb'] in [1, 2]:
+                    msg += f" {cinfo['log'][12:]}"
+
         return msg
 
     # BACKWARDS PROPAGATING FIELD
