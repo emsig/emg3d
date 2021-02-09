@@ -18,6 +18,7 @@ Utility functions for the multigrid solver.
 # the License.
 
 import copy
+import warnings
 import importlib
 from timeit import default_timer
 from datetime import datetime, timedelta
@@ -100,8 +101,11 @@ def _requires(*args, **kwargs):
                 if v:
                     missing = [arg for i, arg in enumerate(wanted)
                                if not available[i]]
-                    print("=> This feature of `emg3d` requires the following, "
-                          f"missing soft dependencies: {missing}.")
+                    # Print is always shown and simpler, warn for the CLI logs.
+                    msg = ("This feature of `emg3d` requires the following,"
+                           f" missing soft dependencies: {missing}.")
+                    print(f"* WARNING :: {msg}")
+                    warnings.warn(msg, UserWarning)
                 else:
                     pass
             return passer
@@ -567,16 +571,20 @@ class Fourier:
 
         # If they are both set, reset one depending on `keep_freq_inp`.
         if self._freq_inp is not None and self._every_x_freq is not None:
-            print("\n* WARNING :: `freq_inp` and `every_x_freq` are mutually "
-                  "exclusive.\n             Re-setting ", end="")
+            msg = ("`freq_inp` and `every_x_freq` are mutually "
+                   "exclusive. Re-setting ")
 
             if keep_freq_inp:  # Keep freq_inp.
-                print("`every_x_freq=None`.\n")
+                msg += "`every_x_freq=None`."
                 self._every_x_freq = None
 
             else:              # Keep every_x_freq.
-                print("`freq_inp=None`.\n")
+                msg += "`freq_inp=None`."
                 self._freq_inp = None
+
+            # Print is always shown and simpler, warn for the CLI logs.
+            print(f"* WARNING :: {msg}")
+            warnings.warn(msg, UserWarning)
 
     # PRINTING ROUTINES
     def _print_freq_ftarg(self):

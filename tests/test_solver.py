@@ -238,6 +238,32 @@ def test_one_liner(capsys):
     assert '; CONVERGED' in out
 
 
+def test_log(capsys):
+    dat = REGRES['res']
+
+    grid = meshes.TensorMesh(
+            [dat['input_grid']['hx'], dat['input_grid']['hy'],
+             dat['input_grid']['hz']], dat['input_grid']['origin'])
+    model = models.Model(**dat['input_model'])
+    sfield = alternatives.get_source_field(**dat['input_source'])
+    inp = {'grid': grid, 'model': model, 'sfield': sfield, 'maxit': 1,
+           'verb': 3}
+
+    efield, info = solver.solve(return_info=True, log=-1, **inp)
+    out, _ = capsys.readouterr()
+    assert out == ""
+    assert ' emg3d START ::' in info['log']
+
+    efield = solver.solve(return_info=True, log=0, **inp)
+    out, _ = capsys.readouterr()
+    assert ' emg3d START ::' in out
+
+    efield, info = solver.solve(return_info=True, log=1, **inp)
+    out, _ = capsys.readouterr()
+    assert ' emg3d START ::' in out
+    assert ' emg3d START ::' in info['log']
+
+
 def test_solver_homogeneous_laplace():
     # Regression test for homogeneous halfspace in Laplace domain.
     # Not very sophisticated; replace/extend by more detailed tests.

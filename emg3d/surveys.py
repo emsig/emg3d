@@ -335,7 +335,7 @@ class Survey:
         from emg3d import io
         kwargs[name] = self                # Add survey to dict.
         kwargs['collect_classes'] = False  # Ensure classes are not collected.
-        io.save(fname, **kwargs)
+        return io.save(fname, **kwargs)
 
     @classmethod
     @utils._requires('xarray')
@@ -366,7 +366,11 @@ class Survey:
 
         """
         from emg3d import io
-        return io.load(fname, **kwargs)[name]
+        out = io.load(fname, **kwargs)
+        if 'verb' in kwargs and kwargs['verb'] < 0:
+            return out[0][name], out[1]
+        else:
+            return out[name]
 
     def select(self, sources=None, receivers=None, frequencies=None):
         """Return a survey with selectod sources, receivers, and frequencies.
@@ -890,10 +894,11 @@ class Dipole(PointDipole):
         """Check coordinates and kwargs."""
 
         # Add additional info to the dipole.
-        for key, value in kwargs.items():
-            if key not in self.accepted_keys:
-                print(f"* WARNING :: Unknown kwargs {{{key}: {value}}}")
-            setattr(self, key, value)
+        for key in self.accepted_keys:
+            if key in kwargs:
+                setattr(self, key, kwargs.pop(key))
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Conversion to float-array fails if there are lists and tuples within
         # the tuple, or similar. This should also catch many wrong inputs.

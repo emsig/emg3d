@@ -17,6 +17,8 @@ Functions that actually call emg3d within the CLI interface.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import os
+import sys
 import json
 import time
 import logging
@@ -50,26 +52,32 @@ def simulation(args_dict):
 
     # Parse configuration file.
     cfg, term = parser.parse_config_file(args_dict)
+    check_files(cfg, term)  # Check all files and directories exist.
     function, verb = term['function'], term['verbosity']
     dry_run = term.get('dry_run', False)
-    verb_io = max(0, verb-1)  # io-verbosity only when debug (verbosity=2).
 
     # Start this task: start timing.
     logger = initiate_logger(cfg, runtime, verb)
 
     # Log start info, python and emg3d version, and python path.
-    logger.info(f"\n:: emg3d {function} START :: {time.asctime()} :: "
-                f"v{utils.__version__}\n")
+    logger.info(f":: emg3d CLI {function} START :: {time.asctime()} :: "
+                f"v{utils.__version__}")
+    logger.debug(f"{utils.Report()}")
 
     # Dump the configuration.
-    if not term['config_file']:
-        logger.warning("* WARNING :: CONFIGURATION FILE NOT FOUND.\n")
     paramdump = json.dumps(cfg, sort_keys=True, indent=4)
-    logger.debug(f"** CONFIGURATION: {term['config_file']}\n{paramdump}\n")
+    logger.debug("\n    :: CONFIGURATION ::\n")
+    logger.debug(f"{term['config_file']}\n{paramdump}")
 
     # Load input.
-    survey = io.load(cfg['files']['survey'], verb=verb_io)['survey']
-    model = io.load(cfg['files']['model'], verb=verb_io)
+    logger.info("\n    :: LOAD SURVEY AND MODEL ::\n")
+    sdata, sinfo = io.load(cfg['files']['survey'], verb=-1)
+    survey = sdata['survey']
+    logger.info(sinfo.split('\n')[0])
+    logger.debug(sinfo.split('\n')[1])
+    model, minfo = io.load(cfg['files']['model'], verb=-1)
+    logger.info(minfo.split('\n')[0])
+    logger.debug(minfo.split('\n')[1])
     min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
 
     # Select data.
@@ -84,7 +92,7 @@ def simulation(args_dict):
             survey=survey,
             grid=model['mesh'],
             model=model['model'],
-            verb=verb,
+            verb=-1,  # Only errors.
             **cfg['simulation_options']
             )
 
@@ -93,23 +101,33 @@ def simulation(args_dict):
         sim._tqdm_opts['disable'] = True
 
     # Print simulation info.
+    logger.info("\n    :: SIMULATION ::")
     logger.info(f"\n{sim}\n")
 
     # Print meshes.
-    logger.debug(sim.print_grids)
+    logger.debug("    :: MESHES ::\n")
+    logger.debug(sim.print_grids(verb=1))
 
     # Initiate output dict, add configuration.
     output = {'configuration': cfg}
 
     # Compute forward model (all calls).
+    logger.info("    :: FORWARD COMPUTATION ::\n")
     if dry_run:
-        output['data'] = np.zeros_like(sim.data.synthetic)
-    elif function == 'forward':
-        sim.compute(observed=True, min_offset=min_offset)
-        output['data'] = sim.data.observed
+        output['data'] = np.zeros(sim.survey.shape, dtype=complex)
     else:
-        sim.compute()
-        output['data'] = sim.data.synthetic
+
+        if function == 'forward':
+            sim.compute(observed=True, min_offset=min_offset)
+            output['data'] = sim.data.observed
+        else:
+            sim.compute()
+            output['data'] = sim.data.synthetic
+
+        # Print Solver Logs.
+        if verb in [0, 1]:
+            print(sim.print_solver_info('efield', verb=0))
+        logger.debug(sim.print_solver_info('efield', verb=1))
 
     # Compute the misfit.
     if function in ['misfit', 'gradient']:
@@ -121,32 +139,54 @@ def simulation(args_dict):
 
     # Compute the gradient.
     if function == 'gradient':
+        logger.info("\n    :: BACKWARD COMPUTATION ::\n")
+
         if dry_run:
             output['gradient'] = np.zeros(model['mesh'].vnC)
         else:
             output['gradient'] = sim.gradient
 
-    # Add solver exit messages to log.
-    if not dry_run:
-        infostr = "\nSolver exit messages:\n"
-        for src, values in sim._dict_efield_info.items():
-            for freq, info in values.items():
-                infostr += f"- Src {src}; {freq} Hz : {info['exit_message']}"
-                if function == 'gradient':
-                    binfo = sim._dict_efield_info[src][freq]['exit_message']
-                    infostr += f"; back: : {binfo}\n"
-                else:
-                    infostr += "\n"
-        logger.debug(infostr)
+            # Print Solver Logs.
+            if verb in [0, 1]:
+                print(sim.print_solver_info('bfield', verb=0))
+            logger.debug(sim.print_solver_info('bfield', verb=1))
 
     # Store output to disk.
+    logger.info("    :: SAVE RESULTS ::\n")
     if cfg['files']['store_simulation']:
         output['simulation'] = sim
-    io.save(cfg['files']['output'], **output, verb=verb_io)
+    oinfo = io.save(cfg['files']['output'], **output, verb=-1)
+    logger.info(oinfo.split('\n')[0])
+    logger.debug(oinfo.split('\n')[1])
 
     # Goodbye
-    logger.info(f"\n:: emg3d {function} END   :: {time.asctime()} :: "
-                f"runtime = {runtime.runtime}\n")
+    logger.info(f"\n:: emg3d CLI {function} END   :: {time.asctime()} :: "
+                f"runtime = {runtime.runtime}")
+
+
+def check_files(cfg, term):
+    """Ensure all paths and files exist."""
+    error = ""
+
+    # First check if config file exists.
+    fname = term['config_file']
+    if not os.path.isfile(fname) and fname != '.':  # '.' => no config file.
+        error += f"* ERROR   :: Config file not found: {fname}\n"
+
+    # Check Survey and Model.
+    for name in ['Survey', 'Model']:
+        fname = cfg['files'][name.lower()]
+        if not os.path.isfile(fname):
+            error += f"* ERROR   :: {name} file not found: {fname}\n"
+
+    # Finally check output directory.
+    dname = os.path.split(cfg['files']['log'])[0]
+    if not os.path.isdir(dname):
+        error += f"* ERROR   :: Output directory does not exist: {dname}\n"
+
+    # If any was not found, exit with error.
+    if len(error) > 10:
+        sys.exit(error[:-1])
 
 
 def initiate_logger(cfg, runtime, verb):
@@ -178,5 +218,12 @@ def initiate_logger(cfg, runtime, verb):
     ch.setFormatter(ch_format)
     ch.set_name('emg3d_ch')  # Add name to easy remove them.
     logger.addHandler(ch)
+
+    # Add handlers to Python Warnings.
+    logging.captureWarnings(True)
+    logger_warnings = logging.getLogger("py.warnings")
+    logger_warnings.setLevel(logging.DEBUG)
+    logger_warnings.addHandler(ch)
+    logger_warnings.addHandler(fh)
 
     return logger

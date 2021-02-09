@@ -141,13 +141,13 @@ class Simulation:
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
-        `grid`, `model`, `sfield`, and `efield`.
+        `grid`, `model`, `sfield`, `efield`, `return_info`, and `log`.
         If not provided the following defaults are used:
 
         - `sslsolver=True`;
         - `semicoarsening=True`;
         - `linerelaxation=True`;
-        - `verb=0` (yet warnings are capture and shown).
+        - `verb=2`;
 
         Note that these defaults are different from the defaults in
         :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
@@ -159,12 +159,12 @@ class Simulation:
         given calls. Default is 4.
 
     verb : int; optional
-        Level of verbosity. Default is 1.
+        Level of verbosity. Default is 0. These are propagated to the called
+        function if not defined above in the possible options.
 
         - -1: Error.
         - 0: Warning.
         - 1: Info.
-        - 2: Debug.
 
     """
 
@@ -189,17 +189,17 @@ class Simulation:
         self.max_workers = max_workers
         self.gridding = gridding
 
-        # Store optional inputs with defaults.
-        self.verb = kwargs.pop('verb', 1)
+        # Get optional inputs with defaults.
         gridding_opts = kwargs.pop('gridding_opts', {}).copy()
+        solver_opts = kwargs.pop('solver_opts', {})
+        self.verb = kwargs.pop('verb', 0)
 
-        # Store solver options with defaults.
-        # The slowest but most robust setting is used; also, verbosity is
-        # switched off entirely, as warnings are captured differently.
-        # Input overwrites all defaults if provided.
+        # Store solver options with defaults: The slowest but most robust
+        # setting is used, but user-input overwrites defaults if provided.
+        # However, verbosity is turned into a log, not real-time verbosity.
         self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
-                            'linerelaxation': True,  'verb': 0,
-                            **kwargs.pop('solver_opts', {})}
+                            'linerelaxation': True, 'verb': 2,
+                            **solver_opts, 'return_info': True, 'log': -1}
 
         # Store original input nCz.
         self._input_nCz = kwargs.pop('_input_nCz', grid.vnC[2])
@@ -520,7 +520,7 @@ class Simulation:
         if 'verb' not in kwargs:
             kwargs['verb'] = self.verb
 
-        io.save(fname, **kwargs)
+        return io.save(fname, **kwargs)
 
     @classmethod
     def from_file(cls, fname, name='simulation', **kwargs):
@@ -549,7 +549,11 @@ class Simulation:
 
         """
         from emg3d import io
-        return io.load(fname, **kwargs)[name]
+        out = io.load(fname, **kwargs)
+        if 'verb' in kwargs and kwargs['verb'] < 0:
+            return out[0][name], out[1]
+        else:
+            return out[name]
 
     # GET FUNCTIONS
     def get_grid(self, source, frequency):
@@ -726,7 +730,6 @@ class Simulation:
                 'grid': self.get_grid(source, freq),
                 'model': self.get_model(source, freq),
                 'sfield': self.get_sfield(source, freq),
-                'return_info': True,
             }
 
             # Compute electric field.
@@ -840,23 +843,17 @@ class Simulation:
         self._dict_hfield = self._dict_initiate
 
         # Loop over src-freq combinations to extract and store.
-        warned = False  # Flag for warnings.
         for i, (src, freq) in enumerate(srcfreq):
 
-            # Store efield.
+            # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
-
-            # Store solver info.
-            info = out[i][1]
-            self._dict_efield_info[src][freq] = info
-            if info['exit'] != 0 and self.verb >= 0:
-                if not warned:
-                    print("Solver warnings:")
-                    warned = True
-                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+            self._dict_efield_info[src][freq] = out[i][1]
 
             # Store responses at receivers.
             self.data['synthetic'].loc[src, :, freq] = out[i][2]
+
+        # Print solver info.
+        print(self.print_solver_info('efield'), end='\r')
 
         # If it shall be used as observed data save a copy.
         if observed:
@@ -1021,9 +1018,25 @@ class Simulation:
             info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
         return info
 
-    @property
-    def print_grids(self):
+    def print_grids(self, verb=None):
         """Print info for all generated grids."""
+
+        # Provided verb > gridding_opts > Simulation.verb
+        if verb is None:
+            verb = getattr(self, 'gridding_opts', {}).get('verb', self.verb)
+
+        # Return if not verbose.
+        if verb < 0:
+            return ''
+
+        def get_grid_info(src, freq):
+            """Return grid info for given source and frequency."""
+            grid = self.get_grid(src, freq)
+            out = ''
+            if verb != 0 and hasattr(grid, 'construct_mesh_info'):
+                out += grid.construct_mesh_info
+            out += grid.__repr__()
+            return out
 
         # Act depending on gridding:
         out = ""
@@ -1032,29 +1045,71 @@ class Simulation:
             # Loop over frequencies.
             for freq in self.survey.frequencies:
                 out += f"Source: all; Frequency: {freq} Hz\n"
-                out += self.get_grid(self._srcfreq[0][0], freq).__repr__()
+                out += get_grid_info(self._srcfreq[0][0], freq)
 
         elif self.gridding == 'source':
 
             # Loop over sources.
             for src in self.survey.sources.keys():
                 out += f"= Source: {src}; Frequency: all =\n"
-                out += self.get_grid(src, self._srcfreq[0][1]).__repr__()
+                out += get_grid_info(src, self._srcfreq[0][1])
 
         elif self.gridding == 'both':
 
             # Loop over sources, frequencies.
             for src, freq in self._srcfreq:
                 out += f"Source: {src}; Frequency: {freq} Hz\n"
-                out += self.get_grid(src, freq).__repr__()
+                out += get_grid_info(src, freq)
 
         else:  # same, input, single
 
             out += "Source: all; Frequency: all\n"
-            out += self.get_grid(self._srcfreq[0][0],
-                                 self._srcfreq[0][1]).__repr__()
+            out += get_grid_info(self._srcfreq[0][0], self._srcfreq[0][1])
 
         return out
+
+    def print_solver_info(self, field, verb=None):
+        """Print solver info."""
+
+        # Get verbosity from simulation if not provided.
+        if verb is None:
+            verb = self.verb
+
+        # Get info dict.
+        info = getattr(self, f"_dict_{field}_info", {})
+        msg = ''
+
+        # Return if not verbose.
+        if verb < 0 or not info:
+            return msg
+
+        # Loop over sources and frequencies.
+        for src, freq in self._srcfreq:
+            cinfo = info[src][freq]
+
+            # Print if verbose or not converged.
+            if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
+
+                # Initial message.
+                if not msg:
+                    msg += '\n'
+                    if verb > 0:
+                        msg += f"    - SOLVER INFO <{field}> -\n\n"
+
+                # Source and frequency info.
+                msg += f"= Src {src}; {freq} Hz ="
+
+                # Print log depending on solver and simulation verbosities.
+                if verb == 0 or self.solver_opts['verb'] not in [1, 2]:
+                    msg += f" {cinfo['exit_message']}\n"
+
+                if verb > 0 and self.solver_opts['verb'] > 2:
+                    msg += f"\n{cinfo['log']}\n"
+
+                if verb > 0 and self.solver_opts['verb'] in [1, 2]:
+                    msg += f" {cinfo['log'][12:]}"
+
+        return msg
 
     # BACKWARDS PROPAGATING FIELD
     def _get_bfields(self, inp):
@@ -1066,7 +1121,6 @@ class Simulation:
             'grid': self.get_grid(*inp),
             'model': self.get_model(*inp),
             'sfield': self._get_rfield(*inp),  # Residual field.
-            'return_info': True,
         }
 
         # Compute and return back-propagated electric field.
@@ -1089,20 +1143,14 @@ class Simulation:
             self._dict_bfield_info = self._dict_initiate
 
         # Loop over src-freq combinations to extract and store.
-        warned = False  # Flag for warnings.
         for i, (src, freq) in enumerate(self._srcfreq):
 
-            # Store bfield.
+            # Store bfield and solver info.
             self._dict_bfield[src][freq] = out[i][0]
+            self._dict_bfield_info[src][freq] = out[i][1]
 
-            # Store solver info.
-            info = out[i][1]
-            self._dict_bfield_info[src][freq] = info
-            if info['exit'] != 0 and self.verb >= 0:
-                if not warned:
-                    print("Solver warnings:")
-                    warned = True
-                print(f"- Src {src}; {freq} Hz : {info['exit_message']}")
+        # Print solver info.
+        print(self.print_solver_info('bfield'))
 
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
@@ -1471,6 +1519,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     # Ensure no gridding_opts left.
     if gridding_opts:
+        print(gridding_opts)
         raise TypeError(
                 f"Unexpected gridding_opts: {list(gridding_opts.keys())}")
 

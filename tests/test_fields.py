@@ -530,13 +530,12 @@ def test_get_receiver_response():
     assert_allclose(epm, e3d, rtol=0.1)
 
 
-def test_source_norm_warning(capsys):
+def test_source_norm_warning():
     # This is a warning that should never be raised...
     hx, x0 = np.ones(4), -2
     mesh = meshes.TensorMesh([hx, hx, hx], (x0, x0, x0))
     sfield = fields.SourceField(mesh, freq=1)
     sfield.fx += 1  # Add something to the field.
-    _ = fields._finite_source_xyz(
-            mesh, (-0.5, 0.5, 0, 0, 0, 0), sfield.fx, 0, 30)
-    out, _ = capsys.readouterr()
-    assert "* WARNING :: Normalizing Source: 101.0000000000." in out
+    with pytest.warns(UserWarning, match="Normalizing Source: 101.0000000000"):
+        _ = fields._finite_source_xyz(
+                mesh, (-0.5, 0.5, 0, 0, 0, 0), sfield.fx, 0, 30)

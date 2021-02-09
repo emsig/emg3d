@@ -5,14 +5,35 @@ Changelog
 recent versions
 """""""""""""""
 
+*latest*: Verbosity & Logging
+-----------------------------
 
-latest
-------
+- Solver:
+
+  - ``solver.solve`` has a new keyword ``log``: it enables to log the solver
+    messages in the returned info dictionary instead of printing them to
+    screen. This is utilized in the CLI and in the ``Simulation`` class to log
+    the solver info.
 
 - ``Survey``: New attribute ``select``, which returns a reduced survey
   containing the selected sources, receivers, and frequencies.
 
-- ``CLI``: Configuration info is added to output data.
+- CLI:
+
+  - Configuration info is added to output data.
+  - Checks now first if all required files and directories exist, and exits
+    gracefully otherwise informing the user. (The default thrown Python errors
+    would be good enough; but user of the CLI interface might not be familiar
+    with Python, so it is better to throw a very simple, clear message.)
+  - Log is more verbose with regards to solver (rel. error, time, nr of it.).
+
+- ``Dipole`` throws new an error instead of a warning if it received an unknown
+  keyword.
+
+- Various small things with regard to how things are logged or shown on screen.
+
+- Changed all DeprecationWarnings to FutureWarnings, meaning they will be
+  removed in the next release.
 
 - Bug fix with regards to data selection in the CLI; moved to ``Survey`` (see
   above).

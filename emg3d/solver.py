@@ -84,7 +84,6 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         carrying out one MG cycle helps to stabilize it.
 
     cycle : str; optional.
-
         Type of multigrid cycle. Default is 'F'.
 
         - 'V': V-cycle, simplest version;
@@ -167,54 +166,51 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 5: Everything (slower due to additional error computations).
         - -1: One-liner (dynamically updated).
 
-    **kwargs : Optional solver options:
+    tol : float
+        Convergence tolerance. Default is 1e-6.
 
-        - `tol` : float
+        Iterations stop as soon as the norm of the residual has decreased by
+        this factor, relative to the residual norm obtained for a zero
+        electric field.
 
-          Convergence tolerance. Default is 1e-6.
+    maxit : int
+        Maximum number of multigrid iterations. Default is 50.
 
-          Iterations stop as soon as the norm of the residual has decreased by
-          this factor, relative to the residual norm obtained for a zero
-          electric field.
+        If `sslsolver` is used, this applies to the `sslsolver`.
 
-        - `maxit` : int
+        In the case that multigrid is used as a pre-conditioner for the
+        `sslsolver`, the maximum iteration for multigrid is defined by the
+        maximum length of the `linerelaxation` and `semicoarsening`-cycles.
 
-          Maximum number of multigrid iterations. Default is 50.
+    nu_init : int
+        Number of initial smoothing steps, before MG cycle. Default is 0.
 
-          If `sslsolver` is used, this applies to the `sslsolver`.
+    nu_pre : int
+        Number of pre-smoothing steps. Default is 2.
 
-          In the case that multigrid is used as a pre-conditioner for the
-          `sslsolver`, the maximum iteration for multigrid is defined by the
-          maximum length of the `linerelaxation` and `semicoarsening`-cycles.
+    nu_coarse : int
+        Number of smoothing steps on coarsest grid. Default is 1.
 
-        - `nu_init` : int
+    nu_post : int
+        Number of post-smoothing steps. Default is 2.
 
-          Number of initial smoothing steps, before MG cycle. Default is 0.
+    clevel : int
+        The maximum coarsening level can be different for each dimension and
+        is, by default, automatically determined (``clevel=-1``). The
+        parameter `clevel` can be used to restrict the maximum coarsening
+        level in any direction by its value.
+        Default is -1.
 
-        - `nu_pre` : int
+    return_info : bool
+        If True, a dictionary is returned with runtime info (final norm and
+        number of iterations of MG and the sslsolver).
 
-          Number of pre-smoothing steps. Default is 2.
+    log : int
+        Only relevant if ``return_info=True``. Default is 1.
 
-        - `nu_coarse` : int
-
-          Number of smoothing steps on coarsest grid. Default is 1.
-
-        - `nu_post` : int
-
-          Number of post-smoothing steps. Default is 2.
-
-        - `clevel` : int
-
-          The maximum coarsening level can be different for each dimension and
-          is, by default, automatically determined (``clevel=-1``). The
-          parameter `clevel` can be used to restrict the maximum coarsening
-          level in any direction by its value.
-          Default is -1.
-
-        - `return_info` : bool
-
-          If True, a dictionary is returned with runtime info (final norm and
-          number of iterations of MG and the sslsolver).
+        - -1: LOG ONLY: Only store info in log, do not print on screen.
+        - 0: SCREEN only: Only print info to screen, do not store in log.
+        - 1: BOTH: Store info in log and print on screen.
 
 
     Returns
@@ -239,6 +235,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - `time`: Runtime (s).
         - `runtime_at_cycle`: Runtime after each cycle (s).
         - `error_at_cycle`: Absolute error after each cycle.
+        - `log`: Stored log.
 
 
     Examples
@@ -421,6 +418,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
             'time': var.runtime_at_cycle[-1],          # Runtime (s).
             'runtime_at_cycle': var.runtime_at_cycle,  # Runtime at cycle (s).
             'error_at_cycle': var.error_at_cycle,      # Abs. error at cycle.
+            'log': var.log_message,                    # Log.
         }
 
     # Return depending on input arguments; or nothing.
@@ -502,7 +500,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         var.cprint("     it cycmax               error", 4)
         var.cprint("      level [  dimension  ]            info\n", 4)
         if var.verb > 4:
-            _print_gs_info(it, level, cycmax, grid, l2_last, "initial error")
+            info = _print_gs_info(it, level, cycmax, grid, l2_last)
+            var.cprint(info + "initial error", 4)
 
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
@@ -512,7 +511,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         # Print initial smoothing info.
         if var.verb > 4:
             norm = residual(grid, model, sfield, efield, True)
-            _print_gs_info(it, level, cycmax, grid, norm, "initial smoothing")
+            info = _print_gs_info(it, level, cycmax, grid, norm)
+            var.cprint(info + "initial smoothing", 4)
 
     # Start the actual (recursive) multigrid cycle.
     while level == 0 or (level > 0 and it < cycmax):
@@ -532,7 +532,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             # Print coarsest grid smoothing info.
             if var.verb > 4:
                 norm = residual(grid, model, sfield, efield, True)
-                _print_gs_info(it, level, cycmax, grid, norm, "coarsest level")
+                info = _print_gs_info(it, level, cycmax, grid, norm)
+                var.cprint(info + "coarsest level", 4)
 
         else:                   # (B) Not yet on coarsest grid.
 
@@ -543,8 +544,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 # Print pre-smoothing info.
                 if var.verb > 4:
                     norm = residual(grid, model, sfield, efield, True)
-                    _print_gs_info(
-                            it, level, cycmax, grid, norm, "pre-smoothing")
+                    info = _print_gs_info(it, level, cycmax, grid, norm)
+                    var.cprint(info + "pre-smoothing", 4)
 
             # Get sc_dir for this grid.
             sc_dir = _current_sc_dir(var.sc_dir, grid)
@@ -572,8 +573,8 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
                 # Print post-smoothing info.
                 if var.verb > 4:
                     norm = residual(grid, model, sfield, efield, True)
-                    _print_gs_info(
-                            it, level, cycmax, grid, norm, "post-smoothing")
+                    info = _print_gs_info(it, level, cycmax, grid, norm)
+                    var.cprint(info + "post-smoothing", 4)
 
         # Update iterator counts.
         it += 1         # Local iterator.
@@ -1080,6 +1081,9 @@ class MGParameters:
 
     # Whether or not to return info.
     return_info: bool = False
+    # Log verbosity.
+    log: int = 1
+    log_message: str = ''
 
     def __post_init__(self):
         """Set and check some of the parameters."""
@@ -1219,7 +1223,10 @@ class MGParameters:
 
         """
         if self.verb > verbosity:
-            print(info, **kwargs)
+            if self.log != 0:
+                self.log_message += str(info)+'\n'
+            if self.log >= 0:
+                print(info, **kwargs)
 
     def one_liner(self, l2_last, last=False):
         """Print continuously updated one-liner.
@@ -1243,9 +1250,9 @@ class MGParameters:
 
         # Print depending on `exit`.
         if last:
-            print(info+f"; {self.exit_message}")
+            self.cprint(info+f"; {self.exit_message}", -100)
         else:
-            print(info, end='\r')
+            self.cprint(info, -100, end='\r')
 
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
@@ -1641,8 +1648,8 @@ def _print_cycle_info(var, l2_last, l2_prev):
     var.cprint(info, 3)
 
 
-def _print_gs_info(it, level, cycmax, grid, norm, text):
-    """Print info to log after each Gauss-Seidel smoothing step.
+def _print_gs_info(it, level, cycmax, grid, norm):
+    """Return info-string to log after each Gauss-Seidel smoothing step.
 
     Parameters
     ----------
@@ -1661,14 +1668,15 @@ def _print_gs_info(it, level, cycmax, grid, norm, text):
     norm : float
         Current error (l2-norm).
 
-    text : str
-        Info about Gauss-Seidel step.
+
+    Returns
+    -------
+    info : str
+        Info string.
 
     """
-
     info = f"     {it:2} {level} {cycmax} [{grid.vnC[0]:3}, {grid.vnC[1]:3}, "
-    info += f"{grid.vnC[2]:3}]: {norm:.3e} {text}"
-    print(info)
+    return info + f"{grid.vnC[2]:3}]: {norm:.3e} "
 
 
 def _terminate(var, l2_last, l2_stag, it):

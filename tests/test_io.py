@@ -61,7 +61,7 @@ def test_save_and_load(tmpdir, capsys):
     model = models.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
 
     # Save it.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning) and pytest.warns(UserWarning, match="se"):
         io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
                 broken=grid3, a=None, b=True,
                 field=field, what={'f': field.fx, 12: 12},
@@ -69,7 +69,14 @@ def test_save_and_load(tmpdir, capsys):
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
     assert utils.__version__ in outstr
-    assert 'WARNING :: Could not serialize <broken>' in outstr
+
+    # Save it with other verbosity.
+    _, _ = capsys.readouterr()
+    io.save(tmpdir+'/testverb.npz', a=None, b=True, verb=0)
+    outstr, _ = capsys.readouterr()
+    assert outstr == ""
+    out = io.save(tmpdir+'/testverb.npz', a=None, b=True, verb=-1)
+    assert 'Data saved to «' in out
 
     # Load it.
     out_npz = io.load(str(tmpdir+'/test.npz'), allow_pickle=True)
@@ -87,6 +94,14 @@ def test_save_and_load(tmpdir, capsys):
     assert_allclose(out_npz['Data']['what']['f'], field.fx)
     assert out_npz['Data']['b'] is True
 
+    # Load it with other verbosity.
+    _, _ = capsys.readouterr()
+    out = io.load(tmpdir+'/testverb.npz', verb=0)
+    outstr, _ = capsys.readouterr()
+    assert outstr == ""
+    out, out_str = io.load(tmpdir+'/testverb.npz', verb=-1)
+    assert 'Data loaded from «' in out_str
+
     # Check message from loading another file
 
     data = io._dict_serialize({'meshes': grid}, collect_classes=True)
@@ -94,10 +109,10 @@ def test_save_and_load(tmpdir, capsys):
     del fdata['TensorMesh>meshes>hx']
 
     np.savez_compressed(tmpdir+'/test2.npz', **fdata)
-    _ = io.load(str(tmpdir+'/test2.npz'), allow_pickle=True)
-    outstr, _ = capsys.readouterr()
-    assert "[version/format/date unknown; not created by emg3d]." in outstr
-    assert "WARNING :: Could not de-serialize <meshes>" in outstr
+    with pytest.warns(UserWarning, match="Could not de-serialize"):
+        _ = io.load(str(tmpdir+'/test2.npz'), allow_pickle=True)
+        outstr, _ = capsys.readouterr()
+        assert "[version/format/date unknown; not created by emg3d]." in outstr
 
     # Unknown keyword.
     with pytest.raises(TypeError, match="Unexpected "):
@@ -111,7 +126,7 @@ def test_save_and_load(tmpdir, capsys):
 
     # Test h5py.
     if h5py:
-        with pytest.warns(DeprecationWarning):
+        with pytest.warns(FutureWarning):
             io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
                     a=1.0, b=1+1j, c=True,
                     d=['1', '2', '3'],
@@ -138,7 +153,7 @@ def test_save_and_load(tmpdir, capsys):
             io.load(str(tmpdir+'/test-h5.h5'))
 
     # Test json.
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(FutureWarning):
         io.save(tmpdir+'/test.json', emg3d=grid, discretize=grid2,
                 a=1.0, b=1+1j,
                 model=model, field=field, what={'f': field.fx},

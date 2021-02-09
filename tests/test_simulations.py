@@ -55,8 +55,9 @@ class TestSimulation():
         assert_allclose(self.simulation.get_sfield('Tx1', 1.0), sfield)
 
         # Check efield
+        print(self.simulation.solver_opts)
         efield, info = solver.solve(
-                self.grid, self.model, sfield, return_info=True,
+                self.grid, self.model, sfield,
                 **self.simulation.solver_opts)
         assert_allclose(self.simulation.get_efield('Tx1', 1.0), efield)
 
@@ -179,6 +180,10 @@ class TestSimulation():
         assert self.simulation.grid == sim2.grid
         assert self.simulation.model == sim2.model
 
+        sim9 = simulations.Simulation.from_file(tmpdir+'/test.npz', verb=-1)
+        assert sim2.name == sim9[0].name
+        assert 'Data loaded from' in sim9[1]
+
         # Clean and ensure it is empty
         sim3 = self.simulation.copy()
         sim3.clean('all')
@@ -283,7 +288,7 @@ def test_simulation_automatic():
 
     # Create a simulation, compute all fields.
     inp = {'survey': survey, 'grid': grid, 'model': model,
-           'gridding_opts': {'expand': [1, 0.5], 'seasurface': 0}}
+           'gridding_opts': {'expand': [1, 0.5], 'seasurface': 0, 'verb': 1}}
     b_sim = simulations.Simulation('both', gridding='both', **inp)
     f_sim = simulations.Simulation('freq', gridding='frequency', **inp)
     t_sim = simulations.Simulation('src', gridding='source', **inp)
@@ -296,14 +301,19 @@ def test_simulation_automatic():
     assert "ources and frequencies; 64 x 64 x 40 (163,840)" in s_sim.__repr__()
 
     # Quick print_grid test:
-    assert "Source: Tx1; Frequency: 10.0 Hz" in b_sim.print_grids
-    assert b_sim.get_grid('Tx0', 1.0).__repr__() in b_sim.print_grids
-    assert "Source: all" in f_sim.print_grids
-    assert f_sim.get_grid('Tx2', 1.0).__repr__() in f_sim.print_grids
-    assert "Frequency: all" in t_sim.print_grids
-    assert t_sim.get_grid('Tx1', 10.0).__repr__() in t_sim.print_grids
-    assert "Source: all; Frequency: all" in s_sim.print_grids
-    assert s_sim.get_grid('Tx2', 0.1).__repr__() in s_sim.print_grids
+    assert "Source: Tx1; Frequency: 10.0 Hz" in b_sim.print_grids()
+    assert "== GRIDDING IN X ==" in b_sim.print_grids()
+    assert b_sim.get_grid('Tx0', 1.0).__repr__() in b_sim.print_grids()
+    assert "Source: all" in f_sim.print_grids()
+    assert "== GRIDDING IN X ==" in f_sim.print_grids()
+    assert f_sim.get_grid('Tx2', 1.0).__repr__() in f_sim.print_grids()
+    assert "Frequency: all" in t_sim.print_grids()
+    assert "== GRIDDING IN X ==" in t_sim.print_grids()
+    assert t_sim.get_grid('Tx1', 10.0).__repr__() in t_sim.print_grids()
+    assert "Source: all; Frequency: all" in s_sim.print_grids()
+    assert "== GRIDDING IN X ==" in s_sim.print_grids()
+    assert s_sim.get_grid('Tx2', 0.1).__repr__() in s_sim.print_grids()
+    assert s_sim.print_grids(verb=-1) == ""
 
     # Grids: Middle source / middle frequency should be the same in all.
     assert f_sim.get_grid('Tx1', 1.0) == t_sim.get_grid('Tx1', 1.0)
@@ -326,6 +336,58 @@ def test_simulation_automatic():
     assert t_sim.get_grid('Tx1', 1.0) == t_sim_copy.get_grid('Tx1', 1.0)
     assert 'expand' not in t_sim.gridding_opts.keys()
     assert 'expand' not in t_sim_copy.gridding_opts.keys()
+
+
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+def test_simulation_print_solver(capsys):
+    grid = meshes.TensorMesh(
+            [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
+             [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
+             [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
+            x0='CCC')
+
+    model = models.Model(grid, property_x=1.5, property_y=1.8,
+                         property_z=3.3, mapping='Resistivity')
+
+    survey = surveys.Survey(
+        name='Test', sources=(0, 0, 0, 0, 0),
+        receivers=([-10000, 10000], 0, 0, 0, 0),
+        frequencies=1.0, noise_floor=1e-15, relative_error=0.05,
+    )
+
+    inp = {'name': 'Test', 'survey': survey, 'grid': grid, 'model': model,
+           'gridding': 'same'}
+    sol = {'sslsolver': False, 'semicoarsening': False,
+           'linerelaxation': False, 'maxit': 1}
+
+    _, _ = capsys.readouterr()  # empty
+
+    # Errors but verb=-1.
+    simulation = simulations.Simulation(verb=-1, **inp, solver_opts=sol)
+    simulation.compute()
+    out, _ = capsys.readouterr()
+    assert out == '\r'
+
+    # Errors with verb=0.
+    out = simulation.print_solver_info('efield', verb=0)
+    assert "= Src Tx0; 1.0 Hz = MAX. ITERATION REACHED, NOT CONVERGED" in out
+
+    # Errors with verb=1.
+    out = simulation.print_solver_info('efield', verb=1)
+    assert "= Src Tx0; 1.0 Hz = 2.6e-02; 1; 0:00:00; MAX. ITERATION" in out
+
+    # No errors; solver-verb 3.
+    simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 3})
+    simulation.compute()
+    out, _ = capsys.readouterr()
+    assert 'MG-cycle' in out
+    assert 'CONVERGED' in out
+
+    # No errors; solver-verb 0.
+    simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 0})
+    simulation.compute()
+    out, _ = capsys.readouterr()
+    assert "= Src Tx0; 1.0 Hz = CONVERGED" in out
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -460,7 +522,7 @@ class TestEstimateGriddingOpts():
             'max_buffer': 10000,
             'min_width_limits': [20, 40],
             'min_width_pps': 4,
-            'verb': 3,
+            'verb': -1,
             }
 
         gdict = simulations.estimate_gridding_opts(

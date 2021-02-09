@@ -31,9 +31,11 @@ try:
     # Backwards compatibility; remove latest for version 1.0.0.
     dv = discretize.__version__.split('.')
     if int(dv[0]) == 0 and int(dv[1]) < 6:
-        msg = ("\n`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`;"
-               "\n`emg3d.TensorMesh` will return a basic mesh, not a "
+        # Print is always shown and simpler, warn for the CLI logs.
+        msg = ("`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`; "
+               "`emg3d.TensorMesh` will return a basic mesh, not a "
                "`discretize.TensorMesh`.")
+        print(f"* WARNING :: {msg}")
         warnings.warn(msg, UserWarning)
         dv = None
 except ImportError:
@@ -155,7 +157,7 @@ class _TensorMesh:
                 f"`{cname}.{old_name}` has been deprecated (will be removed "
                 f"in v0.17.0); please use `{cname}.{new_name}{ind}`."
             )
-            warnings.warn(message, DeprecationWarning)
+            warnings.warn(message, FutureWarning)
             if index is None:
                 return getattr(self, new_name)
             else:
@@ -478,18 +480,16 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
         512, 640, 768, 1024.
 
-    verb : int, optional
-        Verbosity, -1 (error); 0 (warning), 1 (info), 2 (verbose).
-        Default = 0 (Warnings only).
+    verb : int
+        If 1 verbose, if 0 silent (default).
+        Either way, the info is added to the returned mesh as
+        ``mesh.construct_mesh_info``.
 
 
     Returns
     -------
-    origin : float
-        Origin of the mesh.
-
-    widths : ndarray
-        Cell widths of mesh.
+    grid : :class:`emg3d.meshes.TensorMesh`
+        Resulting mesh.
 
 
     """
@@ -498,6 +498,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
+    kwargs['verb'] = -1            # Run x/y/z first, print/collect
+    kwargs['raise_error'] = False  # info, then raise if necessary.
     xparams = {'center': center[0]}
     yparams = {'center': center[1]}
     zparams = {'center': center[2], 'seasurface': seasurface}
@@ -551,18 +553,26 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                 kwargs[name] = value
 
     # Get origins and widths in all directions.
-    if verb > 0:
-        print("         == GRIDDING IN X ==")
-    x0, hx = get_origin_widths(**kwargs, **xparams)
-    if verb > 0:
-        print("\n         == GRIDDING IN Y ==")
-    y0, hy = get_origin_widths(**kwargs, **yparams)
-    if verb > 0:
-        print("\n         == GRIDDING IN Z ==")
-    z0, hz = get_origin_widths(**kwargs, **zparams)
+    x0, hx, xinfo = get_origin_widths(**kwargs, **xparams)
+    y0, hy, yinfo = get_origin_widths(**kwargs, **yparams)
+    z0, hz, zinfo = get_origin_widths(**kwargs, **zparams)
 
-    # Return mesh.
-    return TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
+    # Throw message if no solution was found.
+    if any([out is None for out in [x0, y0, z0]]):
+        raise RuntimeError("No suitable grid found; relax your criteria.")
+
+    # Create mesh.
+    mesh = TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
+
+    # Collect info.
+    info = (f"\n         == GRIDDING IN X ==\n{xinfo}\n"
+            f"\n         == GRIDDING IN Y ==\n{yinfo}\n"
+            f"\n         == GRIDDING IN Z ==\n{zinfo}\n")
+    mesh.construct_mesh_info = info
+    if verb > 0:
+        print(info)
+
+    return mesh
 
 
 def get_origin_widths(frequency, properties, center, domain=None, vector=None,
@@ -585,9 +595,13 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         All parameters are described in :func:`construct_mesh`. The only
         difference is that here only variables for one direction are accepted.
 
+    verb : int
+        If 1 verbose, if 0 silent (default); if -1 it returns the info as
+        string instead of printing it.
+
     raise_error : bool, optional
         If True, an error is raised if no suitable grid is found. Otherwise it
-        just prints a message and returns None's.
+        just returns None's (used by ``construct_mesh``).
         Default is True.
 
     Returns
@@ -597,6 +611,9 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     widths : ndarray
         Cell widths of mesh.
+
+    info : str
+        Info, only if ``verb<0`.
 
     """
     # Get all kwargs.
@@ -796,11 +813,9 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         if raise_error:
             raise RuntimeError(msg)
         else:
-            print(f"* ERROR   :: {msg}")
-            return None, None
+            x0, hx, info = None, None, msg
 
-    # Print info about final grid.
-    if verb > 0:
+    else:  # Collect info about final grid.
 
         # Check max stretching.
         sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
@@ -809,50 +824,44 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         # Display precision.
         prec = int(np.ceil(max(0, -np.log10(min(hx))+1)))
 
-        if verb > 1:
-            end = ""
-        else:
-            end = "\n"
+        info = f"Skin depth     [m] : {skind[0]:.{prec}f}"
+        if cond.size > 1:
+            info += f" / {skind[1]:.{prec}f}"
+        if cond.size > 2:
+            info += f" / {skind[2]:.{prec}f}"
+        info += "  [corr. to `properties`]\n"
 
-        print(f"Skin depth          [m] : {skind[0]:.{prec}f}", end="")
-        if cond.size == 2:
-            print(f" / {skind[1]:.{prec}f}", end=end)
-        elif cond.size == 3:
-            print(f" / {skind[1]:.{prec}f} / {skind[2]:.{prec}f}", end=end)
-        else:
-            print(end=end)
-        if verb > 1:
-            print("  [corresponding to `properties`]")
+        info += (
+            f"Survey dom. DS [m] : "
+            f"{domain[0]:.{prec}f} - {domain[1]:.{prec}f}\n"
+            #
+            f"Comp. dom. DC  [m] : {comp_domain[0]:.{prec}f} - "
+            f"{comp_domain[1]:.{prec}f}\n"
+            #
+            f"Final extent   [m] : {x0:.{prec}f} - {x0+np.sum(hx):.{prec}f}\n"
+            #
+            f"Cell widths    [m] : {min(hxo):.{prec}f} / {max(hxo):.{prec}f} "
+            f"/ {max(hx):.{prec}f}  [min(DS) / max(DS) / max(DC)]\n"
+            #
+            f"Number of cells    : {nx} ({hxo.size} / "
+            f"{nx-hxo.size-nx_remain2} / {nx_remain2})  "
+            f"[Total (DS/DC/remain)]\n"
+            #
+            f"Max stretching     : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}"
+            "  [DS (seasurface) / DC]")
 
-        print(f"Survey domain DS    [m] : {domain[0]:.{prec}f} - "
-              f"{domain[1]:.{prec}f}")
-
-        print(f"Comp. domain DC     [m] : {comp_domain[0]:.{prec}f} - "
-              f"{comp_domain[1]:.{prec}f}")
-
-        print(f"Final extent        [m] : {x0:.{prec}f} - "
-              f"{x0+np.sum(hx):.{prec}f}")
-
-        print(f"Cell widths         [m] : "
-              f"{min(hxo):.{prec}f} / {max(hxo):.{prec}f} / "
-              f"{max(hx):.{prec}f}", end=end)
-        if verb > 1:
-            print("  [min(DS) / max(DS) / max(DC)]")
-
-        print(f"Number of cells         : {nx} ({hxo.size} / "
-              f"{nx-hxo.size-nx_remain2} / {nx_remain2})", end=end)
-        if verb > 1:
-            print("  [Total (DS/DC/remain)]")
-
-        print(f"Max stretching          : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}",
-              end=end)
-        if verb > 1:
-            print("  [DS (seasurface) / DC]")
         if sa_adj > sa_limit:
-            print(f"Note: Stretching in DS >> {sa}.\nThe reason "
-                  "is usually the interplay of center/domain/seasurface.")
+            info += (f"\nNote: Stretching in DS >> {sa}.\nThe reason "
+                     "is usually the interplay of center/domain/seasurface.")
 
-    return x0, hx
+    if verb > 0:
+        print(info)
+
+    # Return required info.
+    if verb < 0:
+        return x0, hx, info
+    else:
+        return x0, hx
 
 
 def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
@@ -1166,7 +1175,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
         - `amax`: Maximum alpha.
 
     """
-    warnings.warn(MESHWARNING, DeprecationWarning)
+    warnings.warn(MESHWARNING, FutureWarning)
 
     # Get variables with default lists:
     if alpha is None:
@@ -1380,7 +1389,7 @@ def get_hx_h0(freq, res, domain, fixed=0., possible_nx=None, min_width=None,
 
 
 def get_cell_numbers(max_nr, max_prime=5, min_div=3):
-    warnings.warn(CELLWARNING, DeprecationWarning)
+    warnings.warn(CELLWARNING, FutureWarning)
     return good_mg_cell_nr(max_nr, max_prime, min_div)
 
 
@@ -1447,7 +1456,7 @@ def get_stretched_h(min_width, domain, nx, x0=0, x1=None, resp_domain=False):
         Cell widths of mesh.
 
     """
-    warnings.warn(MESHWARNING, DeprecationWarning)
+    warnings.warn(MESHWARNING, FutureWarning)
 
     # Cast to arrays
     domain = np.array(domain, dtype=np.float64)
@@ -1598,7 +1607,7 @@ def get_domain(x0=0, freq=1, res=0.3, limits=None, min_width=None,
         Start- and end-points of computation domain.
 
     """
-    warnings.warn(MESHWARNING, DeprecationWarning)
+    warnings.warn(MESHWARNING, FutureWarning)
 
     # Set fact_pos to fact_neg if not provided.
     if fact_pos is None:
@@ -1666,7 +1675,7 @@ def get_hx(alpha, domain, nx, x0, resp_domain=True):
         ``np.r_[xmin, xmin+np.cumsum(hx)]``
 
     """
-    warnings.warn(MESHWARNING, DeprecationWarning)
+    warnings.warn(MESHWARNING, FutureWarning)
 
     if alpha <= 0.:  # If alpha <= 0: equal spacing (no stretching at all)
         hx = np.ones(nx)*np.diff(np.squeeze(domain))/nx

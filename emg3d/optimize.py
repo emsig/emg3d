@@ -107,7 +107,7 @@ def misfit(simulation):
     weights = simulation.data['weights']
 
     # Compute misfit
-    misfit = np.sum(weights*(residual.data.conj()*residual.data).real)/2
+    misfit = np.sum(weights*(residual.conj()*residual)).real/2
 
     return misfit.data
 

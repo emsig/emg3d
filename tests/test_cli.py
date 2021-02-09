@@ -80,7 +80,7 @@ def test_basic(script_runner):
     # Test emg3d/cli/_main_.py by calling the file - III.
     ret = script_runner.run('python', 'emg3d/cli/main.py', '-d')
     assert not ret.success
-    assert "CONFIGURATION FILE NOT FOUND" in ret.stderr
+    assert "* ERROR   :: Config file not found: " in ret.stderr
 
 
 class TestParser:
@@ -142,7 +142,7 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = 'bla'
         _, term = cli.parser.parse_config_file(args_dict)
-        assert term['config_file'] is False
+        assert '/bla' in term['config_file']
 
     def test_term_various(self, tmpdir):
 
@@ -391,9 +391,41 @@ class TestRun:
         args_dict['config'] = 'bla'
         args_dict['verbosity'] = 2
         _, _ = capsys.readouterr()
-        cli.run.simulation(args_dict)
-        _, outstr = capsys.readouterr()
-        assert "* WARNING :: CONFIGURATION FILE NOT FOUND." in outstr
+
+        with pytest.raises(SystemExit) as e:
+            cli.run.simulation(args_dict)
+        assert e.type == SystemExit
+        assert "* ERROR   :: Config file not found: " in e.value.code
+
+        # Missing survey.
+        args_dict = self.args_dict.copy()
+        args_dict['path'] = tmpdir
+        args_dict['survey'] = 'wrong'
+        with pytest.raises(SystemExit) as e:
+            cli.run.simulation(args_dict)
+        assert e.type == SystemExit
+        assert "* ERROR   :: Survey file not found: " in e.value.code
+        assert "wrong" in e.value.code
+
+        # Missing model.
+        args_dict = self.args_dict.copy()
+        args_dict['path'] = tmpdir
+        args_dict['model'] = 'phantommodel'
+        with pytest.raises(SystemExit) as e:
+            cli.run.simulation(args_dict)
+        assert e.type == SystemExit
+        assert "* ERROR   :: Model file not found: " in e.value.code
+        assert "phantommodel" in e.value.code
+
+        # Missing output directory.
+        args_dict = self.args_dict.copy()
+        args_dict['path'] = tmpdir
+        args_dict['output'] = 'phantom/output/dir.npz'
+        with pytest.raises(SystemExit) as e:
+            cli.run.simulation(args_dict)
+        assert e.type == SystemExit
+        assert "* ERROR   :: Output directory does not exist: " in e.value.code
+        assert "phantom/output" in e.value.code
 
     def test_run(self, tmpdir, capsys):
 
