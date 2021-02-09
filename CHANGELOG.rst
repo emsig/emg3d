@@ -5,17 +5,16 @@ Changelog
 recent versions
 """""""""""""""
 
-*latest*: Verbosity & Logging
------------------------------
+v0.16.1: Verbosity & Logging
+----------------------------
 
-- Solver:
+**2021-02-09**
 
-  - ``solver.solve`` has a new keyword ``log``: it enables to log the solver
-    messages in the returned info dictionary instead of printing them to
-    screen. This is utilized in the CLI and in the ``Simulation`` class to log
-    the solver info.
+- ``Solve`` has a new keyword ``log``, which enables to log the solver messages
+  in the returned info dictionary instead of printing them to screen. This is
+  utilized in the CLI and in the ``Simulation`` class to log the solver info.
 
-- ``Survey``: New attribute ``select``, which returns a reduced survey
+- ``Survey`` has a new attribute ``select``, which returns a reduced survey
   containing the selected sources, receivers, and frequencies.
 
 - CLI:
@@ -32,8 +31,8 @@ recent versions
 
 - Various small things with regard to how things are logged or shown on screen.
 
-- Changed all DeprecationWarnings to FutureWarnings, meaning they will be
-  removed in the next release.
+- Changed all ``DeprecationWarnings`` to ``FutureWarnings``, meaning they will
+  be removed in the next release.
 
 - Bug fix with regards to data selection in the CLI; moved to ``Survey`` (see
   above).
