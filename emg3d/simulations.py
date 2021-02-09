@@ -141,7 +141,7 @@ class Simulation:
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
-        `grid`, `model`, `sfield`, and `efield`.
+        `grid`, `model`, `sfield`, `efield`, `return_info`, and `log`.
         If not provided the following defaults are used:
 
         - `sslsolver=True`;
@@ -164,7 +164,7 @@ class Simulation:
 
         - -1: Error.
         - 0: Warning.
-        - 1+: More and more info.
+        - 1: Info.
 
     """
 

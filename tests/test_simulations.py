@@ -313,6 +313,7 @@ def test_simulation_automatic():
     assert "Source: all; Frequency: all" in s_sim.print_grids()
     assert "== GRIDDING IN X ==" in s_sim.print_grids()
     assert s_sim.get_grid('Tx2', 0.1).__repr__() in s_sim.print_grids()
+    assert s_sim.print_grids(verb=-1) == ""
 
     # Grids: Middle source / middle frequency should be the same in all.
     assert f_sim.get_grid('Tx1', 1.0) == t_sim.get_grid('Tx1', 1.0)
@@ -335,6 +336,58 @@ def test_simulation_automatic():
     assert t_sim.get_grid('Tx1', 1.0) == t_sim_copy.get_grid('Tx1', 1.0)
     assert 'expand' not in t_sim.gridding_opts.keys()
     assert 'expand' not in t_sim_copy.gridding_opts.keys()
+
+
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+def test_simulation_print_solver(capsys):
+    grid = meshes.TensorMesh(
+            [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
+             [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
+             [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
+            x0='CCC')
+
+    model = models.Model(grid, property_x=1.5, property_y=1.8,
+                         property_z=3.3, mapping='Resistivity')
+
+    survey = surveys.Survey(
+        name='Test', sources=(0, 0, 0, 0, 0),
+        receivers=([-10000, 10000], 0, 0, 0, 0),
+        frequencies=1.0, noise_floor=1e-15, relative_error=0.05,
+    )
+
+    inp = {'name': 'Test', 'survey': survey, 'grid': grid, 'model': model,
+           'gridding': 'same'}
+    sol = {'sslsolver': False, 'semicoarsening': False,
+           'linerelaxation': False, 'maxit': 1}
+
+    _, _ = capsys.readouterr()  # empty
+
+    # Errors but verb=-1.
+    simulation = simulations.Simulation(verb=-1, **inp, solver_opts=sol)
+    simulation.compute()
+    out, _ = capsys.readouterr()
+    assert out == '\r'
+
+    # Errors with verb=0.
+    out = simulation.print_solver_info('efield', verb=0)
+    assert "= Src Tx0; 1.0 Hz = MAX. ITERATION REACHED, NOT CONVERGED" in out
+
+    # Errors with verb=1.
+    out = simulation.print_solver_info('efield', verb=1)
+    assert "= Src Tx0; 1.0 Hz = 2.6e-02; 1; 0:00:00; MAX. ITERATION" in out
+
+    # No errors; solver-verb 3.
+    simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 3})
+    simulation.compute()
+    out, _ = capsys.readouterr()
+    assert 'MG-cycle' in out
+    assert 'CONVERGED' in out
+
+    # No errors; solver-verb 0.
+    simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 0})
+    simulation.compute()
+    out, _ = capsys.readouterr()
+    assert "= Src Tx0; 1.0 Hz = CONVERGED" in out
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
