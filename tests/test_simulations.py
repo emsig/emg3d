@@ -112,12 +112,6 @@ class TestSimulation():
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
 
-        tsurvey.receivers['Rx01'].electric = False
-        tsurvey.sources['Tx1'].electric = True
-        with pytest.raises(NotImplementedError, match="sources and receivers"):
-            simulations.Simulation(
-                    'Test2', tsurvey, self.grid, self.model)
-
         # gridding='same' with gridding_opts.
         with pytest.raises(TypeError, match="`gridding_opts` is not permitt"):
             simulations.Simulation(

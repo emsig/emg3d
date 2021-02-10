@@ -517,6 +517,25 @@ class Survey:
         return coords
 
     @property
+    def rec_types(self):
+        """Return receiver flags if electric, as tuple.
+
+        Corresponds to ``rec_coords``.
+        """
+
+        # Get receiver coordinates depending if fixed or not.
+        if self.fixed:
+            types = {}
+            for src in self.sources.keys():
+                types[src] = tuple(
+                        [self.receivers[off][src].electric
+                         for off in list(self.receivers)])
+        else:
+            types = tuple([r.electric for r in self.receivers.values()])
+
+        return types
+
+    @property
     def frequencies(self):
         """Frequency array."""
         return self._frequencies

@@ -216,10 +216,9 @@ class Simulation:
 
         # Magnetic sources and receivers are not yet implemented.
         msrc = sum([not s.electric for s in survey.sources.values()]) > 0
-        mrec = sum([not r.electric for r in survey.receivers.values()]) > 0
-        if msrc or mrec:
+        if msrc:
             raise NotImplementedError("Simulation not yet implemented for "
-                                      "magnetic sources and receivers.")
+                                      "magnetic sources.")
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -745,18 +744,28 @@ class Simulation:
 
             # Get receiver coordinates.
             rec_coords = self.survey.rec_coords
+            rec_types = self.survey.rec_types
             # For fixed surveys:
             # rec_coords = self.survey.rec_coords[source]
 
-            # Extract data at receivers.
-            resp = fields.get_receiver_response(
-                    grid=self._dict_grid[source][freq],
-                    field=self._dict_efield[source][freq],
-                    rec=rec_coords
-            )
+            # Store electric receivers.
+            if rec_types.count(True):
 
-            # Store the receiver response.
-            self.data.synthetic.loc[source, :, freq] = resp
+                # Extract data at receivers.
+                resp = fields.get_receiver_response(
+                        grid=self._dict_grid[source][freq],
+                        field=self._dict_efield[source][freq],
+                        rec=rec_coords[rec_types]
+                )
+
+                # Store the receiver response.
+                self.data.synthetic.loc[source, rec_types, freq] = resp
+
+            # Store magnetic receivers.
+            if rec_types.count(False):
+
+                # The magnetic fields are, currently, not returned.
+                _ = self.get_hfield(source, freq)
 
         # Return electric field.
         if call_from_compute:
@@ -777,6 +786,25 @@ class Simulation:
                     self.get_grid(source, freq),
                     self.get_model(source, freq),
                     self.get_efield(source, freq, **kwargs))
+
+            # Get receiver coordinates.
+            rec_coords = self.survey.rec_coords
+            rec_types = np.invert(self.survey.rec_types)
+            # For fixed surveys:
+            # rec_coords = self.survey.rec_coords[source]
+
+            # Store magnetic receivers.
+            if rec_types.count(True):
+
+                # Extract data at receivers.
+                resp = fields.get_receiver_response(
+                        grid=self._dict_grid[source][freq],
+                        field=self._dict_efield[source][freq],
+                        rec=rec_coords[rec_types]
+                )
+
+                # Store the receiver response.
+                self.data.synthetic.loc[source, rec_types, freq] = resp
 
         # Return magnetic field.
         return self._dict_hfield[source][freq]
@@ -1173,6 +1201,7 @@ class Simulation:
                     src=rec.coordinates,
                     freq=frequency,
                     strength=strength,
+                    msrc=not rec.electric,
                 )
 
         return ResidualField
