@@ -551,14 +551,14 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
         lengths = np.sqrt(np.sum((src[:, :-1] - src[:, 1:])**2, axis=0))
         if strength == 0:
             lengths /= lengths.sum()
-        else:
-            lengths *= strength
+        else:  # (Not in-place multiplication, as strength can be complex.)
+            lengths = lengths*strength
 
         # Initiate a zero-valued source field and loop over segments.
         sfield = SourceField(grid, freq=freq)
         sfield.src = src
         sfield.strength = strength
-        sfield.moment = np.array([0., 0, 0])
+        sfield.moment = np.array([0., 0, 0], dtype=lengths.dtype)
 
         # Loop over elements.
         for i in range(sx.size-1):

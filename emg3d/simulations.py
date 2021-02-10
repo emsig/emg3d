@@ -752,14 +752,15 @@ class Simulation:
             if rec_types.count(True):
 
                 # Extract data at receivers.
+                irec = np.arange(len(rec_types))[list(rec_types)]
                 resp = fields.get_receiver_response(
                         grid=self._dict_grid[source][freq],
                         field=self._dict_efield[source][freq],
-                        rec=rec_coords[rec_types]
+                        rec=tuple(np.array(rec_coords)[:, irec])
                 )
 
                 # Store the receiver response.
-                self.data.synthetic.loc[source, rec_types, freq] = resp
+                self.data.synthetic.loc[source, :, freq][irec] = resp
 
             # Store magnetic receivers.
             if rec_types.count(False):
@@ -789,22 +790,23 @@ class Simulation:
 
             # Get receiver coordinates.
             rec_coords = self.survey.rec_coords
-            rec_types = np.invert(self.survey.rec_types)
+            rec_types = self.survey.rec_types
             # For fixed surveys:
             # rec_coords = self.survey.rec_coords[source]
 
             # Store magnetic receivers.
-            if rec_types.count(True):
+            if rec_types.count(False):
 
                 # Extract data at receivers.
+                irec = np.arange(len(rec_types))[np.invert(rec_types)]
                 resp = fields.get_receiver_response(
                         grid=self._dict_grid[source][freq],
                         field=self._dict_efield[source][freq],
-                        rec=rec_coords[rec_types]
+                        rec=tuple(np.array(rec_coords)[:, irec])
                 )
 
                 # Store the receiver response.
-                self.data.synthetic.loc[source, rec_types, freq] = resp
+                self.data.synthetic.loc[source, :, freq][irec] = resp
 
         # Return magnetic field.
         return self._dict_hfield[source][freq]
