@@ -742,6 +742,8 @@ class Simulation:
             del self._dict_hfield[source][freq]
             self._dict_hfield[source][freq] = None
 
+            # TODO move get receiver out of get field.
+
             # Get receiver coordinates.
             rec_coords = self.survey.rec_coords
             rec_types = self.survey.rec_types
@@ -788,6 +790,8 @@ class Simulation:
                     self.get_model(source, freq),
                     self.get_efield(source, freq, **kwargs))
 
+            # TODO move get receiver out of get field.
+
             # Get receiver coordinates.
             rec_coords = self.survey.rec_coords
             rec_types = self.survey.rec_types
@@ -801,7 +805,7 @@ class Simulation:
                 irec = np.arange(len(rec_types))[np.invert(rec_types)]
                 resp = fields.get_receiver_response(
                         grid=self._dict_grid[source][freq],
-                        field=self._dict_efield[source][freq],
+                        field=self._dict_hfield[source][freq],
                         rec=tuple(np.array(rec_coords)[:, irec])
                 )
 
