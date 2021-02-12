@@ -214,7 +214,7 @@ class Simulation:
                     "Simulation currently only implemented for "
                     "`survey.fixed=False`.")
 
-        # Magnetic sources and receivers are not yet implemented.
+        # Magnetic sources are not yet implemented.
         msrc = sum([not s.electric for s in survey.sources.values()]) > 0
         if msrc:
             raise NotImplementedError("Simulation not yet implemented for "
