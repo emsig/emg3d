@@ -1198,6 +1198,14 @@ class Simulation:
             strength *= self.data.weights.loc[source, name, freq].data.conj()
             strength /= ResidualField.smu0
 
+            # Magnetic receivers: the adjoint gradient is formulated for the
+            # electric fields with ``S`` in Equation (1) of [PlMu08]_. For
+            # magnetic receivers we take M instead, which does not have the
+            # factor iwmu; we scale here the source strength accordingly.
+            msrc = not rec.electric
+            if msrc:
+                strength /= -ResidualField.smu0
+
             # If strength is zero (very unlikely), get_source_field would
             # return a normalized field for a unit source. However, in this
             # case we do not want that.
@@ -1207,7 +1215,7 @@ class Simulation:
                     src=rec.coordinates,
                     freq=frequency,
                     strength=strength,
-                    msrc=not rec.electric,
+                    msrc=msrc,
                 )
 
         return ResidualField

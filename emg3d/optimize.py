@@ -170,6 +170,9 @@ def gradient(simulation):
     for src, freq in simulation._srcfreq:
 
         # Multiply forward field with backward field; take real part.
+        # This is the actual Equation (10), with:
+        #   del S / del p = iwu0 V sigma / sigma,
+        # where lambda and E are already volume averaged.
         efield = -np.real(
                 simulation._dict_bfield[src][freq] *
                 simulation._dict_efield[src][freq] *
