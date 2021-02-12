@@ -107,8 +107,8 @@ class TestSimulation():
                     'Test2', tsurvey, self.grid, self.model)
 
         tsurvey.fixed = False
-        tsurvey.sources['Tx1'].electric = False
-        with pytest.raises(NotImplementedError, match="for magnetic sources"):
+        tsurvey.receivers['Rx01'].electric = False
+        with pytest.raises(NotImplementedError, match="magnetic receivers"):
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
 

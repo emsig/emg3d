@@ -73,7 +73,7 @@ class Simulation:
         The Simulation-class has currently a few limitations:
 
         - `survey.fixed`: must be `False`;
-        - sources and receivers must be electric;
+        - receivers must be electric;
 
 
     Parameters
@@ -213,12 +213,6 @@ class Simulation:
             raise NotImplementedError(
                     "Simulation currently only implemented for "
                     "`survey.fixed=False`.")
-
-        # Magnetic sources are not yet implemented.
-        msrc = sum([not s.electric for s in survey.sources.values()]) > 0
-        if msrc:
-            raise NotImplementedError("Simulation not yet implemented for "
-                                      "magnetic sources.")
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -704,7 +698,8 @@ class Simulation:
                     grid=self.get_grid(source, frequency),
                     src=src.coordinates,
                     freq=frequency,
-                    strength=strength)
+                    strength=strength,
+                    electric=src.electric)
 
             self._dict_sfield[source][freq] = sfield
 
@@ -1202,8 +1197,7 @@ class Simulation:
             # electric fields with ``S`` in Equation (1) of [PlMu08]_. For
             # magnetic receivers we take M instead, which does not have the
             # factor iwmu; we scale here the source strength accordingly.
-            msrc = not rec.electric
-            if msrc:
+            if not rec.electric:
                 strength /= -ResidualField.smu0
 
             # If strength is zero (very unlikely), get_source_field would
@@ -1215,7 +1209,7 @@ class Simulation:
                     src=rec.coordinates,
                     freq=frequency,
                     strength=strength,
-                    msrc=msrc,
+                    electric=rec.electric,
                 )
 
         return ResidualField
