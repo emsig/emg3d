@@ -70,10 +70,8 @@ class Simulation:
 
     .. note::
 
-        The Simulation-class has currently a few limitations:
-
-        - `survey.fixed`: must be `False`;
-        - receivers must be electric;
+        The Simulation-class is currently only implemented for
+        ``survey.fixed=False``.
 
 
     Parameters
