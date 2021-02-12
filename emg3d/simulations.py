@@ -73,7 +73,7 @@ class Simulation:
         The Simulation-class has currently a few limitations:
 
         - `survey.fixed`: must be `False`;
-        - sources and receivers must be electric;
+        - receivers must be electric;
 
 
     Parameters
@@ -214,12 +214,11 @@ class Simulation:
                     "Simulation currently only implemented for "
                     "`survey.fixed=False`.")
 
-        # Magnetic sources and receivers are not yet implemented.
-        msrc = sum([not s.electric for s in survey.sources.values()]) > 0
+        # Magnetic receivers are not yet implemented.
         mrec = sum([not r.electric for r in survey.receivers.values()]) > 0
-        if msrc or mrec:
+        if mrec:
             raise NotImplementedError("Simulation not yet implemented for "
-                                      "magnetic sources and receivers.")
+                                      "magnetic receivers.")
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -705,7 +704,8 @@ class Simulation:
                     grid=self.get_grid(source, frequency),
                     src=src.coordinates,
                     freq=frequency,
-                    strength=strength)
+                    strength=strength,
+                    electric=src.electric)
 
             self._dict_sfield[source][freq] = sfield
 

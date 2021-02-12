@@ -5,6 +5,25 @@ Changelog
 recent versions
 """""""""""""""
 
+
+latest
+------
+
+- ``Simulation``:
+
+  - Sources can now be magnetic (unit loops, not yet arbitrarily loops).
+
+- ``fields.get_source_field``: The ``msrc`` argument introduced in v0.16.0 is
+  renamed to ``electric``, and has the opposite meaning. If True, the source is
+  electric, if False, the source is magnetic. This was made to streamline the
+  meaning with the meaning given in ``surveys.Dipole``. The old parameter
+  ``msrc`` is deprecated and will be removed. Warning, if ``msrc`` was provided
+  as positional argument instead of as keyword argument it will now be taken as
+  ``electric``, with the opposite meaning (this is therefore a **backwards
+  incompatibility**).
+
+
+
 v0.16.1: Verbosity & Logging
 ----------------------------
 
