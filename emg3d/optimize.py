@@ -134,6 +134,8 @@ def gradient(simulation):
 
     .. note::
 
+        # TODO ADJUST #
+
         The gradient is currently implemented only for electric sources and
         receivers; only for isotropic models; and not for electric permittivity
         nor magnetic permeability.
@@ -151,6 +153,8 @@ def gradient(simulation):
         Adjoint-state gradient (same shape as simulation.model).
 
     """
+
+    # TODO ADJUST # => ensure epsilon_r = mu_r = 1 or None
 
     # Check limitation 2: So far only isotropic models.
     if simulation.model.case != 0:
