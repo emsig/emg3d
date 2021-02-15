@@ -261,8 +261,9 @@ class Simulation:
         self.grid = grid
         self.model = model
 
-        # Initiate synthetic data with NaN's.
-        self.survey._data['synthetic'] = self.survey.data.observed*np.nan
+        # Initiate synthetic data with NaN's if they don't exist.
+        if 'synthetic' not in self.survey.data.keys():
+            self.survey._data['synthetic'] = self.survey.data.observed*np.nan
 
         # `tqdm`-options; undocumented for the moment.
         # This is likely to change with regards to verbosity and logging.
