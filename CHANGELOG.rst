@@ -22,6 +22,9 @@ latest
   ``electric``, with the opposite meaning (this is therefore a **backwards
   incompatibility**).
 
+- Bugfixes:
+
+  - Stop overwriting synthetic data if provided in the survey to a simulation.
 
 
 v0.16.1: Verbosity & Logging
