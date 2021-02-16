@@ -109,7 +109,11 @@ def simulation(args_dict):
     logger.debug(sim.print_grid_info(return_info=True))
 
     # Initiate output dict, add configuration.
-    output = {'configuration': cfg}
+    # Ideally, we would add the entire configuration; however, this causes
+    # currently problems for saving h5. We therefore save only the data
+    # selection info, such that we know what data was selected.
+    # output = {'configuration': cfg}
+    output = {'configuration': {'data': cfg.get('data', {})}}
 
     # Compute forward model (all calls).
     logger.info("    :: FORWARD COMPUTATION ::\n")
