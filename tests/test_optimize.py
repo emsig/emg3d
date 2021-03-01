@@ -124,6 +124,21 @@ class TestOptimize():
         with pytest.raises(NotImplementedError, match='for isotropic models'):
             optimize.gradient(simulation)
 
+        # Model with electric permittivity.
+        simulation.model = models.Model(self.grid, 1, epsilon_r=3)
+        with pytest.raises(NotImplementedError, match='for el. permittivity'):
+            optimize.gradient(simulation)
+
+        # Model with magnetic permeability.
+        simulation.model = models.Model(
+                self.grid, 1, mu_r=np.ones(self.grid.vnC)*np.pi)
+        with pytest.raises(NotImplementedError, match='for magn. permeabili'):
+            optimize.gradient(simulation)
+
+        # Missing noise_floor / std.
+        simulation.model = models.Model(
+                self.grid, np.arange(1, self.grid.nC+1).reshape(self.grid.vnC),
+                epsilon_r=None, mu_r=np.ones(self.grid.vnC))
         with pytest.raises(ValueError, match="Either `noise_floor` or"):
             optimize.misfit(simulation)
 

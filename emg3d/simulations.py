@@ -711,6 +711,7 @@ class Simulation:
 
         # Get call_from_compute and ensure no kwargs are left.
         call_from_compute = kwargs.pop('call_from_compute', False)
+        call_from_hfield = kwargs.pop('call_from_hfield', False)
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
@@ -732,42 +733,20 @@ class Simulation:
             self._dict_efield[source][freq] = efield
             self._dict_efield_info[source][freq] = info
 
-            # Clean corresponding hfield, so it will be recomputed.
-            del self._dict_hfield[source][freq]
-            self._dict_hfield[source][freq] = None
+            if not call_from_hfield:
 
-            # TODO move get receiver out of get field.
+                # Clean corresponding hfield, so it will be recomputed.
+                del self._dict_hfield[source][freq]
+                self._dict_hfield[source][freq] = None
 
-            # Get receiver coordinates.
-            rec_coords = self.survey.rec_coords
-            rec_types = self.survey.rec_types
-            # For fixed surveys:
-            # rec_coords = self.survey.rec_coords[source]
-
-            # Store electric receivers.
-            if rec_types.count(True):
-
-                # Extract data at receivers.
-                irec = np.arange(len(rec_types))[list(rec_types)]
-                resp = fields.get_receiver_response(
-                        grid=self._dict_grid[source][freq],
-                        field=self._dict_efield[source][freq],
-                        rec=tuple(np.array(rec_coords)[:, irec])
-                )
-
-                # Store the receiver response.
-                self.data.synthetic.loc[source, :, freq][irec] = resp
-
-            # Store magnetic receivers.
-            if rec_types.count(False):
-
-                # The magnetic fields are, currently, not returned.
-                _ = self.get_hfield(source, freq)
+                # Store electric and magnetic responses at receiver locations.
+                self._store_responses(source, frequency)
 
         # Return electric field.
         if call_from_compute:
             return (self._dict_efield[source][freq],
                     self._dict_efield_info[source][freq],
+                    self._dict_hfield[source][freq],
                     self.data.synthetic.loc[source, :, freq].data)
         else:
             return self._dict_efield[source][freq]
@@ -782,32 +761,53 @@ class Simulation:
             self._dict_hfield[source][freq] = fields.get_h_field(
                     self.get_grid(source, freq),
                     self.get_model(source, freq),
-                    self.get_efield(source, freq, **kwargs))
+                    self.get_efield(source, freq,
+                                    call_from_hfield=True, **kwargs))
 
-            # TODO move get receiver out of get field.
-
-            # Get receiver coordinates.
-            rec_coords = self.survey.rec_coords
-            rec_types = self.survey.rec_types
-            # For fixed surveys:
-            # rec_coords = self.survey.rec_coords[source]
-
-            # Store magnetic receivers.
-            if rec_types.count(False):
-
-                # Extract data at receivers.
-                irec = np.arange(len(rec_types))[np.invert(rec_types)]
-                resp = fields.get_receiver_response(
-                        grid=self._dict_grid[source][freq],
-                        field=self._dict_hfield[source][freq],
-                        rec=tuple(np.array(rec_coords)[:, irec])
-                )
-
-                # Store the receiver response.
-                self.data.synthetic.loc[source, :, freq][irec] = resp
+            # Store electric and magnetic responses at receiver locations.
+            self._store_responses(source, frequency)
 
         # Return magnetic field.
         return self._dict_hfield[source][freq]
+
+    def _store_responses(self, source, frequency):
+        """Return electric and magnetic fields at receiver locations."""
+        freq = float(frequency)
+
+        # Get receiver coordinates.
+        rec_coords = self.survey.rec_coords
+        rec_types = self.survey.rec_types
+
+        # For fixed surveys:
+        # rec_coords = self.survey.rec_coords[source]
+
+        # Store electric receivers.
+        if rec_types.count(True):
+
+            # Extract data at receivers.
+            irec = np.arange(len(rec_types))[list(rec_types)]
+            resp = fields.get_receiver_response(
+                    grid=self.get_grid(source, freq),
+                    field=self.get_efield(source, freq),
+                    rec=tuple(np.array(rec_coords)[:, irec])
+            )
+
+            # Store the receiver response.
+            self.data.synthetic.loc[source, :, freq][irec] = resp
+
+        # Store magnetic receivers.
+        if rec_types.count(False):
+
+            # Extract data at receivers.
+            irec = np.arange(len(rec_types))[np.invert(rec_types)]
+            resp = fields.get_receiver_response(
+                    grid=self.get_grid(source, freq),
+                    field=self.get_hfield(source, freq),
+                    rec=tuple(np.array(rec_coords)[:, irec])
+            )
+
+            # Store the receiver response.
+            self.data.synthetic.loc[source, :, freq][irec] = resp
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
@@ -866,19 +866,16 @@ class Simulation:
                 **{'desc': 'Compute efields', **self._tqdm_opts},
         )
 
-        # Clean hfields, so they will be recomputed.
-        del self._dict_hfield
-        self._dict_hfield = self._dict_initiate
-
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
 
             # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
             self._dict_efield_info[src][freq] = out[i][1]
+            self._dict_hfield[src][freq] = out[i][2]
 
             # Store responses at receivers.
-            self.data['synthetic'].loc[src, :, freq] = out[i][2]
+            self.data['synthetic'].loc[src, :, freq] = out[i][3]
 
         # Print solver info.
         self.print_solver_info('efield', verb=self.verb)

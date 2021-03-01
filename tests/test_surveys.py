@@ -173,12 +173,15 @@ class TestSurvey():
         assert sur_list.sources['Tx1'].electric is True
         assert sur_list.receivers['Rx0'].electric is True
         assert sur_list.receivers['Rx1'].electric is False
+        assert sur_list.rec_types == (True, False)
         # fixed
         fsur_list = surveys.Survey('Test', s_list, r_list, 1, fixed=1)
         assert fsur_list.sources['Tx0'].electric is True
         assert fsur_list.sources['Tx1'].electric is True
         assert fsur_list.receivers['Off0']['Tx0'].electric is True
         assert fsur_list.receivers['Off0']['Tx1'].electric is False
+        assert fsur_list.rec_types['Tx0'] == (True, )
+        assert fsur_list.rec_types['Tx1'] == (False, )
 
         # == 2. Tuple ==
         s_tupl = ([0, 0], 0, 0, 0, 0, True)
@@ -188,6 +191,7 @@ class TestSurvey():
         assert sur_tupl.sources['Tx1'].electric is True
         assert sur_tupl.receivers['Rx0'].electric is True
         assert sur_tupl.receivers['Rx1'].electric is False
+        assert sur_tupl.rec_types == (True, False)
 
     def test_copy(self, tmpdir):
         # This also checks to_dict()/from_dict().

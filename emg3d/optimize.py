@@ -151,10 +151,12 @@ def gradient(simulation):
 
     """
 
-    # Check limitation 2: So far only isotropic models.
+    # Check limitation 1: So far only isotropic models.
     if simulation.model.case != 0:
         raise NotImplementedError(
                 "Gradient only implemented for isotropic models.")
+
+    # Check limitation 2: No epsilon_r, mu_r.
     var = (simulation.model.epsilon_r, simulation.model.mu_r)
     for v, n in zip(var, ('el. permittivity', 'magn. permeability')):
         if v is not None and not np.allclose(v, 1.0):
