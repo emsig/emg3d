@@ -89,6 +89,9 @@ jobs:
           python-version: ${{ matrix.case.python-version }}
           miniforge-variant: Mambaforge
           use-mamba: true
+          # The following should not be necessary with Mambaforg(?).
+          channels: conda-forge,defaults
+          channel-priority: strict
 
       - name: Install dependencies
         shell: bash -l {0}
