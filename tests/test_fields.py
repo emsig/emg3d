@@ -164,7 +164,7 @@ def test_arbitrarily_shaped_source():
 
     assert_allclose(scomp2a, scomp2)
     assert_allclose(sman.field, scomp.field)
-    assert_allclose(scomp2.vector, scomp.vector, rtol=1e-6, atol=1e-15)
+    assert_allclose(-scomp2.vector, scomp.vector, rtol=1e-6)
 
     # Normalized
     sman = fields.SourceField(grid, freq=freq)

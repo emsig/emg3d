@@ -578,6 +578,10 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
             sfield += seg_field
             sfield.moment += seg_field.moment
 
+        # Check this with iw/-iw; source definition etc.
+        if not electric:
+            sfield *= -1
+
         return sfield
 
     # From here onwards `src` has to be a finite length dipole  of format

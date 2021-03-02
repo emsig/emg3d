@@ -1193,8 +1193,9 @@ class Simulation:
             # electric fields with ``S`` in Equation (1) of [PlMu08]_. For
             # magnetic receivers we take M instead, which does not have the
             # factor iwmu; we scale here the source strength accordingly.
+            # Or, because of loop (B not H).
             if not rec.electric:
-                strength /= -ResidualField.smu0
+                strength /= ResidualField.smu0
 
             # If strength is zero (very unlikely), get_source_field would
             # return a normalized field for a unit source. However, in this
