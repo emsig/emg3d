@@ -134,9 +134,8 @@ def gradient(simulation):
 
     .. note::
 
-        The gradient is currently implemented only for electric sources and
-        receivers; only for isotropic models; and not for electric permittivity
-        nor magnetic permeability.
+        The gradient is currently implemented only for isotropic models and not
+        for electric permittivity nor magnetic permeability.
 
 
     Parameters
@@ -152,10 +151,16 @@ def gradient(simulation):
 
     """
 
-    # Check limitation 2: So far only isotropic models.
+    # Check limitation 1: So far only isotropic models.
     if simulation.model.case != 0:
         raise NotImplementedError(
                 "Gradient only implemented for isotropic models.")
+
+    # Check limitation 2: No epsilon_r, mu_r.
+    var = (simulation.model.epsilon_r, simulation.model.mu_r)
+    for v, n in zip(var, ('el. permittivity', 'magn. permeability')):
+        if v is not None and not np.allclose(v, 1.0):
+            raise NotImplementedError(f"Gradient not implemented for {n}.")
 
     # Ensure misfit has been computed (and therefore the electric fields).
     _ = simulation.misfit
@@ -170,6 +175,9 @@ def gradient(simulation):
     for src, freq in simulation._srcfreq:
 
         # Multiply forward field with backward field; take real part.
+        # This is the actual Equation (10), with:
+        #   del S / del p = iwu0 V sigma / sigma,
+        # where lambda and E are already volume averaged.
         efield = -np.real(
                 simulation._dict_bfield[src][freq] *
                 simulation._dict_efield[src][freq] *

@@ -6,23 +6,29 @@ recent versions
 """""""""""""""
 
 
-latest
-------
+v0.17.0: Magnetics in Simulation
+--------------------------------
+
+**2021-03-03**
 
 - ``Simulation``:
 
-  - Sources can now be magnetic (unit loops, not yet arbitrarily loops).
+  - Sources and receivers can now be magnetic, also for the adjoint-state
+    gradient (unit loops, not yet arbitrarily loops).
 
-- ``fields.get_source_field``: The ``msrc`` argument introduced in v0.16.0 is
-  renamed to ``electric``, and has the opposite meaning. If True, the source is
-  electric, if False, the source is magnetic. This was made to streamline the
-  meaning with the meaning given in ``surveys.Dipole``. The old parameter
-  ``msrc`` is deprecated and will be removed. Warning, if ``msrc`` was provided
-  as positional argument instead of as keyword argument it will now be taken as
-  ``electric``, with the opposite meaning (this is therefore a **backwards
-  incompatibility**).
+- ``fields.get_source_field``:
 
-- Bugfixes:
+  - The ``msrc`` argument introduced in v0.16.0 is renamed to ``electric``, and
+    has the opposite meaning. If True, the source is electric, if False, the
+    source is magnetic. This was made to streamline the meaning with the
+    meaning given in ``surveys.Dipole``. The old parameter ``msrc`` is
+    deprecated and will be removed. Warning, if ``msrc`` was provided as
+    positional argument instead of as keyword argument it will now be taken as
+    ``electric``, with the opposite meaning (**backwards incompatible**).
+  - The magnetic source was corrected and has the opposite sign now (factor -1;
+    **backwards incompatible**).
+
+- Bug fixes:
 
   - Simulation: Stop overwriting synthetic data if provided in the survey to a
     simulation.

@@ -106,12 +106,6 @@ class TestSimulation():
             simulations.Simulation(
                     'Test2', tsurvey, self.grid, self.model)
 
-        tsurvey.fixed = False
-        tsurvey.receivers['Rx01'].electric = False
-        with pytest.raises(NotImplementedError, match="magnetic receivers"):
-            simulations.Simulation(
-                    'Test2', tsurvey, self.grid, self.model)
-
         # gridding='same' with gridding_opts.
         with pytest.raises(TypeError, match="`gridding_opts` is not permitt"):
             simulations.Simulation(

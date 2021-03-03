@@ -124,6 +124,21 @@ class TestOptimize():
         with pytest.raises(NotImplementedError, match='for isotropic models'):
             optimize.gradient(simulation)
 
+        # Model with electric permittivity.
+        simulation.model = models.Model(self.grid, 1, epsilon_r=3)
+        with pytest.raises(NotImplementedError, match='for el. permittivity'):
+            optimize.gradient(simulation)
+
+        # Model with magnetic permeability.
+        simulation.model = models.Model(
+                self.grid, 1, mu_r=np.ones(self.grid.vnC)*np.pi)
+        with pytest.raises(NotImplementedError, match='for magn. permeabili'):
+            optimize.gradient(simulation)
+
+        # Missing noise_floor / std.
+        simulation.model = models.Model(
+                self.grid, np.arange(1, self.grid.nC+1).reshape(self.grid.vnC),
+                epsilon_r=None, mu_r=np.ones(self.grid.vnC))
         with pytest.raises(ValueError, match="Either `noise_floor` or"):
             optimize.misfit(simulation)
 
@@ -134,55 +149,62 @@ def test_derivative(capsys):
     hx = np.ones(64)*100
     mesh = meshes.TensorMesh([hx, hx, hx], origin=[0, 0, 0])
 
-    # Define a simple survey.
-    survey = surveys.Survey(
-        name='Gradient Test',
-        sources=(1650, 3200, 3200, 0, 0),
-        receivers=(4750, 3200, 3200, 0, 0),
-        frequencies=1.0,
-        noise_floor=1e-15,
-        relative_error=0.05,
-    )
+    # Loop over electric and magnetic receivers.
+    for dip, electric in zip([0, 90], [True, False]):
 
-    # Background Model
-    con_init = np.ones(mesh.vnC)
+        # Define a simple survey.
+        survey = surveys.Survey(
+            name='Gradient Test',
+            sources=(1650, 3200, 3200, 0, 0),
+            receivers=(4750, 3200, 3200, 0, dip, electric),
+            frequencies=1.0,
+            noise_floor=1e-15,
+            relative_error=0.05,
+        )
 
-    # Target Model 1: One Block
-    con_true = np.ones(mesh.vnC)
-    con_true[22:32, 32:42, 20:30] = 0.001
+        # Background Model
+        con_init = np.ones(mesh.vnC)
 
-    model_init = models.Model(mesh, con_init, mapping='Conductivity')
-    model_true = models.Model(mesh, con_true, mapping='Conductivity')
+        # Target Model 1: One Block
+        con_true = np.ones(mesh.vnC)
+        con_true[22:32, 32:42, 20:30] = 0.001
 
-    solver_opts = {
-        'sslsolver': False,
-        'semicoarsening': False,
-        'linerelaxation': False,
-        'tol': 5e-5,  # Reduce tolerance to speed-up
-    }
-    sim_inp = {
-        'name': 'Testing',
-        'survey': survey,
-        'grid': mesh,
-        'solver_opts': solver_opts,
-        'max_workers': 1,
-        'gridding': 'same',
-        'verb': 3,
-    }
+        model_init = models.Model(mesh, con_init, mapping='Conductivity')
+        model_true = models.Model(mesh, con_true, mapping='Conductivity')
 
-    # Compute data (pre-computed and passed to Survey above)
-    sim_data = simulations.Simulation(model=model_true, **sim_inp)
-    sim_data.compute(observed=True)
+        solver_opts = {
+            'sslsolver': False,
+            'semicoarsening': False,
+            'linerelaxation': False,
+            'tol': 5e-5,  # Reduce tolerance to speed-up
+        }
+        sim_inp = {
+            'name': 'Testing',
+            'survey': survey,
+            'grid': mesh,
+            'solver_opts': solver_opts,
+            'max_workers': 1,
+            'gridding': 'same',
+            'verb': 3,
+        }
 
-    # Compute adjoint state misfit and gradient
-    sim_data = simulations.Simulation(model=model_init, **sim_inp)
-    data_misfit = sim_data.misfit
-    grad = sim_data.gradient
+        # Compute data (pre-computed and passed to Survey above)
+        sim_data = simulations.Simulation(model=model_true, **sim_inp)
+        sim_data.compute(observed=True)
 
-    # Note: We test a pseudo-random cell.
-    # Generally, the NRMSD will be below 0.01 %. However, in boundary regions
-    # or regions where the gradient changes from positive to negative this
-    # would fail, so we run a pseudo-random element.
-    nrmsd = random_fd_gradient(
-            False, survey, model_init, mesh, grad, data_misfit, sim_inp)
-    assert nrmsd < 1.0
+        # Compute adjoint state misfit and gradient
+        sim_data = simulations.Simulation(model=model_init, **sim_inp)
+        data_misfit = sim_data.misfit
+        grad = sim_data.gradient
+
+        # Note: We test a pseudo-random cell.
+        # Generally, the NRMSD will be below 0.01 %. However, in boundary
+        # regions or regions where the gradient changes from positive to
+        # negative this would fail, so we run a pseudo-random element.
+        nrmsd = random_fd_gradient(
+                False, survey, model_init, mesh, grad, data_misfit, sim_inp)
+
+        if electric:
+            assert nrmsd < 1.0
+        else:
+            assert nrmsd < 5.0

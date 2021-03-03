@@ -70,10 +70,8 @@ class Simulation:
 
     .. note::
 
-        The Simulation-class has currently a few limitations:
-
-        - `survey.fixed`: must be `False`;
-        - receivers must be electric;
+        The Simulation-class is currently only implemented for
+        ``survey.fixed=False``.
 
 
     Parameters
@@ -213,12 +211,6 @@ class Simulation:
             raise NotImplementedError(
                     "Simulation currently only implemented for "
                     "`survey.fixed=False`.")
-
-        # Magnetic receivers are not yet implemented.
-        mrec = sum([not r.electric for r in survey.receivers.values()]) > 0
-        if mrec:
-            raise NotImplementedError("Simulation not yet implemented for "
-                                      "magnetic receivers.")
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -719,6 +711,7 @@ class Simulation:
 
         # Get call_from_compute and ensure no kwargs are left.
         call_from_compute = kwargs.pop('call_from_compute', False)
+        call_from_hfield = kwargs.pop('call_from_hfield', False)
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
@@ -740,29 +733,20 @@ class Simulation:
             self._dict_efield[source][freq] = efield
             self._dict_efield_info[source][freq] = info
 
-            # Clean corresponding hfield, so it will be recomputed.
-            del self._dict_hfield[source][freq]
-            self._dict_hfield[source][freq] = None
+            if not call_from_hfield:
 
-            # Get receiver coordinates.
-            rec_coords = self.survey.rec_coords
-            # For fixed surveys:
-            # rec_coords = self.survey.rec_coords[source]
+                # Clean corresponding hfield, so it will be recomputed.
+                del self._dict_hfield[source][freq]
+                self._dict_hfield[source][freq] = None
 
-            # Extract data at receivers.
-            resp = fields.get_receiver_response(
-                    grid=self._dict_grid[source][freq],
-                    field=self._dict_efield[source][freq],
-                    rec=rec_coords
-            )
-
-            # Store the receiver response.
-            self.data.synthetic.loc[source, :, freq] = resp
+                # Store electric and magnetic responses at receiver locations.
+                self._store_responses(source, frequency)
 
         # Return electric field.
         if call_from_compute:
             return (self._dict_efield[source][freq],
                     self._dict_efield_info[source][freq],
+                    self._dict_hfield[source][freq],
                     self.data.synthetic.loc[source, :, freq].data)
         else:
             return self._dict_efield[source][freq]
@@ -777,10 +761,53 @@ class Simulation:
             self._dict_hfield[source][freq] = fields.get_h_field(
                     self.get_grid(source, freq),
                     self.get_model(source, freq),
-                    self.get_efield(source, freq, **kwargs))
+                    self.get_efield(source, freq,
+                                    call_from_hfield=True, **kwargs))
+
+            # Store electric and magnetic responses at receiver locations.
+            self._store_responses(source, frequency)
 
         # Return magnetic field.
         return self._dict_hfield[source][freq]
+
+    def _store_responses(self, source, frequency):
+        """Return electric and magnetic fields at receiver locations."""
+        freq = float(frequency)
+
+        # Get receiver coordinates.
+        rec_coords = self.survey.rec_coords
+        rec_types = self.survey.rec_types
+
+        # For fixed surveys:
+        # rec_coords = self.survey.rec_coords[source]
+
+        # Store electric receivers.
+        if rec_types.count(True):
+
+            # Extract data at receivers.
+            erec = np.nonzero(rec_types)[0]
+            resp = fields.get_receiver_response(
+                    grid=self.get_grid(source, freq),
+                    field=self.get_efield(source, freq),
+                    rec=tuple(np.array(rec_coords)[:, erec])
+            )
+
+            # Store the receiver response.
+            self.data.synthetic.loc[source, :, freq][erec] = resp
+
+        # Store magnetic receivers.
+        if rec_types.count(False):
+
+            # Extract data at receivers.
+            mrec = np.nonzero(np.logical_not(rec_types))[0]
+            resp = fields.get_receiver_response(
+                    grid=self.get_grid(source, freq),
+                    field=self.get_hfield(source, freq),
+                    rec=tuple(np.array(rec_coords)[:, mrec])
+            )
+
+            # Store the receiver response.
+            self.data.synthetic.loc[source, :, freq][mrec] = resp
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
@@ -839,19 +866,16 @@ class Simulation:
                 **{'desc': 'Compute efields', **self._tqdm_opts},
         )
 
-        # Clean hfields, so they will be recomputed.
-        del self._dict_hfield
-        self._dict_hfield = self._dict_initiate
-
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
 
             # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
             self._dict_efield_info[src][freq] = out[i][1]
+            self._dict_hfield[src][freq] = out[i][2]
 
             # Store responses at receivers.
-            self.data['synthetic'].loc[src, :, freq] = out[i][2]
+            self.data['synthetic'].loc[src, :, freq] = out[i][3]
 
         # Print solver info.
         self.print_solver_info('efield', verb=self.verb)
@@ -1165,6 +1189,14 @@ class Simulation:
             strength *= self.data.weights.loc[source, name, freq].data.conj()
             strength /= ResidualField.smu0
 
+            # Magnetic receivers: the adjoint gradient is formulated for the
+            # electric fields with ``S`` in Equation (1) of [PlMu08]_. For
+            # magnetic receivers we take M instead, which does not have the
+            # factor iwmu; we scale here the source strength accordingly.
+            # Or, because of loop (B not H).
+            if not rec.electric:
+                strength /= ResidualField.smu0
+
             # If strength is zero (very unlikely), get_source_field would
             # return a normalized field for a unit source. However, in this
             # case we do not want that.
@@ -1174,6 +1206,7 @@ class Simulation:
                     src=rec.coordinates,
                     freq=frequency,
                     strength=strength,
+                    electric=rec.electric,
                 )
 
         return ResidualField
