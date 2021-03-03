@@ -785,29 +785,29 @@ class Simulation:
         if rec_types.count(True):
 
             # Extract data at receivers.
-            irec = np.arange(len(rec_types))[list(rec_types)]
+            erec = np.nonzero(rec_types)[0]
             resp = fields.get_receiver_response(
                     grid=self.get_grid(source, freq),
                     field=self.get_efield(source, freq),
-                    rec=tuple(np.array(rec_coords)[:, irec])
+                    rec=tuple(np.array(rec_coords)[:, erec])
             )
 
             # Store the receiver response.
-            self.data.synthetic.loc[source, :, freq][irec] = resp
+            self.data.synthetic.loc[source, :, freq][erec] = resp
 
         # Store magnetic receivers.
         if rec_types.count(False):
 
             # Extract data at receivers.
-            irec = np.arange(len(rec_types))[np.invert(rec_types)]
+            mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = fields.get_receiver_response(
                     grid=self.get_grid(source, freq),
                     field=self.get_hfield(source, freq),
-                    rec=tuple(np.array(rec_coords)[:, irec])
+                    rec=tuple(np.array(rec_coords)[:, mrec])
             )
 
             # Store the receiver response.
-            self.data.synthetic.loc[source, :, freq][irec] = resp
+            self.data.synthetic.loc[source, :, freq][mrec] = resp
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""

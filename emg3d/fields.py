@@ -524,8 +524,10 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
     """
 
     if 'msrc' in kwargs:
-        warnings.warn("``msrc`` is deprecated and overwrites ``electric``. "
-                      "Use ``electric`` instead.", FutureWarning)
+        msg = ("``msrc`` is deprecated and overwrites ``electric``. "
+               "Use ``electric`` instead.\nAlso, the sign of the magnetic "
+               "source was corrected (switched)")
+        warnings.warn(msg, FutureWarning)
         electric = not kwargs.pop('msrc')
 
     # Ensure no kwargs left.

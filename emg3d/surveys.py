@@ -752,9 +752,9 @@ class Survey:
 
             # See if last tuple element is boolean, hence el/mag-flag.
             if isinstance(inp[-1], (list, tuple, np.ndarray)):
-                provided_elmag = isinstance(inp[-1][0], bool)
+                provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
             else:
-                provided_elmag = isinstance(inp[-1], bool)
+                provided_elmag = isinstance(inp[-1], (bool, np.bool_))
 
             # Get max dimension.
             nd = max([np.array(n, ndmin=1).size for n in inp])
