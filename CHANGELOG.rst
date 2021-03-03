@@ -30,7 +30,11 @@ v0.17.0: Magnetics in Simulation
 
 - Bug fixes:
 
-  - Stop overwriting synthetic data if provided in the survey to a simulation.
+  - Simulation: Stop overwriting synthetic data if provided in the survey to a
+    simulation.
+  - CLI: Removed configuration info from output data; caused problems when
+    storing to h5. This has to be resolved with properly addressing the io
+    stuff. Currently only stores the data selection to output data.
 
 
 v0.16.1: Verbosity & Logging
