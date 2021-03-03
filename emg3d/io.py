@@ -102,14 +102,7 @@ def save(fname, **kwargs):
     # Get and remove optional kwargs.
     compression = kwargs.pop('compression', 'gzip')
     json_indent = kwargs.pop('json_indent', 2)
-    collect_classes = kwargs.pop('collect_classes', False)
     verb = kwargs.pop('verb', 1)
-
-    # Throw deprecation warning for collect_classes.
-    if collect_classes:
-        warnings.warn(
-            "`collect_classes` is deprecated and will be removed "
-            "in the future.", FutureWarning)
 
     # Get absolute path.
     full_path = os.path.abspath(fname)
@@ -121,7 +114,7 @@ def save(fname, **kwargs):
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
-    data = _dict_serialize(kwargs, collect_classes=collect_classes)
+    data = _dict_serialize(kwargs)
 
     # Save data depending on the extension.
     if full_path.endswith('.npz'):
@@ -265,13 +258,12 @@ def load(fname, **kwargs):
         return data
 
 
-def _dict_serialize(inp, out=None, collect_classes=False):
+def _dict_serialize(inp, out=None):
     """Serialize emg3d-classes and other objects in inp-dict.
 
     Returns a serialized dictionary <out> of <inp>, where all members of
     `emg3d.io.KNOWN_CLASSES` are serialized with their respective `to_dict()`
-    methods. These instances are additionally grouped together in dictionaries,
-    and all other stuff is put into 'Data' if `collect_classes=True`.
+    methods.
 
     Any other (non-emg3d) object can be added too, as long as it knows how to
     serialize itself.
@@ -291,11 +283,6 @@ def _dict_serialize(inp, out=None, collect_classes=False):
 
     out : dict
         Output dictionary; created if not provided.
-
-    collect_classes : bool
-        If True, input data is collected in folders for the principal
-        emg3d-classes (type `emg3d.io.KNOWN_CLASSES` to get a list) and
-        everything else collected in a `Data`-folder. Default is False.
 
 
     Returns
@@ -343,24 +330,7 @@ def _dict_serialize(inp, out=None, collect_classes=False):
                     warnings.warn(msg, UserWarning)
                     continue
 
-            # If we are in the root-directory put them in their own category.
-            # `collect_classes` can only be True in root-directory, as it is
-            # set to False in recursion.
-            if collect_classes:
-                value = {key: to_dict}
-                key = name
-            else:
-                value = to_dict
-
-        elif collect_classes:
-            # `collect_classes` can only be True in root-directory, as it is
-            # set to False in recursion.
-            if key.startswith('_'):  # Store meta-data in root-level...
-                out[key] = value
-                continue
-            else:                    # ...rest falls into Data/.
-                value = {key: value}
-                key = 'Data'
+            value = to_dict
 
         # Initiate if necessary.
         if key not in out.keys():
@@ -368,7 +338,7 @@ def _dict_serialize(inp, out=None, collect_classes=False):
 
         # If value is a dict use recursion, else store.
         if isinstance(value, dict):
-            _dict_serialize(value, out[key], collect_classes=False)
+            _dict_serialize(value, out[key])
         else:
             # Limitation 2: None
             if value is None:

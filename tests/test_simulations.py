@@ -246,12 +246,6 @@ class TestSimulation():
         assert 'residual' in sim2['survey']['data'].keys()
         assert 'residual' not in sim3['survey']['data'].keys()
 
-        # Backwards compatibility
-        with pytest.warns(FutureWarning):
-            sim4 = simulation.to_dict()
-            sim4['data'] = {'synthetic': sim4['survey']['data']['observed']}
-            simulations.Simulation.from_dict(sim4)
-
         simulation.clean('all')  # Should remove 'residual', 'bfield-dicts'
         sim5 = simulation.to_dict('all')
         assert 'residual' not in sim5['survey']['data'].keys()
