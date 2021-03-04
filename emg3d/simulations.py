@@ -67,11 +67,6 @@ class Simulation:
         This means, however, that often smaller grids could be used by
         providing the appropriate options in ``gridding_opts``.
 
-    .. note::
-
-        The Simulation-class is currently only implemented for
-        ``survey.fixed=False``.
-
 
     Parameters
     ----------
@@ -163,6 +158,13 @@ class Simulation:
         - 0: Warning.
         - 1: Info.
 
+    name : str, optional
+        Name of the simulation.
+
+    info : str, optional
+        Simulation info or any other info (e.g., what was the purpose of this
+        simulation).
+
     """
 
     # Gridding descriptions (for repr's).
@@ -176,12 +178,11 @@ class Simulation:
             'dict': 'Provided dict of frequency-/source-dependent grids',
             }
 
-    def __init__(self, name, survey, grid, model, max_workers=4,
-                 gridding='single', **kwargs):
+    def __init__(self, survey, grid, model, max_workers=4, gridding='single',
+                 **kwargs):
         """Initiate a new Simulation instance."""
 
         # Store mandatory inputs (grid and model later).
-        self.name = name
         self.survey = survey
         self.max_workers = max_workers
         self.gridding = gridding
@@ -201,15 +202,13 @@ class Simulation:
         # Store original input nCz.
         self._input_nCz = kwargs.pop('_input_nCz', grid.vnC[2])
 
+        # Get the optional info.
+        self.name = kwargs.pop('name', None)
+        self.info = kwargs.pop('info', None)
+
         # Ensure no kwargs left.
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
-
-        # Fixed surveys are not yet implemented.
-        if self.survey.fixed:
-            raise NotImplementedError(
-                    "Simulation currently only implemented for "
-                    "`survey.fixed=False`.")
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -254,7 +253,8 @@ class Simulation:
 
         # Initiate synthetic data with NaN's if they don't exist.
         if 'synthetic' not in self.survey.data.keys():
-            self.survey._data['synthetic'] = self.survey.data.observed*np.nan
+            self.survey._data['synthetic'] = self.data.observed.copy(
+                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
 
         # `tqdm`-options; undocumented for the moment.
         # This is likely to change with regards to verbosity and logging.
@@ -263,8 +263,13 @@ class Simulation:
                 }
 
     def __repr__(self):
-        return (f"*{self.__class__.__name__}* «{self.name}» "
-                f"of {self.survey.__class__.__name__} «{self.survey.name}»\n\n"
+        name = f" «{self.name}»" if self.name else ""
+        info = f"{self.info}\n\n" if self.info else ""
+        if self.survey.name is not None:
+            survey = f" of Survey «{self.survey.name}»"
+        else:
+            survey = ""
+        return (f"*{self.__class__.__name__}*{name}{survey}\n\n{info}"
                 f"- {self.survey.__class__.__name__}: "
                 f"{self.survey.shape[0]} sources; "
                 f"{self.survey.shape[1]} receivers; "
@@ -274,9 +279,14 @@ class Simulation:
                 f"{self._info_grids}")
 
     def _repr_html_(self):
-        return (f"<h3>{self.__class__.__name__} «{self.name}»</h3>"
-                f"of {self.survey.__class__.__name__} «{self.survey.name}»<ul>"
-                f"<li>{self.survey.__class__.__name__}: "
+        name = f" «{self.name}»" if self.name else ""
+        info = f"<p>{self.info}</p>" if self.info else ""
+        if self.survey.name is not None:
+            survey = f"of Survey «{self.survey.name}»"
+        else:
+            survey = ""
+        return (f"<h3>{self.__class__.__name__}{name}</h3>{survey}{info}"
+                f"<ul><li>{self.survey.__class__.__name__}: "
                 f"{self.survey.shape[0]} sources; "
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies</li>"
@@ -769,9 +779,6 @@ class Simulation:
         rec_coords = self.survey.rec_coords
         rec_types = self.survey.rec_types
 
-        # For fixed surveys:
-        # rec_coords = self.survey.rec_coords[source]
-
         # Store electric receivers.
         if rec_types.count(True):
 
@@ -983,7 +990,8 @@ class Simulation:
             for key in ['residual', 'weight']:
                 if key in self.data.keys():
                     del self.data[key]
-            self.data['synthetic'] = self.data.observed*np.nan
+            self.data['synthetic'] = self.data.observed.copy(
+                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
             for name in ['_gradient', '_misfit']:
                 delattr(self, name)
                 setattr(self, name, None)

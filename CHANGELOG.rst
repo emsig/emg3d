@@ -9,6 +9,32 @@ recent versions
 latest: towards v1.0
 --------------------
 
+- ``Simulation``:
+
+  - ``name`` is new optional.
+  - New optional keyword ``info``.
+
+- ``Survey``:
+
+  - ``frequencies`` is new a dict just like ``sources`` and ``receivers``.
+  - ``sources`` and ``receivers`` must be tuples or dicts; lists are no longer
+    permitted. TODO: This will probably reduce to dicts only.
+  - Has no attribute ``observed`` any longer; access it just like any other
+    data through ``Survey.data.observed``.
+  - ``name`` is new optional.
+  - New optional keywords ``date`` and ``info``.
+  - ``noise_floor`` and ``relative_error`` are new stored as data array if they
+    are not floats.
+  - The keyword ``fixed`` has been dropped. To simulate fixed surveys define
+    the receivers with a relative offset to the source, instead of absolute
+    coordinates.
+  - ``data`` can be a dict containing many data set.
+
+- ``Dipole``:
+
+  - No ``name`` parameter any longer.
+
+
 - Removed all deprecated features.
 
 
