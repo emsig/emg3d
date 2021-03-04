@@ -44,7 +44,7 @@ jobs:
           - python-version: 3.8
             name: plain
             os: ubuntu
-            conda: "'discretize<0.6'"  # Check discretize backwards comp.
+            conda: ""
           - python-version: 3.8
             name: full
             os: ubuntu

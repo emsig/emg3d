@@ -17,7 +17,6 @@ A survey stores a set of sources, receivers, and the measured data.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 
@@ -285,12 +284,6 @@ class Survey:
                       receivers=inp['receivers'],
                       frequencies=inp['frequencies'],
                       fixed=bool(inp['fixed']))
-
-            # Backwards compatibility (emg3d < 0.13); remove eventually.
-            if 'observed' in inp.keys():
-                inp['data'] = {'observed': inp['observed']}
-                warnings.warn("Survey-dict is outdated; store with new "
-                              "version of `emg3d`.", FutureWarning)
 
             # Add all data.
             for key, value in inp['data'].items():

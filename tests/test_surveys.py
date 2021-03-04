@@ -230,14 +230,6 @@ class TestSurvey():
         assert srvy5.name == srvy7[0].name
         assert 'Data loaded from' in srvy7[1]
 
-        # Test backwards compatibility.
-        with pytest.warns(FutureWarning):
-            srvy5 = srvy5.to_dict()
-            srvy5['observed'] = srvy5['data']['observed']
-            del srvy5['data']
-            srvy6 = surveys.Survey.from_dict(srvy5)
-            assert_allclose(srvy5['observed'], srvy6.observed)
-
     def test_select(self):
         survey = surveys.Survey(
             'Test',

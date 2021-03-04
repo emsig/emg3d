@@ -24,7 +24,6 @@ high-level, specialised modelling routines.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import warnings
 import itertools
 from copy import deepcopy
 
@@ -449,14 +448,6 @@ class Simulation:
             for name in data:
                 if name in inp.keys():
                     setattr(out, '_'+name, inp.get(name))
-
-            # For backwards compatibility < v0.16.0; remove eventually.
-            if 'data' in inp.keys():
-                warnings.warn("Simulation-dict is outdated; store with new "
-                              "version of `emg3d`.", FutureWarning)
-                for name in inp['data'].keys():
-                    out.data[name] = out.data.observed*np.nan
-                    out.data[name][...] = inp['data'][name]
 
             return out
 
