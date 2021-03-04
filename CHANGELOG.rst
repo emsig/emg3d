@@ -6,6 +6,12 @@ recent versions
 """""""""""""""
 
 
+latest: towards v1.0
+--------------------
+
+- Removed all deprecated features.
+
+
 v0.17.0: Magnetics in Simulation
 --------------------------------
 
