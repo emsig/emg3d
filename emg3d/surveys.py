@@ -136,6 +136,7 @@ class Survey:
             freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
             dnd = len(str(freqs.size-1))  # Max number of digits.
             dfreqs = {f"f{i:0{dnd}d}": x for i, x in enumerate(freqs)}
+            self._freq_array = freqs
             self._frequencies = dfreqs
 
         # Initialize xarray dataset.
@@ -265,10 +266,10 @@ class Survey:
             opt = ['noise_floor', 'relative_error', 'name', 'info', 'date']
 
             # Initiate survey.
-            out = cls(sources=inp.get('sources'),
-                      receivers=inp.get('receivers'),
-                      frequencies=inp.get('frequencies'),
-                      data=inp.get('data'),
+            out = cls(sources=inp['sources'],
+                      receivers=inp['receivers'],
+                      frequencies=inp['frequencies'],
+                      data=inp['data'],
                       **{k: inp[k] if k in inp.keys() else None for k in opt})
 
             return out
@@ -451,6 +452,11 @@ class Survey:
     def frequencies(self):
         """Frequency dict containing all frequencies."""
         return self._frequencies
+
+    @property
+    def freq_array(self):
+        """Return frequencies as tuple."""
+        return tuple(self._freq_array)
 
     @property
     def standard_deviation(self):
