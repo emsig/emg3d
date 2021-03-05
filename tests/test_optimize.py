@@ -92,7 +92,7 @@ class TestOptimize():
         receivers = (np.arange(12)*500, 0, -1000, 0, 0)
         frequencies = (1.0, 2.0)
 
-        survey = surveys.Survey('Test', sources, receivers, frequencies)
+        survey = surveys.Survey(sources, receivers, frequencies)
 
         # Create a simple grid and model
         grid = meshes.TensorMesh(
@@ -103,7 +103,7 @@ class TestOptimize():
 
         # Create a simulation, compute all fields.
         simulation = simulations.Simulation(
-                'Data', survey, grid, model1, max_workers=1,
+                survey, grid, model1, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
                 gridding='same')
@@ -111,7 +111,7 @@ class TestOptimize():
         simulation.compute(observed=True)
 
         simulation = simulations.Simulation(
-                'Model', survey, grid, model2, max_workers=1,
+                survey, grid, model2, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
                 gridding='same')

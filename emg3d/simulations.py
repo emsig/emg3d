@@ -441,18 +441,10 @@ class Simulation:
                 if name in inp.keys():
                     values = inp.get(name)
 
-                    # Storing to_file makes strings out of the freq-keys.
-                    # Undo this.
-                    new_values = {}
-                    for src, val in values.items():
-                        new_values[src] = {}
-                        for freq, v in val.items():
-                            new_values[src][float(freq)] = val.get(freq)
-
                     # De-serialize Model, Field, and TensorMesh instances.
-                    io._dict_deserialize(new_values)
+                    io._dict_deserialize(values)
 
-                    setattr(out, name, new_values)
+                    setattr(out, name, values)
 
             data = ['gradient', 'misfit']
             for name in data:
@@ -551,7 +543,7 @@ class Simulation:
     # GET FUNCTIONS
     def get_grid(self, source, frequency):
         """Return computational grid of the given source and frequency."""
-        freq = float(frequency)
+        freq = self.survey._freq_key(frequency)
 
         # Return grid if it exists already.
         if self._dict_grid[source][freq] is not None:
@@ -573,7 +565,8 @@ class Simulation:
             if freq not in self._grid_frequency.keys():
 
                 # Get grid and store it.
-                inp = {**self.gridding_opts, 'frequency': freq}
+                inp = {**self.gridding_opts, 'frequency':
+                       self.survey.frequencies[freq]}
                 self._grid_frequency[freq] = meshes.construct_mesh(**inp)
 
             # Store link to grid.
@@ -600,7 +593,8 @@ class Simulation:
 
             # Get grid and store it.
             center = self.survey.sources[source].coordinates[:3]
-            inp = {**self.gridding_opts, 'frequency': freq, 'center': center}
+            inp = {**self.gridding_opts, 'frequency':
+                   self.survey.frequencies[freq], 'center': center}
             self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
 
         else:  # Use a single grid for all sources and receivers.
@@ -620,7 +614,7 @@ class Simulation:
 
     def get_model(self, source, frequency):
         """Return model on the grid of the given source and frequency."""
-        freq = float(frequency)
+        freq = self.survey._freq_key(frequency)
 
         # Return model if it exists already.
         if self._dict_model[source][freq] is not None:
@@ -682,7 +676,7 @@ class Simulation:
 
     def get_sfield(self, source, frequency):
         """Return source field for given source and frequency."""
-        freq = float(frequency)
+        freq = self.survey._freq_key(frequency)
 
         # Get source field if it is not stored yet.
         if self._dict_sfield[source][freq] is None:
@@ -695,9 +689,9 @@ class Simulation:
                 strength = 0
 
             sfield = fields.get_source_field(
-                    grid=self.get_grid(source, frequency),
+                    grid=self.get_grid(source, freq),
                     src=src.coordinates,
-                    freq=frequency,
+                    freq=self.survey.frequencies[freq],
                     strength=strength,
                     electric=src.electric)
 
@@ -708,7 +702,7 @@ class Simulation:
 
     def get_efield(self, source, frequency, **kwargs):
         """Return electric field for given source and frequency."""
-        freq = float(frequency)
+        freq = self.survey._freq_key(frequency)
 
         # Get call_from_compute and ensure no kwargs are left.
         call_from_compute = kwargs.pop('call_from_compute', False)
@@ -741,7 +735,7 @@ class Simulation:
                 self._dict_hfield[source][freq] = None
 
                 # Store electric and magnetic responses at receiver locations.
-                self._store_responses(source, frequency)
+                self._store_responses(source, freq)
 
         # Return electric field.
         if call_from_compute:
@@ -754,7 +748,7 @@ class Simulation:
 
     def get_hfield(self, source, frequency, **kwargs):
         """Return magnetic field for given source and frequency."""
-        freq = float(frequency)
+        freq = self.survey._freq_key(frequency)
 
         # If magnetic field not computed yet compute it.
         if self._dict_hfield[source][freq] is None:
@@ -773,7 +767,7 @@ class Simulation:
 
     def _store_responses(self, source, frequency):
         """Return electric and magnetic fields at receiver locations."""
-        freq = float(frequency)
+        freq = self.survey._freq_key(frequency)
 
         # Get receiver coordinates.
         rec_coords = self.survey.rec_coords
@@ -809,7 +803,8 @@ class Simulation:
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
-        return self._dict_efield_info[source][float(frequency)]
+        freq = self.survey._freq_key(frequency)
+        return self._dict_efield_info[source][freq]
 
     # ASYNCHRONOUS COMPUTATION
     def _get_efield(self, inp):
@@ -1009,7 +1004,7 @@ class Simulation:
         if getattr(self, '__srcfreq', None) is None:
             self.__srcfreq = list(
                     itertools.product(self.survey.sources.keys(),
-                                      self.survey.frequencies))
+                                      self.survey.frequencies.keys()))
 
         return self.__srcfreq
 
@@ -1059,7 +1054,7 @@ class Simulation:
         if self.gridding == 'frequency':
 
             # Loop over frequencies.
-            for freq in self.survey.frequencies:
+            for freq in self.survey._freq_array:
                 out += f"= Source: all; Frequency: {freq} Hz =\n"
                 out += get_grid_info(self._srcfreq[0][0], freq)
 
@@ -1074,7 +1069,8 @@ class Simulation:
 
             # Loop over sources, frequencies.
             for src, freq in self._srcfreq:
-                out += f"= Source: {src}; Frequency: {freq} Hz =\n"
+                out += f"= Source: {src}; Frequency: "
+                out += f"{self.survey.frequencies[freq]} Hz =\n"
                 out += get_grid_info(src, freq)
 
         else:  # same, input, single
@@ -1109,7 +1105,8 @@ class Simulation:
                             out += f"    - SOLVER INFO <{field}> -\n\n"
 
                     # Source and frequency info.
-                    out += f"= Source {src}; Frequency {freq} Hz ="
+                    out += f"= Source {src}; Frequency "
+                    out += f"{self.survey.frequencies[freq]} Hz ="
 
                     # Print log depending on solver and simulation verbosities.
                     if verb == 0 or self.solver_opts['verb'] not in [1, 2]:
@@ -1170,11 +1167,12 @@ class Simulation:
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
 
-        freq = float(frequency)
-        grid = self.get_grid(source, frequency)
+        freq = self.survey._freq_key(frequency)
+        float_freq = self.survey.frequencies[freq]
+        grid = self.get_grid(source, freq)
 
         # Initiate empty field
-        ResidualField = fields.SourceField(grid, freq=frequency)
+        ResidualField = fields.SourceField(grid, freq=float_freq)
 
         # Loop over receivers, input as source.
         for name, rec in self.survey.receivers.items():
@@ -1203,7 +1201,7 @@ class Simulation:
                 ResidualField += fields.get_source_field(
                     grid=grid,
                     src=rec.coordinates,
-                    freq=frequency,
+                    freq=float_freq,
                     strength=strength,
                     electric=rec.electric,
                 )
@@ -1406,7 +1404,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)
 
     # Frequency defaults to average frequency (log10).
-    freq = 10**np.mean(np.log10(survey.frequencies))
+    freq = 10**np.mean(np.log10(survey._freq_array))
     gopts['frequency'] = gridding_opts.pop('frequency', freq)
 
     # Center defaults to center of all sources.

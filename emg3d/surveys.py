@@ -94,7 +94,7 @@ class Survey:
           used for loading from file.
 
     frequencies : ndarray
-        Source frequencies (Hz).
+        Source frequencies (Hz); must be unique.
 
     data : ndarray, optional
         The observed data (dtype=np.complex128); must have shape (nsrc, nrec,
@@ -130,14 +130,23 @@ class Survey:
         self._receivers = self._dipole_info_to_dict(receivers, 'receiver')
 
         # Initiate frequencies.
+        # For easier access, we store three items:
+        # - dict {name: freq} (default and used for xarray).
+        # - dict {freq: name} (reverse for flexibility to use the float).
+        # - array (frequencies)
         if isinstance(frequencies, dict):
             self._frequencies = frequencies
+            self._freq_dkeys = {float(v): k for k, v in frequencies.items()}
+            self._freq_array = np.array([
+                float(v) for v in frequencies.values()])
         else:
             freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
             dnd = len(str(freqs.size-1))  # Max number of digits.
-            dfreqs = {f"f{i:0{dnd}d}": x for i, x in enumerate(freqs)}
-            self._freq_array = freqs
+            dfreqs = {f"f{i:0{dnd}d}": float(x) for i, x in enumerate(freqs)}
+            dkeys = {float(x): f"f{i:0{dnd}d}" for i, x in enumerate(freqs)}
             self._frequencies = dfreqs
+            self._freq_dkeys = dkeys  # Store "inverted" dict
+            self._freq_array = freqs
 
         # Initialize xarray dataset.
         self._initiate_dataset(data)
@@ -458,6 +467,13 @@ class Survey:
         """Return frequencies as tuple."""
         return tuple(self._freq_array)
 
+    def _freq_key(self, frequency):
+        """Return key of `frequency`, where frequency is str (key) or float."""
+        if isinstance(frequency, str):
+            return frequency
+        else:
+            return self._freq_dkeys[frequency]
+
     @property
     def standard_deviation(self):
         r"""Returns the standard deviation of the data.
@@ -567,7 +583,7 @@ class Survey:
 
         See :attr:`Survey.standard_deviation` for more info.
         """
-        if noise_floor is not None and noise_floor != 'data._noise_floor':
+        if noise_floor is not None and not isinstance(noise_floor, str):
 
             # Cast
             # noise_floor = np.array(noise_floor, dtype=float, ndmin=1)
@@ -606,8 +622,7 @@ class Survey:
 
         See :attr:`Survey.standard_deviation` for more info.
         """
-        if (relative_error is not None and
-                relative_error != 'data._relative_error'):
+        if relative_error is not None and not isinstance(relative_error, str):
 
             # Cast
             # relative_error = np.array(relative_error, dtype=float, ndmin=1)
@@ -665,8 +680,11 @@ class Survey:
             # Create Dipole-dict.
             out = {names[i]: Dipole(coo[:, i], elmag[i]) for i in range(nd)}
 
-        elif isinstance(inp, dict):  # Dict of de-serialized Dipoles.
-            out = {k: Dipole.from_dict(v) for k, v in inp.items()}
+        elif isinstance(inp, dict):
+            if isinstance(inp[list(inp)[0]], dict):  # Dict of de-ser. Dipoles.
+                out = {k: Dipole.from_dict(v) for k, v in inp.items()}
+            else:  # Assumed dict of dipoles.
+                out = inp
 
         else:
             raise TypeError(
