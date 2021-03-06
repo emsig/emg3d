@@ -5,7 +5,7 @@ Theory
 
 The following provides an introduction to the theoretical foundation of the
 solver `emg3d`. More specific theory is covered in the docstrings of many
-functions, have a look at the :doc:`../api_reference/code-solv`-section or
+functions, have a look at the :doc:`../api_reference/solver-core`-section or
 follow the links to the corresponding functions here within the theory. If you
 just want to use the solver, but do not care much about the internal
 functionality, then the function :func:`emg3d.solver.solve` is the only

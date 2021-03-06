@@ -95,7 +95,7 @@ def test_gauss_seidel(njit):
         gauss_seidel_z = core.gauss_seidel_z.py_func
 
     # At the moment we only compare `gauss_seidel_x/y/z` to `gauss_seidel`.
-    # Better tests should be implemented.
+    # Better tests would always be welcomed...
 
     # Rotate the source, so we have a strong enough signal in all directions
     src = [0, 0, 0, 45, 45]

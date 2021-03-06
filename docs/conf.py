@@ -16,6 +16,7 @@ extensions = [
 ]
 autosummary_generate = True
 add_module_names = True
+add_function_parentheses = False
 
 # Numpydoc settings
 numpydoc_show_class_members = False
@@ -31,6 +32,7 @@ intersphinx_mapping = {
     "discretize": ("https://discretize.simpeg.xyz/en/master", None),
     "empymod": ("https://empymod.readthedocs.io/en/stable", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
+    "numba": ("https://numba.readthedocs.io/en/stable", None),
 }
 
 # ==== 2. General Settings ====
@@ -47,8 +49,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emg3d'
-copyright = f'2018-{time.strftime("%Y")}, The emg3d Developers.'
 author = 'The emg3d Developers'
+copyright = f'2018-{time.strftime("%Y")}, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).
 version = __version__
@@ -81,6 +83,10 @@ html_context = {
     "github_version": "master",
     "doc_path": "docs",
 }
+
+html_use_modindex = True
+html_file_suffix = '.html'
+htmlhelp_basename = 'emg3d'
 
 # ==== 4. linkcheck ====
 

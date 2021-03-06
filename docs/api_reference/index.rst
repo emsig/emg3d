@@ -4,13 +4,15 @@
 API reference
 =============
 
+.. module:: emg3d
+
 .. toctree::
    :maxdepth: 2
-   :caption: API reference
 
-   code-solv
-   code-msaf
-   code-sas
-   code-opt
-   code-utio
-   code-cli
+   surveys-simulations
+   meshes-models
+   fields-maps
+   optimize
+   utils-io
+   solver-core
+   cli
