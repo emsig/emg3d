@@ -87,25 +87,30 @@ class Survey:
           (after `dip` or `z1`), `electric`, a boolean of length 1 or `n`, that
           indicates if the dipoles are electric or magnetic.
 
-        - List: A list of :class:`Dipole`-instances. The names of all dipoles
-          in the list must be unique.
+        - Dictionary: A dict where the values are :class:`Dipole`-instances,
+          de-serialized or not.
 
-        - Dictionary: A dict of de-serialized :class:`Dipole`-instances; mainly
-          used for loading from file.
+    frequencies : ndarray or dict
+        Source frequencies (Hz).
 
-    frequencies : ndarray
-        Source frequencies (Hz); must be unique.
+        - ndarray : (or tuple, list): Frequencies will be stored in a dict with
+          keys assigned starting with 'f0', 'f1', and so on.
+
+        - dict: keys can be arbitrary names, values must be floats.
 
     data : ndarray, optional
         The observed data (dtype=np.complex128); must have shape (nsrc, nrec,
-        nfreq). Alternatively, it can be a dict with containing many datasets,
-        in which one could also store, for instance, standard-deviations for
-        each source-receiver-frequency pair.
+        nfreq). Alternatively, it can be a dict containing many datasets, in
+        which one could also store, for instance, standard-deviations for each
+        source-receiver-frequency pair.
 
         If None, it will be initiated with NaN's.
 
-    noise_floor, relative_error : float, optional
+    noise_floor, relative_error : float or ndarray, optional
         Noise floor and relative error of the data. Default to None.
+        They can be arrays of a shape which can be broadcasted to the data
+        shape, e.g., (nsrc, 1, 1) or (1, nrec, nfreq), or have the dimension of
+        data.
         See :attr:`Survey.standard_deviation` for more info.
 
     name : str, optional
@@ -123,30 +128,11 @@ class Survey:
     def __init__(self, sources, receivers, frequencies, data=None, **kwargs):
         """Initiate a new Survey instance."""
 
-        # Initiate sources.
-        self._sources = self._dipole_info_to_dict(sources, 'source')
-
-        # Initiate receivers.
-        self._receivers = self._dipole_info_to_dict(receivers, 'receiver')
-
-        # Initiate frequencies.
-        # For easier access, we store three items:
-        # - dict {name: freq} (default and used for xarray).
-        # - dict {freq: name} (reverse for flexibility to use the float).
-        # - array (frequencies)
-        if isinstance(frequencies, dict):
-            self._frequencies = frequencies
-            self._freq_dkeys = {float(v): k for k, v in frequencies.items()}
-            self._freq_array = np.array([
-                float(v) for v in frequencies.values()])
-        else:
-            freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
-            dnd = len(str(freqs.size-1))  # Max number of digits.
-            dfreqs = {f"f{i:0{dnd}d}": float(x) for i, x in enumerate(freqs)}
-            dkeys = {float(x): f"f{i:0{dnd}d}" for i, x in enumerate(freqs)}
-            self._frequencies = dfreqs
-            self._freq_dkeys = dkeys  # Store "inverted" dict
-            self._freq_array = freqs
+        # Initiate sources, receivers, and frequencies.
+        self._sources = _dipole_info_to_dict(sources, 'source')
+        self._receivers = _dipole_info_to_dict(receivers, 'receiver')
+        out = _frequency_info_to_dict(frequencies)
+        self._frequencies, self._freq_dkeys, self._freq_array = out
 
         # Initialize xarray dataset.
         self._initiate_dataset(data)
@@ -646,52 +632,6 @@ class Survey:
 
         self._data.attrs['relative_error'] = relative_error
 
-    def _dipole_info_to_dict(self, inp, name):
-        """Create dict with provided source/receiver information."""
-
-        # Create dict depending if `inp` is tuple or dict.
-        if isinstance(inp, tuple):  # Tuple with coordinates
-
-            # See if last tuple element is boolean, hence el/mag-flag.
-            if isinstance(inp[-1], (list, tuple, np.ndarray)):
-                provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
-            else:
-                provided_elmag = isinstance(inp[-1], (bool, np.bool_))
-
-            # Get max dimension.
-            nd = max([np.array(n, ndmin=1).size for n in inp])
-
-            # Expand coordinates.
-            coo = np.array([nd*[val, ] if np.array(val).size == 1 else
-                           val for val in inp], dtype=np.float64)
-
-            # Extract el/mag flag or set to ones (electric) if not provided.
-            if provided_elmag:
-                elmag = coo[-1, :]
-                coo = coo[:-1, :]
-            else:
-                elmag = np.ones(nd)
-
-            # Create dipole names (number-strings).
-            prefix = 'Tx' if name == 'source' else 'Rx'
-            dnd = len(str(nd-1))  # Max number of digits.
-            names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
-
-            # Create Dipole-dict.
-            out = {names[i]: Dipole(coo[:, i], elmag[i]) for i in range(nd)}
-
-        elif isinstance(inp, dict):
-            if isinstance(inp[list(inp)[0]], dict):  # Dict of de-ser. Dipoles.
-                out = {k: Dipole.from_dict(v) for k, v in inp.items()}
-            else:  # Assumed dict of dipoles.
-                out = inp
-
-        else:
-            raise TypeError(
-                    f"Input format of <{name}s> not recognized: {type(inp)}.")
-
-        return out
-
 
 # # Sources and Receivers # #
 @dataclass(order=True, unsafe_hash=True)
@@ -914,3 +854,85 @@ class Dipole(PointDipole):
                        electric=inp['electric'], **kwargs)
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
+
+
+# # Helper routines ##
+def _dipole_info_to_dict(inp, name):
+    """Create dict with provided source/receiver information."""
+
+    # Create dict depending if `inp` is tuple or dict.
+    if isinstance(inp, tuple):  # Tuple with coordinates
+
+        # See if last tuple element is boolean, hence el/mag-flag.
+        if isinstance(inp[-1], (list, tuple, np.ndarray)):
+            provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
+        else:
+            provided_elmag = isinstance(inp[-1], (bool, np.bool_))
+
+        # Get max dimension.
+        nd = max([np.array(n, ndmin=1).size for n in inp])
+
+        # Expand coordinates.
+        coo = np.array([nd*[val, ] if np.array(val).size == 1 else
+                        val for val in inp], dtype=np.float64)
+
+        # Extract el/mag flag or set to ones (electric) if not provided.
+        if provided_elmag:
+            elmag = coo[-1, :]
+            coo = coo[:-1, :]
+        else:
+            elmag = np.ones(nd)
+
+        # Create dipole names (number-strings).
+        prefix = 'Tx' if name == 'source' else 'Rx'
+        dnd = len(str(nd-1))  # Max number of digits.
+        names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
+
+        # Create Dipole-dict.
+        out = {names[i]: Dipole(coo[:, i], elmag[i]) for i in range(nd)}
+
+    elif isinstance(inp, dict):
+        if isinstance(inp[list(inp)[0]], dict):  # Dict of de-ser. Dipoles.
+            out = {k: Dipole.from_dict(v) for k, v in inp.items()}
+        else:  # Assumed dict of dipoles.
+            out = inp
+
+    else:
+        raise TypeError(
+                f"Input format of <{name}s> not recognized: {type(inp)}.")
+
+    return out
+
+
+def _frequency_info_to_dict(frequencies, naming="f"):
+    """Create dicts with provided frequency information.
+
+    For easier access three items are stored:
+    - dict {name: freq}: default and used for xarray;
+    - dict {freq: name}: reverse for flexibility to use the float;
+    - array (frequencies): the frequencies as an array.
+
+    """
+
+    if isinstance(frequencies, dict):
+        name_freq = frequencies
+        freq_name = {float(v): k for k, v in frequencies.items()}
+        freqs = np.array([float(v) for v in frequencies.values()])
+    else:
+        freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
+
+        if freqs.size != np.unique(freqs).size:
+            raise ValueError(f"Contains non-unique frequencies: {freqs}.")
+
+        if naming:
+            dnd = len(str(freqs.size-1))  # Max number of digits.
+            name_freq, freq_name = {}, {}
+            for i, x in enumerate(freqs):
+                name = f"{naming}{i:0{dnd}d}"
+                name_freq[name] = float(x)
+                freq_name[float(x)] = name
+        else:
+            name_freq = {str(x): float(x) for i, x in enumerate(freqs)}
+            freq_name = {float(x): str(x) for i, x in enumerate(freqs)}
+
+    return name_freq, freq_name, freqs
