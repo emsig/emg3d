@@ -1,5 +1,5 @@
-Maintainers Guide
-=================
+Development
+===========
 
 
 Making a release

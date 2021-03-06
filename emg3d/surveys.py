@@ -44,8 +44,8 @@ class Survey:
     dependency, and has to be installed manually to use the `Survey`
     functionality.
 
-    The data is stored in an ndarray of the form `nsrc`x`nrec`x`nfreq in the
-    following way:
+    The data is stored in an ndarray of the form `nsrc`x`nrec`x`nfreq` in the
+    following way::
 
                              f1
             Rx1 Rx2  .  RxR /   f2

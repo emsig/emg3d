@@ -2,8 +2,8 @@ Changelog
 #########
 
 
-recent versions
-"""""""""""""""
+1.x-Series
+""""""""""
 
 
 latest: towards v1.0
@@ -36,6 +36,10 @@ latest: towards v1.0
 
 
 - Removed all deprecated features.
+
+
+0.x-Series
+""""""""""
 
 
 v0.17.0: Magnetics in Simulation
@@ -152,9 +156,6 @@ v0.16.0: Arbitrarily shaped sources
 - ``maps``: ``interp3d`` takes a new keyword ``cval``, which is passed to
   ``map_coordinates``.
 
-
-v0.11.0 - v0.15.3
-"""""""""""""""""
 
 v0.15.3: Move to EMSiG
 ----------------------
@@ -550,9 +551,6 @@ were removed, however.
   - Fixed ``io`` for ``SourceField``, that was not implemented properly.
 
 
-v0.8.0 - v0.10.1
-""""""""""""""""
-
 *v0.10.1* : Zero Source
 -----------------------
 
@@ -786,9 +784,6 @@ v0.8.0 - v0.10.1
   - Changed parameter ``h_min`` to ``min_width`` for consistency reasons in
     ``utils.get_stretched_h``.
 
-
-v0.1.0 - v0.7.1
-"""""""""""""""
 
 *v0.7.1* : JOSS article
 -----------------------

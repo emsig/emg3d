@@ -29,7 +29,7 @@ to the next node, and so on until it reaches the last node, see :numref:`Figure
 simultaneously per step (the fields on the boundaries are never computed, as
 they are assumed to be 0).
 
-.. figure:: _static/schematics2.svg
+.. figure:: ../_static/schematics2.svg
    :width: 60 %
    :align: center
    :alt: Explanation of smoother
@@ -64,7 +64,7 @@ The implemented multigrid method simply joins two adjacent cells to get from
 finer to coarser grids, see :numref:`Figure %s <fine2coarse>` for an example
 coarsening starting with a 16 cells by 16 cells grid.
 
-.. figure:: _static/schematics1.svg
+.. figure:: ../_static/schematics1.svg
    :width: 60 %
    :align: center
    :alt: Fine to coarse grid schematic
@@ -89,7 +89,7 @@ relaxation** :numref:`(Figure %s) <linerelaxation>`. Both require more CPU and
 higher RAM per grid than the standard multigrid, but they can improve the
 convergence rate, which then in turn improves the overall CPU time.
 
-.. figure:: _static/schematics4.svg
+.. figure:: ../_static/schematics4.svg
    :width: 60 %
    :align: center
    :alt: Schematic of semicoarsening
@@ -98,7 +98,7 @@ convergence rate, which then in turn improves the overall CPU time.
    Example of semicoarsening: The cell size is kept constant in one direction.
    The direction can be alternated between iterations.
 
-.. figure:: _static/schematics3.svg
+.. figure:: ../_static/schematics3.svg
    :width: 60 %
    :align: center
    :alt: Schematic of line relaxation

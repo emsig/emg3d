@@ -15,7 +15,7 @@ do some testing with regards to runtime, see the `Tools Section
 <https://emsig.github.io/emg3d-gallery/gallery/index.html#tools>`_. An
 example output of that script is shown in :numref:`Figure %s <runtime>`.
 
-.. figure:: _static/runtime.svg
+.. figure:: ../_static/runtime.svg
    :width: 80 %
    :align: center
    :alt: Runtime
@@ -94,7 +94,7 @@ do some testing with regards to the RAM usage, see the `Tools Section
 <https://emsig.github.io/emg3d-gallery/gallery/index.html#tools>`_. An
 example output of that script is shown in :numref:`Figure %s <ramusage>`.
 
-.. figure:: _static/RAM-Usage.svg
+.. figure:: ../_static/RAM-Usage.svg
    :width: 80 %
    :align: center
    :alt: RAM Usage

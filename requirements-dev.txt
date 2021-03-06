@@ -16,7 +16,7 @@ setuptools_scm
 sphinx
 numpydoc
 sphinx_numfig
-sphinx_rtd_theme
+pydata_sphinx_theme
 sphinx_automodapi
 
 # FOR TESTING
