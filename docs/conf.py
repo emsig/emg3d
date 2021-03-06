@@ -20,7 +20,6 @@ add_module_names = True
 # Numpydoc settings
 numpydoc_show_class_members = False
 numfig = True
-numfig_format = {'figure': 'Figure %s:'}
 
 # Todo settings
 todo_include_todos = True
@@ -48,7 +47,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emg3d'
-copyright = u'2018-{}, The emg3d Developers.'.format(time.strftime("%Y"))
+copyright = f'2018-{time.strftime("%Y")}, The emg3d Developers.'
 author = 'The emg3d Developers'
 
 # |version| and |today| tags (|release|-tag is not used).
@@ -63,40 +62,25 @@ exclude_patterns = ['_build', '../tests']
 pygments_style = 'friendly'
 
 # ==== 3. HTML settings ====
-html_theme = 'sphinx_rtd_theme'
-html_theme_options = {
-    'logo_only': True,
-    'display_version': True,
-    'prev_next_buttons_location': 'both',
-}
+html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
 html_logo = '_static/logo-emg3d-cut.svg'
 html_favicon = '_static/favicon.ico'
-html_sidebars = {
-    '**': [
-        'about.html',
-        'navigation.html',
-        'searchbox.html',
-    ]
+
+html_theme_options = {
+  "github_url": "https://github.com/emsig/emg3d",
+  "external_links": [
+      {"name": "EMSiG", "url": "https://emsig.github.io"},
+  ],
+  "use_edit_page_button": True,
 }
 
 html_context = {
-    'menu_links_name': 'Links',
-    'menu_links': [
-        ('<i class="fa fa-link fa-fw"></i> Website',
-         'https://emsig.github.io'),
-        ('<i class="fa fa-github fa-fw"></i> Source Code',
-         'https://github.com/emsig/emg3d'),
-    ],
+    "github_user": "emsig",
+    "github_repo": "emg3d",
+    "github_version": "master",
+    "doc_path": "docs",
 }
-
-htmlhelp_basename = 'emg3ddoc'
-
-
-# -- CSS fixes --
-def setup(app):
-    app.add_css_file("style.css")
-
 
 # ==== 4. linkcheck ====
 

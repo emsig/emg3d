@@ -536,7 +536,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         Cell widths of mesh.
 
     info : str
-        Info, only if ``verb<0`.
+        Info, only if ``verb<0``.
 
     """
     # Get all kwargs.

@@ -11,28 +11,9 @@ Version: |version| ~ Date: |today|
 
 .. toctree::
    :maxdepth: 2
-   :hidden:
    :caption: User Manual
 
-   usage
-   mgwhat
-   theory
-   cpu_and_ram
-   cli
+   user_guide/index
    gallery
-   references
-   credits
-   changelog
+   api_reference/index
    maintenance
-
-.. toctree::
-   :maxdepth: 2
-   :hidden:
-   :caption: API
-
-   code-solv
-   code-msaf
-   code-sas
-   code-opt
-   code-utio
-   code-cli

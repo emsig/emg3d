@@ -5,13 +5,13 @@ Theory
 
 The following provides an introduction to the theoretical foundation of the
 solver `emg3d`. More specific theory is covered in the docstrings of many
-functions, have a look at the :doc:`code`-section or follow the links to the
-corresponding functions here within the theory. If you just want to use the
-solver, but do not care much about the internal functionality, then the
-function :func:`emg3d.solver.solve` is the only function you will ever need. It
-is the main entry point, and it takes care whether multigrid is used as a
-solver or as a preconditioner (or not at all), while the actual multigrid
-solver is :func:`emg3d.solver.multigrid`.
+functions, have a look at the :doc:`../api_reference/code-solv`-section or
+follow the links to the corresponding functions here within the theory. If you
+just want to use the solver, but do not care much about the internal
+functionality, then the function :func:`emg3d.solver.solve` is the only
+function you will ever need. It is the main entry point, and it takes care
+whether multigrid is used as a solver or as a preconditioner (or not at all),
+while the actual multigrid solver is :func:`emg3d.solver.multigrid`.
 
 .. note::
 
@@ -200,7 +200,7 @@ point values at the midpoint of edges:
 
 The averages and point-values are the same within second-order accuracy.
 
-.. figure:: _static/Muld06_Fig1.png
+.. figure:: ../_static/Muld06_Fig1.png
    :scale: 100 %
    :align: center
    :alt: Staggered grid sketches.
@@ -217,7 +217,7 @@ dual volume is a quarter of the total volume of the four adjacent cells. An
 example for :math:`E_1` is shown in :numref:`Figure %s(b) <Muld06_Fig2>`. The
 vertices of the dual cell are located at the midpoints of the cell faces.
 
-.. figure:: _static/Muld06_Fig2.png
+.. figure:: ../_static/Muld06_Fig2.png
    :scale: 100 %
    :align: center
    :alt: Dual volume sketches.
@@ -590,7 +590,7 @@ replaced by the F-cycle :numref:`(Figure %s) <Muld06_Fig5>`. In the F-cycle, the
 number of coarse-grid corrections increases by one on each subsequent coarser
 grid.
 
-.. figure:: _static/Muld06_Fig3.png
+.. figure:: ../_static/Muld06_Fig3.png
    :scale: 100 %
    :align: center
    :alt: V-Cycle
@@ -602,7 +602,7 @@ grid.
    :math:`h` and the coarsest :math:`8h`. A single coarse-grid correction is
    computed for all grids but the coarsest.
 
-.. figure:: _static/Muld06_Fig4.png
+.. figure:: ../_static/Muld06_Fig4.png
    :scale: 100 %
    :align: center
    :alt: W-Cycle
@@ -612,7 +612,7 @@ grid.
    post-smoothing steps. On each grid except the coarsest, the number of
    coarse-grid corrections is twice that of the underlying finer grid.
 
-.. figure:: _static/Muld06_Fig5.png
+.. figure:: ../_static/Muld06_Fig5.png
    :scale: 100 %
    :align: center
    :alt: F-Cycle

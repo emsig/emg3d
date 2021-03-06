@@ -1,7 +1,8 @@
 """
 Functions related to the command-line interface (CLI) of `emg3d`.
 
-Consult the :doc:`cli` section in the documentation for more information.
+Consult the :doc:`../user_guide/cli` section in the documentation for more
+information.
 """
 # Copyright 2018-2021 The emg3d Developers.
 #
