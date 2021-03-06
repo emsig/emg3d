@@ -1,12 +1,3 @@
-"""
-Electromagnetic modeller in the diffusive limit (low frequencies) for 3D media
-with tri-axial electrical anisotropy. The matrix-free multigrid solver can be
-used as main solver or as preconditioner for one of the Krylov subspace methods
-implemented in :mod:`scipy.sparse.linalg`, and the governing equations are
-discretized on a staggered Yee grid. The code is written completely in Python
-using the ``numpy``/``scipy``-stack, where the most time-consuming parts are
-sped-up through jitted ``numba``-functions.
-"""
 # Copyright 2018-2021 The emg3d Developers.
 #
 # This file is part of emg3d.

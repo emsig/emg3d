@@ -4,14 +4,15 @@
 emg3d
 #####
 
-Version: |version| ~ Date: |today|
+:Release: |version|
+:Date: |today|
 
 .. include:: ../README.rst
   :start-after: sphinx-inclusion-marker
 
 .. toctree::
-   :maxdepth: 2
-   :caption: User Manual
+   :maxdepth: 1
+   :hidden:
 
    user_guide/index
    gallery

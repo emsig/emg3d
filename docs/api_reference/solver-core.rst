@@ -1,8 +1,8 @@
-I/O and Utils
+Solver & Core
 #############
 
-.. automodapi:: emg3d.io
+.. automodapi:: emg3d.solver
    :no-inheritance-diagram:
 
-.. automodapi:: emg3d.utils
+.. automodapi:: emg3d.core
    :no-inheritance-diagram:

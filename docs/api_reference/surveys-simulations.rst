@@ -1,5 +1,5 @@
-Surveys and Simulations
-#######################
+Surveys & Simulations
+#####################
 
 .. automodapi:: emg3d.surveys
    :no-inheritance-diagram:

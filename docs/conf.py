@@ -82,6 +82,10 @@ html_context = {
     "doc_path": "docs",
 }
 
+html_use_modindex = True
+html_file_suffix = '.html'
+htmlhelp_basename = 'emg3d'
+
 # ==== 4. linkcheck ====
 
 # Papers from academic.oup results in a 104 error
