@@ -263,7 +263,7 @@ class TestParser:
             f.write("[data]\n")
             f.write("sources=Tx11\n")
             f.write("receivers=Rx1, Rx2\n")
-            f.write("frequencies=1")
+            f.write("frequencies=f0")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -271,7 +271,7 @@ class TestParser:
         test = cfg['data']
         assert test['sources'] == ['Tx11']
         assert test['receivers'] == ['Rx1', 'Rx2']
-        assert test['frequencies'] == [1.0]
+        assert test['frequencies'] == ['f0']
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             # Write a config file.
@@ -490,7 +490,7 @@ class TestRun:
             f.write("[data]\n")
             f.write("sources=Tx0\n")
             f.write("receivers=Rx04, Rx09, Rx01, Rx11, Rx05\n")
-            f.write("frequencies=1")
+            f.write("frequencies=f0")
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)

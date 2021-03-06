@@ -35,20 +35,17 @@ __all__ = ['Survey', 'Dipole', 'PointDipole']
 class Survey:
     """Create a survey with sources, receivers, and data.
 
-    A survey contains all the sources with their frequencies, receivers, and
-    corresponding data.
+    A survey contains all data with the corresponding information about
+    sources, receivers, and frequencies. The data is a 3D-array of shape
+    (nsrc, nrec, nfreq).
 
     Underlying the survey-class is an xarray, which is basically a regular
     ndarray with axis labels and more. The module `xarray` is a soft
     dependency, and has to be installed manually to use the `Survey`
     functionality.
 
-    This class was developed with a node-based, marine CSEM survey layout in
-    mind. It is therefore optimised for and mostly tested with that setup. This
-    means for a number of receivers which measure for all source positions. The
-    general layout of the data for such a survey is (S, R, F), where `S` is the
-    number of sources, `R` the number of receivers, and `F` the number of
-    frequencies::
+    The data is stored in an ndarray of the form `nsrc`x`nrec`x`nfreq in the
+    following way:
 
                              f1
             Rx1 Rx2  .  RxR /   f2
@@ -65,46 +62,16 @@ class Survey:
                  └───┴───┴───┴───┘  │
                     └───┴───┴───┴───┘
 
-    However, the class can also be used for a CSEM streamer-style survey
-    layout (by setting `fixed=True`), where there is a moving source with one
-    or several receivers at a fixed offset. The layout of the data is then also
-    (S, R, F), but here `S` is the number of locations of the only source, `R`
-    is the number of receiver-offsets, and `F` is the number of frequencies::
-
-                                        f1
-                Offs1     .   OffsR    /   .
-              ┌─────────┬───┬─────────┐   /   fF
-       TxPos1 │ Rx1-TP1 │ . │ RxR-TP1 │──┐   /
-              ├─────────┼───┼─────────┤  │──┐
-       TxPos2 │ Rx1-TP2 │ . │ RxR-TP2 │──┤  │
-              ├─────────┼───┼─────────┤  │──┤
-        .     │ .       │ . │ .       │──┤  │
-              ├─────────┼───┼─────────┤  │──┤
-       TxPosS │ Rx1-TPS │ . │ RxR-TPS │──┤  │
-              └─────────┴───┴─────────┘  │──┤
-                 └─────────┴───┴─────────┘  │
-                    └─────────┴───┴─────────┘
-
-    This means that even though there is only one source, there are actually
-    `S` source dipoles, as each position is treated as a different dipole. The
-    number of receiver dipoles in this case is `SxR`. This setup can also be
-    used for airborne EM.
-
-
-    .. warning::
-
-        The Survey class has mainly been used and tested with ``fixed=False``,
-        which is the default. It is very likely that there are things which are
-        not yet implemented for ``fixed=True``. Please do report problems if
-        you encounter them.
+    Receivers have a switch ``relative``, which is False by default and means
+    that the coordinates are absolute values. If the switch is set to True, the
+    coordinates are relative to the source. As such, the above layout can also
+    be used for a moving source at positions Tx1, Tx2, ..., where the receivers
+    Rx1, Rx2, ... have a constant offset from the source.
 
 
     Parameters
     ----------
-    name : str
-        Name of the survey
-
-    sources, receivers : tuple, list, or dict
+    sources, receivers : tuple or dict
         Sources and receivers.
 
         - Tuples: Coordinates in one of the two following formats:
@@ -120,57 +87,52 @@ class Survey:
           (after `dip` or `z1`), `electric`, a boolean of length 1 or `n`, that
           indicates if the dipoles are electric or magnetic.
 
-        - List: A list of :class:`Dipole`-instances. The names of all dipoles
-          in the list must be unique.
+        - Dictionary: A dict where the values are :class:`Dipole`-instances,
+          de-serialized or not.
 
-        - Dictionary: A dict of de-serialized :class:`Dipole`-instances; mainly
-          used for loading from file.
-
-    frequencies : ndarray
+    frequencies : ndarray or dict
         Source frequencies (Hz).
 
-    data : ndarray or None
+        - ndarray : (or tuple, list): Frequencies will be stored in a dict with
+          keys assigned starting with 'f0', 'f1', and so on.
+
+        - dict: keys can be arbitrary names, values must be floats.
+
+    data : ndarray, optional
         The observed data (dtype=np.complex128); must have shape (nsrc, nrec,
-        nfreq) or, if `fixed=True`, (nsrc, noff, nfreq). If None, it will be
-        initiated with NaN's.
+        nfreq). Alternatively, it can be a dict containing many datasets, in
+        which one could also store, for instance, standard-deviations for each
+        source-receiver-frequency pair.
 
-    fixed : bool
-        Node-based CSEM survey (`fixed=False`; default) or streamer-type CSEM
-        survey (`fixed=True`). In the streamer-type survey, the number of
-        `receivers` supplied must be a multiple of the source positions.
-        In this case, the receivers are grouped into offsets.
+        If None, it will be initiated with NaN's.
 
-    noise_floor, relative_error : float
+    noise_floor, relative_error : float or ndarray, optional
         Noise floor and relative error of the data. Default to None.
+        They can be arrays of a shape which can be broadcasted to the data
+        shape, e.g., (nsrc, 1, 1) or (1, nrec, nfreq), or have the dimension of
+        data.
         See :attr:`Survey.standard_deviation` for more info.
 
-    std : ndarray or None
-        Standard deviation of the data, same shape as data. Default to None.
-        See :attr:`Survey.standard_deviation` for more info.
+    name : str, optional
+        Name of the survey.
+
+    date : str, optional
+        Acquisition date.
+
+    info : str, optional
+        Survey info or any other info (e.g., what was the intent of the survey,
+        what were the acquisition conditions, problems encountered).
 
     """
-    # Currently, `surveys.data` contains an :class:`xarray.Dataset`. As such,
-    # the `Survey`-Class has an xarray-dataset as one of its attributes.
-    # Probably there would be a cleaner way to simply use xarray instead of a
-    # dedicated `Survey`-Class by utilizing, e.g.,
-    # :func:`xarray.register_dataset_accessor`.
 
-    def __init__(self, name, sources, receivers, frequencies, data=None,
-                 fixed=0, **kwargs):
+    def __init__(self, sources, receivers, frequencies, data=None, **kwargs):
         """Initiate a new Survey instance."""
 
-        # Store survey name and fixed.
-        self.name = name
-        self.fixed = fixed
-
-        # Initiate sources.
-        self._sources = self._dipole_info_to_dict(sources, 'source')
-
-        # Initiate receivers.
-        self._receivers = self._dipole_info_to_dict(receivers, 'receiver')
-
-        # Initiate frequencies.
-        self._frequencies = np.array(frequencies, dtype=np.float64, ndmin=1)
+        # Initiate sources, receivers, and frequencies.
+        self._sources = _dipole_info_to_dict(sources, 'source')
+        self._receivers = _dipole_info_to_dict(receivers, 'receiver')
+        out = _frequency_info_to_dict(frequencies)
+        self._frequencies, self._freq_dkeys, self._freq_array = out
 
         # Initialize xarray dataset.
         self._initiate_dataset(data)
@@ -178,7 +140,11 @@ class Survey:
         # Get the optional keywords related to standard deviation.
         self.noise_floor = kwargs.pop('noise_floor', None)
         self.relative_error = kwargs.pop('relative_error', None)
-        self.standard_deviation = kwargs.pop('std', None)
+
+        # Get the optional info.
+        self.name = kwargs.pop('name', None)
+        self.date = kwargs.pop('date', None)
+        self.info = kwargs.pop('info', None)
 
         # Ensure no kwargs left.
         if kwargs:
@@ -188,36 +154,51 @@ class Survey:
     def _initiate_dataset(self, data):
         """Initiate Dataset; wrapped in fct to check if xarray is installed."""
 
+        # Shape of DataArrays.
+        shape = (len(self._sources), len(self._receivers),
+                 len(self._frequencies))
+
         # Initialize NaN-data if not provided.
         if data is None:
-            data = np.ones((len(self._sources), len(self._receivers),
-                            self._frequencies.size),
-                           dtype=np.complex128)*np.nan
-        else:
-            data = np.atleast_3d(data)
+            data = {'observed': np.full(shape, np.nan+1j*np.nan)}
+
+        elif not isinstance(data, dict):
+            data = {'observed': np.atleast_3d(data)}
+
+        # Ensure we have 'observed' data:
+        if 'observed' not in data.keys():
+            data['observed'] = np.full(shape, np.nan+1j*np.nan)
 
         # Create Dataset.
+        dims = ('src', 'rec', 'freq')
         self._data = xarray.Dataset(
-            {'observed': xarray.DataArray(data, dims=('src', 'rec', 'freq'))},
+            {k: xarray.DataArray(v, dims=dims) for k, v in data.items()},
             coords={'src': list(self.sources.keys()),
                     'rec': list(self.receivers.keys()),
                     'freq': list(self.frequencies)},
         )
 
         # Add attributes.
-        self._data.src.attrs['long_name'] = 'Source dipole'
-        self._data.src.attrs['src-dipoles'] = self.sources
-        self._data.rec.attrs['long_name'] = 'Receiver dipole'
-        self._data.rec.attrs['rec-dipoles'] = self.receivers
-        self._data.freq.attrs['long_name'] = 'Source frequency'
+        self._data.src.attrs['Sources'] = "".join(
+                f"{k}: {s.__repr__()};\n" for k, s in self.sources.items())
+        self._data.rec.attrs['Receivers'] = "".join(
+                f"{k}: {d.__repr__()};\n" for k, d in self.receivers.items())
+        self._data.freq.attrs['Frequencies'] = "".join(
+                f"{k}: {f};\n" for k, f in self.frequencies.items())
         self._data.freq.attrs['units'] = 'Hz'
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}: {self.name}\n\n"
+        name = f"  Name: {self.name}\n" if self.name else ""
+        date = f"  Date: {self.date}\n" if self.date else ""
+        info = f"  Info: {self.info}\n" if self.info else ""
+        return (f"{self.__class__.__name__}\n{name}{date}{info}\n"
                 f"{self.data.__repr__()}")
 
     def _repr_html_(self):
-        return (f"<h4>{self.__class__.__name__}: {self.name}</h4><br>"
+        name = f"Name: {self.name}<br>" if self.name else ""
+        date = f"Date: {self.date}<br>" if self.date else ""
+        info = f"Info: {self.info}<br>" if self.info else ""
+        return (f"<h4>{self.__class__.__name__}</h4><br>{name}{date}{info}"
                 f"{self.data._repr_html_()}")
 
     def copy(self):
@@ -227,18 +208,13 @@ class Survey:
     def to_dict(self, copy=False):
         """Store the necessary information of the Survey in a dict."""
 
-        out = {'name': self.name, '__class__': self.__class__.__name__}
+        out = {'__class__': self.__class__.__name__}
 
         # Add sources.
         out['sources'] = {k: v.to_dict() for k, v in self.sources.items()}
 
         # Add receivers.
-        if self.fixed:
-            rec = {}
-            for key, value in self.receivers.items():
-                rec[key] = {k: v.to_dict() for k, v in value.items()}
-        else:
-            rec = {k: v.to_dict() for k, v in self.receivers.items()}
+        rec = {k: v.to_dict() for k, v in self.receivers.items()}
         out['receivers'] = rec
 
         # Add frequencies.
@@ -253,8 +229,10 @@ class Survey:
         out['noise_floor'] = self.data.noise_floor
         out['relative_error'] = self.data.relative_error
 
-        # Fixed.
-        out['fixed'] = int(self.fixed)
+        # Add info.
+        out['name'] = self.name
+        out['date'] = self.date
+        out['info'] = self.info
 
         if copy:
             return deepcopy(out)
@@ -270,8 +248,8 @@ class Survey:
         ----------
         inp : dict
             Dictionary as obtained from :func:`Survey.to_dict`.
-            The dictionary needs the keys `name`, `sources`, `receivers`
-            `frequencies`, `data`, and `fixed`.
+            The dictionary needs the keys `sources`, `receivers` `frequencies`,
+            and `data`.
 
         Returns
         -------
@@ -279,21 +257,15 @@ class Survey:
 
         """
         try:
+            # Optional parameters.
+            opt = ['noise_floor', 'relative_error', 'name', 'info', 'date']
+
             # Initiate survey.
-            out = cls(name=inp['name'], sources=inp['sources'],
+            out = cls(sources=inp['sources'],
                       receivers=inp['receivers'],
                       frequencies=inp['frequencies'],
-                      fixed=bool(inp['fixed']))
-
-            # Add all data.
-            for key, value in inp['data'].items():
-                out._data[key] = out.data.observed*np.nan
-                out._data[key][...] = value
-
-            # v0.14.0 onwards.
-            if 'noise_floor' in inp.keys():
-                out.noise_floor = inp['noise_floor']
-                out.relative_error = inp['relative_error']
+                      data=inp['data'],
+                      **{k: inp[k] if k in inp.keys() else None for k in opt})
 
             return out
 
@@ -384,56 +356,34 @@ class Survey:
 
         # Get a dict of the survey
         survey = self.to_dict()
-        isrc, irec, ifreq = slice(None), slice(None), slice(None)
-
-        # Replace noise floor and relative error.
-        noise_floor = np.atleast_3d(self.noise_floor)
-        relative_error = np.atleast_3d(self.relative_error)
+        selection = {}
 
         # Select sources.
         if sources is not None:
             if isinstance(sources, str):
                 sources = [sources, ]
-            isrc = [list(self.sources).index(s) for s in sources]
             survey['sources'] = {s: survey['sources'][s] for s in sources}
-
-            # Adjust noise floor and relative error.
-            if noise_floor.shape[0] > 1:
-                noise_floor = noise_floor[isrc, :, :]
-            if relative_error.shape[0] > 1:
-                relative_error = relative_error[isrc, :, :]
+            selection['src'] = sources
 
         # Select receivers.
         if receivers is not None:
             if isinstance(receivers, str):
                 receivers = [receivers, ]
-            irec = [list(self.receivers).index(r) for r in receivers]
             survey['receivers'] = {
                     r: survey['receivers'][r] for r in receivers}
-
-            # Adjust noise floor and relative error.
-            if noise_floor.shape[1] > 1:
-                noise_floor = noise_floor[:, irec, :]
-            if relative_error.shape[1] > 1:
-                relative_error = relative_error[:, irec, :]
+            selection['rec'] = receivers
 
         # Select frequencies.
         if frequencies is not None:
-            ifreq = np.isin(self.frequencies, frequencies)
-            survey['frequencies'] = self.frequencies[ifreq]
-
-            # Adjust noise floor and relative error.
-            if noise_floor.shape[2] > 1:
-                noise_floor = noise_floor[:, :, ifreq]
-            if relative_error.shape[2] > 1:
-                relative_error = relative_error[:, :, ifreq]
+            if isinstance(frequencies, str):
+                frequencies = [frequencies, ]
+            survey['frequencies'] = {
+                    r: survey['frequencies'][r] for r in frequencies}
+            selection['freq'] = frequencies
 
         # Replace data with selected data.
         for key in survey['data'].keys():
-            data = self.data[key].data[isrc, :, :][:, irec, :][:, :, ifreq]
-            survey['data'][key] = data
-        survey['noise_floor'] = noise_floor
-        survey['relative_error'] = relative_error
+            survey['data'][key] = self.data[key].sel(**selection)
 
         # Return reduced survey.
         return Survey.from_dict(survey)
@@ -484,64 +434,31 @@ class Survey:
 
     @property
     def rec_coords(self):
-        """Return receiver coordinates.
-
-        The returned format is `(x, y, z, azm, dip)`, a tuple of 5 tuples. If
-        `fixed=True` it returns a dict with the offsets as keys, and for each
-        offset it returns the corresponding receiver coordinates as just
-        outlined.
-        """
-
-        # Get receiver coordinates depending if fixed or not.
-        if self.fixed:
-            coords = {}
-            for src in self.sources.keys():
-                coords[src] = tuple(
-                        np.array([[self.receivers[off][src].xco,
-                                   self.receivers[off][src].yco,
-                                   self.receivers[off][src].zco,
-                                   self.receivers[off][src].azm,
-                                   self.receivers[off][src].dip]
-                                  for off in self.receivers.keys()]).T)
-        else:
-            coords = tuple(np.array([[r.xco, r.yco, r.zco, r.azm, r.dip] for r
-                                     in self.receivers.values()]).T)
-
-        return coords
+        """Return receiver coordinates as `(x, y, z, azm, dip)`."""
+        return tuple(np.array([[r.xco, r.yco, r.zco, r.azm, r.dip] for r
+                               in self.receivers.values()]).T)
 
     @property
     def rec_types(self):
-        """Return receiver flags if electric, as tuple.
-
-        Corresponds to ``rec_coords``.
-        """
-
-        # Get receiver coordinates depending if fixed or not.
-        if self.fixed:
-            types = {}
-            for src in self.sources.keys():
-                types[src] = tuple(
-                        [self.receivers[off][src].electric
-                         for off in list(self.receivers)])
-        else:
-            types = tuple([r.electric for r in self.receivers.values()])
-
-        return types
+        """Return receiver flags if electric, as tuple."""
+        return tuple([r.electric for r in self.receivers.values()])
 
     @property
     def frequencies(self):
-        """Frequency array."""
+        """Frequency dict containing all frequencies."""
         return self._frequencies
 
     @property
-    def observed(self):
-        r"""Returns the observed data."""
-        return self._data.observed
+    def freq_array(self):
+        """Return frequencies as tuple."""
+        return tuple(self._freq_array)
 
-    @observed.setter
-    def observed(self, observed):
-        """Update observed data."""
-        self._data['observed'][...] = observed
+    def _freq_key(self, frequency):
+        """Return key of `frequency`, where frequency is str (key) or float."""
+        if isinstance(frequency, str):
+            return frequency
+        else:
+            return self._freq_dkeys[frequency]
 
     @property
     def standard_deviation(self):
@@ -595,8 +512,8 @@ class Survey:
         """
         # If `std` was set, return it, else compute it from noise_floor and
         # relative_error.
-        if 'std' in self._data.keys():
-            return self.data['std']
+        if 'standard_deviation' in self._data.keys():
+            return self.data['standard_deviation']
 
         elif self.noise_floor is not None or self.relative_error is not None:
 
@@ -604,11 +521,15 @@ class Survey:
             std = self.data.observed.copy(data=np.zeros(self.shape))
 
             # Add noise floor if given.
-            if self.noise_floor is not None:
+            if self.noise_floor == 'data._noise_floor':
+                std += self.data._noise_floor**2
+            elif self.noise_floor is not None:
                 std += self.noise_floor**2
 
             # Add relative error if given.
-            if self.relative_error is not None:
+            if self.relative_error == 'data._relative_error':
+                std += np.abs(self.data._relative_error*self.data.observed)**2
+            elif self.relative_error is not None:
                 std += np.abs(self.relative_error*self.data.observed)**2
 
             # Return.
@@ -619,17 +540,19 @@ class Survey:
             return None
 
     @standard_deviation.setter
-    def standard_deviation(self, std):
+    def standard_deviation(self, standard_deviation):
         """Update standard deviation."""
         # If None it means basically to delete it; otherwise set it.
-        if std is None and 'std' in self.data:
-            del self._data['std']
-        elif std is not None:
+        if standard_deviation is None and 'standard_deviation' in self.data:
+            del self._data['standard_deviation']
+        elif standard_deviation is not None:
             # Ensure all values are bigger than zero.
-            if np.any(std <= 0.0):
+            if np.any(standard_deviation <= 0.0):
                 raise ValueError(
-                    "All values of `std` must be bigger than zero.")
-            self._data['std'] = self.data.observed.copy(data=std)
+                    "All values of `standard_deviation` must be bigger "
+                    "than zero.")
+            self._data['standard_deviation'] = self.data.observed.copy(
+                    data=standard_deviation)
 
     @property
     def noise_floor(self):
@@ -646,22 +569,27 @@ class Survey:
 
         See :attr:`Survey.standard_deviation` for more info.
         """
-        if noise_floor is not None:
+        if noise_floor is not None and not isinstance(noise_floor, str):
+
+            # Cast
+            # noise_floor = np.array(noise_floor, dtype=float, ndmin=1)
+            noise_floor = np.asarray(noise_floor)
 
             # Ensure all values are bigger than zero.
             if np.any(noise_floor <= 0.0):
                 raise ValueError(
                     "All values of `noise_floor` must be bigger than zero.")
 
-            # Ensure it can be broadcast to data.
-            try:
-                _ = np.ones(self.shape)*noise_floor
-            except ValueError as e:
-                raise ValueError(
-                    "Shape of `noise_floor` is not broadcastable to data.\n"
-                    f"Shape of `noise_floor`: {np.shape(noise_floor)}; "
-                    f"`data`: {self.shape}."
-                ) from e
+            # Store relative error.
+            if noise_floor.size == 1:
+                # If one value it is stored as attribute.
+                noise_floor = float(noise_floor)
+            else:
+                # If more than one value it is stored as data array;
+                # broadcasting it if necessary.
+                self.data['_noise_floor'] = self.data.observed.copy(
+                        data=np.ones(self.shape)*noise_floor)
+                noise_floor = 'data._noise_floor'
 
         self._data.attrs['noise_floor'] = noise_floor
 
@@ -680,138 +608,29 @@ class Survey:
 
         See :attr:`Survey.standard_deviation` for more info.
         """
-        if relative_error is not None:
+        if relative_error is not None and not isinstance(relative_error, str):
+
+            # Cast
+            # relative_error = np.array(relative_error, dtype=float, ndmin=1)
+            relative_error = np.asarray(relative_error)
 
             # Ensure all values are bigger than zero.
             if np.any(relative_error <= 0.0):
                 raise ValueError(
                     "All values of `relative_error` must be bigger than zero.")
 
-            # Ensure it can be broadcast to data.
-            try:
-                _ = np.ones(self.shape)*relative_error
-            except ValueError as e:
-                raise ValueError(
-                    "Shape of `relative_error` is not broadcastable to data.\n"
-                    f"Shape of `relative_error`: {np.shape(relative_error)}; "
-                    f"`data`: {self.shape}."
-                ) from e
+            # Store relative error.
+            if relative_error.size == 1:
+                # If one value it is stored as attribute.
+                relative_error = float(relative_error)
+            else:
+                # If more than one value it is stored as data array;
+                # broadcasting it if necessary.
+                self.data['_relative_error'] = self.data.observed.copy(
+                        data=np.ones(self.shape)*relative_error)
+                relative_error = 'data._relative_error'
 
         self._data.attrs['relative_error'] = relative_error
-
-    def _dipole_info_to_dict(self, inp, name):
-        """Create dict with provided source/receiver information."""
-
-        # Create dict depending if `inp` is list, tuple, or dict.
-        if isinstance(inp, list):  # List of Dipoles
-
-            if self.fixed and name == 'receiver':  # Streamer-type receivers.
-
-                # Get dimensions.
-                nd = len(inp)
-                ns = len(self.sources)  # Number of source position.
-                nr = nd//ns             # Number of receivers / source.
-                dnr = len(str(nr-1))    # Max number of digits; rec.
-
-                # Create name lists.
-                rec_names = [f"{i:0{dnr}d}" for i in range(nr)]
-                src_names = list(self.sources.keys())
-
-                # Ensure receivers are multiples of source positions.
-                if nd % ns != 0:
-                    raise ValueError(
-                            "For fixed surveys, the number of receivers\n"
-                            "must be a multiple of number of sources.\n"
-                            f"Provided: #src: {ns}; #rec: {nd}.")
-
-                # Assemble dict.
-                out = {'Off'+name: {} for name in rec_names}
-                for i, key in enumerate(out.keys()):
-                    for ii, src_name in enumerate(src_names):
-                        out[key][src_name] = inp[ii + i*ns]
-
-            else:
-
-                out = {d.name: d for d in inp}
-
-                # Ensure that all names were unique:
-                if len(out) != len(inp):
-                    raise ValueError(
-                            f"There are duplicate {name} names.\n"
-                            f"Provided {name}s: {len(inp)}; "
-                            f"unique names: {len(out)}.")
-
-        elif isinstance(inp, tuple):  # Tuple with coordinates
-
-            # See if last tuple element is boolean, hence el/mag-flag.
-            if isinstance(inp[-1], (list, tuple, np.ndarray)):
-                provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
-            else:
-                provided_elmag = isinstance(inp[-1], (bool, np.bool_))
-
-            # Get max dimension.
-            nd = max([np.array(n, ndmin=1).size for n in inp])
-
-            # Expand coordinates.
-            coo = np.array([nd*[val, ] if np.array(val).size == 1 else
-                           val for val in inp], dtype=np.float64)
-
-            # Extract el/mag flag or set to ones (electric) if not provided.
-            if provided_elmag:
-                elmag = coo[-1, :]
-                coo = coo[:-1, :]
-            else:
-                elmag = np.ones(nd)
-
-            # Create dipole names (number-strings).
-            prefix = 'Tx' if name == 'source' else 'Rx'
-            dnd = len(str(nd-1))  # Max number of digits.
-            names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
-
-            # Create Dipole-dict.
-            if self.fixed and name == 'receiver':  # Streamer-type receivers.
-
-                # Get dimensions.
-                ns = len(self.sources)  # Number of source position.
-                nr = nd//ns             # Number of receivers / source.
-                dnr = len(str(nr-1))    # Max number of digits; rec.
-
-                # Create name lists.
-                rec_names = [f"{i:0{dnr}d}" for i in range(nr)]
-                src_names = list(self.sources.keys())
-
-                # Ensure receivers are multiples of source positions.
-                if nd % ns != 0:
-                    raise ValueError(
-                            "For fixed surveys, the number of receivers\n"
-                            "must be a multiple of number of sources.\n"
-                            f"Provided: #src: {ns}; #rec: {nd}.")
-
-                # Assemble dict.
-                out = {'Off'+rec_name: {} for rec_name in rec_names}
-                for i, key in enumerate(out.keys()):
-                    for ii, src_name in enumerate(src_names):
-                        iii = ii + i*ns
-                        out[key][src_name] = Dipole(
-                                names[iii], coo[:, iii], elmag[iii])
-
-            else:  # Default node-type src-rec comb. and src for streamer-type.
-                out = {names[i]: Dipole(names[i], coo[:, i], elmag[i])
-                       for i in range(nd)}
-
-        elif isinstance(inp, dict):  # Dict of de-serialized Dipoles.
-            if self.fixed and name == 'receiver':
-                out = {}
-                for k, v in inp.items():
-                    out[k] = {k2: Dipole.from_dict(v2) for k2, v2 in v.items()}
-            else:
-                out = {k: Dipole.from_dict(v) for k, v in inp.items()}
-
-        else:
-            raise TypeError(
-                    f"Input format of <{name}s> not recognized: {type(inp)}.")
-
-        return out
 
 
 # # Sources and Receivers # #
@@ -827,9 +646,6 @@ class PointDipole:
 
     Parameters
     ----------
-    name : str
-        Dipole name.
-
     xco, yco, zco : float
         x-, y-, and z-coordinates (m).
 
@@ -844,8 +660,7 @@ class PointDipole:
         Electric dipole if True, magnetic dipole otherwise. Default is True.
 
     """
-    __slots__ = ['name', 'xco', 'yco', 'zco', 'azm', 'dip', 'electric']
-    name: str
+    __slots__ = ['xco', 'yco', 'zco', 'azm', 'dip', 'electric']
     xco: float
     yco: float
     zco: float
@@ -876,9 +691,6 @@ class Dipole(PointDipole):
 
     Parameters
     ----------
-    name : str
-        Dipole name.
-
     coordinates : tuple of floats
         Source coordinates, one of the following:
 
@@ -902,7 +714,7 @@ class Dipole(PointDipole):
     # These are also the only ones which are (de-)serialized.
     accepted_keys = ['strength', ]
 
-    def __init__(self, name, coordinates, electric=True, **kwargs):
+    def __init__(self, coordinates, electric=True, **kwargs):
         """Check coordinates and kwargs."""
 
         # Add additional info to the dipole.
@@ -976,10 +788,10 @@ class Dipole(PointDipole):
             self.electrode1 = (xco-dx/2, yco-dy/2, zco-dz/2)
             self.electrode2 = (xco+dx/2, yco+dy/2, zco+dz/2)
 
-        super().__init__(name, xco, yco, zco, azm, dip, bool(electric))
+        super().__init__(xco, yco, zco, azm, dip, bool(electric))
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}({self.name}, "
+        return (f"{self.__class__.__name__}("
                 f"{['H', 'E'][self.electric]}, "
                 f"{{{self.xco:,.1f}m; {self.yco:,.1f}m; {self.zco:,.1f}m}}, "
                 f"θ={self.azm:.1f}°, φ={self.dip:.1f}°, "
@@ -1008,8 +820,8 @@ class Dipole(PointDipole):
 
     def to_dict(self, copy=False):
         """Store the necessary information of the Dipole in a dict."""
-        out = {'name': self.name, 'coordinates': self.coordinates,
-               'electric': self.electric, '__class__': self.__class__.__name__}
+        out = {'coordinates': self.coordinates, 'electric': self.electric,
+               '__class__': self.__class__.__name__}
 
         # Add accepted kwargs.
         for key in self.accepted_keys:
@@ -1029,7 +841,7 @@ class Dipole(PointDipole):
         ----------
         inp : dict
             Dictionary as obtained from :func:`Dipole.to_dict`. The dictionary
-            needs the keys `name`, `coordinates`, and `electric`.
+            needs the keys `coordinates` and `electric`.
 
         Returns
         -------
@@ -1038,7 +850,89 @@ class Dipole(PointDipole):
         """
         try:
             kwargs = {k: v for k, v in inp.items() if k in cls.accepted_keys}
-            return cls(name=inp['name'], coordinates=inp['coordinates'],
+            return cls(coordinates=inp['coordinates'],
                        electric=inp['electric'], **kwargs)
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
+
+
+# # Helper routines ##
+def _dipole_info_to_dict(inp, name):
+    """Create dict with provided source/receiver information."""
+
+    # Create dict depending if `inp` is tuple or dict.
+    if isinstance(inp, tuple):  # Tuple with coordinates
+
+        # See if last tuple element is boolean, hence el/mag-flag.
+        if isinstance(inp[-1], (list, tuple, np.ndarray)):
+            provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
+        else:
+            provided_elmag = isinstance(inp[-1], (bool, np.bool_))
+
+        # Get max dimension.
+        nd = max([np.array(n, ndmin=1).size for n in inp])
+
+        # Expand coordinates.
+        coo = np.array([nd*[val, ] if np.array(val).size == 1 else
+                        val for val in inp], dtype=np.float64)
+
+        # Extract el/mag flag or set to ones (electric) if not provided.
+        if provided_elmag:
+            elmag = coo[-1, :]
+            coo = coo[:-1, :]
+        else:
+            elmag = np.ones(nd)
+
+        # Create dipole names (number-strings).
+        prefix = 'Tx' if name == 'source' else 'Rx'
+        dnd = len(str(nd-1))  # Max number of digits.
+        names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
+
+        # Create Dipole-dict.
+        out = {names[i]: Dipole(coo[:, i], elmag[i]) for i in range(nd)}
+
+    elif isinstance(inp, dict):
+        if isinstance(inp[list(inp)[0]], dict):  # Dict of de-ser. Dipoles.
+            out = {k: Dipole.from_dict(v) for k, v in inp.items()}
+        else:  # Assumed dict of dipoles.
+            out = inp
+
+    else:
+        raise TypeError(
+                f"Input format of <{name}s> not recognized: {type(inp)}.")
+
+    return out
+
+
+def _frequency_info_to_dict(frequencies, naming="f"):
+    """Create dicts with provided frequency information.
+
+    For easier access three items are stored:
+    - dict {name: freq}: default and used for xarray;
+    - dict {freq: name}: reverse for flexibility to use the float;
+    - array (frequencies): the frequencies as an array.
+
+    """
+
+    if isinstance(frequencies, dict):
+        name_freq = frequencies
+        freq_name = {float(v): k for k, v in frequencies.items()}
+        freqs = np.array([float(v) for v in frequencies.values()])
+    else:
+        freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
+
+        if freqs.size != np.unique(freqs).size:
+            raise ValueError(f"Contains non-unique frequencies: {freqs}.")
+
+        if naming:
+            dnd = len(str(freqs.size-1))  # Max number of digits.
+            name_freq, freq_name = {}, {}
+            for i, x in enumerate(freqs):
+                name = f"{naming}{i:0{dnd}d}"
+                name_freq[name] = float(x)
+                freq_name[float(x)] = name
+        else:
+            name_freq = {str(x): float(x) for i, x in enumerate(freqs)}
+            freq_name = {float(x): str(x) for i, x in enumerate(freqs)}
+
+    return name_freq, freq_name, freqs

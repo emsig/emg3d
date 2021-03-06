@@ -19,7 +19,7 @@ class TestSimulation():
         receivers = (np.arange(12)*500, 0, -1000, 0, 0)
         frequencies = (1.0, 2.0)
 
-        survey = surveys.Survey('Test', sources, receivers, frequencies,
+        survey = surveys.Survey(sources, receivers, frequencies, name='Test',
                                 noise_floor=1e-15, relative_error=0.05)
 
         # Create a simple grid and model
@@ -30,19 +30,19 @@ class TestSimulation():
 
         # Create a simulation, compute all fields.
         simulation = simulations.Simulation(
-                'Test1', survey, grid, model, max_workers=1,
+                survey, grid, model, name='Test1', max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
                 gridding='same')
 
         # Do first one single and then all together.
-        simulation.get_efield('Tx0', 2.0)
+        simulation.get_efield('Tx0', 'f1')
         simulation.compute(observed=True)
 
     def test_derived(self):
 
         # Check model
-        assert self.simulation.get_model('Tx1', 1.0) == self.model
+        assert self.simulation.get_model('Tx1', 'f0') == self.model
 
         # Check grid
         assert self.simulation.get_grid('Tx1', 1.0) == self.grid
@@ -52,14 +52,13 @@ class TestSimulation():
         sfield = fields.get_source_field(
                 self.grid, self.survey.sources['Tx1'].coordinates,
                 freq=1.0, strength=0)
-        assert_allclose(self.simulation.get_sfield('Tx1', 1.0), sfield)
+        assert_allclose(self.simulation.get_sfield('Tx1', 'f0'), sfield)
 
         # Check efield
-        print(self.simulation.solver_opts)
         efield, info = solver.solve(
                 self.grid, self.model, sfield,
                 **self.simulation.solver_opts)
-        assert_allclose(self.simulation.get_efield('Tx1', 1.0), efield)
+        assert_allclose(self.simulation.get_efield('Tx1', 'f0'), efield)
 
         # Unknown keyword
         with pytest.raises(TypeError, match='Unexpected '):
@@ -79,12 +78,12 @@ class TestSimulation():
         s_hfield = self.simulation.get_hfield('Tx1', 1.0)
         assert_allclose(s_hfield, hfield)
         assert_allclose(
-                self.simulation._dict_efield_info['Tx1'][1.0]['abs_error'],
+                self.simulation._dict_efield_info['Tx1']['f0']['abs_error'],
                 info['abs_error'])
         assert_allclose(
-                self.simulation._dict_efield_info['Tx1'][1.0]['rel_error'],
+                self.simulation._dict_efield_info['Tx1']['f0']['rel_error'],
                 info['rel_error'])
-        exit = self.simulation._dict_efield_info['Tx1'][1.0]['exit']
+        exit = self.simulation._dict_efield_info['Tx1']['f0']['exit']
         assert exit == info['exit'] == 1
 
     def test_responses(self):
@@ -97,25 +96,19 @@ class TestSimulation():
 
     def test_errors(self):
         with pytest.raises(TypeError, match='Unexpected '):
-            simulations.Simulation(
-                    'Test2', self.survey, self.grid, self.model, unknown=True)
-
-        tsurvey = self.survey.copy()
-        tsurvey.fixed = True
-        with pytest.raises(NotImplementedError, match="`survey.fixed=False`"):
-            simulations.Simulation(
-                    'Test2', tsurvey, self.grid, self.model)
+            simulations.Simulation(self.survey, self.grid, self.model,
+                                   unknown=True, name='Test2')
 
         # gridding='same' with gridding_opts.
         with pytest.raises(TypeError, match="`gridding_opts` is not permitt"):
             simulations.Simulation(
-                    'Test', self.survey, self.grid, self.model,
+                    self.survey, self.grid, self.model, name='Test',
                     gridding='same', gridding_opts={'bummer': True})
 
         # expand without seasurface
         with pytest.raises(KeyError, match="is required if"):
             simulations.Simulation(
-                    'Test', self.survey, self.grid, self.model,
+                    self.survey, self.grid, self.model, name='Test',
                     gridding='single', gridding_opts={'expand': [1, 2]})
 
     def test_reprs(self):
@@ -175,9 +168,9 @@ class TestSimulation():
         # Clean and ensure it is empty
         sim3 = self.simulation.copy()
         sim3.clean('all')
-        assert sim3._dict_efield['Tx1'][1.0] is None
-        assert sim3._dict_hfield['Tx1'][1.0] is None
-        assert sim3._dict_efield_info['Tx1'][1.0] is None
+        assert sim3._dict_efield['Tx1']['f0'] is None
+        assert sim3._dict_hfield['Tx1']['f0'] is None
+        assert sim3._dict_efield_info['Tx1']['f0'] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             sim3.clean('nothing')
 
@@ -186,15 +179,15 @@ class TestSimulation():
 
         # dict
         sim1 = simulations.Simulation(
-                'Test2', self.survey, self.grid, self.model, gridding='dict',
-                gridding_opts=grids)
+                self.survey, self.grid, self.model, gridding='dict',
+                gridding_opts=grids, name='Test2')
         m1 = sim1.get_model('Tx1', 1.0)
         g1 = sim1.get_grid('Tx1', 1.0)
 
         # provide
         sim2 = simulations.Simulation(
-                'Test2', self.survey, self.grid, self.model,
-                gridding='input', gridding_opts=grids['Tx1'][1.0])
+                self.survey, self.grid, self.model, name='Test2',
+                gridding='input', gridding_opts=grids['Tx1']['f0'])
         m2 = sim2.get_model('Tx1', 1.0)
         g2 = sim2.get_grid('Tx1', 1.0)
 
@@ -231,10 +224,10 @@ class TestSimulation():
                 np.array([-1250, -1250, -2250]))
 
         simulation = simulations.Simulation(
-                'TestX', self.survey, self.grid, self.model, max_workers=1,
+                self.survey, self.grid, self.model, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
-                gridding='input', gridding_opts=newgrid)
+                gridding='input', gridding_opts=newgrid, name='TestX')
 
         grad = simulation.gradient
 
@@ -259,7 +252,7 @@ def test_simulation_automatic(capsys):
     receivers = ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0)
     frequencies = (0.1, 1.0, 10.0)
 
-    survey = surveys.Survey('Test', sources, receivers, frequencies,
+    survey = surveys.Survey(sources, receivers, frequencies, name='Test',
                             noise_floor=1e-15, relative_error=0.05)
 
     # Create a simple grid and model
@@ -271,10 +264,10 @@ def test_simulation_automatic(capsys):
     # Create a simulation, compute all fields.
     inp = {'survey': survey, 'grid': grid, 'model': model,
            'gridding_opts': {'expand': [1, 0.5], 'seasurface': 0, 'verb': 1}}
-    b_sim = simulations.Simulation('both', gridding='both', **inp)
-    f_sim = simulations.Simulation('freq', gridding='frequency', **inp)
-    t_sim = simulations.Simulation('src', gridding='source', **inp)
-    s_sim = simulations.Simulation('single', gridding='single', **inp)
+    b_sim = simulations.Simulation(name='both', gridding='both', **inp)
+    f_sim = simulations.Simulation(name='freq', gridding='frequency', **inp)
+    t_sim = simulations.Simulation(name='src', gridding='source', **inp)
+    s_sim = simulations.Simulation(name='single', gridding='single', **inp)
 
     # Quick repr test.
     assert " 24 x 24 (13,824) - 160 x 160 x 96 (2,457,600)" in b_sim.__repr__()
@@ -396,11 +389,11 @@ def test_source_strength():
     # Create a simple survey; source with and source without strength.
     strength = 5.678
     srccoords = (0, 3000, -950, 0, 0)
-    sources = [surveys.Dipole('NoStrength', srccoords),
-               surveys.Dipole('Strength', srccoords, strength=strength)]
+    sources = {'Strength': surveys.Dipole(srccoords),
+               'NoStrength': surveys.Dipole(srccoords, strength=strength)}
     receivers = (np.arange(12)*500, 0, -1000, 0, 0)
     frequencies = 1.0
-    survey = surveys.Survey('Test', sources, receivers, frequencies)
+    survey = surveys.Survey(sources, receivers, frequencies, name='Test')
 
     # Create a simple grid and model.
     grid = meshes.TensorMesh(
@@ -410,7 +403,7 @@ def test_source_strength():
 
     # Create a simulation, compute all fields.
     simulation = simulations.Simulation(
-            'Test2', survey, grid, model, max_workers=1,
+            survey, grid, model, max_workers=1, name='Test2',
             solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                          'linerelaxation': False, 'semicoarsening': False},
             gridding='same')
@@ -466,7 +459,7 @@ class TestEstimateGriddingOpts():
         receivers = (np.arange(11)*500, 2000, -1000, 0, 0)
         frequencies = (0.1, 10.0)
 
-        survey = surveys.Survey('Test', sources, receivers, frequencies,
+        survey = surveys.Survey(sources, receivers, frequencies,
                                 noise_floor=1e-15, relative_error=0.05)
 
         # Create a simple grid and model
@@ -538,7 +531,7 @@ class TestEstimateGriddingOpts():
         receivers = (0, 3000, -1000, 0, 0)
 
         # Adjusted x-domain.
-        survey = surveys.Survey('Test', self.sources, receivers,
+        survey = surveys.Survey(self.sources, receivers,
                                 self.frequencies, noise_floor=1e-15,
                                 relative_error=0.05)
 
@@ -548,7 +541,7 @@ class TestEstimateGriddingOpts():
         assert_allclose(gdict['domain'][0], (-800, 800))
 
         # Adjusted x-domain.
-        survey = surveys.Survey('Test', sources, self.receivers,
+        survey = surveys.Survey(sources, self.receivers,
                                 self.frequencies, noise_floor=1e-15,
                                 relative_error=0.05)
 

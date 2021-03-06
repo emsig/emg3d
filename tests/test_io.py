@@ -61,9 +61,10 @@ def test_save_and_load(tmpdir, capsys):
     model = models.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
 
     # Save it.
-    io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
-            broken=grid3, a=None, b=True,
-            field=field, what={'f': field.fx, 12: 12})
+    with pytest.warns(UserWarning, match="Could not serialize"):
+        io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
+                broken=grid3, a=None, b=True,
+                field=field, what={'f': field.fx, 12: 12})
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
     assert utils.__version__ in outstr
@@ -210,7 +211,7 @@ def test_known_classes(tmpdir):
     field = fields.Field(grid)
     sfield = fields.SourceField(grid, freq=frequency)
     model = models.Model(grid, 1)
-    pointdip = surveys.Dipole('dip', (0, 1000, -950, 0, 0))
+    pointdip = surveys.Dipole((0, 1000, -950, 0, 0))
 
     out = {
         'TensorMesh': grid,
@@ -227,10 +228,10 @@ def test_known_classes(tmpdir):
     }
 
     if xarray:
-        survey = surveys.Survey('Test', (0, 1000, -950, 0, 0),
+        survey = surveys.Survey((0, 1000, -950, 0, 0),
                                 (-0.5, 0.5, 1000, 1000, -950, -950), frequency)
         simulation = simulations.Simulation(
-                'Test1', survey, grid, model, gridding='same')
+                survey, grid, model, gridding='same')
         out['Survey'] = survey
         out['Simulation'] = simulation
 
