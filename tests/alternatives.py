@@ -42,7 +42,7 @@ def alt_amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, mu_r, hx, hy, hz):
 
     Corresponds more or less to page 636 of [Muld06]_.
 
-    Alternative of ``core.amat_x``.
+    Alternative `numpy`-version of the `numba`-version in ``core.amat_x``.
     """
 
     # Get dimensions
