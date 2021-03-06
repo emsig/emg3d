@@ -6,7 +6,7 @@ functions are implemented as just-in-time (jit) compiled functions using the
 
     «*Numba translates Python functions to optimized machine code at runtime
     using the industry-standard LLVM compiler library. Numba-compiled numerical
-    algorithms in Python can approach the speeds of C or FORTRAN.*» (From the
+    algorithms in Python can approach the speeds of C or FORTRAN.*» (from the
     numba website.)
 
 These functions are not meant to be called directly, particularly not from an
@@ -1339,13 +1339,13 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
 def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
     r"""Insert middle, left, and rhs into main arrays amat and bvec.
 
-    The banded matrix amat contains the main diagonal and the first five lower
-    off-diagonals. They are stored one column after the other, in a 6*n
+    The banded matrix ``amat`` contains the main diagonal and the first five
+    lower off-diagonals. They are stored one column after the other, in a 6*n
     ndarray.
 
     .. highlight:: none
 
-    The complete main matrix `amat` and the `middle` and `left` blocks
+    The complete main matrix ``amat`` and the ``middle`` and ``left`` blocks
     are given by::
 
        .-0
@@ -1361,10 +1361,11 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
        . 1*1, - 4*1, | 1*4, X 4*4, \ 4*4 upper or lower
 
 
-    Both, `middle` and `left`, are 5x5 matrices. The corresponding
-    right-hand-side `rhs` is filled into `bvec`. The matrices `left` and
-    `middle` provided in a single call are horizontally aligned (not
-    vertically). The sorting of amat (banded matrix) and bvec are given by::
+    Both, ``middle`` and ``left``, are 5x5 matrices. The corresponding
+    right-hand-side ``rhs`` is filled into ``bvec``. The matrices ``left`` and
+    ``middle`` provided in a single call are horizontally aligned (not
+    vertically). The sorting of ``amat`` (banded matrix) and ``bvec`` is given
+    by::
 
         amat (66,)             example: n = 11                   bvec (11,)
         --------------                                                 --
@@ -1413,10 +1414,10 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
         Corresponding right-hand-side of length 5.
 
     im : int
-        Current minus-index of direction of line relaxation, {ixm, iym, izm}.
+        Current minus-index of direction of line relaxation, ``i{x;y;z}m``.
 
     nC : int
-        Total number of cells in direction of line relaxation, {nCx, nCy, nCz}.
+        Total number of cells in direction of line relaxation, ``nC{x;y;z}``.
 
     """
     # Define two often used indices
@@ -1470,19 +1471,19 @@ def solve(amat, bvec):
 
     Solve the system A x = b using a non-standard Cholesky factorisation
     without pivoting for a symmetric, complex matrix A tailored to the problem
-    of the multigrid solver. The matrix A (amat) is an array of length 6*n,
+    of the multigrid solver. The matrix A (``amat``) is an array of length 6*n,
     containing the main diagonal and the first five lower off-diagonals
     (ordered so that the first element of the main diagonal is followed by the
     first elements of the off diagonals, then the second elements and so on).
-    The vector bvec has length b.
+    The vector ``bvec`` has length b.
 
-    The solution is placed in b (bvec), and A (amat) is replaced by its
+    The solution is placed in b (``bvec``), and A (``amat``) is replaced by its
     decomposition.
 
     1. Non-standard Cholesky factorisation.
 
-        From [Muld07]_: We use a non-standard Cholesky factorisation. The
-        standard factorisation factors a hermitian matrix A into L L^H, where L
+        From [Muld07]_: «We use a non-standard Cholesky factorisation. The
+        standard factorisation factors a Hermitian matrix A into L L^H, where L
         is a lower triangular matrix and L^H its complex conjugate transpose.
         In our case, the discretisation is based on the Finite Integration
         Technique ([Weil77]_) and provides a matrix A that is complex-valued
@@ -1493,7 +1494,7 @@ def solve(amat, bvec):
         L^T. Because of the symmetry, only the main diagonal and five lower
         diagonal elements of B need to be computed. The Cholesky factorisation
         replaces this matrix by L, containing six diagonals, after which the
-        line relaxation can be carried out by simple back-substitution.
+        line relaxation can be carried out by simple back-substitution.»
 
         :math:`A = L D L^T` factorisation without pivoting:
 
@@ -1624,8 +1625,8 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     fine grid. The weights :math:`w` are obtained from
     :func:`restrict_weights`.
 
-    The restrictions of `rx`, `ry`, and `rz` are stored directly in `crx`,
-    `cry`, and `crz`.
+    The restrictions of ``rx``, ``ry``, and ``rz`` are stored directly in
+    ``crx``, ``cry``, and ``crz``.
 
     Parameters
     ----------
@@ -1636,8 +1637,8 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
         Fine grid {x,y,z}-directed residual.
 
     wx, wy, wz: tuple
-        Tuples containing the weights (wl, w0, wr) as returned from
-        :func:`restrict_weights` for the x-, y-, and z-directions.
+        Tuples containing the weights (``wl``, ``w0``, ``wr``) as returned from
+        :func:`restrict_weights` for the {x,y,z}-directions.
 
     sc_dir : int
         Direction of semicoarsening; 0 for no semicoarsening.
@@ -1988,7 +1989,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
 
 
 @nb.njit(**_numba_setting)
-def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
+def restrict_weights(nodes, cell_centers, h, cnodes, ccell_centers, ch):
     r"""Restriction weights for the coarse-grid correction operator.
 
     Corresponds to Equation 9 in [Muld06]_. A generalized version of that
@@ -2002,10 +2003,10 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     where :math:`d` are the dual grid cell widths, :math:`v` is one of
     :math:`\{x, y, z\}`, and :math:`Q, q` the corresponding entries of
-    :math:`\{K, L, M\}, \{k, l, m\}`. The superscripts :math:`h, 2h` indicate
-    quantities defined on the coarse grid and on the fine grid, respectively.
-    The indices :math:`\{K, L, M\}` on the coarse grid correspond to
-    :math:`\{k, l, m\} = 2\{K, L, M\}` on the fine grid.
+    :math:`\{K, L, M\}, \{k, l, m\}`, respectively. The superscripts :math:`h,
+    2h` indicate quantities defined on the coarse grid and on the fine grid,
+    respectively. The indices :math:`\{K, L, M\}` on the coarse grid correspond
+    to :math:`\{k, l, m\} = 2\{K, L, M\}` on the fine grid.
 
     For the dual volume cell widths at the boundaries the scheme of [MoSu94]_
     is applied, where :math:`d_0^x = h_{1/2}^x/2` at :math:`k = 0`,
@@ -2017,14 +2018,15 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     Parameters
     ----------
-    vectorN, cvectorN : ndarray
-        Cell edges of the fine (vectorN) and coarse (cvectorN) grids.
+    nodes, cnodes : ndarray
+        Cell edges of the fine (``nodes``) and coarse (``cnodes``) grids.
 
-    vectorCC, cvectorCC : ndarray
-        Cell centers of the fine (vectorCC) and coarse (cvectorCC) grids.
+    cell_centers, ccell_centers : ndarray
+        Cell centers of the fine (``cell_centers``) and coarse
+        (``ccell_centers``) grids.
 
     h, ch : ndarray
-        Cell widths of the fine (h) and coarse (ch) grids.
+        Cell widths of the fine (``h``) and coarse (``ch``) grids.
 
     Returns
     -------
@@ -2034,7 +2036,7 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     """
     # Get length of weights
-    n = len(cvectorN)
+    n = len(cnodes)
 
     # Dual grid cell widths
     d = np.empty(n+1)
@@ -2045,17 +2047,17 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     # Left weight
     wl = 1/d[:-1]
-    wl[0] *= (vectorN[0]-h[0]/2) - (cvectorN[0]-ch[0]/2)
+    wl[0] *= (nodes[0]-h[0]/2) - (cnodes[0]-ch[0]/2)
     for i in range(1, n):
-        wl[i] *= vectorCC[2*i-1]-cvectorCC[i-1]
+        wl[i] *= cell_centers[2*i-1]-ccell_centers[i-1]
 
     # Central weight
     w0 = np.ones(n)
 
     # Right weight
     wr = 1/d[1:]
-    wr[-1] *= (cvectorN[-1]+ch[-1]/2) - (vectorN[-1]+h[-1]/2)
+    wr[-1] *= (cnodes[-1]+ch[-1]/2) - (nodes[-1]+h[-1]/2)
     for i in range(n-1):
-        wr[i] *= cvectorCC[i]-vectorCC[2*i]
+        wr[i] *= ccell_centers[i]-cell_centers[2*i]
 
     return wl, w0, wr
