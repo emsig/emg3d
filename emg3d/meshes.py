@@ -31,10 +31,10 @@ except ImportError:
         pass
 
 __all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
-           'wavelength', 'good_mg_cell_nr', 'min_cell_width']
+           'wavelength', 'good_mg_cell_nr', 'min_cell_width', 'BaseMesh']
 
 
-class _TensorMesh:
+class BaseMesh:
     """Minimal TensorMesh for internal multigrid computation.
 
 
@@ -95,7 +95,7 @@ class _TensorMesh:
         return self._cell_volumes
 
 
-class TensorMesh(dTensorMesh, _TensorMesh):
+class TensorMesh(dTensorMesh, BaseMesh):
     """A slightly modified :class:`discretize.TensorMesh`.
 
     Adds a few attributes (`__eq__`, `copy`, `to_dict`, and `from_dict`) to the

@@ -581,7 +581,7 @@ class VolumeModel:
         self.case = model.case
 
         # Store a minimal TensorMesh.
-        self.grid = meshes._TensorMesh(model.grid.h, model.grid.origin)
+        self.grid = meshes.BaseMesh(model.grid.h, model.grid.origin)
 
         # eta_x
         self._eta_x = self.calculate_eta('property_x', model, sfield)
