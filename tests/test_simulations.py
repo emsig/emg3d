@@ -73,7 +73,7 @@ class TestSimulation():
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in info['exit_message']
 
         # Check hfield
-        hfield = fields.get_h_field(self.grid, self.model, efield)
+        hfield = fields.get_h_field(self.model, efield)
         assert_allclose(self.simulation.get_hfield('Tx1', 1.0), hfield)
         s_hfield = self.simulation.get_hfield('Tx1', 1.0)
         assert_allclose(s_hfield, hfield)
@@ -416,7 +416,8 @@ def test_source_strength():
 
 def test_expand_grid_model():
     grid = meshes.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))
-    model = models.Model(grid, 1, np.ones(grid.vnC)*2, mu_r=3, epsilon_r=5)
+    model = models.Model(grid, 1, np.ones(grid.shape_cells)*2, mu_r=3,
+                         epsilon_r=5)
 
     og, om = simulations.expand_grid_model(grid, model, [2, 3], 5)
 
@@ -430,7 +431,7 @@ def test_expand_grid_model():
     assert_allclose(om.property_x[:, :, -2], 2)
     assert_allclose(om.property_x[:, :, -1], 3)
 
-    # Property y (from vnC).
+    # Property y (from shape_cells).
     assert_allclose(om.property_y[:, :, :-2], model.property_y)
     assert_allclose(om.property_y[:, :, -2], 2)
     assert_allclose(om.property_y[:, :, -1], 3)
@@ -466,7 +467,7 @@ class TestEstimateGriddingOpts():
         grid = meshes.TensorMesh(
                 [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
                 np.array([-1250, -1250, -2250]))
-        model = models.Model(grid, 0.1, np.ones(grid.vnC)*10)
+        model = models.Model(grid, 0.1, np.ones(grid.shape_cells)*10)
         model.property_y[5, 8, 3] = 100000  # Cell at source center
 
     def test_empty_dict(self):

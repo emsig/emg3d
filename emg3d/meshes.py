@@ -60,7 +60,6 @@ class _TensorMesh:
         # Node related properties.
         shape_nodes = (self.h[0].size+1, self.h[1].size+1, self.h[2].size+1)
         self.shape_nodes = shape_nodes
-        self.n_nodes = np.prod(shape_nodes)
         self.nodes_x = np.r_[0., self.h[0].cumsum()] + self.origin[0]
         self.nodes_y = np.r_[0., self.h[1].cumsum()] + self.origin[1]
         self.nodes_z = np.r_[0., self.h[2].cumsum()] + self.origin[2]
@@ -80,24 +79,6 @@ class _TensorMesh:
         self.n_edges_x = np.prod(self.shape_edges_x)
         self.n_edges_y = np.prod(self.shape_edges_y)
         self.n_edges_z = np.prod(self.shape_edges_z)
-        self.n_edges_per_direction = (
-            self.n_edges_x, self.n_edges_y, self.n_edges_z)
-        self.n_edges = np.sum(self.n_edges_per_direction)
-
-        # Aliases (in line with `discretize`).
-        self.x0 = self.origin
-        self.nC = self.n_cells
-        self.vnC = self.shape_cells
-        self.nN = self.n_nodes
-        self.vnN = self.shape_nodes
-        self.nE = self.n_edges
-        self.nEx = self.n_edges_x
-        self.nEy = self.n_edges_y
-        self.nEz = self.n_edges_z
-        self.vnE = self.n_edges_per_direction
-        self.vnEx = self.shape_edges_x
-        self.vnEy = self.shape_edges_y
-        self.vnEz = self.shape_edges_z
 
     def __repr__(self):
         """Simple representation."""

@@ -26,9 +26,9 @@ def test_amat_x(njit):
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
     # Create some resistivity model
-    x = np.arange(1, grid.vnC[0]+1)*2
-    y = 1/np.arange(1, grid.vnC[1]+1)
-    z = np.arange(1, grid.vnC[2]+1)[::-1]/10
+    x = np.arange(1, grid.shape_cells[0]+1)*2
+    y = 1/np.arange(1, grid.shape_cells[1]+1)
+    z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
     model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
@@ -37,7 +37,7 @@ def test_amat_x(njit):
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
     # Get volume-averaged model parameters.
-    vmodel = models.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(model, sfield)
 
     # Run two iterations to get a e-field
     efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
@@ -72,7 +72,7 @@ def test_amat_x(njit):
     # \nabla \times \mu_r^{-1}
     # >>> curlmu_r = grid.edgeCurl*(model.mu_r.ravel('F')*Px)
     # Collect it all
-    # >>> fx = etaxE[:grid.nEx] - (curlmu_r*curlE)[:grid.nEx]
+    # >>> fx = etaxE[:grid.n_edges_x] - (curlmu_r*curlE)[:grid.n_edges_x]
     #
     # This might be good to implement once the mesh.Model is reworked.
     # Places to look for:
@@ -119,9 +119,9 @@ def test_gauss_seidel(njit):
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
         # Initialize model with some resistivities.
-        property_x = np.arange(grid.nC)+1
-        property_y = 0.5*np.arange(grid.nC)+1
-        property_z = 2*np.arange(grid.nC)+1
+        property_x = np.arange(grid.n_cells)+1
+        property_y = 0.5*np.arange(grid.n_cells)+1
+        property_z = 2*np.arange(grid.n_cells)+1
 
         model = models.Model(grid, property_x, property_y, property_z)
 
@@ -129,7 +129,7 @@ def test_gauss_seidel(njit):
         sfield = fields.get_source_field(grid, src, freq)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(grid, model, sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         # Run two iterations to get some e-field.
         efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
@@ -249,8 +249,8 @@ def test_restrict(njit):
     ffield.ensure_pec
 
     # Get weigths
-    wlr = np.zeros(fgrid.vnN[0], dtype=np.float_)
-    w0 = np.ones(fgrid.vnN[0], dtype=np.float_)
+    wlr = np.zeros(fgrid.shape_nodes[0], dtype=np.float_)
+    w0 = np.ones(fgrid.shape_nodes[0], dtype=np.float_)
     fw = (wlr, w0, wlr)
 
     # # CASE 0 -- regular # #

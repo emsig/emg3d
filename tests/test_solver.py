@@ -30,11 +30,9 @@ def test_solver_homogeneous(capsys):
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['res']
 
-    grid = meshes.TensorMesh(
-            [dat['input_grid']['hx'], dat['input_grid']['hy'],
-             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
-    sfield = alternatives.get_source_field(**dat['input_source'])
+    grid = model.grid
+    sfield = fields.get_source_field(**dat['input_source'])
 
     # F-cycle
     efield = solver.solve(grid, model, sfield, verb=4)
@@ -48,8 +46,8 @@ def test_solver_homogeneous(capsys):
 
     # Experimental:
     # Check if norms are also the same, at least for first two cycles.
-    assert "3.414e-02  after   1 F-cycles   [1.810e-07, 0.034]   0 0" in out
-    assert "3.523e-03  after   2 F-cycles   [1.868e-08, 0.103]   0 0" in out
+    assert "3.399e-02  after   1 F-cycles   [1.830e-07, 0.034]   0 0" in out
+    assert "3.535e-03  after   2 F-cycles   [1.903e-08, 0.104]   0 0" in out
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(dat['Fresult'], efield)
@@ -162,8 +160,8 @@ def test_solver_homogeneous(capsys):
 def test_solver_heterogeneous(capsys):
     # Regression test for heterogeneous case.
     dat = REGRES['reg_2']
-    grid = dat['grid']
     model = dat['model']
+    grid = model.grid
     sfield = dat['sfield']
     inp = dat['inp']
     for n in ['nu_init', 'nu_pre', 'nu_coarse', 'nu_post']:
@@ -241,11 +239,9 @@ def test_one_liner(capsys):
 def test_log(capsys):
     dat = REGRES['res']
 
-    grid = meshes.TensorMesh(
-            [dat['input_grid']['hx'], dat['input_grid']['hy'],
-             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
-    sfield = alternatives.get_source_field(**dat['input_source'])
+    grid = model.grid
+    sfield = fields.get_source_field(**dat['input_source'])
     inp = {'grid': grid, 'model': model, 'sfield': sfield, 'maxit': 1,
            'verb': 3}
 
@@ -269,11 +265,9 @@ def test_solver_homogeneous_laplace():
     # Not very sophisticated; replace/extend by more detailed tests.
     dat = REGRES['lap']
 
-    grid = meshes.TensorMesh(
-            [dat['input_grid']['hx'], dat['input_grid']['hy'],
-             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
-    sfield = alternatives.get_source_field(**dat['input_source'])
+    grid = model.grid
+    sfield = fields.get_source_field(**dat['input_source'])
 
     # F-cycle
     efield = solver.solve(grid, model, sfield, verb=1)
@@ -323,9 +317,9 @@ def test_smoothing():
         )
 
         # Create some resistivity model
-        x = np.arange(1, grid.vnC[0]+1)*2
-        y = 1/np.arange(1, grid.vnC[1]+1)
-        z = np.arange(1, grid.vnC[2]+1)[::-1]/10
+        x = np.arange(1, grid.shape_cells[0]+1)*2
+        y = 1/np.arange(1, grid.shape_cells[1]+1)
+        z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
         property_x = np.outer(np.outer(x, y), z).ravel()
         freq = 0.319
         model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
@@ -334,7 +328,7 @@ def test_smoothing():
         sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(grid, model, sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         # Run two iterations to get an e-field
         field = solver.solve(grid, model, sfield, maxit=2, verb=1)
@@ -385,7 +379,7 @@ def test_restriction():
     sfield = fields.get_source_field(grid, src, 1)
 
     # Get volume-averaged model parameters.
-    vmodel = models.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(model, sfield)
 
     rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(sfield.fx.shape)
     ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(sfield.fy.shape)
@@ -400,7 +394,8 @@ def test_restriction():
     assert_allclose(csfield.fy[1:-1, :, 1], np.array([[356.+0.j, 436.+0.j]]))
     assert_allclose(csfield.fz[1:-1, 1:-1, :],
                     np.array([[[388.+0.j, 404.+0.j]]]))
-    assert cgrid.vnN[0] == cgrid.vnN[1] == cgrid.vnN[2] == 3
+    assert cgrid.shape_nodes[0] == cgrid.shape_nodes[1] == 3
+    assert cgrid.shape_nodes[2] == 3
     assert cmodel.eta_x[0, 0, 0]/8. == vmodel.eta_x[0, 0, 0]
     assert np.sum(grid.h[0]) == np.sum(cgrid.h[0])
     assert np.sum(grid.h[1]) == np.sum(cgrid.h[1])
@@ -434,9 +429,9 @@ def test_residual():
         origin=np.zeros(3))
 
     # Create some resistivity model
-    x = np.arange(1, grid.vnC[0]+1)*2
-    y = 1/np.arange(1, grid.vnC[1]+1)
-    z = np.arange(1, grid.vnC[2]+1)[::-1]/10
+    x = np.arange(1, grid.shape_cells[0]+1)*2
+    y = 1/np.arange(1, grid.shape_cells[1]+1)
+    z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
     model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
@@ -445,7 +440,7 @@ def test_residual():
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
     # Get volume-averaged model parameters.
-    vmodel = models.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(model, sfield)
 
     # Run two iterations to get an e-field
     efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
@@ -473,20 +468,19 @@ def test_krylov(capsys):
 
     # Load any case.
     dat = REGRES['res']
-    grid = meshes.TensorMesh(
-            [dat['input_grid']['hx'], dat['input_grid']['hy'],
-             dat['input_grid']['hz']], dat['input_grid']['origin'])
     model = models.Model(**dat['input_model'])
+    grid = model.grid
     model.property_x /= 100000  # Set stupid input to make bicgstab fail.
     model.property_y *= 100000  # Set stupid input to make bicgstab fail.
     sfield = fields.get_source_field(**dat['input_source'])
-    vmodel = models.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(model, sfield)
     efield = fields.Field(grid)  # Initiate e-field.
 
     # Get var-instance
     var = solver.MGParameters(
             cycle=None, sslsolver=True, semicoarsening=False,
-            linerelaxation=False, vnC=grid.vnC, verb=4, maxit=-1,
+            linerelaxation=False, shape_cells=grid.shape_cells, verb=4,
+            maxit=-1,
     )
     var.l2_refe = sl.norm(sfield, check_finite=False)
 
@@ -497,60 +491,73 @@ def test_krylov(capsys):
 
 
 def test_mgparameters():
-    vnC = (2**3, 2**5, 2**4)
+    shape_cells = (2**3, 2**5, 2**4)
 
     # 1. semicoarsening
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=True,
-                              linerelaxation=False, vnC=vnC, verb=1)
+                              linerelaxation=False, shape_cells=shape_cells,
+                              verb=1)
     assert 'semicoarsening : True [1 2 3]' in var.__repr__()
     var = solver.MGParameters(cycle='V', sslsolver=False, semicoarsening=1213,
-                              linerelaxation=False, vnC=vnC, verb=1)
+                              linerelaxation=False, shape_cells=shape_cells,
+                              verb=1)
     assert 'semicoarsening : True [1 2 1 3]' in var.__repr__()
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=2,
-                              linerelaxation=False, vnC=vnC, verb=1)
+                              linerelaxation=False, shape_cells=shape_cells,
+                              verb=1)
     assert 'semicoarsening : True [2]' in var.__repr__()
     with pytest.raises(ValueError, match='`semicoarsening` must be one of'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=5,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, shape_cells=shape_cells,
+                            verb=1)
 
     # 2. linerelaxation
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=True, vnC=vnC, verb=1)
+                              linerelaxation=True, shape_cells=shape_cells,
+                              verb=1)
     assert 'linerelaxation : True [4 5 6]' in var.__repr__()
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=1247, vnC=vnC, verb=1)
+                              linerelaxation=1247, shape_cells=shape_cells,
+                              verb=1)
     assert 'linerelaxation : True [1 2 4 7]' in var.__repr__()
     var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=1, vnC=vnC, verb=1, clevel=1)
+                              linerelaxation=1, shape_cells=shape_cells,
+                              verb=1, clevel=1)
     assert 'linerelaxation : True [1]' in var.__repr__()
     assert_allclose(var.clevel, 1)
     with pytest.raises(ValueError, match='`linerelaxation` must be one of'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                            linerelaxation=-9, vnC=vnC, verb=1)
+                            linerelaxation=-9, shape_cells=shape_cells, verb=1)
 
     # 3. sslsolver and cycle
     with pytest.raises(ValueError, match='At least `cycle` or `sslsolver`'):
         solver.MGParameters(cycle=None, sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, shape_cells=shape_cells,
+                            verb=1)
     var = solver.MGParameters(cycle='F', sslsolver=True, semicoarsening=True,
-                              linerelaxation=False, vnC=vnC, verb=1, maxit=33)
+                              linerelaxation=False, shape_cells=shape_cells,
+                              verb=1, maxit=33)
     assert "sslsolver : 'bicgstab'" in var.__repr__()
     assert var.ssl_maxit == 33
     assert var.maxit == 3
     with pytest.raises(ValueError, match='`sslsolver` must be True'):
         solver.MGParameters(cycle='F', sslsolver='abcd', semicoarsening=0,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, shape_cells=shape_cells,
+                            verb=1)
     with pytest.raises(ValueError, match='`sslsolver` must be True'):
         solver.MGParameters(cycle='F', sslsolver=4, semicoarsening=0,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, shape_cells=shape_cells,
+                            verb=1)
     with pytest.raises(ValueError, match='`cycle` must be one of'):
         solver.MGParameters(cycle='G', sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, vnC=vnC, verb=1)
+                            linerelaxation=False, shape_cells=shape_cells,
+                            verb=1)
 
     # 4. Wrong grid size
     with pytest.raises(ValueError, match='Nr. of cells must be at least'):
         solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, vnC=(1, 2, 3), verb=1)
+                            linerelaxation=False, shape_cells=(1, 2, 3),
+                            verb=1)
 
     # 5. Bad grid size
     inp = {'cycle': 'F', 'sslsolver': False, 'semicoarsening': False,
@@ -558,19 +565,21 @@ def test_mgparameters():
     txt = ":: Grid not optimal for MG solver ::"
 
     # One large prime => warning.
-    var = solver.MGParameters(vnC=(11*2**3, 2**5, 2**4), **inp)
+    var = solver.MGParameters(shape_cells=(11*2**3, 2**5, 2**4), **inp)
     assert txt in var.__repr__()
 
     # Large primes, but clevel smaller => no warning.
-    var = solver.MGParameters(vnC=(11*2**5, 11*2**4, 11*2**5), clevel=4, **inp)
+    var = solver.MGParameters(shape_cells=(11*2**5, 11*2**4, 11*2**5),
+                              clevel=4, **inp)
     assert txt not in var.__repr__()
 
     # Large primes, clevel bigger => warning.
-    var = solver.MGParameters(vnC=(11*2**5, 11*2**4, 11*2**5), clevel=5, **inp)
+    var = solver.MGParameters(shape_cells=(11*2**5, 11*2**4, 11*2**5),
+                              clevel=5, **inp)
     assert txt in var.__repr__()
 
     # Only 2 times dividable => warning.
-    var = solver.MGParameters(vnC=(2**3, 2**3, 2**3), **inp)
+    var = solver.MGParameters(shape_cells=(2**3, 2**3, 2**3), **inp)
     assert txt in var.__repr__()
 
 
@@ -578,12 +587,12 @@ def test_RegularGridProlongator():
 
     def prolon_scipy(grid, cgrid, efield, cefield, yz_points):
         """Compute SciPy alternative."""
-        for ixc in range(cgrid.vnC[0]):
+        for ixc in range(cgrid.shape_cells[0]):
             # Bilinear interpolation in the y-z plane
             fn = si.RegularGridInterpolator(
                     (cgrid.nodes_y, cgrid.nodes_z), cefield.fx[ixc, :, :],
                     bounds_error=False, fill_value=None)
-            hh = fn(yz_points).reshape(grid.vnEx[1:], order='F')
+            hh = fn(yz_points).reshape(grid.shape_edges_x[1:], order='F')
 
             # Piecewise constant interpolation in x-direction
             efield[2*ixc, :, :] += hh
@@ -596,9 +605,10 @@ def test_RegularGridProlongator():
         fn = solver.RegularGridProlongator(
                 cgrid.nodes_y, cgrid.nodes_z, yz_points)
 
-        for ixc in range(cgrid.vnC[0]):
+        for ixc in range(cgrid.shape_cells[0]):
             # Bilinear interpolation in the y-z plane
-            hh = fn(cefield.fx[ixc, :, :]).reshape(grid.vnEx[1:], order='F')
+            hh = fn(cefield.fx[ixc, :, :]).reshape(
+                    grid.shape_edges_x[1:], order='F')
 
             # Piecewise constant interpolation in x-direction
             efield[2*ixc, :, :] += hh

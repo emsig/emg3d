@@ -34,6 +34,22 @@ latest: towards v1.0
 
   - No ``name`` parameter any longer.
 
+- ``Model``:
+
+  - A ``Model`` knows now its ``grid``. As a consequence, all the functions
+    that required the ``grid`` and the ``model`` require now only the
+    ``model``; e.g., ``emg3d.solver.solve``, ``emg3d.fields.get_h_field``, or
+    ``emg3d.models.VolumeModel``.
+
+- ``TensorMesh``:
+
+  - The basic ``TensorMesh`` (without ``discretize``) is reduced to the
+    attributes ``origin``, ``h``, ``shape_cells``, ``shape_nodes``,
+    ``n_cells``, ``n_edges_x``, ``n_edges_y``, ``n_edges_z``, ``nodes_x``,
+    ``nodes_y``, ``nodes_z``, ``cell_centers_x``, ``cell_centers_y``,
+    ``cell_centers_z``, ``shape_edges_x``, ``shape_edges_y``,
+    ``shape_edges_z``, and ``cell_volumes``. These are the only required
+    attributes for ``emg3d``.
 
 - Removed all deprecated features.
 

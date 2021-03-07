@@ -92,12 +92,12 @@ def test_grid2grid_volume():
     values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
     vol_in = np.outer(np.outer(
         grid_in.h[0], grid_in.h[1]).ravel('F'), grid_in.h[2])
-    vol_in = vol_in.ravel('F').reshape(grid_in.vnC, order='F')
+    vol_in = vol_in.ravel('F').reshape(grid_in.shape_cells, order='F')
 
     values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
     vol_out = np.outer(np.outer(grid_out.h[0], grid_out.h[1]).ravel('F'),
                        grid_out.h[2])
-    vol_out = vol_out.ravel('F').reshape(grid_out.vnC, order='F')
+    vol_out = vol_out.ravel('F').reshape(grid_out.shape_cells, order='F')
 
     assert_allclose(np.sum(values_out*vol_out), np.sum(values_in*vol_in))
 
@@ -111,7 +111,7 @@ class TestGrid2grid():
         ogrid = meshes.TensorMesh(
                 [np.array([1]), np.array([1]), np.array([1])],
                 [0.5, 0, 0])
-        values = np.r_[9*[1.0, ], 9*[2.0, ]].reshape(igrid.vnC)
+        values = np.r_[9*[1.0, ], 9*[2.0, ]].reshape(igrid.shape_cells)
 
         # Provide wrong dimension:
         with pytest.raises(ValueError, match='There are 2 points and 1 valu'):
@@ -136,7 +136,8 @@ class TestGrid2grid():
             origin=np.array([-320., -1600, -8000]))
 
         # Smoothly changing model for fine grid.
-        cmodel = np.arange(1, fgrid.nC+1).reshape(fgrid.vnC, order='F')
+        cmodel = np.arange(1, fgrid.n_cells+1).reshape(
+                fgrid.shape_cells, order='F')
 
         # Coarser grid.
         cgrid = meshes.TensorMesh(
@@ -155,7 +156,7 @@ class TestGrid2grid():
         tgrid = meshes.TensorMesh(
                 [np.array([1, 1, 1, 1]), np.array([1, 1, 1, 1]),
                  np.array([1, 1, 1, 1])], origin=np.array([0., 0, 0]))
-        tmodel = np.ones(tgrid.nC).reshape(tgrid.vnC, order='F')
+        tmodel = np.ones(tgrid.n_cells).reshape(tgrid.shape_cells, order='F')
         tmodel[:, 0, :] = 2
         t2grid = meshes.TensorMesh(
                 [np.array([1]), np.array([1]), np.array([1])],
@@ -236,8 +237,8 @@ def test_volume_average(njit):
             [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
             origin=np.array([0.5, 3.33, 5]))
 
-    values = np.arange(grid_in.nC, dtype=np.float_).reshape(
-            grid_in.vnC, order='F')
+    values = np.arange(grid_in.n_cells, dtype=np.float_).reshape(
+            grid_in.shape_cells, order='F')
 
     points = (grid_in.nodes_x, grid_in.nodes_y, grid_in.nodes_z)
     new_points = (grid_out.nodes_x, grid_out.nodes_y, grid_out.nodes_z)
@@ -245,14 +246,14 @@ def test_volume_average(njit):
     # Compute volume.
     vol = np.outer(np.outer(
         grid_out.h[0], grid_out.h[1]).ravel('F'), grid_out.h[2])
-    vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
+    vol = vol.ravel('F').reshape(grid_out.shape_cells, order='F')
 
     # New solution.
-    new_values = np.zeros(grid_out.vnC, dtype=values.dtype)
+    new_values = np.zeros(grid_out.shape_cells, dtype=values.dtype)
     volume_average(*points, values, *new_points, new_values, vol)
 
     # Old solution.
-    new_values_alt = np.zeros(grid_out.vnC, dtype=values.dtype)
+    new_values_alt = np.zeros(grid_out.shape_cells, dtype=values.dtype)
     alternatives.alt_volume_average(
             *points, values, *new_points, new_values_alt)
 
@@ -460,12 +461,12 @@ def test_edges2cellaverages(njit):
     field.fz[1, 1, 0] = fz
 
     # Initiate gradient.
-    grad_x = np.zeros(grid.vnC, order='F', dtype=complex)
-    grad_y = np.zeros(grid.vnC, order='F', dtype=complex)
-    grad_z = np.zeros(grid.vnC, order='F', dtype=complex)
+    grad_x = np.zeros(grid.shape_cells, order='F', dtype=complex)
+    grad_y = np.zeros(grid.shape_cells, order='F', dtype=complex)
+    grad_z = np.zeros(grid.shape_cells, order='F', dtype=complex)
 
     # Call function.
-    vol = grid.cell_volumes.reshape(grid.vnC, order='F')
+    vol = grid.cell_volumes.reshape(grid.shape_cells, order='F')
     edges2cellaverages(field.fx, field.fy, field.fz,
                        vol, grad_x, grad_y, grad_z)
     grad = grad_x + grad_y + grad_z
@@ -499,7 +500,7 @@ def test_edges2cellaverages(njit):
     if discretize is not None:
         def volume_disc(grid, field):
             out = grid.aveE2CC*field*grid.cell_volumes
-            return out.reshape(grid.vnC, order='F')
+            return out.reshape(grid.shape_cells, order='F')
 
         assert_allclose(grad, 3*volume_disc(grid, field))
 
@@ -509,6 +510,6 @@ def test_edges2cellaverages(njit):
         out_y = grid.aveEy2CC*field.fy.ravel('F')*grid.cell_volumes
         out_z = grid.aveEz2CC*field.fz.ravel('F')*grid.cell_volumes
 
-        assert_allclose(grad_x, out_x.reshape(grid.vnC, order='F'))
-        assert_allclose(grad_y, out_y.reshape(grid.vnC, order='F'))
-        assert_allclose(grad_z, out_z.reshape(grid.vnC, order='F'))
+        assert_allclose(grad_x, out_x.reshape(grid.shape_cells, order='F'))
+        assert_allclose(grad_y, out_y.reshape(grid.shape_cells, order='F'))
+        assert_allclose(grad_z, out_z.reshape(grid.shape_cells, order='F'))

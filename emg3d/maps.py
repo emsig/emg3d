@@ -111,14 +111,14 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
         return values.__class__(fx, fy, fz)
 
     # If values is a particular field, ensure method is not 'volume'.
-    if not np.all(grid.vnC == values.shape) and method == 'volume':
+    if not np.all(grid.shape_cells == values.shape) and method == 'volume':
         raise ValueError("``method='volume'`` not implemented for fields.")
 
     if method == 'volume':
         points = (grid.nodes_x, grid.nodes_y, grid.nodes_z)
         new_points = (new_grid.nodes_x, new_grid.nodes_y, new_grid.nodes_z)
-        new_values = np.zeros(new_grid.vnC, dtype=values.dtype)
-        vol = new_grid.cell_volumes.reshape(new_grid.vnC, order='F')
+        new_values = np.zeros(new_grid.shape_cells, dtype=values.dtype)
+        vol = new_grid.cell_volumes.reshape(new_grid.shape_cells, order='F')
 
         # Get values from `volume_average`.
         if log:

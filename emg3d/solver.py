@@ -256,8 +256,6 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
     >>> # Compute the electric signal.
     >>> efield = emg3d.solve(grid, model, sfield, verb=4)
-    >>> # Get the corresponding magnetic signal.
-    >>> hfield = emg3d.fields.get_h_field(grid, model, efield)
     .
     :: emg3d START :: 10:27:25 :: v0.9.1
     .
@@ -293,7 +291,8 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
             cycle=cycle, sslsolver=sslsolver, semicoarsening=semicoarsening,
-            linerelaxation=linerelaxation, vnC=grid.vnC, verb=verb, **kwargs
+            linerelaxation=linerelaxation, shape_cells=grid.shape_cells,
+            verb=verb, **kwargs
     )
 
     # Start logging and print all parameters.
@@ -313,7 +312,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
                 "initiate it with `emg3d.fields.SourceField`.")
 
     # Get volume-averaged model values.
-    vmodel = models.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(model, sfield)
 
     # Get efield.
     if efield is None:
@@ -661,7 +660,8 @@ def krylov(grid, model, sfield, efield, var):
 
     # Initiate LinearOperator A x.
     A = ssl.LinearOperator(
-            shape=(grid.nE, grid.nE), dtype=sfield.dtype, matvec=amatvec)
+            shape=(sfield.field.size, sfield.field.size),
+            dtype=sfield.dtype, matvec=amatvec)
 
     # Define MG pre-conditioner as LinearOperator, if `var.cycle`.
     def mg_matvec(sfield):
@@ -680,7 +680,8 @@ def krylov(grid, model, sfield, efield, var):
     M = None
     if var.cycle:
         M = ssl.LinearOperator(
-                shape=(grid.nE, grid.nE), dtype=sfield.dtype, matvec=mg_matvec)
+                shape=(sfield.field.size, sfield.field.size),
+                dtype=sfield.dtype, matvec=mg_matvec)
 
     # Define callback to keep track of sslsolver-iterations.
     def callback(x):
@@ -932,9 +933,10 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     # Interpolate ex in y-z-slices.
     yz_points = _get_prolongation_coordinates(grid, 'y', 'z')
     fn = RegularGridProlongator(cgrid.nodes_y, cgrid.nodes_z, yz_points)
-    for ixc in range(cgrid.vnC[0]):
+    for ixc in range(cgrid.shape_cells[0]):
         # Bilinear interpolation in the y-z plane
-        hh = fn(cefield.fx[ixc, :, :]).reshape(grid.vnEx[1:], order='F')
+        hh = fn(cefield.fx[ixc, :, :]).reshape(
+                grid.shape_edges_x[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
         if sc_dir not in [1, 5, 6]:
@@ -946,10 +948,11 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     # Interpolate ey in x-z-slices.
     xz_points = _get_prolongation_coordinates(grid, 'x', 'z')
     fn = RegularGridProlongator(cgrid.nodes_x, cgrid.nodes_z, xz_points)
-    for iyc in range(cgrid.vnC[1]):
+    for iyc in range(cgrid.shape_cells[1]):
 
         # Bilinear interpolation in the x-z plane
-        hh = fn(cefield.fy[:, iyc, :]).reshape(grid.vnEy[::2], order='F')
+        hh = fn(cefield.fy[:, iyc, :]).reshape(
+                grid.shape_edges_y[::2], order='F')
 
         # Piecewise constant interpolation in y-direction
         if sc_dir not in [2, 4, 6]:
@@ -961,10 +964,11 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     # Interpolate ez in x-y-slices.
     xy_points = _get_prolongation_coordinates(grid, 'x', 'y')
     fn = RegularGridProlongator(cgrid.nodes_x, cgrid.nodes_y, xy_points)
-    for izc in range(cgrid.vnC[2]):
+    for izc in range(cgrid.shape_cells[2]):
 
         # Bilinear interpolation in the x-y plane
-        hh = fn(cefield.fz[:, :, izc]).reshape(grid.vnEz[:-1], order='F')
+        hh = fn(cefield.fz[:, :, izc]).reshape(
+                grid.shape_edges_z[:-1], order='F')
 
         # Piecewise constant interpolation in z-direction
         if sc_dir not in [3, 4, 5]:
@@ -1061,7 +1065,7 @@ class MGParameters:
     sslsolver: str
     linerelaxation: int
     semicoarsening: int
-    vnC: tuple  # Finest grid dimension
+    shape_cells: tuple  # Finest grid dimension
 
     # (B) Parameters with default values
     # Convergence tolerance.
@@ -1126,10 +1130,14 @@ class MGParameters:
             f", {self.nu_coarse}, {self.nu_post}       "
             f"   verb      : {self.verb}\n"
             f"   Original grid  "
-            f": {self.vnC[0]:3} x {self.vnC[1]:3} x {self.vnC[2]:3}  "
-            f"   => {self.vnC[0]*self.vnC[1]*self.vnC[2]:,} cells\n"
-            f"   Coarsest grid  : {self.pclevel['vnC'][0]:3} "
-            f"x {self.pclevel['vnC'][1]:3} x {self.pclevel['vnC'][2]:3}  "
+            f": {self.shape_cells[0]:3} x {self.shape_cells[1]:3} x "
+            f"{self.shape_cells[2]:3}  "
+            f"   => "
+            f"{self.shape_cells[0]*self.shape_cells[1]*self.shape_cells[2]:,}"
+            f" cells\n"
+            f"   Coarsest grid  : {self.pclevel['shape_cells'][0]:3} "
+            f"x {self.pclevel['shape_cells'][1]:3} "
+            f"x {self.pclevel['shape_cells'][2]:3}  "
             f"   => {self.pclevel['nC']:,} cells\n"
             f"   Coarsest level : {self.pclevel['clevel'][0]:3} "
             f"; {self.pclevel['clevel'][1]:3} ;{self.pclevel['clevel'][2]:4} "
@@ -1154,7 +1162,7 @@ class MGParameters:
         # number of times you can divide by two in this dimension.
         clevel = np.zeros(3, dtype=np.int_)
         for i in range(3):
-            n = self.vnC[i]
+            n = self.shape_cells[i]
             while n % 2 == 0 and n > 2:
                 clevel[i] += 1
                 n /= 2
@@ -1174,10 +1182,11 @@ class MGParameters:
 
         # Store coarsest nr of cells on coarsest grid and dimension for the
         # log-printing.
-        sx = int(self.vnC[0]/2**clevel[0])
-        sy = int(self.vnC[1]/2**clevel[1])
-        sz = int(self.vnC[2]/2**clevel[2])
-        self.pclevel = {'nC': sx*sy*sz, 'vnC': (sx, sy, sz), 'clevel': clevel}
+        sx = int(self.shape_cells[0]/2**clevel[0])
+        sy = int(self.shape_cells[1]/2**clevel[1])
+        sz = int(self.shape_cells[2]/2**clevel[2])
+        self.pclevel = {'nC': sx*sy*sz, 'shape_cells': (sx, sy, sz),
+                        'clevel': clevel}
 
         # Check some grid characteristics. Good values up to 1024 are:
         # - 2*2^{2, ..., 9}: 8, 16,  32,  64, 128, 256, 512, 1024,
@@ -1199,11 +1208,12 @@ class MGParameters:
             self.pclevel['message'] = ""
 
         # Check at least two cells in each direction
-        if np.any(np.array(self.vnC) < 2):
+        if np.any(np.array(self.shape_cells) < 2):
             raise ValueError(
                     "Nr. of cells must be at least two in each direction\n"
                     "Provided shape: "
-                    f"({self.vnC[0]}, {self.vnC[1]}, {self.vnC[2]}).")
+                    f"({self.shape_cells[0]}, {self.shape_cells[1]}, "
+                    f"{self.shape_cells[2]}).")
 
     def cprint(self, info, verbosity, **kwargs):
         """Conditional printing.
@@ -1489,9 +1499,12 @@ def _current_sc_dir(sc_dir, grid):
     # Find out in which direction we want to half the number of cells.
     # This depends on an (optional) direction of semicoarsening, and
     # if the number of cells in a direction can still be halved.
-    xsc_dir = grid.vnC[0] % 2 != 0 or grid.vnC[0] < 3 or sc_dir == 1
-    ysc_dir = grid.vnC[1] % 2 != 0 or grid.vnC[1] < 3 or sc_dir == 2
-    zsc_dir = grid.vnC[2] % 2 != 0 or grid.vnC[2] < 3 or sc_dir == 3
+    xsc_dir = (grid.shape_cells[0] % 2 != 0 or grid.shape_cells[0] < 3
+               or sc_dir == 1)
+    ysc_dir = (grid.shape_cells[1] % 2 != 0 or grid.shape_cells[1] < 3
+               or sc_dir == 2)
+    zsc_dir = (grid.shape_cells[2] % 2 != 0 or grid.shape_cells[2] < 3
+               or sc_dir == 3)
 
     # Set current sc_dir depending on the above outcome.
     if xsc_dir:
@@ -1539,7 +1552,7 @@ def _current_lr_dir(lr_dir, grid):
     """
     lr_dir = np.copy(lr_dir)
 
-    if grid.vnC[0] == 2:  # Check x-direction.
+    if grid.shape_cells[0] == 2:  # Check x-direction.
         if lr_dir == 1:
             lr_dir = 0
         elif lr_dir == 5:
@@ -1549,7 +1562,7 @@ def _current_lr_dir(lr_dir, grid):
         elif lr_dir == 7:
             lr_dir = 4
 
-    if grid.vnC[1] == 2:  # Check y-direction.
+    if grid.shape_cells[1] == 2:  # Check y-direction.
         if lr_dir == 2:
             lr_dir = 0
         elif lr_dir == 4:
@@ -1559,7 +1572,7 @@ def _current_lr_dir(lr_dir, grid):
         elif lr_dir == 7:
             lr_dir = 5
 
-    if grid.vnC[2] == 2:  # Check z-direction.
+    if grid.shape_cells[2] == 2:  # Check z-direction.
         if lr_dir == 3:
             lr_dir = 0
         elif lr_dir == 4:
@@ -1675,8 +1688,9 @@ def _print_gs_info(it, level, cycmax, grid, norm):
         Info string.
 
     """
-    info = f"     {it:2} {level} {cycmax} [{grid.vnC[0]:3}, {grid.vnC[1]:3}, "
-    return info + f"{grid.vnC[2]:3}]: {norm:.3e} "
+    info = f"     {it:2} {level} {cycmax} [{grid.shape_cells[0]:3}, "
+    info += f"{grid.shape_cells[1]:3}, "
+    return info + f"{grid.shape_cells[2]:3}]: {norm:.3e} "
 
 
 def _terminate(var, l2_last, l2_stag, it):
@@ -1813,8 +1827,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.nodes_x, grid.cell_centers_x, grid.h[0], cgrid.nodes_x,
                 cgrid.cell_centers_x, cgrid.h[0])
     else:
-        wxlr = np.zeros(grid.vnN[0], dtype=np.float64)
-        wx0 = np.ones(grid.vnN[0], dtype=np.float64)
+        wxlr = np.zeros(grid.shape_nodes[0], dtype=np.float64)
+        wx0 = np.ones(grid.shape_nodes[0], dtype=np.float64)
         wx = (wxlr, wx0, wxlr)
 
     if sc_dir not in [2, 4, 6]:
@@ -1822,8 +1836,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.nodes_y, grid.cell_centers_y, grid.h[1], cgrid.nodes_y,
                 cgrid.cell_centers_y, cgrid.h[1])
     else:
-        wylr = np.zeros(grid.vnN[1], dtype=np.float64)
-        wy0 = np.ones(grid.vnN[1], dtype=np.float64)
+        wylr = np.zeros(grid.shape_nodes[1], dtype=np.float64)
+        wy0 = np.ones(grid.shape_nodes[1], dtype=np.float64)
         wy = (wylr, wy0, wylr)
 
     if sc_dir not in [3, 4, 5]:
@@ -1831,8 +1845,8 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
                 grid.nodes_z, grid.cell_centers_z, grid.h[2], cgrid.nodes_z,
                 cgrid.cell_centers_z, cgrid.h[2])
     else:
-        wzlr = np.zeros(grid.vnN[2], dtype=np.float64)
-        wz0 = np.ones(grid.vnN[2], dtype=np.float64)
+        wzlr = np.zeros(grid.shape_nodes[2], dtype=np.float64)
+        wz0 = np.ones(grid.shape_nodes[2], dtype=np.float64)
         wz = (wzlr, wz0, wzlr)
 
     return wx, wy, wz

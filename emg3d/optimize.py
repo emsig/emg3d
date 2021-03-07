@@ -169,7 +169,7 @@ def gradient(simulation):
     simulation._bcompute()
 
     # Pre-allocate the gradient on the mesh.
-    grad_model = np.zeros(simulation.grid.vnC, order='F')
+    grad_model = np.zeros(simulation.grid.shape_cells, order='F')
 
     # Loop over source-frequency pairs.
     for src, freq in simulation._srcfreq:
@@ -184,14 +184,14 @@ def gradient(simulation):
                 simulation._dict_efield[src][freq].smu0)
 
         # Pre-allocate the gradient for the computational grid.
-        vnC = simulation._dict_grid[src][freq].vnC
-        grad_x = np.zeros(vnC, order='F')
-        grad_y = np.zeros(vnC, order='F')
-        grad_z = np.zeros(vnC, order='F')
+        shape_cells = simulation._dict_grid[src][freq].shape_cells
+        grad_x = np.zeros(shape_cells, order='F')
+        grad_y = np.zeros(shape_cells, order='F')
+        grad_z = np.zeros(shape_cells, order='F')
 
         # Map the field to cell centers times volume.
         vol = simulation._dict_grid[src][freq].cell_volumes.reshape(
-                vnC, order='F')
+                shape_cells, order='F')
         maps.edges2cellaverages(ex=efield.fx, ey=efield.fy, ez=efield.fz,
                                 vol=vol,
                                 out_x=grad_x, out_y=grad_y, out_z=grad_z)

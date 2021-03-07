@@ -146,7 +146,7 @@ def simulation(args_dict):
         logger.info("\n    :: BACKWARD COMPUTATION ::\n")
 
         if dry_run:
-            output['gradient'] = np.zeros(model['mesh'].vnC)
+            output['gradient'] = np.zeros(model['mesh'].shape_cells)
         else:
             output['gradient'] = sim.gradient
 

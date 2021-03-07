@@ -245,9 +245,9 @@ def test_field(tmpdir):
             [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
             np.zeros(3))
 
-    ex = create_dummy(*grid.vnEx)
-    ey = create_dummy(*grid.vnEy)
-    ez = create_dummy(*grid.vnEz)
+    ex = create_dummy(*grid.shape_edges_x)
+    ey = create_dummy(*grid.shape_edges_y)
+    ez = create_dummy(*grid.shape_edges_z)
 
     # Test the views
     ee = fields.Field(ex, ey, ez)
@@ -305,7 +305,7 @@ def test_field(tmpdir):
 
     # Set a dimension from the mesh to None, ensure field fails.
     if discretize is None:
-        grid.nEx = None
+        grid.n_edges_x = None
     else:
         grid = discretize.TensorMesh([1, 1], [1, 1])
     with pytest.raises(ValueError, match='Provided grid must be a 3D grid'):
@@ -350,30 +350,28 @@ def test_get_h_field():
 
     # Check it does still the same (pure regression).
     dat = REGRES['reg_2']
-    grid = dat['grid']
     model = dat['model']
     efield = dat['result']
     hfield = dat['hresult']
 
-    hout = fields.get_h_field(grid, model, efield)
+    hout = fields.get_h_field(model, efield)
     assert_allclose(hfield, hout)
     # Check it knows it is magnetic.
     assert hout.is_electric is False
 
     # Add some mu_r - Just 1, to trigger, and compare.
     dat = REGRES['res']
-    grid = dat['grid']
     efield = dat['Fresult']
     model1 = models.Model(**dat['input_model'])
     model2 = models.Model(**dat['input_model'], mu_r=1.)
 
-    hout1 = fields.get_h_field(grid, model1, efield)
-    hout2 = fields.get_h_field(grid, model2, efield)
+    hout1 = fields.get_h_field(model1, efield)
+    hout2 = fields.get_h_field(model2, efield)
     assert_allclose(hout1, hout2)
 
     # Ensure they are not the same if mu_r!=1/None provided
     model3 = models.Model(**dat['input_model'], mu_r=2.)
-    hout3 = fields.get_h_field(grid, model3, efield)
+    hout3 = fields.get_h_field(model3, efield)
     with pytest.raises(AssertionError):
         assert_allclose(hout1, hout3)
 
@@ -441,7 +439,7 @@ def test_get_receiver():
     assert_allclose(out9, 1.+1j)
 
     # Check it works with model parameters.
-    model = models.Model(grid, np.ones(grid.vnC))
+    model = models.Model(grid, np.ones(grid.shape_cells))
     out10 = fields.get_receiver(
             grid, model.property_x, (-10, -10, -10), 'linear', True)
     assert_allclose(out10, 1.)
@@ -484,7 +482,7 @@ def test_get_receiver_response():
 
     # Same for magnetic field.
     model = models.Model(grid)
-    hfield = fields.get_h_field(grid, model, efield)
+    hfield = fields.get_h_field(model, efield)
 
     # Comparison to `get_receiver`.
     rec = ([0.5, 1, 2], [0.5, 2, 3], 2)

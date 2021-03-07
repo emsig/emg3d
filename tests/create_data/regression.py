@@ -85,9 +85,9 @@ input_grid = {'hx': grid.h[0], 'hy': grid.h[1], 'hz': grid.h[2],
 
 # Initialize model
 # Create a model with random resistivities between [0, 50)
-property_x = np.random.random(grid.nC)*50
-property_y = np.random.random(grid.nC)*50
-property_z = np.random.random(grid.nC)*50
+property_x = np.random.random(grid.n_cells)*50
+property_y = np.random.random(grid.n_cells)*50
+property_z = np.random.random(grid.n_cells)*50
 model = models.Model(grid, property_x, property_y, property_z,
                      mapping='Resistivity')
 
@@ -110,7 +110,7 @@ efield = solver.solve(
         linerelaxation=linerelaxation, tol=tol, maxit=maxit, nu_init=nu_init,
         nu_pre=nu_pre, nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
-hfield = fields.get_h_field(grid, model, efield)
+hfield = fields.get_h_field(model, efield)
 
 # Store input and result
 reg_2 = {
@@ -146,18 +146,10 @@ grid = TensorMesh(
 all_attr = [
     'origin',
     'shape_cells', 'shape_nodes',
-    'n_nodes', 'n_edges', 'n_cells',
-    'n_edges_x', 'n_edges_y', 'n_edges_z',
-    'n_edges_per_direction',
+    'n_cells', 'n_edges_x', 'n_edges_y', 'n_edges_z',
     'nodes_x', 'nodes_y', 'nodes_z',
     'cell_centers_x', 'cell_centers_y', 'cell_centers_z',
     'shape_edges_x', 'shape_edges_y', 'shape_edges_z',
-    # aliases
-    'x0',
-    'nC', 'vnC',
-    'nN', 'vnN',
-    'nE', 'nEx', 'nEy', 'nEz',
-    'vnE', 'vnEx', 'vnEy', 'vnEz',
 ]
 
 mesh = {}
