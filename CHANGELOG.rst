@@ -38,8 +38,7 @@ latest: towards v1.0
 
   - A ``Model`` knows now its ``grid``. As a consequence, all the functions
     that required the ``grid`` and the ``model`` require now only the
-    ``model``; e.g., ``emg3d.solver.solve``, ``emg3d.fields.get_h_field``, or
-    ``emg3d.models.VolumeModel``.
+    ``model``; e.g., ``emg3d.solver.solve`` or ``emg3d.fields.get_h_field``.
 
 - ``TensorMesh``:
 
@@ -50,6 +49,10 @@ latest: towards v1.0
     ``cell_centers_z``, ``shape_edges_x``, ``shape_edges_y``,
     ``shape_edges_z``, and ``cell_volumes``. These are the only required
     attributes for ``emg3d``.
+
+- ``solver.solve``:
+
+  - Does not take a ``grid`` any longer.
 
 - Removed all deprecated features.
 

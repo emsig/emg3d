@@ -32,7 +32,7 @@ __all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
 
 
 # MAIN USER-FACING FUNCTION
-def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
+def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
           semicoarsening=False, linerelaxation=False, verb=1, **kwargs):
     r"""Solver for 3D CSEM data with tri-axial electrical anisotropy.
 
@@ -61,9 +61,6 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     Parameters
     ----------
-    grid : TensorMesh
-        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
-
     model : Model
         The model; a :class:`emg3d.models.Model` instance.
 
@@ -255,7 +252,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     >>> sfield = emg3d.fields.get_source_field(
     >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
     >>> # Compute the electric signal.
-    >>> efield = emg3d.solve(grid, model, sfield, verb=4)
+    >>> efield = emg3d.solve(model, sfield, verb=4)
     .
     :: emg3d START :: 10:27:25 :: v0.9.1
     .
@@ -291,7 +288,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
             cycle=cycle, sslsolver=sslsolver, semicoarsening=semicoarsening,
-            linerelaxation=linerelaxation, shape_cells=grid.shape_cells,
+            linerelaxation=linerelaxation, shape_cells=model.shape,
             verb=verb, **kwargs
     )
 
@@ -317,7 +314,8 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     # Get efield.
     if efield is None:
         # If not provided, initiate an empty one.
-        efield = fields.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
+        efield = fields.Field(vmodel.grid, dtype=sfield.dtype,
+                              freq=sfield._freq)
 
         # Set flag to return the field.
         var.do_return = True
@@ -339,7 +337,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         var.do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
-        var.l2 = residual(grid, vmodel, sfield, efield, True)
+        var.l2 = residual(vmodel, sfield, efield, True)
         if var.l2 < var.tol*var.l2_refe:
 
             # Switch-off both sslsolver and multigrid.
@@ -365,7 +363,8 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         info = "   > RETURN ZERO E-FIELD (provided sfield is zero)\n"
 
         # Zero-source means zero e-field.
-        efield = fields.Field(grid, dtype=sfield.dtype, freq=sfield._freq)
+        efield = fields.Field(model.grid, dtype=sfield.dtype,
+                              freq=sfield._freq)
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]  {'rel. error':<22}"
@@ -379,9 +378,9 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
-        krylov(grid, vmodel, sfield, efield, var)
+        krylov(vmodel, sfield, efield, var)
     elif var.cycle:    # ... multigrid.
-        multigrid(grid, vmodel, sfield, efield, var)
+        multigrid(vmodel, sfield, efield, var)
 
     # Get exit status.
     exit_status = int(var.exit_message != 'CONVERGED')
@@ -430,7 +429,7 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
 
 # SOLVERS
-def multigrid(grid, model, sfield, efield, var, **kwargs):
+def multigrid(model, sfield, efield, var, **kwargs):
     """Multigrid solver for 3D controlled-source electromagnetic (CSEM) data.
 
     Multigrid solver as presented in [Muld06]_, including semicoarsening and
@@ -446,9 +445,6 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The grid. See :class:`emg3d.meshes.TensorMesh`.
-
     model : :class:`emg3d.models.VolumeModel`
         The Model. See :class:`emg3d.models.VolumeModel`.
 
@@ -485,7 +481,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     cyc = 0  # Initiate cycle count.
 
     # Compute current error (l2-norms).
-    l2_last = residual(grid, model, sfield, efield, True)
+    l2_last = residual(model, sfield, efield, True)
 
     # Initiate the error-array to check for stagnation.
     l2_stag = np.ones(var._maxcycle)*l2_last
@@ -499,18 +495,18 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         var.cprint("     it cycmax               error", 4)
         var.cprint("      level [  dimension  ]            info\n", 4)
         if var.verb > 4:
-            info = _print_gs_info(it, level, cycmax, grid, l2_last)
+            info = _print_gs_info(it, level, cycmax, model.grid, l2_last)
             var.cprint(info + "initial error", 4)
 
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
         # Smooth and re-compute error.
-        smoothing(grid, model, sfield, efield, var.nu_init, var.lr_dir)
+        smoothing(model, sfield, efield, var.nu_init, var.lr_dir)
 
         # Print initial smoothing info.
         if var.verb > 4:
-            norm = residual(grid, model, sfield, efield, True)
-            info = _print_gs_info(it, level, cycmax, grid, norm)
+            norm = residual(model, sfield, efield, True)
+            info = _print_gs_info(it, level, cycmax, model.grid, norm)
             var.cprint(info + "initial smoothing", 4)
 
     # Start the actual (recursive) multigrid cycle.
@@ -526,40 +522,39 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
             # reduces the number of coarsening levels.
 
             # Gauss-Seidel on the coarsest grid.
-            smoothing(grid, model, sfield, efield, var.nu_coarse, var.lr_dir)
+            smoothing(model, sfield, efield, var.nu_coarse, var.lr_dir)
 
             # Print coarsest grid smoothing info.
             if var.verb > 4:
-                norm = residual(grid, model, sfield, efield, True)
-                info = _print_gs_info(it, level, cycmax, grid, norm)
+                norm = residual(model, sfield, efield, True)
+                info = _print_gs_info(it, level, cycmax, model.grid, norm)
                 var.cprint(info + "coarsest level", 4)
 
         else:                   # (B) Not yet on coarsest grid.
 
             # (B.1) Pre-smoothing (nu_pre).
             if var.nu_pre > 0:
-                smoothing(grid, model, sfield, efield, var.nu_pre, var.lr_dir)
+                smoothing(model, sfield, efield, var.nu_pre, var.lr_dir)
 
                 # Print pre-smoothing info.
                 if var.verb > 4:
-                    norm = residual(grid, model, sfield, efield, True)
-                    info = _print_gs_info(it, level, cycmax, grid, norm)
+                    norm = residual(model, sfield, efield, True)
+                    info = _print_gs_info(it, level, cycmax, model.grid, norm)
                     var.cprint(info + "pre-smoothing", 4)
 
             # Get sc_dir for this grid.
-            sc_dir = _current_sc_dir(var.sc_dir, grid)
+            sc_dir = _current_sc_dir(var.sc_dir, model.grid)
 
             # (B.2) Restrict grid, model, and fields from fine to coarse grid.
-            res = residual(grid, model, sfield, efield)  # Get residual.
-            cgrid, cmodel, csfield, cefield = restriction(
-                    grid, model, sfield, res, sc_dir)
+            res = residual(model, sfield, efield)  # Get residual.
+            cmodel, csfield, cefield = restriction(model, sfield, res, sc_dir)
 
             # (B.3) Recursive call for coarse-grid correction.
-            multigrid(cgrid, cmodel, csfield, cefield, var, level=level+1,
+            multigrid(cmodel, csfield, cefield, var, level=level+1,
                       new_cycmax=cycmax-cyc)
 
             # (B.4) Add coarse field residual to fine grid field.
-            prolongation(grid, efield, cgrid, cefield, sc_dir)
+            prolongation(model.grid, efield, cmodel.grid, cefield, sc_dir)
 
             # Append current prolongation level for QC.
             if var._first_cycle and var.verb > 3:
@@ -567,12 +562,12 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
 
             # (B.5) Post-smoothing (nu_post).
             if var.nu_post > 0:
-                smoothing(grid, model, sfield, efield, var.nu_post, var.lr_dir)
+                smoothing(model, sfield, efield, var.nu_post, var.lr_dir)
 
                 # Print post-smoothing info.
                 if var.verb > 4:
-                    norm = residual(grid, model, sfield, efield, True)
-                    info = _print_gs_info(it, level, cycmax, grid, norm)
+                    norm = residual(model, sfield, efield, True)
+                    info = _print_gs_info(it, level, cycmax, model.grid, norm)
                     var.cprint(info + "post-smoothing", 4)
 
         # Update iterator counts.
@@ -587,7 +582,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
         else:          # Original grid reached, check termination criteria.
 
             # Get current error (l2-norm).
-            l2_last = residual(grid, model, sfield, efield, True)
+            l2_last = residual(model, sfield, efield, True)
 
             # Print end-of-cycle info.
             _print_cycle_info(var, l2_last, l2_prev)
@@ -606,7 +601,7 @@ def multigrid(grid, model, sfield, efield, var, **kwargs):
     var.l2 = l2_last
 
 
-def krylov(grid, model, sfield, efield, var):
+def krylov(model, sfield, efield, var):
     """Krylov Subspace iterative solver for 3D CSEM data.
 
     Using a Krylov subspace iterative solver (defined in `var.sslsolver`)
@@ -622,9 +617,6 @@ def krylov(grid, model, sfield, efield, var):
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The grid. See :class:`emg3d.meshes.TensorMesh`.
-
     model : :class:`emg3d.models.VolumeModel`
         The Model. See :class:`emg3d.models.VolumeModel`.
 
@@ -646,14 +638,15 @@ def krylov(grid, model, sfield, efield, var):
         """Compute A x for solver; residual is b-Ax = src-amatvec."""
 
         # Cast current efield to Field instance.
-        efield = fields.Field(grid, efield)
+        efield = fields.Field(model.grid, efield)
 
         # Compute A x.
-        rfield = fields.Field(grid, dtype=efield.dtype, freq=freq)
+        rfield = fields.Field(model.grid, dtype=efield.dtype, freq=freq)
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, model.zeta, grid.h[0], grid.h[1], grid.h[2])
+                model.eta_z, model.zeta, model.grid.h[0], model.grid.h[1],
+                model.grid.h[2])
 
         # Return Field instance.
         return -rfield
@@ -668,11 +661,11 @@ def krylov(grid, model, sfield, efield, var):
         """Use multigrid as pre-conditioner."""
 
         # Cast current fields to Field instances.
-        sfield = fields.Field(grid, sfield, freq=freq)
-        efield = fields.Field(grid, dtype=sfield.dtype, freq=freq)
+        sfield = fields.Field(model.grid, sfield, freq=freq)
+        efield = fields.Field(model.grid, dtype=sfield.dtype, freq=freq)
 
         # Solve for these fields.
-        multigrid(grid, model, sfield, efield, var)
+        multigrid(model, sfield, efield, var)
 
         return efield
 
@@ -691,7 +684,7 @@ def krylov(grid, model, sfield, efield, var):
 
         # Add current runtime and error to var.
         var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
-        var.l2 = residual(grid, model, sfield, fields.Field(grid, x), True)
+        var.l2 = residual(model, sfield, fields.Field(model.grid, x), True)
         var.error_at_cycle = np.r_[var.error_at_cycle, var.l2]
 
         # Print error (only if verbose).
@@ -736,7 +729,7 @@ def krylov(grid, model, sfield, efield, var):
 
 
 # MULTIGRID SUB-ROUTINES
-def smoothing(grid, model, sfield, efield, nu, lr_dir):
+def smoothing(model, sfield, efield, nu, lr_dir):
     """Reducing high-frequency error by smoothing.
 
     Solves the linear equation system :math:`A x = b` iteratively using the
@@ -757,9 +750,6 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        Input grid.
-
     model : :class:`emg3d.models.VolumeModel`
         Input model.
 
@@ -781,10 +771,11 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
 
     # Collect Gauss-Seidel input (same for all routines)
     inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, model.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
+           model.eta_z, model.zeta, model.grid.h[0], model.grid.h[1],
+           model.grid.h[2], nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
-    lr_dir = _current_lr_dir(lr_dir, grid)
+    lr_dir = _current_lr_dir(lr_dir, model.grid)
 
     # Compute and store fields (in-place)
     if lr_dir == 0:             # Standard MG
@@ -800,7 +791,7 @@ def smoothing(grid, model, sfield, efield, nu, lr_dir):
         core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
 
-def restriction(grid, model, sfield, residual, sc_dir):
+def restriction(model, sfield, residual, sc_dir):
     """Downsampling of grid, model, and fields to a coarser grid.
 
     The restriction of the residual is used as source term for the coarse grid.
@@ -816,9 +807,6 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        Input grid.
-
     model : :class:`emg3d.models.VolumeModel`
         Input model.
 
@@ -831,9 +819,6 @@ def restriction(grid, model, sfield, residual, sc_dir):
 
     Returns
     -------
-    cgrid : :class:`emg3d.meshes.TensorMesh`
-        Coarse grid.
-
     cmodel : :class:`emg3d.models.VolumeModel`
         Coarse model.
 
@@ -857,22 +842,23 @@ def restriction(grid, model, sfield, residual, sc_dir):
         rz = 1
 
     # Compute distances of coarse grid.
-    ch = [np.diff(grid.nodes_x[::rx]),
-          np.diff(grid.nodes_y[::ry]),
-          np.diff(grid.nodes_z[::rz])]
+    ch = [np.diff(model.grid.nodes_x[::rx]),
+          np.diff(model.grid.nodes_y[::ry]),
+          np.diff(model.grid.nodes_z[::rz])]
 
     # Create new `TensorMesh` instance for coarse grid
-    cgrid = meshes._TensorMesh(ch, grid.origin)
+    cgrid = meshes._TensorMesh(ch, model.grid.origin)
 
     # 2. RESTRICT MODEL
 
     class VolumeModel:
         """Dummy class to create coarse-grid model."""
-        def __init__(self, case):
+        def __init__(self, case, grid):
             """Initialize with case."""
             self.case = case
+            self.grid = grid
 
-    cmodel = VolumeModel(model.case)
+    cmodel = VolumeModel(model.case, cgrid)
     cmodel.eta_x = _restrict_model_parameters(model.eta_x, sc_dir)
     if model.case in [1, 3]:  # HTI or tri-axial.
         cmodel.eta_y = _restrict_model_parameters(model.eta_y, sc_dir)
@@ -887,7 +873,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     # 3. RESTRICT FIELDS
 
     # Get the weights (Equation 9 of [Muld06]_).
-    wx, wy, wz = _get_restriction_weights(grid, cgrid, sc_dir)
+    wx, wy, wz = _get_restriction_weights(model.grid, cmodel.grid, sc_dir)
 
     # Compute the source terms (Equation 8 in [Muld06]_).
     # Initiate zero field.
@@ -899,7 +885,7 @@ def restriction(grid, model, sfield, residual, sc_dir):
     csfield.ensure_pec
     cefield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
 
-    return cgrid, cmodel, csfield, cefield
+    return cmodel, csfield, cefield
 
 
 def prolongation(grid, efield, cgrid, cefield, sc_dir):
@@ -981,7 +967,7 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     efield.ensure_pec
 
 
-def residual(grid, model, sfield, efield, norm=False):
+def residual(model, sfield, efield, norm=False):
     r"""Computing the residual.
 
     Returns the complete residual as given in [Muld06]_, page 636, middle of
@@ -1004,9 +990,6 @@ def residual(grid, model, sfield, efield, norm=False):
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        Input grid.
-
     model : :class:`emg3d.models.VolumeModel`
         Input model.
 
@@ -1035,7 +1018,7 @@ def residual(grid, model, sfield, efield, norm=False):
     rfield = sfield.copy()
     core.amat_x(rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy,
                 efield.fz, model.eta_x, model.eta_y, model.eta_z, model.zeta,
-                grid.h[0], grid.h[1], grid.h[2])
+                model.grid.h[0], model.grid.h[1], model.grid.h[2])
 
     if norm:  # Return its error.
         return sl.norm(rfield, check_finite=False)

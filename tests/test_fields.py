@@ -516,7 +516,7 @@ def test_get_receiver_response():
 
     model = models.Model(grid, res)
     sfield = fields.get_source_field(grid, src, freq)
-    efield = solver.solve(grid, model, sfield, semicoarsening=True,
+    efield = solver.solve(model, sfield, semicoarsening=True,
                           sslsolver=True, linerelaxation=True, verb=1)
 
     # epm = empymod.bipole(src, rec, [], res, freq, verb=1)

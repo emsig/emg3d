@@ -56,8 +56,7 @@ class TestSimulation():
 
         # Check efield
         efield, info = solver.solve(
-                self.grid, self.model, sfield,
-                **self.simulation.solver_opts)
+                self.model, sfield, **self.simulation.solver_opts)
         assert_allclose(self.simulation.get_efield('Tx1', 'f0'), efield)
 
         # Unknown keyword

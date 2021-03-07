@@ -716,7 +716,6 @@ class Simulation:
             # Input parameters.
             solver_input = {
                 **self.solver_opts,
-                'grid': self.get_grid(source, freq),
                 'model': self.get_model(source, freq),
                 'sfield': self.get_sfield(source, freq),
             }
@@ -1129,7 +1128,6 @@ class Simulation:
         # Input parameters.
         solver_input = {
             **self.solver_opts,
-            'grid': self.get_grid(*inp),
             'model': self.get_model(*inp),
             'sfield': self._get_rfield(*inp),  # Residual field.
         }
