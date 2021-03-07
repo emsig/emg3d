@@ -61,16 +61,16 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The grid. See :class:`emg3d.meshes.TensorMesh`.
+    grid : TensorMesh
+        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    model : :class:`emg3d.models.Model`
-        The model. See :class:`emg3d.models.Model`.
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance.
 
-    sfield : :class:`emg3d.fields.SourceField`
+    sfield : SourceField
         The source field. See :func:`emg3d.fields.get_source_field`.
 
-    efield : :class:`emg3d.fields.Field`, optional
+    efield : Field, optional
         Initial electric field. It is initiated with zeroes if not provided. A
         provided efield MUST have frequency information (initiated with
         ``emg3d.fields.Field(..., freq)``).
@@ -86,10 +86,10 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
     cycle : str; optional.
         Type of multigrid cycle. Default is 'F'.
 
-        - 'V': V-cycle, simplest version;
-        - 'W': W-cycle, most expensive version;
-        - 'F': F-cycle, sort of a compromise between 'V' and 'W';
-        - None: Does not use multigrid, only `sslsolver`.
+        - ``'V'``: V-cycle, simplest version;
+        - ``'W'``: W-cycle, most expensive version;
+        - ``'F'``: F-cycle, sort of a compromise between V- and W-cycle;
+        - ``None``: Does not use multigrid, only the chosen ``sslsolver``.
 
         If None, `sslsolver` must be provided, and the `sslsolver` will be used
         without multigrid pre-conditioning.
@@ -166,14 +166,14 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         - 5: Everything (slower due to additional error computations).
         - -1: One-liner (dynamically updated).
 
-    tol : float
+    tol : float, optional
         Convergence tolerance. Default is 1e-6.
 
         Iterations stop as soon as the norm of the residual has decreased by
         this factor, relative to the residual norm obtained for a zero
         electric field.
 
-    maxit : int
+    maxit : int, optional
         Maximum number of multigrid iterations. Default is 50.
 
         If `sslsolver` is used, this applies to the `sslsolver`.
@@ -182,30 +182,30 @@ def solve(grid, model, sfield, efield=None, cycle='F', sslsolver=False,
         `sslsolver`, the maximum iteration for multigrid is defined by the
         maximum length of the `linerelaxation` and `semicoarsening`-cycles.
 
-    nu_init : int
+    nu_init : int, optional
         Number of initial smoothing steps, before MG cycle. Default is 0.
 
-    nu_pre : int
+    nu_pre : int, optional
         Number of pre-smoothing steps. Default is 2.
 
-    nu_coarse : int
+    nu_coarse : int, optional
         Number of smoothing steps on coarsest grid. Default is 1.
 
-    nu_post : int
+    nu_post : int, optional
         Number of post-smoothing steps. Default is 2.
 
-    clevel : int
+    clevel : int, optional
         The maximum coarsening level can be different for each dimension and
         is, by default, automatically determined (``clevel=-1``). The
         parameter `clevel` can be used to restrict the maximum coarsening
         level in any direction by its value.
         Default is -1.
 
-    return_info : bool
+    return_info : bool, optional
         If True, a dictionary is returned with runtime info (final norm and
         number of iterations of MG and the sslsolver).
 
-    log : int
+    log : int, optional
         Only relevant if ``return_info=True``. Default is 1.
 
         - -1: LOG ONLY: Only store info in log, do not print on screen.
@@ -1463,7 +1463,7 @@ class RegularGridProlongator:
         return edges
 
 
-# MG HELPER ROUTINES
+# MG HELPER ROUTINES (private, undocumented)
 def _current_sc_dir(sc_dir, grid):
     """Return current direction(s) for semicoarsening.
 

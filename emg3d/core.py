@@ -1636,7 +1636,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     rx, ry, rz : ndarray
         Fine grid {x,y,z}-directed residual.
 
-    wx, wy, wz: tuple
+    wx, wy, wz: (ndarray, ndarray, ndarray)
         Tuples containing the weights (``wl``, ``w0``, ``wr``) as returned from
         :func:`restrict_weights` for the {x,y,z}-directions.
 

@@ -40,10 +40,10 @@ class _TensorMesh:
 
     Parameters
     ----------
-    h : list of three ndarrays
+    h : [array_like, array_like, array_like]
         Cell widths in [x, y, z] directions.
 
-    origin : ndarray of dimension (3, )
+    origin : array_like
         Origin (x, y, z).
 
     """
@@ -127,10 +127,10 @@ class TensorMesh(dTensorMesh, _TensorMesh):
 
     Parameters
     ----------
-    h : list of three ndarrays
+    h : [array_like, array_like, array_like]
         Cell widths in [x, y, z] directions.
 
-    origin : ndarray of dimension (3, )
+    origin : array_like
         Origin (x, y, z).
 
     """
