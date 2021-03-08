@@ -40,16 +40,16 @@ input_source = {
 sfield = fields.get_source_field(**input_source)
 
 # F-cycle
-fefield = solver.solve(grid, model, sfield)
+fefield = solver.solve(model, sfield)
 
 # W-cycle
-wefield = solver.solve(grid, model, sfield, cycle='W')
+wefield = solver.solve(model, sfield, cycle='W')
 
 # V-cycle
-vefield = solver.solve(grid, model, sfield, cycle='V')
+vefield = solver.solve(model, sfield, cycle='V')
 
 # BiCGSTAB; F-cycle
-bicefield = solver.solve(grid, model, sfield, sslsolver=True)
+bicefield = solver.solve(model, sfield, sslsolver=True)
 
 out = {
     'input_grid': input_grid,
@@ -106,7 +106,7 @@ nu_post = 2
 clevel = 10  # Way to high
 
 efield = solver.solve(
-        grid, model, sfield, semicoarsening=semicoarsening,
+        model, sfield, semicoarsening=semicoarsening,
         linerelaxation=linerelaxation, tol=tol, maxit=maxit, nu_init=nu_init,
         nu_pre=nu_pre, nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
@@ -197,10 +197,10 @@ input_source_l = {
 sfield_l = fields.get_source_field(**input_source_l)
 
 # F-cycle
-fefield_l = solver.solve(grid_l, model_l, sfield_l)
+fefield_l = solver.solve(model_l, sfield_l)
 
 # BiCGSTAB; F-cycle
-bicefield_l = solver.solve(grid_l, model_l, sfield_l, sslsolver=True)
+bicefield_l = solver.solve(model_l, sfield_l, sslsolver=True)
 
 out_l = {
     'input_grid': input_grid_l,
