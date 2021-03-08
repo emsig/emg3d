@@ -306,7 +306,7 @@ class TestMaps:
     values = np.array([0.01, 10, 3, 4])
 
     def test_basic(self):
-        class MyMap(maps._Map):
+        class MyMap(maps.BaseMap):
             def __init__(self):
                 super().__init__('my awesome map')
 

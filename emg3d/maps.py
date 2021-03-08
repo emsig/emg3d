@@ -281,7 +281,7 @@ def register_map(func):
     return func
 
 
-class _Map:
+class BaseMap:
     """Maps variable `x` to computational variable `σ` (conductivity)."""
 
     def __init__(self, description):
@@ -308,16 +308,16 @@ class _Map:
 
     def to_dict(self):
         """Store the map name in a dict for serialization."""
-        return {'name': self.name, '__class__': '_Map'}
+        return {'name': self.name, '__class__': 'BaseMap'}
 
     @classmethod
     def from_dict(cls, inp):
-        """Get :class:`_Map` instance from name in dict."""
+        """Get :class:`BaseMap` instance from name in dict."""
         return MAPLIST['Map'+inp['name']]()
 
 
 @register_map
-class MapConductivity(_Map):
+class MapConductivity(BaseMap):
     """Maps `σ` to computational variable `σ` (conductivity).
 
     - forward: x = σ
@@ -339,7 +339,7 @@ class MapConductivity(_Map):
 
 
 @register_map
-class MapLgConductivity(_Map):
+class MapLgConductivity(BaseMap):
     """Maps `log_10(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(σ)
@@ -361,7 +361,7 @@ class MapLgConductivity(_Map):
 
 
 @register_map
-class MapLnConductivity(_Map):
+class MapLnConductivity(BaseMap):
     """Maps `log_e(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(σ)
@@ -383,7 +383,7 @@ class MapLnConductivity(_Map):
 
 
 @register_map
-class MapResistivity(_Map):
+class MapResistivity(BaseMap):
     """Maps `ρ` to computational variable `σ` (conductivity).
 
     - forward: x = ρ = σ^-1
@@ -405,7 +405,7 @@ class MapResistivity(_Map):
 
 
 @register_map
-class MapLgResistivity(_Map):
+class MapLgResistivity(BaseMap):
     """Maps `log_10(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(ρ) = log_10(σ^-1)
@@ -427,7 +427,7 @@ class MapLgResistivity(_Map):
 
 
 @register_map
-class MapLnResistivity(_Map):
+class MapLnResistivity(BaseMap):
     """Maps `log_e(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(ρ) = log_e(σ^-1)

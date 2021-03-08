@@ -56,6 +56,10 @@ latest: towards v1.0
 
   - Does not take a ``grid`` any longer.
 
+- ``maps``:
+
+  - Renamed ``_Map`` to ``BaseMap``.
+
 - Removed all deprecated features.
 
 
