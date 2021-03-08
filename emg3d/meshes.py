@@ -48,7 +48,7 @@ class BaseMesh:
 
     """
 
-    def __init__(self, h, origin=None, **kwargs):
+    def __init__(self, h, origin, **kwargs):
         """Initialize the mesh."""
 
         # Store origin.
