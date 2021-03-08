@@ -302,12 +302,10 @@ def test_field(tmpdir):
         fields.Field.from_dict(edict)
 
     # Set a dimension from the mesh to None, ensure field fails.
-    if discretize is None:
-        grid.n_edges_x = None
-    else:
+    if discretize:
         grid = discretize.TensorMesh([1, 1], [1, 1])
-    with pytest.raises(ValueError, match='Provided grid must be a 3D grid'):
-        fields.Field(grid)
+        with pytest.raises(ValueError, match='Provided grid must be a 3D gr'):
+            fields.Field(grid)
 
     # Ensure it can be pickled.
     with shelve.open(tmpdir+'/test') as db:
