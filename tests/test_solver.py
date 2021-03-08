@@ -379,7 +379,8 @@ def test_restriction():
     rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(sfield.fx.shape)
     ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(sfield.fy.shape)
     rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(sfield.fz.shape)
-    rr = fields.Field(rx, ry, rz)
+    field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
+    rr = fields.Field(grid, field)
 
     # Restrict it
     cmodel, csfield, cefield = solver.restriction(vmodel, sfield, rr, sc_dir=0)

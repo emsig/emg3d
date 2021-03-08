@@ -174,7 +174,8 @@ def test_compare_dicts(capsys):
     e1 = create_dummy(*grid.shape_edges_x)
     e2 = create_dummy(*grid.shape_edges_y)
     e3 = create_dummy(*grid.shape_edges_z)
-    ee = fields.Field(e1, e2, e3, freq=.938)
+    field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
+    ee = fields.Field(grid, field, freq=.938)
 
     dict1 = io._dict_serialize(
             {'model': model, 'grid': grid, 'field': ee,

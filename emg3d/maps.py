@@ -108,7 +108,8 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
                        extrapolate, log)
 
         # Return a field instance.
-        return values.__class__(fx, fy, fz)
+        field = np.r_[fx.ravel('F'), fy.ravel('F'), fz.ravel('F')]
+        return values.__class__(new_grid, field)
 
     # If values is a particular field, ensure method is not 'volume'.
     if not np.all(grid.shape_cells == values.shape) and method == 'volume':

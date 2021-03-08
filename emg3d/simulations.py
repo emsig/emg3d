@@ -776,8 +776,7 @@ class Simulation:
 
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
-            resp = fields.get_receiver_response(
-                    grid=self.get_grid(source, freq),
+            resp = fields.get_receiver(
                     field=self.get_efield(source, freq),
                     rec=tuple(np.array(rec_coords)[:, erec])
             )
@@ -790,8 +789,7 @@ class Simulation:
 
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
-            resp = fields.get_receiver_response(
-                    grid=self.get_grid(source, freq),
+            resp = fields.get_receiver(
                     field=self.get_hfield(source, freq),
                     rec=tuple(np.array(rec_coords)[:, mrec])
             )
