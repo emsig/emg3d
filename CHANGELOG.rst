@@ -56,6 +56,16 @@ latest: towards v1.0
 
   - Does not take a ``grid`` any longer.
 
+- ``fields``:
+
+  - The function ``emg3d.fields.get_receiver`` was removed and replaced by
+    its successor ``emg3d.fields.get_receiver_response``;
+    ``emg3d.fields.get_receiver_response`` does not exist any longer.
+  - A ``Field`` knows now its ``grid``. As a consequence, all the functions
+    that required the ``grid`` and the ``field`` require now only the
+    ``field``; e.g., ``emg3d.fields.get_receiver``.
+
+
 - ``maps``:
 
   - Renamed ``_Map`` to ``BaseMap``.

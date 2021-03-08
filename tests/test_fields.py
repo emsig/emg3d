@@ -15,7 +15,7 @@ try:
 except ImportError:
     discretize = None
 
-from emg3d import io, meshes, models, fields, solver, utils
+from emg3d import io, meshes, models, fields, solver
 
 # Data generated with tests/create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
@@ -250,16 +250,14 @@ def test_field(tmpdir):
     ez = create_dummy(*grid.shape_edges_z)
 
     # Test the views
-    ee = fields.Field(ex, ey, ez)
-    assert_allclose(ee, np.r_[ex.ravel('F'), ey.ravel('F'), ez.ravel('F')])
+    field = np.r_[ex.ravel('F'), ey.ravel('F'), ez.ravel('F')]
+    ee = fields.Field(grid, field)
+    assert_allclose(ee, field)
     assert_allclose(ee.fx, ex)
     assert_allclose(ee.fy, ey)
     assert_allclose(ee.fz, ez)
     assert ee.smu0 is None
     assert ee.sval is None
-
-    # Check it knows it is electric.
-    assert ee.is_electric is True
 
     # Test amplitude and phase.
     assert_allclose(ee.fx.amp(), np.abs(ee.fx))
@@ -356,8 +354,6 @@ def test_get_h_field():
 
     hout = fields.get_h_field(model, efield)
     assert_allclose(hfield, hout)
-    # Check it knows it is magnetic.
-    assert hout.is_electric is False
 
     # Add some mu_r - Just 1, to trigger, and compare.
     dat = REGRES['res']
@@ -377,34 +373,6 @@ def test_get_h_field():
 
 
 def test_get_receiver():
-    grid = meshes.TensorMesh(
-            [np.array([1, 1, 2, 1]), np.ones(4), np.ones(4)], [-1, -2, -2])
-    field = fields.Field(grid)
-
-    # Provide wrong rec_loc input:
-    with pytest.raises(ValueError, match='Coordinates needs to be in the'):
-        fields.get_receiver(grid, field.fx, (1, 1))
-
-    # Simple linear interpolation test.
-    field.fx = np.arange(1, field.fx.size+1)
-    field = field.real  # For simplicity
-    out1 = fields.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0), 'linear')
-    assert_allclose(out1, [50., 50+1/3, 51])
-    out1a, out1b, out1c = fields.get_receiver(  # Check recursion
-            grid, field, ([0.5, 1, 2], 0, 0), 'linear')
-    assert_allclose(out1, out1a)
-    assert_allclose(out1b, out1c)
-    assert_allclose(out1b, [0, 0, 0])
-    assert out1b.__class__ == utils.EMArray
-
-    out2 = fields.get_receiver(
-            grid, field.fx, ([0.5, 1, 2], 1/3, 0.25), 'linear')
-    assert_allclose(out2, [56+1/3., 56+2/3, 57+1/3])
-
-    # Check 'cubic' is re-set to 'linear for tiny grids.
-    out3 = fields.get_receiver(grid, field.fx, ([0.5, 1, 2], 0, 0), 'cubic')
-    assert_allclose(out1, out3)
-
     # Check cubic spline runs fine (NOT CHECKING ACTUAL VALUES!.
     grid = meshes.TensorMesh(
             [np.ones(4), np.array([1, 2, 3, 1]), np.array([2, 1, 1, 1])],
@@ -412,41 +380,6 @@ def test_get_receiver():
     field = fields.Field(grid)
     field.field = np.ones(field.size) + 1j*np.ones(field.size)
 
-    out4 = fields.get_receiver(
-            grid, field.fx, ([0.5, 1, 2], [0.5, 2, 3], 2), 'linear')
-    out5 = fields.get_receiver(grid, field.fx, ([0.5, 1, 2], [0.5, 2, 3], 2))
-    out5real = fields.get_receiver(
-            grid, field.fx.real, ([0.5, 1, 2], [0.5, 2, 3], 2))
-    assert_allclose(out5, out4)
-    assert_allclose(out5real, out4.real)
-
-    # Check amplitude and phase
-    assert_allclose(out5.amp(), np.abs(out5))
-    assert_allclose(out5.pha(unwrap=False), np.angle(out5))
-
-    # Check it returns 0 if outside.
-    out6 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'linear')
-    out7 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'cubic')
-
-    assert_allclose(out6, np.nan+0j*np.nan)
-    assert_allclose(out7, np.nan+0j*np.nan)
-
-    # Check it does not return 0 if inside.
-    out8 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'linear', True)
-    out9 = fields.get_receiver(grid, field.fx, (-10, -10, -10), 'cubic', True)
-
-    assert_allclose(out8, 1.+1j)
-    assert_allclose(out9, 1.+1j)
-
-    # Check it works with model parameters.
-    model = models.Model(grid, np.ones(grid.shape_cells))
-    out10 = fields.get_receiver(
-            grid, model.property_x, (-10, -10, -10), 'linear', True)
-    assert_allclose(out10, 1.)
-    assert out10.__class__ != utils.EMArray
-
-
-def test_get_receiver_response():
     grid = meshes.TensorMesh(
             [np.ones(6), np.array([1, 1, 2, 3, 1]), np.array([1, 2, 1, 1, 1])],
             [-1, -1, -1])
@@ -455,49 +388,11 @@ def test_get_receiver_response():
 
     # Provide wrong rec_loc input:
     with pytest.raises(ValueError, match='`rec` needs to be in the form'):
-        fields.get_receiver_response(grid, efield, (1, 1, 1))
+        fields.get_receiver(efield, (1, 1, 1))
 
     # Provide particular field instead of field instance:
     with pytest.raises(ValueError, match='`field` must be a `Field`-inst'):
-        fields.get_receiver_response(grid, efield.fx, (1, 1, 1, 0, 0))
-
-    # Comparison to `get_receiver`.
-    rec = ([0.5, 1, 2], [0.5, 2, 3], 2)
-    out1a = fields.get_receiver(grid, efield.fx, rec)
-    out1b = fields.get_receiver(grid, efield.fy, rec)
-    out1c = fields.get_receiver(grid, efield.fz, rec)
-    out2a = fields.get_receiver_response(
-                grid, efield, (rec[0], rec[1], rec[2], 0, 0))
-    out2b = fields.get_receiver_response(
-                grid, efield, (rec[0], rec[1], rec[2], 90, 0))
-    out2c = fields.get_receiver_response(
-                grid, efield, (rec[0], rec[1], rec[2], 0, 90))
-    assert_allclose(out1a, out2a)
-    assert_allclose(out1b, out2b)
-    assert_allclose(out1c, out2c)
-
-    # Check it returns 0 if outside.
-    out3 = fields.get_receiver_response(grid, efield, (-10, -10, -10, 0, 0))
-    assert_allclose(out3, np.nan+1j*np.nan)
-
-    # Same for magnetic field.
-    model = models.Model(grid)
-    hfield = fields.get_h_field(model, efield)
-
-    # Comparison to `get_receiver`.
-    rec = ([0.5, 1, 2], [0.5, 2, 3], 2)
-    out4a = fields.get_receiver(grid, hfield.fx, rec)
-    out4b = fields.get_receiver(grid, hfield.fy, rec)
-    out4c = fields.get_receiver(grid, hfield.fz, rec)
-    out5a = fields.get_receiver_response(
-                grid, hfield, (rec[0], rec[1], rec[2], 0, 0))
-    out5b = fields.get_receiver_response(
-                grid, hfield, (rec[0], rec[1], rec[2], 90, 0))
-    out5c = fields.get_receiver_response(
-                grid, hfield, (rec[0], rec[1], rec[2], 0, 90))
-    assert_allclose(out4a, out5a)
-    assert_allclose(out4b, out5b)
-    assert_allclose(out4c, out5c)
+        fields.get_receiver(efield.fx, (1, 1, 1, 0, 0))
 
     # Coarse check with emg3d.solve and empymod.
     x = np.array([400, 450, 500, 550])
@@ -524,7 +419,7 @@ def test_get_receiver_response():
                     -1.90064149e-12+7.51937145e-12j,
                     1.09602131e-12+3.33066197e-12j,
                     1.25359248e-12+1.02630145e-12j])
-    e3d = fields.get_receiver_response(grid, efield, rec)
+    e3d = fields.get_receiver(efield, rec)
 
     # 10 % is still OK, grid is very coarse for fast comp (2s)
     assert_allclose(epm, e3d, rtol=0.1)

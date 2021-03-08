@@ -86,9 +86,8 @@ class TestSimulation():
         assert exit == info['exit'] == 1
 
     def test_responses(self):
-        rec_resp = fields.get_receiver_response(
-                self.grid, self.simulation.get_efield('Tx1', 1.0),
-                self.survey.rec_coords)
+        rec_resp = fields.get_receiver(
+                self.simulation.get_efield('Tx1', 1.0), self.survey.rec_coords)
         assert_allclose(
                 self.simulation.data.synthetic[1, :, 0].data,
                 rec_resp, atol=1e-16)
