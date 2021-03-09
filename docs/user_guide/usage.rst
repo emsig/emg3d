@@ -60,6 +60,10 @@ folder ``path-to-your-conda-env/conda-meta/``.
 Basic Example
 -------------
 
+TODO : This section is outdated (text doesn't match code); code is now a basic
+example executed directly when compiling the docs. However, numba is disabled
+on RTD, so only tiny examples can run.
+
 Here we show a *very* basic example. To see some more realistic models have a
 look at the `gallery <https://emsig.github.io/emg3d-gallery>`_. This
 particular example is also there, with some further explanations and examples
@@ -70,12 +74,11 @@ It also contains an example without using ``discretize``.
 First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
 ``numpy``:
 
-.. code-block:: python
+.. ipython::
 
-    >>> import emg3d
-    >>> import discretize
-    >>> import numpy as np
-
+    In [1]: import emg3d
+       ...: import numpy as np
+       ...: from matplotlib.colors import LogNorm
 
 First, we define the mesh (see :class:`discretize.TensorMesh` for more info).
 In reality, this task requires some careful considerations. E.g., to avoid edge
@@ -83,78 +86,90 @@ effects, the mesh should be large enough in order for the fields to dissipate,
 yet fine enough around source and receiver to accurately model them. This grid
 is too small, but serves as a minimal example.
 
-.. code-block:: python
+.. ipython::
 
-    >>> grid = discretize.TensorMesh(
-    >>>         [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
-    >>>          [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
-    >>>          [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
-    >>>         x0='CCC')
-    >>> print(grid)
-
-      TensorMesh: 49,152 cells
-
-                          MESH EXTENT             CELL WIDTH      FACTOR
-      dir    nC        min           max         min       max      max
-      ---   ---  ---------------------------  ------------------  ------
-       x     48       -662.16        662.16     25.00     37.01    1.04
-       y     32       -857.96        857.96     50.00     63.34    1.03
-       z     32       -540.80        540.80     30.00     44.32    1.05
-
+    In [2]: # Create a simple grid, 8 cells of length 2 in each direction,
+       ...: # centered around the origin.
+       ...: cw = 2*np.ones(8)
+       ...: grid = emg3d.TensorMesh(h=[cw, cw, cw], origin=(-8, -8, -8))
+       ...: grid
+    Out[2]:  TensorMesh: 512 cells
+       ...:
+       ...:                      MESH EXTENT             CELL WIDTH      FACTOR
+       ...:  dir    nC        min           max         min       max      max
+       ...:  ---   ---  ---------------------------  ------------------  ------
+       ...:   x      8         -8.00          8.00      2.00      2.00    1.00
+       ...:   y      8         -8.00          8.00      2.00      2.00    1.00
+       ...:   z      8         -8.00          8.00      2.00      2.00    1.00
+       ...:
 
 Next we define a very simple fullspace model with
 :math:`\rho_x=1.5\,\Omega\,\text{m}`, :math:`\rho_y=1.8\,\Omega\,\text{m}`, and
 :math:`\rho_z=3.3\,\Omega\,\text{m}`. The source is an x-directed dipole at the
 origin, with a 10 Hz signal of 1 A.
 
-.. code-block:: python
+.. ipython::
 
-    >>> model = emg3d.models.Model(
-    >>>     grid, property_x=1.5, property_y=1.8, property_z=3.3)
-    >>> sfield = emg3d.fields.get_source_field(
-    >>>     grid, src=[0, 0, 0, 0, 0], freq=10.0)
+    In [3]: # The model is a fullspace with tri-axial anisotropy.
+       ...: model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
+       ...:                     property_z=3.3, mapping='Resistivity')
+       ...: model
+    Out[3]:    Model [resistivity]; tri-axial; 8 x 8 x 8 (512)
+
+    In [4]: # The source is a x-directed, horizontal dipole at (0, 0, 0)
+       ...: # with a frequency of 1 Hz.
+       ...: sfield = emg3d.fields.get_source_field(
+       ...:         grid, src=[0, 0, 0, 0, 0], freq=1)
 
 Now we can compute the electric field with ``emg3d``:
 
-.. code-block:: python
+.. ipython::
 
-    >>> efield = emg3d.solve(grid, model, sfield, verb=4)
-
-    :: emg3d START :: 15:24:40 :: v0.13.0
-
-       MG-cycle       : 'F'                 sslsolver : False
-       semicoarsening : False [0]           tol       : 1e-06
-       linerelaxation : False [0]           maxit     : 50
-       nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 3
-       Original grid  :  48 x  32 x  32     => 49,152 cells
-       Coarsest grid  :   3 x   2 x   2     => 12 cells
-       Coarsest level :   4 ;   4 ;   4
-
-       [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
-
-           h_
-          2h_ \                  /
-          4h_  \          /\    /
-          8h_   \    /\  /  \  /
-         16h_    \/\/  \/    \/
-
-       [11:18:17]   2.623e-02  after   1 F-cycles   [1.464e-06, 0.026]   0 0
-       [11:18:17]   2.253e-03  after   2 F-cycles   [1.258e-07, 0.086]   0 0
-       [11:18:17]   3.051e-04  after   3 F-cycles   [1.704e-08, 0.135]   0 0
-       [11:18:17]   5.500e-05  after   4 F-cycles   [3.071e-09, 0.180]   0 0
-       [11:18:18]   1.170e-05  after   5 F-cycles   [6.531e-10, 0.213]   0 0
-       [11:18:18]   2.745e-06  after   6 F-cycles   [1.532e-10, 0.235]   0 0
-       [11:18:18]   6.873e-07  after   7 F-cycles   [3.837e-11, 0.250]   0 0
-
-       > CONVERGED
-       > MG cycles        : 7
-       > Final rel. error : 6.873e-07
-
-    :: emg3d END   :: 15:24:42 :: runtime = 0:00:02
+    In [5]: # Compute the electric signal.
+       ...: efield = emg3d.solve(model, sfield, verb=4)
+    Out[5]: :: emg3d START :: 11:14:25 :: v1.0.0
+       ...:
+       ...: MG-cycle       : 'F'                 sslsolver : False
+       ...: semicoarsening : False [0]           tol       : 1e-06
+       ...: linerelaxation : False [0]           maxit     : 50
+       ...: nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 4
+       ...: Original grid  :   8 x   8 x   8     => 512 cells
+       ...: Coarsest grid  :   2 x   2 x   2     => 8 cells
+       ...: Coarsest level :   2 ;   2 ;   2     :: Grid not optimal for MG solver ::
+       ...:
+       ...: [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
+       ...:
+       ...:     h_
+       ...:     2h_ \    /
+       ...:     4h_  \/\/
+       ...:
+       ...: [11:14:40]   2.284e-02  after   1 F-cycles   [1.275e-06, 0.023]   0 0
+       ...: [11:14:40]   1.565e-03  after   2 F-cycles   [8.739e-08, 0.069]   0 0
+       ...: [11:14:40]   1.295e-04  after   3 F-cycles   [7.232e-09, 0.083]   0 0
+       ...: [11:14:40]   1.197e-05  after   4 F-cycles   [6.685e-10, 0.092]   0 0
+       ...: [11:14:40]   1.233e-06  after   5 F-cycles   [6.886e-11, 0.103]   0 0
+       ...: [11:14:40]   1.415e-07  after   6 F-cycles   [7.899e-12, 0.115]   0 0
+       ...:
+       ...: > CONVERGED
+       ...: > MG cycles        : 6
+       ...: > Final rel. error : 1.415e-07
+       ...:
+       ...: :: emg3d END   :: 11:14:40 :: runtime = 0:00:15
 
 So the computation required seven multigrid F-cycles and took just a bit more
 than 2 seconds. It was able to coarsen in each dimension four times, where the
 input grid had 49,152 cells, and the coarsest grid had 12 cells.
+
+.. ipython::
+
+    @savefig basic_example.png width=4in
+    In [1]: # Get cell-averaged values of the real component.
+       ...: ccr_efield = grid.aveE2CCV * efield.real
+       ...:
+       ...: grid.plot_slice(
+       ...:     ccr_efield, normal='Y', v_type='CCv', view='vec',
+       ...:     pcolor_opts={'norm': LogNorm()},
+       ...: );
 
 
 Related ecosystem

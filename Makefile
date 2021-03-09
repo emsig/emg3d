@@ -37,4 +37,4 @@ clean:
 	rm -rf build/ dist/ .eggs/ emg3d.egg-info/ emg3d/version.py  # build
 	rm -rf */__pycache__/ */*/__pycache__/      # python cache
 	rm -rf .coverage htmlcov/ .pytest_cache/    # tests and coverage
-	rm -rf docs/api/ docs/_build/               # docs
+	rm -rf docs/api/ docs/_build/ docs/savefig/ # docs
