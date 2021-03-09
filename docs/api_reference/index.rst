@@ -1,8 +1,13 @@
 .. _api-reference:
 
-=============
+#############
 API reference
-=============
+#############
+
+:Release: |version|
+:Date: |today|
+
+----
 
 .. module:: emg3d
 
