@@ -15,6 +15,156 @@ is given in the chapter :doc:`theory`, and further literature is provided in
 the :doc:`references`.
 
 
+Test 1 : Numba for RTD?
+-----------------------
+
+.. ipython::
+
+    In [1]: import emg3d
+       ...: import numpy as np
+
+    In [2]: # Create a simple grid, 8 cells of length 1 in each direction,
+       ...: # starting at the origin.
+       ...: grid = emg3d.TensorMesh(
+       ...:          [np.ones(8), np.ones(8), np.ones(8)],
+       ...:          origin=np.array([0, 0, 0]))
+
+    In [3]: # The model is a fullspace with tri-axial anisotropy.
+       ...: model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
+       ...:                     property_z=3.3, mapping='Resistivity')
+
+    In [4]: # The source is a x-directed, horizontal dipole at (4, 4, 4)
+       ...: # with a frequency of 10 Hz.
+       ...: sfield = emg3d.fields.get_source_field(
+       ...:         grid, src=[4, 4, 4, 0, 0], freq=10)
+
+    In [5]: # Compute the electric signal.
+       ...: efield = emg3d.solve(model, sfield, verb=4)
+    Out[5]: :: emg3d START :: 11:14:25 :: v1.0.0
+       ...:
+       ...: MG-cycle       : 'F'                 sslsolver : False
+       ...: semicoarsening : False [0]           tol       : 1e-06
+       ...: linerelaxation : False [0]           maxit     : 50
+       ...: nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 4
+       ...: Original grid  :   8 x   8 x   8     => 512 cells
+       ...: Coarsest grid  :   2 x   2 x   2     => 8 cells
+       ...: Coarsest level :   2 ;   2 ;   2     :: Grid not optimal for MG solver ::
+       ...:
+       ...: [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
+       ...:
+       ...:     h_
+       ...:     2h_ \    /
+       ...:     4h_  \/\/
+       ...:
+       ...: [11:14:40]   2.284e-02  after   1 F-cycles   [1.275e-06, 0.023]   0 0
+       ...: [11:14:40]   1.565e-03  after   2 F-cycles   [8.739e-08, 0.069]   0 0
+       ...: [11:14:40]   1.295e-04  after   3 F-cycles   [7.232e-09, 0.083]   0 0
+       ...: [11:14:40]   1.197e-05  after   4 F-cycles   [6.685e-10, 0.092]   0 0
+       ...: [11:14:40]   1.233e-06  after   5 F-cycles   [6.886e-11, 0.103]   0 0
+       ...: [11:14:40]   1.415e-07  after   6 F-cycles   [7.899e-12, 0.115]   0 0
+       ...:
+       ...: > CONVERGED
+       ...: > MG cycles        : 6
+       ...: > Final rel. error : 1.415e-07
+       ...:
+       ...: :: emg3d END   :: 11:14:40 :: runtime = 0:00:15
+
+    @savefig plot_simple.png width=4in
+    In [1]: from matplotlib.colors import LogNorm
+       ...: # Get cell-averaged values of the real component.
+       ...: ccr_efield = grid.aveE2CCV * efield.real
+       ...:
+       ...: grid.plot_slice(
+       ...:     ccr_efield, normal='Y', v_type='CCv', view='vec',
+       ...:     pcolor_opts={'norm': LogNorm()},
+       ...: );
+
+
+Test 2 : Coordinate System
+--------------------------
+
+.. ipython::
+    :suppress:
+
+    @savefig coordinate_system.png width=4in
+    In [1]: import empymod
+       ...: import numpy as np
+       ...: import matplotlib.pyplot as plt
+       ...: from mpl_toolkits.mplot3d import Axes3D
+       ...: from mpl_toolkits.mplot3d import proj3d
+       ...: from matplotlib.patches import FancyArrowPatch
+       ...: class Arrow3D(FancyArrowPatch):
+       ...:     """https://stackoverflow.com/a/29188796"""
+       ...:
+       ...:     def __init__(self, xs, ys, zs):
+       ...:         FancyArrowPatch.__init__(
+       ...:                 self, (0, 0), (0, 0), mutation_scale=20, lw=1.5,
+       ...:                 arrowstyle='-|>', color='.2', zorder=100)
+       ...:         self._verts3d = xs, ys, zs
+       ...:
+       ...:     def draw(self, renderer):
+       ...:         xs3d, ys3d, zs3d = self._verts3d
+       ...:         xs, ys, _ = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+       ...:         self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+       ...:         FancyArrowPatch.draw(self, renderer)
+       ...: # Create figure
+       ...: fig = plt.figure(figsize=(6, 5))
+       ...:
+       ...:
+       ...: # Right-handed  system
+       ...: ax = fig.add_subplot(111, projection='3d', facecolor='w')
+       ...: ax.axis('off')
+       ...:
+       ...: P = (6, 10, -8)
+       ...:
+       ...: # Coordinate system
+       ...: # The first three are not visible, but for the aspect ratio of the plot.
+       ...: ax.plot([-2, 12], [0, 0], [0, 0], c='w')
+       ...: ax.plot([0, 0], [-2, 12], [0, 0], c='w')
+       ...: ax.plot([0, 0], [0, 0], [-10, 4], c='w')
+       ...: ax.add_artist(Arrow3D([-2, 12], [0, 0], [0, 0]))
+       ...: ax.add_artist(Arrow3D([0, 0], [-2, 14], [0, 0]))
+       ...: ax.add_artist(Arrow3D([0, 0], [0, 0], [-10, 4]))
+       ...: ax.plot([0, P[0]], [P[1], P[1]], [P[2], P[2]], ':', c='.8')
+       ...: ax.plot([0, P[0]], [0, 0], [P[2], P[2]], ':', c='.8')
+       ...: ax.plot([P[0], P[0]], [0, P[1]], [P[2], P[2]], ':', c='.8')
+       ...: ax.plot([0, 0], [0, P[1]], [P[2], P[2]], ':', c='.8')
+       ...: ax.plot([P[0], P[0]], [P[1], P[1]], [0, P[2]], '--', c='.6')
+       ...:
+       ...:
+       ...: # Annotate it
+       ...: ax.text(9, 3, 0, r'$x$ / Easting')
+       ...: ax.text(0, 10, 1, r'$y$ / Northing')
+       ...: ax.text(-1, 0, 4, r'$z$ / Elevation')
+       ...:
+       ...: # Helper lines
+       ...: ax.plot([0, P[0]], [0, P[1]], [0, 0], '--', c='.6')
+       ...:
+       ...:
+       ...: # Resulting trajectory
+       ...: ax.plot([0, P[0]], [0, P[1]], [0, P[2]], 'C0')
+       ...:
+       ...: fact = 7
+       ...:
+       ...: # Theta
+       ...: azm = np.arcsin(P[1]/np.sqrt(P[0]**2+P[1]**2))
+       ...: lazm = np.linspace(0, azm, 31)
+       ...: ax.plot(np.cos(lazm)*fact, np.sin(lazm)*fact, 0, c='C5')
+       ...: ax.text(6, 4, 0, r"$\theta$", color='C5', fontsize=14)
+       ...:
+       ...: # Phi
+       ...: dip = np.pi/2-np.arcsin(np.sqrt(P[0]**2+P[1]**2)/np.sqrt(P[0]**2+P[1]**2+P[2]**2))
+       ...: print(f"theta = {np.rad2deg(azm):.1f}°; phi = {np.rad2deg(dip):.1f}°")
+       ...: ldip = np.linspace(0, dip, 31)
+       ...: ax.plot(np.cos(azm)*np.cos(ldip)*fact, np.sin(azm)*np.cos(ldip)*fact, -np.sin(ldip)*fact, c='C1')
+       ...: ax.text(4.5, 4, -2, r"$\varphi$", color='C1', fontsize=14)
+       ...:
+       ...: ax.view_init(azim=-70, elev=10)
+       ...: ax.dist = 6
+       ...: plt.title('RHS coordinate system')
+       ...: plt.tight_layout()
+
+
 Installation
 ------------
 

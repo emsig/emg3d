@@ -6,13 +6,17 @@ from emg3d import __version__
 # Load extensions
 extensions = [
     'sphinx.ext.autodoc',
+    'numpydoc',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'sphinx.ext.todo',
-    'sphinx.ext.intersphinx',
-    'numpydoc',
+    'sphinx.ext.doctest',
+    # 'sphinx.ext.todo',
     'sphinx_automodapi.automodapi',
+    'matplotlib.sphinxext.plot_directive',
+    'IPython.sphinxext.ipython_console_highlighting',
+    'IPython.sphinxext.ipython_directive',
 ]
 autosummary_generate = True
 add_module_names = True
