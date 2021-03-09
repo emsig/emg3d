@@ -67,10 +67,8 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
     sfield : SourceField
         The source field. See :func:`emg3d.fields.get_source_field`.
 
-    efield : Field, optional
-        Initial electric field. It is initiated with zeroes if not provided. A
-        provided efield MUST have frequency information (initiated with
-        ``emg3d.fields.Field(..., freq)``).
+    efield : Field, default: zero Field
+        Initial electric field. It is initiated with zeroes if not provided.
 
         If an initial efield is provided nothing is returned, but the final
         efield is directly put into the provided efield.
@@ -80,8 +78,8 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         relaxation. The sslsolver is at times unstable with an initial guess,
         carrying out one MG cycle helps to stabilize it.
 
-    cycle : str; optional.
-        Type of multigrid cycle. Default is 'F'.
+    cycle : str, default: 'F'
+        Type of multigrid cycle.
 
         - ``'V'``: V-cycle, simplest version;
         - ``'W'``: W-cycle, most expensive version;
@@ -100,9 +98,9 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
            8h_     \/       \/\/  \/       \/\/  \/\/
 
 
-    sslsolver : str, optional
+    sslsolver : str, default: False
         A :mod:`scipy.sparse.linalg`-solver, to use with MG as pre-conditioner
-        or on its own (if ``cycle=None``). Default is False.
+        or on its own (if ``cycle=None``).
 
         Current possibilities:
 
@@ -117,8 +115,8 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         It does currently not work with 'cg', 'bicg', 'qmr', and 'minres' for
         various reasons (e.g., some require `rmatvec` in addition to `matvec`).
 
-    semicoarsening : int; optional
-        Semicoarsening. Default is False.
+    semicoarsening : int, default: False
+        Semicoarsening.
 
         - True: Cycling over 1, 2, 3.
         - 0 or False: No semicoarsening.
@@ -129,8 +127,8 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
           cycle over these values, e.g., ``semicoarsening=1213`` will cycle
           over [1, 2, 1, 3].
 
-    linerelaxation : int; optional
-        Line relaxation. Default is False.
+    linerelaxation : int, default: False
+        Line relaxation.
 
         This parameter is not respected on the coarsest grid, except if it is
         set to 0. If it is bigger than zero line relaxation on the coarsest
@@ -152,8 +150,8 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         Note: Smoothing is generally done in lexicographical order, except for
         line relaxation in y direction; the reason is speed (memory access).
 
-    verb : int; optional
-        Level of verbosity (the higher the more verbose). Default is 1.
+    verb : int, default: 1
+        Level of verbosity (the higher the more verbose).
 
         - 0: Nothing.
         - 1: Warnings.
@@ -163,15 +161,15 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         - 5: Everything (slower due to additional error computations).
         - -1: One-liner (dynamically updated).
 
-    tol : float, optional
-        Convergence tolerance. Default is 1e-6.
+    tol : float, default: 1e-6
+        Convergence tolerance.
 
         Iterations stop as soon as the norm of the residual has decreased by
         this factor, relative to the residual norm obtained for a zero
         electric field.
 
-    maxit : int, optional
-        Maximum number of multigrid iterations. Default is 50.
+    maxit : int, default: 50
+        Maximum number of multigrid iterations.
 
         If `sslsolver` is used, this applies to the `sslsolver`.
 
@@ -179,31 +177,30 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         `sslsolver`, the maximum iteration for multigrid is defined by the
         maximum length of the `linerelaxation` and `semicoarsening`-cycles.
 
-    nu_init : int, optional
-        Number of initial smoothing steps, before MG cycle. Default is 0.
+    nu_init : int, default: 0
+        Number of initial smoothing steps, before MG cycle.
 
-    nu_pre : int, optional
-        Number of pre-smoothing steps. Default is 2.
+    nu_pre : int, default: 2
+        Number of pre-smoothing steps.
 
-    nu_coarse : int, optional
-        Number of smoothing steps on coarsest grid. Default is 1.
+    nu_coarse : int, default: 1
+        Number of smoothing steps on coarsest grid.
 
-    nu_post : int, optional
-        Number of post-smoothing steps. Default is 2.
+    nu_post : int, default: 2
+        Number of post-smoothing steps.
 
-    clevel : int, optional
+    clevel : int, default: -1
         The maximum coarsening level can be different for each dimension and
         is, by default, automatically determined (``clevel=-1``). The
         parameter `clevel` can be used to restrict the maximum coarsening
         level in any direction by its value.
-        Default is -1.
 
-    return_info : bool, optional
+    return_info : bool, default: False
         If True, a dictionary is returned with runtime info (final norm and
         number of iterations of MG and the sslsolver).
 
-    log : int, optional
-        Only relevant if ``return_info=True``. Default is 1.
+    log : int, default: 1
+        Only relevant if ``return_info=True``.
 
         - -1: LOG ONLY: Only store info in log, do not print on screen.
         - 0: SCREEN only: Only print info to screen, do not store in log.
