@@ -1,5 +1,3 @@
-.. _user-guide:
-
 ##########
 User Guide
 ##########
@@ -12,11 +10,15 @@ User Guide
 .. toctree::
    :maxdepth: 2
 
+   about
+   installation
    usage
+   cli
    mgwhat
    theory
    cpu_and_ram
-   cli
+   credits
+   citation
    references
    changelog
-   credits
+   license

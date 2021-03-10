@@ -1,60 +1,5 @@
-.. _GettingStarted:
-
 Getting started
-###############
-
-The code ``emg3d`` ([WeMS19]_) is a three-dimensional modeller for
-electromagnetic (EM) diffusion as used, for instance, in controlled-source EM
-(CSEM) surveys frequently applied in the search for, amongst other,
-groundwater, hydrocarbons, and minerals.
-
-The core of the code is primarily based on [Muld06]_, [Muld07]_, and [Muld08]_.
-You can read more about the background of the code in the chapter
-:doc:`credits`. An introduction to the underlying theory of multigrid methods
-is given in the chapter :doc:`theory`, and further literature is provided in
-the :doc:`references`.
-
-
-Installation
-------------
-
-You can install emg3d either via ``conda``:
-
-.. code-block:: console
-
-   conda install -c conda-forge emg3d
-
-or via ``pip``:
-
-.. code-block:: console
-
-   pip install emg3d
-
-Minimum requirements are Python version 3.7 or higher and the modules ``scipy``
-and ``numba``. Various other packages are recommended or required for some
-advanced functionalities, namely:
-
-- ``xarray``: For the ``Survey`` class (many sources and receivers at once).
-- ``discretize``: For advanced meshing tools (fancy mesh-representations and
-  plotting utilities).
-- ``matplotlib``: To use the plotting utilities within ``discretize``.
-- ``h5py``: Save and load data in the HDF5 format.
-- ``empymod``: Time-domain modelling (``utils.Fourier``).
-- ``scooby``: For the version and system report (``emg3d.Report()``).
-
-If you are new to Python we recommend using a Python distribution, which will
-ensure that all dependencies are met, specifically properly compiled versions
-of ``NumPy`` and ``SciPy``; we recommend using `Anaconda
-<https://www.anaconda.com/distribution>`_. If you install Anaconda you can
-simply start the *Anaconda Navigator*, add the channel ``conda-forge`` and
-``emg3d`` will appear in the package list and can be installed with a click.
-
-Using NumPy and SciPy with the Intel Math Kernel Library (*mkl*) can
-significantly improve computation time. You can check if ``mkl`` is used via
-``conda list``: The entries for the BLAS and LAPACK libraries should contain
-something with ``mkl``, not with ``openblas``. To enforce it you might have to
-create a file ``pinned``, containing the line ``libblas[build=*mkl]`` in the
-folder ``path-to-your-conda-env/conda-meta/``.
+===============
 
 
 Basic Example
@@ -164,24 +109,21 @@ input grid had 49,152 cells, and the coarsest grid had 12 cells.
        ...:                 pcolor_opts={'norm': LogNorm()});
 
 
-Related ecosystem
+Coordinate System
 -----------------
 
-To create advanced meshes it is recommended to use `discretize
-<https://discretize.simpeg.xyz>`_ from the SimPEG framework. It also comes with
-some neat plotting functionalities to plot model parameters and resulting
-fields. Furthermore, it can serve as a link to use `PyVista
-<https://docs.pyvista.org>`_ to create nice 3D plots even within a notebook.
+The coordinate system is shown in :numref:`Figure %s <coordinate_system>`. It
+is a right-handed system (RHS) with x pointing East, y pointing North, and z
+pointing upwards. The azimuth is defined as the anticlockwise rotation from
+Easting towards Northing, and dip is defined as the clockwise rotation from the
+horizontal plane down.
 
-Projects which can be used to compare or validate the results are, e.g.,
-`empymod <https://emsig.github.io>`_ for layered models or `SimPEG
-<https://simpeg.xyz>`_ for 3D models. It is also possible to create a
-geological model with `GemPy <https://www.gempy.org>`_ and, again via
-discretize, move it to emg3d to compute CSEM responses for it.
+.. figure:: ../_static/coordinate_system.svg
+   :align: center
+   :alt: Coordinate System
+   :name: coordinate_system
 
-Have a look at the `gallery <https://emsig.github.io/emg3d-gallery>`_ for
-many examples of how to use emg3d together with the mentioned projects and
-more!
+   Coordinate system used in emg3d: RHS with positive z upwards.
 
 
 Tips and Tricks
@@ -222,70 +164,3 @@ its docstring. Here a few additional information.
   <https://emsig.github.io/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_
   in the gallery for an example how to run some tests on your particular
   problem.
-
-
-Contributing and Roadmap
-------------------------
-
-New contributions, bug reports, or any kind of feedback is always welcomed!
-Have a look at the `Roadmap-project
-<https://github.com/emsig/emg3d/projects/1>`_ to get an idea of things that
-could be implemented. The GitHub `issues
-<https://github.com/emsig/emg3d/issues>`_ and
-`PR's <https://github.com/emsig/emg3d/pulls>`_ are also a good starting
-point. The best way for interaction is at https://github.com/emsig or by
-joining the `Slack channel <http://slack.simpeg.xyz>`_ «em-x-d» of SimPEG. If
-you prefer to get in touch outside of GitHub/Slack use the contact form on
-https://werthmuller.org.
-
-To install emg3d from source, you can download the latest version from GitHub
-and install it in your python distribution via:
-
-.. code-block:: console
-
-   python setup.py install
-
-Please make sure your code follows the pep8-guidelines by using, for instance,
-the python module ``flake8``, and also that your code is covered with
-appropriate tests. Just get in touch if you have any doubts.
-
-
-Tests and benchmarks
---------------------
-
-The modeller comes with a test suite using ``pytest``. If you want to run the
-tests, just install ``pytest`` and run it within the ``emg3d``-top-directory.
-
-.. code-block:: console
-
-    > pytest --cov=emg3d --flake8
-
-It should run all tests successfully. Please let us know if not!
-
-Note that installations of ``em3gd`` via conda or pip do not have the
-test-suite included. To run the test-suite you must download ``emg3d`` from
-GitHub.
-
-There is also a benchmark suite using *airspeed velocity*, located in the
-`emsig/emg3d-asv <https://github.com/emsig/emg3d-asv>`_-repository. The results
-of my machine can be found in the `emsig/emg3d-bench
-<https://github.com/emsig/emg3d-bench>`_, its rendered version at
-`emsig.github.io/emg3d-asv <https://emsig.github.io/emg3d-asv>`_.
-
-
-License
--------
-
-Copyright 2018-2021 The emg3d Developers.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    https://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.

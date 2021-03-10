@@ -1,5 +1,5 @@
 Utils & I/O
-###########
+===========
 
 .. automodapi:: emg3d.utils
    :no-inheritance-diagram:

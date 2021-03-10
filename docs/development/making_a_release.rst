@@ -1,9 +1,5 @@
-Development
-===========
-
-
 Making a release
-----------------
+================
 
 1. Update ``CHANGELOG.rst``.
 

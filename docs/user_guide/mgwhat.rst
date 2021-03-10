@@ -1,5 +1,5 @@
 Multi-what?
-###########
+===========
 
 If you have never heard of the multigrid method before you might ask yourself
 "*multi-what?*" The following is an intent to describe the multigrid method

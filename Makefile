@@ -22,7 +22,7 @@ pytest:
 	pytest --cov=emg3d --flake8 && coverage html
 
 flake8:
-	flake8 docs/conf.py setup.py emg3d/ tests/
+	flake8 docs/ setup.py emg3d/ tests/
 
 doc:
 	cd docs && make html && cd ..

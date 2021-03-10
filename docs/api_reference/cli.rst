@@ -1,5 +1,5 @@
 Command Line Interface
-######################
+======================
 
 .. automodule:: emg3d.cli
 

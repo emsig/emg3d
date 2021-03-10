@@ -19,7 +19,7 @@ emg3d Documentation
    user_guide/index
    gallery
    api_reference/index
-   maintenance
+   development/index
 
 ----
 

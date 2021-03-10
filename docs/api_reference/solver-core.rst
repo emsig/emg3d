@@ -1,5 +1,5 @@
 Solver & Core
-#############
+=============
 
 .. automodapi:: emg3d.solver
    :no-inheritance-diagram:

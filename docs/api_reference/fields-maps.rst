@@ -1,5 +1,5 @@
 Fields & Maps
-#############
+=============
 
 .. automodapi:: emg3d.fields
    :no-inheritance-diagram:

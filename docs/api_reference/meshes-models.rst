@@ -1,5 +1,5 @@
 Meshes & Models
-###############
+===============
 
 .. automodapi:: emg3d.meshes
    :no-inheritance-diagram:
