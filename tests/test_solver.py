@@ -640,3 +640,66 @@ def test_RegularGridProlongator():
     out2 = prolon_emg3d(grid, cgrid, efield2.fx, cefield, yz_points)
 
     assert_allclose(out1, out2)
+
+
+def test_get_restriction_weights():
+
+    x = [500, 700, 800, 1000]
+    cx = [1200, 1800]
+    y = [2, 2, 2, 2]
+    cy = [4, 4]
+
+    grid = meshes.TensorMesh([x, y, x], (0, 0, 0))
+    cgrid = meshes.TensorMesh([cx, cy, cx], (0, 0, 0))
+
+    # 1. Simple example following equation 9, [Muld06]_.
+    wxl = np.array([350/250, 250/600, 400/900])
+    wx0 = np.array([1., 1., 1.])
+    wxr = np.array([350/600, 500/900, 400/500])
+    wyl = np.array([1, 0.5, 0.5])
+    wy0 = np.array([1., 1., 1.])
+    wyr = np.array([0.5, 0.5, 1])
+    wdl = np.array([0., 0., 0., 0., 0.])  # dummy
+    wd0 = np.array([1., 1., 1., 1., 1.])  # dummy
+    wdr = np.array([0., 0., 0., 0., 0.])  # dummy
+
+    for i in [0, 5, 6]:
+        wx, wy, wz = solver._get_restriction_weights(grid, cgrid, i)
+
+        if i not in [5, 6]:
+            assert_allclose(wxl, wx[0])
+            assert_allclose(wx0, wx[1])
+            assert_allclose(wxr, wx[2])
+        else:
+            assert_allclose(wdl, wx[0])
+            assert_allclose(wd0, wx[1])
+            assert_allclose(wdr, wx[2])
+
+        if i != 6:
+            assert_allclose(wyl, wy[0])
+            assert_allclose(wy0, wy[1])
+            assert_allclose(wyr, wy[2])
+        else:
+            assert_allclose(wdl, wy[0])
+            assert_allclose(wd0, wy[1])
+            assert_allclose(wdr, wy[2])
+
+        if i != 5:
+            assert_allclose(wxl, wz[0])
+            assert_allclose(wx0, wz[1])
+            assert_allclose(wxr, wz[2])
+        else:
+            assert_allclose(wdl, wz[0])
+            assert_allclose(wd0, wz[1])
+            assert_allclose(wdr, wz[2])
+
+
+def test_get_prolongation_coordinates():
+    grid = meshes.TensorMesh([[1, 2], [3, 4], [5, 6]], (0, 0, 0))
+    out = solver._get_prolongation_coordinates(grid, 'x', 'y')
+    test = [0, 1, 3, 0, 1, 3, 0, 1, 3, 0, 0, 0, 3, 3, 3, 7, 7, 7]
+    assert_allclose(out.ravel('F'), test)
+
+def test_ConvergenceError():
+    with pytest.raises(solver._ConvergenceError):
+        raise solver._ConvergenceError

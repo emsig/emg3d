@@ -1787,16 +1787,17 @@ def _restrict_model_parameters(param, sc_dir):
 def _get_restriction_weights(grid, cgrid, sc_dir):
     """Return restriction weights.
 
-    Return the weights (Equation 9 of [Muld06]_). The corresponding weights are
-    not actually used in the case of semicoarsening. We still have to provide
-    arrays of the correct format though, otherwise numba will complain in the
-    jitted functions.
+    Return the weights as given in Equation 9 of [Muld06]_. It is a wrapper for
+    the numba-jitted function :func:`emg3d.core.restrict_weights`. The
+    corresponding weights are not actually used in the case of semicoarsening.
+    We still have to provide arrays of the correct format though, otherwise
+    numba will complain in the jitted functions.
 
 
     Parameters
     ----------
-    grid, cgrid : :class:`emg3d.meshes.TensorMesh`
-        Fine and coarse grids.
+    grid, cgrid : TensorMesh
+        Fine and coarse grids; :class:`emg3d.meshes.TensorMesh` instances.
 
     sc_dir : int
         Direction of semicoarsening.
@@ -1804,33 +1805,37 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
 
     Returns
     -------
-    wx, wy, wz : ndarray
-        Restriction weights.
+    wx, wy, wz : tuple
+        Restriction weights in x, y, and z direction, consisting of
+        (left, center, right) weights.
 
     """
+    # x-directed weights.
     if sc_dir not in [1, 5, 6]:
         wx = core.restrict_weights(
                 grid.nodes_x, grid.cell_centers_x, grid.h[0], cgrid.nodes_x,
                 cgrid.cell_centers_x, cgrid.h[0])
-    else:
+    else:  # Dummy weights in case of semicoarsening.
         wxlr = np.zeros(grid.shape_nodes[0], dtype=np.float64)
         wx0 = np.ones(grid.shape_nodes[0], dtype=np.float64)
         wx = (wxlr, wx0, wxlr)
 
+    # y-directed weights.
     if sc_dir not in [2, 4, 6]:
         wy = core.restrict_weights(
                 grid.nodes_y, grid.cell_centers_y, grid.h[1], cgrid.nodes_y,
                 cgrid.cell_centers_y, cgrid.h[1])
-    else:
+    else:  # Dummy weights in case of semicoarsening.
         wylr = np.zeros(grid.shape_nodes[1], dtype=np.float64)
         wy0 = np.ones(grid.shape_nodes[1], dtype=np.float64)
         wy = (wylr, wy0, wylr)
 
+    # z-directed weights.
     if sc_dir not in [3, 4, 5]:
         wz = core.restrict_weights(
                 grid.nodes_z, grid.cell_centers_z, grid.h[2], cgrid.nodes_z,
                 cgrid.cell_centers_z, cgrid.h[2])
-    else:
+    else:  # Dummy weights in case of semicoarsening.
         wzlr = np.zeros(grid.shape_nodes[2], dtype=np.float64)
         wz0 = np.ones(grid.shape_nodes[2], dtype=np.float64)
         wz = (wzlr, wz0, wzlr)
