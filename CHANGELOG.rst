@@ -55,6 +55,18 @@ latest: towards v1.0
 - ``solver.solve``:
 
   - Does not take a ``grid`` any longer.
+  - Some verbosity levels changed (consistency throughout module). The new
+    levels are [old level in brackets]:
+
+    - -1: Nothing. [0]
+    - 0: Warnings. [1]
+    - 1: One-liner at the end. [2]
+    - 2: One-liner (dynamically updated). [-1]
+    - 3: Runtime and information about the method. [same]
+    - 4: Additional information for each MG-cycle. [same]
+    - 5: Everything (slower due to additional error computations). [same]
+
+    Level three now updates dynamically just as level 2.
 
 - ``fields``:
 

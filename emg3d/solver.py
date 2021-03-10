@@ -33,7 +33,7 @@ __all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
 
 # MAIN USER-FACING FUNCTION
 def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
-          semicoarsening=False, linerelaxation=False, verb=1, **kwargs):
+          semicoarsening=False, linerelaxation=False, verb=0, **kwargs):
     r"""Solver for 3D CSEM data with tri-axial electrical anisotropy.
 
     The principal solver of `emg3d` is using the multigrid method as presented
@@ -150,16 +150,16 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         Note: Smoothing is generally done in lexicographical order, except for
         line relaxation in y direction; the reason is speed (memory access).
 
-    verb : int, default: 1
+    verb : int, default: 0
         Level of verbosity (the higher the more verbose).
 
-        - 0: Nothing.
-        - 1: Warnings.
-        - 2: One-liner at the end.
+        - -1: Nothing.
+        - 0: Warnings.
+        - 1: One-liner at the end.
+        - 2: One-liner (dynamically updated).
         - 3: Runtime and information about the method.
         - 4: Additional information for each MG-cycle.
         - 5: Everything (slower due to additional error computations).
-        - -1: One-liner (dynamically updated).
 
     tol : float, default: 1e-6
         Convergence tolerance.
@@ -383,7 +383,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
     exit_status = int(var.exit_message != 'CONVERGED')
 
     # Print runtime information.
-    if var.verb < 0 or var.verb == 2:
+    if var.verb in [1, 2]:
         var.one_liner(var.l2, True)
     elif var.verb > 2:
         if var.sslsolver:  # sslsolver-specific info.
@@ -396,8 +396,8 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         info += f":: emg3d END   :: {var.time.now} :: "
         info += f"runtime = {var.time.runtime}\n"
         var.cprint(info, 2)
-    elif var.verb == 1 and exit_status == 1:
-        var.cprint(f"* WARNING :: {var.exit_message}", 0)
+    elif var.verb == 0 and exit_status == 1:
+        var.cprint(f"* WARNING :: {var.exit_message}", -1)
 
     # Assemble the info_dict if return_info
     if var.return_info:
@@ -697,7 +697,7 @@ def krylov(model, sfield, efield, var):
 
             var.cprint(log, 3)
 
-        elif var.verb < 0:
+        elif var.verb in [2, 3]:
 
             var.one_liner(var.l2)
 
@@ -713,7 +713,11 @@ def krylov(model, sfield, efield, var):
         var.exit_message += " (returned field is zero)"
 
     # Convergence-checks for sslsolver.
-    pre = "\n   > "
+    if var.verb == 3:
+        pre = 50*" " + "\r"
+    else:
+        pre = "\n"
+    pre += "   > "
     if i < 0:
         if var.exit_message == '':
             var.exit_message = f"Error in {var.sslsolver} ({i})"
@@ -1066,7 +1070,7 @@ class MGParameters:
     # Whether or not to return info.
     return_info: bool = False
     # Log verbosity.
-    log: int = 1
+    log: int = 0
     log_message: str = ''
 
     def __post_init__(self):
@@ -1582,10 +1586,10 @@ def _print_cycle_info(var, l2_last, l2_prev):
     var.error_at_cycle = np.r_[var.error_at_cycle, l2_last]
 
     # Start info string, return if not enough verbose.
-    if var.verb < 0:  # One-liner
+    if var.verb in [2, 3]:  # One-liner
         var.one_liner(l2_last)
-        return
-    elif var.verb < 4:
+
+    if var.verb < 4:
         # Set first_cycle to False, to stop logging.
         return
     elif var.verb > 4:
@@ -1729,7 +1733,9 @@ def _terminate(var, l2_last, l2_stag, it):
         if var.sslsolver and sslabort:  # Force abortion of SSL solver.
             raise _ConvergenceError
         elif not var.sslsolver:  # Print info (if not preconditioner).
-            if var.verb < 5:
+            if var.verb == 3:
+                add = 50*" " + "\r"
+            elif var.verb < 5:
                 add = "\n"
             else:
                 add = ""
