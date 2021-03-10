@@ -145,32 +145,34 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
 
                 # 2. Multiply by average of mu_r [Muld06]_ p 636 bottom-left.
                 # u = M v = V mu_r^-1 v = V mu_r^-1 nabla x E
-                v1pp *= 0.5*(zeta[ixm, iy, iz] + zeta[ix, iy, iz])
-                v1mp *= 0.5*(zeta[ixm, iym, iz] + zeta[ix, iym, iz])
-                v1pm *= 0.5*(zeta[ixm, iy, izm] + zeta[ix, iy, izm])
+                # (Factor 0.5 to average moved to point 5.)
+                v1pp *= zeta[ixm, iy, iz] + zeta[ix, iy, iz]
+                v1mp *= zeta[ixm, iym, iz] + zeta[ix, iym, iz]
+                v1pm *= zeta[ixm, iy, izm] + zeta[ix, iy, izm]
 
-                v2pp *= 0.5*(zeta[ix, iym, iz] + zeta[ix, iy, iz])
-                v2mp *= 0.5*(zeta[ixm, iym, iz] + zeta[ixm, iy, iz])
-                v2pm *= 0.5*(zeta[ix, iym, izm] + zeta[ix, iy, izm])
+                v2pp *= zeta[ix, iym, iz] + zeta[ix, iy, iz]
+                v2mp *= zeta[ixm, iym, iz] + zeta[ixm, iy, iz]
+                v2pm *= zeta[ix, iym, izm] + zeta[ix, iy, izm]
 
-                v3pp *= 0.5*(zeta[ix, iy, izm] + zeta[ix, iy, iz])
-                v3mp *= 0.5*(zeta[ixm, iy, izm] + zeta[ixm, iy, iz])
-                v3pm *= 0.5*(zeta[ix, iym, izm] + zeta[ix, iym, iz])
+                v3pp *= zeta[ix, iy, izm] + zeta[ix, iy, iz]
+                v3mp *= zeta[ixm, iy, izm] + zeta[ixm, iy, iz]
+                v3pm *= zeta[ix, iym, izm] + zeta[ix, iym, iz]
 
                 # 3. Another curl [Muld06]_ p. 636 bottom-right; completes:
                 # nabla x M v = nabla x V mu_r^-1 nabla x E
-                rrx = (v3pp/hy[iy]-v3pm/hy[iym]) - (v2pp/hz[iz]-v2pm/hz[izm])
-                rry = (v1pp/hz[iz]-v1pm/hz[izm]) - (v3pp/hx[ix]-v3mp/hx[ixm])
-                rrz = (v2pp/hx[ix]-v2mp/hx[ixm]) - (v1pp/hy[iy]-v1mp/hy[iym])
+                rrx = v3pp/hy[iy] - v3pm/hy[iym] - v2pp/hz[iz] + v2pm/hz[izm]
+                rry = v1pp/hz[iz] - v1pm/hz[izm] - v3pp/hx[ix] + v3mp/hx[ixm]
+                rrz = v2pp/hx[ix] - v2mp/hx[ixm] - v1pp/hy[iy] + v1mp/hy[iym]
 
                 # 4. Sigma-term, [Muld06]_ p. 636 top-left (average of # eta).
                 # S = i omega mu_0 sigma~ V
-                stx = 0.25*(eta_x[ix, iym, izm] + eta_x[ix, iym, iz] +
-                            eta_x[ix, iy, izm] + eta_x[ix, iy, iz])
-                sty = 0.25*(eta_y[ixm, iy, izm] + eta_y[ix, iy, izm] +
-                            eta_y[ixm, iy, iz] + eta_y[ix, iy, iz])
-                stz = 0.25*(eta_z[ixm, iym, iz] + eta_z[ix, iym, iz] +
-                            eta_z[ixm, iy, iz] + eta_z[ix, iy, iz])
+                # (Factor 0.25 to average moved to point 5.)
+                stx = (eta_x[ix, iym, izm] + eta_x[ix, iym, iz] +
+                       eta_x[ix, iy, izm] + eta_x[ix, iy, iz])
+                sty = (eta_y[ixm, iy, izm] + eta_y[ix, iy, izm] +
+                       eta_y[ixm, iy, iz] + eta_y[ix, iy, iz])
+                stz = (eta_z[ixm, iym, iz] + eta_z[ix, iym, iz] +
+                       eta_z[ixm, iy, iz] + eta_z[ix, iy, iz])
 
                 # NOTE re zero boundary conditions for tangential E field:
                 # At the moment these elements are computed but now
@@ -188,9 +190,9 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
                 # -V (i omega mu_0 sigma~ E - nabla x mu_r^-1 nabla x E)
                 # Subtracting this from the source terms will yield the
                 # residual.
-                rx[ix, iy, iz] -= rrx - stx*ex[ix, iy, iz]
-                ry[ix, iy, iz] -= rry - sty*ey[ix, iy, iz]
-                rz[ix, iy, iz] -= rrz - stz*ez[ix, iy, iz]
+                rx[ix, iy, iz] -= 0.5*rrx - 0.25*stx*ex[ix, iy, iz]
+                ry[ix, iy, iz] -= 0.5*rry - 0.25*sty*ey[ix, iy, iz]
+                rz[ix, iy, iz] -= 0.5*rrz - 0.25*stz*ez[ix, iy, iz]
 
 
 # Smoother (Gauss-Seidel method)
