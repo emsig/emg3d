@@ -25,267 +25,268 @@ def create_dummy(nx, ny, nz):
     return out.reshape(nx, ny, nz)
 
 
-def test_solver_homogeneous(capsys):
-    # Regression test for homogeneous halfspace.
-    # Not very sophisticated; replace/extend by more detailed tests.
-    dat = REGRES['res']
+class TestSolve:
 
-    model = models.Model(**dat['input_model'])
-    grid = model.grid
-    sfield = fields.get_source_field(**dat['input_source'])
+    def test_solver_homogeneous(self, capsys):
+        # Regression test for homogeneous halfspace.
+        # Not very sophisticated; replace/extend by more detailed tests.
+        dat = REGRES['res']
 
-    # F-cycle
-    efield = solver.solve(model, sfield, verb=4)
-    out, _ = capsys.readouterr()
+        model = models.Model(**dat['input_model'])
+        grid = model.grid
+        sfield = fields.get_source_field(**dat['input_source'])
 
-    assert ' emg3d START ::' in out
-    assert ' [hh:mm:ss] ' in out
-    assert ' MG cycles ' in out
-    assert ' Final rel. error ' in out
-    assert ' emg3d END   :: ' in out
+        # F-cycle
+        efield = solver.solve(model, sfield, verb=4)
+        out, _ = capsys.readouterr()
 
-    # Experimental:
-    # Check if norms are also the same, at least for first two cycles.
-    assert "3.399e-02  after   1 F-cycles   [1.830e-07, 0.034]   0 0" in out
-    assert "3.535e-03  after   2 F-cycles   [1.903e-08, 0.104]   0 0" in out
+        assert ' emg3d START ::' in out
+        assert ' [hh:mm:ss] ' in out
+        assert ' MG cycles ' in out
+        assert ' Final rel. error ' in out
+        assert ' emg3d END   :: ' in out
 
-    # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['Fresult'], efield)
+        # Experimental:
+        # Check if norms are also the same, at least for first two cycles.
+        assert "3.399e-02  after   1 F-cycles   [1.830e-07, 0.034]   0 " in out
+        assert "3.535e-03  after   2 F-cycles   [1.903e-08, 0.104]   0 " in out
 
-    # W-cycle
-    wfield = solver.solve(model, sfield, cycle='W')
+        # Check all fields (ex, ey, and ez)
+        assert_allclose(dat['Fresult'], efield)
 
-    # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['Wresult'], wfield)
+        # W-cycle
+        wfield = solver.solve(model, sfield, cycle='W')
 
-    # V-cycle
-    vfield = solver.solve(model, sfield, cycle='V')
-    _, _ = capsys.readouterr()  # clear output
+        # Check all fields (ex, ey, and ez)
+        assert_allclose(dat['Wresult'], wfield)
 
-    # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['Vresult'], vfield)
+        # V-cycle
+        vfield = solver.solve(model, sfield, cycle='V')
+        _, _ = capsys.readouterr()  # clear output
 
-    # BiCGSTAB with some print checking.
-    efield = solver.solve(model, sfield, verb=4, sslsolver=True)
-    out, _ = capsys.readouterr()
-    assert ' emg3d START ::' in out
-    assert ' [hh:mm:ss] ' in out
-    assert ' CONVERGED' in out
-    assert ' Solver steps ' in out
-    assert ' MG prec. steps ' in out
-    assert ' Final rel. error ' in out
-    assert ' emg3d END   :: ' in out
+        # Check all fields (ex, ey, and ez)
+        assert_allclose(dat['Vresult'], vfield)
 
-    # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['bicresult'], efield)
+        # BiCGSTAB with some print checking.
+        efield = solver.solve(model, sfield, verb=4, sslsolver=True)
+        out, _ = capsys.readouterr()
+        assert ' emg3d START ::' in out
+        assert ' [hh:mm:ss] ' in out
+        assert ' CONVERGED' in out
+        assert ' Solver steps ' in out
+        assert ' MG prec. steps ' in out
+        assert ' Final rel. error ' in out
+        assert ' emg3d END   :: ' in out
 
-    # Same as previous, without BiCGSTAB, but some print checking.
-    efield = solver.solve(model, sfield, verb=4)
-    out, _ = capsys.readouterr()
-    assert ' emg3d START ::' in out
-    assert ' [hh:mm:ss] ' in out
-    assert ' CONVERGED' in out
-    assert ' MG cycles ' in out
-    assert ' Final rel. error ' in out
-    assert ' emg3d END   :: ' in out
+        # Check all fields (ex, ey, and ez)
+        assert_allclose(dat['bicresult'], efield)
 
-    # Max it
-    maxit = 2
-    _, info = solver.solve(
-            model, sfield, verb=3, maxit=maxit, return_info=True)
-    out, _ = capsys.readouterr()
-    assert ' MAX. ITERATION REACHED' in out
-    assert maxit == info['it_mg']
-    assert info['exit'] == 1
-    assert 'MAX. ITERATION REACHED' in info['exit_message']
+        # Same as previous, without BiCGSTAB, but some print checking.
+        efield = solver.solve(model, sfield, verb=4)
+        out, _ = capsys.readouterr()
+        assert ' emg3d START ::' in out
+        assert ' [hh:mm:ss] ' in out
+        assert ' CONVERGED' in out
+        assert ' MG cycles ' in out
+        assert ' Final rel. error ' in out
+        assert ' emg3d END   :: ' in out
 
-    # BiCGSTAB with lower verbosity, print checking.
-    _ = solver.solve(model, sfield, verb=3, maxit=1, sslsolver=True)
-    out, _ = capsys.readouterr()
-    assert ' MAX. ITERATION REACHED' in out
+        # Max it
+        maxit = 2
+        _, info = solver.solve(
+                model, sfield, verb=3, maxit=maxit, return_info=True)
+        out, _ = capsys.readouterr()
+        assert ' MAX. ITERATION REACHED' in out
+        assert maxit == info['it_mg']
+        assert info['exit'] == 1
+        assert 'MAX. ITERATION REACHED' in info['exit_message']
 
-    # Just check if it runs without failing for other solvers.
-    _ = solver.solve(model, sfield, verb=5, maxit=1, sslsolver='gcrotmk')
+        # BiCGSTAB with lower verbosity, print checking.
+        _ = solver.solve(model, sfield, verb=3, maxit=1, sslsolver=True)
+        out, _ = capsys.readouterr()
+        assert ' MAX. ITERATION REACHED' in out
 
-    # Provide initial field.
-    _, _ = capsys.readouterr()  # empty
-    efield_copy = efield.copy()
-    outarray = solver.solve(model, sfield, efield_copy, verb=3)
-    out, _ = capsys.readouterr()
+        # Just check if it runs without failing for other solvers.
+        _ = solver.solve(model, sfield, verb=5, maxit=1, sslsolver='gcrotmk')
 
-    # Ensure there is no output.
-    assert outarray is None
-    assert "NOTHING DONE (provided efield already good enough)" in out
-    # Ensure the field did not change.
-    assert_allclose(efield, efield_copy)
+        # Provide initial field.
+        _, _ = capsys.readouterr()  # empty
+        efield_copy = efield.copy()
+        outarray = solver.solve(model, sfield, efield_copy, verb=3)
+        out, _ = capsys.readouterr()
 
-    # Provide initial field and return info.
-    info = solver.solve(model, sfield, efield_copy, return_info=True)
-    assert info['it_mg'] == 0
-    assert info['it_ssl'] == 0
-    assert info['exit'] == 0
-    assert info['exit_message'] == 'CONVERGED'
+        # Ensure there is no output.
+        assert outarray is None
+        assert "NOTHING DONE (provided efield already good enough)" in out
+        # Ensure the field did not change.
+        assert_allclose(efield, efield_copy)
 
-    # Provide initial field, ensure one initial multigrid is carried out
-    # without linerelaxation nor semicoarsening.
-    _, _ = capsys.readouterr()  # empty
-    efield = fields.Field(grid)
-    outarray = solver.solve(
-            model, sfield, efield, sslsolver=True, semicoarsening=True,
-            linerelaxation=True, maxit=2, verb=4)
-    out, _ = capsys.readouterr()
-    assert "after                       1 F-cycles    4 1" in out
-    assert "after                       2 F-cycles    5 2" in out
+        # Provide initial field and return info.
+        info = solver.solve(model, sfield, efield_copy, return_info=True)
+        assert info['it_mg'] == 0
+        assert info['it_ssl'] == 0
+        assert info['exit'] == 0
+        assert info['exit_message'] == 'CONVERGED'
 
-    # Provide an initial source-field without frequency information.
-    wrong_sfield = fields.Field(grid)
-    wrong_sfield.field = sfield.field
-    with pytest.raises(ValueError, match="Source field is missing frequency"):
-        solver.solve(model, wrong_sfield, efield=efield, verb=1)
+        # Provide initial field, ensure one initial multigrid is carried out
+        # without linerelaxation nor semicoarsening.
+        _, _ = capsys.readouterr()  # empty
+        efield = fields.Field(grid)
+        outarray = solver.solve(
+                model, sfield, efield, sslsolver=True, semicoarsening=True,
+                linerelaxation=True, maxit=2, verb=4)
+        out, _ = capsys.readouterr()
+        assert "after                       1 F-cycles    4 1" in out
+        assert "after                       2 F-cycles    5 2" in out
 
-    # Check stagnation by providing an almost zero source field.
-    _ = solver.solve(model, sfield*0+1e-20, maxit=100)
-    out, _ = capsys.readouterr()
-    assert "STAGNATED" in out
+        # Provide an initial source-field without frequency information.
+        wrong_sfield = fields.Field(grid)
+        wrong_sfield.field = sfield.field
+        with pytest.raises(ValueError, match="Source field is missing frequ"):
+            solver.solve(model, wrong_sfield, efield=efield, verb=1)
 
-    # Check a zero field is returned for a zero source field.
-    efield = solver.solve(model, sfield*0, maxit=100, verb=3)
-    out, _ = capsys.readouterr()
-    assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
-    assert np.linalg.norm(efield) == 0.0
+        # Check stagnation by providing an almost zero source field.
+        _ = solver.solve(model, sfield*0+1e-20, maxit=100)
+        out, _ = capsys.readouterr()
+        assert "STAGNATED" in out
 
+        # Check a zero field is returned for a zero source field.
+        efield = solver.solve(model, sfield*0, maxit=100, verb=3)
+        out, _ = capsys.readouterr()
+        assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
+        assert np.linalg.norm(efield) == 0.0
 
-def test_solver_heterogeneous(capsys):
-    # Regression test for heterogeneous case.
-    dat = REGRES['reg_2']
-    model = dat['model']
-    sfield = dat['sfield']
-    inp = dat['inp']
-    for n in ['nu_init', 'nu_pre', 'nu_coarse', 'nu_post']:
-        inp[n] = int(inp[n])
-    inp['verb'] = 5
+    def test_solver_heterogeneous(self, capsys):
+        # Regression test for heterogeneous case.
+        dat = REGRES['reg_2']
+        model = dat['model']
+        sfield = dat['sfield']
+        inp = dat['inp']
+        for n in ['nu_init', 'nu_pre', 'nu_coarse', 'nu_post']:
+            inp[n] = int(inp[n])
+        inp['verb'] = 5
 
-    efield = solver.solve(model, sfield, **inp)
+        efield = solver.solve(model, sfield, **inp)
 
-    assert_allclose(dat['result'], efield.field)
+        assert_allclose(dat['result'], efield.field)
 
-    _, _ = capsys.readouterr()  # Clean up
+        _, _ = capsys.readouterr()  # Clean up
 
-    # Check with provided e-field; 2x2 iter should yield the same as 4 iter.
-    efield2 = solver.solve(model, sfield, maxit=4, verb=0)
-    out, _ = capsys.readouterr()  # Clean up
-    assert "* WARNING :: MAX. ITERATION REACHED, NOT CONVERGED" in out
-    efield3 = solver.solve(model, sfield, maxit=2, verb=0)
-    solver.solve(model, sfield, efield3, maxit=2, verb=0)
+        # Check with provided e-field; 2x2 iter should yield the same as 4 iter
+        efield2 = solver.solve(model, sfield, maxit=4, verb=0)
+        out, _ = capsys.readouterr()  # Clean up
+        assert "* WARNING :: MAX. ITERATION REACHED, NOT CONVERGED" in out
+        efield3 = solver.solve(model, sfield, maxit=2, verb=0)
+        solver.solve(model, sfield, efield3, maxit=2, verb=0)
 
-    assert_allclose(efield2, efield3)
+        assert_allclose(efield2, efield3)
 
-    _, _ = capsys.readouterr()  # Clean up
+        _, _ = capsys.readouterr()  # Clean up
 
-    # One test without post-smoothing to check if it runs.
-    efield4 = solver.solve(
-            model, sfield, sslsolver=True, semicoarsening=True,
-            linerelaxation=True, maxit=20, nu_pre=0, nu_post=4, verb=4)
-    efield5 = solver.solve(
-            model, sfield, sslsolver=True, semicoarsening=True,
-            linerelaxation=True, maxit=20, nu_pre=4, nu_post=0, verb=4)
-    # They don't converge, and hence don't agree. Just a lazy test.
-    assert_allclose(efield4, efield5, atol=1e-15, rtol=1e-5)
+        # One test without post-smoothing to check if it runs.
+        efield4 = solver.solve(
+                model, sfield, sslsolver=True, semicoarsening=True,
+                linerelaxation=True, maxit=20, nu_pre=0, nu_post=4, verb=4)
+        efield5 = solver.solve(
+                model, sfield, sslsolver=True, semicoarsening=True,
+                linerelaxation=True, maxit=20, nu_pre=4, nu_post=0, verb=4)
+        # They don't converge, and hence don't agree. Just a lazy test.
+        assert_allclose(efield4, efield5, atol=1e-15, rtol=1e-5)
 
-    # Check the QC plot if it is too long.
-    # Coincidently, this one also diverges if nu_pre=0!
-    # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
-    mesh = meshes.TensorMesh(
-            [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
-            origin=np.array([-0.5, -1, -1]))
-    sfield = alternatives.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
-    model = models.Model(mesh)
-    _ = solver.solve(model, sfield, verb=4, nu_pre=0)
-    out, _ = capsys.readouterr()
-    assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
-    assert "DIVERGED" in out
+        # Check the QC plot if it is too long.
+        # Coincidently, this one also diverges if nu_pre=0!
+        # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
+        mesh = meshes.TensorMesh(
+                [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
+                origin=np.array([-0.5, -1, -1]))
+        sfield = alternatives.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
+        model = models.Model(mesh)
+        _ = solver.solve(model, sfield, verb=4, nu_pre=0)
+        out, _ = capsys.readouterr()
+        assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
+        assert "DIVERGED" in out
 
+    def test_log(self, capsys):
+        dat = REGRES['res']
 
-def test_one_liner(capsys):
-    grid = meshes.TensorMesh(
-            [np.ones(8), np.ones(8), np.ones(8)], origin=np.array([0, 0, 0]))
-    model = models.Model(grid, property_x=1.5, property_y=1.8, property_z=3.3)
-    sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
+        model = models.Model(**dat['input_model'])
+        sfield = fields.get_source_field(**dat['input_source'])
+        inp = {'model': model, 'sfield': sfield, 'maxit': 1, 'verb': 3}
 
-    # Dynamic one-liner.
-    out, _ = capsys.readouterr()
-    _ = solver.solve(model, sfield, verb=1)
-    out, _ = capsys.readouterr()
-    assert '6; 0:00:' in out
-    assert '; CONVERGED' in out
+        efield, info = solver.solve(return_info=True, log=-1, **inp)
+        out, _ = capsys.readouterr()
+        assert out == ""
+        assert ' emg3d START ::' in info['log']
 
-    out, _ = capsys.readouterr()
-    _ = solver.solve(model, sfield, sslsolver=True, verb=1)
-    out, _ = capsys.readouterr()
-    assert '3(5); 0:00:' in out
-    assert '; CONVERGED' in out
+        efield = solver.solve(return_info=True, log=0, **inp)
+        out, _ = capsys.readouterr()
+        assert ' emg3d START ::' in out
 
-    # One-liner.
-    out, _ = capsys.readouterr()
-    _ = solver.solve(model, sfield, sslsolver=True, verb=1)
-    out, _ = capsys.readouterr()
-    assert '3(5); 0:00:' in out
-    assert '; CONVERGED' in out
+        efield, info = solver.solve(return_info=True, log=1, **inp)
+        out, _ = capsys.readouterr()
+        assert ' emg3d START ::' in out
+        assert ' emg3d START ::' in info['log']
 
+    def test_solver_homogeneous_laplace(self, ):
+        # Regression test for homogeneous halfspace in Laplace domain.
+        # Not very sophisticated; replace/extend by more detailed tests.
+        dat = REGRES['lap']
 
-def test_log(capsys):
-    dat = REGRES['res']
+        model = models.Model(**dat['input_model'])
+        grid = model.grid
+        sfield = fields.get_source_field(**dat['input_source'])
 
-    model = models.Model(**dat['input_model'])
-    sfield = fields.get_source_field(**dat['input_source'])
-    inp = {'model': model, 'sfield': sfield, 'maxit': 1, 'verb': 3}
+        # F-cycle
+        efield = solver.solve(model, sfield)
 
-    efield, info = solver.solve(return_info=True, log=-1, **inp)
-    out, _ = capsys.readouterr()
-    assert out == ""
-    assert ' emg3d START ::' in info['log']
+        # Check all fields (ex, ey, and ez)
+        assert_allclose(dat['Fresult'], efield, atol=1e-14)
 
-    efield = solver.solve(return_info=True, log=0, **inp)
-    out, _ = capsys.readouterr()
-    assert ' emg3d START ::' in out
+        # BiCGSTAB with some print checking.
+        efield = solver.solve(model, sfield, sslsolver=True)
 
-    efield, info = solver.solve(return_info=True, log=1, **inp)
-    out, _ = capsys.readouterr()
-    assert ' emg3d START ::' in out
-    assert ' emg3d START ::' in info['log']
+        # Check all fields (ex, ey, and ez)
+        assert_allclose(dat['bicresult'], efield, atol=1e-14)
 
+        # If efield is complex, assert it fails.
+        efield = fields.Field(grid, dtype=np.complex_)
 
-def test_solver_homogeneous_laplace():
-    # Regression test for homogeneous halfspace in Laplace domain.
-    # Not very sophisticated; replace/extend by more detailed tests.
-    dat = REGRES['lap']
-
-    model = models.Model(**dat['input_model'])
-    grid = model.grid
-    sfield = fields.get_source_field(**dat['input_source'])
-
-    # F-cycle
-    efield = solver.solve(model, sfield)
-
-    # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['Fresult'], efield, atol=1e-14)
-
-    # BiCGSTAB with some print checking.
-    efield = solver.solve(model, sfield, sslsolver=True)
-
-    # Check all fields (ex, ey, and ez)
-    assert_allclose(dat['bicresult'], efield, atol=1e-14)
-
-    # If efield is complex, assert it fails.
-    efield = fields.Field(grid, dtype=np.complex_)
-
-    with pytest.raises(ValueError, match='Source field and electric field'):
-        efield = solver.solve(model, sfield, efield=efield)
+        with pytest.raises(ValueError, match='Source field and electric fiel'):
+            efield = solver.solve(model, sfield, efield=efield)
 
 
 def multigrid():
     pass
     # No test at the moment. Add one!
+
+
+def test_krylov(capsys):
+
+    # Everything should be tested just fine in `test_solver`.
+    # Just check here for bicgstab-error.
+
+    # Load any case.
+    dat = REGRES['res']
+    model = models.Model(**dat['input_model'])
+    grid = model.grid
+    model.property_x /= 100000  # Set stupid input to make bicgstab fail.
+    model.property_y *= 100000  # Set stupid input to make bicgstab fail.
+    sfield = fields.get_source_field(**dat['input_source'])
+    vmodel = models.VolumeModel(model, sfield)
+    efield = fields.Field(grid)  # Initiate e-field.
+
+    # Get var-instance
+    var = solver.MGParameters(
+            cycle=None, sslsolver=True, semicoarsening=False,
+            linerelaxation=False, shape_cells=grid.shape_cells, verb=4,
+            maxit=-1,
+    )
+    var.l2_refe = sl.norm(sfield, check_finite=False)
+
+    # Call krylov and ensure it fails properly.
+    solver.krylov(vmodel, sfield, efield, var)
+    out, _ = capsys.readouterr()
+    assert '* ERROR   :: Error in bicgstab' in out
 
 
 def test_smoothing():
@@ -361,60 +362,179 @@ def test_smoothing():
             assert_allclose(efield, ofield)
 
 
-def test_restriction():
+class TestRestrictionProlongation:
 
-    # Simple test with restriction followed by prolongation.
-    src = [150, 150, 150, 0, 45]
-    grid = meshes.TensorMesh(
-            [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
-            origin=np.zeros(3))
+    def test_sc_0(self):
+        sc = 0
 
-    # Create dummy model and fields, parameters don't matter.
-    model = models.Model(grid, 1, 1, 1, 1)
-    sfield = fields.get_source_field(grid, src, 1)
+        # Simple test with restriction followed by prolongation.
+        src = [150, 150, 150, 0, 45]
+        grid = meshes.TensorMesh(
+                [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
+                origin=np.zeros(3))
 
-    # Get volume-averaged model parameters.
-    vmodel = models.VolumeModel(model, sfield)
+        # Create dummy model and fields, parameters don't matter.
+        model = models.Model(grid, 1, 1, 1, 1)
+        sfield = fields.get_source_field(grid, src, 1)
 
-    rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(sfield.fx.shape)
-    ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(sfield.fy.shape)
-    rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(sfield.fz.shape)
-    field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
-    rr = fields.Field(grid, field)
+        # Get volume-averaged model parameters.
+        vmodel = models.VolumeModel(model, sfield)
 
-    # Restrict it
-    cmodel, csfield, cefield = solver.restriction(vmodel, sfield, rr, sc_dir=0)
+        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+                sfield.fx.shape)
+        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+                sfield.fy.shape)
+        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+                sfield.fz.shape)
+        field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
+        rr = fields.Field(grid, field)
 
-    assert_allclose(csfield.fx[:, 1:-1, 1], np.array([[196.+0.j], [596.+0.j]]))
-    assert_allclose(csfield.fy[1:-1, :, 1], np.array([[356.+0.j, 436.+0.j]]))
-    assert_allclose(csfield.fz[1:-1, 1:-1, :],
-                    np.array([[[388.+0.j, 404.+0.j]]]))
-    assert cmodel.grid.shape_nodes[0] == cmodel.grid.shape_nodes[1] == 3
-    assert cmodel.grid.shape_nodes[2] == 3
-    assert cmodel.eta_x[0, 0, 0]/8. == vmodel.eta_x[0, 0, 0]
-    assert np.sum(grid.h[0]) == np.sum(cmodel.grid.h[0])
-    assert np.sum(grid.h[1]) == np.sum(cmodel.grid.h[1])
-    assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
+        # Restrict it
+        cmodel, csfield, cefield = solver.restriction(
+                vmodel, sfield, rr, sc_dir=sc)
 
-    # Add pi to the coarse e-field
-    efield = fields.Field(grid)
-    cefield += np.pi
+        assert_allclose(csfield.fx[:, 1:-1, 1],
+                        np.array([[196.+0.j], [596.+0.j]]))
+        assert_allclose(csfield.fy[1:-1, :, 1],
+                        np.array([[356.+0.j, 436.+0.j]]))
+        assert_allclose(csfield.fz[1:-1, 1:-1, :],
+                        np.array([[[388.+0.j, 404.+0.j]]]))
+        assert cmodel.grid.shape_nodes[0] == cmodel.grid.shape_nodes[1] == 3
+        assert cmodel.grid.shape_nodes[2] == 3
+        assert cmodel.eta_x[0, 0, 0]/8. == vmodel.eta_x[0, 0, 0]
+        assert np.sum(grid.h[0]) == np.sum(cmodel.grid.h[0])
+        assert np.sum(grid.h[1]) == np.sum(cmodel.grid.h[1])
+        assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
 
-    # Prolong it
-    solver.prolongation(grid, efield, cmodel.grid, cefield, sc_dir=0)
+        # Add pi to the coarse e-field
+        efield = fields.Field(grid)
+        cefield += np.pi
 
-    assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
-    assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)
-    assert np.all(efield.fz[1:-1, 1:-1, :] == np.pi)
+        # Prolong it
+        solver.prolongation(grid, efield, cmodel.grid, cefield, sc_dir=sc)
 
+        assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
+        assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)
+        assert np.all(efield.fz[1:-1, 1:-1, :] == np.pi)
 
-def prolongation():
-    pass
-    # No test at the moment. Add one!
+    def test_sc_1(self):
+        sc = 1
+
+        # Simple test with restriction followed by prolongation.
+        src = [150, 150, 150, 0, 45]
+        grid = meshes.TensorMesh(
+                [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
+                origin=np.zeros(3))
+
+        # Create dummy model and fields, parameters don't matter.
+        model = models.Model(grid, 1)
+        sfield = fields.get_source_field(grid, src, 1)
+
+        # Get volume-averaged model parameters.
+        vmodel = models.VolumeModel(model, sfield)
+
+        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+                sfield.fx.shape)
+        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+                sfield.fy.shape)
+        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+                sfield.fz.shape)
+        field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
+        rr = fields.Field(grid, field)
+
+        # Restrict it
+        cmodel, csfield, cefield = solver.restriction(
+                vmodel, sfield, rr, sc_dir=sc)
+
+        assert_allclose(csfield.fx[:, 1:-1, 1],
+                        np.array([[48.+0.j], [148.+0.j],
+                                  [248.+0.j], [348.+0.j]]))
+        assert_allclose(csfield.fy[1:-1, :, 1],
+                        np.array([[98.+0.j, 138.+0.j], [178.+0.j, 218.+0.j],
+                                  [258.+0.j, 298.+0.j]]))
+        assert_allclose(csfield.fz[1:-1, 1:-1, :],
+                        np.array([[[114.+0.j, 122.+0.j]],
+                                  [[194.+0.j, 202.+0.j]],
+                                  [[274.+0.j, 282.+0.j]]]))
+        assert cmodel.grid.shape_nodes[0] == 5
+        assert cmodel.grid.shape_nodes[1] == 3
+        assert cmodel.grid.shape_nodes[2] == 3
+        assert cmodel.eta_x[0, 0, 0]/4. == vmodel.eta_x[0, 0, 0]
+        assert np.sum(grid.h[0]) == np.sum(cmodel.grid.h[0])
+        assert np.sum(grid.h[1]) == np.sum(cmodel.grid.h[1])
+        assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
+
+        # Add pi to the coarse e-field
+        efield = fields.Field(grid)
+        cefield += np.pi
+
+        # Prolong it
+        solver.prolongation(grid, efield, cmodel.grid, cefield, sc_dir=sc)
+
+        assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
+        assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)
+        assert np.all(efield.fz[1:-1, 1:-1, :] == np.pi)
+
+    def test_sc_4(self):
+        sc = 4
+
+        # Simple test with restriction followed by prolongation.
+        src = [150, 150, 150, 0, 45]
+        grid = meshes.TensorMesh(
+                [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
+                origin=np.zeros(3))
+
+        # Create dummy model and fields, parameters don't matter.
+        model = models.Model(grid, 1, 1)
+        sfield = fields.get_source_field(grid, src, 1)
+
+        # Get volume-averaged model parameters.
+        vmodel = models.VolumeModel(model, sfield)
+
+        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+                sfield.fx.shape)
+        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+                sfield.fy.shape)
+        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+                sfield.fz.shape)
+        field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
+        rr = fields.Field(grid, field)
+
+        # Restrict it
+        cmodel, csfield, cefield = solver.restriction(
+                vmodel, sfield, rr, sc_dir=sc)
+
+        assert_allclose(csfield.fx[:, 1:-1, 1],
+                        np.array([[37.+0.j, 47.+0.j, 57.+0.j],
+                                  [137.+0.j, 147.+0.j, 157]]))
+        assert_allclose(csfield.fy[1:-1, :, 1],
+                        np.array([[82.+0.j, 92.+0.j, 102.+0.j, 112.+0.j]]))
+        assert_allclose(csfield.fz[1:-1, 1:-1, :],
+                        np.array([[[88.+0.j, 90, 92, 94],
+                                   [96.+0.j, 98, 100, 102],
+                                   [104.+0.j, 106, 108, 110]]]))
+        assert cmodel.grid.shape_nodes[0] == 3
+        assert cmodel.grid.shape_nodes[1] == 5
+        assert cmodel.grid.shape_nodes[2] == 5
+        assert cmodel.eta_x[0, 0, 0]/2. == vmodel.eta_x[0, 0, 0]
+        assert np.sum(grid.h[0]) == np.sum(cmodel.grid.h[0])
+        assert np.sum(grid.h[1]) == np.sum(cmodel.grid.h[1])
+        assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
+
+        # Add pi to the coarse e-field
+        efield = fields.Field(grid)
+        cefield += np.pi
+
+        # Prolong it
+        solver.prolongation(grid, efield, cmodel.grid, cefield, sc_dir=sc)
+
+        assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
+        assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)
+        assert np.all(efield.fz[1:-1, 1:-1, :] == np.pi)
 
 
 def test_residual():
-    # The only thing to test here is that residual returns the same as
+    # The only thing to test here is that the residual returns the same as
     # sfield-amat_x. Basically a copy of the function itself.
 
     # Create a grid
@@ -454,35 +574,6 @@ def test_residual():
     # Compare
     assert_allclose(out, rfield)
     assert_allclose(outnorm, np.linalg.norm(out))
-
-
-def test_krylov(capsys):
-
-    # Everything should be tested just fine in `test_solver`.
-    # Just check here for bicgstab-error.
-
-    # Load any case.
-    dat = REGRES['res']
-    model = models.Model(**dat['input_model'])
-    grid = model.grid
-    model.property_x /= 100000  # Set stupid input to make bicgstab fail.
-    model.property_y *= 100000  # Set stupid input to make bicgstab fail.
-    sfield = fields.get_source_field(**dat['input_source'])
-    vmodel = models.VolumeModel(model, sfield)
-    efield = fields.Field(grid)  # Initiate e-field.
-
-    # Get var-instance
-    var = solver.MGParameters(
-            cycle=None, sslsolver=True, semicoarsening=False,
-            linerelaxation=False, shape_cells=grid.shape_cells, verb=4,
-            maxit=-1,
-    )
-    var.l2_refe = sl.norm(sfield, check_finite=False)
-
-    # Call krylov and ensure it fails properly.
-    solver.krylov(vmodel, sfield, efield, var)
-    out, _ = capsys.readouterr()
-    assert '* ERROR   :: Error in bicgstab' in out
 
 
 def test_MGParameters():
@@ -897,3 +988,28 @@ def test_print_one_liner(capsys):
     out, _ = capsys.readouterr()
     assert ":: emg3d :: 1.0e-02; 0(0); 0:00:0" in out
     assert "TEST" in out
+
+    grid = meshes.TensorMesh(
+            [np.ones(8), np.ones(8), np.ones(8)], origin=np.array([0, 0, 0]))
+    model = models.Model(grid, property_x=1.5, property_y=1.8, property_z=3.3)
+    sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
+
+    # Dynamic one-liner.
+    out, _ = capsys.readouterr()
+    _ = solver.solve(model, sfield, verb=1)
+    out, _ = capsys.readouterr()
+    assert '6; 0:00:' in out
+    assert '; CONVERGED' in out
+
+    out, _ = capsys.readouterr()
+    _ = solver.solve(model, sfield, sslsolver=True, verb=1)
+    out, _ = capsys.readouterr()
+    assert '3(5); 0:00:' in out
+    assert '; CONVERGED' in out
+
+    # One-liner.
+    out, _ = capsys.readouterr()
+    _ = solver.solve(model, sfield, sslsolver=True, verb=1)
+    out, _ = capsys.readouterr()
+    assert '3(5); 0:00:' in out
+    assert '; CONVERGED' in out

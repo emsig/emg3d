@@ -452,7 +452,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
         The electric field. See :class:`emg3d.fields.Field`.
 
     var : :class:`MGParameters` instance
-        As returned by :func:`multigrid`.
+        As returned by :func:`emg3d.solver.multigrid`.
 
     **kwargs : Recursion parameters.
         Do not use; only used internally by recursion; `level` (current
@@ -624,7 +624,7 @@ def krylov(model, sfield, efield, var):
         The electric field. See :class:`emg3d.fields.Field`.
 
     var : :class:`MGParameters` instance
-        As returned by :func:`multigrid`.
+        As returned by :func:`emg3d.solver.multigrid`.
 
     """
     # Get frequency
@@ -737,28 +737,26 @@ def smoothing(model, sfield, efield, nu, lr_dir):
     Gauss-Seidel method. This acts as smoother or, on the coarsest grid, as a
     direct solver.
 
-
     This is a simple wrapper for the jitted computation in
     :func:`emg3d.core.gauss_seidel`, :func:`emg3d.core.gauss_seidel_x`,
-    :func:`emg3d.core.gauss_seidel_y`, and
-    :func:`emg3d.core.gauss_seidel_z` (`@njit` can not [yet] access class
-    attributes). See these functions for more details and corresponding theory.
+    :func:`emg3d.core.gauss_seidel_y`, and :func:`emg3d.core.gauss_seidel_z`
+    (consult these functions for more details and corresponding theory).
 
     The electric fields are updated in-place.
 
-    This function is called by :func:`multigrid`.
+    This function is called by :func:`emg3d.solver.multigrid`.
 
 
     Parameters
     ----------
-    model : :class:`emg3d.models.VolumeModel`
-        Input model.
+    model : VolumeModel
+        Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : :class:`emg3d.fields.SourceField`
-        Input source field.
+    sfield : SourceField
+        Input source field; a :class:`emg3d.fields.SourceField` instance.
 
-    efield : :class:`emg3d.fields.Field`
-        Input electric field.
+    efield : Field
+        Input electric field; a :class:`emg3d.fields.Field` instance.
 
     nu : int
         Number of Gauss-Seidel steps; odd numbers are forward, even numbers are
@@ -766,29 +764,30 @@ def smoothing(model, sfield, efield, nu, lr_dir):
         a forward and a backward step.
 
     lr_dir : int
-        Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
+        Direction of line relaxation.
 
     """
 
     # Collect Gauss-Seidel input (same for all routines)
-    inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-           model.eta_z, model.zeta, model.grid.h[0], model.grid.h[1],
-           model.grid.h[2], nu)
+    inp = (sfield.fx, sfield.fy, sfield.fz,
+           model.eta_x, model.eta_y, model.eta_z, model.zeta,
+           model.grid.h[0], model.grid.h[1], model.grid.h[2],
+           nu)
 
     # Avoid line relaxation in a direction where there are only two cells.
-    lr_dir = _current_lr_dir(lr_dir, model.grid)
+    c_lr_dir = _current_lr_dir(lr_dir, model.grid)
 
     # Compute and store fields (in-place)
-    if lr_dir == 0:             # Standard MG
+    if c_lr_dir == 0:             # Standard MG
         core.gauss_seidel(efield.fx, efield.fy, efield.fz, *inp)
 
-    if lr_dir in [1, 5, 6, 7]:  # Line relaxation in x-direction
+    if c_lr_dir in [1, 5, 6, 7]:  # Line relaxation in x-direction
         core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
 
-    if lr_dir in [2, 4, 6, 7]:  # Line relaxation in y-direction
+    if c_lr_dir in [2, 4, 6, 7]:  # Line relaxation in y-direction
         core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
 
-    if lr_dir in [3, 4, 5, 7]:  # Line relaxation in z-direction
+    if c_lr_dir in [3, 4, 5, 7]:  # Line relaxation in z-direction
         core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
 
@@ -797,36 +796,36 @@ def restriction(model, sfield, residual, sc_dir):
 
     The restriction of the residual is used as source term for the coarse grid.
 
-    Corresponds to Equations 8 and 9 in [Muld06]_ and surrounding text. In the
+    Corresponds to Equations 8 and 9 and surrounding text in [Muld06]_. In the
     case of the restriction of the residual, this function is a wrapper for the
     jitted functions :func:`emg3d.core.restrict_weights` and
-    :func:`emg3d.core.restrict` (`@njit` can not [yet] access class
-    attributes). See these functions for more details and corresponding theory.
+    :func:`emg3d.core.restrict` (consult these functions for more details and
+    corresponding theory).
 
-    This function is called by :func:`multigrid`.
+    This function is called by :func:`emg3d.solver.multigrid`.
 
 
     Parameters
     ----------
-    model : :class:`emg3d.models.VolumeModel`
-        Input model.
+    model : VolumeModel
+        Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : :class:`emg3d.fields.SourceField`
-        Input source field.
+    sfield : SourceField
+        Input source field; a :class:`emg3d.fields.SourceField` instance.
 
     sc_dir : int
-        Direction of semicoarsening (0, 1, 2, or 3).
+        Direction of semicoarsening.
 
 
     Returns
     -------
-    cmodel : :class:`emg3d.models.VolumeModel`
+    cmodel : VolumeModel
         Coarse model.
 
-    csfield : :class:`emg3d.fields.SourceField`
+    csfield : SourceField
         Coarse source field. Corresponds to restriction of fine-grid residual.
 
-    cefield : :class:`emg3d.fields.Field`
+    cefield : Field
         Coarse electric field, complex zeroes.
 
     """
@@ -893,27 +892,27 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     """Interpolating the electric field from coarse grid to fine grid.
 
     The prolongation from a coarser to a finer grid is the inverse process of
-    the restriction (:func:`restriction`) from a finer to a coarser grid. The
-    interpolated values of the coarse grid electric field are added to the fine
-    grid electric field, in-place. Piecewise constant interpolation is used in
-    the direction of the field, and bilinear interpolation in the other two
-    directions.
+    the restriction (:func:`emg3d.solver.restriction`) from a finer to a
+    coarser grid. The interpolated values of the coarse grid electric field are
+    added to the fine grid electric field, in-place. Piecewise constant
+    interpolation is used in the direction of the field, and bilinear
+    interpolation in the other two directions. See Equation 10 in [Muld06]_ and
+    surrounding text.
 
-    See Equation 10 in [Muld06]_ and surrounding text.
-
-    This function is called by :func:`multigrid`.
+    This function is called by :func:`emg3d.solver.multigrid`.
 
 
     Parameters
     ----------
-    grid, cgrid : :class:`emg3d.meshes.TensorMesh`
-        Fine and coarse grids.
+    grid, cgrid : TensorMesh
+        Fine and coarse grids; :class:`emg3d.meshes.TensorMesh` instances.
 
-    efield, cefield : :class:`emg3d.fields.Field`
-        Fine and coarse grid electric fields.
+    efield, cefield : Field
+        Fine and coarse grid electric fields, :class:`emg3d.fields.Field`
+        instances.
 
     sc_dir : int
-        Direction of semicoarsening (0, 1, 2, or 3).
+        Direction of semicoarsening.
 
     """
 
@@ -972,47 +971,36 @@ def residual(model, sfield, efield, norm=False):
     r"""Computing the residual.
 
     Returns the complete residual as given in [Muld06]_, page 636, middle of
-    the right column:
+    the right column. This is a simple wrapper for the jitted computation in
+    :func:`emg3d.core.amat_x` (consult that function for more details and
+    corresponding theory).
 
-    .. math::
-
-        \mathbf{r} = V \left( \mathrm{i}\omega\mu_0\mathbf{J_s}
-                     + \mathrm{i}\omega\mu_0 \tilde{\sigma} \mathbf{E}
-                     - \nabla \times \mu_\mathrm{r}^{-1} \nabla \times
-                       \mathbf{E} \right) .
-
-    This is a simple wrapper for the jitted computation in
-    :func:`emg3d.core.amat_x` (`@njit` can not [yet] access class
-    attributes). See :func:`emg3d.core.amat_x` for more details and
-    corresponding theory.
-
-    This function is called by :func:`multigrid`.
+    This function is called by :func:`emg3d.solver.multigrid`.
 
 
     Parameters
     ----------
-    model : :class:`emg3d.models.VolumeModel`
-        Input model.
+    model : VolumeModel
+        Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : :class:`emg3d.fields.SourceField`
-        Input source field.
+    sfield : SourceField
+        Input source field; a :class:`emg3d.fields.SourceField` instance.
 
-    efield : :class:`emg3d.fields.Field`
-        Input electric field.
+    efield : Field
+        Input electric field; a :class:`emg3d.fields.Field` instance.
 
-    norm : bool
+    norm : bool, default: False
         If True, the error (l2-norm) of the residual is returned, not the
         residual.
 
 
     Returns
     -------
-    residual : Field
-        Returned if ``norm=False``. The residual field;
-        :class:`emg3d.fields.Field` instance.
+    residual : Field, returned if ``norm=False``
+        The residual field; :class:`emg3d.fields.Field` instance.
 
-    norm : float
-        Returned if ``norm=True``. The error (l2-norm) of the residual
+    norm : float, returned if ``norm=True``
+        The error (l2-norm) of the residual.
 
     """
     # Get residual.
@@ -1021,9 +1009,12 @@ def residual(model, sfield, efield, norm=False):
                 efield.fz, model.eta_x, model.eta_y, model.eta_z, model.zeta,
                 model.grid.h[0], model.grid.h[1], model.grid.h[2])
 
-    if norm:  # Return its error.
+    # Return error if norm.
+    if norm:
         return sl.norm(rfield, check_finite=False)
-    else:     # Return residual.
+
+    # Return residual if not norm.
+    else:
         return rfield
 
 
@@ -1039,7 +1030,7 @@ class MGParameters:
     Returns
     -------
     var : class:`MGParameters`
-        As required by :func:`multigrid`.
+        As required by :func:`emg3d.solver.multigrid`.
 
     """
 
@@ -1549,7 +1540,8 @@ def _terminate(var, l2_last, l2_stag, it):
     Parameters
     ----------
     var : MGParameters
-        A multigrid parameter instance used within :func:`multigrid`.
+        A multigrid parameter instance used within
+        :func:`emg3d.solver.multigrid`.
 
     l2_last, l2_stag : float
         Last error and error for stagnation comparison (l2-norms).
@@ -1742,7 +1734,8 @@ def _print_cycle_info(var, l2_last, l2_prev):
     Parameters
     ----------
     var : MGParameters
-        A multigrid parameter instance used within :func:`multigrid`.
+        A multigrid parameter instance used within
+        :func:`emg3d.solver.multigrid`.
 
     l2_last, l2_prev : float
         Last and previous errors (l2-norms).
