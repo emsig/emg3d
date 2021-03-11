@@ -576,97 +576,115 @@ def test_residual():
     assert_allclose(outnorm, np.linalg.norm(out))
 
 
-def test_MGParameters():
+class TestMGParameters:
     shape_cells = (2**3, 2**5, 2**4)
 
-    # 1. semicoarsening
-    var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=True,
-                              linerelaxation=False, shape_cells=shape_cells,
-                              verb=0)
-    assert 'semicoarsening : True [1 2 3]' in var.__repr__()
-    var = solver.MGParameters(cycle='V', sslsolver=False, semicoarsening=1213,
-                              linerelaxation=False, shape_cells=shape_cells,
-                              verb=0)
-    assert 'semicoarsening : True [1 2 1 3]' in var.__repr__()
-    var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=2,
-                              linerelaxation=False, shape_cells=shape_cells,
-                              verb=0)
-    assert 'semicoarsening : True [2]' in var.__repr__()
-    with pytest.raises(ValueError, match='`semicoarsening` must be one of'):
-        solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=5,
-                            linerelaxation=False, shape_cells=shape_cells,
-                            verb=0)
+    def test_semicoarsening(self):
+        var = solver.MGParameters(
+                cycle='F', sslsolver=False, semicoarsening=True,
+                linerelaxation=False, shape_cells=self.shape_cells, verb=0)
+        assert 'semicoarsening : True [1 2 3]' in var.__repr__()
+        var = solver.MGParameters(
+                cycle='V', sslsolver=False, semicoarsening=1213,
+                linerelaxation=False, shape_cells=self.shape_cells, verb=0)
+        assert 'semicoarsening : True [1 2 1 3]' in var.__repr__()
+        var = solver.MGParameters(
+                cycle='F', sslsolver=False, semicoarsening=2,
+                linerelaxation=False, shape_cells=self.shape_cells, verb=0)
+        assert 'semicoarsening : True [2]' in var.__repr__()
+        with pytest.raises(ValueError, match='`semicoarsening` must be one o'):
+            solver.MGParameters(
+                    cycle='F', sslsolver=False, semicoarsening=5,
+                    linerelaxation=False, shape_cells=self.shape_cells, verb=0)
 
-    # 2. linerelaxation
-    var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=True, shape_cells=shape_cells,
-                              verb=0)
-    assert 'linerelaxation : True [4 5 6]' in var.__repr__()
-    var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=1247, shape_cells=shape_cells,
-                              verb=0)
-    assert 'linerelaxation : True [1 2 4 7]' in var.__repr__()
-    var = solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                              linerelaxation=1, shape_cells=shape_cells,
-                              verb=0, clevel=1)
-    assert 'linerelaxation : True [1]' in var.__repr__()
-    assert_allclose(var.clevel, 1)
-    with pytest.raises(ValueError, match='`linerelaxation` must be one of'):
-        solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                            linerelaxation=-9, shape_cells=shape_cells, verb=0)
+    def test_linerelaxation(self):
+        var = solver.MGParameters(
+                cycle='F', sslsolver=False, semicoarsening=False,
+                linerelaxation=True, shape_cells=self.shape_cells, verb=0)
+        assert 'linerelaxation : True [4 5 6]' in var.__repr__()
+        var = solver.MGParameters(
+                cycle='F', sslsolver=False, semicoarsening=False,
+                linerelaxation=1247, shape_cells=self.shape_cells, verb=0)
+        assert 'linerelaxation : True [1 2 4 7]' in var.__repr__()
+        var = solver.MGParameters(
+                cycle='F', sslsolver=False, semicoarsening=False,
+                linerelaxation=1, shape_cells=self.shape_cells, verb=0,
+                clevel=1)
+        assert 'linerelaxation : True [1]' in var.__repr__()
+        assert_allclose(var.clevel, 1)
+        with pytest.raises(ValueError, match='`linerelaxation` must be one o'):
+            solver.MGParameters(
+                    cycle='F', sslsolver=False, semicoarsening=False,
+                    linerelaxation=-9, shape_cells=self.shape_cells, verb=0)
 
-    # 3. sslsolver and cycle
-    with pytest.raises(ValueError, match='At least `cycle` or `sslsolver`'):
-        solver.MGParameters(cycle=None, sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, shape_cells=shape_cells,
-                            verb=0)
-    var = solver.MGParameters(cycle='F', sslsolver=True, semicoarsening=True,
-                              linerelaxation=False, shape_cells=shape_cells,
-                              verb=0, maxit=33)
-    assert "sslsolver : 'bicgstab'" in var.__repr__()
-    assert var.ssl_maxit == 33
-    assert var.maxit == 3
-    with pytest.raises(ValueError, match='`sslsolver` must be True'):
-        solver.MGParameters(cycle='F', sslsolver='abcd', semicoarsening=0,
-                            linerelaxation=False, shape_cells=shape_cells,
-                            verb=0)
-    with pytest.raises(ValueError, match='`sslsolver` must be True'):
-        solver.MGParameters(cycle='F', sslsolver=4, semicoarsening=0,
-                            linerelaxation=False, shape_cells=shape_cells,
-                            verb=0)
-    with pytest.raises(ValueError, match='`cycle` must be one of'):
-        solver.MGParameters(cycle='G', sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, shape_cells=shape_cells,
-                            verb=0)
+    def test_sslsolver_and_cycle(self):
+        with pytest.raises(ValueError, match='At least `cycle` or `sslsolve'):
+            solver.MGParameters(
+                    cycle=None, sslsolver=False, semicoarsening=False,
+                    linerelaxation=False, shape_cells=self.shape_cells, verb=0)
+        var = solver.MGParameters(
+                cycle='F', sslsolver=True, semicoarsening=True,
+                linerelaxation=False, shape_cells=self.shape_cells, verb=0,
+                maxit=33)
+        assert "sslsolver : 'bicgstab'" in var.__repr__()
+        assert var.ssl_maxit == 33
+        assert var.maxit == 3
+        with pytest.raises(ValueError, match='`sslsolver` must be True'):
+            solver.MGParameters(
+                    cycle='F', sslsolver='abcd', semicoarsening=0,
+                    linerelaxation=False, shape_cells=self.shape_cells, verb=0)
+        with pytest.raises(ValueError, match='`sslsolver` must be True'):
+            solver.MGParameters(
+                    cycle='F', sslsolver=4, semicoarsening=0,
+                    linerelaxation=False, shape_cells=self.shape_cells, verb=0)
+        with pytest.raises(ValueError, match='`cycle` must be one of'):
+            solver.MGParameters(
+                    cycle='G', sslsolver=False, semicoarsening=False,
+                    linerelaxation=False, shape_cells=self.shape_cells, verb=0)
 
     # 4. Wrong grid size
-    with pytest.raises(ValueError, match='Nr. of cells must be at least'):
-        solver.MGParameters(cycle='F', sslsolver=False, semicoarsening=False,
-                            linerelaxation=False, shape_cells=(1, 2, 3),
-                            verb=0)
+    def test_wrong_grid_size(self):
+        with pytest.raises(ValueError, match='Nr. of cells must be at least'):
+            solver.MGParameters(
+                    cycle='F', sslsolver=False, semicoarsening=False,
+                    linerelaxation=False, shape_cells=(1, 2, 3), verb=0)
 
-    # 5. Bad grid size
-    inp = {'cycle': 'F', 'sslsolver': False, 'semicoarsening': False,
-           'linerelaxation': False, 'verb': 0}
-    txt = ":: Grid not optimal for MG solver ::"
+    def test_bad_grid_size(self):
+        inp = {'cycle': 'F', 'sslsolver': False, 'semicoarsening': False,
+               'linerelaxation': False, 'verb': 0}
+        txt = ":: Grid not optimal for MG solver ::"
 
-    # One large prime => warning.
-    var = solver.MGParameters(shape_cells=(11*2**3, 2**5, 2**4), **inp)
-    assert txt in var.__repr__()
+        # One large prime => warning.
+        var = solver.MGParameters(shape_cells=(11*2**3, 2**5, 2**4), **inp)
+        assert txt in var.__repr__()
 
-    # Large primes, but clevel smaller => no warning.
-    var = solver.MGParameters(shape_cells=(11*2**5, 11*2**4, 11*2**5),
-                              clevel=4, **inp)
-    assert txt not in var.__repr__()
+        # Large primes, but clevel smaller => no warning.
+        var = solver.MGParameters(
+                shape_cells=(11*2**5, 11*2**4, 11*2**5), clevel=4, **inp)
+        assert txt not in var.__repr__()
 
-    # Large primes, clevel bigger => warning.
-    var = solver.MGParameters(shape_cells=(11*2**5, 11*2**4, 11*2**5),
-                              clevel=5, **inp)
-    assert txt in var.__repr__()
+        # Large primes, clevel bigger => warning.
+        var = solver.MGParameters(
+                shape_cells=(11*2**5, 11*2**4, 11*2**5), clevel=5, **inp)
+        assert txt in var.__repr__()
 
-    # Only 2 times dividable => warning.
-    var = solver.MGParameters(shape_cells=(2**3, 2**3, 2**3), **inp)
-    assert txt in var.__repr__()
+        # Only 2 times dividable => warning.
+        var = solver.MGParameters(shape_cells=(2**3, 2**3, 2**3), **inp)
+        assert txt in var.__repr__()
+
+    def test_cprint(self, capsys):
+        var = solver.MGParameters(
+                cycle='F', sslsolver=False, semicoarsening=True, log=1,
+                linerelaxation=False, shape_cells=self.shape_cells, verb=2)
+        var.cprint('test', 3)
+        out, _ = capsys.readouterr()
+        assert out == ""
+        assert var.log_message == ""
+
+        var.cprint('test', 1)
+        out, _ = capsys.readouterr()
+        assert out == "test\n"
+        assert var.log_message == "test\n"
 
 
 def test_RegularGridProlongator():
@@ -930,7 +948,7 @@ def test_print_cycle_info(capsys):
     var = solver.MGParameters(
             verb=4, cycle='F', sslsolver=False, linerelaxation=False,
             semicoarsening=False, shape_cells=(16, 8, 2))
-    var._level_all = [0, 1, 2, 3, 2, 3]
+    var.level_all = [0, 1, 2, 3, 2, 3]
     solver._print_cycle_info(var, 1.0, 2.0)
     out, _ = capsys.readouterr()
 
@@ -941,7 +959,7 @@ def test_print_cycle_info(capsys):
     var = solver.MGParameters(
             verb=5, cycle='F', sslsolver=True, linerelaxation=False,
             semicoarsening=False, shape_cells=(16, 8, 2))
-    var._level_all = list(np.r_[0, np.array(50*[[1, 2, 3, 2, 1], ]).ravel()])
+    var.level_all = list(np.r_[0, np.array(50*[[1, 2, 3, 2, 1], ]).ravel()])
     var.it = 123
     solver._print_cycle_info(var, 1.0, 2.0)
     out, _ = capsys.readouterr()
@@ -953,7 +971,7 @@ def test_print_cycle_info(capsys):
     var = solver.MGParameters(
             verb=3, cycle='F', sslsolver=False, linerelaxation=False,
             semicoarsening=False, shape_cells=(16, 8, 2))
-    var._level_all = [0, 1, 2, 3, 2, 3]
+    var.level_all = [0, 1, 2, 3, 2, 3]
     solver._print_cycle_info(var, 1.0, 2.0)
     out, _ = capsys.readouterr()
     assert ":: emg3d :: 1.0e+00; 0; 0:00:0" in out

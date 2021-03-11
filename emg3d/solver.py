@@ -19,6 +19,7 @@ however, are in :mod:`emg3d.core` as numba-jitted functions.
 # the License.
 
 import itertools
+from typing import Union
 from dataclasses import dataclass
 
 import numpy as np
@@ -27,8 +28,9 @@ import scipy.sparse.linalg as ssl
 
 from emg3d import core, meshes, models, fields, utils
 
-__all__ = ['solve', 'multigrid', 'smoothing', 'restriction', 'prolongation',
-           'residual', 'krylov', 'MGParameters', 'RegularGridProlongator']
+__all__ = ['solve', 'multigrid', 'krylov', 'smoothing', 'restriction',
+           'prolongation', 'residual', 'MGParameters',
+           'RegularGridProlongator']
 
 
 # MAIN USER-FACING FUNCTION
@@ -78,7 +80,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         relaxation. The sslsolver is at times unstable with an initial guess,
         carrying out one MG cycle helps to stabilize it.
 
-    cycle : str, default: 'F'
+    cycle : {str, None}, default: 'F'
         Type of multigrid cycle.
 
         - ``'V'``: V-cycle, simplest version;
@@ -98,7 +100,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
            8h_     \/       \/\/  \/       \/\/  \/\/
 
 
-    sslsolver : str, default: False
+    sslsolver : {str, bool}, default: False
         A :mod:`scipy.sparse.linalg`-solver, to use with MG as pre-conditioner
         or on its own (if ``cycle=None``).
 
@@ -115,7 +117,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         It does currently not work with 'cg', 'bicg', 'qmr', and 'minres' for
         various reasons (e.g., some require `rmatvec` in addition to `matvec`).
 
-    semicoarsening : int, default: False
+    semicoarsening : {int, bool}, default: False
         Semicoarsening.
 
         - True: Cycling over 1, 2, 3.
@@ -127,7 +129,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
           cycle over these values, e.g., ``semicoarsening=1213`` will cycle
           over [1, 2, 1, 3].
 
-    linerelaxation : int, default: False
+    linerelaxation : {int, bool}, default: False
         Line relaxation.
 
         This parameter is not respected on the coarsest grid, except if it is
@@ -387,7 +389,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
         _print_one_liner(var, var.l2, True)
     elif var.verb > 2:
         if var.sslsolver:  # sslsolver-specific info.
-            info = f"   > Solver steps     : {var._ssl_it}\n"
+            info = f"   > Solver steps     : {var.ssl_it}\n"
             if var.cycle:
                 info += f"   > MG prec. steps   : {var.it}\n"
         elif var.cycle:    # multigrid-specific info.
@@ -409,7 +411,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
             'ref_error': var.l2_refe,    # Reference error [norm(sfield)].
             'tol': var.tol,              # Tolerance (abs_error<ref_error*tol).
             'it_mg': var.it,             # Multigrid iterations.
-            'it_ssl': var._ssl_it,       # SSL iterations.
+            'it_ssl': var.ssl_it,        # SSL iterations.
             'time': var.runtime_at_cycle[-1],          # Runtime (s).
             'runtime_at_cycle': var.runtime_at_cycle,  # Runtime at cycle (s).
             'error_at_cycle': var.error_at_cycle,      # Abs. error at cycle.
@@ -437,7 +439,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
     - The current error (l2-norm) is stored in `var.l2`.
     - The reference error (l2-norm of sfield) is stored in `var.l2_refe`.
 
-    This function is called by :func:`solve`.
+    This function is called by :func:`emg3d.solver.solve`.
 
 
     Parameters
@@ -481,11 +483,11 @@ def multigrid(model, sfield, efield, var, **kwargs):
     l2_last = residual(model, sfield, efield, True)
 
     # Initiate the error-array to check for stagnation.
-    l2_stag = np.ones(var._maxcycle)*l2_last
+    l2_stag = np.ones(var.maxcycle)*l2_last
 
     # Keep track on the levels during the first cycle, for QC.
-    if var._first_cycle and var.verb > 3:
-        var._level_all.append(level)
+    if var.first_cycle and var.verb > 3:
+        var.level_all.append(level)
 
     # Print initial call info.
     if level == 0:
@@ -511,7 +513,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
 
         # Store errors for comparisons (previous and previous of same cycle).
         l2_prev = l2_last
-        l2_stag[(it-1) % var._maxcycle] = l2_last
+        l2_stag[(it-1) % var.maxcycle] = l2_last
 
         if level == var.clevel[var.sc_dir]:  # (A) Coarsest grid, solve system.
             # Note that coarsest grid depends on semicoarsening (sc_dir). If
@@ -554,8 +556,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
             prolongation(model.grid, efield, cmodel.grid, cefield, sc_dir)
 
             # Append current prolongation level for QC.
-            if var._first_cycle and var.verb > 3:
-                var._level_all.append(level)
+            if var.first_cycle and var.verb > 3:
+                var.level_all.append(level)
 
             # (B.5) Post-smoothing (nu_post).
             if var.nu_post > 0:
@@ -591,7 +593,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
                 var.lr_dir = next(var.lr_cycle)
 
             # Check if any termination criteria is fulfilled.
-            if _terminate(var, l2_last, l2_stag[(it-1) % var._maxcycle], it):
+            if _terminate(var, l2_last, l2_stag[(it-1) % var.maxcycle], it):
                 break
 
     # Store final error (l2-norm).
@@ -609,7 +611,7 @@ def krylov(model, sfield, efield, var):
     - The current error (l2-norm) is stored in `var.l2`.
     - The reference error (l2-norm of sfield) is stored in `var.l2_refe`.
 
-    This function is called by :func:`solve`.
+    This function is called by :func:`emg3d.solver.solve`.
 
 
     Parameters
@@ -677,7 +679,7 @@ def krylov(model, sfield, efield, var):
     def callback(x):
         """Solver iteration count and error (l2-norm)."""
         # Update iteration count.
-        var._ssl_it += 1
+        var.ssl_it += 1
 
         # Add current runtime and error to var.
         var.runtime_at_cycle = np.r_[var.runtime_at_cycle, var.time.elapsed]
@@ -688,11 +690,11 @@ def krylov(model, sfield, efield, var):
         if var.verb > 3:
 
             log = f"   [{var.time.now}]   {var.l2/var.l2_refe:.3e} "
-            log += f" after {var._ssl_it:3} {var.sslsolver}-cycles"
+            log += f" after {var.ssl_it:3} {var.sslsolver}-cycles"
 
             # For those solvers who run an iteration before the first
             # preconditioner run ['gcrotmk'].
-            if var._ssl_it == 1 and var.it == 0 and var.cycle is not None:
+            if var.ssl_it == 1 and var.it == 0 and var.cycle is not None:
                 log += "\n"
 
             var.cprint(log, 3)
@@ -1021,28 +1023,32 @@ def residual(model, sfield, efield, norm=False):
 # VARIABLE DATACLASS
 @dataclass
 class MGParameters:
-    """Collect multigrid solver settings.
+    """Multigrid solver settings.
 
-    This dataclass is used by the main :func:`solve`-routine. See
-    :func:`solve` for a description of the mandatory and optional input
-    parameters and more information .
+    This dataclass is used by the main solver routine to keep track of
+    settings, errors, which level we currently are in, runtime, log, and so on.
 
-    Returns
-    -------
-    var : class:`MGParameters`
-        As required by :func:`emg3d.solver.multigrid`.
+    This class is instantiated by :func:`emg3d.solver.solve`. Consult that
+    function for a description of the mandatory and optional input parameters
+    and more information .
 
     """
 
-    # (A) Parameters without default values (mandatory).
+    # (A) Mandatory parameters.
+    # Verbosity.
     verb: int
-    cycle: str
-    sslsolver: str
-    linerelaxation: int
-    semicoarsening: int
-    shape_cells: tuple  # Finest grid dimension
+    # Type of multigrid cycle.
+    cycle: Union[str, None]
+    # SciPy Sparse Linalg solver flag.
+    sslsolver: Union[str, bool]
+    # Semicoarsening flag.
+    semicoarsening: Union[int, bool]
+    # Line relaxation flag.
+    linerelaxation: Union[int, bool]
+    # Shape of the input model.
+    shape_cells: tuple
 
-    # (B) Parameters with default values
+    # (B) Optional parameters with default values
     # Convergence tolerance.
     tol: float = 1e-6
     # Maximum iteration.
@@ -1057,39 +1063,35 @@ class MGParameters:
     nu_post: int = 2
     # Coarsest level; automatically determined if a negative number is given.
     clevel: int = -1
-
-    # Whether or not to return info.
+    # Flag whether or not to return info.
     return_info: bool = False
-    # Log verbosity.
+    # Log if logging verbosity.
     log: int = 0
-    log_message: str = ''
 
     def __post_init__(self):
         """Set and check some of the parameters."""
 
-        # 0. Set some additional variables.
-        self._level_all = list()   # To keep track of the levels for QC-figure.
-        self._first_cycle = True   # Flag if in first cycle for QC-figure.
-        self.it = 0                # To store MG cycle count.
-        self._ssl_it = 0           # To store solver iteration count.
-        self.l2 = 1.0              # To store current error.
-        self.l2_refe = 1.0         # To store reference error.
-        self.exit_message = ''     # For convergence status.
+        # Levels and iterations.
+        self.level_all = list()   # To keep track of the levels for QC-figure.
+        self.first_cycle = True   # Flag if in first cycle for QC-figure.
+        self.it = 0               # To store MG cycle count.
+        self.ssl_it = 0           # To store solver iteration count.
+        self.l2 = 1.0             # To store current error.
+        self.l2_refe = 1.0        # To store reference error.
+        self._max_level()         # Max coarsening levels.
 
-        self.time = utils.Time()   # Timer.
+        # Initiate logging strings, timer, errors, and return flag.
+        self.exit_message = ''    # For convergence status.
+        self.log_message = ''     # For returning info.
+        self.time = utils.Time()  # Time.
         self.runtime_at_cycle = np.array([0.])  # Store runtime per cycle.
         self.error_at_cycle = np.array([0.])    # Store error per cycle.
-        self.do_return = True      # Whether or not to return the efield.
+        self.do_return = True     # Whether or not to return the efield.
 
-        # 1. Set everything related to semicoarsening and line relaxation.
+        # Semicoarsening, line relaxation, and Solver/Cycle check.
         self._semicoarsening()
         self._linerelaxation()
-
-        # 2. Set everything to used solver and MG-cycle.
         self._solver_and_cycle()
-
-        # 3. Check max coarsening level.
-        self.max_level
 
     def __repr__(self):
         """Print all relevant parameters."""
@@ -1097,37 +1099,62 @@ class MGParameters:
         outstring = (
             f"   MG-cycle       : {self.cycle!r:17}"
             f"   sslsolver : {self.sslsolver!r}\n"
-            f"   semicoarsening : {self._p_sc_dir:17}"
+            #
+            f"   semicoarsening : {self._repr_sc_dir:17}"
             f"   tol       : {self.tol}\n"
-            f"   linerelaxation : {self._p_lr_dir:17}"
-            f"   maxit     : {self._maxit}\n"
-            f"   nu_{{i,1,c,2}}   : {self.nu_init}, {self.nu_pre}"
-            f", {self.nu_coarse}, {self.nu_post}       "
+            #
+            f"   linerelaxation : {self._repr_lr_dir:17}"
+            f"   maxit     : {self._repr_maxit}\n"
+            #
+            f"   nu_{{i,1,c,2}}   : {self.nu_init}, {self.nu_pre},"
+            f" {self.nu_coarse}, {self.nu_post}       "
             f"   verb      : {self.verb}\n"
-            f"   Original grid  "
-            f": {self.shape_cells[0]:3} x {self.shape_cells[1]:3} x "
-            f"{self.shape_cells[2]:3}  "
-            f"   => "
-            f"{self.shape_cells[0]*self.shape_cells[1]*self.shape_cells[2]:,}"
+            #
+            f"   Original grid  : {self.shape_cells[0]:3} x"
+            f" {self.shape_cells[1]:3} x {self.shape_cells[2]:3}     =>"
+            f" {self.shape_cells[0]*self.shape_cells[1]*self.shape_cells[2]:,}"
             f" cells\n"
-            f"   Coarsest grid  : {self.pclevel['shape_cells'][0]:3} "
-            f"x {self.pclevel['shape_cells'][1]:3} "
-            f"x {self.pclevel['shape_cells'][2]:3}  "
-            f"   => {self.pclevel['nC']:,} cells\n"
-            f"   Coarsest level : {self.pclevel['clevel'][0]:3} "
-            f"; {self.pclevel['clevel'][1]:3} ;{self.pclevel['clevel'][2]:4} "
-            f"  {self.pclevel['message']}"
-            f"\n"
+            #
+            f"   Coarsest grid  : {self._repr_clevel['shape_cells'][0]:3} x"
+            f" {self._repr_clevel['shape_cells'][1]:3} x"
+            f" {self._repr_clevel['shape_cells'][2]:3}  "
+            f"   => {self._repr_clevel['nC']:,} cells\n"
+            #
+            f"   Coarsest level : {self._repr_clevel['clevel'][0]:3} ;"
+            f" {self._repr_clevel['clevel'][1]:3}"
+            f" ;{self._repr_clevel['clevel'][2]:4} "
+            f"  {self._repr_clevel['message']}\n"
         )
 
         return outstring
 
-    @property
-    def max_level(self):
-        r"""Sets dimension-dependent level variable `clevel`.
+    def cprint(self, info, verbosity, **kwargs):
+        r"""Prints and logs ``info`` if ``self.verb`` > ``verbosity``.
 
-        Requires at least two cells in each direction (for `nCx`, `nCy`, and
-        `nCz`).
+        Parameters
+        ----------
+        info : str
+            String to be printed.
+
+        verbosity : int
+            Verbosity of info.
+
+        kwargs : optional
+            Arguments passed to ``print()``, e.g., ``end='\r'``.
+
+        """
+        if self.verb > verbosity:
+            if self.log != 0:
+                self.log_message += str(info)+'\n'
+            if self.log >= 0:
+                print(info, **kwargs)
+
+    def _max_level(self):
+        r"""Sets dimension-dependent level variable ``clevel``.
+
+        Requires at least two cells in each direction (for ``nCx``, ``nCy``,
+        and ``nCz``).
+
         """
         # Store input clevel for checks.
         inp_clevel = np.inf if self.clevel < 0 else self.clevel
@@ -1155,13 +1182,13 @@ class MGParameters:
              max(clevel[0], clevel[1])]             # Max-level if sc_dir=3
         )
 
-        # Store coarsest nr of cells on coarsest grid and dimension for the
+        # Store coarsest number of cells on coarsest grid and dimension for the
         # log-printing.
         sx = int(self.shape_cells[0]/2**clevel[0])
         sy = int(self.shape_cells[1]/2**clevel[1])
         sz = int(self.shape_cells[2]/2**clevel[2])
-        self.pclevel = {'nC': sx*sy*sz, 'shape_cells': (sx, sy, sz),
-                        'clevel': clevel}
+        self._repr_clevel = {'nC': sx*sy*sz, 'shape_cells': (sx, sy, sz),
+                             'clevel': clevel}
 
         # Check some grid characteristics. Good values up to 1024 are:
         # - 2*2^{2, ..., 9}: 8, 16,  32,  64, 128, 256, 512, 1024,
@@ -1174,13 +1201,16 @@ class MGParameters:
         # Ignore if clevel was provided and also reached (user wants it).
         check_inp = zip(clevel, [sx, sy, sz])
         low_prime = any([cl < inp_clevel and sl > 7 for cl, sl in check_inp])
+
         # Check if it can be at least 3 (or inp_clevel) times coarsened.
         min_div = any(clevel < min(inp_clevel, 3))
+
         # Raise warning if necessary.
         if low_prime or min_div:
-            self.pclevel['message'] = "  :: Grid not optimal for MG solver ::"
+            msg = "  :: Grid not optimal for MG solver ::"
+            self._repr_clevel['message'] = msg
         else:
-            self.pclevel['message'] = ""
+            self._repr_clevel['message'] = ""
 
         # Check at least two cells in each direction
         if np.any(np.array(self.shape_cells) < 2):
@@ -1189,29 +1219,6 @@ class MGParameters:
                     "Provided shape: "
                     f"({self.shape_cells[0]}, {self.shape_cells[1]}, "
                     f"{self.shape_cells[2]}).")
-
-    def cprint(self, info, verbosity, **kwargs):
-        """Conditional printing.
-
-        Prints `info` if `self.verb` > `verbosity`.
-
-        Parameters
-        ----------
-        info : str
-            String to be printed.
-
-        verbosity : int
-            Verbosity of info.
-
-        kwargs : optional
-            Arguments passed to `print`.
-
-        """
-        if self.verb > verbosity:
-            if self.log != 0:
-                self.log_message += str(info)+'\n'
-            if self.log >= 0:
-                print(info, **kwargs)
 
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
@@ -1245,8 +1252,8 @@ class MGParameters:
 
         # Set semicoarsening to True/False; print statement
         self.semicoarsening = self.sc_dir != 0
-        self._p_sc_dir = f"{self.semicoarsening} {sc_cycle}"
-        self._raw_sc_cycle = sc_cycle
+        self._repr_sc_dir = f"{self.semicoarsening} {sc_cycle}"
+        self.raw_sc_cycle = sc_cycle
 
     def _linerelaxation(self):
         """Set everything related to line relaxation."""
@@ -1280,8 +1287,8 @@ class MGParameters:
 
         # Set linerelaxation to True/False; print statement
         self.linerelaxation = self.lr_dir != 0
-        self._p_lr_dir = f"{self.linerelaxation} {lr_cycle}"
-        self._raw_lr_cycle = lr_cycle
+        self._repr_lr_dir = f"{self.linerelaxation} {lr_cycle}"
+        self.raw_lr_cycle = lr_cycle
 
     def _solver_and_cycle(self):
         """Set everything related to solver and MG-cycle."""
@@ -1314,13 +1321,13 @@ class MGParameters:
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
         self.ssl_maxit = 0             # Maximum iteration
-        self._maxit = f"{self.maxit}"  # For printing
-        self._maxcycle = max(len(self._raw_sc_cycle), len(self._raw_lr_cycle))
+        self._repr_maxit = f"{self.maxit}"  # For printing
+        self.maxcycle = max(len(self.raw_sc_cycle), len(self.raw_lr_cycle))
         if self.sslsolver:
             self.ssl_maxit = self.maxit
             if self.cycle is not None:  # Only if MG is used
-                self.maxit = self._maxcycle
-                self._maxit += f" ({self.maxit})"  # For printing
+                self.maxit = self.maxcycle
+                self._repr_maxit += f" ({self.maxit})"  # For printing
 
 
 # INTERPOLATION DATACLASS
@@ -1758,10 +1765,10 @@ def _print_cycle_info(var, l2_last, l2_prev):
         info = ""
 
     # Add multigrid-cycle visual QC on first cycle.
-    if var._first_cycle:
+    if var.first_cycle:
 
         # Cast levels into array, get maximum.
-        _lvl_all = np.array(var._level_all, dtype=np.int_)
+        _lvl_all = np.array(var.level_all, dtype=np.int_)
         lvl_max = np.max(_lvl_all)
 
         # Get levels, multiply by difference to get +/-.
@@ -1786,7 +1793,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
             info += f"{len(lvl)} steps.)\n"
 
         # Set first_cycle to False, to reduce verbosity from now on.
-        var._first_cycle = False
+        var.first_cycle = False
 
     # Add iteration log.
     info += f"   [{var.time.now}]   {l2_last/var.l2_refe:.3e}  "
@@ -1850,7 +1857,7 @@ def _print_one_liner(var, l2_last, last=False):
     # Collect info.
     info = f":: emg3d :: {l2_last/var.l2_refe:.1e}; "  # Absolute error.
     if var.sslsolver:  # For multigrid as preconditioner.
-        info += f"{var._ssl_it}({var.it}); "
+        info += f"{var.ssl_it}({var.it}); "
     else:               # Stand-alone multigrid.
         info += f"{var.it}; "
     info += f"{var.time.runtime}"  # Runtime
