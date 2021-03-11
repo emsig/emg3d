@@ -1,6 +1,6 @@
 """
-The actual multigrid solver routines. The most computationally intensive parts,
-however, are in the :mod:`emg3d.core` as numba-jitted functions.
+The actual multigrid solver routines. The computationally intensive parts,
+however, are in :mod:`emg3d.core` as numba-jitted functions.
 """
 # Copyright 2018-2021 The emg3d Developers.
 #
@@ -384,7 +384,7 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
 
     # Print runtime information.
     if var.verb in [1, 2]:
-        var.one_liner(var.l2, True)
+        _print_one_liner(var, var.l2, True)
     elif var.verb > 2:
         if var.sslsolver:  # sslsolver-specific info.
             info = f"   > Solver steps     : {var._ssl_it}\n"
@@ -492,8 +492,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
         var.cprint("     it cycmax               error", 4)
         var.cprint("      level [  dimension  ]            info\n", 4)
         if var.verb > 4:
-            info = _print_gs_info(it, level, cycmax, model.grid, l2_last)
-            var.cprint(info + "initial error", 4)
+            _print_gs_info(var, it, level, cycmax, model.grid, l2_last,
+                           "initial error")
 
     # Initial smoothing (nu_init).
     if level == 0 and var.nu_init > 0:
@@ -503,8 +503,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
         # Print initial smoothing info.
         if var.verb > 4:
             norm = residual(model, sfield, efield, True)
-            info = _print_gs_info(it, level, cycmax, model.grid, norm)
-            var.cprint(info + "initial smoothing", 4)
+            _print_gs_info(var, it, level, cycmax, model.grid, norm,
+                           "initial smoothing")
 
     # Start the actual (recursive) multigrid cycle.
     while level == 0 or (level > 0 and it < cycmax):
@@ -524,8 +524,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
             # Print coarsest grid smoothing info.
             if var.verb > 4:
                 norm = residual(model, sfield, efield, True)
-                info = _print_gs_info(it, level, cycmax, model.grid, norm)
-                var.cprint(info + "coarsest level", 4)
+                _print_gs_info(var, it, level, cycmax, model.grid, norm,
+                               "coarsest level")
 
         else:                   # (B) Not yet on coarsest grid.
 
@@ -536,8 +536,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
                 # Print pre-smoothing info.
                 if var.verb > 4:
                     norm = residual(model, sfield, efield, True)
-                    info = _print_gs_info(it, level, cycmax, model.grid, norm)
-                    var.cprint(info + "pre-smoothing", 4)
+                    _print_gs_info(var, it, level, cycmax, model.grid, norm,
+                                   "pre-smoothing")
 
             # Get sc_dir for this grid.
             sc_dir = _current_sc_dir(var.sc_dir, model.grid)
@@ -564,8 +564,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
                 # Print post-smoothing info.
                 if var.verb > 4:
                     norm = residual(model, sfield, efield, True)
-                    info = _print_gs_info(it, level, cycmax, model.grid, norm)
-                    var.cprint(info + "post-smoothing", 4)
+                    _print_gs_info(var, it, level, cycmax, model.grid, norm,
+                                   "post-smoothing")
 
         # Update iterator counts.
         it += 1         # Local iterator.
@@ -699,7 +699,7 @@ def krylov(model, sfield, efield, var):
 
         elif var.verb in [2, 3]:
 
-            var.one_liner(var.l2)
+            _print_one_liner(var, var.l2)
 
     # Solve the system with sslsolver.
     # The ssl solvers do not abort if the norm diverges or is not finite. We
@@ -918,8 +918,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
     """
 
     # Interpolate ex in y-z-slices.
-    yz_points = _get_prolongation_coordinates(grid, 'y', 'z')
-    fn = RegularGridProlongator(cgrid.nodes_y, cgrid.nodes_z, yz_points)
+    fn = RegularGridProlongator(
+            cgrid.nodes_y, cgrid.nodes_z, grid.nodes_y, grid.nodes_z)
     for ixc in range(cgrid.shape_cells[0]):
         # Bilinear interpolation in the y-z plane
         hh = fn(cefield.fx[ixc, :, :]).reshape(
@@ -933,8 +933,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
             efield.fx[ixc, :, :] += hh
 
     # Interpolate ey in x-z-slices.
-    xz_points = _get_prolongation_coordinates(grid, 'x', 'z')
-    fn = RegularGridProlongator(cgrid.nodes_x, cgrid.nodes_z, xz_points)
+    fn = RegularGridProlongator(
+            cgrid.nodes_x, cgrid.nodes_z, grid.nodes_x, grid.nodes_z)
     for iyc in range(cgrid.shape_cells[1]):
 
         # Bilinear interpolation in the x-z plane
@@ -949,8 +949,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
             efield.fy[:, iyc, :] += hh
 
     # Interpolate ez in x-y-slices.
-    xy_points = _get_prolongation_coordinates(grid, 'x', 'y')
-    fn = RegularGridProlongator(cgrid.nodes_x, cgrid.nodes_y, xy_points)
+    fn = RegularGridProlongator(
+            cgrid.nodes_x, cgrid.nodes_y, grid.nodes_x, grid.nodes_y)
     for izc in range(cgrid.shape_cells[2]):
 
         # Bilinear interpolation in the x-y plane
@@ -1222,32 +1222,6 @@ class MGParameters:
             if self.log >= 0:
                 print(info, **kwargs)
 
-    def one_liner(self, l2_last, last=False):
-        """Print continuously updated one-liner.
-
-        Parameters
-        ----------
-        l2_last : float
-            Current error.
-
-        last : bool
-            If True, adds `exit_message` and finishes line.
-
-        """
-        # Collect info.
-        info = f":: emg3d :: {l2_last/self.l2_refe:.1e}; "  # Absolute error.
-        if self.sslsolver:  # For multigrid as preconditioner.
-            info += f"{self._ssl_it}({self.it}); "
-        else:               # Stand-alone multigrid.
-            info += f"{self.it}; "
-        info += f"{self.time.runtime}"  # Runtime
-
-        # Print depending on `exit`.
-        if last:
-            self.cprint(info+f"; {self.exit_message}", -100)
-        else:
-            self.cprint(info, -100, end='\r')
-
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
 
@@ -1365,9 +1339,10 @@ class RegularGridProlongator:
     This is a heavily modified and adapted version of
     :class:`scipy.interpolate.RegularGridInterpolator`.
 
-    The main difference (besides the pre-sets) is that this version allows to
-    initiate an instance with the coarse and fine grids. This initialize will
-    compute the required weights, and it has therefore only to be done once.
+    The main difference (besides the different signature and different
+    pre-sets) is that this version allows to initiate an instance with the
+    coarse and fine grids. This initialize will compute the required weights,
+    and it has therefore only to be done once.
 
     After this, interpolating values from the coarse to the fine grid can be
     carried out much faster.
@@ -1375,30 +1350,27 @@ class RegularGridProlongator:
     Simplifications in comparison to
     :class:`scipy.interpolate.RegularGridInterpolator`:
 
-    - No sanity checks what-so-ever.
+    - No sanity checks;
     - Only 2D data;
     - ``method='linear'``;
     - ``bounds_error=False``;
     - ``fill_value=None``.
 
     It results in a speed-up factor of about 2, independent of grid size, for
-    this particular case. The prolongation is the second-most expensive part of
-    multigrid after the smoothing. Trying to improve this further might
-    therefore be useful.
+    this particular case.
 
     Parameters
     ----------
-    x, y : ndarray
-        The x/y-coordinates defining the coarse grid.
-
-    cxy : ndarray of shape (..., 2)
-        The ([[x], [y]]).T-coordinates defining the fine grid.
+    cx, cy, x, y : ndarray
+        The coordinates defining the coarse (cx, cy) and fine (x, y) grids.
 
     """
 
-    def __init__(self, x, y, cxy):
-        self.size = cxy.shape[0]
-        self._set_edges_and_weights((x, y), cxy)
+    def __init__(self, cx, cy, x, y):
+        by, bx = np.broadcast_arrays(y, x[:, None])
+        xy = np.r_[bx.ravel('F'), by.ravel('F')].reshape(-1, 2, order='F')
+        self.size = xy.shape[0]
+        self._set_edges_and_weights((cx, cy), xy)
 
     def __call__(self, values):
         """Return values of coarse grid on fine grid locations.
@@ -1406,12 +1378,12 @@ class RegularGridProlongator:
         Parameters
         ----------
         values : ndarray
-            Values corresponding to x/y-coordinates.
+            Values corresponding to fine-grid (x/y) coordinates.
 
         Returns
         -------
         result : ndarray
-            Values corresponding to cxy-coordinates.
+            Values corresponding to coarse-grid (cx/cy) coordinates.
 
         """
         # Initiate result.
@@ -1423,17 +1395,17 @@ class RegularGridProlongator:
 
         return result
 
-    def _set_edges_and_weights(self, xy, cxy):
-        """Compute weights to go from xy- to cxy-coordinates."""
+    def _set_edges_and_weights(self, cxy, xy):
+        """Compute weights to go from coarse to fine grid coordinates."""
 
-        # Find relevant edges between which cxy are situated.
+        # Find relevant edges between which xy are situated.
         indices = []
 
         # Compute distance to lower edge in unity units.
         norm_distances = []
 
         # Iterate through dimensions.
-        for x, grid in zip(cxy.T, xy):
+        for x, grid in zip(xy.T, cxy):
             i = np.searchsorted(grid, x) - 1
             i[i < 0] = 0
             i[i > grid.size - 2] = grid.size - 2
@@ -1461,15 +1433,14 @@ class RegularGridProlongator:
 def _current_sc_dir(sc_dir, grid):
     """Return current direction(s) for semicoarsening.
 
-    Semicoarsening is defined in `self.sc_dir`. Here `self.sc_dir` is checked
-    with which directions can actually still be halved, and depending on that,
-    an adjusted `sc_dir` is returned for this particular grid.
+    Checks which directions can actually still be halved and adjusts ``sc_dir``
+    if necessary for this particular grid.
 
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        Input grid.
+    grid : TensorMesh
+        Current grid.
 
     sc_dir : int
         Direction of semicoarsening.
@@ -1514,68 +1485,264 @@ def _current_sc_dir(sc_dir, grid):
 def _current_lr_dir(lr_dir, grid):
     """Return current direction(s) for line relaxation.
 
-    Line relaxation is defined in `self.lr_dir`. Here `self.lr_dir` is checked
-    with the dimension of the grid, to avoid line relaxation in a direction
-    where there are only two cells.
+    Checks which directions can actually still apply line relaxation and
+    adjusts ``lr_dir`` if necessary for this particular grid.
 
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        Input grid.
+    grid : TensorMesh
+        Current grid.
 
     lr_dir : int
-        Direction of line relaxation {0, 1, 2, 3, 4, 5, 6, 7}.
+        Direction of line relaxation.
 
 
     Returns
     -------
-    lr_dir : int
+    c_lr_dir : int
         Current direction of line relaxation.
 
     """
-    lr_dir = np.copy(lr_dir)
+    c_lr_dir = np.copy(lr_dir)
 
     if grid.shape_cells[0] == 2:  # Check x-direction.
-        if lr_dir == 1:
-            lr_dir = 0
-        elif lr_dir == 5:
-            lr_dir = 3
-        elif lr_dir == 6:
-            lr_dir = 2
-        elif lr_dir == 7:
-            lr_dir = 4
+        if c_lr_dir == 1:
+            c_lr_dir = 0
+        elif c_lr_dir == 5:
+            c_lr_dir = 3
+        elif c_lr_dir == 6:
+            c_lr_dir = 2
+        elif c_lr_dir == 7:
+            c_lr_dir = 4
 
     if grid.shape_cells[1] == 2:  # Check y-direction.
-        if lr_dir == 2:
-            lr_dir = 0
-        elif lr_dir == 4:
-            lr_dir = 3
-        elif lr_dir == 6:
-            lr_dir = 1
-        elif lr_dir == 7:
-            lr_dir = 5
+        if c_lr_dir == 2:
+            c_lr_dir = 0
+        elif c_lr_dir == 4:
+            c_lr_dir = 3
+        elif c_lr_dir == 6:
+            c_lr_dir = 1
+        elif c_lr_dir == 7:
+            c_lr_dir = 5
 
     if grid.shape_cells[2] == 2:  # Check z-direction.
-        if lr_dir == 3:
-            lr_dir = 0
-        elif lr_dir == 4:
-            lr_dir = 2
-        elif lr_dir == 5:
-            lr_dir = 1
-        elif lr_dir == 7:
-            lr_dir = 6
+        if c_lr_dir == 3:
+            c_lr_dir = 0
+        elif c_lr_dir == 4:
+            c_lr_dir = 2
+        elif c_lr_dir == 5:
+            c_lr_dir = 1
+        elif c_lr_dir == 7:
+            c_lr_dir = 6
 
-    return lr_dir
+    return c_lr_dir
 
 
+def _terminate(var, l2_last, l2_stag, it):
+    """Return multigrid termination flag.
+
+    Checks all termination criteria and returns True if at least one is
+    fulfilled.
+
+
+    Parameters
+    ----------
+    var : MGParameters
+        A multigrid parameter instance used within :func:`multigrid`.
+
+    l2_last, l2_stag : float
+        Last error and error for stagnation comparison (l2-norms).
+
+    it : int
+        Iteration number.
+
+
+    Returns
+    -------
+    finished : bool
+        Boolean indicating if multigrid is finished.
+
+    """
+
+    finished = False
+    sslabort = False
+
+    # Converged if we reached the tolerance.
+    if l2_last < var.tol*var.l2_refe:
+        var.exit_message = "CONVERGED"
+        finished = True
+
+    # Diverged if it is 10x larger than last or not a number.
+    elif l2_last > 10*var.l2_refe or not np.isfinite(l2_last):
+        var.exit_message = "DIVERGED"
+        finished = True
+        sslabort = True  # Force abort if sslsolver.
+
+    # Stagnated if it is >= the stagnation value.
+    elif it > 2 and l2_last >= l2_stag:
+        var.exit_message = "STAGNATED"
+        finished = True
+        sslabort = True  # Force abort if sslsolver.
+        # Note: SSL will not fall into this, as it compares to the last value
+        #       of the same cycle type. However, if used as preconditioner each
+        #       cycle-type is only run once, before returning to the SSL.
+
+    # Maximum iterations reached.
+    elif it == var.maxit:
+        if not var.sslsolver:
+            var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
+        finished = True
+
+    # Force abort (ssl solver) or print info.
+    if finished:
+
+        # Force abortion of SSL solver.
+        if var.sslsolver and sslabort:
+            raise _ConvergenceError
+
+        # Print info (if not preconditioner).
+        elif not var.sslsolver:
+            if var.verb == 3:
+                add = 50*" " + "\r"
+            elif var.verb < 5:
+                add = "\n"
+            else:
+                add = ""
+            var.cprint(add+"   > "+var.exit_message, 2)
+
+    return finished
+
+
+def _restrict_model_parameters(param, sc_dir):
+    """Restrict model parameters.
+
+    Parameters
+    ----------
+    param : ndarray
+        Model parameter to restrict.
+
+    sc_dir : int
+        Direction of semicoarsening.
+
+    Returns
+    -------
+    out : ndarray
+        Restricted model parameter.
+
+    """
+    # Only sum the four cells in y-z-plane
+    if sc_dir == 1:
+        out = param[:, :-1:2, :-1:2] + param[:, 1::2, :-1:2]
+        out += param[:, :-1:2, 1::2] + param[:, 1::2, 1::2]
+
+    # Only sum the four cells in x-z-plane
+    elif sc_dir == 2:
+        out = param[:-1:2, :, :-1:2] + param[1::2, :, :-1:2]
+        out += param[:-1:2, :, 1::2] + param[1::2, :, 1::2]
+
+    # Only sum the four cells in x-y-plane
+    elif sc_dir == 3:
+        out = param[:-1:2, :-1:2, :] + param[1::2, :-1:2, :]
+        out += param[:-1:2, 1::2, :] + param[1::2, 1::2, :]
+
+    # Only sum the two cells in x-direction
+    elif sc_dir == 4:
+        out = param[:-1:2, :, :] + param[1::2, :, :]
+
+    # Only sum the two cells y-direction
+    elif sc_dir == 5:
+        out = param[:, :-1:2, :] + param[:, 1::2, :]
+
+    # Only sum the two cells z-direction
+    elif sc_dir == 6:
+        out = param[:, :, :-1:2] + param[:, :, 1::2]
+
+    # Standard: Sum all 8 cells.
+    else:
+        out = param[:-1:2, :-1:2, :-1:2] + param[1::2, :-1:2, :-1:2]
+        out += param[:-1:2, :-1:2, 1::2] + param[1::2, :-1:2, 1::2]
+        out += param[:-1:2, 1::2, :-1:2] + param[1::2, 1::2, :-1:2]
+        out += param[:-1:2, 1::2, 1::2] + param[1::2, 1::2, 1::2]
+
+    return out
+
+
+def _get_restriction_weights(grid, cgrid, sc_dir):
+    """Return restriction weights.
+
+    Return the weights as given in Equation 9 of [Muld06]_. It is a wrapper for
+    the numba-jitted function :func:`emg3d.core.restrict_weights`. The
+    corresponding weights are not actually used in the case of semicoarsening.
+    We still have to provide arrays of the correct format though, otherwise
+    numba will complain in the jitted functions.
+
+
+    Parameters
+    ----------
+    grid, cgrid : TensorMesh
+        Fine and coarse grids; :class:`emg3d.meshes.TensorMesh` instances.
+
+    sc_dir : int
+        Direction of semicoarsening.
+
+
+    Returns
+    -------
+    wx, wy, wz : tuple
+        Restriction weights in x, y, and z direction, consisting of
+        (left, center, right) weights.
+
+    """
+    # x-directed weights.
+    if sc_dir not in [1, 5, 6]:
+        wx = core.restrict_weights(
+                grid.nodes_x, grid.cell_centers_x, grid.h[0], cgrid.nodes_x,
+                cgrid.cell_centers_x, cgrid.h[0])
+
+    else:  # Dummy weights in case of semicoarsening.
+        wxlr = np.zeros(grid.shape_nodes[0], dtype=np.float64)
+        wx0 = np.ones(grid.shape_nodes[0], dtype=np.float64)
+        wx = (wxlr, wx0, wxlr)
+
+    # y-directed weights.
+    if sc_dir not in [2, 4, 6]:
+        wy = core.restrict_weights(
+                grid.nodes_y, grid.cell_centers_y, grid.h[1], cgrid.nodes_y,
+                cgrid.cell_centers_y, cgrid.h[1])
+
+    else:  # Dummy weights in case of semicoarsening.
+        wylr = np.zeros(grid.shape_nodes[1], dtype=np.float64)
+        wy0 = np.ones(grid.shape_nodes[1], dtype=np.float64)
+        wy = (wylr, wy0, wylr)
+
+    # z-directed weights.
+    if sc_dir not in [3, 4, 5]:
+        wz = core.restrict_weights(
+                grid.nodes_z, grid.cell_centers_z, grid.h[2], cgrid.nodes_z,
+                cgrid.cell_centers_z, cgrid.h[2])
+
+    else:  # Dummy weights in case of semicoarsening.
+        wzlr = np.zeros(grid.shape_nodes[2], dtype=np.float64)
+        wz0 = np.ones(grid.shape_nodes[2], dtype=np.float64)
+        wz = (wzlr, wz0, wzlr)
+
+    return wx, wy, wz
+
+
+class _ConvergenceError(Exception):
+    """Custom exception for convergence issues with SSL solvers."""
+    pass
+
+
+# VERBOSITY HELPER ROUTINES (private, undocumented)
 def _print_cycle_info(var, l2_last, l2_prev):
     """Print cycle info to log.
 
     Parameters
     ----------
-    var : `MGParameters` instance
-        As returned by :func:`multigrid`.
+    var : MGParameters
+        A multigrid parameter instance used within :func:`multigrid`.
 
     l2_last, l2_prev : float
         Last and previous errors (l2-norms).
@@ -1587,7 +1754,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
 
     # Start info string, return if not enough verbose.
     if var.verb in [2, 3]:  # One-liner
-        var.one_liner(l2_last)
+        _print_one_liner(var, l2_last)
 
     if var.verb < 4:
         # Set first_cycle to False, to stop logging.
@@ -1645,7 +1812,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
     var.cprint(info, 3)
 
 
-def _print_gs_info(it, level, cycmax, grid, norm):
+def _print_gs_info(var, it, level, cycmax, grid, norm, add):
     """Return info-string to log after each Gauss-Seidel smoothing step.
 
     Parameters
@@ -1659,197 +1826,44 @@ def _print_gs_info(it, level, cycmax, grid, norm):
     cycmax : int
         Maximum MG cycles.
 
-    grid : :class:`emg3d.meshes.TensorMesh`
-        Input grid.
+    grid : TensorMesh
+        Current grid.
 
     norm : float
         Current error (l2-norm).
 
-
-    Returns
-    -------
-    info : str
-        Info string.
+    add : str
+        Information to add at the end.
 
     """
     info = f"     {it:2} {level} {cycmax} [{grid.shape_cells[0]:3}, "
     info += f"{grid.shape_cells[1]:3}, "
-    return info + f"{grid.shape_cells[2]:3}]: {norm:.3e} "
+    info += f"{grid.shape_cells[2]:3}]: {norm:.3e} "
+    var.cprint(info + add, 4)
 
 
-def _terminate(var, l2_last, l2_stag, it):
-    """Return multigrid termination flag.
-
-    Checks all termination criteria and returns True if at least one is
-    fulfilled.
-
+def _print_one_liner(var, l2_last, last=False):
+    """Print continuously updated one-liner.
 
     Parameters
     ----------
-    var : `MGParameters` instance
-        As returned by :func:`multigrid`.
+    l2_last : float
+        Current error.
 
-    l2_last, l2_stag : float
-        Last error and error for stagnation comparison (l2-norms).
-
-    it : int
-        Iteration number.
-
-
-    Returns
-    -------
-    finished : bool
-        Boolean indicating if multigrid is finished.
+    last : bool
+        If True, adds `exit_message` and finishes line.
 
     """
+    # Collect info.
+    info = f":: emg3d :: {l2_last/var.l2_refe:.1e}; "  # Absolute error.
+    if var.sslsolver:  # For multigrid as preconditioner.
+        info += f"{var._ssl_it}({var.it}); "
+    else:               # Stand-alone multigrid.
+        info += f"{var.it}; "
+    info += f"{var.time.runtime}"  # Runtime
 
-    finished = False
-    sslabort = False
-
-    if l2_last < var.tol*var.l2_refe:    # Converged.
-        var.exit_message = "CONVERGED"
-        finished = True
-
-    elif l2_last > 10*var.l2_refe or not np.isfinite(l2_last):  # Diverged.
-        var.exit_message = "DIVERGED"
-        finished = True
-        sslabort = True  # Force abort if sslsolver.
-
-    elif it > 2 and l2_last >= l2_stag:  # Stagnated.
-        var.exit_message = "STAGNATED"
-        finished = True
-        sslabort = True  # Force abort if sslsolver.
-        # Note: SSL will not fall into this, as it compares to the last value
-        #       of the same cycle type. However, if used as preconditioner each
-        #       cycle-type is only run once, before returning to the SSL.
-
-    elif it == var.maxit:                # Maximum iterations reached.
-        if not var.sslsolver:
-            var.exit_message = "MAX. ITERATION REACHED, NOT CONVERGED"
-        finished = True
-
-    # Force abort (ssl solver) or print info.
-    if finished:
-        if var.sslsolver and sslabort:  # Force abortion of SSL solver.
-            raise _ConvergenceError
-        elif not var.sslsolver:  # Print info (if not preconditioner).
-            if var.verb == 3:
-                add = 50*" " + "\r"
-            elif var.verb < 5:
-                add = "\n"
-            else:
-                add = ""
-            var.cprint(add+"   > "+var.exit_message, 2)
-
-    return finished
-
-
-def _restrict_model_parameters(param, sc_dir):
-    """Restrict model parameters.
-
-    Parameters
-    ----------
-    param : ndarray
-        Model parameter to restrict.
-
-    sc_dir : int
-        Direction of semicoarsening.
-
-    Returns
-    -------
-    out : ndarray
-        Restricted model parameter.
-
-    """
-    if sc_dir == 1:    # Only sum the four cells in y-z-plane
-        out = param[:, :-1:2, :-1:2] + param[:, 1::2, :-1:2]
-        out += param[:, :-1:2, 1::2] + param[:, 1::2, 1::2]
-    elif sc_dir == 2:  # Only sum the four cells in x-z-plane
-        out = param[:-1:2, :, :-1:2] + param[1::2, :, :-1:2]
-        out += param[:-1:2, :, 1::2] + param[1::2, :, 1::2]
-    elif sc_dir == 3:  # Only sum the four cells in x-y-plane
-        out = param[:-1:2, :-1:2, :] + param[1::2, :-1:2, :]
-        out += param[:-1:2, 1::2, :] + param[1::2, 1::2, :]
-    elif sc_dir == 4:  # Only sum the two cells in x-direction
-        out = param[:-1:2, :, :] + param[1::2, :, :]
-    elif sc_dir == 5:  # Only sum the two cells y-direction
-        out = param[:, :-1:2, :] + param[:, 1::2, :]
-    elif sc_dir == 6:  # Only sum the two cells z-direction
-        out = param[:, :, :-1:2] + param[:, :, 1::2]
-    else:            # Standard: Sum all 8 cells.
-        out = param[:-1:2, :-1:2, :-1:2] + param[1::2, :-1:2, :-1:2]
-        out += param[:-1:2, :-1:2, 1::2] + param[1::2, :-1:2, 1::2]
-        out += param[:-1:2, 1::2, :-1:2] + param[1::2, 1::2, :-1:2]
-        out += param[:-1:2, 1::2, 1::2] + param[1::2, 1::2, 1::2]
-    return out
-
-
-def _get_restriction_weights(grid, cgrid, sc_dir):
-    """Return restriction weights.
-
-    Return the weights as given in Equation 9 of [Muld06]_. It is a wrapper for
-    the numba-jitted function :func:`emg3d.core.restrict_weights`. The
-    corresponding weights are not actually used in the case of semicoarsening.
-    We still have to provide arrays of the correct format though, otherwise
-    numba will complain in the jitted functions.
-
-
-    Parameters
-    ----------
-    grid, cgrid : TensorMesh
-        Fine and coarse grids; :class:`emg3d.meshes.TensorMesh` instances.
-
-    sc_dir : int
-        Direction of semicoarsening.
-
-
-    Returns
-    -------
-    wx, wy, wz : tuple
-        Restriction weights in x, y, and z direction, consisting of
-        (left, center, right) weights.
-
-    """
-    # x-directed weights.
-    if sc_dir not in [1, 5, 6]:
-        wx = core.restrict_weights(
-                grid.nodes_x, grid.cell_centers_x, grid.h[0], cgrid.nodes_x,
-                cgrid.cell_centers_x, cgrid.h[0])
-    else:  # Dummy weights in case of semicoarsening.
-        wxlr = np.zeros(grid.shape_nodes[0], dtype=np.float64)
-        wx0 = np.ones(grid.shape_nodes[0], dtype=np.float64)
-        wx = (wxlr, wx0, wxlr)
-
-    # y-directed weights.
-    if sc_dir not in [2, 4, 6]:
-        wy = core.restrict_weights(
-                grid.nodes_y, grid.cell_centers_y, grid.h[1], cgrid.nodes_y,
-                cgrid.cell_centers_y, cgrid.h[1])
-    else:  # Dummy weights in case of semicoarsening.
-        wylr = np.zeros(grid.shape_nodes[1], dtype=np.float64)
-        wy0 = np.ones(grid.shape_nodes[1], dtype=np.float64)
-        wy = (wylr, wy0, wylr)
-
-    # z-directed weights.
-    if sc_dir not in [3, 4, 5]:
-        wz = core.restrict_weights(
-                grid.nodes_z, grid.cell_centers_z, grid.h[2], cgrid.nodes_z,
-                cgrid.cell_centers_z, cgrid.h[2])
-    else:  # Dummy weights in case of semicoarsening.
-        wzlr = np.zeros(grid.shape_nodes[2], dtype=np.float64)
-        wz0 = np.ones(grid.shape_nodes[2], dtype=np.float64)
-        wz = (wzlr, wz0, wzlr)
-
-    return wx, wy, wz
-
-
-def _get_prolongation_coordinates(grid, d1, d2):
-    """Compute required coordinates of finer grid for prolongation."""
-    D2, D1 = np.broadcast_arrays(
-            getattr(grid, 'nodes_'+d2), getattr(grid, 'nodes_'+d1)[:, None])
-    return np.r_[D1.ravel('F'), D2.ravel('F')].reshape(-1, 2, order='F')
-
-
-class _ConvergenceError(Exception):
-    """Custom exception for convergence issues with SSL solvers."""
-    pass
+    # Print depending on `exit`.
+    if last:
+        var.cprint(info+f"; {var.exit_message}", -100)
+    else:
+        var.cprint(info, -100, end='\r')

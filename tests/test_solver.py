@@ -485,7 +485,7 @@ def test_krylov(capsys):
     assert '* ERROR   :: Error in bicgstab' in out
 
 
-def test_mgparameters():
+def test_MGParameters():
     shape_cells = (2**3, 2**5, 2**4)
 
     # 1. semicoarsening
@@ -580,14 +580,16 @@ def test_mgparameters():
 
 def test_RegularGridProlongator():
 
-    def prolon_scipy(grid, cgrid, efield, cefield, yz_points):
+    def prolon_scipy(grid, cgrid, efield, cefield):
+        CZ, CY = np.broadcast_arrays(grid.nodes_z, grid.nodes_y[:, None])
+        yz = np.r_[CY.ravel('F'), CZ.ravel('F')].reshape(-1, 2, order='F')
         """Compute SciPy alternative."""
         for ixc in range(cgrid.shape_cells[0]):
             # Bilinear interpolation in the y-z plane
             fn = si.RegularGridInterpolator(
                     (cgrid.nodes_y, cgrid.nodes_z), cefield.fx[ixc, :, :],
                     bounds_error=False, fill_value=None)
-            hh = fn(yz_points).reshape(grid.shape_edges_x[1:], order='F')
+            hh = fn(yz).reshape(grid.shape_edges_x[1:], order='F')
 
             # Piecewise constant interpolation in x-direction
             efield[2*ixc, :, :] += hh
@@ -595,10 +597,10 @@ def test_RegularGridProlongator():
 
         return efield
 
-    def prolon_emg3d(grid, cgrid, efield, cefield, yz_points):
+    def prolon_emg3d(grid, cgrid, efield, cefield):
         """Compute emg3d alternative."""
         fn = solver.RegularGridProlongator(
-                cgrid.nodes_y, cgrid.nodes_z, yz_points)
+                cgrid.nodes_y, cgrid.nodes_z, grid.nodes_y, grid.nodes_z)
 
         for ixc in range(cgrid.shape_cells[0]):
             # Bilinear interpolation in the y-z plane
@@ -632,18 +634,152 @@ def test_RegularGridProlongator():
     cefield.fx = np.arange(cefield.fx.size)
     cefield.fx = 1j*np.arange(cefield.fx.size)/10
 
-    # Required interpolation points.
-    yz_points = solver._get_prolongation_coordinates(grid, 'y', 'z')
-
     # Compare
-    out1 = prolon_scipy(grid, cgrid, efield1.fx, cefield, yz_points)
-    out2 = prolon_emg3d(grid, cgrid, efield2.fx, cefield, yz_points)
+    out1 = prolon_scipy(grid, cgrid, efield1.fx, cefield)
+    out2 = prolon_emg3d(grid, cgrid, efield2.fx, cefield)
 
     assert_allclose(out1, out2)
 
 
-def test_get_restriction_weights():
+def test_current_sc_dir():
+    hx = np.ones(4)
+    grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))  # Big enough
 
+    # Big enough, no change.
+    for sc_dir in range(4):
+        assert sc_dir == solver._current_sc_dir(sc_dir, grid)
+
+    # Small in all directions => always 0
+    grid = meshes.TensorMesh([[2, 2], [2, 2], [2, 2]], (0, 0, 0))
+    for sc_dir in range(4):
+        assert 6 == solver._current_sc_dir(sc_dir, grid)
+
+    # Small in y, z
+    grid = meshes.TensorMesh([hx, [2, 2], [2, 2]], (0, 0, 0))
+    assert 4 == solver._current_sc_dir(0, grid)
+    assert 6 == solver._current_sc_dir(1, grid)
+    assert 4 == solver._current_sc_dir(2, grid)
+    assert 4 == solver._current_sc_dir(3, grid)
+
+    # Small in x, z
+    grid = meshes.TensorMesh([[2, 2], hx, [2, 2]], (0, 0, 0))
+    assert 5 == solver._current_sc_dir(0, grid)
+    assert 5 == solver._current_sc_dir(1, grid)
+    assert 6 == solver._current_sc_dir(2, grid)
+    assert 5 == solver._current_sc_dir(3, grid)
+
+
+def test_current_lr_dir():
+    hx = np.ones(4)
+    grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))  # Big enough
+
+    # Big enough, no change.
+    for lr_dir in range(8):
+        assert lr_dir == solver._current_lr_dir(lr_dir, grid)
+
+    # Small in all directions => always 0
+    grid = meshes.TensorMesh([[2, 2], [2, 2], [2, 2]], (0, 0, 0))
+    for lr_dir in range(8):
+        assert 0 == solver._current_lr_dir(lr_dir, grid)
+
+    # Small in y, z
+    grid = meshes.TensorMesh([hx, [2, 2], [2, 2]], (0, 0, 0))
+    for lr_dir in [0, 1]:
+        assert lr_dir == solver._current_lr_dir(lr_dir, grid)
+    for lr_dir in [2, 3, 4]:
+        assert 0 == solver._current_lr_dir(lr_dir, grid)
+    for lr_dir in [5, 6, 7]:
+        assert 1 == solver._current_lr_dir(lr_dir, grid)
+
+    # Small in z
+    grid = meshes.TensorMesh([hx, hx, [2, 2]], (0, 0, 0))
+    for lr_dir in [0, 1, 2, 6]:
+        assert lr_dir == solver._current_lr_dir(lr_dir, grid)
+    assert 0 == solver._current_lr_dir(3, grid)
+    assert 2 == solver._current_lr_dir(4, grid)
+    assert 1 == solver._current_lr_dir(5, grid)
+    assert 6 == solver._current_lr_dir(7, grid)
+
+
+def test_terminate():
+    class MGParameters:
+        """Fake MGParameters class."""
+        def __init__(self, verb=0, sslsolver=None):
+            self.verb = verb
+            self.exit_message = ""
+            self.sslsolver = sslsolver
+            self.maxit = 5
+            self.l2_refe = 1e-3
+            self.tol = 1e-2
+
+        def cprint(self, info, verbosity, **kwargs):
+            self.info = info
+
+    # Converged
+    var = MGParameters()
+    out = solver._terminate(var, 1e-6, 5e-6, 1)
+    assert out is True
+    assert var.exit_message == "CONVERGED"
+    assert "   > " + var.exit_message in var.info
+
+    # Diverged if it is 10x larger than last or not a number.
+    var = MGParameters(verb=3)
+    out = solver._terminate(var, np.inf, 5e-6, 1)
+    assert out is True
+    assert var.exit_message == "DIVERGED"
+    assert "   > " + var.exit_message in var.info
+
+    # Stagnated if it is >= the stagnation value.
+    var = MGParameters()
+    out = solver._terminate(var, 1e-3, 1e-4, 3)
+    assert out is True
+    assert var.exit_message == "STAGNATED"
+    assert "   > " + var.exit_message in var.info
+    out = solver._terminate(var, 1e-3, 1e-4, 1)  # Not on first iteration
+    assert out is False
+    var.sslsolver = True
+    with pytest.raises(solver._ConvergenceError):
+        solver._terminate(var, 1e-3, 1e-4, 3)
+
+    # Maximum iterations reached.
+    var = MGParameters(5)
+    out = solver._terminate(var, 1e-5, 1e-4, 5)
+    assert out is True
+    assert var.exit_message == "MAX. ITERATION REACHED, NOT CONVERGED"
+    assert "   > " + var.exit_message in var.info
+
+
+def test_restrict_model_parameters():
+    data = np.arange(1, 9).reshape((2, 2, 2), order='F')
+    # array([[[1, 5],
+    #         [3, 7]],
+    #
+    #        [[2, 6],
+    #         [4, 8]]])
+
+    assert_allclose(solver._restrict_model_parameters(data, 0).ravel('F'),
+                    [1+2+3+4+5+6+7+8])
+
+    assert_allclose(solver._restrict_model_parameters(data, 1).ravel('F'),
+                    [1+3+5+7, 2+4+6+8])
+
+    assert_allclose(solver._restrict_model_parameters(data, 2).ravel('F'),
+                    [1+5+2+6, 3+7+4+8])
+
+    assert_allclose(solver._restrict_model_parameters(data, 3).ravel('F'),
+                    [1+2+3+4, 5+6+7+8])
+
+    assert_allclose(solver._restrict_model_parameters(data, 4).ravel('F'),
+                    [1+2, 3+4, 5+6, 7+8])
+
+    assert_allclose(solver._restrict_model_parameters(data, 5).ravel('F'),
+                    [1+3, 2+4, 5+7, 6+8])
+
+    assert_allclose(solver._restrict_model_parameters(data, 6).ravel('F'),
+                    [1+5, 2+6, 3+7, 4+8])
+
+
+def test_get_restriction_weights():
     x = [500, 700, 800, 1000]
     cx = [1200, 1800]
     y = [2, 2, 2, 2]
@@ -694,12 +830,70 @@ def test_get_restriction_weights():
             assert_allclose(wdr, wz[2])
 
 
-def test_get_prolongation_coordinates():
-    grid = meshes.TensorMesh([[1, 2], [3, 4], [5, 6]], (0, 0, 0))
-    out = solver._get_prolongation_coordinates(grid, 'x', 'y')
-    test = [0, 1, 3, 0, 1, 3, 0, 1, 3, 0, 0, 0, 3, 3, 3, 7, 7, 7]
-    assert_allclose(out.ravel('F'), test)
-
 def test_ConvergenceError():
     with pytest.raises(solver._ConvergenceError):
         raise solver._ConvergenceError
+
+
+def test_print_cycle_info(capsys):
+    var = solver.MGParameters(
+            verb=4, cycle='F', sslsolver=False, linerelaxation=False,
+            semicoarsening=False, shape_cells=(16, 8, 2))
+    var._level_all = [0, 1, 2, 3, 2, 3]
+    solver._print_cycle_info(var, 1.0, 2.0)
+    out, _ = capsys.readouterr()
+
+    assert "h_\n      2h_ \\    \n      4h_  \\   \n      8h_   \\/\\\n" in out
+    assert "   1.000e+00  after   0 F-cycles   [1.000e+00, 0.500]   0 0" in out
+
+    # Cuts at 70.
+    var = solver.MGParameters(
+            verb=5, cycle='F', sslsolver=True, linerelaxation=False,
+            semicoarsening=False, shape_cells=(16, 8, 2))
+    var._level_all = list(np.r_[0, np.array(50*[[1, 2, 3, 2, 1], ]).ravel()])
+    var.it = 123
+    solver._print_cycle_info(var, 1.0, 2.0)
+    out, _ = capsys.readouterr()
+    assert "restricted to first 70 steps" in out
+    assert 21*" " + "123" in out
+    assert out[-1] == "\n"
+
+    # One-liner.
+    var = solver.MGParameters(
+            verb=3, cycle='F', sslsolver=False, linerelaxation=False,
+            semicoarsening=False, shape_cells=(16, 8, 2))
+    var._level_all = [0, 1, 2, 3, 2, 3]
+    solver._print_cycle_info(var, 1.0, 2.0)
+    out, _ = capsys.readouterr()
+    assert ":: emg3d :: 1.0e+00; 0; 0:00:0" in out
+
+
+def test_print_gs_info(capsys):
+    var = solver.MGParameters(
+            verb=5, cycle='F', sslsolver=False, linerelaxation=False,
+            semicoarsening=False, shape_cells=(16, 8, 2))
+
+    grid = meshes.TensorMesh([[1, 1], [1, 1], [1, 1]], (0, 0, 0))
+    solver._print_gs_info(var, 1, 2, 3, grid, 0.01, 'test')
+    out, _ = capsys.readouterr()
+    assert out == "      1 2 3 [  2,   2,   2]: 1.000e-02 test\n"
+
+
+def test_print_one_liner(capsys):
+    var = solver.MGParameters(
+            verb=5, cycle='F', sslsolver=False, linerelaxation=False,
+            semicoarsening=False, shape_cells=(16, 8, 2))
+
+    solver._print_one_liner(var, 1e-2, False)
+    out, _ = capsys.readouterr()
+    assert ":: emg3d :: 1.0e-02; 0; 0:00:0" in out
+
+    var = solver.MGParameters(
+            verb=5, cycle='F', sslsolver=True, linerelaxation=False,
+            semicoarsening=False, shape_cells=(16, 8, 2))
+    var.exit_message = "TEST"
+
+    solver._print_one_liner(var, 1e-2, True)
+    out, _ = capsys.readouterr()
+    assert ":: emg3d :: 1.0e-02; 0(0); 0:00:0" in out
+    assert "TEST" in out

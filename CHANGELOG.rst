@@ -68,6 +68,12 @@ latest: towards v1.0
 
     Level three now updates dynamically just as level 2.
 
+- Other changes in ``solver``:
+
+  - ``RegularGridProlongator``: Changed signature from ``x, y, cxy`` to ``cx,
+    cy, x, y`` (it now incorporates the function
+    ``_get_prolongation_coordinates``.)
+
 - ``fields``:
 
   - The function ``emg3d.fields.get_receiver`` was removed and replaced by
