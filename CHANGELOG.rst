@@ -54,7 +54,18 @@ latest: towards v1.0
 
 - ``solver.solve``:
 
-  - Does not take a ``grid`` any longer.
+  - New signature: ``def solve(model, sfield, sslsolver, semicoarsening,
+    linerelaxation, verb, **kwargs)`` (the old signature was ``def solve(grid,
+    model, sfield, efield, cycle, sslsolver, semicoarsening, linerelaxation,
+    verb, **kwargs)``):
+
+    - ``grid`` is no longer a parameter; it is contained in ``model``.
+    - ``efield`` and ``cycle`` are degraded to ``kwargs``.
+
+  - The defaults for ``sslsolver``, ``semicoarsening``, and ``linerelaxation``
+    is new ``True`` (before it was ``False``). This is not necessarily the
+    fastest setting, but generally the most robust setting.
+
   - Some verbosity levels changed (consistency throughout module). The new
     levels are [old level in brackets]:
 

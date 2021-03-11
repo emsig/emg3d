@@ -40,7 +40,8 @@ def test_amat_x(njit):
     vmodel = models.VolumeModel(model, sfield)
 
     # Run two iterations to get a e-field
-    efield = solver.solve(model, sfield, maxit=2, verb=1)
+    efield = solver.solve(model, sfield, sslsolver=False, semicoarsening=False,
+                          linerelaxation=False, maxit=2, verb=1)
 
     # amat_x
     rr1 = fields.Field(grid)
@@ -110,7 +111,9 @@ def test_gauss_seidel(njit):
         vmodel = models.VolumeModel(model, sfield)
 
         # Run two iterations to get some e-field.
-        efield = solver.solve(model, sfield, maxit=2, verb=1)
+        efield = solver.solve(model, sfield, sslsolver=False,
+                              semicoarsening=False, linerelaxation=False,
+                              maxit=2, verb=1)
 
         inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
                vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)

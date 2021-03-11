@@ -12,8 +12,9 @@ functions are implemented as just-in-time (jit) compiled functions using the
 These functions are not meant to be called directly, particularly not from an
 end-user; they are called from functions in :func:`emg3d.solver.solve`.
 
-For an end-user it can still be insightful to look at the documentation of
-these functions if you are interested in understanding how the solver works.
+For an end-user it can still be insightful to look at the documentation and
+code of these functions if you are interested in understanding how the
+multigrid solver works, the theory and its implementation.
 
 For a developer interested in making emg3d faster this is the right place to
 start, as by far the most time is spent in these functions, particularly in

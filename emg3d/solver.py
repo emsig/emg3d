@@ -1,6 +1,14 @@
 """
 The actual multigrid solver routines. The computationally intensive parts,
 however, are in :mod:`emg3d.core` as numba-jitted functions.
+
+The only relevant function, from an end-user perspective, is
+:func:`emg3d.solver.solve`. The other functions and classes are not meant to be
+called directly, they are all used by the solver internally. It can, however,
+still be insightful to look at the documentation and code of these functions if
+you are interested in understanding how the multigrid solver works, the theory
+and its implementation.
+
 """
 # Copyright 2018-2021 The emg3d Developers.
 #
@@ -34,31 +42,35 @@ __all__ = ['solve', 'multigrid', 'krylov', 'smoothing', 'restriction',
 
 
 # MAIN USER-FACING FUNCTION
-def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
-          semicoarsening=False, linerelaxation=False, verb=0, **kwargs):
+def solve(model, sfield, sslsolver=True, semicoarsening=True,
+          linerelaxation=True, verb=0, **kwargs):
     r"""Solver for 3D CSEM data with tri-axial electrical anisotropy.
 
-    The principal solver of `emg3d` is using the multigrid method as presented
-    in [Muld06]_. Multigrid can be used as a standalone solver, or as a
+    The principal solver of emg3d is using the multigrid method as presented in
+    [Muld06]_. Multigrid can be used as a standalone solver, or as a
     preconditioner for an iterative solver from the
     :mod:`scipy.sparse.linalg`-library, e.g.,
     :func:`scipy.sparse.linalg.bicgstab`. Alternatively, these Krylov subspace
-    solvers can also be used without multigrid at all. See the `cycle` and
-    `sslsolver` parameters.
+    solvers can also be used without multigrid at all (see the ``cycle`` and
+    ``sslsolver`` parameters).
 
-    Implemented are the `F`-, `V`-, and `W`-cycle schemes for multigrid
-    (`cycle` parameter), and the amount of smoothing steps (initial smoothing,
+    Implemented are the F-, V-, and W-cycle schemes for multigrid (``cycle``
+    parameter), and the amount of smoothing steps (initial smoothing,
     pre-smoothing, coarsest-grid smoothing, and post-smoothing) can be set
-    individually (`nu_init`, `nu_pre`, `nu_coarse`, and `nu_post`,
+    individually (``nu_init``, ``nu_pre``, ``nu_coarse``, and ``nu_post``,
     respectively). The maximum level of coarsening can be restricted with the
-    `clevel` parameter.
+    ``clevel`` parameter.
 
     Semicoarsening and line relaxation, as presented in [Muld07]_, are
-    implemented, see the `semicoarsening` and `linerelaxation` parameters.
-    Using the BiCGSTAB solver together with multigrid preconditioning with
-    semicoarsening and line relaxation is slow but generally the most robust.
-    Not using BiCGSTAB nor semicoarsening nor line relaxation is fast but may
-    fail on stretched grids.
+    implemented, see the ``semicoarsening`` and ``linerelaxation`` parameters.
+    Using the BiCGSTAB solver together with multigrid preconditioning,
+    semicoarsening, and line relaxation is generally the most robust solution,
+    albeit not necessarily the fastest (it is the default setting for this
+    reason). Just using traditional multigrid without BiCGSTAB nor
+    semicoarsening nor line relaxation is often faster but may fail on
+    stretched grids or for models with strong anisotropy. However, only testing
+    the parameters for a given model can give certainty to which parameters are
+    best.
 
 
     Parameters
@@ -69,82 +81,48 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
     sfield : SourceField
         The source field. See :func:`emg3d.fields.get_source_field`.
 
-    efield : Field, default: zero Field
-        Initial electric field. It is initiated with zeroes if not provided.
-
-        If an initial efield is provided nothing is returned, but the final
-        efield is directly put into the provided efield.
-
-        If an initial field is provided and a sslsolver is used, then it first
-        carries out one multigrid cycle without semicoarsening nor line
-        relaxation. The sslsolver is at times unstable with an initial guess,
-        carrying out one MG cycle helps to stabilize it.
-
-    cycle : {str, None}, default: 'F'
-        Type of multigrid cycle.
-
-        - ``'V'``: V-cycle, simplest version;
-        - ``'W'``: W-cycle, most expensive version;
-        - ``'F'``: F-cycle, sort of a compromise between V- and W-cycle;
-        - ``None``: Does not use multigrid, only the chosen ``sslsolver``.
-
-        If None, `sslsolver` must be provided, and the `sslsolver` will be used
-        without multigrid pre-conditioning.
-
-        Comparison of V (left), F (middle), and W (right) cycles for the case
-        of four grids (three relaxation and prolongation steps)::
-
-            h_
-           2h_   \    /   \          /   \            /
-           4h_    \  /     \    /\  /     \    /\    /
-           8h_     \/       \/\/  \/       \/\/  \/\/
-
-
-    sslsolver : {str, bool}, default: False
-        A :mod:`scipy.sparse.linalg`-solver, to use with MG as pre-conditioner
-        or on its own (if ``cycle=None``).
+    sslsolver : {str, bool}, default: True
+        A :mod:`scipy.sparse.linalg`-solver, to use with multigrid as
+        pre-conditioner or on its own (if ``cycle=None``).
 
         Current possibilities:
 
-            - True or 'bicgstab': BIConjugate Gradient STABilized
-              :func:`scipy.sparse.linalg.bicgstab`;
-            - 'cgs': Conjugate Gradient Squared
-              :func:`scipy.sparse.linalg.cgs`;
-            - 'gcrotmk': GCROT: Generalized Conjugate Residual with inner
+            - ``True`` or ``'bicgstab'``: BiConjugate Gradient STABilized
+              (:func:`scipy.sparse.linalg.bicgstab`).
+            - ``'cgs'``: Conjugate Gradient Squared
+              (:func:`scipy.sparse.linalg.cgs`).
+            - ``'gcrotmk'``: GCROT: Generalized Conjugate Residual with inner
               Orthogonalization and Outer Truncation
-              :func:`scipy.sparse.linalg.gcrotmk`.
+              (:func:`scipy.sparse.linalg.gcrotmk`).
 
-        It does currently not work with 'cg', 'bicg', 'qmr', and 'minres' for
-        various reasons (e.g., some require `rmatvec` in addition to `matvec`).
+        It does currently not work with ``'cg'``, ``'bicg'``, ``'qmr'``, and
+        ``'minres'`` for various reasons (e.g., some require ``rmatvec`` in
+        addition to ``matvec``).
 
-    semicoarsening : {int, bool}, default: False
+    semicoarsening : {int, bool}, default: True
         Semicoarsening.
 
-        - True: Cycling over 1, 2, 3.
-        - 0 or False: No semicoarsening.
-        - 1: Semicoarsening in x direction.
-        - 2: Semicoarsening in y direction.
-        - 3: Semicoarsening in z direction.
+        - ``True``: Cycling over 1, 2, 3.
+        - ``0`` or ``False``: No semicoarsening.
+        - ``1``: Semicoarsening in x direction.
+        - ``2``: Semicoarsening in y direction.
+        - ``3``: Semicoarsening in z direction.
         - Multi-digit number containing digits from 0 to 3. Multigrid will
           cycle over these values, e.g., ``semicoarsening=1213`` will cycle
           over [1, 2, 1, 3].
 
-    linerelaxation : {int, bool}, default: False
+    linerelaxation : {int, bool}, default: True
         Line relaxation.
 
-        This parameter is not respected on the coarsest grid, except if it is
-        set to 0. If it is bigger than zero line relaxation on the coarsest
-        grid is carried out along all dimensions which have more than 2 cells.
-
-        - True: Cycling over [4, 5, 6].
-        - 0 or False: No line relaxation.
-        - 1: line relaxation in x direction.
-        - 2: line relaxation in y direction.
-        - 3: line relaxation in z direction.
-        - 4: line relaxation in y and z directions.
-        - 5: line relaxation in x and z directions.
-        - 6: line relaxation in x and y directions.
-        - 7: line relaxation in x, y, and z directions.
+        - ``True``: Cycling over [4, 5, 6].
+        - ``0`` or ``False``: No line relaxation.
+        - ``1``: line relaxation in x direction.
+        - ``2``: line relaxation in y direction.
+        - ``3``: line relaxation in z direction.
+        - ``4``: line relaxation in y and z directions.
+        - ``5``: line relaxation in x and z directions.
+        - ``6``: line relaxation in x and y directions.
+        - ``7``: line relaxation in x, y, and z directions.
         - Multi-digit number containing digits from 0 to 7. Multigrid will
           cycle over these values, e.g., ``linerelaxation=1213`` will cycle
           over [1, 2, 1, 3].
@@ -155,13 +133,43 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
     verb : int, default: 0
         Level of verbosity (the higher the more verbose).
 
-        - -1: Nothing.
-        - 0: Warnings.
-        - 1: One-liner at the end.
-        - 2: One-liner (dynamically updated).
-        - 3: Runtime and information about the method.
-        - 4: Additional information for each MG-cycle.
-        - 5: Everything (slower due to additional error computations).
+        - ``-1``: Nothing.
+        - ``0``: Warnings.
+        - ``1``: One-liner at the end.
+        - ``2``: One-liner, dynamically updated.
+        - ``3``: Information about the method plus dynamic one-liner.
+        - ``4``: Additional information for each MG-cycle.
+        - ``5``: Everything (slower due to additional error computations).
+
+    cycle : {str, None}, default: 'F'
+        Type of multigrid cycle.
+
+        - ``'V'``: V-cycle, simplest version.
+        - ``'W'``: W-cycle, most expensive version.
+        - ``'F'``: F-cycle, sort of a compromise between V- and W-cycle.
+        - ``None``: Does not use multigrid, only the chosen ``sslsolver``.
+
+        A ``sslsolver`` has to be provided if ``cycle=None``, and the
+        ``sslsolver`` will then be used without multigrid pre-conditioning.
+
+        Comparison of V (left), F (middle), and W (right) cycles for the case
+        of four grids (three relaxation and prolongation steps)::
+
+            h_
+           2h_   \    /   \          /   \            /
+           4h_    \  /     \    /\  /     \    /\    /
+           8h_     \/       \/\/  \/       \/\/  \/\/
+
+    efield : Field, default: zero Field
+        Initial electric field. It is initiated with zeroes if not provided.
+
+        If an initial efield is provided nothing is returned, but the final
+        efield is directly put into the provided efield.
+
+        If an initial field is provided and a sslsolver is used, then it first
+        carries out one multigrid cycle without semicoarsening nor line
+        relaxation. The sslsolver is at times unstable with an initial guess,
+        carrying out one multigrid cycle helps to stabilize it.
 
     tol : float, default: 1e-6
         Convergence tolerance.
@@ -173,14 +181,14 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
     maxit : int, default: 50
         Maximum number of multigrid iterations.
 
-        If `sslsolver` is used, this applies to the `sslsolver`.
+        If ``sslsolver`` is used, this applies to the ``sslsolver``.
 
         In the case that multigrid is used as a pre-conditioner for the
-        `sslsolver`, the maximum iteration for multigrid is defined by the
-        maximum length of the `linerelaxation` and `semicoarsening`-cycles.
+        ``sslsolver``, the maximum iteration for multigrid is defined by the
+        maximum length of the ``linerelaxation`` and ``semicoarsening``-cycles.
 
     nu_init : int, default: 0
-        Number of initial smoothing steps, before MG cycle.
+        Number of initial smoothing steps, before multigrid cycle.
 
     nu_pre : int, default: 2
         Number of pre-smoothing steps.
@@ -194,101 +202,78 @@ def solve(model, sfield, efield=None, cycle='F', sslsolver=False,
     clevel : int, default: -1
         The maximum coarsening level can be different for each dimension and
         is, by default, automatically determined (``clevel=-1``). The
-        parameter `clevel` can be used to restrict the maximum coarsening
+        parameter ``clevel`` can be used to restrict the maximum coarsening
         level in any direction by its value.
 
     return_info : bool, default: False
-        If True, a dictionary is returned with runtime info (final norm and
-        number of iterations of MG and the sslsolver).
+        If True, a dictionary is returned with runtime info (final norm,
+        number of iterations of multigrid and the sslsolver, log, exit message,
+        etc).
 
     log : int, default: 1
         Only relevant if ``return_info=True``.
 
-        - -1: LOG ONLY: Only store info in log, do not print on screen.
-        - 0: SCREEN only: Only print info to screen, do not store in log.
-        - 1: BOTH: Store info in log and print on screen.
+        - ``-1``: LOG ONLY: Only store info in log, do not print on screen.
+        - ``0``: SCREEN only: Only print info to screen, do not store in log.
+        - ``1``: BOTH: Store info in log and print on screen.
 
 
     Returns
     -------
-    efield : :class:`emg3d.fields.Field`
-        Resulting electric field. Is not returned but replaced in-place if an
+    efield : Field
+        Resulting electric field. It is not returned but stored in-place if an
         initial efield was provided.
 
-    info_dict : dict
-        Dictionary with runtime info; only if ``return_info=True``.
+    info_dict : dict, returned if ``return_info=True``
+        Dictionary with runtime info. Keys:
 
-        Keys:
-
-        - `exit`: Exit status, 0=Success, 1=Failure;
-        - `exit_message`: Exit message, check this if ``exit=1``;
-        - `abs_error`: Absolute error;
-        - `rel_error`: Relative error;
-        - `ref_error`: Reference error [norm(sfield)];
-        - `tol`: Tolerance (abs_error<ref_error*tol);
-        - `it_mg`: Number of multigrid iterations;
-        - `it_ssl`: Number of SSL iterations;
-        - `time`: Runtime (s).
-        - `runtime_at_cycle`: Runtime after each cycle (s).
-        - `error_at_cycle`: Absolute error after each cycle.
-        - `log`: Stored log.
+        - ``exit``: Exit status, 0=Success, 1=Failure;
+        - ``exit_message``: Exit message, check this if ``exit=1``;
+        - ``abs_error``: Absolute error;
+        - ``rel_error``: Relative error;
+        - ``ref_error``: Reference error [norm(sfield)];
+        - ``tol``: Tolerance (abs_error<ref_error*tol);
+        - ``it_mg``: Number of multigrid iterations;
+        - ``it_ssl``: Number of SSL iterations;
+        - ``time``: Runtime (s).
+        - ``runtime_at_cycle``: Runtime after each cycle (s).
+        - ``error_at_cycle``: Absolute error after each cycle.
+        - ``log``: Stored log.
 
 
     Examples
     --------
-    >>> import emg3d
-    >>> import numpy as np
-    >>> # Create a simple grid, 8 cells of length 1 in each direction,
-    >>> # starting at the origin.
-    >>> grid = emg3d.TensorMesh(
-    >>>         [np.ones(8), np.ones(8), np.ones(8)],
-    >>>         origin=np.array([0, 0, 0]))
-    >>> # The model is a fullspace with tri-axial anisotropy.
-    >>> model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
-    >>>                     property_z=3.3, mapping='Resistivity')
-    >>> # The source is a x-directed, horizontal dipole at (4, 4, 4)
-    >>> # with a frequency of 10 Hz.
-    >>> sfield = emg3d.fields.get_source_field(
-    >>>         grid, src=[4, 4, 4, 0, 0], freq=10)
-    >>> # Compute the electric signal.
-    >>> efield = emg3d.solve(model, sfield, verb=4)
-    .
-    :: emg3d START :: 10:27:25 :: v0.9.1
-    .
-       MG-cycle       : 'F'                 sslsolver : False
-       semicoarsening : False [0]           tol       : 1e-06
-       linerelaxation : False [0]           maxit     : 50
-       nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 4
-       Original grid  :   8 x   8 x   8     => 512 cells
-       Coarsest grid  :   2 x   2 x   2     => 8 cells
-       Coarsest level :   2 ;   2 ;   2
-    .
-       [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
-    .
-           h_
-          2h_ \    /
-          4h_  \/\/
-    .
-       [10:27:25]   2.284e-02  after   1 F-cycles   [1.275e-06, 0.023]   0 0
-       [10:27:25]   1.565e-03  after   2 F-cycles   [8.739e-08, 0.069]   0 0
-       [10:27:25]   1.295e-04  after   3 F-cycles   [7.232e-09, 0.083]   0 0
-       [10:27:25]   1.197e-05  after   4 F-cycles   [6.685e-10, 0.092]   0 0
-       [10:27:25]   1.233e-06  after   5 F-cycles   [6.886e-11, 0.103]   0 0
-       [10:27:25]   1.415e-07  after   6 F-cycles   [7.899e-12, 0.115]   0 0
-    .
-       > CONVERGED
-       > MG cycles        : 6
-       > Final rel. error : 1.415e-07
-    .
-    :: emg3d END   :: 10:27:25 :: runtime = 0:00:00
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create a simple grid, 8 cells of length 1 in each direction,
+          ...: # starting at the origin.
+          ...: hx = np.ones(8)
+          ...: grid = emg3d.TensorMesh([hx, hx, hx], origin=(0, 0, 0))
+
+       In [3]: # The model is a fullspace with tri-axial anisotropy.
+          ...: model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
+          ...:                     property_z=3.3, mapping='Resistivity')
+
+       In [4]: # The source is a x-directed, horizontal dipole at (4, 4, 4)
+          ...: # with a frequency of 10 Hz.
+          ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azm, dip)
+          ...: sfield = emg3d.fields.get_source_field(grid, src=coo, freq=10)
+
+       In [5]: # Compute the electric signal.
+          ...: efield = emg3d.solve(model, sfield, verb=4)
 
     """
 
     # Solver settings; get from kwargs or set to default values.
+    efield = kwargs.pop('efield', None)
     var = MGParameters(
-            cycle=cycle, sslsolver=sslsolver, semicoarsening=semicoarsening,
-            linerelaxation=linerelaxation, shape_cells=model.shape,
-            verb=verb, **kwargs
+            sslsolver=sslsolver, semicoarsening=semicoarsening,
+            linerelaxation=linerelaxation, shape_cells=model.shape, verb=verb,
+            **kwargs
     )
 
     # Start logging and print all parameters.
@@ -432,34 +417,42 @@ def multigrid(model, sfield, efield, var, **kwargs):
     """Multigrid solver for 3D controlled-source electromagnetic (CSEM) data.
 
     Multigrid solver as presented in [Muld06]_, including semicoarsening and
-    line relaxation as presented in and [Muld07]_.
+    line relaxation as presented in [Muld07]_.
 
-    - The electric field is stored in-place in `efield`.
-    - The number of multigrid cycles is stored in `var.it`.
-    - The current error (l2-norm) is stored in `var.l2`.
-    - The reference error (l2-norm of sfield) is stored in `var.l2_refe`.
+    - The electric field is stored in-place in ``efield``.
+    - The number of multigrid cycles is stored in ``var.it``.
+    - The current error (l2-norm) is stored in ``var.l2``.
+    - The reference error (l2-norm of ``sfield``) is stored in ``var.l2_refe``.
+
+    This function is the "heart" of the multigrid method, cycling through
+    different grids, restricting and prolonging accordingly the grids, models,
+    and fields.
 
     This function is called by :func:`emg3d.solver.solve`.
 
 
     Parameters
     ----------
-    model : :class:`emg3d.models.VolumeModel`
-        The Model. See :class:`emg3d.models.VolumeModel`.
+    model : VolumeModel
+        Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : :class:`emg3d.fields.SourceField`
-        The source field. See :func:`emg3d.fields.get_source_field`.
+    sfield : SourceField
+        The source field; a :class:`emg3d.fields.SourceField` instance.
 
-    efield : :class:`emg3d.fields.Field`
-        The electric field. See :class:`emg3d.fields.Field`.
 
-    var : :class:`MGParameters` instance
-        As returned by :func:`emg3d.solver.multigrid`.
+    efield : Field
+        The electric field; a :class:`emg3d.fields.Field` instance.
 
-    **kwargs : Recursion parameters.
-        Do not use; only used internally by recursion; `level` (current
-        coarsening level) and `new_cycmax` (new maximum of MG cycles, takes
-        care of V/W/F-cycling).
+    var : MGParameters
+        A multigrid parameter instance used within
+        :func:`emg3d.solver.multigrid`.
+
+    level, new_cycmax : int, default: 0
+        Parameters internally used for recursion (do not use):
+
+        - ``level``: current coarsening level;
+        - ``new_cycmax``: new maximum of multigrid cycles, takes care of
+          V/W/F-cycling.
 
     """
     # Get recursion parameters.
@@ -493,7 +486,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
     if level == 0:
         var.cprint("     it cycmax               error", 4)
         var.cprint("      level [  dimension  ]            info\n", 4)
-        if var.verb > 4:
+        if var.verb > 4:  # Cond. as it causes extra comp. time.
             _print_gs_info(var, it, level, cycmax, model.grid, l2_last,
                            "initial error")
 
@@ -503,7 +496,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
         smoothing(model, sfield, efield, var.nu_init, var.lr_dir)
 
         # Print initial smoothing info.
-        if var.verb > 4:
+        if var.verb > 4:  # Cond. as it causes extra comp. time.
             norm = residual(model, sfield, efield, True)
             _print_gs_info(var, it, level, cycmax, model.grid, norm,
                            "initial smoothing")
@@ -515,28 +508,30 @@ def multigrid(model, sfield, efield, var, **kwargs):
         l2_prev = l2_last
         l2_stag[(it-1) % var.maxcycle] = l2_last
 
-        if level == var.clevel[var.sc_dir]:  # (A) Coarsest grid, solve system.
-            # Note that coarsest grid depends on semicoarsening (sc_dir). If
-            # semicoarsening is carried out along the biggest dimension it
+        # (A) Coarsest grid, solve system.
+        if level == var.clevel[var.sc_dir]:
+            # Note that the coarsest grid depends on semicoarsening (sc_dir).
+            # If semicoarsening is carried out along the biggest dimension it
             # reduces the number of coarsening levels.
 
             # Gauss-Seidel on the coarsest grid.
             smoothing(model, sfield, efield, var.nu_coarse, var.lr_dir)
 
             # Print coarsest grid smoothing info.
-            if var.verb > 4:
+            if var.verb > 4:  # Cond. as it causes extra comp. time.
                 norm = residual(model, sfield, efield, True)
                 _print_gs_info(var, it, level, cycmax, model.grid, norm,
                                "coarsest level")
 
-        else:                   # (B) Not yet on coarsest grid.
+        # (B) Not yet on coarsest grid.
+        else:
 
             # (B.1) Pre-smoothing (nu_pre).
             if var.nu_pre > 0:
                 smoothing(model, sfield, efield, var.nu_pre, var.lr_dir)
 
                 # Print pre-smoothing info.
-                if var.verb > 4:
+                if var.verb > 4:  # Cond. as it causes extra comp. time.
                     norm = residual(model, sfield, efield, True)
                     _print_gs_info(var, it, level, cycmax, model.grid, norm,
                                    "pre-smoothing")
@@ -564,7 +559,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
                 smoothing(model, sfield, efield, var.nu_post, var.lr_dir)
 
                 # Print post-smoothing info.
-                if var.verb > 4:
+                if var.verb > 4:  # Cond. as it causes extra comp. time.
                     norm = residual(model, sfield, efield, True)
                     _print_gs_info(var, it, level, cycmax, model.grid, norm,
                                    "post-smoothing")
@@ -601,32 +596,33 @@ def multigrid(model, sfield, efield, var, **kwargs):
 
 
 def krylov(model, sfield, efield, var):
-    """Krylov Subspace iterative solver for 3D CSEM data.
+    """Wrapper for Krylov Subspace iterative solver implemented in SciPy.
 
-    Using a Krylov subspace iterative solver (defined in `var.sslsolver`)
+    Using a Krylov subspace iterative solver (defined in ``var.sslsolver``)
     implemented in SciPy with or without multigrid as a pre-conditioner
     ([Muld06]_).
 
-    - The electric field is stored in-place in `efield`.
-    - The current error (l2-norm) is stored in `var.l2`.
-    - The reference error (l2-norm of sfield) is stored in `var.l2_refe`.
+    - The electric field is stored in-place in ``efield``.
+    - The current error (l2-norm) is stored in ``var.l2``.
+    - The reference error (l2-norm of ``sfield``) is stored in ``var.l2_refe``.
 
     This function is called by :func:`emg3d.solver.solve`.
 
 
     Parameters
     ----------
-    model : :class:`emg3d.models.VolumeModel`
-        The Model. See :class:`emg3d.models.VolumeModel`.
+    model : VolumeModel
+        Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : :class:`emg3d.fields.SourceField`
-        The source field. See :func:`emg3d.fields.get_source_field`.
+    sfield : SourceField
+        The source field; a :class:`emg3d.fields.SourceField` instance.
 
-    efield : :class:`emg3d.fields.Field`
-        The electric field. See :class:`emg3d.fields.Field`.
+    efield : Field
+        The electric field; a :class:`emg3d.fields.Field` instance.
 
-    var : :class:`MGParameters` instance
-        As returned by :func:`emg3d.solver.multigrid`.
+    var : MGParameters
+        A multigrid parameter instance used within
+        :func:`emg3d.solver.multigrid`.
 
     """
     # Get frequency
@@ -644,8 +640,8 @@ def krylov(model, sfield, efield, var):
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
-                model.eta_z, model.zeta, model.grid.h[0], model.grid.h[1],
-                model.grid.h[2])
+                model.eta_z, model.zeta,
+                model.grid.h[0], model.grid.h[1], model.grid.h[2])
 
         # Return Field instance.
         return -rfield
@@ -655,7 +651,7 @@ def krylov(model, sfield, efield, var):
             shape=(sfield.field.size, sfield.field.size),
             dtype=sfield.dtype, matvec=amatvec)
 
-    # Define MG pre-conditioner as LinearOperator, if `var.cycle`.
+    # Define multigrid pre-conditioner as LinearOperator, if `var.cycle`.
     def mg_matvec(sfield):
         """Use multigrid as pre-conditioner."""
 
@@ -678,6 +674,7 @@ def krylov(model, sfield, efield, var):
     # Define callback to keep track of sslsolver-iterations.
     def callback(x):
         """Solver iteration count and error (l2-norm)."""
+
         # Update iteration count.
         var.ssl_it += 1
 
@@ -1037,8 +1034,6 @@ class MGParameters:
     # (A) Mandatory parameters.
     # Verbosity.
     verb: int
-    # Type of multigrid cycle.
-    cycle: Union[str, None]
     # SciPy Sparse Linalg solver flag.
     sslsolver: Union[str, bool]
     # Semicoarsening flag.
@@ -1049,6 +1044,8 @@ class MGParameters:
     shape_cells: tuple
 
     # (B) Optional parameters with default values
+    # Type of multigrid cycle.
+    cycle: Union[str, None] = 'F'
     # Convergence tolerance.
     tol: float = 1e-6
     # Maximum iteration.
@@ -1074,7 +1071,7 @@ class MGParameters:
         # Levels and iterations.
         self.level_all = list()   # To keep track of the levels for QC-figure.
         self.first_cycle = True   # Flag if in first cycle for QC-figure.
-        self.it = 0               # To store MG cycle count.
+        self.it = 0               # To store multigrid cycle count.
         self.ssl_it = 0           # To store solver iteration count.
         self.l2 = 1.0             # To store current error.
         self.l2_refe = 1.0        # To store reference error.
@@ -1307,7 +1304,7 @@ class MGParameters:
                     "`cycle` must be one of {'F', 'V', 'W', None}.\n"
                     f"Provided: cycle={self.cycle}.")
 
-        # Add maximum MG cycles depending on cycle
+        # Add maximum multigrid cycles depending on cycle
         if self.cycle in ['F', 'W']:
             self.cycmax = 2
         else:
@@ -1325,7 +1322,7 @@ class MGParameters:
         self.maxcycle = max(len(self.raw_sc_cycle), len(self.raw_lr_cycle))
         if self.sslsolver:
             self.ssl_maxit = self.maxit
-            if self.cycle is not None:  # Only if MG is used
+            if self.cycle is not None:  # Only if multigrid is used
                 self.maxit = self.maxcycle
                 self._repr_maxit += f" ({self.maxit})"  # For printing
 
@@ -1427,7 +1424,7 @@ class RegularGridProlongator:
         return edges
 
 
-# MG HELPER ROUTINES (private, undocumented)
+# MULTIGRID HELPER ROUTINES (private, undocumented)
 def _current_sc_dir(sc_dir, grid):
     """Return current direction(s) for semicoarsening.
 
@@ -1824,7 +1821,7 @@ def _print_gs_info(var, it, level, cycmax, grid, norm, add):
         Current coarsening level.
 
     cycmax : int
-        Maximum MG cycles.
+        Maximum multigrid cycles.
 
     grid : TensorMesh
         Current grid.

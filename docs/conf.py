@@ -25,6 +25,8 @@ add_function_parentheses = False
 # Numpydoc settings
 numpydoc_show_class_members = False
 numfig = True
+# Make numpydoc to generate plots for example sections
+numpydoc_use_plots = True
 
 # Todo settings
 todo_include_todos = True

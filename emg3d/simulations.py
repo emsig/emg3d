@@ -133,18 +133,8 @@ class Simulation:
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
-        `grid`, `model`, `sfield`, `efield`, `return_info`, and `log`.
-        If not provided the following defaults are used:
-
-        - `sslsolver=True`;
-        - `semicoarsening=True`;
-        - `linerelaxation=True`;
-        - `verb=2`;
-
-        Note that these defaults are different from the defaults in
-        :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
-        many cases, but they are the most robust combination at which you can
-        throw most things.
+        `grid`, `model`, `sfield`, `efield`, `return_info`, and `log`. Default
+        verbosity is ``verb=2``.
 
     max_workers : int
         The maximum number of processes that can be used to execute the
@@ -195,9 +185,8 @@ class Simulation:
         # Store solver options with defaults: The slowest but most robust
         # setting is used, but user-input overwrites defaults if provided.
         # However, verbosity is turned into a log, not real-time verbosity.
-        self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
-                            'linerelaxation': True, 'verb': 2,
-                            **solver_opts, 'return_info': True, 'log': -1}
+        self.solver_opts = {
+                'verb': 2, **solver_opts, 'return_info': True, 'log': -1}
 
         # Store original input nCz.
         self._input_nCz = kwargs.pop('_input_nCz', grid.shape_cells[2])
