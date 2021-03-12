@@ -559,7 +559,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
                       new_cycmax=cycmax-cyc)
 
             # (B.4) Add coarse field residual to fine grid field.
-            prolongation(model.grid, efield, cmodel.grid, cefield, sc_dir)
+            prolongation(efield, cefield, sc_dir)
 
             # Append current prolongation level for QC.
             if var.first_cycle and var.verb > 3:
@@ -898,7 +898,7 @@ def restriction(model, sfield, residual, sc_dir):
     return cmodel, csfield, cefield
 
 
-def prolongation(grid, efield, cgrid, cefield, sc_dir):
+def prolongation(efield, cefield, sc_dir):
     """Interpolating the electric field from coarse grid to fine grid.
 
     The prolongation from a coarser to a finer grid is the inverse process of
@@ -914,9 +914,6 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
 
     Parameters
     ----------
-    grid, cgrid : TensorMesh
-        Fine and coarse grids; :class:`emg3d.meshes.TensorMesh` instances.
-
     efield, cefield : Field
         Fine and coarse grid electric fields, :class:`emg3d.fields.Field`
         instances.
@@ -925,6 +922,8 @@ def prolongation(grid, efield, cgrid, cefield, sc_dir):
         Direction of semicoarsening.
 
     """
+    # Grids.
+    grid, cgrid = efield.grid, cefield.grid
 
     # Interpolate ex in y-z-slices.
     fn = RegularGridProlongator(

@@ -500,7 +500,7 @@ class TestRestrictionProlongation:
         cefield += np.pi
 
         # Prolong it
-        solver.prolongation(grid, efield, cmodel.grid, cefield, sc_dir=sc)
+        solver.prolongation(efield, cefield, sc_dir=sc)
 
         assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
         assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)
@@ -558,7 +558,7 @@ class TestRestrictionProlongation:
         cefield += np.pi
 
         # Prolong it
-        solver.prolongation(grid, efield, cmodel.grid, cefield, sc_dir=sc)
+        solver.prolongation(efield, cefield, sc_dir=sc)
 
         assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
         assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)
@@ -615,7 +615,7 @@ class TestRestrictionProlongation:
         cefield += np.pi
 
         # Prolong it
-        solver.prolongation(grid, efield, cmodel.grid, cefield, sc_dir=sc)
+        solver.prolongation(efield, cefield, sc_dir=sc)
 
         assert np.all(efield.fx[:, 1:-1, 1:-1] == np.pi)
         assert np.all(efield.fy[1:-1, :, 1:-1] == np.pi)
