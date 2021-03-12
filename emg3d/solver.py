@@ -44,7 +44,7 @@ __all__ = ['solve', 'multigrid', 'krylov', 'smoothing', 'restriction',
 # MAIN USER-FACING FUNCTION
 def solve(model, sfield, sslsolver=True, semicoarsening=True,
           linerelaxation=True, verb=0, **kwargs):
-    r"""Solver for 3D CSEM data with tri-axial electrical anisotropy.
+    r"""Solver for three-dimensional electromagnetic diffusion.
 
     The principal solver of emg3d is using the multigrid method as presented in
     [Muld06]_. Multigrid can be used as a standalone solver, or as a
@@ -65,12 +65,12 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     implemented, see the ``semicoarsening`` and ``linerelaxation`` parameters.
     Using the BiCGSTAB solver together with multigrid preconditioning,
     semicoarsening, and line relaxation is generally the most robust solution,
-    albeit not necessarily the fastest (it is the default setting for this
-    reason). Just using traditional multigrid without BiCGSTAB nor
-    semicoarsening nor line relaxation is often faster but may fail on
-    stretched grids or for models with strong anisotropy. However, only testing
-    the parameters for a given model can give certainty to which parameters are
-    best.
+    albeit not necessarily the fastest. It is the default setting for its
+    robustness. Just using traditional multigrid without BiCGSTAB nor
+    semicoarsening nor line relaxation uses the least memory and is often
+    faster but may fail on stretched grids or for models with strong
+    anisotropy. However, only testing the parameters for a given model can give
+    certainty to which parameters are best.
 
 
     Parameters
@@ -160,8 +160,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
            4h_    \  /     \    /\  /     \    /\    /
            8h_     \/       \/\/  \/       \/\/  \/\/
 
-    efield : Field, default: zero Field
-        Initial electric field. It is initiated with zeroes if not provided.
+    efield : Field, default: None
+        Initial electric field. If is initiated with zeroes if not provided.
 
         If an initial efield is provided nothing is returned, but the final
         efield is directly put into the provided efield.
@@ -202,8 +202,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     clevel : int, default: -1
         The maximum coarsening level can be different for each dimension and
         is, by default, automatically determined (``clevel=-1``). The
-        parameter ``clevel`` can be used to restrict the maximum coarsening
-        level in any direction by its value.
+        parameter ``clevel`` restricts the maximum coarsening level by its
+        value.
 
     return_info : bool, default: False
         If True, a dictionary is returned with runtime info (final norm,
@@ -217,15 +217,20 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         - ``0``: SCREEN only: Only print info to screen, do not store in log.
         - ``1``: BOTH: Store info in log and print on screen.
 
+    plain : bool, default: False
+        Plain multigrid method. This is a shortcut for ``sslsolver=False,
+        semicoarsening=False, linerelaxation=False``. The three parameters
+        remain unchanged if they are set to anything else than ``True``.
+
 
     Returns
     -------
-    efield : Field
+    efield : Field, returned if ``efield=None``
         Resulting electric field. It is not returned but stored in-place if an
         initial efield was provided.
 
     info_dict : dict, returned if ``return_info=True``
-        Dictionary with runtime info. Keys:
+        Dictionary with solver info. Keys:
 
         - ``exit``: Exit status, 0=Success, 1=Failure;
         - ``exit_message``: Exit message, check this if ``exit=1``;
@@ -254,7 +259,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
           ...: hx = np.ones(8)
           ...: grid = emg3d.TensorMesh([hx, hx, hx], origin=(0, 0, 0))
 
-       In [3]: # The model is a fullspace with tri-axial anisotropy.
+       In [3]: # Create a fullspace model with tri-axial anisotropy.
           ...: model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
           ...:                     property_z=3.3, mapping='Resistivity')
 
@@ -263,13 +268,19 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
           ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azm, dip)
           ...: sfield = emg3d.fields.get_source_field(grid, src=coo, freq=10)
 
-       In [5]: # Compute the electric signal.
-          ...: efield = emg3d.solve(model, sfield, verb=4)
+       In [5]: # Solve for the electric field.
+          ...: efield = emg3d.solve(model, sfield, plain=True, verb=4)
 
     """
 
-    # Solver settings; get from kwargs or set to default values.
+    # Extract kwargs which do not go into MGParameters.
+    if kwargs.pop('plain', False):
+        sslsolver = False if sslsolver is True else sslsolver
+        semicoarsening = False if semicoarsening is True else semicoarsening
+        linerelaxation = False if linerelaxation is True else linerelaxation
     efield = kwargs.pop('efield', None)
+
+    # Solver settings; get from kwargs or set to default values.
     var = MGParameters(
             sslsolver=sslsolver, semicoarsening=semicoarsening,
             linerelaxation=linerelaxation, shape_cells=model.shape, verb=verb,
@@ -414,7 +425,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
 # SOLVERS
 def multigrid(model, sfield, efield, var, **kwargs):
-    """Multigrid solver for 3D controlled-source electromagnetic (CSEM) data.
+    """Multigrid solver for three-dimensional electromagnetic diffusion.
 
     Multigrid solver as presented in [Muld06]_, including semicoarsening and
     line relaxation as presented in [Muld07]_.
@@ -596,7 +607,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
 
 
 def krylov(model, sfield, efield, var):
-    """Wrapper for Krylov Subspace iterative solver implemented in SciPy.
+    """Krylov subspace solver for three-dimensional electromagnetic diffusion.
 
     Using a Krylov subspace iterative solver (defined in ``var.sslsolver``)
     implemented in SciPy with or without multigrid as a pre-conditioner

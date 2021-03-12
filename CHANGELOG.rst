@@ -66,6 +66,11 @@ latest: towards v1.0
     is new ``True`` (before it was ``False``). This is not necessarily the
     fastest setting, but generally the most robust setting.
 
+  - New parameter ``plain``, which is by default ``False``. If it is set to
+    ``True`` it uses plain multigrid, hence ``sslsolver=False``,
+    ``semicoarsening=False``, and ``linerelaxation=False``, unless these
+    parameters were set to anything different than ``True``.
+
   - Some verbosity levels changed (consistency throughout module). The new
     levels are [old level in brackets]:
 

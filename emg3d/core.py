@@ -46,7 +46,7 @@ _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 # LinearOperator to compute A x
 @nb.njit(**_numba_setting)
 def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
-    r"""Residual without or with source term.
+    r"""Residual with or without source term.
 
     Compute the residual as given in [Muld06]_ in middle of the right column
     on page 636, but without the source term:

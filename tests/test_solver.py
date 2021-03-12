@@ -27,9 +27,8 @@ def create_dummy(nx, ny, nz):
 
 class TestSolve:
 
-    def test_solver_homogeneous(self, capsys):
+    def test_homogeneous(self, capsys):
         # Regression test for homogeneous halfspace.
-        # Not very sophisticated; replace/extend by more detailed tests.
         dat = REGRES['res']
 
         model = models.Model(**dat['input_model'])
@@ -37,9 +36,7 @@ class TestSolve:
         sfield = fields.get_source_field(**dat['input_source'])
 
         # F-cycle
-        efield = solver.solve(model, sfield, sslsolver=False,
-                              semicoarsening=False, linerelaxation=False,
-                              verb=4)
+        efield = solver.solve(model, sfield, plain=True, verb=4)
         out, _ = capsys.readouterr()
 
         assert ' emg3d START ::' in out
@@ -57,25 +54,21 @@ class TestSolve:
         assert_allclose(dat['Fresult'], efield)
 
         # W-cycle
-        wfield = solver.solve(model, sfield, sslsolver=False,
-                              semicoarsening=False, linerelaxation=False,
-                              cycle='W')
+        wfield = solver.solve(model, sfield, plain=True, cycle='W')
 
         # Check all fields (ex, ey, and ez)
         assert_allclose(dat['Wresult'], wfield)
 
         # V-cycle
-        vfield = solver.solve(model, sfield, sslsolver=False,
-                              semicoarsening=False, linerelaxation=False,
-                              cycle='V')
+        vfield = solver.solve(model, sfield, plain=True, cycle='V')
         _, _ = capsys.readouterr()  # clear output
 
         # Check all fields (ex, ey, and ez)
         assert_allclose(dat['Vresult'], vfield)
 
         # BiCGSTAB with some print checking.
-        efield = solver.solve(model, sfield, verb=4, semicoarsening=False,
-                              linerelaxation=False)
+        efield = solver.solve(model, sfield, verb=4, sslsolver='bicgstab',
+                              plain=True)
         out, _ = capsys.readouterr()
         assert ' emg3d START ::' in out
         assert ' [hh:mm:ss] ' in out
@@ -89,9 +82,7 @@ class TestSolve:
         assert_allclose(dat['bicresult'], efield)
 
         # Same as previous, without BiCGSTAB, but some print checking.
-        efield = solver.solve(model, sfield, sslsolver=False,
-                              semicoarsening=False, linerelaxation=False,
-                              verb=4)
+        efield = solver.solve(model, sfield, plain=True, verb=4)
         out, _ = capsys.readouterr()
         assert ' emg3d START ::' in out
         assert ' [hh:mm:ss] ' in out
@@ -102,9 +93,8 @@ class TestSolve:
 
         # Max it
         maxit = 2
-        _, info = solver.solve(
-                model, sfield, sslsolver=False, semicoarsening=False,
-                linerelaxation=False, verb=3, maxit=maxit, return_info=True)
+        _, info = solver.solve(model, sfield, plain=True, verb=3, maxit=maxit,
+                               return_info=True)
         out, _ = capsys.readouterr()
         assert ' MAX. ITERATION REACHED' in out
         assert maxit == info['it_mg']
@@ -112,22 +102,20 @@ class TestSolve:
         assert 'MAX. ITERATION REACHED' in info['exit_message']
 
         # BiCGSTAB with lower verbosity, print checking.
-        _ = solver.solve(model, sfield, semicoarsening=False,
-                         linerelaxation=False, verb=3, maxit=1)
+        _ = solver.solve(model, sfield, sslsolver='bicgstab', plain=True,
+                         verb=3, maxit=1)
         out, _ = capsys.readouterr()
         assert ' MAX. ITERATION REACHED' in out
 
         # Just check if it runs without failing for other solvers.
-        _ = solver.solve(model, sfield, sslsolver='gcrotmk',
-                         semicoarsening=False, linerelaxation=False, verb=5,
-                         maxit=1)
+        _ = solver.solve(model, sfield, sslsolver='gcrotmk', plain=True,
+                         verb=5, maxit=1)
 
         # Provide initial field.
         _, _ = capsys.readouterr()  # empty
         efield_copy = efield.copy()
         outarray = solver.solve(
-                model, sfield, sslsolver=False, semicoarsening=False,
-                linerelaxation=False, efield=efield_copy, verb=3)
+                model, sfield, plain=True, efield=efield_copy, verb=3)
         out, _ = capsys.readouterr()
 
         # Ensure there is no output.
@@ -137,9 +125,8 @@ class TestSolve:
         assert_allclose(efield, efield_copy)
 
         # Provide initial field and return info.
-        info = solver.solve(
-                model, sfield, sslsolver=False, semicoarsening=False,
-                linerelaxation=False, efield=efield_copy, return_info=True)
+        info = solver.solve(model, sfield, plain=True, efield=efield_copy,
+                            return_info=True)
         assert info['it_mg'] == 0
         assert info['it_ssl'] == 0
         assert info['exit'] == 0
@@ -158,25 +145,21 @@ class TestSolve:
         wrong_sfield = fields.Field(grid)
         wrong_sfield.field = sfield.field
         with pytest.raises(ValueError, match="Source field is missing frequ"):
-            solver.solve(model, wrong_sfield, sslsolver=False,
-                         semicoarsening=False, linerelaxation=False,
-                         efield=efield, verb=1)
+            solver.solve(
+                    model, wrong_sfield, plain=True, efield=efield, verb=1)
 
         # Check stagnation by providing an almost zero source field.
-        _ = solver.solve(model, sfield*0+1e-20, sslsolver=False,
-                         semicoarsening=False, linerelaxation=False, maxit=100)
+        _ = solver.solve(model, sfield*0+1e-20, plain=True, maxit=100)
         out, _ = capsys.readouterr()
         assert "STAGNATED" in out
 
         # Check a zero field is returned for a zero source field.
-        efield = solver.solve(
-                model, sfield*0, sslsolver=False, semicoarsening=False,
-                linerelaxation=False, maxit=100, verb=3)
+        efield = solver.solve(model, sfield*0, plain=True, maxit=100, verb=3)
         out, _ = capsys.readouterr()
         assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
         assert np.linalg.norm(efield) == 0.0
 
-    def test_solver_heterogeneous(self, capsys):
+    def test_heterogeneous(self, capsys):
         # Regression test for heterogeneous case.
         dat = REGRES['reg_2']
         model = dat['model']
@@ -193,17 +176,12 @@ class TestSolve:
         _, _ = capsys.readouterr()  # Clean up
 
         # Check with provided e-field; 2x2 iter should yield the same as 4 iter
-        efield2 = solver.solve(
-                model, sfield, sslsolver=False, semicoarsening=False,
-                linerelaxation=False, maxit=4, verb=0)
+        efield2 = solver.solve(model, sfield, plain=True, maxit=4, verb=0)
         out, _ = capsys.readouterr()  # Clean up
         assert "* WARNING :: MAX. ITERATION REACHED, NOT CONVERGED" in out
-        efield3 = solver.solve(
-                model, sfield, sslsolver=False, semicoarsening=False,
-                linerelaxation=False, maxit=2, verb=0)
+        efield3 = solver.solve(model, sfield, plain=True, maxit=2, verb=0)
         solver.solve(
-                model, sfield, sslsolver=False, semicoarsening=False,
-                linerelaxation=False, efield=efield3, maxit=2, verb=0)
+                model, sfield, plain=True, efield=efield3, maxit=2, verb=0)
 
         assert_allclose(efield2, efield3)
 
@@ -225,9 +203,7 @@ class TestSolve:
                 origin=np.array([-0.5, -1, -1]))
         sfield = alternatives.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
         model = models.Model(mesh)
-        _ = solver.solve(
-                model, sfield, sslsolver=False, linerelaxation=False,
-                semicoarsening=False, verb=4, nu_pre=0)
+        _ = solver.solve(model, sfield, plain=True, verb=4, nu_pre=0)
         out, _ = capsys.readouterr()
         assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
         assert "DIVERGED" in out
@@ -237,23 +213,28 @@ class TestSolve:
 
         model = models.Model(**dat['input_model'])
         sfield = fields.get_source_field(**dat['input_source'])
-        inp = {'model': model, 'sfield': sfield, 'maxit': 1, 'verb': 3}
+        inp = {'model': model, 'sfield': sfield, 'plain': True, 'maxit': 1}
 
-        efield, info = solver.solve(return_info=True, log=-1, **inp)
+        efield, info = solver.solve(return_info=True, log=-1, verb=3, **inp)
         out, _ = capsys.readouterr()
         assert out == ""
         assert ' emg3d START ::' in info['log']
 
-        efield = solver.solve(return_info=True, log=0, **inp)
+        efield = solver.solve(return_info=True, log=0, verb=3, **inp)
         out, _ = capsys.readouterr()
         assert ' emg3d START ::' in out
 
-        efield, info = solver.solve(return_info=True, log=1, **inp)
+        efield, info = solver.solve(return_info=True, log=1, verb=3, **inp)
         out, _ = capsys.readouterr()
         assert ' emg3d START ::' in out
         assert ' emg3d START ::' in info['log']
 
-    def test_solver_homogeneous_laplace(self, ):
+        efield, info = solver.solve(return_info=True, log=1, verb=1, **inp)
+        out, _ = capsys.readouterr()
+        assert 'MAX. ITERATION REACHED, NOT CONVERGED' in out
+        assert 'MAX. ITERATION REACHED, NOT CONVERGED' in info['log']
+
+    def test_laplace(self, ):
         # Regression test for homogeneous halfspace in Laplace domain.
         # Not very sophisticated; replace/extend by more detailed tests.
         dat = REGRES['lap']
@@ -263,9 +244,7 @@ class TestSolve:
         sfield = fields.get_source_field(**dat['input_source'])
 
         # F-cycle
-        efield = solver.solve(
-                model, sfield, sslsolver=False, semicoarsening=False,
-                linerelaxation=False)
+        efield = solver.solve(model, sfield, plain=True)
 
         # Check all fields (ex, ey, and ez)
         assert_allclose(dat['Fresult'], efield, atol=1e-14)
@@ -281,9 +260,7 @@ class TestSolve:
         efield = fields.Field(grid, dtype=np.complex_)
 
         with pytest.raises(ValueError, match='Source field and electric fiel'):
-            efield = solver.solve(
-                    model, sfield, sslsolver=False, semicoarsening=False,
-                    linerelaxation=False, efield=efield)
+            efield = solver.solve(model, sfield, plain=True, efield=efield)
 
 
 class TestMultigrid:
