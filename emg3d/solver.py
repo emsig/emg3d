@@ -922,16 +922,14 @@ def prolongation(efield, cefield, sc_dir):
         Direction of semicoarsening.
 
     """
-    # Grids.
-    grid, cgrid = efield.grid, cefield.grid
 
     # Interpolate ex in y-z-slices.
-    fn = RegularGridProlongator(
-            cgrid.nodes_y, cgrid.nodes_z, grid.nodes_y, grid.nodes_z)
-    for ixc in range(cgrid.shape_cells[0]):
+    fn = RegularGridProlongator(cefield.grid.nodes_y, cefield.grid.nodes_z,
+                                efield.grid.nodes_y, efield.grid.nodes_z)
+    for ixc in range(cefield.grid.shape_cells[0]):
         # Bilinear interpolation in the y-z plane
         hh = fn(cefield.fx[ixc, :, :]).reshape(
-                grid.shape_edges_x[1:], order='F')
+                efield.grid.shape_edges_x[1:], order='F')
 
         # Piecewise constant interpolation in x-direction
         if sc_dir not in [1, 5, 6]:
@@ -941,13 +939,13 @@ def prolongation(efield, cefield, sc_dir):
             efield.fx[ixc, :, :] += hh
 
     # Interpolate ey in x-z-slices.
-    fn = RegularGridProlongator(
-            cgrid.nodes_x, cgrid.nodes_z, grid.nodes_x, grid.nodes_z)
-    for iyc in range(cgrid.shape_cells[1]):
+    fn = RegularGridProlongator(cefield.grid.nodes_x, cefield.grid.nodes_z,
+                                efield.grid.nodes_x, efield.grid.nodes_z)
+    for iyc in range(cefield.grid.shape_cells[1]):
 
         # Bilinear interpolation in the x-z plane
         hh = fn(cefield.fy[:, iyc, :]).reshape(
-                grid.shape_edges_y[::2], order='F')
+                efield.grid.shape_edges_y[::2], order='F')
 
         # Piecewise constant interpolation in y-direction
         if sc_dir not in [2, 4, 6]:
@@ -957,13 +955,13 @@ def prolongation(efield, cefield, sc_dir):
             efield.fy[:, iyc, :] += hh
 
     # Interpolate ez in x-y-slices.
-    fn = RegularGridProlongator(
-            cgrid.nodes_x, cgrid.nodes_y, grid.nodes_x, grid.nodes_y)
-    for izc in range(cgrid.shape_cells[2]):
+    fn = RegularGridProlongator(cefield.grid.nodes_x, cefield.grid.nodes_y,
+                                efield.grid.nodes_x, efield.grid.nodes_y)
+    for izc in range(cefield.grid.shape_cells[2]):
 
         # Bilinear interpolation in the x-y plane
         hh = fn(cefield.fz[:, :, izc]).reshape(
-                grid.shape_edges_z[:-1], order='F')
+                efield.grid.shape_edges_z[:-1], order='F')
 
         # Piecewise constant interpolation in z-direction
         if sc_dir not in [3, 4, 5]:
