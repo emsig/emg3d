@@ -34,6 +34,75 @@ latest: towards v1.0
 
   - No ``name`` parameter any longer.
 
+- ``Model``:
+
+  - A ``Model`` knows now its ``grid``. As a consequence, all the functions
+    that required the ``grid`` and the ``model`` require now only the
+    ``model``; e.g., ``emg3d.solver.solve`` or ``emg3d.fields.get_h_field``.
+
+- ``TensorMesh``:
+
+  - The basic mesh (without ``discretize``) is renamed from ``_TensorMesh`` to
+    ``BaseMesh``.
+
+  - Reduced ``BaseMesh`` to the attributes ``origin``, ``h``, ``shape_cells``,
+    ``shape_nodes``, ``n_cells``, ``n_edges_x``, ``n_edges_y``, ``n_edges_z``,
+    ``nodes_x``, ``nodes_y``, ``nodes_z``, ``cell_centers_x``,
+    ``cell_centers_y``, ``cell_centers_z``, ``shape_edges_x``,
+    ``shape_edges_y``, ``shape_edges_z``, and ``cell_volumes``. These are the
+    only required attributes for ``emg3d``.
+
+- ``solver.solve``:
+
+  - New signature: ``def solve(model, sfield, sslsolver, semicoarsening,
+    linerelaxation, verb, **kwargs)`` (the old signature was ``def solve(grid,
+    model, sfield, efield, cycle, sslsolver, semicoarsening, linerelaxation,
+    verb, **kwargs)``):
+
+    - ``grid`` is no longer a parameter; it is contained in ``model``.
+    - ``efield`` and ``cycle`` are degraded to ``kwargs``.
+
+  - The defaults for ``sslsolver``, ``semicoarsening``, and ``linerelaxation``
+    is new ``True`` (before it was ``False``). This is not necessarily the
+    fastest setting, but generally the most robust setting.
+
+  - New parameter ``plain``, which is by default ``False``. If it is set to
+    ``True`` it uses plain multigrid, hence ``sslsolver=False``,
+    ``semicoarsening=False``, and ``linerelaxation=False``, unless these
+    parameters were set to anything different than ``True``.
+
+  - Some verbosity levels changed (consistency throughout module). The new
+    levels are [old level in brackets]:
+
+    - -1: Nothing. [0]
+    - 0: Warnings. [1]
+    - 1: One-liner at the end. [2]
+    - 2: One-liner (dynamically updated). [-1]
+    - 3: Runtime and information about the method. [same]
+    - 4: Additional information for each MG-cycle. [same]
+    - 5: Everything (slower due to additional error computations). [same]
+
+    Level three now updates dynamically just as level 2.
+
+- Other changes in ``solver``:
+
+  - ``RegularGridProlongator``: Changed signature from ``x, y, cxy`` to ``cx,
+    cy, x, y`` (it now incorporates the function
+    ``_get_prolongation_coordinates``.)
+
+- ``fields``:
+
+  - The function ``emg3d.fields.get_receiver`` was removed and replaced by
+    its successor ``emg3d.fields.get_receiver_response``;
+    ``emg3d.fields.get_receiver_response`` does not exist any longer.
+  - A ``Field`` knows now its ``grid``. As a consequence, all the functions
+    that required the ``grid`` and the ``field`` require now only the
+    ``field``; e.g., ``emg3d.fields.get_receiver``.
+
+
+- ``maps``:
+
+  - Renamed ``_Map`` to ``BaseMap``.
 
 - Removed all deprecated features.
 

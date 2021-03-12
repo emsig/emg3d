@@ -1,7 +1,5 @@
-.. _Theory:
-
-Theory
-######
+Background Theory
+=================
 
 The following provides an introduction to the theoretical foundation of the
 solver `emg3d`. More specific theory is covered in the docstrings of many

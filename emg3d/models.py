@@ -22,7 +22,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.constants import epsilon_0
 
-from emg3d import maps
+from emg3d import maps, meshes
 
 __all__ = ['Model', 'VolumeModel']
 
@@ -50,7 +50,7 @@ class Model:
 
     property_{x;y;z} : float or ndarray; default to 1.
         Material property in x-, y-, and z-directions. If ndarray, they must
-        have the shape of grid.vnC (F-ordered) or grid.nC.
+        have the shape of grid.shape_cells (F-ordered) or grid.n_cells.
 
         By default, property refers to electrical resistivity. However, this
         can be changed with an appropriate map. For more info, see the
@@ -63,16 +63,16 @@ class Model:
 
     mu_r : None, float, or ndarray
         Relative magnetic permeability (isotropic). If ndarray it must have the
-        shape of grid.vnC (F-ordered) or grid.nC. Default is None, which
-        corresponds to 1., but avoids the computation of zeta. Magnetic
+        shape of grid.shape_cells (F-ordered) or grid.n_cells. Default is None,
+        which corresponds to 1., but avoids the computation of zeta. Magnetic
         permeability has to be bigger than zero and smaller than infinity.
 
     epsilon_r : None, float, or ndarray
         Relative electric permittivity (isotropic). If ndarray it must have the
-        shape of grid.vnC (F-ordered) or grid.nC. The displacement part is
-        completely neglected (diffusive approximation) if set to None, which is
-        the default. Electric permittivity has to be bigger than zero and
-        smaller than infinity.
+        shape of grid.shape_cells (F-ordered) or grid.n_cells. The displacement
+        part is completely neglected (diffusive approximation) if set to None,
+        which is the default. Electric permittivity has to be bigger than zero
+        and smaller than infinity.
 
     mapping : str
         Defines what type the input `property_{x;y;z}`-values correspond to. By
@@ -96,21 +96,12 @@ class Model:
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
-        # Store required info from grid.
-        if hasattr(grid, 'shape'):
-            # This is an alternative possibility. Instead of the grid, we only
-            # need the model.vnC. Mainly used internally to construct new
-            # models.
-            self.vnC = grid
-            self.nC = np.prod(grid)
-        else:
-            self.nC = grid.nC
-            self.vnC = grid.vnC
+        # Store grid.
+        self.grid = grid
 
-        # Copies of vnC and nC, but more widely used/known
-        # (vnC and nC are the discretize attributes).
-        self.shape = tuple(self.vnC)
-        self.size = self.nC
+        # Alias shape_cells and n_cells to shape and size.
+        self.shape = self.grid.shape_cells
+        self.size = self.grid.n_cells
 
         # Check case.
         self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
@@ -145,8 +136,8 @@ class Model:
         return (f"Model [{self.map.description}]; {self.case_names[self.case]}"
                 f"{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}"
-                f"; {self.vnC[0]} x {self.vnC[1]} x {self.vnC[2]} "
-                f"({self.nC:,})")
+                f"; {self.shape[0]} x {self.shape[1]} x {self.shape[2]} "
+                f"({self.size:,})")
 
     def __add__(self, model):
         """Add two models."""
@@ -162,7 +153,7 @@ class Model:
         kwargs = self._apply_operator(model, np.add)
 
         # Return new Model instance.
-        return Model(grid=np.array(self.vnC), **kwargs)
+        return Model(grid=self.grid, **kwargs)
 
     def __sub__(self, model):
         """Subtract two models."""
@@ -178,13 +169,13 @@ class Model:
         kwargs = self._apply_operator(model, np.subtract)
 
         # Return new Model instance.
-        return Model(grid=np.array(self.vnC), **kwargs)
+        return Model(grid=self.grid, **kwargs)
 
     def __eq__(self, model):
         """Compare two models.
 
-        Note: Shape of parameters can be different, e.g. float, nC, or vnC. As
-              long as all values agree it returns True.
+        Note: Shape of parameters can be different, e.g. float, size, or shape.
+              As long as all values agree it returns True.
 
         """
 
@@ -244,8 +235,9 @@ class Model:
         else:
             out['epsilon_r'] = None
 
-        # vnC.
-        out['vnC'] = np.array(self.vnC)
+        # Grid info.
+        out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
+                       'hz': self.grid.h[2], 'origin': self.grid.origin}
 
         # Map.
         out['mapping'] = self.map.name
@@ -267,7 +259,7 @@ class Model:
         inp : dict
             Dictionary as obtained from :func:`Model.to_dict`.
             The dictionary needs the keys `property_x`, `property_y`,
-            `property_z`, `mu_r`, `epsilon_r`, `vnC`, and `mapping`.
+            `property_z`, `mu_r`, `epsilon_r`, `grid`, and `mapping`.
 
         Returns
         -------
@@ -275,10 +267,13 @@ class Model:
 
         """
         try:
-            return cls(grid=inp['vnC'], property_x=inp['property_x'],
+            return cls(grid=meshes.TensorMesh.from_dict(inp['grid']),
+                       property_x=inp['property_x'],
                        property_y=inp['property_y'],
-                       property_z=inp['property_z'], mu_r=inp['mu_r'],
-                       epsilon_r=inp['epsilon_r'], mapping=inp['mapping'])
+                       property_z=inp['property_z'],
+                       mu_r=inp['mu_r'],
+                       epsilon_r=inp['epsilon_r'],
+                       mapping=inp['mapping'])
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
@@ -393,37 +388,38 @@ class Model:
                 'new_grid': new_grid
         }
 
-        def ensure_vnc(prop):
-            """Expand float-properties to shape vnC."""
-            return prop*np.ones(grid.vnC) if prop.size == 1 else prop
+        def ensure_shape(prop):
+            """Expand float-properties to shape."""
+            return prop*np.ones(self.shape) if prop.size == 1 else prop
 
         # property_x (always).
-        property_x = maps.grid2grid(values=ensure_vnc(self.property_x), **inp)
+        property_x = maps.grid2grid(
+                values=ensure_shape(self.property_x), **inp)
 
         # property_y.
         if self.case in [1, 3]:
             property_y = maps.grid2grid(
-                    values=ensure_vnc(self.property_y), **inp)
+                    values=ensure_shape(self.property_y), **inp)
         else:
             property_y = None
 
         # property_z.
         if self.case in [2, 3]:
             property_z = maps.grid2grid(
-                    values=ensure_vnc(self.property_z), **inp)
+                    values=ensure_shape(self.property_z), **inp)
         else:
             property_z = None
 
         # mu_r.
         if self._mu_r is not None:
-            mu_r = maps.grid2grid(values=ensure_vnc(self.mu_r), **inp)
+            mu_r = maps.grid2grid(values=ensure_shape(self.mu_r), **inp)
         else:
             mu_r = None
 
         # epsilon_r.
         if self._epsilon_r is not None:
             epsilon_r = maps.grid2grid(
-                values=ensure_vnc(self.epsilon_r), **inp)
+                values=ensure_shape(self.epsilon_r), **inp)
         else:
             epsilon_r = None
 
@@ -436,7 +432,7 @@ class Model:
     def _check_parameter(self, var, name, mapped=False):
         """Check parameter.
 
-        - Shape must be (), (1,), nC, or vnC.
+        - Shape must be (), (1,), size, or shape.
         - Value(s) must be 0 < var < inf.
         """
 
@@ -448,10 +444,10 @@ class Model:
         var = np.asarray(var, dtype=np.float64).ravel('F')
 
         # Check for wrong size.
-        if var.size not in [1, self.nC]:
+        if var.size not in [1, self.size]:
             raise ValueError(
-                    f"Shape of {name} must be (), {self.vnC}, or "
-                    f"{self.nC}.\nProvided: {var.shape}.")
+                    f"Shape of {name} must be (), {self.shape}, or "
+                    f"{self.size}.\nProvided: {var.shape}.")
 
         # Check they are positive.
         if not mapped or (mapped and not self.map.name.startswith('L')):
@@ -465,15 +461,15 @@ class Model:
         return var
 
     def _return_parameter(self, var):
-        """Return parameter as float or shape vnC."""
+        """Return parameter as float or shape."""
 
         # Return depending on value and size.
         if var is None:      # Because of mu_r, epsilon_r.
             return None
         elif var.size == 1:  # In case of float.
             return var
-        else:                # Else, has shape vnC.
-            return var.reshape(self.vnC, order='F')
+        else:                # Else, has shape.
+            return var.reshape(self.shape, order='F')
 
     def _operator_test(self, model):
         """Check if `self` and `model` are consistent for operations.
@@ -569,9 +565,6 @@ class VolumeModel:
 
     Parameters
     ----------
-    grid : TensorMesh
-        Grid on which to apply model.
-
     model : Model
         Model to transform to volume-averaged values.
 
@@ -581,25 +574,28 @@ class VolumeModel:
 
     """
 
-    def __init__(self, grid, model, sfield):
+    def __init__(self, model, sfield):
         """Initiate a new model with volume-averaged properties."""
 
         # Store case, for restriction.
         self.case = model.case
 
+        # Store a minimal TensorMesh.
+        self.grid = meshes.BaseMesh(model.grid.h, model.grid.origin)
+
         # eta_x
-        self._eta_x = self.calculate_eta('property_x', grid, model, sfield)
+        self._eta_x = self.calculate_eta('property_x', model, sfield)
 
         # eta_y
         if model.case in [1, 3]:  # HTI or tri-axial.
-            self._eta_y = self.calculate_eta('property_y', grid, model, sfield)
+            self._eta_y = self.calculate_eta('property_y', model, sfield)
 
         # eta_z
         if self.case in [2, 3]:  # VTI or tri-axial.
-            self._eta_z = self.calculate_eta('property_z', grid, model, sfield)
+            self._eta_z = self.calculate_eta('property_z', model, sfield)
 
         # zeta
-        self._zeta = self.calculate_zeta('mu_r', grid, model)
+        self._zeta = self.calculate_zeta('mu_r', model)
 
     # ETA's
     @property
@@ -629,11 +625,12 @@ class VolumeModel:
         return self._zeta
 
     @staticmethod
-    def calculate_eta(name, grid, model, field):
+    def calculate_eta(name, model, field):
         r"""eta: volume multiplied with conductivity."""
 
         # Initiate eta
-        eta = field.smu0*grid.cell_volumes.reshape(grid.vnC, order='F')
+        eta = field.smu0*model.grid.cell_volumes.reshape(
+                model.shape, order='F')
 
         # Compute eta depending on epsilon.
         if model.epsilon_r is None:  # Diffusive approximation.
@@ -647,10 +644,10 @@ class VolumeModel:
         return eta
 
     @staticmethod
-    def calculate_zeta(name, grid, model):
+    def calculate_zeta(name, model):
         r"""zeta: volume divided by mu_r."""
 
-        zeta = grid.cell_volumes.reshape(grid.vnC, order='F')
+        zeta = model.grid.cell_volumes.reshape(model.shape, order='F')
         if getattr(model, name, None) is None:
             return zeta
 

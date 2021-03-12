@@ -108,17 +108,18 @@ def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
                        extrapolate, log)
 
         # Return a field instance.
-        return values.__class__(fx, fy, fz)
+        field = np.r_[fx.ravel('F'), fy.ravel('F'), fz.ravel('F')]
+        return values.__class__(new_grid, field)
 
     # If values is a particular field, ensure method is not 'volume'.
-    if not np.all(grid.vnC == values.shape) and method == 'volume':
+    if not np.all(grid.shape_cells == values.shape) and method == 'volume':
         raise ValueError("``method='volume'`` not implemented for fields.")
 
     if method == 'volume':
         points = (grid.nodes_x, grid.nodes_y, grid.nodes_z)
         new_points = (new_grid.nodes_x, new_grid.nodes_y, new_grid.nodes_z)
-        new_values = np.zeros(new_grid.vnC, dtype=values.dtype)
-        vol = new_grid.cell_volumes.reshape(new_grid.vnC, order='F')
+        new_values = np.zeros(new_grid.shape_cells, dtype=values.dtype)
+        vol = new_grid.cell_volumes.reshape(new_grid.shape_cells, order='F')
 
         # Get values from `volume_average`.
         if log:
@@ -281,7 +282,7 @@ def register_map(func):
     return func
 
 
-class _Map:
+class BaseMap:
     """Maps variable `x` to computational variable `σ` (conductivity)."""
 
     def __init__(self, description):
@@ -308,16 +309,16 @@ class _Map:
 
     def to_dict(self):
         """Store the map name in a dict for serialization."""
-        return {'name': self.name, '__class__': '_Map'}
+        return {'name': self.name, '__class__': 'BaseMap'}
 
     @classmethod
     def from_dict(cls, inp):
-        """Get :class:`_Map` instance from name in dict."""
+        """Get :class:`BaseMap` instance from name in dict."""
         return MAPLIST['Map'+inp['name']]()
 
 
 @register_map
-class MapConductivity(_Map):
+class MapConductivity(BaseMap):
     """Maps `σ` to computational variable `σ` (conductivity).
 
     - forward: x = σ
@@ -339,7 +340,7 @@ class MapConductivity(_Map):
 
 
 @register_map
-class MapLgConductivity(_Map):
+class MapLgConductivity(BaseMap):
     """Maps `log_10(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(σ)
@@ -361,7 +362,7 @@ class MapLgConductivity(_Map):
 
 
 @register_map
-class MapLnConductivity(_Map):
+class MapLnConductivity(BaseMap):
     """Maps `log_e(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(σ)
@@ -383,7 +384,7 @@ class MapLnConductivity(_Map):
 
 
 @register_map
-class MapResistivity(_Map):
+class MapResistivity(BaseMap):
     """Maps `ρ` to computational variable `σ` (conductivity).
 
     - forward: x = ρ = σ^-1
@@ -405,7 +406,7 @@ class MapResistivity(_Map):
 
 
 @register_map
-class MapLgResistivity(_Map):
+class MapLgResistivity(BaseMap):
     """Maps `log_10(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(ρ) = log_10(σ^-1)
@@ -427,7 +428,7 @@ class MapLgResistivity(_Map):
 
 
 @register_map
-class MapLnResistivity(_Map):
+class MapLnResistivity(BaseMap):
     """Maps `log_e(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(ρ) = log_e(σ^-1)

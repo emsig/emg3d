@@ -50,11 +50,12 @@ def test_save_and_load(tmpdir, capsys):
 
     # Some field.
     field = fields.Field(grid)
-    field.field = np.arange(grid.nE)+1j*np.ones(grid.nE)
+    ne = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
+    field.field = np.arange(ne)+1j*np.ones(ne)
     field.ensure_pec
 
     # Some model.
-    property_x = create_dummy(*grid.vnC, False)
+    property_x = create_dummy(*grid.shape_cells, False)
     property_y = property_x/2.0
     property_z = property_x*1.4
     mu_r = property_x*1.11
@@ -170,10 +171,11 @@ def test_compare_dicts(capsys):
     model = models.Model(grid, property_x=1., property_y=2.,
                          property_z=3., mu_r=4.)
 
-    e1 = create_dummy(*grid.vnEx)
-    e2 = create_dummy(*grid.vnEy)
-    e3 = create_dummy(*grid.vnEz)
-    ee = fields.Field(e1, e2, e3, freq=.938)
+    e1 = create_dummy(*grid.shape_edges_x)
+    e2 = create_dummy(*grid.shape_edges_y)
+    e3 = create_dummy(*grid.shape_edges_z)
+    field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
+    ee = fields.Field(grid, field, freq=.938)
 
     dict1 = io._dict_serialize(
             {'model': model, 'grid': grid, 'field': ee,

@@ -36,9 +36,9 @@ __all__ = ['save', 'load']
 
 # Known classes to serialize and de-serialize.
 KNOWN_CLASSES = {
-    '_Map': maps._Map,
     'Model': models.Model,
     'Field': fields.Field,
+    'BaseMap': maps.BaseMap,
     'Survey': surveys.Survey,
     'Dipole': surveys.Dipole,
     'TensorMesh': meshes.TensorMesh,

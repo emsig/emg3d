@@ -25,10 +25,10 @@ import numpy as np
 from scipy.constants import mu_0
 from scipy.special import sindg, cosdg
 
-from emg3d import maps, models, utils
+from emg3d import maps, meshes, models, utils
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
-           'get_receiver_response', 'get_h_field']
+           'get_h_field']
 
 
 class Field(np.ndarray):
@@ -53,10 +53,6 @@ class Field(np.ndarray):
        Calling it with a :class:`emg3d.meshes.TensorMesh` instance and an
        `ndarray` returns a `Field` instance of the provided `ndarray`, of same
        data type.
-    3. ``Field(fx, fy, fz)``:
-       Calling it with three `ndarray`'s which represent the field in x-, y-,
-       and z-direction returns a `Field` instance with these views, of same
-       data type.
 
     Sort-order is 'F'.
 
@@ -64,22 +60,18 @@ class Field(np.ndarray):
     Parameters
     ----------
 
-    fx_or_grid : :class:`emg3d.meshes.TensorMesh` or ndarray
-        Either a TensorMesh instance or an ndarray of shape grid.nEx or
-        grid.vnEx. See explanations above. Only mandatory parameter; if the
-        only one provided, it will initiate a zero-field of `dtype`.
+    grid : :class:`emg3d.meshes.TensorMesh` or ndarray
+        Either a TensorMesh instance or an ndarray of shape grid.n_edges_x or
+        grid.shape_edges_x. See explanations above. Only mandatory parameter;
+        if the only one provided, it will initiate a zero-field of `dtype`.
 
-    fy_or_field : :class:`Field` or ndarray, optional
-        Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
-        See explanations above.
-
-    fz : ndarray, optional
-        An ndarray of shape grid.nEz or grid.vnEz. See explanations above.
+    field : :class:`Field` or ndarray, optional
+        Either a Field instance or an ndarray of shape grid.n_edges_y or
+        grid.shape_edges_y. See explanations above.
 
     dtype : dtype, optional
-        Only used if ``fy_or_field=None`` and ``fz=None``; the initiated
-        zero-field for the provided TensorMesh has data type `dtype`.
-        Default: complex.
+        Only used if ``field=None``; the initiated zero-field for the provided
+        TensorMesh has data type `dtype`. Default: complex.
 
     freq : float, optional
         Source frequency (Hz), used to compute the Laplace parameter `s`.
@@ -94,44 +86,26 @@ class Field(np.ndarray):
 
     """
 
-    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None,
-                dtype=np.complex128, freq=None):
+    def __new__(cls, grid, field=None, dtype=np.complex128, freq=None):
         """Initiate a new Field instance."""
 
+        if len(grid.shape_cells) != 3:
+            raise ValueError("Provided grid must be a 3D grid.")
+
         # Collect field
-        if fy_or_field is None and fz is None:          # Empty Field with
-            new = np.zeros(fx_or_grid.nE, dtype=dtype)  # dimension grid.nE.
-        elif fz is None:                  # grid and field provided
-            new = fy_or_field
-        else:                             # fx, fy, fz provided
-            new = np.r_[fx_or_grid.ravel('F'), fy_or_field.ravel('F'),
-                        fz.ravel('F')]
+        if field is None:
+            nc = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
+            field = np.zeros(nc, dtype=dtype)
 
         # Store the field as object
-        obj = np.asarray(new).view(cls)
+        obj = np.asarray(field).view(cls)
 
-        # Store relevant numbers for the views.
-        if fy_or_field is not None and fz is not None:  # Deduce from arrays
-            obj.nEx = fx_or_grid.size
-            obj.nEy = fy_or_field.size
-            obj.nEz = fz.size
-            obj.vnEx = fx_or_grid.shape
-            obj.vnEy = fy_or_field.shape
-            obj.vnEz = fz.shape
-        else:                                     # If grid is provided
-            attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz']
-
-            for attr in attr_list:
-                setattr(obj, attr, getattr(fx_or_grid, attr))
-
-            # Ensure the grid has three dimensions.
-            # (Can happend with a 1D or 2D discretize mesh.)
-            if None in [obj.nEx, obj.nEy, obj.nEz]:
-                raise ValueError("Provided grid must be a 3D grid.")
+        # Store grid
+        obj.grid = grid
 
         # Store frequency
-        if freq is None and hasattr(fy_or_field, 'freq'):
-            freq = fy_or_field._freq
+        if freq is None and hasattr(field, 'freq'):
+            freq = field._freq
         obj._freq = freq
         if freq == 0.0:
             raise ValueError(
@@ -146,12 +120,7 @@ class Field(np.ndarray):
         if obj is None:
             return
 
-        self.nEx = getattr(obj, 'nEx', None)
-        self.nEy = getattr(obj, 'nEy', None)
-        self.nEz = getattr(obj, 'nEz', None)
-        self.vnEx = getattr(obj, 'vnEx', None)
-        self.vnEy = getattr(obj, 'vnEy', None)
-        self.vnEz = getattr(obj, 'vnEz', None)
+        self.grid = getattr(obj, 'grid', None)
         self._freq = getattr(obj, '_freq', None)
 
     def __reduce__(self):
@@ -163,9 +132,8 @@ class Field(np.ndarray):
 
         # Create our own tuple to pass to __setstate__.
         new_state = pickled_state[2]
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq']
-        for attr in attr_list:
-            new_state += (getattr(self, attr),)
+        new_state += (self.grid.h[0], self.grid.h[1], self.grid.h[2],
+                      self.grid.origin, self._freq)
 
         # Return tuple that replaces parent's __setstate__ tuple with our own.
         return (pickled_state[0], pickled_state[1], new_state)
@@ -175,14 +143,15 @@ class Field(np.ndarray):
         => https://stackoverflow.com/a/26599346
         """
         # Set the necessary attributes (in reverse order).
-        attr_list = ['nEx', 'nEy', 'nEz', 'vnEx', 'vnEy', 'vnEz', '_freq']
-        attr_list.reverse()
-        for i, name in enumerate(attr_list):
-            i += 1  # We need it 1..#attr instead of 0..#attr-1.
-            setattr(self, name, state[-i])
+        self._freq = state[-1]
+        origin = state[-2]
+        hz = state[-3]
+        hy = state[-4]
+        hx = state[-5]
+        self.grid = meshes.TensorMesh([hx, hy, hz], origin)
 
         # Call the parent's __setstate__ with the other tuple elements.
-        super().__setstate__(state[0:-i])
+        super().__setstate__(state[0:-5])
 
     def copy(self):
         """Return a copy of the Field."""
@@ -191,8 +160,9 @@ class Field(np.ndarray):
     def to_dict(self, copy=False):
         """Store the necessary information of the Field in a dict."""
         out = {'field': np.array(self.field), 'freq': self._freq,
-               'vnEx': self.vnEx, 'vnEy': self.vnEy, 'vnEz': self.vnEz,
                '__class__': self.__class__.__name__}
+        out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
+                       'hz': self.grid.h[2], 'origin': self.grid.origin}
         if copy:
             return deepcopy(out)
         else:
@@ -206,8 +176,8 @@ class Field(np.ndarray):
         ----------
         inp : dict
             Dictionary as obtained from :func:`Field.to_dict`.
-            The dictionary needs the keys `field`, `freq`, `vnEx`, `vnEy`, and
-            `vnEz`.
+            The dictionary needs the keys `field`, `freq`, `shape_edges_x`,
+            `shape_edges_y`, and `shape_edges_z`.
 
         Returns
         -------
@@ -215,30 +185,12 @@ class Field(np.ndarray):
 
         """
 
-        # Create a dummy with the required attributes for the field instance.
-        class Grid:
-            pass
-
-        grid = Grid()
-
         # Check and get the required keys from the input.
         try:
-            field = inp['field']
-            freq = inp['freq']
-            grid.vnEx = inp['vnEx']
-            grid.vnEy = inp['vnEy']
-            grid.vnEz = inp['vnEz']
+            grid = meshes.TensorMesh.from_dict(inp.pop('grid'))
+            return cls(grid=grid, field=inp['field'], freq=inp['freq'])
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
-
-        # Compute missing info.
-        grid.nEx = np.prod(grid.vnEx)
-        grid.nEy = np.prod(grid.vnEy)
-        grid.nEz = np.prod(grid.vnEz)
-        grid.nE = grid.nEx + grid.nEy + grid.nEz
-
-        # Return Field instance.
-        return cls(fx_or_grid=grid, fy_or_field=field, freq=freq)
 
     @property
     def field(self):
@@ -253,32 +205,35 @@ class Field(np.ndarray):
     @property
     def fx(self):
         """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
-        return self.view()[:self.nEx].reshape(self.vnEx, order='F')
+        return self.view()[:self.grid.n_edges_x].reshape(
+                self.grid.shape_edges_x, order='F')
 
     @fx.setter
     def fx(self, fx):
         """Update field in x-direction."""
-        self.view()[:self.nEx] = fx.ravel('F')
+        self.view()[:self.grid.n_edges_x] = fx.ravel('F')
 
     @property
     def fy(self):
         """View of the field in the y-direction (nNx, nCy, nNz)."""
-        return self.view()[self.nEx:-self.nEz].reshape(self.vnEy, order='F')
+        return self.view()[self.grid.n_edges_x:-self.grid.n_edges_z].reshape(
+                self.grid.shape_edges_y, order='F')
 
     @fy.setter
     def fy(self, fy):
         """Update field in y-direction."""
-        self.view()[self.nEx:-self.nEz] = fy.ravel('F')
+        self.view()[self.grid.n_edges_x:-self.grid.n_edges_z] = fy.ravel('F')
 
     @property
     def fz(self):
         """View of the field in the z-direction (nNx, nNy, nCz)."""
-        return self.view()[-self.nEz:].reshape(self.vnEz, order='F')
+        return self.view()[-self.grid.n_edges_z:].reshape(
+                self.grid.shape_edges_z, order='F')
 
     @fz.setter
     def fz(self, fz):
         """Update electric field in z-direction."""
-        self.view()[-self.nEz:] = fz.ravel('F')
+        self.view()[-self.grid.n_edges_z:] = fz.ravel('F')
 
     def amp(self):
         """Amplitude of the electromagnetic field."""
@@ -359,11 +314,6 @@ class Field(np.ndarray):
         self.fz[:, 0, :] = 0.
         self.fz[:, -1, :] = 0.
 
-    @property
-    def is_electric(self):
-        """Returns True if Field is electric, False if it is magnetic."""
-        return self.vnEx[0] < self.vnEy[0]
-
 
 class SourceField(Field):
     r"""Create a Source-Field instance with x-, y-, and z-views of the field.
@@ -376,22 +326,18 @@ class SourceField(Field):
     Parameters
     ----------
 
-    fx_or_grid : :class:`emg3d.meshes.TensorMesh` or ndarray
-        Either a TensorMesh instance or an ndarray of shape grid.nEx or
-        grid.vnEx. See explanations above. Only mandatory parameter; if the
-        only one provided, it will initiate a zero-field of `dtype`.
+    grid : :class:`emg3d.meshes.TensorMesh` or ndarray
+        Either a TensorMesh instance or an ndarray of shape grid.n_edges_x or
+        grid.shape_edges_x. See explanations above. Only mandatory parameter;
+        if the only one provided, it will initiate a zero-field of `dtype`.
 
-    fy_or_field : :class:`Field` or ndarray, optional
-        Either a Field instance or an ndarray of shape grid.nEy or grid.vnEy.
-        See explanations above.
-
-    fz : ndarray, optional
-        An ndarray of shape grid.nEz or grid.vnEz. See explanations above.
+    field : :class:`Field` or ndarray, optional
+        Either a Field instance or an ndarray of shape grid.n_edges_y or
+        grid.shape_edges_y. See explanations above.
 
     dtype : dtype, optional
-        Only used if ``fy_or_field=None`` and ``fz=None``; the initiated
-        zero-field for the provided TensorMesh has data type `dtype`.
-        Default: complex.
+        Only used if ``field=None``; the initiated zero-field for the provided
+        TensorMesh has data type `dtype`. Default: complex.
 
     freq : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
@@ -407,8 +353,7 @@ class SourceField(Field):
 
     """
 
-    def __new__(cls, fx_or_grid, fy_or_field=None, fz=None,
-                dtype=np.complex128, freq=None):
+    def __new__(cls, grid, field=None, dtype=np.complex128, freq=None):
         """Initiate a new Source Field."""
         # Ensure frequency is provided.
         if freq is None:
@@ -419,8 +364,7 @@ class SourceField(Field):
         else:
             dtype = float
 
-        return super().__new__(cls, fx_or_grid, fy_or_field=fy_or_field,
-                               fz=fz, dtype=dtype, freq=freq)
+        return super().__new__(cls, grid, field=field, dtype=dtype, freq=freq)
 
     @property
     def vector(self):
@@ -624,107 +568,12 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
     return sfield
 
 
-def get_receiver(grid, values, coordinates, method='cubic', extrapolate=False):
-    """Return values corresponding to grid at coordinates.
-
-    Works for electric fields as well as magnetic fields obtained with
-    :func:`get_h_field`, and for model parameters.
-
-    Note that in order to avoid boundary effects the first and last value in
-    each direction is neglected. Values for coordinates outside of the grid
-    are set to NaN's, unless extrapolate is set.
-
-
-    Parameters
-    ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The model grid.
-
-    values : ndarray
-        Field instance, or a particular field (e.g. field.fx); Model
-        parameters.
-
-    coordinates : tuple (x, y, z)
-        Coordinates (x, y, z) where to interpolate `values`; e.g. receiver
-        locations.
-
-    method : str, optional
-        The method of interpolation to perform, 'linear' or 'cubic'.
-        Default is 'cubic' (forced to 'linear' if there are less than 3 points
-        in any direction).
-
-    extrapolate : bool
-        If True, points on `new_grid` which are outside of `grid` are
-        filled by the nearest value (if ``method='cubic'``) or by extrapolation
-        (if ``method='linear'``). If False, points outside are set to NaN's.
-
-        Default is False.
-
-
-    Returns
-    -------
-    new_values : ndarray or :class:`utils.EMArray`
-        Values at `coordinates`.
-
-        If input was a field it returns an EMArray, which is a subclassed
-        ndarray with ``.pha`` and ``.amp`` attributes.
-
-        If input was an entire Field instance, output is a tuple (fx, fy, fz).
-
-
-    See Also
-    --------
-    grid2grid : Interpolation of model parameters or fields to a new grid.
-    get_receiver_response : Get response for arbitrarily rotated receivers.
-
-    """
-    # If values is a Field instance, call it recursively for each field.
-    if hasattr(values, 'field') and values.field.ndim == 1:
-        fx = get_receiver(grid, values.fx, coordinates, method, extrapolate)
-        fy = get_receiver(grid, values.fy, coordinates, method, extrapolate)
-        fz = get_receiver(grid, values.fz, coordinates, method, extrapolate)
-        return fx, fy, fz
-
-    if len(coordinates) != 3:
-        raise ValueError(
-                "Coordinates needs to be in the form (x, y, z).\n"
-                f"Length of provided coord.: {len(coordinates)}.")
-
-    # Get the vectors corresponding to input data. Dimensions:
-    #
-    #         E-field          H-field      |  Model Parameter
-    #  x: [nCx, nNy, nNz]  [nNx, nCy, nCz]  |
-    #  y: [nNx, nCy, nNz]  [nCx, nNy, nCz]  |  [nCx, nCy, nCz]
-    #  z: [nNx, nNy, nCz]  [nCx, nCy, nNz]  |
-    #
-    points = tuple()
-    for i, coord in enumerate(['x', 'y', 'z']):
-        if values.shape[i] == getattr(grid, 'shape_nodes')[i]:
-            pts = (getattr(grid, 'nodes_'+coord)[1:-1], )
-        else:
-            pts = (getattr(grid, 'cell_centers_'+coord)[1:-1], )
-
-        # Add to points.
-        points += pts
-
-    if extrapolate:
-        fill_value = None
-        mode = 'nearest'
-    else:
-        fill_value = np.array(0, values.dtype)*np.nan
-        mode = 'constant'
-    out = maps.interp3d(points, values[1:-1, 1:-1, 1:-1], coordinates,
-                        method, fill_value, mode, cval=np.nan)
-
-    # Return an EMArray if input is a field, else simply the values.
-    if values.size == grid.nC:
-        return out
-    else:
-        return utils.EMArray(out)
-
-
-def get_receiver_response(grid, field, rec):
+def get_receiver(field, rec):
     """Return the field (response) at receiver coordinates.
+
+    - TODO :: removed get_receiver
+    - TODO :: check, simplify, document
+    - TODO :: Improve tests!
 
     Note that in order to avoid boundary effects the first and last value in
     each direction is neglected. Field values for coordinates outside of the
@@ -733,9 +582,6 @@ def get_receiver_response(grid, field, rec):
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The model grid.
-
     field : :class:`Field`
         The electric or magnetic field.
 
@@ -781,14 +627,10 @@ def get_receiver_response(grid, field, rec):
                          "particular field such as `field.fx`.")
 
     # Get the vectors corresponding to input data.
-    if field.is_electric:
-        points = ((grid.cell_centers_x, grid.nodes_y, grid.nodes_z),
-                  (grid.nodes_x, grid.cell_centers_y, grid.nodes_z),
-                  (grid.nodes_x, grid.nodes_y, grid.cell_centers_z))
-    else:
-        points = ((grid.nodes_x, grid.cell_centers_y, grid.cell_centers_z),
-                  (grid.cell_centers_x, grid.nodes_y, grid.cell_centers_z),
-                  (grid.cell_centers_x, grid.cell_centers_y, grid.nodes_z))
+    grid = field.grid
+    points = ((grid.cell_centers_x, grid.nodes_y, grid.nodes_z),
+              (grid.nodes_x, grid.cell_centers_y, grid.nodes_z),
+              (grid.nodes_x, grid.nodes_y, grid.cell_centers_z))
 
     # Remove first and last value in each direction.
     points = tuple([tuple([p[1:-1] for p in pp]) for pp in points])
@@ -810,8 +652,12 @@ def get_receiver_response(grid, field, rec):
     return utils.EMArray(resp)
 
 
-def get_h_field(grid, model, field):
+def get_h_field(model, field):
     r"""Return magnetic field corresponding to provided electric field.
+
+    - TODO REWORK THIS!
+
+    - TODO Decide if to remove outermost layer or not
 
     Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
     :math:`\mathbf{E}` using Farady's law, given by
@@ -825,20 +671,17 @@ def get_h_field(grid, model, field):
     the other field directions. This means that the provided electric field and
     the returned magnetic field have different dimensions::
 
-       E-field:  x: [grid.cell_centers_x,  grid.nodes_y,  grid.nodes_z]
-                 y: [ grid.nodes_x, grid.cell_centers_y,  grid.nodes_z]
-                 z: [ grid.nodes_x,  grid.nodes_y, grid.cell_centers_z]
+       E-field:  x: [grid.cell_centers_x, grid.nodes_y, grid.nodes_z]
+                 y: [grid.nodes_x, grid.cell_centers_y, grid.nodes_z]
+                 z: [grid.nodes_x, grid.nodes_y, grid.cell_centers_z]
 
-       H-field:  x: [ grid.nodes_x, grid.cell_centers_y, grid.cell_centers_z]
-                 y: [grid.cell_centers_x,  grid.nodes_y, grid.cell_centers_z]
-                 z: [grid.cell_centers_x, grid.cell_centers_y,  grid.nodes_z]
+       H-field:  x: [grid.nodes_x, grid.cell_centers_y, grid.cell_centers_z]
+                 y: [grid.cell_centers_x, grid.nodes_y, grid.cell_centers_z]
+                 z: [grid.cell_centers_x, grid.cell_centers_y, grid.nodes_z]
 
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; :class:`TensorMesh` instance.
-
     model : Model
         Model; :class:`Model` instance.
 
@@ -855,53 +698,80 @@ def get_h_field(grid, model, field):
 
     # Carry out the curl (^ corresponds to differentiation axis):
     # H_x = (E_z^1 - E_y^2)
-    e3d_hx = (np.diff(field.fz, axis=1)/grid.h[1][None, :, None] -
-              np.diff(field.fy, axis=2)/grid.h[2][None, None, :])
+    e3d_hx = (np.diff(field.fz, axis=1)/field.grid.h[1][None, :, None] -
+              np.diff(field.fy, axis=2)/field.grid.h[2][None, None, :])
 
     # H_y = (E_x^2 - E_z^0)
-    e3d_hy = (np.diff(field.fx, axis=2)/grid.h[2][None, None, :] -
-              np.diff(field.fz, axis=0)/grid.h[0][:, None, None])
+    e3d_hy = (np.diff(field.fx, axis=2)/field.grid.h[2][None, None, :] -
+              np.diff(field.fz, axis=0)/field.grid.h[0][:, None, None])
 
     # H_z = (E_y^0 - E_x^1)
-    e3d_hz = (np.diff(field.fy, axis=0)/grid.h[0][:, None, None] -
-              np.diff(field.fx, axis=1)/grid.h[1][None, :, None])
+    e3d_hz = (np.diff(field.fy, axis=0)/field.grid.h[0][:, None, None] -
+              np.diff(field.fx, axis=1)/field.grid.h[1][None, :, None])
 
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
     if model._mu_r is not None:
 
         # Get volume-averaged values.
-        vmodel = models.VolumeModel(grid, model, field)
+        vmodel = models.VolumeModel(model, field)
 
         # Plus and minus indices.
-        ixm = np.r_[0, np.arange(grid.vnC[0])]
-        ixp = np.r_[np.arange(grid.vnC[0]), grid.vnC[0]-1]
-        iym = np.r_[0, np.arange(grid.vnC[1])]
-        iyp = np.r_[np.arange(grid.vnC[1]), grid.vnC[1]-1]
-        izm = np.r_[0, np.arange(grid.vnC[2])]
-        izp = np.r_[np.arange(grid.vnC[2]), grid.vnC[2]-1]
+        ixm = np.r_[0, np.arange(model.shape[0])]
+        ixp = np.r_[np.arange(model.shape[0]), model.shape[0]-1]
+        iym = np.r_[0, np.arange(model.shape[1])]
+        iyp = np.r_[np.arange(model.shape[1]), model.shape[1]-1]
+        izm = np.r_[0, np.arange(model.shape[2])]
+        izp = np.r_[np.arange(model.shape[2]), model.shape[2]-1]
 
         # Average mu_r for dual-grid.
         zeta_x = (vmodel.zeta[ixm, :, :] + vmodel.zeta[ixp, :, :])/2.
         zeta_y = (vmodel.zeta[:, iym, :] + vmodel.zeta[:, iyp, :])/2.
         zeta_z = (vmodel.zeta[:, :, izm] + vmodel.zeta[:, :, izp])/2.
 
-        hvx = grid.h[0][:, None, None]
-        hvy = grid.h[1][None, :, None]
-        hvz = grid.h[2][None, None, :]
+        hvx = field.grid.h[0][:, None, None]
+        hvy = field.grid.h[1][None, :, None]
+        hvz = field.grid.h[2][None, None, :]
 
         # Define the widths of the dual grid.
-        dx = (np.r_[0., grid.h[0]] + np.r_[grid.h[0], 0.])/2.
-        dy = (np.r_[0., grid.h[1]] + np.r_[grid.h[1], 0.])/2.
-        dz = (np.r_[0., grid.h[2]] + np.r_[grid.h[2], 0.])/2.
+        dx = (np.r_[0., field.grid.h[0]] + np.r_[field.grid.h[0], 0.])/2.
+        dy = (np.r_[0., field.grid.h[1]] + np.r_[field.grid.h[1], 0.])/2.
+        dz = (np.r_[0., field.grid.h[2]] + np.r_[field.grid.h[2], 0.])/2.
 
         # Multiply fields by mu_r.
         e3d_hx *= zeta_x/(dx[:, None, None]*hvy*hvz)
         e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
         e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
 
+    # TODO change to Magnetic Field
+
+    # Create magnetic grid.
+    hx = np.diff((field.grid.nodes_x[:-1] + field.grid.nodes_x[1:])/2)
+    hx = np.r_[field.grid.h[0][0], hx, field.grid.h[0][-1]]
+    hy = np.diff((field.grid.nodes_y[:-1] + field.grid.nodes_y[1:])/2)
+    hy = np.r_[field.grid.h[1][0], hy, field.grid.h[1][-1]]
+    hz = np.diff((field.grid.nodes_z[:-1] + field.grid.nodes_z[1:])/2)
+    hz = np.r_[field.grid.h[2][0], hz, field.grid.h[2][-1]]
+    origin = (field.grid.origin[0] - field.grid.h[0][0]/2,
+              field.grid.origin[1] - field.grid.h[1][0]/2,
+              field.grid.origin[2] - field.grid.h[2][0]/2)
+    grid = meshes.TensorMesh([hx, hy, hz], origin)
+
+    n_e3d_hx = np.zeros(grid.shape_edges_x, dtype=e3d_hx.dtype)
+    n_e3d_hx[:, 1:-1, 1:-1] = e3d_hx
+    e3d_hx = n_e3d_hx
+
+    n_e3d_hy = np.zeros(grid.shape_edges_y, dtype=e3d_hy.dtype)
+    n_e3d_hy[1:-1, :, 1:-1] = e3d_hy
+    e3d_hy = n_e3d_hy
+
+    n_e3d_hz = np.zeros(grid.shape_edges_z, dtype=e3d_hz.dtype)
+    n_e3d_hz[1:-1, 1:-1, :] = e3d_hz
+    e3d_hz = n_e3d_hz
+
     # Create a Field instance and divide by s*mu_0 and return.
-    return -Field(e3d_hx, e3d_hy, e3d_hz)/field.smu0
+    new = np.r_[e3d_hx.ravel('F'), e3d_hy.ravel('F'), e3d_hz.ravel('F')]
+    return -Field(grid, new, freq=field._freq)/field.smu0
 
 
 def _finite_source_xyz(grid, src, s, xyz, decimals):

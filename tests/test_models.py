@@ -29,7 +29,7 @@ class TestModel:
                 [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
                 np.zeros(3))
 
-        property_x = create_dummy(*grid.vnC, False)
+        property_x = create_dummy(*grid.shape_cells, False)
         property_y = property_x/2.0
         property_z = property_x*1.4
         mu_r = property_x*1.11
@@ -45,10 +45,10 @@ class TestModel:
         model1e = models.Model(grid)
         model1.mu_r = None
         model1.epsilon_r = None
-        vmodel1 = models.VolumeModel(grid, model1, sfield)
+        vmodel1 = models.VolumeModel(model1, sfield)
         assert_allclose(model1.property_x, model1.property_y)
-        assert_allclose(model1.nC, grid.nC)
-        assert_allclose(model1.vnC, grid.vnC)
+        assert_allclose(model1.size, grid.n_cells)
+        assert_allclose(model1.shape, grid.shape_cells)
         assert_allclose(vmodel1.eta_z, vmodel1.eta_y)
         assert model1.mu_r is None
         assert model1.epsilon_r is None
@@ -69,30 +69,30 @@ class TestModel:
         assert model1e.case == 3
 
         model1.epsilon_r = 1  # Just set to 1 CURRENTLY.
-        vmodel1b = models.VolumeModel(grid, model1, sfield)
+        vmodel1b = models.VolumeModel(model1, sfield)
         assert_allclose(vmodel1b.eta_x, vmodel1.eta_x)
         assert np.iscomplex(vmodel1b.eta_x[0, 0, 0])
 
         # Using ints
         model2 = models.Model(grid, 2., 3., 4.)
-        vmodel2 = models.VolumeModel(grid, model2, sfield)
+        vmodel2 = models.VolumeModel(model2, sfield)
         assert_allclose(model2.property_x*1.5, model2.property_y)
         assert_allclose(model2.property_x*2, model2.property_z)
 
         # VTI: Setting property_x and property_z, not property_y
         model2b = models.Model(grid, 2., property_z=4.)
-        vmodel2b = models.VolumeModel(grid, model2b, sfield)
+        vmodel2b = models.VolumeModel(model2b, sfield)
         assert_allclose(model2b.property_x, model2b.property_y)
         assert_allclose(vmodel2b.eta_y, vmodel2b.eta_x)
         model2b.property_z = model2b.property_x
         model2c = models.Model(grid, 2., property_z=model2b.property_z.copy())
-        vmodel2c = models.VolumeModel(grid, model2c, sfield)
+        vmodel2c = models.VolumeModel(model2c, sfield)
         assert_allclose(model2c.property_x, model2c.property_z)
         assert_allclose(vmodel2c.eta_z, vmodel2c.eta_x)
 
         # HTI: Setting property_x and property_y, not property_z
         model2d = models.Model(grid, 2., 4.)
-        vmodel2d = models.VolumeModel(grid, model2d, sfield)
+        vmodel2d = models.VolumeModel(model2d, sfield)
         assert_allclose(model2d.property_x, model2d.property_z)
         assert_allclose(vmodel2d.eta_z, vmodel2d.eta_x)
 
@@ -111,26 +111,26 @@ class TestModel:
             models.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
         # Check with all inputs
-        gridvol = grid.cell_volumes.reshape(grid.vnC, order='F')
+        gridvol = grid.cell_volumes.reshape(grid.shape_cells, order='F')
         model3 = models.Model(
             grid, property_x, property_y, property_z, mu_r=mu_r)
-        vmodel3 = models.VolumeModel(grid, model3, sfield)
+        vmodel3 = models.VolumeModel(model3, sfield)
         assert_allclose(model3.property_x, model3.property_y*2)
-        assert_allclose(model3.property_x.shape, grid.vnC)
+        assert_allclose(model3.property_x.shape, grid.shape_cells)
         assert_allclose(model3.property_x, model3.property_z/1.4)
         assert_allclose(gridvol/mu_r, vmodel3.zeta)
         # Check with all inputs
         model3b = models.Model(
             grid, property_x.ravel('F'), property_y.ravel('F'),
             property_z.ravel('F'), mu_r=mu_r.ravel('F'))
-        vmodel3b = models.VolumeModel(grid, model3b, sfield)
+        vmodel3b = models.VolumeModel(model3b, sfield)
         assert_allclose(model3b.property_x, model3b.property_y*2)
-        assert_allclose(model3b.property_x.shape, grid.vnC)
+        assert_allclose(model3b.property_x.shape, grid.shape_cells)
         assert_allclose(model3b.property_x, model3b.property_z/1.4)
         assert_allclose(gridvol/mu_r, vmodel3b.zeta)
 
-        # Check setters vnC
-        tres = np.ones(grid.vnC)
+        # Check setters shape_cells
+        tres = np.ones(grid.shape_cells)
         model3.property_x[:, :, :] = tres*2.0
         model3.property_y[:, :1, :] = tres[:, :1, :]*3.0
         model3.property_y[:, 1:, :] = tres[:, 1:, :]*3.0
@@ -147,18 +147,18 @@ class TestModel:
         eta_x = sfield.smu0*(1./model3.property_x + iomep)*gridvol
         eta_y = sfield.smu0*(1./model3.property_y + iomep)*gridvol
         eta_z = sfield.smu0*(1./model3.property_z + iomep)*gridvol
-        vmodel3 = models.VolumeModel(grid, model3, sfield)
+        vmodel3 = models.VolumeModel(model3, sfield)
         assert_allclose(vmodel3.eta_x, eta_x)
         assert_allclose(vmodel3.eta_y, eta_y)
         assert_allclose(vmodel3.eta_z, eta_z)
 
         # Check volume
-        assert_allclose(grid.cell_volumes.reshape(grid.vnC, order='F'),
+        assert_allclose(grid.cell_volumes.reshape(grid.shape_cells, order='F'),
                         vmodel2.zeta)
         model4 = models.Model(grid, 1)
-        vmodel4 = models.VolumeModel(grid, model4, sfield)
+        vmodel4 = models.VolumeModel(model4, sfield)
         assert_allclose(vmodel4.zeta,
-                        grid.cell_volumes.reshape(grid.vnC, order='F'))
+                        grid.cell_volumes.reshape(grid.shape_cells, order='F'))
 
         # Check a couple of out-of-range failures
         with pytest.raises(ValueError, match='`property_x` must be all'):
@@ -186,7 +186,7 @@ class TestModel:
                 [np.array([2]), np.array([4]), np.array([5])],
                 np.array([1, 2, 2.5]))
 
-        property_x = create_dummy(*grid.vnC, False)
+        property_x = create_dummy(*grid.shape_cells, False)
         property_y = property_x/2.0
         property_z = property_x*1.4
         mu_r = property_x*1.11
@@ -286,8 +286,8 @@ class TestModelOperators:
     model_epsilon_b = models.Model(mesh_base, 2., epsilon_r=2.)
 
     model_int_diff = models.Model(mesh_diff, 1.)
-    model_nC = models.Model(mesh_base, np.ones(mesh_base.nC)*2.)
-    model_vnC = models.Model(mesh_base, np.ones(mesh_base.vnC))
+    model_nC = models.Model(mesh_base, np.ones(mesh_base.n_cells)*2.)
+    model_shape_cells = models.Model(mesh_base, np.ones(mesh_base.shape_cells))
 
     def test_operator_test(self):
         with pytest.raises(ValueError, match='Models must be of the'):
@@ -305,8 +305,8 @@ class TestModelOperators:
 
     def test_add(self):
         a = self.model_int + self.model_nC
-        b = self.model_nC + self.model_vnC
-        c = self.model_int + self.model_vnC
+        b = self.model_nC + self.model_shape_cells
+        c = self.model_int + self.model_shape_cells
         assert a == b
         assert a != c
         assert a.property_x[0, 0, 0] == 3.0
@@ -379,21 +379,22 @@ class TestModelOperators:
     def test_general(self):
 
         # Check shape and size
-        assert_allclose(self.model_int.shape, self.mesh_base.vnC)
-        assert self.model_int.size == self.mesh_base.nC
+        assert_allclose(self.model_int.shape, self.mesh_base.shape_cells)
+        assert self.model_int.size == self.mesh_base.n_cells
 
     def test_copy(self):
-        model_new1 = self.model_vnC.copy()
+        model_new1 = self.model_shape_cells.copy()
         model_new2 = self.model_3_a.copy()
         model_new3 = self.model_mu_a.copy()
         model_new4 = self.model_epsilon_a.copy()
 
-        assert model_new1 == self.model_vnC
+        assert model_new1 == self.model_shape_cells
         assert model_new2 == self.model_3_a
         assert model_new3 == self.model_mu_a
         assert model_new4 == self.model_epsilon_a
 
-        assert model_new1.property_x.base is not self.model_vnC.property_x.base
+        assert (model_new1.property_x.base is not
+                self.model_shape_cells.property_x.base)
         assert model_new2.property_y.base is not self.model_3_a.property_y.base
         assert model_new2.property_z.base is not self.model_3_a.property_z.base
         assert model_new3.mu_r.base is not self.model_mu_a.mu_r.base
@@ -404,7 +405,7 @@ class TestModelOperators:
         # dict is already tested via copy. Just the other cases here.
         mdict = self.model_3_b.to_dict()
         keys = ['property_x', 'property_y', 'property_z', 'mu_r', 'epsilon_r',
-                'vnC']
+                'grid']
         for key in keys:
             assert key in mdict.keys()
         for key in keys[:3]:

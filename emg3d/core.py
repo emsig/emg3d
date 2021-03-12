@@ -12,8 +12,9 @@ functions are implemented as just-in-time (jit) compiled functions using the
 These functions are not meant to be called directly, particularly not from an
 end-user; they are called from functions in :func:`emg3d.solver.solve`.
 
-For an end-user it can still be insightful to look at the documentation of
-these functions if you are interested in understanding how the solver works.
+For an end-user it can still be insightful to look at the documentation and
+code of these functions if you are interested in understanding how the
+multigrid solver works, the theory and its implementation.
 
 For a developer interested in making emg3d faster this is the right place to
 start, as by far the most time is spent in these functions, particularly in
@@ -45,7 +46,7 @@ _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 # LinearOperator to compute A x
 @nb.njit(**_numba_setting)
 def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
-    r"""Residual without or with source term.
+    r"""Residual with or without source term.
 
     Compute the residual as given in [Muld06]_ in middle of the right column
     on page 636, but without the source term:
@@ -1638,7 +1639,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     rx, ry, rz : ndarray
         Fine grid {x,y,z}-directed residual.
 
-    wx, wy, wz: tuple
+    wx, wy, wz: (ndarray, ndarray, ndarray)
         Tuples containing the weights (``wl``, ``w0``, ``wr``) as returned from
         :func:`restrict_weights` for the {x,y,z}-directions.
 

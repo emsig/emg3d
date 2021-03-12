@@ -40,16 +40,16 @@ input_source = {
 sfield = fields.get_source_field(**input_source)
 
 # F-cycle
-fefield = solver.solve(grid, model, sfield)
+fefield = solver.solve(model, sfield)
 
 # W-cycle
-wefield = solver.solve(grid, model, sfield, cycle='W')
+wefield = solver.solve(model, sfield, cycle='W')
 
 # V-cycle
-vefield = solver.solve(grid, model, sfield, cycle='V')
+vefield = solver.solve(model, sfield, cycle='V')
 
 # BiCGSTAB; F-cycle
-bicefield = solver.solve(grid, model, sfield, sslsolver=True)
+bicefield = solver.solve(model, sfield, sslsolver=True)
 
 out = {
     'input_grid': input_grid,
@@ -85,9 +85,9 @@ input_grid = {'hx': grid.h[0], 'hy': grid.h[1], 'hz': grid.h[2],
 
 # Initialize model
 # Create a model with random resistivities between [0, 50)
-property_x = np.random.random(grid.nC)*50
-property_y = np.random.random(grid.nC)*50
-property_z = np.random.random(grid.nC)*50
+property_x = np.random.random(grid.n_cells)*50
+property_y = np.random.random(grid.n_cells)*50
+property_z = np.random.random(grid.n_cells)*50
 model = models.Model(grid, property_x, property_y, property_z,
                      mapping='Resistivity')
 
@@ -106,11 +106,11 @@ nu_post = 2
 clevel = 10  # Way to high
 
 efield = solver.solve(
-        grid, model, sfield, semicoarsening=semicoarsening,
+        model, sfield, semicoarsening=semicoarsening,
         linerelaxation=linerelaxation, tol=tol, maxit=maxit, nu_init=nu_init,
         nu_pre=nu_pre, nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
-hfield = fields.get_h_field(grid, model, efield)
+hfield = fields.get_h_field(model, efield)
 
 # Store input and result
 reg_2 = {
@@ -146,18 +146,10 @@ grid = TensorMesh(
 all_attr = [
     'origin',
     'shape_cells', 'shape_nodes',
-    'n_nodes', 'n_edges', 'n_cells',
-    'n_edges_x', 'n_edges_y', 'n_edges_z',
-    'n_edges_per_direction',
+    'n_cells', 'n_edges_x', 'n_edges_y', 'n_edges_z',
     'nodes_x', 'nodes_y', 'nodes_z',
     'cell_centers_x', 'cell_centers_y', 'cell_centers_z',
     'shape_edges_x', 'shape_edges_y', 'shape_edges_z',
-    # aliases
-    'x0',
-    'nC', 'vnC',
-    'nN', 'vnN',
-    'nE', 'nEx', 'nEy', 'nEz',
-    'vnE', 'vnEx', 'vnEy', 'vnEz',
 ]
 
 mesh = {}
@@ -205,10 +197,10 @@ input_source_l = {
 sfield_l = fields.get_source_field(**input_source_l)
 
 # F-cycle
-fefield_l = solver.solve(grid_l, model_l, sfield_l)
+fefield_l = solver.solve(model_l, sfield_l)
 
 # BiCGSTAB; F-cycle
-bicefield_l = solver.solve(grid_l, model_l, sfield_l, sslsolver=True)
+bicefield_l = solver.solve(model_l, sfield_l, sslsolver=True)
 
 out_l = {
     'input_grid': input_grid_l,

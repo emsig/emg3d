@@ -6,13 +6,17 @@ from emg3d import __version__
 # Load extensions
 extensions = [
     'sphinx.ext.autodoc',
+    'numpydoc',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'sphinx.ext.todo',
-    'sphinx.ext.intersphinx',
-    'numpydoc',
+    'sphinx.ext.doctest',
+    # 'sphinx.ext.todo',
     'sphinx_automodapi.automodapi',
+    'matplotlib.sphinxext.plot_directive',
+    'IPython.sphinxext.ipython_console_highlighting',
+    'IPython.sphinxext.ipython_directive',
 ]
 autosummary_generate = True
 add_module_names = True
@@ -21,6 +25,8 @@ add_function_parentheses = False
 # Numpydoc settings
 numpydoc_show_class_members = False
 numfig = True
+# Make numpydoc to generate plots for example sections
+numpydoc_use_plots = True
 
 # Todo settings
 todo_include_todos = True
@@ -74,7 +80,7 @@ html_theme_options = {
   "external_links": [
       {"name": "EMSiG", "url": "https://emsig.github.io"},
   ],
-  "use_edit_page_button": True,
+  # "use_edit_page_button": True,
 }
 
 html_context = {

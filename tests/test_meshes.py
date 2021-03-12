@@ -42,10 +42,10 @@ def test_TensorMesh():
     grid = REGRES['grid']
     grid['h'] = [grid.pop('hx'), grid.pop('hy'), grid.pop('hz')]
 
-    mesh = meshes._TensorMesh(grid['h'], origin=grid['x0'])
+    mesh = meshes.BaseMesh(grid['h'], origin=grid['origin'])
 
     # Use this grid instance to create emg3d equivalent.
-    emg3dgrid = meshes.TensorMesh(grid['h'], origin=grid['x0'])
+    emg3dgrid = meshes.TensorMesh(grid['h'], origin=grid['origin'])
 
     # Ensure they are the same.
     for key, value in grid.items():

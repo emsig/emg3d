@@ -1,5 +1,5 @@
 CLI interface
-#############
+=============
 
 Command-line interface for certain specific tasks, such as forward modelling
 and gradient computation of the misfit function. The command is ``emg3d``,

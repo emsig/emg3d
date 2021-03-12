@@ -26,9 +26,9 @@ def test_amat_x(njit):
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
     # Create some resistivity model
-    x = np.arange(1, grid.vnC[0]+1)*2
-    y = 1/np.arange(1, grid.vnC[1]+1)
-    z = np.arange(1, grid.vnC[2]+1)[::-1]/10
+    x = np.arange(1, grid.shape_cells[0]+1)*2
+    y = 1/np.arange(1, grid.shape_cells[1]+1)
+    z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
     model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
@@ -37,10 +37,11 @@ def test_amat_x(njit):
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
     # Get volume-averaged model parameters.
-    vmodel = models.VolumeModel(grid, model, sfield)
+    vmodel = models.VolumeModel(model, sfield)
 
     # Run two iterations to get a e-field
-    efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
+    efield = solver.solve(model, sfield, sslsolver=False, semicoarsening=False,
+                          linerelaxation=False, maxit=2, verb=1)
 
     # amat_x
     rr1 = fields.Field(grid)
@@ -57,28 +58,6 @@ def test_amat_x(njit):
 
     # Check all fields (ex, ey, and ez)
     assert_allclose(-rr1, rr2, atol=1e-23)
-
-    # 2. Compare to other solution
-
-    # This should be possible using mesh-internals. Some ideas here:
-    #
-    # => fx example; fy and fz accordingly
-    # Interpolation matrix
-    # >>> Px = grid.getInterpolationMat(grid.gridCC, locType='Ex')
-    # \eta_x E
-    # >>> etaxE = model.eta_x.ravel('F')*Px*pfield.field
-    # \nabla \times \E
-    # >>> curlE = grid.edgeCurl*pfield.field
-    # \nabla \times \mu_r^{-1}
-    # >>> curlmu_r = grid.edgeCurl*(model.mu_r.ravel('F')*Px)
-    # Collect it all
-    # >>> fx = etaxE[:grid.nEx] - (curlmu_r*curlE)[:grid.nEx]
-    #
-    # This might be good to implement once the mesh.Model is reworked.
-    # Places to look for:
-    # - EM/Base:
-    #     - MfMui
-    #     - Problem3D_e => return C.T*MfMui*C + 1j*omega(freq)*MeSigma
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -119,9 +98,9 @@ def test_gauss_seidel(njit):
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
         # Initialize model with some resistivities.
-        property_x = np.arange(grid.nC)+1
-        property_y = 0.5*np.arange(grid.nC)+1
-        property_z = 2*np.arange(grid.nC)+1
+        property_x = np.arange(grid.n_cells)+1
+        property_y = 0.5*np.arange(grid.n_cells)+1
+        property_z = 2*np.arange(grid.n_cells)+1
 
         model = models.Model(grid, property_x, property_y, property_z)
 
@@ -129,10 +108,12 @@ def test_gauss_seidel(njit):
         sfield = fields.get_source_field(grid, src, freq)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(grid, model, sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         # Run two iterations to get some e-field.
-        efield = solver.solve(grid, model, sfield, maxit=2, verb=1)
+        efield = solver.solve(model, sfield, sslsolver=False,
+                              semicoarsening=False, linerelaxation=False,
+                              maxit=2, verb=1)
 
         inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
                vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
@@ -151,6 +132,60 @@ def test_gauss_seidel(njit):
 
         # Check the resulting field.
         assert_allclose(efield.field, cfield.field)
+
+
+@pytest.mark.parametrize("njit", [True, False])
+def test_blocks_to_amat(njit):
+    if njit:
+        blocks_to_amat = core.blocks_to_amat
+    else:
+        blocks_to_amat = core.blocks_to_amat.py_func
+
+    # Create some dummy data
+
+    # Main matrix amat and RHS bvec
+    # Size: 3 blocks of 5x5; 6 diagonals, hence 3*5*6
+    amat = np.zeros(90)
+    bvec = np.zeros(15)
+
+    # Middle blocks
+    middle1 = np.array([1, 2, 3, 4, 5, -1, 7, 8, 9, 10, -1, -1, 13,
+                        14, 15, -1, -1, -1, 19, 20, -1, -1, -1, -1, 25])
+    middle2 = np.array([31, 32, 33, 34, 35, -1, 37, 38, 39, 40, -1, -1,
+                        43, 44, 45, -1, -1, -1, 49, 50, -1, -1, -1, -1, 55])
+    middle3 = np.array([61, 62, 63, 64, 65, -1, 67, 68, 69, 70, -1, -1,
+                        73, 74, 75, -1, -1, -1, 79, 80, -1, -1, -1, -1, 85])
+
+    # Left blocks
+    left1 = -np.ones(25)
+    left2 = np.array([6, -1, -1, -1, -1, 11, 12, -1, -1, -1, 16, 17, 18,
+                      -1, -1, 21, 22, 23, 24, -1, 26, 27, 28, 29, 30])
+    left3 = np.array([36, -1, -1, -1, -1, 41, 42, -1, -1, -1, 46, 47, 48,
+                      -1, -1, 51, 52, 53, 54, -1, 56, 57, 58, 59, 60])
+
+    # RHS
+    rhs1 = np.arange(1, 6)
+    rhs2 = np.arange(6, 11)
+    rhs3 = np.arange(11, 16)
+
+    # Call blocks_to_amat three times to fill in all blocks
+    blocks_to_amat(amat, bvec, middle1, left1, rhs1, 0, 3)
+    blocks_to_amat(amat, bvec, middle2, left2, rhs2, 1, 3)
+    blocks_to_amat(amat, bvec, middle3, left3, rhs3, 2, 3)
+
+    # The result should look like this
+    amat_res = np.arange(1., 91)
+    amat_res[5] = amat_res[35] = amat_res[41] = 0
+    amat_res[46:48] = 0
+    amat_res[51:54] = 0
+    amat_res[56:60] = 0
+    amat_res[61:] = 0
+    bvec_res = np.arange(1., 16)
+    bvec_res[11:] = 0
+
+    # Check it
+    assert_allclose(amat_res, amat)
+    assert_allclose(bvec_res, bvec)
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -249,8 +284,8 @@ def test_restrict(njit):
     ffield.ensure_pec
 
     # Get weigths
-    wlr = np.zeros(fgrid.vnN[0], dtype=np.float_)
-    w0 = np.ones(fgrid.vnN[0], dtype=np.float_)
+    wlr = np.zeros(fgrid.shape_nodes[0], dtype=np.float_)
+    w0 = np.ones(fgrid.shape_nodes[0], dtype=np.float_)
     fw = (wlr, w0, wlr)
 
     # # CASE 0 -- regular # #
@@ -468,57 +503,3 @@ def test_restrict_weights(njit):
     assert_allclose(wxl, wl)
     assert_allclose(wx0, w0)
     assert_allclose(wxr, wr)
-
-
-@pytest.mark.parametrize("njit", [True, False])
-def test_blocks_to_amat(njit):
-    if njit:
-        blocks_to_amat = core.blocks_to_amat
-    else:
-        blocks_to_amat = core.blocks_to_amat.py_func
-
-    # Create some dummy data
-
-    # Main matrix amat and RHS bvec
-    # Size: 3 blocks of 5x5; 6 diagonals, hence 3*5*6
-    amat = np.zeros(90)
-    bvec = np.zeros(15)
-
-    # Middle blocks
-    middle1 = np.array([1, 2, 3, 4, 5, -1, 7, 8, 9, 10, -1, -1, 13,
-                        14, 15, -1, -1, -1, 19, 20, -1, -1, -1, -1, 25])
-    middle2 = np.array([31, 32, 33, 34, 35, -1, 37, 38, 39, 40, -1, -1,
-                        43, 44, 45, -1, -1, -1, 49, 50, -1, -1, -1, -1, 55])
-    middle3 = np.array([61, 62, 63, 64, 65, -1, 67, 68, 69, 70, -1, -1,
-                        73, 74, 75, -1, -1, -1, 79, 80, -1, -1, -1, -1, 85])
-
-    # Left blocks
-    left1 = -np.ones(25)
-    left2 = np.array([6, -1, -1, -1, -1, 11, 12, -1, -1, -1, 16, 17, 18,
-                      -1, -1, 21, 22, 23, 24, -1, 26, 27, 28, 29, 30])
-    left3 = np.array([36, -1, -1, -1, -1, 41, 42, -1, -1, -1, 46, 47, 48,
-                      -1, -1, 51, 52, 53, 54, -1, 56, 57, 58, 59, 60])
-
-    # RHS
-    rhs1 = np.arange(1, 6)
-    rhs2 = np.arange(6, 11)
-    rhs3 = np.arange(11, 16)
-
-    # Call blocks_to_amat three times to fill in all blocks
-    blocks_to_amat(amat, bvec, middle1, left1, rhs1, 0, 3)
-    blocks_to_amat(amat, bvec, middle2, left2, rhs2, 1, 3)
-    blocks_to_amat(amat, bvec, middle3, left3, rhs3, 2, 3)
-
-    # The result should look like this
-    amat_res = np.arange(1., 91)
-    amat_res[5] = amat_res[35] = amat_res[41] = 0
-    amat_res[46:48] = 0
-    amat_res[51:54] = 0
-    amat_res[56:60] = 0
-    amat_res[61:] = 0
-    bvec_res = np.arange(1., 16)
-    bvec_res[11:] = 0
-
-    # Check it
-    assert_allclose(amat_res, amat)
-    assert_allclose(bvec_res, bvec)

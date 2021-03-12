@@ -133,18 +133,8 @@ class Simulation:
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
-        `grid`, `model`, `sfield`, `efield`, `return_info`, and `log`.
-        If not provided the following defaults are used:
-
-        - `sslsolver=True`;
-        - `semicoarsening=True`;
-        - `linerelaxation=True`;
-        - `verb=2`;
-
-        Note that these defaults are different from the defaults in
-        :func:`emg3d.solver.solve`. The defaults chosen here will be slower in
-        many cases, but they are the most robust combination at which you can
-        throw most things.
+        `grid`, `model`, `sfield`, `efield`, `return_info`, and `log`. Default
+        verbosity is ``verb=2``.
 
     max_workers : int
         The maximum number of processes that can be used to execute the
@@ -195,12 +185,11 @@ class Simulation:
         # Store solver options with defaults: The slowest but most robust
         # setting is used, but user-input overwrites defaults if provided.
         # However, verbosity is turned into a log, not real-time verbosity.
-        self.solver_opts = {'sslsolver': True, 'semicoarsening': True,
-                            'linerelaxation': True, 'verb': 2,
-                            **solver_opts, 'return_info': True, 'log': -1}
+        self.solver_opts = {
+                'verb': 2, **solver_opts, 'return_info': True, 'log': -1}
 
         # Store original input nCz.
-        self._input_nCz = kwargs.pop('_input_nCz', grid.vnC[2])
+        self._input_nCz = kwargs.pop('_input_nCz', grid.shape_cells[2])
 
         # Get the optional info.
         self.name = kwargs.pop('name', None)
@@ -716,7 +705,6 @@ class Simulation:
             # Input parameters.
             solver_input = {
                 **self.solver_opts,
-                'grid': self.get_grid(source, freq),
                 'model': self.get_model(source, freq),
                 'sfield': self.get_sfield(source, freq),
             }
@@ -754,7 +742,6 @@ class Simulation:
         if self._dict_hfield[source][freq] is None:
 
             self._dict_hfield[source][freq] = fields.get_h_field(
-                    self.get_grid(source, freq),
                     self.get_model(source, freq),
                     self.get_efield(source, freq,
                                     call_from_hfield=True, **kwargs))
@@ -778,8 +765,7 @@ class Simulation:
 
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
-            resp = fields.get_receiver_response(
-                    grid=self.get_grid(source, freq),
+            resp = fields.get_receiver(
                     field=self.get_efield(source, freq),
                     rec=tuple(np.array(rec_coords)[:, erec])
             )
@@ -792,8 +778,7 @@ class Simulation:
 
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
-            resp = fields.get_receiver_response(
-                    grid=self.get_grid(source, freq),
+            resp = fields.get_receiver(
                     field=self.get_hfield(source, freq),
                     rec=tuple(np.array(rec_coords)[:, mrec])
             )
@@ -1012,25 +997,25 @@ class Simulation:
     def _info_grids(self):
         """Return a string with "min {- max}" grid size."""
         if self.gridding == 'same':
-            min_nC = self.grid.nC
-            min_vC = self.grid.vnC
+            min_nC = self.grid.n_cells
+            min_vC = self.grid.shape_cells
             has_minmax = False
         elif self.gridding in ['single', 'input']:
             grid = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
-            min_nC = grid.nC
-            min_vC = grid.vnC
+            min_nC = grid.n_cells
+            min_vC = grid.shape_cells
             has_minmax = False
         else:
             min_nC = 1e100
             max_nC = 0
             for src, freq in self._srcfreq:
                 grid = self.get_grid(src, freq)
-                if grid.nC > max_nC:
-                    max_nC = grid.nC
-                    max_vC = grid.vnC
-                if grid.nC < min_nC:
-                    min_nC = grid.nC
-                    min_vC = grid.vnC
+                if grid.n_cells > max_nC:
+                    max_nC = grid.n_cells
+                    max_vC = grid.shape_cells
+                if grid.n_cells < min_nC:
+                    min_nC = grid.n_cells
+                    min_vC = grid.shape_cells
             has_minmax = min_nC != max_nC
         info = f"{min_vC[0]} x {min_vC[1]} x {min_vC[2]} ({min_nC:,})"
         if has_minmax:
@@ -1130,7 +1115,6 @@ class Simulation:
         # Input parameters.
         solver_input = {
             **self.solver_opts,
-            'grid': self.get_grid(*inp),
             'model': self.get_model(*inp),
             'sfield': self._get_rfield(*inp),  # Residual field.
         }
@@ -1256,7 +1240,8 @@ def expand_grid_model(grid, model, expand, interface):
             prop_ext = None
 
         else:
-            prop_ext = np.zeros((grid.vnC[0], grid.vnC[1], grid.vnC[2]+nadd))
+            prop_ext = np.zeros((grid.shape_cells[0], grid.shape_cells[1],
+                                 grid.shape_cells[2]+nadd))
             prop_ext[:, :, :-nadd] = getattr(model, prop)
             if nadd == 2:
                 prop_ext[:, :, -2] = add_values[0]
@@ -1381,7 +1366,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
     input_nCz : int, optional
         If :func:`expand_grid_model` was used, `input_nCz` corresponds to the
-        original ``grid.vnC[2]``.
+        original ``grid.shape_cells[2]``.
 
 
     Returns

@@ -1,5 +1,5 @@
 CPU & RAM
-#########
+=========
 
 The multigrid method is attractive because it shows optimal scaling for both
 runtime and memory consumption. In the following are a few notes regarding

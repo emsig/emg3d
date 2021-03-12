@@ -99,7 +99,8 @@ class TestOptimize():
                 [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
                 np.array([-1250, -1250, -2250]))
         model1 = models.Model(grid, 1)
-        model2 = models.Model(grid, np.arange(1, grid.nC+1).reshape(grid.vnC))
+        model2 = models.Model(grid, np.arange(1, grid.n_cells+1).reshape(
+            grid.shape_cells))
 
         # Create a simulation, compute all fields.
         simulation = simulations.Simulation(
@@ -131,14 +132,15 @@ class TestOptimize():
 
         # Model with magnetic permeability.
         simulation.model = models.Model(
-                self.grid, 1, mu_r=np.ones(self.grid.vnC)*np.pi)
+                self.grid, 1, mu_r=np.ones(self.grid.shape_cells)*np.pi)
         with pytest.raises(NotImplementedError, match='for magn. permeabili'):
             optimize.gradient(simulation)
 
         # Missing noise_floor / std.
         simulation.model = models.Model(
-                self.grid, np.arange(1, self.grid.nC+1).reshape(self.grid.vnC),
-                epsilon_r=None, mu_r=np.ones(self.grid.vnC))
+                self.grid, np.arange(1, self.grid.n_cells+1).reshape(
+                    self.grid.shape_cells),
+                epsilon_r=None, mu_r=np.ones(self.grid.shape_cells))
         with pytest.raises(ValueError, match="Either `noise_floor` or"):
             optimize.misfit(simulation)
 
@@ -163,10 +165,10 @@ def test_derivative(capsys):
         )
 
         # Background Model
-        con_init = np.ones(mesh.vnC)
+        con_init = np.ones(mesh.shape_cells)
 
         # Target Model 1: One Block
-        con_true = np.ones(mesh.vnC)
+        con_true = np.ones(mesh.shape_cells)
         con_true[22:32, 32:42, 20:30] = 0.001
 
         model_init = models.Model(mesh, con_init, mapping='Conductivity')
