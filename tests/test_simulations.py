@@ -434,10 +434,8 @@ def test_expand_grid_model():
     assert_allclose(om.property_y[:, :, -2], 2)
     assert_allclose(om.property_y[:, :, -1], 3)
 
-    # Property y (from property_x).
-    assert_allclose(om.property_z[:, :, :-2], 1)
-    assert_allclose(om.property_z[:, :, -2], 2)
-    assert_allclose(om.property_z[:, :, -1], 3)
+    # Property z.
+    assert om.property_z is None
 
     # Property mu_r (from float).
     assert_allclose(om.mu_r[:, :, :-2], 3)

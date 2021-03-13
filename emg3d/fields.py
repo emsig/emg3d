@@ -711,7 +711,7 @@ def get_h_field(model, field):
 
     # If relative magnetic permeability is not one, we have to take the volume
     # into account, as mu_r is volume-averaged.
-    if model._mu_r is not None:
+    if model.mu_r is not None:
 
         # Get volume-averaged values.
         model._init_vol_average(field)

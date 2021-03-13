@@ -1236,7 +1236,7 @@ def expand_grid_model(grid, model, expand, interface):
     def extend_property(prop, add_values, nadd):
         """Expand property `model.prop`, IF it is not None."""
 
-        if getattr(model, '_'+prop) is None:
+        if getattr(model, prop) is None:
             prop_ext = None
 
         else:
@@ -1434,7 +1434,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
             data = np.array([])
             for p in ['x', 'y', 'z']:
                 prop = getattr(model, 'property_'+p)
-                if getattr(model, '_property_'+p) is None:
+                if prop is None:
                     continue
                 elif prop.ndim == 1:
                     data = np.r_[data, model.map.backward(prop)]

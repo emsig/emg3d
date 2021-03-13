@@ -47,6 +47,9 @@ latest: towards v1.0
 
   - ``VolumeModel`` is, again, incorporated into ``Model``.
 
+  - ``Model``: all data is now stored in one array; [x, y, z, epsilon_r, mu_r];
+    if the {y;z} property is not set, it returns ``None`` now, not x.
+
 - ``TensorMesh``:
 
   - The basic mesh (without ``discretize``) is renamed from ``_TensorMesh`` to

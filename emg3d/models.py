@@ -43,8 +43,6 @@ class Model:
 
     TODOs:
 
-    - Store all properties in one array; properties as conductivities:
-      [cond_x, cond_y, cond_z, eperm, mperm]
     - Change to a subclassed ndarray; should give +;-;*;/;==;< etc
 
 
@@ -112,21 +110,48 @@ class Model:
         self.map = getattr(maps, 'Map'+mapping)()
 
         # Initiate all parameters.
-        self._property_x = self._init_parameter(property_x, 'property_x')
-        self._property_y = self._init_parameter(property_y, 'property_y')
-        self._property_z = self._init_parameter(property_z, 'property_z')
-        self._epsilon_r = self._init_parameter(epsilon_r, 'epsilon_r')
-        self._mu_r = self._init_parameter(mu_r, 'mu_r',)
+        property_x = self._init_parameter(property_x, 'property_x')
+        property_y = self._init_parameter(property_y, 'property_y')
+        property_z = self._init_parameter(property_z, 'property_z')
+        epsilon_r = self._init_parameter(epsilon_r, 'epsilon_r')
+        mu_r = self._init_parameter(mu_r, 'mu_r',)
 
         # Set case.
-        if self._property_y is None and self._property_z is None:
+        self._iy = None
+        self._iz = None
+        if property_y is None and property_z is None:
             self.case = 0                   # Case 0: Isotropic.
-        elif self._property_z is None:
+            data = property_x
+        elif property_z is None:
             self.case = 1                   # Case 1: HTI.
-        elif self._property_y is None:
+            self._iy = self.size
+            data = np.r_[property_x, property_y]
+        elif property_y is None:
             self.case = 2                   # Case 2: VTI.
+            self._iz = self.size
+            data = np.r_[property_x, property_z]
         else:
             self.case = 3                   # Case 3: Tri-axial anisotropy.
+            self._iy = self.size
+            self._iz = 2*self.size
+            data = np.r_[property_x, property_y, property_z]
+
+        self._ie = None
+        self._im = None
+        if epsilon_r is None and mu_r is None:
+            pass
+        elif mu_r is None:
+            self._ie = data.size
+            data = np.r_[data, epsilon_r]
+        elif epsilon_r is None:
+            self._im = data.size
+            data = np.r_[data, mu_r]
+        else:
+            self._ie = data.size
+            self._im = data.size+self.size
+            data = np.r_[data, epsilon_r, mu_r]
+
+        self.data = data
 
         self.case_name = ['isotropic', 'HTI', 'VTI', 'tri-axial'][self.case]
 
@@ -197,8 +222,10 @@ class Model:
         # Compare values.
         if equal:
             equal *= np.allclose(self.property_x, model.property_x)
-            equal *= np.allclose(self.property_y, model.property_y)
-            equal *= np.allclose(self.property_z, model.property_z)
+            if self.property_y is not None:
+                equal *= np.allclose(self.property_y, model.property_y)
+            if self.property_z is not None:
+                equal *= np.allclose(self.property_z, model.property_z)
             # operator_test ensures mu_r are both or neither None.
             if self.mu_r is not None:
                 equal *= np.allclose(self.mu_r, model.mu_r)
@@ -286,71 +313,78 @@ class Model:
     @property
     def property_x(self):
         r"""Property in x-direction."""
-        return self._property_x.reshape(self.shape, order='F')
+        return self.data[:self.size].reshape(self.shape, order='F')
 
     @property_x.setter
     def property_x(self, property_x):
         r"""Update property in x-direction."""
         self._check_positive_finite(property_x, 'property_x')
-        self._property_x[:] = np.asarray(property_x).ravel('F')
+        self.data[:self.size] = np.asarray(property_x).ravel('F')
 
     @property
     def property_y(self):
         r"""Property in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self._property_y.reshape(self.shape, order='F')
+            return self.data[self._iy:self._iy+self.size].reshape(
+                    self.shape, order='F')
         else:                    # Return property_x.
-            return self.property_x
+            return None
 
     @property_y.setter
     def property_y(self, property_y):
         r"""Update property in y-direction."""
         self._check_positive_finite(property_y, 'property_y')
-        self._property_y[:] = np.asarray(property_y).ravel('F')
+        self.data[self._iy:self._iy+self.size] = np.asarray(
+                property_y).ravel('F')
 
     @property
     def property_z(self):
         r"""Property in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self._property_z.reshape(self.shape, order='F')
+            return self.data[self._iz:self._iz+self.size].reshape(
+                    self.shape, order='F')
         else:                    # Return property_x.
-            return self.property_x
+            return None
 
     @property_z.setter
     def property_z(self, property_z):
         r"""Update property in z-direction."""
         self._check_positive_finite(property_z, 'property_z')
-        self._property_z[:] = np.asarray(property_z).ravel('F')
+        self.data[self._iz:self._iz+self.size] = np.asarray(
+                property_z).ravel('F')
 
     # ELECTRIC PERMITTIVITIES
     @property
     def epsilon_r(self):
         r"""Electric permittivity."""
-        if self._epsilon_r is None:
-            return self._epsilon_r
+        if self._ie is None:
+            return None
         else:
-            return self._epsilon_r.reshape(self.shape, order='F')
+            return self.data[self._ie:self._ie+self.size].reshape(
+                    self.shape, order='F')
 
     @epsilon_r.setter
     def epsilon_r(self, epsilon_r):
         r"""Update electric permittivity."""
         self._check_positive_finite(epsilon_r, 'epsilon_r')
-        self._epsilon_r[:] = np.asarray(epsilon_r).ravel('F')
+        self.data[self._ie:self._ie+self.size] = np.asarray(
+                epsilon_r).ravel('F')
 
     # MAGNETIC PERMEABILITIES
     @property
     def mu_r(self):
         r"""Magnetic permeability."""
-        if self._mu_r is None:
-            return self._mu_r
+        if self._im is None:
+            return None
         else:
-            return self._mu_r.reshape(self.shape, order='F')
+            return self.data[self._im:self._im+self.size].reshape(
+                    self.shape, order='F')
 
     @mu_r.setter
     def mu_r(self, mu_r):
         r"""Update magnetic permeability."""
         self._check_positive_finite(mu_r, 'mu_r')
-        self._mu_r[:] = np.asarray(mu_r).ravel('F')
+        self.data[self._im:self._im+self.size] = np.asarray(mu_r).ravel('F')
 
     def interpolate2grid(self, grid, new_grid, **grid2grid_opts):
         """Interpolate `Model` located on `grid` to `new_grid`.
@@ -407,17 +441,17 @@ class Model:
             property_z = None
 
         # mu_r.
-        if self._mu_r is not None:
-            mu_r = maps.grid2grid(values=ensure_shape(self.mu_r), **inp)
-        else:
+        if self._im is None:
             mu_r = None
+        else:
+            mu_r = maps.grid2grid(values=ensure_shape(self.mu_r), **inp)
 
         # epsilon_r.
-        if self._epsilon_r is not None:
+        if self._ie is None:
+            epsilon_r = None
+        else:
             epsilon_r = maps.grid2grid(
                 values=ensure_shape(self.epsilon_r), **inp)
-        else:
-            epsilon_r = None
 
         # Assemble coarse model.
         return Model(new_grid, property_x=property_x, property_y=property_y,
@@ -482,6 +516,18 @@ class Model:
         if self.case != model.case:
             msg = ("Models must be of the same isotropy type but have types"
                    f" '{self.case_name}' and '{model.case_name}'.")
+            raise ValueError(msg)
+
+        # Ensure TODO:
+        if hasattr(self.property_y, 'dtype') != hasattr(
+                model.property_y, 'dtype'):
+            msg = ("TODO")
+            raise ValueError(msg)
+
+        # Ensure TODO:
+        if hasattr(self.property_z, 'dtype') != hasattr(
+                model.property_z, 'dtype'):
+            msg = ("TODO")
             raise ValueError(msg)
 
         # Ensure both or none has mu_r:
@@ -574,13 +620,17 @@ class Model:
         # Initiate eta
         eta = field.smu0*self.grid.cell_volumes.reshape(self.shape, order='F')
 
+        if getattr(self, name) is None:
+            sig_term = self.map.backward(self.property_x)
+        else:
+            sig_term = self.map.backward(getattr(self, name))
+
         # Compute eta depending on epsilon.
-        if self.epsilon_r is None:  # Diffusive approximation.
-            eta *= self.map.backward(getattr(self, name))
+        if self._ie is None:  # Diffusive approximation.
+            eta = eta*sig_term
 
         else:
             eps_term = field.sval*epsilon_0*self.epsilon_r
-            sig_term = self.map.backward(getattr(self, name))
             eta *= sig_term - eps_term
 
         return eta
@@ -600,12 +650,11 @@ class Model:
             frequency-information is taken from the provided source filed.
 
         """
+        zeta = self.grid.cell_volumes.reshape(self.shape, order='F')
+        if self._im is not None:
+            zeta = zeta / self.mu_r
 
-        if self.mu_r is not None:
-            zeta = self.grid.cell_volumes / self._mu_r
-        else:
-            zeta = self.grid.cell_volumes
-        return zeta.reshape(self.shape, order='F')
+        return zeta
 
     # Volume averaged values
     @property
