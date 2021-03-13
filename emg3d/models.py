@@ -24,8 +24,6 @@ from scipy.constants import epsilon_0
 
 from emg3d import maps, meshes
 
-__all__ = ['Model', 'VolumeModel']
-
 
 # MODEL
 class Model:
@@ -45,9 +43,6 @@ class Model:
 
     TODOs:
 
-    - Combine Model and VolumeModel again.
-      VolumeModel doesn't make sense; in the first restriction() it is changed
-      to a dummy anyway.
     - Store all properties in one array; properties as conductivities:
       [cond_x, cond_y, cond_z, eperm, mperm]
     - Change to a subclassed ndarray; should give +;-;*;/;==;< etc
@@ -134,6 +129,12 @@ class Model:
             self.case = 3                   # Case 3: Tri-axial anisotropy.
 
         self.case_name = ['isotropic', 'HTI', 'VTI', 'tri-axial'][self.case]
+
+        # Initiate dummy values for volume averaged values.
+        self._eta_x = None
+        self._eta_y = None
+        self._eta_z = None
+        self._zeta = None
 
     def __repr__(self):
         """Simple representation."""
@@ -536,58 +537,77 @@ class Model:
 
         return kwargs
 
-
-class VolumeModel:
-    r"""Return a volume-averaged version of provided model.
-
-    Takes a Model instance and returns the volume averaged values. This is used
-    by the solver internally.
-
-    .. math::
-
-        \eta_{\{x,y,z\}} = -V\mathrm{i}\omega\mu_0
-              \left(\rho^{-1}_{\{x,y,z\}} + \mathrm{i}\omega\varepsilon\right)
-
-    .. math::
-
-        \zeta = V\mu_\mathrm{r}^{-1}
-
-
-    Parameters
-    ----------
-    model : Model
-        Model to transform to volume-averaged values.
-
-    sfield : SourceField
-       A VolumeModel is frequency-dependent. The frequency-information is taken
-       from the provided source filed.
-
-    """
-
-    def __init__(self, model, sfield):
+    def _init_vol_average(self, sfield):
         """Initiate a new model with volume-averaged properties."""
 
-        # Store case, for restriction.
-        self.case = model.case
-
-        # Store a minimal TensorMesh.
-        self.grid = meshes.BaseMesh(model.grid.h, model.grid.origin)
-
         # eta_x
-        self._eta_x = self.calculate_eta('property_x', model, sfield)
+        self._eta_x = self._calculate_eta('property_x', sfield)
 
         # eta_y
-        if model.case in [1, 3]:  # HTI or tri-axial.
-            self._eta_y = self.calculate_eta('property_y', model, sfield)
+        if self.case in [1, 3]:  # HTI or tri-axial.
+            self._eta_y = self._calculate_eta('property_y', sfield)
 
         # eta_z
         if self.case in [2, 3]:  # VTI or tri-axial.
-            self._eta_z = self.calculate_eta('property_z', model, sfield)
+            self._eta_z = self._calculate_eta('property_z', sfield)
 
         # zeta
-        self._zeta = self.calculate_zeta('mu_r', model)
+        self._zeta = self._calculate_zeta()
 
-    # ETA's
+    def _calculate_eta(self, name, field):
+        r"""eta: volume multiplied with conductivity.
+
+        .. math::
+
+            \eta_{\{x,y,z\}} = -V\mathrm{i}\omega\mu_0
+                \left(\rho^{-1}_{\{x,y,z\}} +
+                \mathrm{i}\omega\varepsilon\right)
+
+        Parameters
+        ----------
+        sfield : SourceField
+            Volume-averaged model parameters are frequency-dependent. The
+            frequency-information is taken from the provided source filed.
+
+        """
+
+        # Initiate eta
+        eta = field.smu0*self.grid.cell_volumes.reshape(self.shape, order='F')
+
+        # Compute eta depending on epsilon.
+        if self.epsilon_r is None:  # Diffusive approximation.
+            eta *= self.map.backward(getattr(self, name))
+
+        else:
+            eps_term = field.sval*epsilon_0*self.epsilon_r
+            sig_term = self.map.backward(getattr(self, name))
+            eta *= sig_term - eps_term
+
+        return eta
+
+    def _calculate_zeta(self):
+        r"""zeta: volume divided by mu_r.
+
+        .. math::
+
+            \zeta = V\mu_\mathrm{r}^{-1}
+
+
+        Parameters
+        ----------
+        sfield : SourceField
+            Volume-averaged model parameters are frequency-dependent. The
+            frequency-information is taken from the provided source filed.
+
+        """
+
+        if self.mu_r is not None:
+            zeta = self.grid.cell_volumes / self._mu_r
+        else:
+            zeta = self.grid.cell_volumes
+        return zeta.reshape(self.shape, order='F')
+
+    # Volume averaged values
     @property
     def eta_x(self):
         r"""eta in x-direction."""
@@ -613,33 +633,3 @@ class VolumeModel:
     def zeta(self):
         r"""zeta."""
         return self._zeta
-
-    @staticmethod
-    def calculate_eta(name, model, field):
-        r"""eta: volume multiplied with conductivity."""
-
-        # Initiate eta
-        eta = field.smu0*model.grid.cell_volumes.reshape(
-                model.shape, order='F')
-
-        # Compute eta depending on epsilon.
-        if model.epsilon_r is None:  # Diffusive approximation.
-            eta *= model.map.backward(getattr(model, name))
-
-        else:
-            eps_term = field.sval*epsilon_0*model.epsilon_r
-            sig_term = model.map.backward(getattr(model, name))
-            eta *= sig_term - eps_term
-
-        return eta
-
-    @staticmethod
-    def calculate_zeta(name, model):
-        r"""zeta: volume divided by mu_r."""
-
-        zeta = model.grid.cell_volumes.reshape(model.shape, order='F')
-        if model.mu_r is None:
-            return zeta
-
-        else:
-            return zeta/getattr(model, name)

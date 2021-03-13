@@ -34,7 +34,7 @@ import numpy as np
 import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
 
-from emg3d import core, meshes, models, fields, utils
+from emg3d import core, meshes, fields, utils
 
 __all__ = ['solve', 'multigrid', 'krylov', 'smoothing', 'restriction',
            'prolongation', 'residual', 'MGParameters',
@@ -303,13 +303,13 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
                 "Create it with `emg3d.fields.get_source_field`, or\n"
                 "initiate it with `emg3d.fields.SourceField`.")
 
-    # Get volume-averaged model values.
-    vmodel = models.VolumeModel(model, sfield)
+    # Initiate volume-averaged model values.
+    model._init_vol_average(sfield)
 
     # Get efield.
     if efield is None:
         # If not provided, initiate an empty one.
-        efield = fields.Field(vmodel.grid, dtype=sfield.dtype,
+        efield = fields.Field(model.grid, dtype=sfield.dtype,
                               freq=sfield._freq)
 
         # Set flag to return the field.
@@ -332,7 +332,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         var.do_return = False
 
         # If efield is provided, check if it is already sufficiently good.
-        var.l2 = residual(vmodel, sfield, efield, True)
+        var.l2 = residual(model, sfield, efield, True)
         if var.l2 < var.tol*var.l2_refe:
 
             # Switch-off both sslsolver and multigrid.
@@ -373,9 +373,9 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
     # Solve the system with...
     if var.sslsolver:  # ... sslsolver.
-        krylov(vmodel, sfield, efield, var)
+        krylov(model, sfield, efield, var)
     elif var.cycle:    # ... multigrid.
-        multigrid(vmodel, sfield, efield, var)
+        multigrid(model, sfield, efield, var)
 
     # Get exit status.
     exit_status = int(var.exit_message != 'CONVERGED')

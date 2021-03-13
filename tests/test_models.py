@@ -42,36 +42,36 @@ class TestModel:
         # Check representation of Model.
         assert 'Model [resistivity]; isotropic' in model1.__repr__()
 
-        vmodel1 = models.VolumeModel(model1, sfield)
+        model1._init_vol_average(sfield)
         assert_allclose(model1.property_x, model1.property_y)
         assert_allclose(model1.size, grid.n_cells)
         assert_allclose(model1.shape, grid.shape_cells)
-        assert_allclose(vmodel1.eta_z, vmodel1.eta_y)
+        assert_allclose(model1.eta_z, model1.eta_y)
         assert model1.mu_r is None
         assert model1.epsilon_r is None
 
         # Using ints
         model2 = models.Model(grid, 2., 3., 4.)
-        vmodel2 = models.VolumeModel(model2, sfield)
+        model2._init_vol_average(sfield)
         assert_allclose(model2.property_x*1.5, model2.property_y)
         assert_allclose(model2.property_x*2, model2.property_z)
 
         # VTI: Setting property_x and property_z, not property_y
         model2b = models.Model(grid, 2., property_z=4.)
-        vmodel2b = models.VolumeModel(model2b, sfield)
+        model2b._init_vol_average(sfield)
         assert_allclose(model2b.property_x, model2b.property_y)
-        assert_allclose(vmodel2b.eta_y, vmodel2b.eta_x)
+        assert_allclose(model2b.eta_y, model2b.eta_x)
         model2b.property_z = model2b.property_x
         model2c = models.Model(grid, 2., property_z=model2b.property_z.copy())
-        vmodel2c = models.VolumeModel(model2c, sfield)
+        model2c._init_vol_average(sfield)
         assert_allclose(model2c.property_x, model2c.property_z)
-        assert_allclose(vmodel2c.eta_z, vmodel2c.eta_x)
+        assert_allclose(model2c.eta_z, model2c.eta_x)
 
         # HTI: Setting property_x and property_y, not property_z
         model2d = models.Model(grid, 2., 4.)
-        vmodel2d = models.VolumeModel(model2d, sfield)
+        model2d._init_vol_average(sfield)
         assert_allclose(model2d.property_x, model2d.property_z)
-        assert_allclose(vmodel2d.eta_z, vmodel2d.eta_x)
+        assert_allclose(model2d.eta_z, model2d.eta_x)
 
         # Pure air, epsilon_r init with 0 => should be 1!
         model6 = models.Model(grid, 2e14)
@@ -90,20 +90,20 @@ class TestModel:
         gridvol = grid.cell_volumes.reshape(grid.shape_cells, order='F')
         model3 = models.Model(
             grid, property_x, property_y, property_z, mu_r=mu_r)
-        vmodel3 = models.VolumeModel(model3, sfield)
+        model3._init_vol_average(sfield)
         assert_allclose(model3.property_x, model3.property_y*2)
         assert_allclose(model3.property_x.shape, grid.shape_cells)
         assert_allclose(model3.property_x, model3.property_z/1.4)
-        assert_allclose(gridvol/mu_r, vmodel3.zeta)
+        assert_allclose(gridvol/model3.mu_r, model3.zeta)
         # Check with all inputs
         model3b = models.Model(
             grid, property_x.ravel('F'), property_y.ravel('F'),
             property_z.ravel('F'), mu_r=mu_r.ravel('F'))
-        vmodel3b = models.VolumeModel(model3b, sfield)
+        model3b._init_vol_average(sfield)
         assert_allclose(model3b.property_x, model3b.property_y*2)
         assert_allclose(model3b.property_x.shape, grid.shape_cells)
         assert_allclose(model3b.property_x, model3b.property_z/1.4)
-        assert_allclose(gridvol/mu_r, vmodel3b.zeta)
+        assert_allclose(gridvol/mu_r, model3b.zeta)
 
         # Check setters shape_cells
         tres = np.ones(grid.shape_cells)
@@ -121,17 +121,17 @@ class TestModel:
         eta_x = sfield.smu0*(1./model3.property_x + iomep)*gridvol
         eta_y = sfield.smu0*(1./model3.property_y + iomep)*gridvol
         eta_z = sfield.smu0*(1./model3.property_z + iomep)*gridvol
-        vmodel3 = models.VolumeModel(model3, sfield)
-        assert_allclose(vmodel3.eta_x, eta_x)
-        assert_allclose(vmodel3.eta_y, eta_y)
-        assert_allclose(vmodel3.eta_z, eta_z)
+        model3._init_vol_average(sfield)
+        assert_allclose(model3.eta_x, eta_x)
+        assert_allclose(model3.eta_y, eta_y)
+        assert_allclose(model3.eta_z, eta_z)
 
         # Check volume
         assert_allclose(grid.cell_volumes.reshape(grid.shape_cells, order='F'),
-                        vmodel2.zeta)
+                        model2.zeta)
         model4 = models.Model(grid, 1)
-        vmodel4 = models.VolumeModel(model4, sfield)
-        assert_allclose(vmodel4.zeta,
+        model4._init_vol_average(sfield)
+        assert_allclose(model4.zeta,
                         grid.cell_volumes.reshape(grid.shape_cells, order='F'))
 
         # Check a couple of out-of-range failures

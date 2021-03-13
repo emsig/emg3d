@@ -45,6 +45,8 @@ latest: towards v1.0
     permittivity, it cannot be added afterwards. However, it can be initiated
     with dummy values and adjusted later.
 
+  - ``VolumeModel`` is, again, incorporated into ``Model``.
+
 - ``TensorMesh``:
 
   - The basic mesh (without ``discretize``) is renamed from ``_TensorMesh`` to
