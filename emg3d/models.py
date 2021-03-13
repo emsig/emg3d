@@ -43,12 +43,22 @@ class Model:
     permittivity).
 
 
+    TODOs:
+
+    - Combine Model and VolumeModel again.
+      VolumeModel doesn't make sense; in the first restriction() it is changed
+      to a dummy anyway.
+    - Store all properties in one array; properties as conductivities:
+      [cond_x, cond_y, cond_z, eperm, mperm]
+    - Change to a subclassed ndarray; should give +;-;*;/;==;< etc
+
+
     Parameters
     ----------
     grid : TensorMesh
         Grid on which to apply model.
 
-    property_{x;y;z} : float or ndarray; default to 1.
+    property_{x;y;z} : {float, ndarray}, default: 1.
         Material property in x-, y-, and z-directions. If ndarray, they must
         have the shape of grid.shape_cells (F-ordered) or grid.n_cells.
 
@@ -103,37 +113,31 @@ class Model:
         self.shape = self.grid.shape_cells
         self.size = self.grid.n_cells
 
-        # Check case.
-        self.case_names = ['isotropic', 'HTI', 'VTI', 'tri-axial']
-        if property_y is None and property_z is None:
-            # 0: Isotropic.
-            self.case = 0
-        elif property_z is None:
-            # 1: HTI.
-            self.case = 1
-        elif property_y is None:
-            # 2: VTI.
-            self.case = 2
-        else:
-            # 3: Tri-axial anisotropy.
-            self.case = 3
-
         # Get map.
         self.map = getattr(maps, 'Map'+mapping)()
 
         # Initiate all parameters.
-        self._property_x = self._check_parameter(
-                property_x, 'property_x', True)
-        self._property_y = self._check_parameter(
-                property_y, 'property_y', True)
-        self._property_z = self._check_parameter(
-                property_z, 'property_z', True)
-        self._mu_r = self._check_parameter(mu_r, 'mu_r')
-        self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
+        self._property_x = self._init_parameter(property_x, 'property_x')
+        self._property_y = self._init_parameter(property_y, 'property_y')
+        self._property_z = self._init_parameter(property_z, 'property_z')
+        self._epsilon_r = self._init_parameter(epsilon_r, 'epsilon_r')
+        self._mu_r = self._init_parameter(mu_r, 'mu_r',)
+
+        # Set case.
+        if self._property_y is None and self._property_z is None:
+            self.case = 0                   # Case 0: Isotropic.
+        elif self._property_z is None:
+            self.case = 1                   # Case 1: HTI.
+        elif self._property_y is None:
+            self.case = 2                   # Case 2: VTI.
+        else:
+            self.case = 3                   # Case 3: Tri-axial anisotropy.
+
+        self.case_name = ['isotropic', 'HTI', 'VTI', 'tri-axial'][self.case]
 
     def __repr__(self):
         """Simple representation."""
-        return (f"Model [{self.map.description}]; {self.case_names[self.case]}"
+        return (f"Model [{self.map.description}]; {self.case_name}"
                 f"{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}"
                 f"; {self.shape[0]} x {self.shape[1]} x {self.shape[2]} "
@@ -281,80 +285,71 @@ class Model:
     @property
     def property_x(self):
         r"""Property in x-direction."""
-        return self._return_parameter(self._property_x)
+        return self._property_x.reshape(self.shape, order='F')
 
     @property_x.setter
     def property_x(self, property_x):
         r"""Update property in x-direction."""
-        self._property_x = self._check_parameter(
-                property_x, 'property_x', True)
+        self._check_positive_finite(property_x, 'property_x')
+        self._property_x[:] = np.asarray(property_x).ravel('F')
 
     @property
     def property_y(self):
         r"""Property in y-direction."""
         if self.case in [1, 3]:  # HTI or tri-axial.
-            return self._return_parameter(self._property_y)
+            return self._property_y.reshape(self.shape, order='F')
         else:                    # Return property_x.
-            return self._return_parameter(self._property_x)
+            return self.property_x
 
     @property_y.setter
     def property_y(self, property_y):
         r"""Update property in y-direction."""
-
-        # Adjust case in case property_z was not set so far.
-        if self.case == 0:  # If it was isotropic, it is HTI now.
-            self.case = 1
-        elif self.case == 2:  # If it was VTI, it is tri-axial now.
-            self.case = 3
-
-        # Update it.
-        self._property_y = self._check_parameter(
-                property_y, 'property_y', True)
+        self._check_positive_finite(property_y, 'property_y')
+        self._property_y[:] = np.asarray(property_y).ravel('F')
 
     @property
     def property_z(self):
         r"""Property in z-direction."""
         if self.case in [2, 3]:  # VTI or tri-axial.
-            return self._return_parameter(self._property_z)
+            return self._property_z.reshape(self.shape, order='F')
         else:                    # Return property_x.
-            return self._return_parameter(self._property_x)
+            return self.property_x
 
     @property_z.setter
     def property_z(self, property_z):
         r"""Update property in z-direction."""
-
-        # Adjust case in case property_z was not set so far.
-        if self.case == 0:  # If it was isotropic, it is VTI now.
-            self.case = 2
-        elif self.case == 1:  # If it was HTI, it is tri-axial now.
-            self.case = 3
-
-        # Update it.
-        self._property_z = self._check_parameter(
-                property_z, 'property_z', True)
-
-    # MAGNETIC PERMEABILITIES
-    @property
-    def mu_r(self):
-        r"""Magnetic permeability."""
-        return self._return_parameter(self._mu_r)
-
-    @mu_r.setter
-    def mu_r(self, mu_r):
-        r"""Update magnetic permeability."""
-        self._mu_r = self._check_parameter(mu_r, 'mu_r')
+        self._check_positive_finite(property_z, 'property_z')
+        self._property_z[:] = np.asarray(property_z).ravel('F')
 
     # ELECTRIC PERMITTIVITIES
     @property
     def epsilon_r(self):
         r"""Electric permittivity."""
-        # Get epsilon.
-        return self._return_parameter(self._epsilon_r)
+        if self._epsilon_r is None:
+            return self._epsilon_r
+        else:
+            return self._epsilon_r.reshape(self.shape, order='F')
 
     @epsilon_r.setter
     def epsilon_r(self, epsilon_r):
         r"""Update electric permittivity."""
-        self._epsilon_r = self._check_parameter(epsilon_r, 'epsilon_r')
+        self._check_positive_finite(epsilon_r, 'epsilon_r')
+        self._epsilon_r[:] = np.asarray(epsilon_r).ravel('F')
+
+    # MAGNETIC PERMEABILITIES
+    @property
+    def mu_r(self):
+        r"""Magnetic permeability."""
+        if self._mu_r is None:
+            return self._mu_r
+        else:
+            return self._mu_r.reshape(self.shape, order='F')
+
+    @mu_r.setter
+    def mu_r(self, mu_r):
+        r"""Update magnetic permeability."""
+        self._check_positive_finite(mu_r, 'mu_r')
+        self._mu_r[:] = np.asarray(mu_r).ravel('F')
 
     def interpolate2grid(self, grid, new_grid, **grid2grid_opts):
         """Interpolate `Model` located on `grid` to `new_grid`.
@@ -429,47 +424,43 @@ class Model:
                      mapping=self.map.name)
 
     # INTERNAL UTILITIES
-    def _check_parameter(self, var, name, mapped=False):
-        """Check parameter.
-
-        - Shape must be (), (1,), size, or shape.
-        - Value(s) must be 0 < var < inf.
-        """
+    def _init_parameter(self, values, name):
+        """Initiate parameter by casting and broadcasting."""
 
         # If None, exit.
-        if var is None:
+        if values is None:
             return None
 
-        # Cast it to floats, ravel.
-        var = np.asarray(var, dtype=np.float64).ravel('F')
+        # Cast it to floats.
+        values = np.asarray(values, dtype=np.float64)
 
-        # Check for wrong size.
-        if var.size not in [1, self.size]:
-            raise ValueError(
-                    f"Shape of {name} must be (), {self.shape}, or "
-                    f"{self.size}.\nProvided: {var.shape}.")
+        # If it is not self.size or self.shape, broadcast it.
+        if values.shape != self.shape and values.size != self.size:
+            values = np.ones(self.shape)*values
+
+        self._check_positive_finite(values, name)
+
+        return values.ravel('F')
+
+    def _check_positive_finite(self, values, name):
+        """Check parameter values are positive (on linear scale) and finite."""
+
+        if hasattr(self, '_'+name) and getattr(self, '_'+name) is None:
+            msg = f"Model was initiated without `{name}`; cannot set values."
+            raise ValueError(msg)
+
+        if 'property_' in name:
+            mapped = self.map.backward(values)
+        else:
+            mapped = values
 
         # Check they are positive.
-        if not mapped or (mapped and not self.map.name.startswith('L')):
-            if not np.all(var > 0):
-                raise ValueError(f"`{name}` must be all `0 < var`.")
+        if not np.all(np.real(mapped) > 0.0):
+            raise ValueError(f"`{name}` must be all bigger than zero.")
 
         # Check |val| < inf.
-        if not np.all(np.abs(var) < np.inf):
-            raise ValueError(f"`{name}` must be all `var < inf`.")
-
-        return var
-
-    def _return_parameter(self, var):
-        """Return parameter as float or shape."""
-
-        # Return depending on value and size.
-        if var is None:      # Because of mu_r, epsilon_r.
-            return None
-        elif var.size == 1:  # In case of float.
-            return var
-        else:                # Else, has shape.
-            return var.reshape(self.shape, order='F')
+        if not np.all(np.isfinite(mapped)):
+            raise ValueError(f"`{name}` must be all finite.")
 
     def _operator_test(self, model):
         """Check if `self` and `model` are consistent for operations.
@@ -489,8 +480,7 @@ class Model:
         # Ensure the two instances have the same case.
         if self.case != model.case:
             msg = ("Models must be of the same isotropy type but have types"
-                   f" '{self.case_names[self.case]}' and"
-                   f" '{model.case_names[model.case]}'.")
+                   f" '{self.case_name}' and '{model.case_name}'.")
             raise ValueError(msg)
 
         # Ensure both or none has mu_r:
@@ -648,7 +638,7 @@ class VolumeModel:
         r"""zeta: volume divided by mu_r."""
 
         zeta = model.grid.cell_volumes.reshape(model.shape, order='F')
-        if getattr(model, name, None) is None:
+        if model.mu_r is None:
             return zeta
 
         else:

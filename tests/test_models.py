@@ -42,9 +42,6 @@ class TestModel:
         # Check representation of Model.
         assert 'Model [resistivity]; isotropic' in model1.__repr__()
 
-        model1e = models.Model(grid)
-        model1.mu_r = None
-        model1.epsilon_r = None
         vmodel1 = models.VolumeModel(model1, sfield)
         assert_allclose(model1.property_x, model1.property_y)
         assert_allclose(model1.size, grid.n_cells)
@@ -52,26 +49,6 @@ class TestModel:
         assert_allclose(vmodel1.eta_z, vmodel1.eta_y)
         assert model1.mu_r is None
         assert model1.epsilon_r is None
-
-        # Assert that the cases changes if we assign y- and z- resistivities
-        # (I).
-        model1.property_x = model1.property_x
-        assert model1.case == 0
-        model1.property_y = 2*model1.property_x
-        assert model1.case == 1
-        model1.property_z = 2*model1.property_x
-        assert model1.case == 3
-
-        assert model1e.case == 0
-        model1e.property_z = 2*model1.property_x
-        assert model1e.case == 2
-        model1e.property_y = 2*model1.property_x
-        assert model1e.case == 3
-
-        model1.epsilon_r = 1  # Just set to 1 CURRENTLY.
-        vmodel1b = models.VolumeModel(model1, sfield)
-        assert_allclose(vmodel1b.eta_x, vmodel1.eta_x)
-        assert np.iscomplex(vmodel1b.eta_x[0, 0, 0])
 
         # Using ints
         model2 = models.Model(grid, 2., 3., 4.)
@@ -101,14 +78,13 @@ class TestModel:
         assert model6.epsilon_r is None
 
         # Check wrong shape
-        with pytest.raises(ValueError, match='Shape of property_x must be ()'):
+        with pytest.raises(ValueError, match='could not be broadcast'):
             models.Model(grid, np.arange(1, 11))
-        with pytest.raises(ValueError, match='Shape of property_y must be ()'):
+        with pytest.raises(ValueError, match='could not be broadcast'):
             models.Model(grid, property_y=np.ones((2, 5, 6)))
-        with pytest.raises(ValueError, match='Shape of property_z must be ()'):
-            models.Model(grid, property_z=np.array([1, 3]))
-        with pytest.raises(ValueError, match='Shape of mu_r must be ()'):
-            models.Model(grid, mu_r=np.array([[1, ], [3, ]]))
+        # Actual broadcasting.
+        models.Model(grid, property_z=np.array([1, 3]))
+        models.Model(grid, mu_r=np.array([[1, ], [3, ]]))
 
         # Check with all inputs
         gridvol = grid.cell_volumes.reshape(grid.shape_cells, order='F')
@@ -136,11 +112,9 @@ class TestModel:
         model3.property_y[:, 1:, :] = tres[:, 1:, :]*3.0
         model3.property_z = tres*4.0
         model3.mu_r = tres*5.0
-        model3.epsilon_r = tres*6.0
         assert_allclose(tres*2., model3.property_x)
         assert_allclose(tres*3., model3.property_y)
         assert_allclose(tres*4., model3.property_z)
-        assert_allclose(tres*6., model3.epsilon_r)
 
         # Check eta
         iomep = sfield.sval*models.epsilon_0
@@ -165,9 +139,9 @@ class TestModel:
             _ = models.Model(grid, property_x=property_x*0)
         Model = models.Model(grid, property_x=property_x)
         with pytest.raises(ValueError, match='`property_x` must be all'):
-            Model._check_parameter(property_x*0, 'property_x')
+            Model._check_positive_finite(property_x*0, 'property_x')
         with pytest.raises(ValueError, match='`property_x` must be all'):
-            Model._check_parameter(-1.0, 'property_x')
+            Model._check_positive_finite(-1.0, 'property_x')
         with pytest.raises(ValueError, match='`property_y` must be all'):
             _ = models.Model(grid, property_y=np.inf)
         with pytest.raises(ValueError, match='`property_z` must be all'):
@@ -319,25 +293,25 @@ class TestModelOperators:
 
         # All different cases
         a = self.model_1_a + self.model_1_a
-        assert a.property_x == self.model_1_b.property_x
-        assert a.property_y == self.model_1_b.property_y
+        assert_allclose(a.property_x, self.model_1_b.property_x)
+        assert_allclose(a.property_y, self.model_1_b.property_y)
         assert a.property_z.base is a.property_x.base
 
         a = self.model_2_a + self.model_2_a
-        assert a.property_x == self.model_2_b.property_x
+        assert_allclose(a.property_x, self.model_2_b.property_x)
         assert a.property_y.base is a.property_x.base
-        assert a.property_z == self.model_2_b.property_z
+        assert_allclose(a.property_z, self.model_2_b.property_z)
 
         a = self.model_3_a + self.model_3_a
-        assert a.property_x == self.model_3_b.property_x
-        assert a.property_y == self.model_3_b.property_y
-        assert a.property_z == self.model_3_b.property_z
+        assert_allclose(a.property_x, self.model_3_b.property_x)
+        assert_allclose(a.property_y, self.model_3_b.property_y)
+        assert_allclose(a.property_z, self.model_3_b.property_z)
 
         # mu_r and epsilon_r
         a = self.model_mu_a + self.model_mu_a
         b = self.model_epsilon_a + self.model_epsilon_a
-        assert a.mu_r == self.model_mu_b.mu_r
-        assert b.epsilon_r == self.model_epsilon_b.epsilon_r
+        assert_allclose(a.mu_r, self.model_mu_b.mu_r)
+        assert_allclose(b.epsilon_r, self.model_epsilon_b.epsilon_r)
 
     def test_sub(self):
         # Addition with something else than a model
@@ -346,25 +320,25 @@ class TestModelOperators:
 
         # All different cases
         a = self.model_1_b - self.model_1_a
-        assert a.property_x == self.model_1_a.property_x
-        assert a.property_y == self.model_1_a.property_y
+        assert_allclose(a.property_x, self.model_1_a.property_x)
+        assert_allclose(a.property_y, self.model_1_a.property_y)
         assert a.property_z.base is a.property_x.base
 
         a = self.model_2_b - self.model_2_a
-        assert a.property_x == self.model_2_a.property_x
+        assert_allclose(a.property_x, self.model_2_a.property_x)
         assert a.property_y.base is a.property_x.base
-        assert a.property_z == self.model_2_a.property_z
+        assert_allclose(a.property_z, self.model_2_a.property_z)
 
         a = self.model_3_b - self.model_3_a
-        assert a.property_x == self.model_3_a.property_x
-        assert a.property_y == self.model_3_a.property_y
-        assert a.property_z == self.model_3_a.property_z
+        assert_allclose(a.property_x, self.model_3_a.property_x)
+        assert_allclose(a.property_y, self.model_3_a.property_y)
+        assert_allclose(a.property_z, self.model_3_a.property_z)
 
         # mu_r and epsilon_r
         a = self.model_mu_b - self.model_mu_a
         b = self.model_epsilon_b - self.model_epsilon_a
-        assert a.mu_r == self.model_mu_a.mu_r
-        assert b.epsilon_r == self.model_epsilon_a.epsilon_r
+        assert_allclose(a.mu_r, self.model_mu_a.mu_r)
+        assert_allclose(b.epsilon_r, self.model_epsilon_a.epsilon_r)
 
     def test_eq(self):
 
