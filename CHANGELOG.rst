@@ -45,10 +45,9 @@ latest: towards v1.0
     permittivity, it cannot be added afterwards. However, it can be initiated
     with dummy values and adjusted later.
 
-  - ``VolumeModel`` is, again, incorporated into ``Model``.
-
-  - ``Model``: all data is now stored in one array; [x, y, z, epsilon_r, mu_r];
-    if the {y;z} property is not set, it returns ``None`` now, not x.
+  - ``Model``: if ``property_y`` or ``property_z`` are not set they return now
+    ``None``, not ``property_x``. Also, only properties that have been
+    initiated can be changed afterwards.
 
 - ``TensorMesh``:
 

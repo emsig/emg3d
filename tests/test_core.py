@@ -37,7 +37,7 @@ def test_amat_x(njit):
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
     # Get volume-averaged model parameters.
-    model._init_vol_average(sfield)
+    vmodel = models.VolumeModel(model, sfield)
 
     # Run two iterations to get a e-field
     efield = solver.solve(model, sfield, sslsolver=False, semicoarsening=False,
@@ -46,14 +46,14 @@ def test_amat_x(njit):
     # amat_x
     rr1 = fields.Field(grid)
     amat_x(rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
-           model.eta_x, model.eta_y, model.eta_z, model.zeta, grid.h[0],
+           vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
            grid.h[1], grid.h[2])
 
     # amat_x - alternative
     rr2 = fields.Field(grid)
     alternatives.alt_amat_x(
             rr2.fx, rr2.fy, rr2.fz, efield.fx, efield.fy, efield.fz,
-            model.eta_x, model.eta_y, model.eta_z, model.zeta, grid.h[0],
+            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
             grid.h[1], grid.h[2])
 
     # Check all fields (ex, ey, and ez)
@@ -108,15 +108,15 @@ def test_gauss_seidel(njit):
         sfield = fields.get_source_field(grid, src, freq)
 
         # Get volume-averaged model parameters.
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         # Run two iterations to get some e-field.
         efield = solver.solve(model, sfield, sslsolver=False,
                               semicoarsening=False, linerelaxation=False,
                               maxit=2, verb=1)
 
-        inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-               model.eta_z, model.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
+        inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
+               vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
 
         # Get result from `gauss_seidel`.
         cfield = fields.Field(grid, efield.copy())

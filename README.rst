@@ -36,7 +36,7 @@ Features
 - **Iterative, matrix-free multigrid solver**, scaling linearly (CPU & RAM)
   with the number of unknowns, O(N).
 - Uses **regular, stretched grids**.
-- Handles **tri-axial electrical anisotropy**, isotropic electric permittivity,
+- Handles **triaxial electrical anisotropy**, isotropic electric permittivity,
   and isotropic magnetic permeability.
 - Written **purely in Python** using the NumPy/SciPy-stack, where the most time-
   and memory-consuming parts are sped up through jitted **Numba**-functions;

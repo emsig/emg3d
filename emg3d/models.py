@@ -1,5 +1,5 @@
 """
-Everything to create model-properties for the multigrid solver.
+Everything to store electromagnetic material properties for the solver.
 """
 # Copyright 2018-2021 The emg3d Developers.
 #
@@ -24,70 +24,77 @@ from scipy.constants import epsilon_0
 
 from emg3d import maps, meshes
 
+__all__ = ['Model', 'VolumeModel']
+
 
 # MODEL
 class Model:
-    r"""Create a model instance.
+    r"""A model containing the electromagnetic properties of the Earth.
 
-    Class to provide model parameters (x-, y-, and z-directed properties
-    [resistivity or conductivity; linear or on log_10/log_e-scale], electric
-    permittivity and magnetic permeability) to the solver. Relative magnetic
-    permeability :math:`\mu_\mathrm{r}` is by default set to one and electric
-    permittivity :math:`\varepsilon_\mathrm{r}` is by default set to zero, but
-    they can also be provided (isotropically). Keep in mind that the multigrid
-    method as implemented in `emg3d` only works for the diffusive
-    approximation. As soon as the displacement-part in the Maxwell's equations
-    becomes too dominant it will fail (high frequencies or very high electric
+    A model provides the required model parameters to the solver. The x-, y-,
+    and z-directed electrical properties are by default resistivities. However,
+    they can be defined as resistivities, :math:`\rho\ (\Omega\,\mathrm{m})`,
+    or conductivities, :math:`\sigma\ (\mathrm{S/m})`, either on a linear or on
+    a logarithmic scale (log or ln), by choosing the appropriate ``mapping``.
+    Relative magnetic permeability :math:`\mu_\mathrm{r}` is by default set to
+    one and electric permittivity :math:`\varepsilon_\mathrm{r}` is by default
+    set to zero, but they can also be provided (isotropically). Keep in mind
+    that the multigrid method as implemented in emg3d works for the diffusive
+    approximation. When the displacement part in Maxwell's equations becomes
+    too dominant it will start to fail (high frequencies or very high electric
     permittivity).
-
-
-    TODOs:
-
-    - Change to a subclassed ndarray; should give +;-;*;/;==;< etc
 
 
     Parameters
     ----------
     grid : TensorMesh
-        Grid on which to apply model.
+        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    property_{x;y;z} : {float, ndarray}, default: 1.
-        Material property in x-, y-, and z-directions. If ndarray, they must
-        have the shape of grid.shape_cells (F-ordered) or grid.n_cells.
+    property_{x;y;z} : {None, array_like}, default: ``1`` (x), ``None`` (y, z)
+        Electrical material property in x-, y-, and z-directions. The
+        properties are stored as Fortran-ordered arrays with the shape given by
+        ``grid.shape``. The provided value must be broadcastable to that shape.
 
         By default, property refers to electrical resistivity. However, this
-        can be changed with an appropriate map. For more info, see the
-        description of the parameter `mapping`. The internals of `emg3d` work,
-        irrelevant of the map, with electrical conductivities.
+        can be changed with an appropriate ``mapping`` (the internals of
+        emg3d work, irrelevant of the map, with electrical conductivities).
 
-        Resistivities and conductivities have to be bigger than zero and
-        smaller than infinity (if provided on a linear scale; not on
-        logarithmic scales).
+        The properties have to be of finite value, bigger than zero (on linear
+        scale). The four supported anisotropy cases are:
 
-    mu_r : None, float, or ndarray
-        Relative magnetic permeability (isotropic). If ndarray it must have the
-        shape of grid.shape_cells (F-ordered) or grid.n_cells. Default is None,
-        which corresponds to 1., but avoids the computation of zeta. Magnetic
-        permeability has to be bigger than zero and smaller than infinity.
+        - ``x;y=None;z=None``: isotropic (``y=z=x``);
+        - ``x;y=None;z``: vertical transverse isotropy VTI (``y=x``);
+        - ``x;y;z=None``: horizontal transverse isotropy HTI (``z=x``);
+        - ``x;y;z``: triaxial  anisotropy.
 
-    epsilon_r : None, float, or ndarray
-        Relative electric permittivity (isotropic). If ndarray it must have the
-        shape of grid.shape_cells (F-ordered) or grid.n_cells. The displacement
-        part is completely neglected (diffusive approximation) if set to None,
-        which is the default. Electric permittivity has to be bigger than zero
-        and smaller than infinity.
+        If a property is not initiated it cannot be set later on (e.g., if a
+        VTI model is created, it is not possible to set ``property_y`` later
+        on, instead, a new model has to be initiated).
 
-    mapping : str
-        Defines what type the input `property_{x;y;z}`-values correspond to. By
-        default, they represent resistivities (Ohm.m). The implemented types
-        are:
+    mu_r, epsilon_r : {None, array_like}, default: ``None``
+        Relative magnetic permeability (-) and relative electric permittivity
+        (-), respectively, both isotropic. The properties are stored as
+        Fortran-ordered arrays with the shape given by ``grid.shape``. The
+        provided value must be broadcastable to that shape.
 
-        - 'Conductivity'; σ (S/m),
-        - 'LgConductivity'; log_10(σ),
-        - 'LnConductivity'; log_e(σ),
-        - 'Resistivity'; ρ (Ohm.m); Default,
-        - 'LgResistivity'; log_10(ρ),
-        - 'LnResistivity'; log_e(ρ).
+        The properties have to be of finite value, bigger than zero.
+
+        The relative magnetic permeability is assumed to be 1 if not provided.
+
+        The relative electric permittivity is assumed to be 0 if not provided,
+        which ignores the displacement part completely (diffusive
+        approximation)
+
+    mapping : str, default: ``'Resistivity'``
+        Defines what type the electrical input ``property_{x;y;z}``-values
+        correspond to. The implemented types are:
+
+        - ``'Resistivity'``; ρ (Ω m);
+        - ``'Conductivity'``; σ (S/m);
+        - ``'LgResistivity'``; log_10(ρ);
+        - ``'LgConductivity'``; log_10(σ);
+        - ``'LnResistivity'``; log_e(ρ);
+        - ``'LnConductivity'``; log_e(σ).
 
     """
 
@@ -106,64 +113,31 @@ class Model:
         self.shape = self.grid.shape_cells
         self.size = self.grid.n_cells
 
-        # Get map.
+        # Get and store map.
         self.map = getattr(maps, 'Map'+mapping)()
 
-        # Initiate all parameters.
-        property_x = self._init_parameter(property_x, 'property_x')
-        property_y = self._init_parameter(property_y, 'property_y')
-        property_z = self._init_parameter(property_z, 'property_z')
-        epsilon_r = self._init_parameter(epsilon_r, 'epsilon_r')
-        mu_r = self._init_parameter(mu_r, 'mu_r',)
+        # Initiate and store all parameters.
+        self._property_x = self._init_parameter(property_x, 'property_x')
+        self._property_y = self._init_parameter(property_y, 'property_y')
+        self._property_z = self._init_parameter(property_z, 'property_z')
+        self._mu_r = self._init_parameter(mu_r, 'mu_r',)
+        self._epsilon_r = self._init_parameter(epsilon_r, 'epsilon_r')
+        self._properties = ['property_x', 'property_y', 'property_z',
+                            'mu_r', 'epsilon_r']
 
-        # Set case.
-        self._iy = None
-        self._iz = None
-        if property_y is None and property_z is None:
-            self.case = 0                   # Case 0: Isotropic.
-            data = property_x
-        elif property_z is None:
-            self.case = 1                   # Case 1: HTI.
-            self._iy = self.size
-            data = np.r_[property_x, property_y]
-        elif property_y is None:
-            self.case = 2                   # Case 2: VTI.
-            self._iz = self.size
-            data = np.r_[property_x, property_z]
+        # Store case.
+        if self._property_y is None and self._property_z is None:
+            self.case = 'isotropic'
+        elif self._property_z is None:
+            self.case = 'HTI'
+        elif self._property_y is None:
+            self.case = 'VTI'
         else:
-            self.case = 3                   # Case 3: Tri-axial anisotropy.
-            self._iy = self.size
-            self._iz = 2*self.size
-            data = np.r_[property_x, property_y, property_z]
-
-        self._ie = None
-        self._im = None
-        if epsilon_r is None and mu_r is None:
-            pass
-        elif mu_r is None:
-            self._ie = data.size
-            data = np.r_[data, epsilon_r]
-        elif epsilon_r is None:
-            self._im = data.size
-            data = np.r_[data, mu_r]
-        else:
-            self._ie = data.size
-            self._im = data.size+self.size
-            data = np.r_[data, epsilon_r, mu_r]
-
-        self.data = data
-
-        self.case_name = ['isotropic', 'HTI', 'VTI', 'tri-axial'][self.case]
-
-        # Initiate dummy values for volume averaged values.
-        self._eta_x = None
-        self._eta_y = None
-        self._eta_z = None
-        self._zeta = None
+            self.case = 'triaxial'
 
     def __repr__(self):
         """Simple representation."""
-        return (f"Model [{self.map.description}]; {self.case_name}"
+        return (f"Model [{self.map.description}]; {self.case}"
                 f"{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}"
                 f"; {self.shape[0]} x {self.shape[1]} x {self.shape[2]} "
@@ -183,7 +157,7 @@ class Model:
         kwargs = self._apply_operator(model, np.add)
 
         # Return new Model instance.
-        return Model(grid=self.grid, **kwargs)
+        return Model(grid=self.grid, mapping=self.map.name, **kwargs)
 
     def __sub__(self, model):
         """Subtract two models."""
@@ -199,15 +173,10 @@ class Model:
         kwargs = self._apply_operator(model, np.subtract)
 
         # Return new Model instance.
-        return Model(grid=self.grid, **kwargs)
+        return Model(grid=self.grid, mapping=self.map.name, **kwargs)
 
     def __eq__(self, model):
-        """Compare two models.
-
-        Note: Shape of parameters can be different, e.g. float, size, or shape.
-              As long as all values agree it returns True.
-
-        """
+        """Compare two models."""
 
         # Check if model is a Model instance.
         equal = model.__class__.__name__ == 'Model'
@@ -219,19 +188,12 @@ class Model:
             except ValueError:
                 equal = False
 
-        # Compare values.
+        # Compare values if not None.
         if equal:
-            equal *= np.allclose(self.property_x, model.property_x)
-            if self.property_y is not None:
-                equal *= np.allclose(self.property_y, model.property_y)
-            if self.property_z is not None:
-                equal *= np.allclose(self.property_z, model.property_z)
-            # operator_test ensures mu_r are both or neither None.
-            if self.mu_r is not None:
-                equal *= np.allclose(self.mu_r, model.mu_r)
-            # operator_test ensures epsilon_r are both or neither None.
-            if self.epsilon_r is not None:
-                equal *= np.allclose(self.epsilon_r, model.epsilon_r)
+            for prop in self._properties:
+                val = getattr(self, prop)
+                if val is not None:
+                    equal *= np.allclose(val, getattr(model, prop))
 
         return bool(equal)
 
@@ -245,27 +207,8 @@ class Model:
         out = {}
 
         # Properties.
-        out['property_x'] = self.property_x
-        if self.case in [1, 3]:
-            out['property_y'] = self.property_y
-        else:
-            out['property_y'] = None
-        if self.case in [2, 3]:
-            out['property_z'] = self.property_z
-        else:
-            out['property_z'] = None
-
-        # mu_r.
-        if self.mu_r is not None:
-            out['mu_r'] = self.mu_r
-        else:
-            out['mu_r'] = None
-
-        # epsilon_r.
-        if self.epsilon_r is not None:
-            out['epsilon_r'] = self.epsilon_r
-        else:
-            out['epsilon_r'] = None
+        for prop in self._properties:
+            out[prop] = getattr(self, prop)
 
         # Grid info.
         out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
@@ -284,18 +227,21 @@ class Model:
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert the dictionary into a Model instance.
+        """Convert dictionary into a Model instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Model.to_dict`.
-            The dictionary needs the keys `property_x`, `property_y`,
-            `property_z`, `mu_r`, `epsilon_r`, `grid`, and `mapping`.
+            Dictionary as obtained from :func:`Model.to_dict`. The dictionary
+            needs the keys ``property_x``, ``property_y``, ``property_z``,
+            ``mu_r``, ``epsilon_r``, ``grid``, and ``mapping``; ``grid`` itself
+            is also a dict which needs the keys ``hx``, ``hy``, ``hz``, and
+            ``origin``.
 
         Returns
         -------
-        obj : :class:`Model` instance
+        obj : Model
+            A new :class:`emg3d.models.Model` instance.
 
         """
         try:
@@ -306,157 +252,109 @@ class Model:
                        mu_r=inp['mu_r'],
                        epsilon_r=inp['epsilon_r'],
                        mapping=inp['mapping'])
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
 
-    # PROPERTY
+        except KeyError as e:
+            raise KeyError(f"Variable {e} missing in ``inp``.") from e
+
+    # ELECTRICAL PROPERTIES
     @property
     def property_x(self):
-        r"""Property in x-direction."""
-        return self.data[:self.size].reshape(self.shape, order='F')
+        r"""Electrical property in x-direction."""
+        return self._property_x
 
     @property_x.setter
     def property_x(self, property_x):
-        r"""Update property in x-direction."""
+        r"""Update electrical property in x-direction."""
         self._check_positive_finite(property_x, 'property_x')
-        self.data[:self.size] = np.asarray(property_x).ravel('F')
+        self._property_x[:] = np.asfortranarray(property_x, dtype=np.float64)
 
     @property
     def property_y(self):
-        r"""Property in y-direction."""
-        if self.case in [1, 3]:  # HTI or tri-axial.
-            return self.data[self._iy:self._iy+self.size].reshape(
-                    self.shape, order='F')
-        else:                    # Return property_x.
-            return None
+        r"""Electrical property in y-direction."""
+        return self._property_y
 
     @property_y.setter
     def property_y(self, property_y):
-        r"""Update property in y-direction."""
+        r"""Update electrical property in y-direction."""
         self._check_positive_finite(property_y, 'property_y')
-        self.data[self._iy:self._iy+self.size] = np.asarray(
-                property_y).ravel('F')
+        self._property_y[:] = np.asfortranarray(property_y, dtype=np.float64)
 
     @property
     def property_z(self):
-        r"""Property in z-direction."""
-        if self.case in [2, 3]:  # VTI or tri-axial.
-            return self.data[self._iz:self._iz+self.size].reshape(
-                    self.shape, order='F')
-        else:                    # Return property_x.
-            return None
+        r"""Electrical property in z-direction."""
+        return self._property_z
 
     @property_z.setter
     def property_z(self, property_z):
-        r"""Update property in z-direction."""
+        r"""Update electrical property in z-direction."""
         self._check_positive_finite(property_z, 'property_z')
-        self.data[self._iz:self._iz+self.size] = np.asarray(
-                property_z).ravel('F')
+        self._property_z[:] = np.asfortranarray(property_z, dtype=np.float64)
 
-    # ELECTRIC PERMITTIVITIES
-    @property
-    def epsilon_r(self):
-        r"""Electric permittivity."""
-        if self._ie is None:
-            return None
-        else:
-            return self.data[self._ie:self._ie+self.size].reshape(
-                    self.shape, order='F')
-
-    @epsilon_r.setter
-    def epsilon_r(self, epsilon_r):
-        r"""Update electric permittivity."""
-        self._check_positive_finite(epsilon_r, 'epsilon_r')
-        self.data[self._ie:self._ie+self.size] = np.asarray(
-                epsilon_r).ravel('F')
-
-    # MAGNETIC PERMEABILITIES
     @property
     def mu_r(self):
-        r"""Magnetic permeability."""
-        if self._im is None:
-            return None
-        else:
-            return self.data[self._im:self._im+self.size].reshape(
-                    self.shape, order='F')
+        r"""Relative magnetic permeability."""
+        return self._mu_r
 
     @mu_r.setter
     def mu_r(self, mu_r):
-        r"""Update magnetic permeability."""
+        r"""Update relative magnetic permeability."""
         self._check_positive_finite(mu_r, 'mu_r')
-        self.data[self._im:self._im+self.size] = np.asarray(mu_r).ravel('F')
+        self._mu_r[:] = np.asfortranarray(mu_r, dtype=np.float64)
 
-    def interpolate2grid(self, grid, new_grid, **grid2grid_opts):
-        """Interpolate `Model` located on `grid` to `new_grid`.
+    @property
+    def epsilon_r(self):
+        r"""Relative electric permittivity."""
+        return self._epsilon_r
+
+    @epsilon_r.setter
+    def epsilon_r(self, epsilon_r):
+        r"""Update relative electric permittivity."""
+        self._check_positive_finite(epsilon_r, 'epsilon_r')
+        self._epsilon_r[:] = np.asfortranarray(epsilon_r, dtype=np.float64)
+
+    # INTERPOLATION
+    def interpolate2grid(self, grid, **grid2grid_opts):
+        """Interpolate the model to a new grid.
 
 
         Parameters
         ----------
-        grid, new_grid : TensorMesh
-            Input and output model grids;
-            :class:`emg3d.meshes.TensorMesh` instances.
+        grid : TensorMesh
+            Grid of the new model; a :class:`emg3d.meshes.TensorMesh` instance.
 
         grid2grid_opts : dict
-            Passed through to :func:`maps.grid2grid`. Defaults are
-            `method='volume'`, `log=True`, and `extrapolate=True`.
+            Passed through to :func:`emg3d.maps.grid2grid`. Defaults are
+            ``method='volume'``, ``log=True``, and ``extrapolate=True``.
 
 
         Returns
         -------
-        NewModel : Model
-            New :class:`Model` instance on `new_grid`.
+        obj : Model
+            A new :class:`emg3d.models.Model` instance on ``grid``.
 
         """
 
         # Get solver options, set to defaults if not provided.
-        inp = {
-                'method': 'volume',
-                'extrapolate': True,
-                'log': not self.map.name.startswith('L'),
-                **(grid2grid_opts if grid2grid_opts is not None else {}),
-                'grid': grid,
-                'new_grid': new_grid
+        g2g_inp = {
+            'method': 'volume',
+            'extrapolate': True,
+            'log': not self.map.name.startswith('L'),
+            **(grid2grid_opts if grid2grid_opts is not None else {}),
+            'grid': self.grid,
+            'new_grid': grid,
         }
 
-        def ensure_shape(prop):
-            """Expand float-properties to shape."""
-            return prop*np.ones(self.shape) if prop.size == 1 else prop
+        # Interpolate property_{x;y;z}; mu_r; and epsilon_r; add to dict.
+        model_inp = {}
+        for prop in self._properties:
+            var = getattr(self, prop)
+            if var is None:
+                model_inp[prop] = None
+            else:
+                model_inp[prop] = maps.grid2grid(values=var, **g2g_inp)
 
-        # property_x (always).
-        property_x = maps.grid2grid(
-                values=ensure_shape(self.property_x), **inp)
-
-        # property_y.
-        if self.case in [1, 3]:
-            property_y = maps.grid2grid(
-                    values=ensure_shape(self.property_y), **inp)
-        else:
-            property_y = None
-
-        # property_z.
-        if self.case in [2, 3]:
-            property_z = maps.grid2grid(
-                    values=ensure_shape(self.property_z), **inp)
-        else:
-            property_z = None
-
-        # mu_r.
-        if self._im is None:
-            mu_r = None
-        else:
-            mu_r = maps.grid2grid(values=ensure_shape(self.mu_r), **inp)
-
-        # epsilon_r.
-        if self._ie is None:
-            epsilon_r = None
-        else:
-            epsilon_r = maps.grid2grid(
-                values=ensure_shape(self.epsilon_r), **inp)
-
-        # Assemble coarse model.
-        return Model(new_grid, property_x=property_x, property_y=property_y,
-                     property_z=property_z, mu_r=mu_r, epsilon_r=epsilon_r,
-                     mapping=self.map.name)
+        # Assemble new model.
+        return Model(grid, mapping=self.map.name, **model_inp)
 
     # INTERNAL UTILITIES
     def _init_parameter(self, values, name):
@@ -466,26 +364,33 @@ class Model:
         if values is None:
             return None
 
-        # Cast it to floats.
-        values = np.asarray(values, dtype=np.float64)
+        # Cast it to an array of floats, in Fortran order.
+        values = np.asfortranarray(values, dtype=np.float64)
 
-        # If it is not self.size or self.shape, broadcast it.
-        if values.shape != self.shape and values.size != self.size:
-            values = np.ones(self.shape)*values
+        # If 1D array of self.size, reshape it.
+        if values.size == self.size:
+            values = values.reshape(self.shape, order='F')
 
+        # If not of shape self.shape, broadcast it.
+        elif values.shape != self.shape:
+            values = np.ones(self.shape, order='F')*values
+
+        # Check >0 and finite.
         self._check_positive_finite(values, name)
 
-        return values.ravel('F')
+        return values
 
     def _check_positive_finite(self, values, name):
         """Check parameter values are positive (on linear scale) and finite."""
 
+        # If it is None, it cannot be set.
         if hasattr(self, '_'+name) and getattr(self, '_'+name) is None:
             msg = f"Model was initiated without `{name}`; cannot set values."
             raise ValueError(msg)
 
+        # Get mapped values; checks are carried out on conductivities.
         if 'property_' in name:
-            mapped = self.map.backward(values)
+            mapped = self.map.backward(np.asarray(values))
         else:
             mapped = values
 
@@ -498,187 +403,131 @@ class Model:
             raise ValueError(f"`{name}` must be all finite.")
 
     def _operator_test(self, model):
-        """Check if `self` and `model` are consistent for operations.
+        """Check if ``self`` and ``model`` are consistent for operations."""
 
-        Note: {hx; hy; hz} is not checked. As long as the models have the
-              same shape, isotropy, and mapping the operation will be carried
-              out.
-
-        """
-
-        # Ensure the two instances have the same dimension.
-        if np.any(self.shape != model.shape):
-            msg = (f"Models could not be broadcast together with shapes "
-                   f"{self.shape} and {model.shape}.")
-            raise ValueError(msg)
+        # Ensure the two instances have the same grid.
+        if self.grid != model.grid:
+            raise ValueError("Models have different grids.")
 
         # Ensure the two instances have the same case.
         if self.case != model.case:
-            msg = ("Models must be of the same isotropy type but have types"
-                   f" '{self.case_name}' and '{model.case_name}'.")
-            raise ValueError(msg)
-
-        # Ensure TODO:
-        if hasattr(self.property_y, 'dtype') != hasattr(
-                model.property_y, 'dtype'):
-            msg = ("TODO")
-            raise ValueError(msg)
-
-        # Ensure TODO:
-        if hasattr(self.property_z, 'dtype') != hasattr(
-                model.property_z, 'dtype'):
-            msg = ("TODO")
-            raise ValueError(msg)
+            raise ValueError("Models have different anisotropy.")
 
         # Ensure both or none has mu_r:
-        if hasattr(self.mu_r, 'dtype') != hasattr(model.mu_r, 'dtype'):
-            msg = ("Either both or none of the models must have `mu_r` "
-                   f"defined; provided: '{hasattr(self.mu_r, 'dtype')}' "
-                   f"and '{hasattr(model.mu_r, 'dtype')}'.")
-            raise ValueError(msg)
+        if (self.mu_r is None) != (model.mu_r is None):
+            raise ValueError("One model has mu_r, the other not.")
 
         # Ensure both or none has epsilon_r:
-        if (hasattr(self.epsilon_r, 'dtype') !=
-                hasattr(model.epsilon_r, 'dtype')):
-            msg = ("Either both or none of the models must have `epsilon_r` "
-                   f"defined; provided: '{hasattr(self.epsilon_r, 'dtype')}' "
-                   f"and '{hasattr(model.epsilon_r, 'dtype')}'.")
-            raise ValueError(msg)
+        if (self.epsilon_r is None) != (model.epsilon_r is None):
+            raise ValueError("One model has epsilon_r, the other not.")
 
         # Ensure the two instances have the same mapping:
         if self.map.name != model.map.name:
-            msg = ("Models must have the same mapping but have mappings"
-                   f" '{self.map.name}' and '{model.map.name}'.")
-            raise ValueError(msg)
+            raise ValueError("Models have different mappings.")
 
     def _apply_operator(self, model, operator):
         """Apply the provided operator to self and model."""
 
+        # Apply operator to property_{x;y;z}; mu_r; and epsilon_r; add to dict.
         kwargs = {}
-
-        # Subtract properties.
-        kwargs['property_x'] = operator(self.property_x, model.property_x)
-        if self.case in [1, 3]:
-            kwargs['property_y'] = operator(self.property_y, model.property_y)
-        else:
-            kwargs['property_y'] = None
-        if self.case in [2, 3]:
-            kwargs['property_z'] = operator(self.property_z, model.property_z)
-        else:
-            kwargs['property_z'] = None
-
-        # Subtract mu_r.
-        if self.mu_r is not None:
-            kwargs['mu_r'] = operator(self.mu_r, model.mu_r)
-        else:
-            kwargs['mu_r'] = None
-
-        # Subtract epsilon_r.
-        if self.epsilon_r is not None:
-            kwargs['epsilon_r'] = operator(self.epsilon_r, model.epsilon_r)
-        else:
-            kwargs['epsilon_r'] = None
-
-        kwargs['mapping'] = self.map.name
+        for prop in self._properties:
+            val = getattr(self, prop)
+            if val is None:
+                kwargs[prop] = None
+            else:
+                kwargs[prop] = operator(val, getattr(model, prop))
 
         return kwargs
 
-    def _init_vol_average(self, sfield):
+
+class VolumeModel:
+    r"""Return simplified model with volume-averaged eta_{x;y;z}; zeta.
+
+    Takes a model and a source field and returns the volume-averaged eta and
+    zeta values. This is used internally by the solver.
+
+    .. math::
+
+        \eta_{\{x,y,z\}} = -V\mathrm{i}\omega\mu_0
+              \left(\sigma_{\{x,y,z\}} + \mathrm{i}\omega\varepsilon\right)
+
+    .. math::
+
+        \zeta = V\mu_\mathrm{r}^{-1}
+
+
+    Parameters
+    ----------
+    model : Model
+        Model to transform to volume-averaged values.
+
+    sfield : SourceField
+       A VolumeModel is frequency-dependent. The frequency-information is taken
+       from the provided source field.
+
+    """
+
+    def __init__(self, model, sfield):
         """Initiate a new model with volume-averaged properties."""
 
-        # eta_x
-        self._eta_x = self._calculate_eta('property_x', sfield)
+        # Store case and minimal TensorMesh.
+        self.case = model.case
+        self.grid = meshes.BaseMesh(model.grid.h, model.grid.origin)
 
-        # eta_y
-        if self.case in [1, 3]:  # HTI or tri-axial.
-            self._eta_y = self._calculate_eta('property_y', sfield)
+        # Get volume for volume-averaged values.
+        vol = self.grid.cell_volumes.reshape(model.shape, order='F')
 
-        # eta_z
-        if self.case in [2, 3]:  # VTI or tri-axial.
-            self._eta_z = self._calculate_eta('property_z', sfield)
+        # Compute and store eta.
+        for name in model._properties[:3]:
 
-        # zeta
-        self._zeta = self._calculate_zeta()
+            prop = getattr(model, name)
 
-    def _calculate_eta(self, name, field):
-        r"""eta: volume multiplied with conductivity.
+            if prop is None:
+                eta = None
 
-        .. math::
+            else:
+                # Get conductivities.
+                cond = model.map.backward(prop)
 
-            \eta_{\{x,y,z\}} = -V\mathrm{i}\omega\mu_0
-                \left(\rho^{-1}_{\{x,y,z\}} +
-                \mathrm{i}\omega\varepsilon\right)
+                # Diffusive approximation.
+                if model.epsilon_r is None:
+                    eta = sfield.smu0*vol*cond
 
-        Parameters
-        ----------
-        sfield : SourceField
-            Volume-averaged model parameters are frequency-dependent. The
-            frequency-information is taken from the provided source filed.
+                # Complete version.
+                else:
+                    eta = sfield.smu0*vol*(
+                            cond - sfield.sval*epsilon_0*model.epsilon_r)
 
-        """
+            setattr(self, '_eta_' + name[-1], eta)
 
-        # Initiate eta
-        eta = field.smu0*self.grid.cell_volumes.reshape(self.shape, order='F')
+        # Compute and store zeta.
+        zeta = vol
+        if model.mu_r is not None:
+            zeta /= model.mu_r
+        self._zeta = zeta
 
-        if getattr(self, name) is None:
-            sig_term = self.map.backward(self.property_x)
-        else:
-            sig_term = self.map.backward(getattr(self, name))
-
-        # Compute eta depending on epsilon.
-        if self._ie is None:  # Diffusive approximation.
-            eta = eta*sig_term
-
-        else:
-            eps_term = field.sval*epsilon_0*self.epsilon_r
-            eta *= sig_term - eps_term
-
-        return eta
-
-    def _calculate_zeta(self):
-        r"""zeta: volume divided by mu_r.
-
-        .. math::
-
-            \zeta = V\mu_\mathrm{r}^{-1}
-
-
-        Parameters
-        ----------
-        sfield : SourceField
-            Volume-averaged model parameters are frequency-dependent. The
-            frequency-information is taken from the provided source filed.
-
-        """
-        zeta = self.grid.cell_volumes.reshape(self.shape, order='F')
-        if self._im is not None:
-            zeta = zeta / self.mu_r
-
-        return zeta
-
-    # Volume averaged values
     @property
     def eta_x(self):
-        r"""eta in x-direction."""
+        r"""Volume-averaged eta in x-direction."""
         return self._eta_x
 
     @property
     def eta_y(self):
-        r"""eta in y-direction."""
-        if self.case in [1, 3]:  # HTI or tri-axial.
+        r"""Volume-averaged eta in y-direction."""
+        if self.case in ['HTI', 'triaxial']:
             return self._eta_y
-        else:                    # Return eta_x.
+        else:
             return self._eta_x
 
     @property
     def eta_z(self):
-        r"""eta in z-direction."""
-        if self.case in [2, 3]:  # VTI or tri-axial.
+        r"""Volume-averaged eta in z-direction."""
+        if self.case in ['VTI', 'triaxial']:
             return self._eta_z
-        else:                    # Return eta_x.
+        else:
             return self._eta_x
 
     @property
     def zeta(self):
-        r"""zeta."""
+        r"""Volume-averaged, isotropic zeta."""
         return self._zeta

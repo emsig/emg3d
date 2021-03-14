@@ -25,7 +25,7 @@ import numpy as np
 from scipy.constants import mu_0
 from scipy.special import sindg, cosdg
 
-from emg3d import maps, meshes, utils
+from emg3d import maps, meshes, models, utils
 
 __all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
            'get_h_field']
@@ -714,7 +714,7 @@ def get_h_field(model, field):
     if model.mu_r is not None:
 
         # Get volume-averaged values.
-        model._init_vol_average(field)
+        vmodel = models.VolumeModel(model, field)
 
         # Plus and minus indices.
         ixm = np.r_[0, np.arange(model.shape[0])]
@@ -725,9 +725,9 @@ def get_h_field(model, field):
         izp = np.r_[np.arange(model.shape[2]), model.shape[2]-1]
 
         # Average mu_r for dual-grid.
-        zeta_x = (model.zeta[ixm, :, :] + model.zeta[ixp, :, :])/2.
-        zeta_y = (model.zeta[:, iym, :] + model.zeta[:, iyp, :])/2.
-        zeta_z = (model.zeta[:, :, izm] + model.zeta[:, :, izp])/2.
+        zeta_x = (vmodel.zeta[ixm, :, :] + vmodel.zeta[ixp, :, :])/2.
+        zeta_y = (vmodel.zeta[:, iym, :] + vmodel.zeta[:, iyp, :])/2.
+        zeta_z = (vmodel.zeta[:, :, izm] + vmodel.zeta[:, :, izp])/2.
 
         hvx = field.grid.h[0][:, None, None]
         hvy = field.grid.h[1][None, :, None]

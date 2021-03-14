@@ -273,7 +273,7 @@ class TestMultigrid:
         model = models.Model(**dat['input_model'])
         grid = model.grid
         sfield = fields.get_source_field(**dat['input_source'])
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
         efield = fields.Field(grid)  # Initiate e-field.
 
         # Get var-instance
@@ -285,7 +285,7 @@ class TestMultigrid:
         var.l2_refe = sl.norm(sfield, check_finite=False)
 
         # Call multigrid.
-        solver.multigrid(model, sfield, efield, var)
+        solver.multigrid(vmodel, sfield, efield, var)
         out, _ = capsys.readouterr()
         assert '> CONVERGED' in out
 
@@ -299,10 +299,10 @@ class TestKrylov:
         dat = REGRES['res']
         model = models.Model(**dat['input_model'])
         grid = model.grid
-        model.property_x /= 100000  # Set stupid input to make bicgstab fail.
-        model.property_y *= 100000  # Set stupid input to make bicgstab fail.
+        model.property_x *= 100000  # Set stupid input to make bicgstab fail.
+        model.property_y /= 100000  # Set stupid input to make bicgstab fail.
         sfield = fields.get_source_field(**dat['input_source'])
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
         efield = fields.Field(grid)  # Initiate e-field.
 
         # Get var-instance
@@ -314,7 +314,7 @@ class TestKrylov:
         var.l2_refe = sl.norm(sfield, check_finite=False)
 
         # Call krylov and ensure it fails properly.
-        solver.krylov(model, sfield, efield, var)
+        solver.krylov(vmodel, sfield, efield, var)
         out, _ = capsys.readouterr()
         assert '* ERROR   :: Error in bicgstab' in out
 
@@ -325,7 +325,7 @@ class TestKrylov:
         model = models.Model(**dat['input_model'])
         grid = model.grid
         sfield = fields.get_source_field(**dat['input_source'])
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
         efield = fields.Field(grid)  # Initiate e-field.
 
         # Get var-instance
@@ -337,7 +337,7 @@ class TestKrylov:
         var.l2_refe = sl.norm(sfield, check_finite=False)
 
         # Call krylov and ensure it fails properly.
-        solver.krylov(model, sfield, efield, var)
+        solver.krylov(vmodel, sfield, efield, var)
         out, _ = capsys.readouterr()
         assert 'DIVERGED' in out
 
@@ -348,7 +348,7 @@ class TestKrylov:
         model = models.Model(**dat['input_model'])
         grid = model.grid
         sfield = fields.get_source_field(**dat['input_source'])
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
         efield = fields.Field(grid)  # Initiate e-field.
 
         # Get var-instance
@@ -360,7 +360,7 @@ class TestKrylov:
         var.l2_refe = sl.norm(sfield, check_finite=False)
 
         # Call krylov and ensure it fails properly.
-        solver.krylov(model, sfield, efield, var)
+        solver.krylov(vmodel, sfield, efield, var)
         out, _ = capsys.readouterr()
         assert '> CONVERGED' in out
 
@@ -373,7 +373,7 @@ class TestKrylov:
                 maxit=1,
         )
         var.l2_refe = sl.norm(sfield, check_finite=False)
-        solver.krylov(model, sfield, efield, var)
+        solver.krylov(vmodel, sfield, efield, var)
         out, _ = capsys.readouterr()
         assert 'MAX. ITERATION REACHED' in out
 
@@ -413,14 +413,14 @@ def test_smoothing():
         sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
         # Get volume-averaged model parameters.
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         # Run two iterations to get an e-field
         field = solver.solve(model, sfield, maxit=2)
 
         # Collect Gauss-Seidel input (same for all routines)
-        inp = (sfield.fx, sfield.fy, sfield.fz, model.eta_x, model.eta_y,
-               model.eta_z, model.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
+        inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
+               vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
 
         func = ['', '_x', '_y', '_z']
         for lr_dir in range(8):
@@ -445,7 +445,7 @@ def test_smoothing():
 
             # Use solver.smoothing
             ofield = fields.Field(grid, field)
-            solver.smoothing(model, sfield, ofield, nu, lr_dir)
+            solver.smoothing(vmodel, sfield, ofield, nu, lr_dir)
 
             # Compare
             assert_allclose(efield, ofield)
@@ -467,7 +467,7 @@ class TestRestrictionProlongation:
         sfield = fields.get_source_field(grid, src, 1)
 
         # Get volume-averaged model parameters.
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
                 sfield.fx.shape)
@@ -480,7 +480,7 @@ class TestRestrictionProlongation:
 
         # Restrict it
         cmodel, csfield, cefield = solver.restriction(
-                model, sfield, rr, sc_dir=sc)
+                vmodel, sfield, rr, sc_dir=sc)
 
         assert_allclose(csfield.fx[:, 1:-1, 1],
                         np.array([[196.+0.j], [596.+0.j]]))
@@ -490,7 +490,7 @@ class TestRestrictionProlongation:
                         np.array([[[388.+0.j, 404.+0.j]]]))
         assert cmodel.grid.shape_nodes[0] == cmodel.grid.shape_nodes[1] == 3
         assert cmodel.grid.shape_nodes[2] == 3
-        assert cmodel.eta_x[0, 0, 0]/8. == model.eta_x[0, 0, 0]
+        assert cmodel.eta_x[0, 0, 0]/8. == vmodel.eta_x[0, 0, 0]
         assert np.sum(grid.h[0]) == np.sum(cmodel.grid.h[0])
         assert np.sum(grid.h[1]) == np.sum(cmodel.grid.h[1])
         assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
@@ -520,7 +520,7 @@ class TestRestrictionProlongation:
         sfield = fields.get_source_field(grid, src, 1)
 
         # Get volume-averaged model parameters.
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
                 sfield.fx.shape)
@@ -533,7 +533,7 @@ class TestRestrictionProlongation:
 
         # Restrict it
         cmodel, csfield, cefield = solver.restriction(
-                model, sfield, rr, sc_dir=sc)
+                vmodel, sfield, rr, sc_dir=sc)
 
         assert_allclose(csfield.fx[:, 1:-1, 1],
                         np.array([[48.+0.j], [148.+0.j],
@@ -548,7 +548,7 @@ class TestRestrictionProlongation:
         assert cmodel.grid.shape_nodes[0] == 5
         assert cmodel.grid.shape_nodes[1] == 3
         assert cmodel.grid.shape_nodes[2] == 3
-        assert cmodel.eta_x[0, 0, 0]/4. == model.eta_x[0, 0, 0]
+        assert cmodel.eta_x[0, 0, 0]/4. == vmodel.eta_x[0, 0, 0]
         assert np.sum(grid.h[0]) == np.sum(cmodel.grid.h[0])
         assert np.sum(grid.h[1]) == np.sum(cmodel.grid.h[1])
         assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
@@ -578,7 +578,7 @@ class TestRestrictionProlongation:
         sfield = fields.get_source_field(grid, src, 1)
 
         # Get volume-averaged model parameters.
-        model._init_vol_average(sfield)
+        vmodel = models.VolumeModel(model, sfield)
 
         rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
                 sfield.fx.shape)
@@ -591,7 +591,7 @@ class TestRestrictionProlongation:
 
         # Restrict it
         cmodel, csfield, cefield = solver.restriction(
-                model, sfield, rr, sc_dir=sc)
+                vmodel, sfield, rr, sc_dir=sc)
 
         assert_allclose(csfield.fx[:, 1:-1, 1],
                         np.array([[37.+0.j, 47.+0.j, 57.+0.j],
@@ -605,7 +605,7 @@ class TestRestrictionProlongation:
         assert cmodel.grid.shape_nodes[0] == 3
         assert cmodel.grid.shape_nodes[1] == 5
         assert cmodel.grid.shape_nodes[2] == 5
-        assert cmodel.eta_x[0, 0, 0]/2. == model.eta_x[0, 0, 0]
+        assert cmodel.eta_x[0, 0, 0]/2. == vmodel.eta_x[0, 0, 0]
         assert np.sum(grid.h[0]) == np.sum(cmodel.grid.h[0])
         assert np.sum(grid.h[1]) == np.sum(cmodel.grid.h[1])
         assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
@@ -644,7 +644,7 @@ def test_residual():
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
 
     # Get volume-averaged model parameters.
-    model._init_vol_average(sfield)
+    vmodel = models.VolumeModel(model, sfield)
 
     # Run two iterations to get an e-field
     efield = solver.solve(model, sfield, maxit=2)
@@ -653,12 +653,12 @@ def test_residual():
     rfield = sfield.copy()
     core.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
-            model.eta_x, model.eta_y, model.eta_z, model.zeta, grid.h[0],
+            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
             grid.h[1], grid.h[2])
 
     # Compute residual
-    out = solver.residual(model, sfield, efield)
-    outnorm = solver.residual(model, sfield, efield, True)
+    out = solver.residual(vmodel, sfield, efield)
+    outnorm = solver.residual(vmodel, sfield, efield, True)
 
     # Compare
     assert_allclose(out, rfield)

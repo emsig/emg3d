@@ -3,7 +3,7 @@ A simulation is the computation (modelling) of electromagnetic responses of a
 resistivity (conductivity) model for a given survey.
 
 In its heart, `emg3d` is a multigrid solver for 3D electromagnetic diffusion
-with tri-axial electrical anisotropy. However, it contains most functionalities
+with triaxial electrical anisotropy. However, it contains most functionalities
 to also act as a modeller. The simulation module combines all these things
 by combining surveys with computational meshes and fields and providing
 high-level, specialised modelling routines.
@@ -624,7 +624,7 @@ class Simulation:
             # Get model for this frequency if not yet computed.
             if freq not in self._model_frequency.keys():
                 self._model_frequency[freq] = self.model.interpolate2grid(
-                        self.grid, self.get_grid(source, freq))
+                        self.get_grid(source, freq))
 
             # Store link to model.
             self._dict_model[source][freq] = self._model_frequency[freq]
@@ -638,7 +638,7 @@ class Simulation:
             # Get model for this source if not yet computed.
             if source not in self._model_source.keys():
                 self._model_source[source] = self.model.interpolate2grid(
-                        self.grid, self.get_grid(source, freq))
+                        self.get_grid(source, freq))
 
             # Store link to model.
             self._dict_model[source][freq] = self._model_source[source]
@@ -647,7 +647,7 @@ class Simulation:
 
             # Get model and store it.
             self._dict_model[source][freq] = self.model.interpolate2grid(
-                        self.grid, self.get_grid(source, freq))
+                        self.get_grid(source, freq))
 
         else:  # Use a single grid for all sources and receivers.
             # Default case; catches 'single' but also anything else.
@@ -655,7 +655,7 @@ class Simulation:
             # Get model if not yet computed.
             if not hasattr(self, '_model_single'):
                 self._model_single = self.model.interpolate2grid(
-                        self.grid, self.get_grid(source, freq))
+                        self.get_grid(source, freq))
 
             # Store link to model.
             self._dict_model[source][freq] = self._model_single
