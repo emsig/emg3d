@@ -55,7 +55,7 @@ origin, with a 10 Hz signal of 1 A.
     In [3]: model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
        ...:                     property_z=3.3, mapping='Resistivity')
        ...: model
-    Out[3]:    Model [resistivity]; tri-axial; 48 x 32 x 32 (49,152)
+    Out[3]:    Model [resistivity]; triaxial; 48 x 32 x 32 (49,152)
 
     In [4]: sfield = emg3d.get_source_field(grid=grid, src=[0, 0, 0, 0, 0], freq=10)
 

@@ -40,6 +40,15 @@ latest: towards v1.0
     that required the ``grid`` and the ``model`` require now only the
     ``model``; e.g., ``emg3d.solver.solve`` or ``emg3d.fields.get_h_field``.
 
+  - A ``Model`` has to be initiated with all desired properties; it cannot be
+    changed afterwards. E.g., if it was initiated without electric
+    permittivity, it cannot be added afterwards. However, it can be initiated
+    with dummy values and adjusted later.
+
+  - ``Model``: if ``property_y`` or ``property_z`` are not set they return now
+    ``None``, not ``property_x``. Also, only properties that have been
+    initiated can be changed afterwards.
+
 - ``TensorMesh``:
 
   - The basic mesh (without ``discretize``) is renamed from ``_TensorMesh`` to

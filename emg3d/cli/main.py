@@ -35,7 +35,7 @@ def main(args=None):
     # Start CLI-arg-parser and define arguments.
     parser = argparse.ArgumentParser(
         description="emg3d is a multigrid solver for 3D EM diffusion "
-                    "with tri-axial anisotropy."
+                    "with triaxial anisotropy."
     )
 
     # arg: Optional parameter-file name.

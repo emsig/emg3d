@@ -299,8 +299,8 @@ class TestKrylov:
         dat = REGRES['res']
         model = models.Model(**dat['input_model'])
         grid = model.grid
-        model.property_x /= 100000  # Set stupid input to make bicgstab fail.
-        model.property_y *= 100000  # Set stupid input to make bicgstab fail.
+        model.property_x *= 100000  # Set stupid input to make bicgstab fail.
+        model.property_y /= 100000  # Set stupid input to make bicgstab fail.
         sfield = fields.get_source_field(**dat['input_source'])
         vmodel = models.VolumeModel(model, sfield)
         efield = fields.Field(grid)  # Initiate e-field.

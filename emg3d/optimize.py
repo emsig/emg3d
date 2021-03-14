@@ -152,7 +152,7 @@ def gradient(simulation):
     """
 
     # Check limitation 1: So far only isotropic models.
-    if simulation.model.case != 0:
+    if simulation.model.case != 'isotropic':
         raise NotImplementedError(
                 "Gradient only implemented for isotropic models.")
 
