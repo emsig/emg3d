@@ -76,11 +76,11 @@ html_logo = '_static/logo-emg3d-cut.svg'
 html_favicon = '_static/favicon.ico'
 
 html_theme_options = {
-  "github_url": "https://github.com/emsig/emg3d",
-  "external_links": [
-      {"name": "EMSiG", "url": "https://emsig.github.io"},
-  ],
-  # "use_edit_page_button": True,
+    "github_url": "https://github.com/emsig/emg3d",
+    "external_links": [
+        {"name": "EMSiG", "url": "https://emsig.github.io"},
+    ],
+    # "use_edit_page_button": True,
 }
 
 html_context = {
