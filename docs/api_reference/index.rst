@@ -12,7 +12,8 @@ API reference
 .. toctree::
    :maxdepth: 2
 
-   surveys-simulations
+   surveys
+   simulations
    meshes-models
    fields-maps
    optimize

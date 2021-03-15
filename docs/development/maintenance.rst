@@ -43,3 +43,15 @@ Quick overview / QC
      :alt: Zenodo DOI
 
   Check Zenodo is linking to the latest release.
+
+
+Info from ReadTheDocs
+---------------------
+
+.. ipython::
+
+    In [1]: import emg3d
+       ...: emg3d.Report(
+       ...:     ['sphinx', 'numpydoc', 'ipykernel', 'sphinx_numfig',
+       ...:      'sphinx_automodapi', 'pydata_sphinx_theme']
+       ...: )
