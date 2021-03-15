@@ -80,7 +80,7 @@ html_theme_options = {
     "external_links": [
         {"name": "EMSiG", "url": "https://emsig.github.io"},
     ],
-  # "use_edit_page_button": True,
+    # "use_edit_page_button": True,
 }
 
 html_context = {
