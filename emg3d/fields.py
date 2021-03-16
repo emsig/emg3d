@@ -314,6 +314,46 @@ class Field(np.ndarray):
         self.fz[:, 0, :] = 0.
         self.fz[:, -1, :] = 0.
 
+    # INTERPOLATION
+    def interpolate_to_grid(self, grid, **interpolate_opts):
+        """Interpolate the field to a new grid.
+
+
+        Parameters
+        ----------
+        grid : TensorMesh
+            Grid of the new model; a :class:`emg3d.meshes.TensorMesh` instance.
+
+        interpolate_opts : dict
+            Passed through to :func:`emg3d.maps.interpolate`. Defaults are
+            ``method='cubic'``, ``log=True``, and ``extrapolate=False``.
+
+
+        Returns
+        -------
+        obj : Field
+            A new :class:`emg3d.fields.Field` instance on ``grid``.
+
+        """
+
+        # Get solver options, set to defaults if not provided.
+        g2g_inp = {
+            'method': 'cubic',
+            'extrapolate': False,
+            'log': True,
+            **({} if interpolate_opts is None else interpolate_opts),
+            'grid': self.grid,
+            'new_grid': grid,
+        }
+
+        # Interpolate f{x;y;z} add to dict.
+        field = np.r_[maps.interpolate(values=self.fx, **g2g_inp).ravel('F'),
+                      maps.interpolate(values=self.fy, **g2g_inp).ravel('F'),
+                      maps.interpolate(values=self.fz, **g2g_inp).ravel('F')]
+
+        # Assemble new field.
+        return Field(grid, field, freq=self._freq)
+
 
 class SourceField(Field):
     r"""Create a Source-Field instance with x-, y-, and z-views of the field.
@@ -574,6 +614,7 @@ def get_receiver(field, rec):
     - TODO :: removed get_receiver
     - TODO :: check, simplify, document
     - TODO :: Improve tests!
+    - TODO :: incorporate into Field
 
     Note that in order to avoid boundary effects the first and last value in
     each direction is neglected. Field values for coordinates outside of the
@@ -639,14 +680,16 @@ def get_receiver(field, rec):
     resp = np.zeros(max([np.atleast_1d(x).size for x in rec]),
                     dtype=field.dtype)
 
-    # Add the required responses.
+    # Add the required responses. # TODO Change to maps.interpolate
+    from scipy.interpolate import interpnd
     factors = _rotation(*rec[3:])  # Geometrical weights from angles.
-    inp = {'method': 'cubic', 'fill_value': 0.0, 'mode': 'constant',
-           'cval': np.nan}
+    map_opts = {'mode': 'constant', 'cval': np.nan}
+    xi = interpnd._ndim_coords_from_arrays(rec[:3], ndim=3)
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
-            resp += factors[i]*maps.interp3d(
-                       points[i], ff[1:-1, 1:-1, 1:-1], rec[:3], **inp)
+            resp += factors[i]*maps.interp_spline_3d(
+                       points[i], ff[1:-1, 1:-1, 1:-1], xi,
+                       map_opts=map_opts)
 
     # Return response.
     return utils.EMArray(resp)
@@ -658,6 +701,8 @@ def get_h_field(model, field):
     - TODO REWORK THIS!
 
     - TODO Decide if to remove outermost layer or not
+
+    - TODO :: incorporate into Field
 
     Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
     :math:`\mathbf{E}` using Farady's law, given by

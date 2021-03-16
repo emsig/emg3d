@@ -111,7 +111,27 @@ latest: towards v1.0
 
 - ``maps``:
 
-  - Renamed ``_Map`` to ``BaseMap``.
+  - TODO : Completely reworked interpolation.
+
+  - Renamed
+
+    - ``_Map`` to ``BaseMap``;
+    - ``grid2grid`` to ``interpolate``;
+    - ``edges2cellaverages`` to ``interp_edges_to_vol_averages``;
+    - ``volume_average`` to ``interp_volume_average``;
+    - ``interp3d`` to ``interp_spline_3d``.
+
+  - Most of the renamed function have also new signatures.
+
+  - ``grid_to_grid``:
+
+    - Does not accept entire fields any longer. Entire fields can be mapped
+      with their new ``field.interpolate_to_grid`` method.
+
+    - Accepts also ndarray (..., 3) containing coordinates, instead of a new
+      grid.
+
+    - Additional method ``'nearest'`` to sample the model.
 
 - Removed all deprecated features.
 
