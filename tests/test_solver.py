@@ -36,7 +36,7 @@ class TestSolve:
         sfield = fields.get_source_field(**dat['input_source'])
 
         # F-cycle
-        efield = solver.solve(model, sfield, plain=True, verb=4)
+        efield = solver.solve(model=model, sfield=sfield, plain=True, verb=4)
         out, _ = capsys.readouterr()
 
         assert ' emg3d START ::' in out

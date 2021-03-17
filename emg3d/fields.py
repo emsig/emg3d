@@ -683,13 +683,12 @@ def get_receiver(field, rec):
     # Add the required responses. # TODO Change to maps.interpolate
     from scipy.interpolate import interpnd
     factors = _rotation(*rec[3:])  # Geometrical weights from angles.
-    map_opts = {'mode': 'constant', 'cval': np.nan}
     xi = interpnd._ndim_coords_from_arrays(rec[:3], ndim=3)
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interp_spline_3d(
                        points[i], ff[1:-1, 1:-1, 1:-1], xi,
-                       map_opts=map_opts)
+                       mode='constant', cval=np.nan)
 
     # Return response.
     return utils.EMArray(resp)

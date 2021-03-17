@@ -27,30 +27,58 @@ import scipy as sp
 from scipy import ndimage as _      # noqa - sp.ndimage
 from scipy import interpolate as _  # noqa - sp.interpolate
 
-__all__ = ['MapConductivity', 'MapLgConductivity', 'MapLnConductivity',
-           'MapResistivity', 'MapLgResistivity', 'MapLnResistivity',
-           'interpolate', 'interp_spline_3d', 'interp_volume_average',
-           'interp_edges_to_vol_averages']
+__all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
+           'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
+           'MapLnResistivity', 'interpolate', 'interp_spline_3d',
+           'interp_volume_average', 'interp_edges_to_vol_averages']
 
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 
 # MAPS
-MAPLIST = {}
+MAPLIST = {}  # Dict containing all mappings.
 
 
 def register_map(func):
+    """Decorator to register maps."""
     MAPLIST[func.__name__] = func
     return func
 
 
 class BaseMap:
-    """Maps variable `x` to computational variable `σ` (conductivity)."""
+    """Maps variable `x` to computational variable `σ` (conductivity).
+
+    Subclass this BaseMap to create new maps. A map class must start with
+    ``Map`` followed by a name, e.g., ``MapProperty``.
+
+    To be able to load custom maps using ``emg3d.io.load`` define the map
+    before you load the files, and register the map by putting the decorator
+    ``emg3d.maps.register_map``. This will enable the I/O to properly
+    instantiate your custom maps.
+
+    .. code-block:: python
+
+        @emg3d.maps.register_map
+        class MapProperty(emg3d.maps.BaseMap):
+            '''Description'''
+            def __init__(self):
+                super().__init__('property')
+
+            def forward(self, conductivity):
+                return # Mapping from your property to conductivity.
+
+            def backward(self, mapped):
+                return # Mapping from conductivity to your property.
+
+            def derivative_chain(self, gradient, mapped):
+                gradient *= # Chain rule of your backward mapping.
+
+    """
 
     def __init__(self, description):
         """Initiate the map."""
-        self.name = self.__class__.__name__[3:]
+        self.name = self.__class__.__name__[3:]  # Class name without `Map`
         self.description = description
 
     def __repr__(self):
@@ -72,7 +100,7 @@ class BaseMap:
 
     def to_dict(self):
         """Store the map name in a dict for serialization."""
-        return {'name': self.name, '__class__': 'BaseMap'}
+        return {'name': self.name, '__class__': 'BaseMap'}  # Always BaseMap
 
     @classmethod
     def from_dict(cls, inp):
@@ -383,14 +411,12 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
         # # Use `interp_spline_3d` if method is 'cubic' # #
         if method == 'cubic':
 
-            map_opts = {
+            opts = {
                 'mode': 'nearest' if extrapolate else 'constant',
                 **({} if kwargs is None else kwargs),
             }
 
-            values_x = interp_spline_3d(
-                    points, values, new_points,
-                    map_opts=map_opts)
+            values_x = interp_spline_3d(points, values, new_points, **opts)
 
         # # Use `RegularGridInterpolator` if method is 'nearest'/'linear' # #
         else:
@@ -415,18 +441,18 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
     return values_x
 
 
-def interp_spline_3d(points, values, xi, map_opts=None, interp1d_opts=None):
+def interp_spline_3d(points, values, xi, **kwargs):
     """Interpolate values in 3D with a cubic spline.
 
     This functionality is best accessed through :func:`emg3d.maps.interpolate`
     by setting ``method='cubic'``.
 
-    This custom version of :func:`scipy.ndimage.map_coordinates` enables 3D
-    cubic interpolation. This is achieved by a cubic interpolation of the new
-    points from the old points using :func:`scipy.interpolate.interp1d` for
-    each direction to bring the new points onto the artificial index coordinate
-    system of ndimage. Once we have the coordinates we can call
-    :func:`scipy.ndimage.map_coordinates`
+    3D cubic spline interpolation is achieved by mapping the ``points`` to
+    regular indices and interpolate with cubic splines
+    (:class:`scipy.interpolate.interp1d`) the ``xi`` to this artificial
+    coordinate system. The ``values`` can then be interpolated from ``points``
+    to ``xi`` on this transformed coordinate system using cubic spline
+    interpolation through :func:`scipy.ndimage.map_coordinates`.
 
 
     Parameters
@@ -440,15 +466,14 @@ def interp_spline_3d(points, values, xi, map_opts=None, interp1d_opts=None):
     xi : ndarray
         Coordinates (x, y, z) of new points, shape ``(..., 3)``.
 
-    map_opts : dict, default: None
+    kwargs : dict, optional
         Passed through to :func:`scipy.ndimage.map_coordinates`.
+        Potentially valuable keywords to pass are
 
-    interp1d_opts : dict, default: None
-        Passed through to :func:`scipy.interpolate.interp1d`.
-
-        The default behaviour of ``interp_cube_3d`` is to pass
-        ``kind='cubic'``, ``bounds_error=False``, and ``fill_value=
-        'extrapolate'``)
+        - ``order``: which has to be in the range of 0-5, default is 3;
+        - ``mode``: default is ``'constant'``, options include ``'nearest'``;
+        - ``cval``: the value to fill past edges if ``mode='constant'``,
+          default is 0.0.
 
 
     Returns
@@ -461,25 +486,18 @@ def interp_spline_3d(points, values, xi, map_opts=None, interp1d_opts=None):
     # `map_coordinates` uses the indices of the input data (our values) as
     # coordinates. We have therefore to transform our desired output
     # coordinates to this artificial coordinate system too.
-    interp1d_opts = {
-        'kind': 'cubic',
-        'bounds_error': False,
-        'fill_value': 'extrapolate',
-        **({} if interp1d_opts is None else interp1d_opts),
-    }
     coords = np.empty(xi.T.shape)
     for i in range(3):
         coords[i] = sp.interpolate.interp1d(
-                points[i], np.arange(len(points[i])),
-                **interp1d_opts)(xi[:, i])
+                points[i], np.arange(len(points[i])), kind='cubic',
+                bounds_error=False, fill_value='extrapolate')(xi[:, i])
 
     # `map_coordinates` only works for real data; split it up if complex.
     # Note: SciPy 1.6 (12/2020) introduced complex-valued
     #       ndimage.map_coordinates; replace eventually.
-    map_opts = ({} if map_opts is None else map_opts)
-    values_x = sp.ndimage.map_coordinates(values.real, coords, **map_opts)
+    values_x = sp.ndimage.map_coordinates(values.real, coords, **kwargs)
     if 'complex' in values.dtype.name:
-        imag = sp.ndimage.map_coordinates(values.imag, coords, **map_opts)
+        imag = sp.ndimage.map_coordinates(values.imag, coords, **kwargs)
         values_x = values_x + 1j*imag
 
     return values_x
@@ -487,11 +505,9 @@ def interp_spline_3d(points, values, xi, map_opts=None, interp1d_opts=None):
 
 @nb.njit(**_numba_setting)
 def interp_volume_average(
-        edges_x, edges_y, edges_z, values, new_edges_x, new_edges_y,
-        new_edges_z, new_values, new_vol):
-    """Interpolate values defined on cell centers to volume-averaged values.
-
-    The ``field`` is assumed to be from a :class:`emg3d.fields.Field` instance.
+        nodes_x, nodes_y, nodes_z, values, new_nodes_x, new_nodes_y,
+        new_nodes_z, new_values, new_vol):
+    """Interpolate properties from `grid` to `new_grid` using volume averages.
 
     This functionality is best accessed through :func:`emg3d.maps.interpolate`
     by setting ``method='volume'``.
@@ -499,37 +515,40 @@ def interp_volume_average(
     Interpolation using the volume averaging technique. The original
     implementation (see ``emg3d v0.7.1``) followed [PlDM07]_. Joseph Capriotti
     took that algorithm and made it much faster for implementation in
-    *discretize*. The current implementation is a simplified version of his
-    (the *discretize* version works for 1D, 2D, and 3D meshes and can also
-    return a sparse matrix representing the operation), translated from Cython
-    to Numba.
+    *discretize*. The current implementation is a translation of that from
+    Cython to Numba, heavily simplified for the 3D use case in *emg3d*.
 
     The result is added to ``new_values``.
 
 
     Parameters
     ----------
-    edges_{x;y;z} : ndarray
-        The edges in x-, y-, and z-directions for the original grid.
+    nodes_{x;y;z} : ndarray
+        The nodes in x-, y-, and z-directions for the original grid,
+        ``grid.nodes_{x;y;z}``, from a :func:`emg3d.meshes.TensorMesh`
+        instance.
 
     values : ndarray
-        Values corresponding to original grid.
+        Values corresponding to original grid (of shape ``grid.shape_cells``).
 
-    new_edges_{x;y;z} : ndarray
-        The edges in x-, y-, and z-directions for the new grid.
+    new_nodes_{x;y;z} : ndarray
+        The nodes in x-, y-, and z-directions for the new grids,
+        ``new_grid.nodes_{x;y;z}``, from a :func:`emg3d.meshes.TensorMesh`
+        instance.
 
     new_values : ndarray
-        Array where values corresponding to the new grid will be added.
+        Array where values corresponding to the new grid will be added (of
+        shape ``new_grid.shape_cells``).
 
     new_vol : ndarray
-        The cell volumes of the new grid.
+        The cell volumes of the new grid (``new_grid.cell_volumes``).
 
     """
 
     # Get the weights and indices for each direction.
-    wx, ix_in, ix_out = _volume_average_weights(edges_x, new_edges_x)
-    wy, iy_in, iy_out = _volume_average_weights(edges_y, new_edges_y)
-    wz, iz_in, iz_out = _volume_average_weights(edges_z, new_edges_z)
+    wx, ix_in, ix_out = _volume_average_weights(nodes_x, new_nodes_x)
+    wy, iy_in, iy_out = _volume_average_weights(nodes_y, new_nodes_y)
+    wz, iz_in, iz_out = _volume_average_weights(nodes_z, new_nodes_z)
 
     # Loop over the elements and sum up the contributions.
     for iz, w_z in enumerate(wz):
@@ -549,70 +568,69 @@ def interp_volume_average(
 
 
 @nb.njit(**_numba_setting)
-def _volume_average_weights(x1, x2):
-    """Return the weights for the volume averaging technique.
+def _volume_average_weights(x_i, x_o):
+    """Return weights for volume averaging technique.
 
 
     Parameters
     ----------
-    x1, x2 : ndarray
-        The edges in x-, y-, or z-directions for the original (x1) and the new
-        (x2) grids.
+    x_i, x_o : ndarray
+        The nodes in x-, y-, or z-directions for the input (x_i) and output
+        (x_o) grids.
 
 
     Returns
     -------
     hs : ndarray
-        Weights for the mapping of x1 to x2.
+        Weights for the mapping of x_i to x_o.
 
-    ix1, ix2 : ndarray
-        Indices to map x1 to x2.
+    ix_i, ix_o : ndarray
+        Indices to map x_i to x_o.
 
     """
-    # Get unique edges.
-    xs = np.unique(np.concatenate((x1, x2)))
-    n1, n2, nh = len(x1), len(x2), len(xs)-1
+    # Get unique nodes.
+    xs = np.unique(np.concatenate((x_i, x_o)))
+    n1, n2, nh = len(x_i), len(x_o), len(xs)-1
 
     # Get weights and indices for the two arrays.
-    # - hs corresponds to np.diff(xs) where x1 and x2 overlap; zero outside.
-    # - x1[ix1] can be mapped to x2[ix2] with the corresponding weight.
-    hs = np.empty(nh)                   # Pre-allocate weights.
-    ix1 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x1.
-    ix2 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x2.
+    # - wx corresponds to np.diff(xs) where x_i and x_o overlap; zero outside.
+    # - x_i[ix_i] can be mapped to x_o[ix_o] with the corresponding weight.
+    wx = np.empty(nh)                   # Pre-allocate weights.
+    ix_i = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x_i.
+    ix_o = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x_o.
     center = 0.0
     i1, i2, i, ii = 0, 0, 0, 0
     for i in range(nh):
         center = 0.5*(xs[i]+xs[i+1])
-        if x2[0] <= center and center <= x2[n2-1]:
-            hs[ii] = xs[i+1]-xs[i]
-            while i1 < n1-1 and center >= x1[i1]:
+        if x_o[0] <= center and center <= x_o[n2-1]:
+            wx[ii] = xs[i+1]-xs[i]
+            while i1 < n1-1 and center >= x_i[i1]:
                 i1 += 1
-            while i2 < n2-1 and center >= x2[i2]:
+            while i2 < n2-1 and center >= x_o[i2]:
                 i2 += 1
-            ix1[ii] = min(max(i1-1, 0), n1-1)
-            ix2[ii] = min(max(i2-1, 0), n2-1)
+            ix_i[ii] = min(max(i1-1, 0), n1-1)
+            ix_o[ii] = min(max(i2-1, 0), n2-1)
             ii += 1
 
-    return hs[:ii], ix1[:ii], ix2[:ii]
+    return wx[:ii], ix_i[:ii], ix_o[:ii]
 
 
 @nb.njit(**_numba_setting)
 def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
     r"""Interpolate fields defined on edges to volume-averaged cell values.
 
-    The ``field`` is assumed to be from a :class:`emg3d.fields.Field` instance.
-
     Parameters
     ----------
     ex, ey, ez : ndarray
-        Electric fields in x-, y-, and z-directions (``field.f{x;y;z}``).
+        Electric fields in x-, y-, and z-directions from a
+        :func:`emg3d.fields.Field` instance (``field.f{x;y;z}``).
 
     volumes : ndarray
-        Cell volumes of the grid (``field.grid.cell_volumes``).
+        Cell volumes of the corresponding grid (``field.grid.cell_volumes``).
 
     ox, oy, oz : ndarray
-        Output arrays (of shape ``field.grid.shape_cells``) where the results
-        are placed (per direction).
+        Output arrays where the results are placed (of shape
+        ``field.grid.shape_cells``).
 
     """
 

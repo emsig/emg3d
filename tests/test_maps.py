@@ -18,20 +18,20 @@ except ImportError:
 
 # MAPS
 class TestMaps:
-    mesh = meshes.TensorMesh(
-            [np.array([1, 1]), np.array([1, 1]), np.array([1])],
-            np.array([0, 0, 0]))
+    mesh = meshes.TensorMesh([[1, 1], [1, 1], [1]], (0, 0, 0))
 
     values = np.array([0.01, 10, 3, 4])
 
     def test_basic(self):
-        class MyMap(maps.BaseMap):
+
+        @maps.register_map
+        class MapNew(maps.BaseMap):
             def __init__(self):
-                super().__init__('my awesome map')
+                super().__init__(description='my new map')
 
-        testmap = MyMap()
+        testmap = MapNew()
 
-        assert "MyMap: my awesome map" in testmap.__repr__()
+        assert "MapNew: my new map" in testmap.__repr__()
 
         with pytest.raises(NotImplementedError, match='Forward map not imple'):
             testmap.forward(1)
@@ -41,6 +41,16 @@ class TestMaps:
 
         with pytest.raises(NotImplementedError, match='Derivative chain not '):
             testmap.derivative_chain(1, 1)
+
+        # Check to_dict/from_dict
+        mmap = testmap.to_dict()
+        new1 = MapNew.from_dict(mmap)
+        new2 = maps.BaseMap.from_dict(mmap)
+
+        assert new1.__class__.__name__ == 'MapNew'
+        assert new1.name == 'New'
+        assert new2.__class__.__name__ == 'MapNew'
+        assert new2.name == 'New'
 
     def test_conductivity(self):
         model = models.Model(self.mesh, self.values, mapping='Conductivity')
@@ -407,7 +417,7 @@ class TestInterpolate:
             maps.interpolate(grid, field.fx, xi, method='volume')
 
 
-def test_interp_cubic_3d():
+def test_interp_spline_3d():
     x = np.array([1., 2, 4, 5])
     pts = (x, x, x)
 
@@ -416,8 +426,19 @@ def test_interp_cubic_3d():
     v1[1, :, :] = 4.0
     v1[2, :, :] = 16.0
     v1[3, :, :] = 25.0
+
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=0)
+    assert_allclose(out, 16)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=1)
+    assert_allclose(out, 10)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=2)
+    assert_allclose(out, 9.4)
     out = maps.interp_spline_3d(points=pts, values=v1, xi=p1)
     assert_allclose(out, 9.25)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=4)
+    assert_allclose(out, 9.117647)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=5)
+    assert_allclose(out, 9.0625)
 
     p2 = np.array([[1, 3, 3], [3, 3, 3], [4, 3, 3]])
     v2 = np.rollaxis(v1, 1)
@@ -435,14 +456,8 @@ def test_interp_cubic_3d():
     v1[1, :, :] = 4.0
     v1[2, :, :] = 16.0
     v1[3, :, :] = 25.0
-    map_opts = {'cval': 999}
-    out = maps.interp_spline_3d(
-            points=pts, values=v1, xi=p1, map_opts=map_opts)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, cval=999)
     assert_allclose(out, 999)
-
-    with pytest.raises(ValueError, match='A value in x_new is above the inte'):
-        opts = {'bounds_error': True, 'fill_value': False}
-        maps.interp_spline_3d(points=pts, values=v1, xi=p1, interp1d_opts=opts)
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -514,8 +529,8 @@ def test_volume_average_weights(njit):
     assert_allclose(iz_in, [0, 0, 0, 1, 1, 1, 2])
     assert_allclose(iz_out, [0, 1, 2, 2, 3, 4, 5])
 
-    w, inp, out = volume_avg_weights(np.array([0., 5, 7, 10]),
-                                     np.array([-1., 1, 4, 6, 7, 11]))
+    w, inp, out = volume_avg_weights(x_i=np.array([0., 5, 7, 10]),
+                                     x_o=np.array([-1., 1, 4, 6, 7, 11]))
     assert_allclose(w, [1, 1, 3, 1, 1, 1, 3, 1])
     assert_allclose(inp, [0, 0, 0, 0, 1, 1, 2, 2])
     assert_allclose(out, [0, 0, 1, 2, 2, 3, 4, 4])
@@ -553,8 +568,9 @@ def test_interp_edges_to_vol_averages(njit):
     cell_volumes = grid.cell_volumes.reshape(grid.shape_cells, order='F')
 
     # Call function.
-    edges_to_vol_averages(field.fx, field.fy, field.fz, cell_volumes,
-                          grad_x, grad_y, grad_z)
+    edges_to_vol_averages(ex=field.fx, ey=field.fy, ez=field.fz,
+                          volumes=cell_volumes,
+                          ox=grad_x, oy=grad_y, oz=grad_z)
     grad = grad_x + grad_y + grad_z
 
     # Check all eight cells explicitly by
