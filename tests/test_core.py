@@ -23,7 +23,8 @@ def test_amat_x(njit):
     hy = np.ones(8)*800
     hz = np.ones(4)*500
     grid = meshes.TensorMesh(
-            [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
+            h=[hx, hy, hz],
+            origin=np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
     # Create some resistivity model
     x = np.arange(1, grid.shape_cells[0]+1)*2
@@ -31,7 +32,9 @@ def test_amat_x(njit):
     z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
+    model = models.Model(
+            grid=grid, property_x=property_x, property_y=0.8*property_x,
+            property_z=2*property_x)
 
     # Create a source field
     sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
@@ -40,8 +43,9 @@ def test_amat_x(njit):
     vmodel = models.VolumeModel(model, sfield)
 
     # Run two iterations to get a e-field
-    efield = solver.solve(model, sfield, sslsolver=False, semicoarsening=False,
-                          linerelaxation=False, maxit=2, verb=1)
+    efield = solver.solve(
+            model=model, sfield=sfield, sslsolver=False, semicoarsening=False,
+            linerelaxation=False, maxit=2, verb=1)
 
     # amat_x
     rr1 = fields.Field(grid)

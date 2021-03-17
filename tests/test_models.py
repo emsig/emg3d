@@ -169,7 +169,7 @@ class TestModel:
 
         model1inp = models.Model(grid, property_x)
 
-        model1out = model1inp.interpolate2grid(grid2)
+        model1out = model1inp.interpolate_to_grid(grid2)
         assert_allclose(model1out.property_x[0],
                         10**(np.sum(np.log10(model1inp.property_x))/8))
         assert model1out.property_y is None
@@ -181,7 +181,7 @@ class TestModel:
                 grid, property_x=property_x, property_y=property_y,
                 property_z=property_z, mu_r=mu_r, epsilon_r=epsilon_r)
 
-        model2out = model2inp.interpolate2grid(grid2)
+        model2out = model2inp.interpolate_to_grid(grid2)
         assert_allclose(model2out.property_x[0],
                         10**(np.sum(np.log10(model2inp.property_x))/8))
         assert_allclose(model2out.property_y[0],

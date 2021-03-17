@@ -219,7 +219,7 @@ def alt_volume_average(edges_x, edges_y, edges_z, values,
     """Interpolation using the volume averaging technique.
 
     This corresponds more or less to the version used by Mulder/Plessix, and
-    is much slower then the improved version by Capriot.
+    is much slower then the improved version by Joseph Capriotti.
 
     The result is added to new_values.
 

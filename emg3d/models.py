@@ -313,7 +313,7 @@ class Model:
         self._epsilon_r[:] = np.asfortranarray(epsilon_r, dtype=np.float64)
 
     # INTERPOLATION
-    def interpolate2grid(self, grid, **grid2grid_opts):
+    def interpolate_to_grid(self, grid, **interpolate_opts):
         """Interpolate the model to a new grid.
 
 
@@ -322,8 +322,8 @@ class Model:
         grid : TensorMesh
             Grid of the new model; a :class:`emg3d.meshes.TensorMesh` instance.
 
-        grid2grid_opts : dict
-            Passed through to :func:`emg3d.maps.grid2grid`. Defaults are
+        interpolate_opts : dict
+            Passed through to :func:`emg3d.maps.interpolate`. Defaults are
             ``method='volume'``, ``log=True``, and ``extrapolate=True``.
 
 
@@ -339,9 +339,9 @@ class Model:
             'method': 'volume',
             'extrapolate': True,
             'log': not self.map.name.startswith('L'),
-            **(grid2grid_opts if grid2grid_opts is not None else {}),
+            **({} if interpolate_opts is None else interpolate_opts),
             'grid': self.grid,
-            'new_grid': grid,
+            'xi': grid,
         }
 
         # Interpolate property_{x;y;z}; mu_r; and epsilon_r; add to dict.
@@ -351,7 +351,7 @@ class Model:
             if var is None:
                 model_inp[prop] = None
             else:
-                model_inp[prop] = maps.grid2grid(values=var, **g2g_inp)
+                model_inp[prop] = maps.interpolate(values=var, **g2g_inp)
 
         # Assemble new model.
         return Model(grid, mapping=self.map.name, **model_inp)

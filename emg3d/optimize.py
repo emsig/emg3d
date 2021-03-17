@@ -190,15 +190,15 @@ def gradient(simulation):
         grad_z = np.zeros(shape_cells, order='F')
 
         # Map the field to cell centers times volume.
-        vol = simulation._dict_grid[src][freq].cell_volumes.reshape(
+        cell_volumes = simulation._dict_grid[src][freq].cell_volumes.reshape(
                 shape_cells, order='F')
-        maps.edges2cellaverages(ex=efield.fx, ey=efield.fy, ez=efield.fz,
-                                vol=vol,
-                                out_x=grad_x, out_y=grad_y, out_z=grad_z)
+        maps.interp_edges_to_vol_averages(
+                ex=efield.fx, ey=efield.fy, ez=efield.fz,
+                volumes=cell_volumes, ox=grad_x, oy=grad_y, oz=grad_z)
         grad = grad_x + grad_y + grad_z
 
         # Bring the gradient back from the computation grid to the model grid.
-        tgrad = maps.grid2grid(
+        tgrad = maps.interpolate(
                     simulation._dict_grid[src][freq],
                     -grad, simulation.grid, method='cubic')
 
