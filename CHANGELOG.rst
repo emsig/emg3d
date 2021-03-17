@@ -111,27 +111,23 @@ latest: towards v1.0
 
 - ``maps``:
 
-  - TODO : Completely reworked interpolation.
+  - The entire interpolation got reworked. The principal routine
+    ``maps.interpolate`` can now be used to interpolate values living on a grid
+    to another grid or to points defined either by a tuple or by an ndarray.
+    The implemented methods are 'nearest' (new), 'linear', 'cubic', and
+    'volume'.
 
-  - Renamed
+  - The main interpolation routine ``maps.interpolate`` does not accept entire
+    fields any longer. Entire fields can be mapped with their own
+    ``field.interpolate_to_grid`` method.
+
+  - Renamed (most have also new signatures):
 
     - ``_Map`` to ``BaseMap``;
     - ``grid2grid`` to ``interpolate``;
     - ``edges2cellaverages`` to ``interp_edges_to_vol_averages``;
     - ``volume_average`` to ``interp_volume_average``;
     - ``interp3d`` to ``interp_spline_3d``.
-
-  - Most of the renamed function have also new signatures.
-
-  - ``grid_to_grid``:
-
-    - Does not accept entire fields any longer. Entire fields can be mapped
-      with their new ``field.interpolate_to_grid`` method.
-
-    - Accepts also ndarray (..., 3) containing coordinates, instead of a new
-      grid.
-
-    - Additional method ``'nearest'`` to sample the model.
 
 - Removed all deprecated features.
 

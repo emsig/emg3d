@@ -167,6 +167,11 @@ class TestMaps:
 
 # INTERPOLATIONS
 class TestInterpolate:
+    # emg3d.interpolate is only a dispatcher function, calling other
+    # interpolation routines; there are lots of small dummy tests here, but in
+    # the end it is not up to emg3d.interpolate to check the accuracy of the
+    # actual interpolation; the only relevance is to check if it calls the
+    # right function.
 
     def test_linear(self):
         igrid = meshes.TensorMesh(
@@ -177,12 +182,9 @@ class TestInterpolate:
                 [0.5, 0, 0])
         values = np.r_[9*[1.0, ], 9*[2.0, ]].reshape(igrid.shape_cells)
 
-        # Provide wrong dimension:
-        with pytest.raises(ValueError, match='There are 2 points and 1 valu'):
-            maps.interpolate(igrid, values[1:, :, :], ogrid)
-
         # Simple, linear example.
-        out = maps.interpolate(igrid, values, ogrid, 'linear')
+        out = maps.interpolate(
+                grid=igrid, values=values, xi=ogrid, method='linear')
         assert_allclose(out[0, 0, 0], 1.5)
 
         # Provide ogrid.gridCC.
@@ -250,7 +252,7 @@ class TestInterpolate:
         out = maps.interpolate(tgrid, tmodel, t2grid, 'linear', False)
         assert_allclose(out, 0.)
 
-    def test_interpolate_volume(self):
+    def test_volume(self):
         # == X == Simple 1D model
         grid_in = meshes.TensorMesh(
                 [np.ones(5)*10, np.array([1, ]), np.array([1, ])],
@@ -333,29 +335,6 @@ class TestInterpolate:
 
         assert_allclose(np.sum(values_out*vol_out), np.sum(values_in*vol_in))
 
-    def linear(self):
-        points = (np.array([-0.5, 0.5]), np.array([-0.5,  0.5]),
-                  np.array([-0.5, 0.5]))
-        new_pts = np.array([[-0.25, +0.25, 0.0]])
-
-        values = np.array([[[1, 1], [1, 1.0]], [[2, 2], [2, 2]]])
-        out = maps.interp_spline_3d(points=points, values=values, xi=new_pts)
-        assert_allclose(out, 1.25)
-
-        values = np.array([[[1, 2], [1, 2.0]], [[1, 2], [1, 2]]])
-        out = maps.interp_spline_3d(points=points, values=values, xi=new_pts)
-        assert_allclose(out, 1.5)
-
-        values = np.array([[[1, 1], [2, 2.0]], [[1, 1], [2, 2]]])
-        out = maps.interp_spline_3d(points=points, values=values, xi=new_pts)
-        assert_allclose(out, 1.75)
-
-        new_pts = np.array([[10, +0.25, 0.0]])
-        map_opts = {'fill_value': 999}
-        out = maps.interp_spline_3d(
-                points=points, values=values, xi=new_pts, map_opts=map_opts)
-        assert_allclose(out, 999)
-
     def test_all_run(self):
         hx = [1, 1, 1, 2, 4, 8]
         grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))
@@ -407,14 +386,87 @@ class TestInterpolate:
         # property - grid
         _ = maps.interpolate(grid, model.property_x, grid2, method='volume')
         # field - grid
-        with pytest.raises(ValueError, match="not implemented for fields"):
+        with pytest.raises(ValueError, match="for cell-centered properties"):
             maps.interpolate(grid, field.fx, grid2, method='volume')
         # property - points
         with pytest.raises(ValueError, match="only implemented for TensorM"):
             maps.interpolate(grid, model.property_x, xi, method='volume')
         # field - points
-        with pytest.raises(ValueError, match="not implemented for fields"):
+        with pytest.raises(ValueError, match="only implemented for TensorM"):
             maps.interpolate(grid, field.fx, xi, method='volume')
+
+
+def test_points_from_grids():
+    hx = [1, 1, 1, 2, 4, 8]
+    grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))
+    grid2 = meshes.TensorMesh([[2, 4, 5], [1, 1], [4, 5]], (0, 1, 0))
+
+    xi_tuple = (1, [8, 7, 6, 8, 9], [1])
+    xi_array = np.arange(18).reshape(-1, 3)
+
+    v_prop = np.ones(grid.shape_cells)
+    v_field = np.ones(grid.shape_edges_x)
+
+    # linear  - values = prop  - xi = grid
+    out = maps._points_from_grids(grid, v_prop, grid2, 'linear')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][0, :], [1., 1.5, 2])
+    assert out[2] == (3, 2, 2)
+
+    # nearest - values = field - xi = grid
+    out = maps._points_from_grids(grid, v_field, grid2, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][1], [0., 1., 2., 3., 5., 9., 17.])
+    assert_allclose(out[1][1, :], [4., 1., 0.])
+    assert out[2] == (3, 3, 3)
+
+    # cubic   - values = prop  - xi = tuple
+    out = maps._points_from_grids(grid, v_prop, xi_tuple, 'cubic')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][2], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][2, :], [1., 6., 1.])
+    assert out[2] == (5, )
+
+    # linear  - values = field - xi = tuple
+    out = maps._points_from_grids(grid, v_field, xi_tuple, 'linear')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][-1, :], [1., 9., 1.])
+    assert out[2] == (5, )
+
+    # nearest - values = prop  - xi = ndarray
+    out = maps._points_from_grids(grid, v_prop, xi_array, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1], xi_array)
+    assert out[2] == (6, )
+
+    # cubic   - values = field - xi = ndarray
+    out = maps._points_from_grids(grid, v_field, xi_array, 'cubic')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1], xi_array)
+    assert out[2] == (6, )
+
+    # cubic   - values = 1Darr - xi = grid  - FAILS
+    with pytest.raises(ValueError, match='must be a 3D ndarray'):
+        maps._points_from_grids(grid, v_field.ravel(), grid2, 'cubic')
+
+    # volume  - values = prop  - xi = grid
+    out = maps._points_from_grids(grid, v_prop, grid2, 'volume')
+    assert isinstance(out[1], tuple)
+    assert_allclose(out[0][0], [0., 1, 2, 3, 5, 9, 17])
+    assert_allclose(out[1][0], [0., 2, 6, 11])
+    assert out[2] == (3, 2, 2)
+
+    # volume  - values = field - xi = grid  - FAILS
+    with pytest.raises(ValueError, match='only implemented for cell-centered'):
+        maps._points_from_grids(grid, v_field, grid2, 'volume')
+
+    # volume  - values = prop  - xi = tuple - FAILS
+    with pytest.raises(ValueError, match='only implemented for TensorMesh'):
+        maps._points_from_grids(grid, v_prop, xi_tuple, 'volume')
 
 
 def test_interp_spline_3d():

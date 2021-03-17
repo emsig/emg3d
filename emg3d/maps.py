@@ -24,8 +24,8 @@ Interpolation routines mapping values between different grids.
 import numba as nb
 import numpy as np
 import scipy as sp
-from scipy import ndimage as _      # noqa - sp.ndimage
-from scipy import interpolate as _  # noqa - sp.interpolate
+import scipy.ndimage
+import scipy.interpolate
 
 __all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
@@ -243,7 +243,7 @@ class MapLnResistivity(BaseMap):
 # INTERPOLATIONS
 def interpolate(grid, values, xi, method='linear', extrapolate=True,
                 log=False, **kwargs):
-    """Interpolate values from one grid to another grid or points.
+    """Interpolate values from one grid to another grid or to points.
 
 
     Parameters
@@ -252,37 +252,43 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
         Input grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     values : ndarray
-        A model property such as ``Model.property_x``, or a particular field
-        such as ``Field.fx`` (``ndim=3``). The dimensions in each directions
-        must either correspond to the number of nodes or edges in the
-        corresponding direction.
+        A model property such as ``Model.property_x``, or a field such as
+        ``Field.fx`` (``ndim=3``; the dimension in each direction must either
+        correspond to the number of nodes or cell centers in the corresponding
+        direction).
 
-    xi : {ndarray, TensorMesh}
-        Output coordinates:
+    xi : {TensorMesh, tuple, ndarray}
+        Output coordinates; possibilities:
 
         - A grid (:class:`emg3d.meshes.TensorMesh`): interpolation from one
           grid to another.
-        - Arbitrary point coordinates as ``ndarray`` of shape ``(..., 3)``:
-          returns a flat array with the values on the provided coordinates.
+        - A tuple (array_like, array_like, array_like) containing x-, y-, and
+          z-coordinates. The length of each can be either one or the number of
+          coordinates, the size-one elements will be expanded internally to the
+          length of the coordinates. E.g., ``(x, [y0, y1, y2], z)`` will be
+          expanded to ``([x, x, x], [y0, y1, y2], [z, z, z])``.
+        - Arbitrary point coordinates as ``ndarray`` of shape ``(..., 3)``,
+          e.g., ``array([[x0, y0, z0], ..., [xN, yN, zN]))``.
 
     method : {'nearest', 'linear', 'volume', 'cubic'}, default: ``'linear'``
         The method of interpolation to perform.
 
         - ``'nearest', 'linear'``: Fastest methods; work for model properties
-          and fields living on edges;
-          :class:`scipy.interpolateu.RegularGridInterpolator`.
+          and fields living on edges. Carried out with
+          :class:`scipy.interpolate.RegularGridInterpolator`.
 
-        - ``'cubic'``: Requires at least four points in any direction;
+        - ``'cubic'``: Cubic spline interpolation using
           :func:`emg3d.maps.interp_spline_3d`.
 
-        - ``'volume'``: Ensures that the total sum of the interpolated quantity
-          stays constant; :func:`emg3d.maps.interp_volume_average`.
+        - ``'volume'``: Volume average interpolation using
+          :func:`emg3d.maps.interp_volume_average`.
 
-          The result can be quite different if you provide resistivity,
-          conductivity, or the logarithm of any of the two. The recommended way
-          is to provide the logarithm of resistivity or conductivity, in which
-          case the output of one is indeed the inverse of the output of the
-          other.
+          Volume average interpolation ensures that the total sum of the
+          interpolated quantity stays constant. The result can be quite
+          different if you provide resistivity, conductivity, or the logarithm
+          of any of the two. The recommended way is to use ``log=True``, in
+          which case the output is the same for conductivities and
+          resistivities.
 
           This method is only implemented for quantities living on cell
           centers, not on edges (hence not for fields); and only for grids as
@@ -299,18 +305,19 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
 
         - ``'cubic'``: If True, values outside of the domain are extrapolated
           using nearest interpolation (``mode='nearest'``); if False, values
-          outside are set to (``mode='constant'``)
+          outside are set to 0.0 (``mode='constant', cval=0.0``).
 
         - ``'volume'``: Always uses nearest interpolation for points outside of
           the provided grid, independent of the choice of ``extrapolate``.
 
     log : bool, default: ``False``
-        If True, the interpolation is carried out on a log10-scale; corresponds
-        to ``10**interpolate(grid, np.log10(values), ...)``.
+        If True, the interpolation is carried out on a log10-scale; this
+        corresponds to ``10**interpolate(grid, np.log10(values), ...)``.
 
     kwargs : dict, optional
         Will be forwarded to the corresponding interpolation algorithm, if they
-        accept additional keywords.
+        accept additional keywords. This can be used, e.g., to change the
+        behaviour outlined in the parameter ``extrapolate``.
 
 
     Returns
@@ -320,40 +327,117 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
 
     """
 
-    # # Input checks # #
-
-    # Check if 'xi' is an ndarray; else assume it is a TensorMesh.
-    xi_is_grid = not isinstance(xi, (np.ndarray, tuple))
-
-    # The values must either live on cell centers or on edges.
-    if np.ndim(values) != 3:
-        msg = ("``values`` must be a 3D ndarray living on cell centers or "
-               "edges of the ``grid``.")
-        raise ValueError(msg)
-
-    # For 'volume', the shape of the values must correspond to shape of cells.
-    if method == 'volume' and not np.all(grid.shape_cells == values.shape):
-        raise ValueError("``method='volume'`` not implemented for fields.")
-
-    # For 'volume' 'xi' must be a TensorMesh.
-    if method == 'volume' and not xi_is_grid:
-        msg = ("``method='volume'`` only implemented for TensorMesh "
-               "instances as input for ``xi``.")
-        raise ValueError(msg)
-
-    # Check enough points for cubic (req. would be order+1; default order=3).
-    if method == 'cubic' and any([x < 4 for x in values.shape]):
-        msg = ("``method='cubic'`` needs at least four points in each "
-               "dimension.")
-        raise ValueError(msg)
-
-    # # Take log10 if set # #
+    # Take log10 if set.
     if log:
         values = np.log10(values)
 
-    # # Get points from input grids # #
+    # Get points in the right shape.
+    points, new_points, shape = _points_from_grids(grid, values, xi, method)
 
-    # Initiate points and new_points, if required.
+    # Carry out the actual interpolation.
+    if method == 'volume':
+
+        # Pre-allocate output.
+        values_x = np.zeros(shape, order='F', dtype=values.dtype)
+
+        interp_volume_average(
+                nodes_x=points[0], nodes_y=points[1], nodes_z=points[2],
+                values=values, new_nodes_x=new_points[0],
+                new_nodes_y=new_points[1], new_nodes_z=new_points[2],
+                new_values=values_x,
+                new_vol=xi.cell_volumes.reshape(shape, order='F'))
+
+    elif method == 'cubic':
+
+        opts = {
+            'mode': 'nearest' if extrapolate else 'constant',
+            **({} if kwargs is None else kwargs),
+        }
+
+        values_x = interp_spline_3d(
+                points=points, values=values, xi=new_points, **opts)
+
+    else:  # 'nearest'/'linear' (will raise ValueError if unknown method).
+
+        opts = {
+            'bounds_error': False,
+            'fill_value': None if extrapolate else 0.0,
+            **({} if kwargs is None else kwargs),
+        }
+
+        values_x = sp.interpolate.RegularGridInterpolator(
+                points=points, values=values, method=method,
+                **opts)(xi=new_points)
+
+    # Return to linear if log10 was applied.
+    if log:
+        values_x = 10**values_x
+
+    # Reshape and return.
+    return values_x.reshape(shape, order='F')
+
+
+def _points_from_grids(grid, values, xi, method):
+    """Return `points` and `new_points` from original grid and new grid/points.
+
+    Returns ``points``, ``new_points``, and ``shape`` to use with
+    :func:`emg3d.maps.interp_volume_average`,
+    :func:`emg3d.maps.interp_spline_3d`, and
+    :class:`scipy.interpolate.RegularGridInterpolator`.
+
+
+    For the input parameters, see :func:`emg3d.maps.interpolate`.
+
+    Returns
+    -------
+    points : (ndarray, ndarray, ndarray)
+        Tuple containing the x-, y-, and z-coordinates of the input values.
+
+    new_points : {(ndarray, ndarray, ndarray); ndarray}
+        Depends on the ``method``:
+
+        - If ``method='volume'``: (ndarray, ndarray, ndarray)
+
+          Tuple containing the x-, y-, and z-coordinates of the output values.
+
+        - Else: ndarray
+
+          Coordinates in an ndarray of shape (..., 3):
+          ``array([[x1, y1, z1], ..., [xn, yn, zn]])``.
+
+    shape : tuple
+        Final shape of the output values.
+
+    """
+
+    # Specific checks for method='volume'.
+    if method == 'volume':
+        msg = "``method='volume'`` is only implemented for "
+
+        # 'xi' must be a TensorMesh.
+        if not hasattr(xi, 'nodes_x'):
+            msg += "TensorMesh instances as input for ``xi``."
+            raise ValueError(msg)
+
+        # Shape of the values must correspond to shape of cells.
+        if grid.shape_cells != values.shape:
+            msg += "cell-centered properties; required shape = "
+            raise ValueError(msg + f"{grid.shape_cells}.")
+
+    # General dimensionality check.
+    else:
+        if values.shape not in [grid.shape_cells, grid.shape_edges_x,
+                                grid.shape_edges_y, grid.shape_edges_z]:
+            msg = ("``values`` must be a 3D ndarray living on cell centers "
+                   "or edges of the ``grid``.")
+            raise ValueError(msg)
+
+    # Check if 'xi' is a TensorMesh.
+    xi_is_grid = hasattr(xi, 'nodes_x')
+
+    # # Get points from input # #
+
+    # 1. Get required tuples from input grids.
     points = tuple()
     if xi_is_grid:
         new_points = tuple()
@@ -380,18 +464,15 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
             new_points += (new_pts, )
             shape += (len(new_pts), )
 
-    # # Use `interp_volume_average` if method is 'volume' # #
-    if method == 'volume':
-        values_x = np.zeros(xi.shape_cells, order='F', dtype=values.dtype)
-        vol = xi.cell_volumes.reshape(xi.shape_cells, order='F')
-        interp_volume_average(
-                *points, values, *new_points, values_x, new_vol=vol)
+    # After this step the points/new_points are:
+    # points: (x-points, y-points, z-points)
+    # new_points: (new-x-points, new-y-points, new-z-points)  # if xi_is_grid
 
-    # Coordinates/shape are different handled for volume than the rest.
-    else:
+    # 'volume' takes new_points as tuples. However, the other methods take an
+    # (..., 3) ndarray of the coordinates.
+    if method != 'volume':
 
         # # Convert points to correct format # #
-
         if xi_is_grid:
             xx, yy, zz = np.broadcast_arrays(
                     new_points[0][:, None, None],
@@ -408,37 +489,13 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
             shape = new_points.shape[:-1]
             new_points = new_points.reshape(-1, 3)
 
-        # # Use `interp_spline_3d` if method is 'cubic' # #
-        if method == 'cubic':
+        # After this step the new_points are:
+        # new_points: array([[x1, y1, z1], ..., [xn, yn, zn]])
 
-            opts = {
-                'mode': 'nearest' if extrapolate else 'constant',
-                **({} if kwargs is None else kwargs),
-            }
+    else:
+        shape = xi.shape_cells
 
-            values_x = interp_spline_3d(points, values, new_points, **opts)
-
-        # # Use `RegularGridInterpolator` if method is 'nearest'/'linear' # #
-        else:
-
-            opts = {
-                'bounds_error': False,
-                'fill_value': None if extrapolate else 0.0,
-                **({} if kwargs is None else kwargs),
-            }
-
-            values_x = sp.interpolate.RegularGridInterpolator(
-                    points=points, values=values, method=method,
-                    **opts)(xi=new_points)
-
-        # # Reshape accordingly # #
-        values_x = values_x.reshape(shape, order='F')
-
-    # # Come back if we were on log10. # #
-    if log:
-        values_x = 10**values_x
-
-    return values_x
+    return points, new_points, shape
 
 
 def interp_spline_3d(points, values, xi, **kwargs):
