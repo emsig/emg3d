@@ -118,9 +118,6 @@ class TensorMesh(dTensorMesh, BaseMesh):
 
     """
 
-    def __init__(self, h, origin, **kwargs):
-        super().__init__(h=h, origin=origin, **kwargs)
-
     def __eq__(self, mesh):
         """Compare two meshes.
 
