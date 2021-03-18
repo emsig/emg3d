@@ -517,6 +517,25 @@ class Survey:
         return coords
 
     @property
+    def rec_types(self):
+        """Return receiver flags if electric, as tuple.
+
+        Corresponds to ``rec_coords``.
+        """
+
+        # Get receiver coordinates depending if fixed or not.
+        if self.fixed:
+            types = {}
+            for src in self.sources.keys():
+                types[src] = tuple(
+                        [self.receivers[off][src].electric
+                         for off in list(self.receivers)])
+        else:
+            types = tuple([r.electric for r in self.receivers.values()])
+
+        return types
+
+    @property
     def frequencies(self):
         """Frequency array."""
         return self._frequencies
@@ -733,9 +752,9 @@ class Survey:
 
             # See if last tuple element is boolean, hence el/mag-flag.
             if isinstance(inp[-1], (list, tuple, np.ndarray)):
-                provided_elmag = isinstance(inp[-1][0], bool)
+                provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
             else:
-                provided_elmag = isinstance(inp[-1], bool)
+                provided_elmag = isinstance(inp[-1], (bool, np.bool_))
 
             # Get max dimension.
             nd = max([np.array(n, ndmin=1).size for n in inp])

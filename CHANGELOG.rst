@@ -5,17 +5,48 @@ Changelog
 recent versions
 """""""""""""""
 
-*latest*: Verbosity & Logging
------------------------------
 
-- Solver:
+v0.17.0: Magnetics in Simulation
+--------------------------------
 
-  - ``solver.solve`` has a new keyword ``log``: it enables to log the solver
-    messages in the returned info dictionary instead of printing them to
-    screen. This is utilized in the CLI and in the ``Simulation`` class to log
-    the solver info.
+**2021-03-03**
 
-- ``Survey``: New attribute ``select``, which returns a reduced survey
+- ``Simulation``:
+
+  - Sources and receivers can now be magnetic, also for the adjoint-state
+    gradient (unit loops, not yet arbitrarily loops).
+
+- ``fields.get_source_field``:
+
+  - The ``msrc`` argument introduced in v0.16.0 is renamed to ``electric``, and
+    has the opposite meaning. If True, the source is electric, if False, the
+    source is magnetic. This was made to streamline the meaning with the
+    meaning given in ``surveys.Dipole``. The old parameter ``msrc`` is
+    deprecated and will be removed. Warning, if ``msrc`` was provided as
+    positional argument instead of as keyword argument it will now be taken as
+    ``electric``, with the opposite meaning (**backwards incompatible**).
+  - The magnetic source was corrected and has the opposite sign now (factor -1;
+    **backwards incompatible**).
+
+- Bug fixes:
+
+  - Simulation: Stop overwriting synthetic data if provided in the survey to a
+    simulation.
+  - CLI: Removed configuration info from output data; caused problems when
+    storing to h5. This has to be resolved with properly addressing the io
+    stuff. Currently only stores the data selection to output data.
+
+
+v0.16.1: Verbosity & Logging
+----------------------------
+
+**2021-02-09**
+
+- ``Solve`` has a new keyword ``log``, which enables to log the solver messages
+  in the returned info dictionary instead of printing them to screen. This is
+  utilized in the CLI and in the ``Simulation`` class to log the solver info.
+
+- ``Survey`` has a new attribute ``select``, which returns a reduced survey
   containing the selected sources, receivers, and frequencies.
 
 - CLI:
@@ -32,8 +63,8 @@ recent versions
 
 - Various small things with regard to how things are logged or shown on screen.
 
-- Changed all DeprecationWarnings to FutureWarnings, meaning they will be
-  removed in the next release.
+- Changed all ``DeprecationWarnings`` to ``FutureWarnings``, meaning they will
+  be removed in the next release.
 
 - Bug fix with regards to data selection in the CLI; moved to ``Survey`` (see
   above).

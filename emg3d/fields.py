@@ -443,8 +443,8 @@ class SourceField(Field):
         return np.real(self.field.fz/self.smu0)
 
 
-def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
-                     decimals=6):
+def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
+                     decimals=6, **kwargs):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -477,9 +477,9 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
           - Arbitrarily shaped source: ``[[x-coo], [y-coo], [z-coo]]``.
 
         Point dipoles will be converted internally to finite length dipoles
-        of ``length``. In the case of a point dipole one can set ``msrc=True``,
-        which will create a square loop of ``length``x``length`` perpendicular
-        to the dipole.
+        of ``length``. In the case of a point dipole one can set
+        ``electric=False``, which will create a square loop of
+        ``length``x``length`` perpendicular to the dipole.
 
     freq : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
@@ -499,15 +499,16 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
 
         Default is 0.
 
-    msrc : bool, optional
-        Shortcut to create a magnetic source. If True, the format of ``src``
+    electric : bool, optional
+        Shortcut to create a magnetic source. If False, the format of ``src``
         must be that of a point dipole: ``[x, y, z, azimuth, dip]`` (for the
-        other formats setting ``msrc`` has no effect). It then creates a square
-        loop perpendicular to this dipole, with side-length 1.
+        other formats setting ``electric`` has no effect). It then creates a
+        square loop perpendicular to this dipole, with side-length 1.
+        Default is True, meaning an electric source.
 
     length : float, optional
         Length (m) of the point dipole when converted to a finite length
-        dipole, or edge-length (m) of the square loop if ``msrc=True``.
+        dipole, or edge-length (m) of the square loop if ``electric=False``.
         Default is 1.0.
 
     decimals: int, optional
@@ -521,6 +522,18 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
         Source field, normalized to 1 A m.
 
     """
+
+    if 'msrc' in kwargs:
+        msg = ("``msrc`` is deprecated and overwrites ``electric``. "
+               "Use ``electric`` instead.\nAlso, the sign of the magnetic "
+               "source was corrected (switched)")
+        warnings.warn(msg, FutureWarning)
+        electric = not kwargs.pop('msrc')
+
+    # Ensure no kwargs left.
+    if kwargs:
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+
     # Cast some parameters.
     if not np.allclose(np.size(src[0]), [np.size(c) for c in src]):
         raise ValueError(
@@ -530,10 +543,10 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
     src = np.asarray(src, dtype=np.float64)
     strength = np.asarray(strength)
 
-    # Convert point dipole sources to finite dipoles or loops (msrc).
+    # Convert point dipole sources to finite dipoles or loops (electric).
     if src.shape == (5, ):  # Point dipole
 
-        if msrc:  # Magnetic: convert to square loop perp. to dipole.
+        if not electric:  # Magnetic: convert to square loop perp. to dipole.
             src = _square_loop_from_point_dipole(src, length)
             # src.shape = (3, 5)
 
@@ -551,14 +564,14 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
         lengths = np.sqrt(np.sum((src[:, :-1] - src[:, 1:])**2, axis=0))
         if strength == 0:
             lengths /= lengths.sum()
-        else:
-            lengths *= strength
+        else:  # (Not in-place multiplication, as strength can be complex.)
+            lengths = lengths*strength
 
         # Initiate a zero-valued source field and loop over segments.
         sfield = SourceField(grid, freq=freq)
         sfield.src = src
         sfield.strength = strength
-        sfield.moment = np.array([0., 0, 0])
+        sfield.moment = np.array([0., 0, 0], dtype=lengths.dtype)
 
         # Loop over elements.
         for i in range(sx.size-1):
@@ -566,6 +579,10 @@ def get_source_field(grid, src, freq, strength=0, msrc=False, length=1.0,
             seg_field = get_source_field(grid, segment, freq, lengths[i])
             sfield += seg_field
             sfield.moment += seg_field.moment
+
+        # Check this with iw/-iw; source definition etc.
+        if not electric:
+            sfield *= -1
 
         return sfield
 

@@ -98,32 +98,7 @@ def setup(app):
     app.add_css_file("style.css")
 
 
-# ==== 4. Other Document Type Settings ====
-# Options for LaTeX output
-latex_elements = {
-    'papersize': 'a4paper',
-    'pointsize': '10pt',
-}
-latex_documents = [
-    (master_doc, 'emg3d.tex', 'emg3d Documentation',
-     'The emg3d Developers', 'manual'),
-]
-
-# Options for manual page output
-man_pages = [
-    (master_doc, 'emg3d', 'emg3d Documentation',
-     [author], 1)
-]
-
-# Options for Texinfo output
-texinfo_documents = [
-    (master_doc, 'emg3d', 'emg3d Documentation',
-     author, 'emg3d', description,
-     'Electromagnetic geophysical modelling'),
-]
-
-
-# ==== 5. linkcheck ====
+# ==== 4. linkcheck ====
 
 # Papers from academic.oup results in a 104 error
 linkcheck_ignore = [
