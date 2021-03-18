@@ -50,7 +50,7 @@ class Model:
     grid : TensorMesh
         The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    property_{x;y;z} : {None, array_like}, default: ``1`` (x), ``None`` (y, z)
+    property_{x;y;z} : {None, array_like}, default: 1 (x), None (y, z)
         Electrical material property in x-, y-, and z-directions. The
         properties are stored as Fortran-ordered arrays with the shape given by
         ``grid.shape``. The provided value must be broadcastable to that shape.
@@ -71,7 +71,7 @@ class Model:
         VTI model is created, it is not possible to set ``property_y`` later
         on, instead, a new model has to be initiated).
 
-    mu_r, epsilon_r : {None, array_like}, default: ``None``
+    mu_r, epsilon_r : {None, array_like}, default: None
         Relative magnetic permeability (-) and relative electric permittivity
         (-), respectively, both isotropic. The properties are stored as
         Fortran-ordered arrays with the shape given by ``grid.shape``. The
@@ -85,7 +85,7 @@ class Model:
         which ignores the displacement part completely (diffusive
         approximation)
 
-    mapping : str, default: ``'Resistivity'``
+    mapping : str, default: 'Resistivity'
         Defines what type the electrical input ``property_{x;y;z}``-values
         correspond to. The implemented types are:
 

@@ -269,7 +269,7 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
         - Arbitrary point coordinates as ``ndarray`` of shape ``(..., 3)``,
           e.g., ``array([[x0, y0, z0], ..., [xN, yN, zN]))``.
 
-    method : {'nearest', 'linear', 'volume', 'cubic'}, default: ``'linear'``
+    method : {'nearest', 'linear', 'volume', 'cubic'}, default: 'linear'
         The method of interpolation to perform.
 
         - ``'nearest', 'linear'``: Fastest methods; work for model properties
@@ -293,7 +293,7 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
           centers, not on edges (hence not for fields); and only for grids as
           input to ``xi``.
 
-    extrapolate : bool, default: ``True``
+    extrapolate : bool, default: True
         This parameter controls the default parameters provided to the
         interpolation routines.
 
@@ -309,7 +309,7 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
         - ``'volume'``: Always uses nearest interpolation for points outside of
           the provided grid, independent of the choice of ``extrapolate``.
 
-    log : bool, default: ``False``
+    log : bool, default: False
         If True, the interpolation is carried out on a log10-scale; this
         corresponds to ``10**interpolate(grid, np.log10(values), ...)``.
 
@@ -526,7 +526,7 @@ def interp_spline_3d(points, values, xi, **kwargs):
         Passed through to :func:`scipy.ndimage.map_coordinates`.
         Potentially valuable keywords to pass are
 
-        - ``order``: which has to be in the range of 0-5, default is 3;
+        - ``order``: which has to be in the range of 0-5, default: 3;
         - ``mode``: default is ``'constant'``, options include ``'nearest'``;
         - ``cval``: the value to fill past edges if ``mode='constant'``,
           default is 0.0.

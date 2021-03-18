@@ -331,10 +331,10 @@ def test_simulation_automatic(capsys):
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_print_solver(capsys):
     grid = meshes.TensorMesh(
-            [[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
-             [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
-             [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
-            x0='CCC')
+            h=[[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
+               [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
+               [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
+            origin='CCC')
 
     model = models.Model(grid, property_x=1.5, property_y=1.8,
                          property_z=3.3, mapping='Resistivity')

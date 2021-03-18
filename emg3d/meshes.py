@@ -30,18 +30,20 @@ except ImportError:
     class dTensorMesh:
         pass
 
-__all__ = ['TensorMesh', 'construct_mesh', 'get_origin_widths', 'skin_depth',
-           'wavelength', 'good_mg_cell_nr', 'min_cell_width', 'BaseMesh']
+__all__ = ['BaseMesh', 'TensorMesh', 'construct_mesh', 'get_origin_widths',
+           'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width']
 
 
 class BaseMesh:
     """Minimal TensorMesh for internal multigrid computation.
 
+    The base mesh has everything that is needed within
+    :func:`emg3d.solver.solve`, but nothing more.
 
     Parameters
     ----------
     h : [array_like, array_like, array_like]
-        Cell widths in [x, y, z] directions.
+        Cell widths in x, y, and z directions.
 
     origin : array_like
         Origin (x, y, z).
@@ -96,31 +98,34 @@ class BaseMesh:
 
 
 class TensorMesh(dTensorMesh, BaseMesh):
-    """A slightly modified :class:`discretize.TensorMesh`.
+    """A slightly modified version of :class:`discretize.TensorMesh`.
 
-    Adds a few attributes (`__eq__`, `copy`, `to_dict`, and `from_dict`) to the
+    Adds a few attributes (``__eq__``, ``copy``, and ``{to;from}_dict``) to
     :class:`discretize.TensorMesh`.
 
-    Falls back to a minimal TensorMesh if `discretize` is not installed.
-    Nothing fancy is possible with the minimal TensorMesh, particularly NO
-    plotting nor nice repr-functions.
+    It falls back to a minimal TensorMesh if discretize is not installed.
+    Nothing fancy is possible with the minimal TensorMesh, particularly *no*
+    plotting.
 
 
     Parameters
     ----------
     h : [array_like, array_like, array_like]
-        Cell widths in [x, y, z] directions.
+        Cell widths in x, y, and z directions.
 
     origin : array_like
         Origin (x, y, z).
 
     """
 
+    def __init__(self, h, origin, **kwargs):
+        super().__init__(h=h, origin=origin, **kwargs)
+
     def __eq__(self, mesh):
         """Compare two meshes.
 
-        The provided `mesh` can be either a `emg3d` or a `discretize`
-        TensorMesh.
+        The provided ``mesh`` can be either an emg3d or a discretize
+        TensorMesh instance.
 
         """
 
@@ -159,22 +164,25 @@ class TensorMesh(dTensorMesh, BaseMesh):
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert dictionary into :class:`TensorMesh` instance.
+        """Convert dictionary into :class:`emg3d.meshes.TensorMesh` instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`TensorMesh.to_dict`.
-            The dictionary needs the keys `hx`, `hy`, `hz`, and `origin`.
+            Dictionary as obtained from
+            :func:`emg3d.meshes.TensorMesh.to_dict`. The dictionary needs the
+            keys ``hx``, ``hy``, ``hz``, and ``origin``.
 
         Returns
         -------
-        obj : :class:`TensorMesh` instance
+        mesh : TensorMesh
+            A :class:`emg3d.meshes.TensorMesh` instance.
 
         """
         try:
             return cls(h=[inp['hx'], inp['hy'], inp['hz']],
                        origin=inp['origin'])
+
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
@@ -183,7 +191,22 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                    seasurface=None, **kwargs):
     r"""Return a TensorMesh for given parameters.
 
-    The constructed mesh is frequency- and property-dependent. Some details are
+    Designing an appropriate grid is the most time-consuming part of any 3D
+    modelling:
+
+    - Cell sizes should be small enough to represent changes in the model as
+      well as to minimize interpolation errors in the fields.
+    - The computational domain has to be big enough to avoid effects from the
+      boundary condition.
+    - The total number of cells should be small to speed up computation.
+
+    These are in itself contradictory requirements, and they additionally
+    depend all on the subsurface properties, the frequency under consideration,
+    and the survey type.
+
+    This function is a helper routine to construct an appropriate grid.
+    However, there is no guarantee that it is the best or even a good grid. The
+    constructed grid is frequency- and property-dependent. Some details are
     explained in other functions:
 
     - The minimum cell width :math:`\Delta_\text{min}` is a function of
@@ -205,20 +228,21 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
        :name: AutoGrid
 
        Relation between survey domain (Ds, ``domain``), computational domain
-       (Dc), and buffer zone. The survey domain should contain all sources and
-       receivers as well as any important feature that should be represented in
-       the data. The buffer zone is calculated as a function of wavelength with
-       the provided property in the given direction.
+       (Dc), and buffer zone. The survey domain should contain all sources (red
+       stars) and receivers (blue triangles) as well as any important feature
+       that should be represented in the data. The buffer zone is calculated as
+       a function of wavelength with the provided property in the given
+       direction.
 
-    By default, the buffer zone around the survey domain is one wavelength.
-    This means that the signal has to travel two wavelengths to get from the
-    end of the survey domain to the end of the computational domain and back.
-    This approach is quite conservative and on the safe side. You can reduce
-    the buffer thickness if you know what you are doing. There are three
-    parameters which influence the thickness of the buffer for a given
-    frequency: ``properties``, which is used to calculate the skin depth and
-    the wavelength, ``lambda_factor`` (default is 1) which sets how many times
-    the wavelength is the thickness of the buffer (relative factor), and
+    The buffer zone around the survey domain is by default one wavelength. This
+    means that the signal has to travel two wavelengths to get from the end of
+    the survey domain to the end of the computational domain and back. This
+    approach is quite conservative and on the safe side. You can reduce the
+    buffer thickness if you know what you are doing. There are three parameters
+    which influence the thickness of the buffer for a given frequency:
+    ``properties``, which is used to calculate the skin depth and the
+    wavelength, ``lambda_factor`` (default is 1) which sets how many times the
+    wavelength is the thickness of the buffer (relative factor), and
     ``max_buffer``, which is an absolute maximum for the buffer thickness. A
     graphical illustration is given in :numref:`Figure %s <Buffer>`.
 
@@ -242,7 +266,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         the extent of the buffer zone, and therefore of the computational
         domain, are a function of skin depth.
 
-    properties : float or list
+    properties : {float, array_like}
         Properties to calculate the skin depths, which in turn are used to
         calculate the minimum cell width (usually at source location) and the
         extent of the buffer around the survey domain. The properties can be
@@ -258,69 +282,70 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
         - ``[p1, p2]``:
 
-          - 1 : min_width,
-          - 2 : buffer in all directions;
+          - ``p1`` : min_width,
+          - ``p2`` : buffer in all directions;
 
         - ``[p1, p2, p3]``:
 
-          - 1 : min_width,
-          - 2 : buffer in negative z-direction,
-          - 3 : buffer in all other directions;
+          - ``p1`` : min_width,
+          - ``p2`` : buffer in negative z-direction,
+          - ``p3`` : buffer in all other directions;
 
         - ``[p1, p2, p3, p4]``:
 
-          - 1 : min_width,
-          - 2 : buffer in horizontal directions,
-          - 3; 4 : buffer in negative; positive z-direction.
+          - ``p1`` : min_width,
+          - ``p2`` : buffer in horizontal directions,
+          - ``p3``; ``p4`` : buffer in negative; positive z-direction.
 
         - ``[p1, p2, p3, p4, p5, p6, p7]``:
 
-          - 1 : min_width,
-          - 2; 3 : buffer in negative; positive x-direction,
-          - 4; 5 : buffer in negative; positive y-direction,
-          - 6; 7 : buffer in negative; positive z-direction.
+          - ``p1`` : min_width,
+          - ``p2``; ``p3`` : buffer in negative; positive x-direction,
+          - ``p4``; ``p5`` : buffer in negative; positive y-direction,
+          - ``p6``; ``p7`` : buffer in negative; positive z-direction.
 
-    center : tuple
-        Tuple (or list, ndarray) of three floats for (x, y, z). The mesh is
-        centered around this point, which means that here is the smallest cell.
-        Usually this is the source location.
+    center : array_like
+        Center coordinates (x, y, z). The mesh is centered around this point,
+        which means that here is the smallest cell. Usually this is the source
+        location.
 
-    domain : tuple of lists, list, or None, optional
+    domain : {tuple, list, None}, optional
         Contains the survey-domain limits. This domain should include all
         source and receiver positions as well as any important feature of the
         model. Format: ``([xmin, xmax], [ymin, ymax], [zmin, zmax])``.
 
         It can be None, or individual lists can be None (e.g., ``(None, None,
-        [zmin, zmax])``), in which case you have to provide a ``vector``, which
-        is then assumed to span exactly the domain. If only one list is
-        provided it is applied to all dimensions.
+        [zmin, zmax])``), in which case you have to provide either the
+        corresponding ``distance`` or ``vector``, which is then assumed to span
+        exactly the domain. If only one list is provided it is applied to all
+        dimensions.
 
-    distance : tuple of lists, list, or None, optional
+    distance : {tuple, list, None}, optional
         An alternative to ``domain``: Instead of defining the domain in
         absolute values, they are defined here as distance from the center.
         Format: ``([xl, xr], [yl, yr], [zd, zu])``. From this the domain is
         given as ``([cx-xl, cx+xr], [cy-yl, cy+yr], [cz-zd, cz+zu])``, where
         ``center=(cx, cy, cz)``.
 
-    vector : tuple of three ndarrays, ndarray, or None, optional
+    vector : {tuple, ndarray, None}, optional
         Contains vectors of mesh-edges that should be used. If provided, the
-        vector MUST at least include all of the survey domain. If ``domain``
+        vector *must* at least include all of the survey domain. If ``domain``
         is not provided, it is defined as the minimum/maximum of the provided
         vector. Format: ``(xvector, yvector, zvector)``.
 
         It can be None, or individual ndarrays can be None (e.g., ``(xvector,
-        yvector, None)``), in which case you have to provide a ``domain``. If
-        only one ndarray is provided it is applied to all dimensions.
+        yvector, None)``), in which case you have to provide a ``domain`` or
+        ``distance``. If only one ndarray is provided it is applied to all
+        dimensions.
 
-    seasurface : float, optional
+    seasurface : float, default: None
         Air-sea interface. This has only to be set in the marine case, when the
         mesh in z-direction is sought for (and the interface is not contained
         in ``vector``). If set, it will ensure that at the sea surface is an
-        actual boundary. It has to be bigger then the lower limit of the survey
+        actual boundary. It has to be bigger than the lower limit of the survey
         domain.
-        Default is None.
 
-    stretching : list or tuple of lists, optional
+    stretching : {tuple, list}, default: [1.0, 1.5]
         Maximum stretching factors in the form of ``[max Ds, max Dc]``: the
         first value is the maximum stretching for the survey domain (default is
         1.0), the second value is the maximum stretching for the buffer zone
@@ -329,35 +354,27 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         y, z)``. Note that the first value has no influence on dimensions where
         a ``vector`` is provided.
 
-    min_width_limits : float, list or None, optional
-        Passed through :func:`min_cell_width` as ``limits``.
-        A tuple of three can be provided for direction dependent values.
-        Note that this value has no influence on dimensions where a ``vector``
-        is provided.
+    min_width_limits : {float, list, tuple, None}, default: None
+        Passed through to :func:`cell_width` as ``limits``. A tuple of three
+        can be provided for direction dependent values. Note that this value
+        has no influence on dimensions where a ``vector`` is provided.
 
-        Default is None.
+    min_width_pps : {tuple, float}, default: 3.0
+        Passed through to :func:`cell_width` as ``pps``. A tuple of three can
+        be provided for direction dependent values. Note that this value has no
+        influence on dimensions where a ``vector`` is provided.
 
-    min_width_pps : float or int, optional
-        Passed through :func:`min_cell_width` as ``pps``.
-        A tuple of three can be provided for direction dependent values.
-        Note that this value has no influence on dimensions where a ``vector``
-        is provided.
-
-        Default is 3.
-
-    lambda_factor : float, optional
+    lambda_factor : float, default: 1.0
         The buffer is taken as one wavelength from the survey domain. This can
         be regarded as quite conservative (but safe). The parameter
         ``lambda_factor`` can be used to reduce (or increase) this factor.
-        Default is 1.0.
 
-    max_buffer : float, optional
+    max_buffer : float, default: 100_000
         Maximum thickness of the buffer zone around survey domain. If
         ``lambda_from_center=True``, this is the maximum distance from the
         center to the end of the computational domain.
-        Default is 100,000 (100 km).
 
-    lambda_from_center : bool, optional
+    lambda_from_center : bool, default: False
         Flag how to compute the extent of the computational mesh as a function
         of wavelength:
 
@@ -366,37 +383,36 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         - True: The distance from the center to the edge of the computational
           domain and back to the end of the survey domain is two wavelengths.
 
-    mapping : str or map, optional
+    mapping : {str, Map}, default: 'Resistivity'
         Defines what type the input ``property_{x;y;z}``-values correspond to.
         By default, they represent resistivities (Ohm.m). The implemented
         mappings are:
 
-        - 'Conductivity'; σ (S/m),
-        - 'LgConductivity'; log_10(σ),
-        - 'LnConductivity'; log_e(σ),
-        - 'Resistivity'; ρ (Ohm.m); Default,
-        - 'LgResistivity'; log_10(ρ),
-        - 'LnResistivity'; log_e(ρ).
+        - ``'Resistivity'``; ρ (Ω m);
+        - ``'Conductivity'``; σ (S/m);
+        - ``'LgResistivity'``; log_10(ρ);
+        - ``'LgConductivity'``; log_10(σ);
+        - ``'LnResistivity'``; log_e(ρ);
+        - ``'LnConductivity'``; log_e(σ).
 
-    cell_numbers : list, optional
+    cell_numbers : array_like, optional
         List of possible numbers of cells. See :func:`good_mg_cell_nr`.
         Default is ``good_mg_cell_nr(1024, 5, 3)``, which corresponds to
         numbers 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384,
         512, 640, 768, 1024.
 
-    verb : int
-        If 1 verbose, if 0 silent (default).
-        Either way, the info is added to the returned mesh as
-        ``mesh.construct_mesh_info``.
+    verb : int, default: 0
+        If 1 verbose, if 0 silent. The info is added either way to the returned
+        mesh as ``mesh.construct_mesh_info``.
 
 
     Returns
     -------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        Resulting mesh.
-
+    grid : TensorMesh
+        Resulting mesh, a :class:`emg3d.meshes.TensorMesh` instance.
 
     """
+    kwargs = deepcopy(kwargs)  # To not change a provided dict.
     verb = kwargs.get('verb', 0)
     distance = kwargs.pop('distance', None)
 
@@ -426,17 +442,18 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     else:
         kwargs['properties'] = properties
 
+    def _put_in_dicts(dicts, value, name):
+        """Loop over dicts and put corresponding values."""
+        for i, data in enumerate(dicts):
+            if value[i] is not None:
+                data[name] = value[i]
+
     # Add optionally direction specific args.
     for name, value in zip(['domain', 'vector', 'distance'],
                            [domain, vector, distance]):
         if (value is not None and len(value) == 3 and not
                 isinstance(value, np.ndarray)):
-            if value[0] is not None:
-                xparams[name] = value[0]
-            if value[1] is not None:
-                yparams[name] = value[1]
-            if value[2] is not None:
-                zparams[name] = value[2]
+            _put_in_dicts([xparams, yparams, zparams], value, name)
         else:
             kwargs[name] = value
 
@@ -447,12 +464,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
             if isinstance(value, (int, float)):
                 kwargs[name] = np.array([value])
             elif len(value) == 3:
-                if value[0] is not None:
-                    xparams[name] = value[0]
-                if value[1] is not None:
-                    yparams[name] = value[1]
-                if value[2] is not None:
-                    zparams[name] = value[2]
+                _put_in_dicts([xparams, yparams, zparams], value, name)
             else:
                 kwargs[name] = value
 
@@ -466,7 +478,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         raise RuntimeError("No suitable grid found; relax your criteria.")
 
     # Create mesh.
-    mesh = TensorMesh([hx, hy, hz], origin=np.array([x0, y0, z0]))
+    mesh = TensorMesh(h=[hx, hy, hz], origin=np.array([x0, y0, z0]))
 
     # Collect info.
     info = (f"\n         == GRIDDING IN X ==\n{xinfo}\n"
@@ -483,30 +495,28 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
                       seasurface=None, **kwargs):
     r"""Return origin and cell widths for given parameters.
 
-    This function works in one dimension only, and is used by
-    :func:`construct_mesh` once in each direction. It is recommended to use
-    directly function :func:`construct_mesh`, which returns a
-    :class:`TensorMesh`.
+    Calculate and return the starting point (origin) and cell widths given
+    the input parameters. The output can be used as input (for one dimension)
+    to create a :class:`emg3d.meshes.TensorMesh`. The function is used by
+    :func:`construct_mesh` once in each direction.
 
-    All the parameters are described in :func:`construct_mesh`. Described here
-    are only the differences.
+    .. note::
+
+        The parameters are described in :func:`construct_mesh`. Described here
+        are only the differences. It is recommended to use directly
+        :func:`construct_mesh`.
 
 
     Parameters
     ----------
 
-    All : description
-        All parameters are described in :func:`construct_mesh`. The only
-        difference is that here only variables for one direction are accepted.
+    verb : int, default: 0
+        If 1 verbose, if 0 silent, if -1 it returns the info as string instead
+        of printing it.
 
-    verb : int
-        If 1 verbose, if 0 silent (default); if -1 it returns the info as
-        string instead of printing it.
-
-    raise_error : bool, optional
+    raise_error : bool, default: True
         If True, an error is raised if no suitable grid is found. Otherwise it
         just returns None's (used by ``construct_mesh``).
-        Default is True.
 
     Returns
     -------
@@ -516,8 +526,8 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     widths : ndarray
         Cell widths of mesh.
 
-    info : str
-        Info, only if ``verb<0``.
+    info : str, returned if verb<0
+        Info.
 
     """
     # Get all kwargs.
@@ -550,14 +560,13 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     skind = skin_depth(frequency, cond_arr)
 
     # Minimum cell width.
-    dmin = min_cell_width(skind[0], min_width_pps, min_width_limits)
+    dmin = cell_width(skind[0], min_width_pps, min_width_limits)
 
     # Survey domain: if not provided get from vector or distance.
     # Priority: domain > vector > distance.
     if domain is None and vector is None and distance is None:
-        raise ValueError(
-                "At least one of `domain`, `distance`, and `vector` "
-                "must be provided.")
+        raise ValueError("At least one of `domain`, `distance`, "
+                         "and `vector` must be provided.")
     elif domain is None:
         if vector is None:
             domain = np.array([center-abs(distance[0]),
@@ -568,17 +577,15 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         domain = np.array(domain, dtype=np.float64)
         if vector is not None:
             if domain[0] < vector.min() or domain[1] > vector.max():
-                raise ValueError(
-                        "Provided vector MUST at least include all of the "
-                        "survey domain.")
+                raise ValueError("Provided vector MUST at least include "
+                                 "all of the survey domain.")
 
     # Seasurface related checks.
     if seasurface is not None:
 
         # Check that seasurface > center.
         if seasurface <= center:
-            raise ValueError(
-                    "The `seasurface` but be bigger then `center`.")
+            raise ValueError("The `seasurface` must be bigger than `center`.")
 
         # If center is close to seasurface, set it to seasurface.
         if abs(seasurface - center) < dmin:
@@ -769,36 +776,41 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
 
 def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
-    r"""Returns 'good' cell numbers for the multigrid method.
+    r"""Return 'good' cell numbers for the multigrid method.
 
-    'Good' cell numbers are numbers which can be divided by 2 as many times as
-    possible. At the end there will be a low prime number.
+    'Good' cell numbers are numbers which can be divided by two as many times
+    as possible. At the end there should be a low prime number.
 
-    The function adds all numbers :math:`p 2^n \leq M` for :math:`p={2, 3, ...,
-    p_\text{max}}` and :math:`n={n_\text{min}, n_\text{min}+1, ..., \infty}`;
-    :math:`M, p_\text{max}, n_\text{min}` correspond to `max_nr`, `max_prime`,
-    and `min_div`, respectively.
+    The function adds all numbers
+
+    .. math::
+
+        p\ 2^n &\leq M \ , \text{ for}
+
+        p &= {2, 3, ..., p_\text{max}} \ ;
+
+        n &= {n_\text{min}, n_\text{min}+1, ..., \infty} \ ,
+
+    where :math:`M, p_\text{max}, n_\text{min}` correspond to ``max_nr``,
+    ``max_prime``, and ``min_div``, respectively.
 
 
     Parameters
     ----------
-    max_nr : int, optional
+    max_nr : int, default: 1024
         Maximum number of cells.
-        Default is 1024.
 
-    max_prime : int, optional
+    max_prime : int, default: 5
         Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
         limits in order to avoid too big lowest grids in the multigrid method.
-        Default is 5.
 
-    min_div : int, optional
+    min_div : int, default: 3
         Minimum times the number can be divided by two.
-        Default is 3.
 
 
     Returns
     -------
-    numbers : array
+    numbers : ndarray
         Array containing all possible cell numbers from lowest to highest.
 
     """
@@ -824,8 +836,8 @@ def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
     return numbers[numbers <= max_nr]
 
 
-def skin_depth(frequency, conductivity, mu=mu_0):
-    r"""Return skin depth for provided frequency and conductivity.
+def skin_depth(frequency, conductivity, mu_r=1.0):
+    r"""Return skin depth as a function of frequency and conductivity.
 
     The skin depth :math:`\delta` (m) is given by
 
@@ -835,8 +847,8 @@ def skin_depth(frequency, conductivity, mu=mu_0):
         \delta = \sqrt{\frac{2}{\omega\sigma\mu}}\ ,
 
     where :math:`\omega=2\pi f` is angular frequency of frequency :math:`f`
-    (Hz), :math:`\sigma` is conductivity (S/m), and :math:`\mu` is magnetic
-    permeability (H/m).
+    (Hz), :math:`\sigma` is conductivity (S/m), and :math:`\mu=\mu_\rm{r}\mu_0`
+    is magnetic permeability (H/m).
 
 
     Parameters
@@ -847,8 +859,8 @@ def skin_depth(frequency, conductivity, mu=mu_0):
     conductivity : float
         Conductivity (S/m).
 
-    mu : float, optional
-        Magnetic permeability (H/m); default is :math:`\mu_0`.
+    mu_r : float, default: 1.0
+        Relative magnetic permeability (-).
 
 
     Returns
@@ -857,52 +869,58 @@ def skin_depth(frequency, conductivity, mu=mu_0):
         Skin depth (m).
 
     """
-    skind = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu)
-    if frequency < 0:  # For Laplace-domain computations.
-        skind /= np.sqrt(2*np.pi)
+    skindepth = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu_r*mu_0)
 
-    return skind
+    # For Laplace-domain computations.
+    if frequency < 0:
+        skindepth /= np.sqrt(2*np.pi)
+
+    return skindepth
 
 
 def wavelength(skin_depth):
-    r"""Return the wavelength.
+    r"""Return wavelength as a function of skin depth.
 
     The wavelength :math:`\lambda` (m) is given by
 
     .. math::
         :label: wavelength
 
-        \lambda = 2\pi\delta\ .
+        \lambda = 2\pi\delta\ ,
 
-    The skin depth :math:`\delta` is a function of frequency and conductivity
-    and is given by :func:`skin_depth`, Equation :eq:`skindepth`.
+    where the skin depth :math:`\delta` is a function of frequency and
+    conductivity and is given by :func:`skin_depth`, Equation :eq:`skindepth`.
 
 
     Parameters
     ----------
-    skin_depth : float or ndarray.
+    skin_depth : {float, ndarray}
         Skin depth (m).
 
 
     Returns
     -------
-    wavelength : float or ndarray
+    wavelength : {float, ndarray}
         Wavelength (m).
 
     """
     return 2*np.pi*skin_depth
 
 
-def min_cell_width(skin_depth, pps=3, limits=None):
-    r"""Return the minimum cell width.
+def cell_width(skin_depth, pps=3, limits=None):
+    r"""Return cell width as function of points per skin depth.
 
-    The minimum cell width is defined by the desired points per skin depth,
+    The cell width :math:`\Delta` is defined by the desired points per skin
+    depth,
 
     .. math::
         :label: mincellwidth
 
-        \Delta_\text{min} =
-        \text{limits[0]} \le \frac{\delta}{\text{pps}} \le \text{limits[1]} \ .
+        \Delta = \Delta_\text{min} \le \frac{\delta}{\text{pps}} \le
+                 \Delta_\text{max} \ ,
+
+    to ensure that there are ``pps`` cells per skin depth (unless restricted by
+    ``limits``).
 
     The skin depth :math:`\delta` is a function of frequency and conductivity
     and is given by :func:`skin_depth`, Equation :eq:`skindepth`.
@@ -913,25 +931,25 @@ def min_cell_width(skin_depth, pps=3, limits=None):
     skin_depth : float
         Skin depth (m).
 
-    pps : int
+    pps : float
         Points per skin depth.
 
-    limits : None, float, or list of two floats
-        Limits on minimum width:
+    limits : {None, float, array_like}, default: None
+        Limits on cell width:
 
-        - None: No limits.
-        - float: Returns limits as dmin.
-        - [min, max]: dmin is limited to this range.
+        - ``None``: No limits.
+        - ``float``: Simply returns the ``limits`` as cell width.
+        - ``[min, max]``: Cell width is limited to this range.
 
 
     Returns
     -------
-    dmin : float
-        Minimum cell width (m).
+    cell_width : float
+        Cell width (m).
 
     """
-    # Calculate min cell width.
-    dmin = skin_depth/pps
+    # Calculate cell width.
+    cell_width = skin_depth/pps
 
     # Respect user limits.
     if limits is not None:
@@ -939,8 +957,9 @@ def min_cell_width(skin_depth, pps=3, limits=None):
         limits = np.array(limits, ndmin=1)
 
         if limits.size == 1:
-            dmin = limits  # Ignores skin depth and pps.
-        else:
-            dmin = np.clip(dmin, *limits)  # Restrict.
+            cell_width = limits  # Ignores skin depth and pps.
 
-    return dmin
+        else:
+            cell_width = np.clip(cell_width, *limits)  # Restrict.
+
+    return cell_width

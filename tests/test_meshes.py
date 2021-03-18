@@ -37,91 +37,187 @@ def create_dummy(nx, ny, nz, imag=True):
     return out.reshape(nx, ny, nz)
 
 
-def test_TensorMesh():
-    # Load mesh created with discretize.TensorMesh.
-    grid = REGRES['grid']
-    grid['h'] = [grid.pop('hx'), grid.pop('hy'), grid.pop('hz')]
+def test_BaseMesh():
+    hx = [1, 1]
+    hy = [2, 2]
+    hz = [3, 3]
+    origin = (10, 100, 1000)
+    grid = meshes.BaseMesh(h=[hx, hy, hz], origin=origin)
 
-    mesh = meshes.BaseMesh(grid['h'], origin=grid['origin'])
+    assert_allclose(grid.origin, origin)
+    assert_allclose(grid.h[0], hx)
+    assert_allclose(grid.h[1], hy)
+    assert_allclose(grid.h[2], hz)
 
-    # Use this grid instance to create emg3d equivalent.
-    emg3dgrid = meshes.TensorMesh(grid['h'], origin=grid['origin'])
+    assert_allclose(grid.shape_nodes, [3, 3, 3])
+    assert_allclose(grid.nodes_x, [10, 11, 12])
+    assert_allclose(grid.nodes_y, [100, 102, 104])
+    assert_allclose(grid.nodes_z, [1000, 1003, 1006])
 
-    # Ensure they are the same.
-    for key, value in grid.items():
-        if key == 'h':
-            for i in range(3):
-                assert_allclose(value[i], getattr(emg3dgrid, key)[i])
+    assert_allclose(grid.shape_cells, [2, 2, 2])
+    assert_allclose(grid.n_cells, 8)
+    assert_allclose(grid.cell_centers_x, [10.5, 11.5])
+    assert_allclose(grid.cell_centers_y, [101, 103])
+    assert_allclose(grid.cell_centers_z, [1001.5, 1004.5])
+
+    assert_allclose(grid.shape_edges_x, [2, 3, 3])
+    assert_allclose(grid.shape_edges_y, [3, 2, 3])
+    assert_allclose(grid.shape_edges_z, [3, 3, 2])
+    assert_allclose(grid.n_edges_x, 18)
+    assert_allclose(grid.n_edges_y, 18)
+    assert_allclose(grid.n_edges_z, 18)
+
+    assert "TensorMesh: 2 x 2 x 2 (8)" in grid.__repr__()
+
+    assert_allclose(grid.cell_volumes, np.ones(8)*6)
+
+
+class TestTensorMesh:
+    def test_TensorMesh(self):
+        # Load mesh created with discretize.TensorMesh.
+        grid = REGRES['grid']
+        grid['h'] = [grid.pop('hx'), grid.pop('hy'), grid.pop('hz')]
+
+        mesh = meshes.BaseMesh(grid['h'], origin=grid['origin'])
+
+        # Use this grid instance to create emg3d equivalent.
+        emg3dgrid = meshes.TensorMesh(grid['h'], origin=grid['origin'])
+
+        # Ensure they are the same.
+        for key, value in grid.items():
+            if key == 'h':
+                for i in range(3):
+                    assert_allclose(value[i], getattr(emg3dgrid, key)[i])
+            else:
+                assert_allclose(value, getattr(emg3dgrid, key))
+
+        # Copy
+        cgrid = emg3dgrid.copy()
+        assert_allclose(cgrid.cell_volumes, emg3dgrid.cell_volumes)
+        dgrid = emg3dgrid.to_dict()
+        cdgrid = meshes.TensorMesh.from_dict(dgrid)
+        assert_allclose(cdgrid.cell_volumes, emg3dgrid.cell_volumes)
+        del dgrid['hx']
+        with pytest.raises(KeyError, match="Variable 'hx' missing in `inp`"):
+            meshes.TensorMesh.from_dict(dgrid)
+
+        # Check __eq__.
+        assert emg3dgrid == cgrid
+        newgrid = meshes.TensorMesh(
+                [np.ones(3), np.ones(3), np.ones(3)], np.zeros(3))
+        assert emg3dgrid != newgrid
+
+        assert 'TensorMesh: 40 x 30 x 1 (1,200)' in mesh.__repr__()
+        assert not hasattr(mesh, '_repr_html_')
+
+        assert mesh.cell_volumes.sum() > 69046392
+
+    def test_TensorMesh_repr(self):
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.ones(2), np.ones(2), np.ones(2)], np.zeros(3))
+
+        # Check representation of TensorMesh.
+        if discretize is None:
+            assert 'TensorMesh: 2 x 2 x 2 (8)' in grid.__repr__()
+            assert not hasattr(grid, '_repr_html_')
         else:
-            assert_allclose(value, getattr(emg3dgrid, key))
-
-    # Copy
-    cgrid = emg3dgrid.copy()
-    assert_allclose(cgrid.cell_volumes, emg3dgrid.cell_volumes)
-    dgrid = emg3dgrid.to_dict()
-    cdgrid = meshes.TensorMesh.from_dict(dgrid)
-    assert_allclose(cdgrid.cell_volumes, emg3dgrid.cell_volumes)
-    del dgrid['hx']
-    with pytest.raises(KeyError, match="Variable 'hx' missing in `inp`"):
-        meshes.TensorMesh.from_dict(dgrid)
-
-    # Check __eq__.
-    assert emg3dgrid == cgrid
-    newgrid = meshes.TensorMesh(
-            [np.ones(3), np.ones(3), np.ones(3)], np.zeros(3))
-    assert emg3dgrid != newgrid
-
-    assert 'TensorMesh: 40 x 30 x 1 (1,200)' in mesh.__repr__()
-    assert not hasattr(mesh, '_repr_html_')
-
-    assert mesh.cell_volumes.sum() > 69046392
+            assert 'TensorMesh: 8 cells' in grid.__repr__()
+            assert hasattr(grid, '_repr_html_')
 
 
-def test_TensorMesh_repr():
-    # Create some dummy data
-    grid = meshes.TensorMesh([np.ones(2), np.ones(2), np.ones(2)], np.zeros(3))
+class TestConstructMesh:
+    def test_verb(self, capsys):
+        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=1)
+        out, _ = capsys.readouterr()
+        assert "         == GRIDDING IN X ==" in out
+        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
 
-    # Check representation of TensorMesh.
-    if discretize is None:
-        assert 'TensorMesh: 2 x 2 x 2 (8)' in grid.__repr__()
-        assert not hasattr(grid, '_repr_html_')
-    else:
-        assert 'TensorMesh: 8 cells' in grid.__repr__()
-        assert hasattr(grid, '_repr_html_')
+        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=0)
+        out, _ = capsys.readouterr()
+        assert "" == out
+        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
 
+        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=-1)
+        out, _ = capsys.readouterr()
+        assert "" == out
+        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
 
-def test_skin_depth():
-    t1 = meshes.skin_depth(1/np.pi, 2.0, 2.0)
-    assert t1 == 0.5
+        # No suitable grid warning.
+        with pytest.raises(RuntimeError, match="No suitable grid found; "):
+            meshes.construct_mesh(1, 1, (0, 0, 0), [-1, 1], cell_numbers=[1, ])
 
-    t2 = meshes.skin_depth(1/np.pi, 1/mu_0)
-    assert t2 == 1
+    def test_compare_to_gow1(self):
+        f = 1/np.pi
+        p = 9*mu_0
+        c = (1, 2, 3)
+        d = [-1, 1]
+        x0, hx = meshes.get_origin_widths(f, p, c[0], d, stretching=[1, 1.3])
+        y0, hy = meshes.get_origin_widths(f, p, c[1], d, stretching=[1.5, 1])
+        z0, hz = meshes.get_origin_widths(f, p, c[2], d, stretching=[1, 1])
+        m = meshes.construct_mesh(
+                f, [p, p, p, p], c, d, stretching=([1, 1.3], [1.5, 1], [1, 1]))
 
-    t3 = meshes.skin_depth(-1/(2*np.pi**2), 2.0, 2.0)
-    assert t3 == 0.5
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
 
+    def test_compare_to_gow2(self):
+        vz = np.arange(100)[::-1]*-20
+        x0, hx = meshes.get_origin_widths(
+                0.77, [0.3, 1, 2], 0, [-1000, 1000], min_width_limits=[20, 40])
+        y0, hy = meshes.get_origin_widths(
+                0.77, [0.3, 2, 1], 0, [-2000, 2000], min_width_limits=[20, 40])
+        z0, hz = meshes.get_origin_widths(
+                0.77, [0.3, 2, 1e8], 0, vector=vz, min_width_limits=[20, 40])
+        m = meshes.construct_mesh(
+                frequency=0.77,
+                properties=[0.3, 1, 2, 2, 1, 2, 1e8],
+                center=(0, 0, 0),
+                domain=([-1000, 1000], [-2000, 2000], None),
+                vector=(None, None, vz),
+                min_width_limits=[20, 40],
+                )
 
-def test_wavelength():
-    t1 = meshes.wavelength(0.5)
-    assert_allclose(t1, np.pi)
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
 
+    def test_compare_to_gow3(self):
+        x0, hx = meshes.get_origin_widths(
+                0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
+        y0, hy = meshes.get_origin_widths(
+                0.2, [1.0, 2.0], 16, [-1234, 8956], min_width_limits=20)
+        z0, hz = meshes.get_origin_widths(
+                0.2, [1.0, 3.0], -33.3333, [-100, 100], min_width_limits=20)
+        m = meshes.construct_mesh(
+                frequency=0.2,
+                properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
+                center=(-423, 16, -33.3333),
+                domain=([-3333, 222], [-1234, 8956], [-100, 100]),
+                min_width_limits=20,
+                )
 
-def test_min_cell_width():
-    t1 = meshes.min_cell_width(1, pps=1)
-    assert t1 == 1
+        assert_allclose(m.origin, (x0, y0, z0), atol=1e-3)
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
 
-    t2 = meshes.min_cell_width(1)
-    assert np.round(t2, 3) == 0.333
+    def test_compare_to_gow4(self):
+        inp = {'frequency': 1.234, 'center': (0, 0, 0),
+               'domain': ([-100, 100], [-100, 100], [-100, 100])}
+        m3 = meshes.construct_mesh(properties=[0.3, 1.0, 1e8], **inp)
+        m4 = meshes.construct_mesh(properties=[0.3, 1e8, 1.0, 1e8], **inp)
 
-    t3 = meshes.min_cell_width(503.0, limits=10)
-    assert t3 == 10
-
-    t3 = meshes.min_cell_width(503.0, limits=[100, 120])
-    assert t3 == 120
+        assert_allclose(m3.origin, m4.origin)
+        assert_allclose(m3.h[0], m4.h[0])
+        assert_allclose(m3.h[1], m4.h[1])
+        assert_allclose(m3.h[2], m4.h[2])
 
 
 class TestGetOriginWidths:
-
     def test_errors(self, capsys):
         with pytest.raises(TypeError, match='Unexpected '):
             meshes.get_origin_widths(1, 1, 0, [-1, 1], unknown=True)
@@ -132,7 +228,7 @@ class TestGetOriginWidths:
         with pytest.raises(ValueError, match="Provided vector MUST at least"):
             meshes.get_origin_widths(1, 1, 0, [-1, 1], np.array([0, 1, 2]))
 
-        with pytest.raises(ValueError, match="The `seasurface` but be bigger"):
+        with pytest.raises(ValueError, match="The `seasurface` must be bigge"):
             meshes.get_origin_widths(1, 1, 0, [-1, 1], seasurface=-2)
 
         # No suitable grid warning.
@@ -259,15 +355,13 @@ class TestGetOriginWidths:
         assert "Max stretching     : 1.000 (1.000) / 1.370" in out
 
         # High frequencies.
-        meshes.get_origin_widths(
+        _, _, out = meshes.get_origin_widths(
             frequency=1e8,
             properties=[5, 1, 50],
             center=0,
             domain=[-1, 1],
-            verb=1,
+            verb=-1,
             )
-
-        out, _ = capsys.readouterr()
 
         assert "Skin depth     [m] : 0.113 / 0.050 / 0.356" in out
         assert "Survey dom. DS [m] : -1.000 - 1.000" in out
@@ -278,99 +372,7 @@ class TestGetOriginWidths:
         assert "Max stretching     : 1.000 (1.000) / 1.100" in out
 
 
-class TestConstructMesh:
-
-    def test_verb(self, capsys):
-        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=1)
-        out, _ = capsys.readouterr()
-        assert "         == GRIDDING IN X ==" in out
-        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
-
-        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=0)
-        out, _ = capsys.readouterr()
-        assert "" == out
-        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
-
-        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=-1)
-        out, _ = capsys.readouterr()
-        assert "" == out
-        assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
-
-        # No suitable grid warning.
-        with pytest.raises(RuntimeError, match="No suitable grid found; "):
-            meshes.construct_mesh(1, 1, (0, 0, 0), [-1, 1], cell_numbers=[1, ])
-
-    def test_compare_to_gow1(self):
-        f = 1/np.pi
-        p = 9*mu_0
-        c = (1, 2, 3)
-        d = [-1, 1]
-        x0, hx = meshes.get_origin_widths(f, p, c[0], d, stretching=[1, 1.3])
-        y0, hy = meshes.get_origin_widths(f, p, c[1], d, stretching=[1.5, 1])
-        z0, hz = meshes.get_origin_widths(f, p, c[2], d, stretching=[1, 1])
-        m = meshes.construct_mesh(
-                f, [p, p, p, p], c, d, stretching=([1, 1.3], [1.5, 1], [1, 1]))
-
-        assert_allclose(m.origin, (x0, y0, z0))
-        assert_allclose(m.h[0], hx)
-        assert_allclose(m.h[1], hy)
-        assert_allclose(m.h[2], hz)
-
-    def test_compare_to_gow2(self):
-        vz = np.arange(100)[::-1]*-20
-        x0, hx = meshes.get_origin_widths(
-                0.77, [0.3, 1, 2], 0, [-1000, 1000], min_width_limits=[20, 40])
-        y0, hy = meshes.get_origin_widths(
-                0.77, [0.3, 2, 1], 0, [-2000, 2000], min_width_limits=[20, 40])
-        z0, hz = meshes.get_origin_widths(
-                0.77, [0.3, 2, 1e8], 0, vector=vz, min_width_limits=[20, 40])
-        m = meshes.construct_mesh(
-                frequency=0.77,
-                properties=[0.3, 1, 2, 2, 1, 2, 1e8],
-                center=(0, 0, 0),
-                domain=([-1000, 1000], [-2000, 2000], None),
-                vector=(None, None, vz),
-                min_width_limits=[20, 40],
-                )
-
-        assert_allclose(m.origin, (x0, y0, z0))
-        assert_allclose(m.h[0], hx)
-        assert_allclose(m.h[1], hy)
-        assert_allclose(m.h[2], hz)
-
-    def test_compare_to_gow3(self):
-        x0, hx = meshes.get_origin_widths(
-                0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
-        y0, hy = meshes.get_origin_widths(
-                0.2, [1.0, 2.0], 16, [-1234, 8956], min_width_limits=20)
-        z0, hz = meshes.get_origin_widths(
-                0.2, [1.0, 3.0], -33.3333, [-100, 100], min_width_limits=20)
-        m = meshes.construct_mesh(
-                frequency=0.2,
-                properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
-                center=(-423, 16, -33.3333),
-                domain=([-3333, 222], [-1234, 8956], [-100, 100]),
-                min_width_limits=20,
-                )
-
-        assert_allclose(m.origin, (x0, y0, z0), atol=1e-3)
-        assert_allclose(m.h[0], hx)
-        assert_allclose(m.h[1], hy)
-        assert_allclose(m.h[2], hz)
-
-    def test_compare_to_gow4(self):
-        inp = {'frequency': 1.234, 'center': (0, 0, 0),
-               'domain': ([-100, 100], [-100, 100], [-100, 100])}
-        m3 = meshes.construct_mesh(properties=[0.3, 1.0, 1e8], **inp)
-        m4 = meshes.construct_mesh(properties=[0.3, 1e8, 1.0, 1e8], **inp)
-
-        assert_allclose(m3.origin, m4.origin)
-        assert_allclose(m3.h[0], m4.h[0])
-        assert_allclose(m3.h[1], m4.h[1])
-        assert_allclose(m3.h[2], m4.h[2])
-
-
-def test_good_mg_cell_numbers(capsys):
+def test_good_mg_cell_nr(capsys):
     numbers = meshes.good_mg_cell_nr(max_nr=128, max_prime=5, min_div=3)
     assert_allclose([16, 24, 32, 40, 48, 64, 80, 96, 128], numbers)
 
@@ -379,3 +381,33 @@ def test_good_mg_cell_numbers(capsys):
 
     numbers = meshes.good_mg_cell_nr(max_nr=50, max_prime=3, min_div=5)
     assert len(numbers) == 0
+
+
+def test_skin_depth():
+    t1 = meshes.skin_depth(1/np.pi, 2.0, 2.0/mu_0)
+    assert t1 == 0.5
+
+    t2 = meshes.skin_depth(1/np.pi, 1/mu_0)
+    assert t2 == 1
+
+    t3 = meshes.skin_depth(-1/(2*np.pi**2), 2.0)
+    assert_allclose(t3, np.sqrt(0.5/mu_0))
+
+
+def test_wavelength():
+    t1 = meshes.wavelength(0.5)
+    assert_allclose(t1, np.pi)
+
+
+def test_cell_width():
+    t1 = meshes.cell_width(1, pps=1)
+    assert t1 == 1
+
+    t2 = meshes.cell_width(1)
+    assert np.round(t2, 3) == 0.333
+
+    t3 = meshes.cell_width(503.0, limits=10)
+    assert t3 == 10
+
+    t3 = meshes.cell_width(503.0, limits=[100, 120])
+    assert t3 == 120
