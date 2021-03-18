@@ -611,14 +611,14 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
 def get_receiver(field, rec):
     """Return the field (response) at receiver coordinates.
 
-    - TODO :: removed get_receiver
     - TODO :: check, simplify, document
-    - TODO :: Improve tests!
     - TODO :: incorporate into Field
+    - TODO :: Improve tests!
 
     Note that in order to avoid boundary effects the first and last value in
     each direction is neglected. Field values for coordinates outside of the
-    grid are set to NaN's.
+    grid are set to NaN's. However, all receivers should be much further away
+    from the boundary.
 
 
     Parameters
@@ -677,21 +677,20 @@ def get_receiver(field, rec):
     points = tuple([tuple([p[1:-1] for p in pp]) for pp in points])
 
     # Pre-allocate the response.
-    resp = np.zeros(max([np.atleast_1d(x).size for x in rec]),
-                    dtype=field.dtype)
+    _, xi, shape = maps._points_from_grids(
+            field.grid, field.fx, rec[:3], 'cubic')
+    resp = np.zeros(xi.shape[0], dtype=field.dtype)
 
-    # Add the required responses. # TODO Change to maps.interpolate
-    from scipy.interpolate import interpnd
+    # Add the required responses.
     factors = _rotation(*rec[3:])  # Geometrical weights from angles.
-    xi = interpnd._ndim_coords_from_arrays(rec[:3], ndim=3)
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interp_spline_3d(
-                       points[i], ff[1:-1, 1:-1, 1:-1], xi,
-                       mode='constant', cval=np.nan)
+                        points[i], ff[1:-1, 1:-1, 1:-1], xi,
+                        mode='constant', cval=np.nan)
 
     # Return response.
-    return utils.EMArray(resp)
+    return utils.EMArray(resp.reshape(shape, order='F'))
 
 
 def get_h_field(model, field):

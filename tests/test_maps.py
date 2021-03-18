@@ -468,6 +468,16 @@ def test_points_from_grids():
     with pytest.raises(ValueError, match='only implemented for TensorMesh'):
         maps._points_from_grids(grid, v_prop, xi_tuple, 'volume')
 
+    # tuple can contain any dimension; it will work (undocumented).
+    shape = (3, 2, 4, 5)
+    coords = np.arange(np.prod(shape)).reshape(shape, order='F')
+    xi_tuple2 = (1, coords, 10)
+    out = maps._points_from_grids(grid, v_field, xi_tuple2, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][-1, :], [1., 119, 10])
+    assert out[2] == shape
+
 
 def test_interp_spline_3d():
     x = np.array([1., 2, 4, 5])
