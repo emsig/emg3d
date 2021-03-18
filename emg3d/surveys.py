@@ -462,7 +462,7 @@ class Survey:
 
     @property
     def standard_deviation(self):
-        r"""Returns the standard deviation of the data.
+        r"""Return the standard deviation of the data.
 
         The standard deviation can be set by providing an array of the same
         dimension as the data itself:
@@ -556,7 +556,7 @@ class Survey:
 
     @property
     def noise_floor(self):
-        r"""Returns the noise floor of the data.
+        r"""Return the noise floor of the data.
 
         See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
 
@@ -595,7 +595,7 @@ class Survey:
 
     @property
     def relative_error(self):
-        r"""Returns the relative error of the data.
+        r"""Return the relative error of the data.
 
         See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
 

@@ -81,7 +81,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     sfield : SourceField
         The source field. See :func:`emg3d.fields.get_source_field`.
 
-    sslsolver : {str, bool}, default: ``True``
+    sslsolver : {str, bool}, default: True
         A :mod:`scipy.sparse.linalg`-solver, to use with multigrid as
         pre-conditioner or on its own (if ``cycle=None``).
 
@@ -99,7 +99,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         ``'minres'`` for various reasons (e.g., some require ``rmatvec`` in
         addition to ``matvec``).
 
-    semicoarsening : {int, bool}, default: ``True``
+    semicoarsening : {int, bool}, default: True
         Semicoarsening.
 
         - ``True``: Cycling over 1, 2, 3.
@@ -111,7 +111,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
           cycle over these values, e.g., ``semicoarsening=1213`` will cycle
           over [1, 2, 1, 3].
 
-    linerelaxation : {int, bool}, default: ``True``
+    linerelaxation : {int, bool}, default: True
         Line relaxation.
 
         - ``True``: Cycling over [4, 5, 6].
@@ -130,7 +130,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         Note: Smoothing is generally done in lexicographical order, except for
         line relaxation in y direction; the reason is speed (memory access).
 
-    verb : int, default: ``0``
+    verb : int, default: 0
         Level of verbosity (the higher the more verbose).
 
         - ``-1``: Nothing.
@@ -141,7 +141,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         - ``4``: Additional information for each MG-cycle.
         - ``5``: Everything (slower due to additional error computations).
 
-    cycle : {str, None}, default: ``'F'``
+    cycle : {str, None}, default: 'F'
         Type of multigrid cycle.
 
         - ``'V'``: V-cycle, simplest version.
@@ -160,7 +160,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
            4h_    \  /     \    /\  /     \    /\    /
            8h_     \/       \/\/  \/       \/\/  \/\/
 
-    efield : Field, default: ``None``
+    efield : Field, default: None
         Initial electric field. If is initiated with zeroes if not provided.
 
         If an initial efield is provided nothing is returned, but the final
@@ -171,14 +171,14 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         relaxation. The sslsolver is at times unstable with an initial guess,
         carrying out one multigrid cycle helps to stabilize it.
 
-    tol : float, default: ``1e-6``
+    tol : float, default: 1e-6
         Convergence tolerance.
 
         Iterations stop as soon as the norm of the residual has decreased by
         this factor, relative to the residual norm obtained for a zero
         electric field.
 
-    maxit : int, default: ``50``
+    maxit : int, default: 50
         Maximum number of multigrid iterations.
 
         If ``sslsolver`` is used, this applies to the ``sslsolver``.
@@ -187,37 +187,37 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         ``sslsolver``, the maximum iteration for multigrid is defined by the
         maximum length of the ``linerelaxation`` and ``semicoarsening``-cycles.
 
-    nu_init : int, default: ``0``
+    nu_init : int, default: 0
         Number of initial smoothing steps, before multigrid cycle.
 
-    nu_pre : int, default: ``2``
+    nu_pre : int, default: 2
         Number of pre-smoothing steps.
 
-    nu_coarse : int, default: ``1``
+    nu_coarse : int, default: 1
         Number of smoothing steps on coarsest grid.
 
-    nu_post : int, default: ``2``
+    nu_post : int, default: 2
         Number of post-smoothing steps.
 
-    clevel : int, default: ``-1``
+    clevel : int, default: -1
         The maximum coarsening level can be different for each dimension and
         is, by default, automatically determined (``clevel=-1``). The
         parameter ``clevel`` restricts the maximum coarsening level by its
         value.
 
-    return_info : bool, default: ``False``
+    return_info : bool, default: False
         If True, a dictionary is returned with runtime info (final norm,
         number of iterations of multigrid and the sslsolver, log, exit message,
         etc).
 
-    log : int, default: ``1``
+    log : int, default: 1
         Only relevant if ``return_info=True``.
 
         - ``-1``: LOG ONLY: Only store info in log, do not print on screen.
         - ``0``: SCREEN only: Only print info to screen, do not store in log.
         - ``1``: BOTH: Store info in log and print on screen.
 
-    plain : bool, default: ``False``
+    plain : bool, default: False
         Plain multigrid method. This is a shortcut for ``sslsolver=False,
         semicoarsening=False, linerelaxation=False``. The three parameters
         remain unchanged if they are set to anything else than ``True``.
@@ -225,11 +225,11 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
     Returns
     -------
-    efield : Field, returned if ``efield=None``
+    efield : Field, returned if efield=None
         Resulting electric field. It is not returned but stored in-place if an
         initial efield was provided.
 
-    info_dict : dict, returned if ``return_info=True``
+    info_dict : dict, returned if return_info=True
         Dictionary with solver info. Keys:
 
         - ``exit``: Exit status, 0=Success, 1=Failure;
@@ -458,7 +458,7 @@ def multigrid(model, sfield, efield, var, **kwargs):
         A multigrid parameter instance used within
         :func:`emg3d.solver.multigrid`.
 
-    level, new_cycmax : int, default: ``0``
+    level, new_cycmax : int, default: 0
         Parameters internally used for recursion (do not use):
 
         - ``level``: current coarsening level;
@@ -997,17 +997,17 @@ def residual(model, sfield, efield, norm=False):
     efield : Field
         Input electric field; a :class:`emg3d.fields.Field` instance.
 
-    norm : bool, default: ``False``
+    norm : bool, default: False
         If True, the error (l2-norm) of the residual is returned, not the
         residual.
 
 
     Returns
     -------
-    residual : Field, returned if ``norm=False``
+    residual : Field, returned if norm=False
         The residual field; :class:`emg3d.fields.Field` instance.
 
-    norm : float, returned if ``norm=True``
+    norm : float, returned if norm=True
         The error (l2-norm) of the residual.
 
     """

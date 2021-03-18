@@ -49,10 +49,12 @@ latest: towards v1.0
     ``None``, not ``property_x``. Also, only properties that have been
     initiated can be changed afterwards.
 
-- ``TensorMesh``:
+- ``meshes``:
 
-  - The basic mesh (without ``discretize``) is renamed from ``_TensorMesh`` to
-    ``BaseMesh``.
+  - Renamed:
+
+    - ``_TensorMesh`` to ``BaseMesh``.
+    - ``min_cell_width`` to ``cell_width``.
 
   - Reduced ``BaseMesh`` to the attributes ``origin``, ``h``, ``shape_cells``,
     ``shape_nodes``, ``n_cells``, ``n_edges_x``, ``n_edges_y``, ``n_edges_z``,

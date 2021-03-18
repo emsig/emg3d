@@ -978,7 +978,7 @@ class Simulation:
 
     @property
     def _dict_initiate(self):
-        """Returns a dict of the structure `dict[source][freq]=None`."""
+        """Return a dict of the structure `dict[source][freq]=None`."""
         return {src: {freq: None for freq in self.survey.frequencies}
                 for src in self.survey.sources.keys()}
 
