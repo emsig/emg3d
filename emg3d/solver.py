@@ -172,8 +172,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         carrying out one multigrid cycle helps to stabilize it.
 
         Note that the tangential field at the boundary of a provided efield is
-        set to zero ensuring the perfect electric conductor boundary condition
-        (PEC).
+        set to zero to ensure a PEC boundary (perfect electric conductor).
 
     tol : float, default: 1e-6
         Convergence tolerance.
