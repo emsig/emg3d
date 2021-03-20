@@ -38,10 +38,8 @@ class Field(np.ndarray):
     z-directed fields as attributes, stored as `fx`, `fy`, and `fz`. The
     default array contains the whole field, which can be the electric field,
     the source field, or the residual field, in a 1D array. A `Field` instance
-    has additionally the property `ensure_pec` which, if called, ensures
-    Perfect Electric Conductor (PEC) boundary condition. It also has the two
-    attributes `amp` and `pha` for the amplitude and phase, as common in
-    frequency-domain CSEM.
+    has additionally the two attributes `amp` and `pha` for the amplitude and
+    phase, as common in frequency-domain CSEM.
 
     A `Field` can be initiated in three ways:
 
@@ -292,27 +290,6 @@ class Field(np.ndarray):
                 self._sval = None
 
         return self._sval
-
-    @property
-    def ensure_pec(self):
-        """Set Perfect Electric Conductor (PEC) boundary condition."""
-        # Apply PEC to fx
-        self.fx[:, 0, :] = 0.
-        self.fx[:, -1, :] = 0.
-        self.fx[:, :, 0] = 0.
-        self.fx[:, :, -1] = 0.
-
-        # Apply PEC to fy
-        self.fy[0, :, :] = 0.
-        self.fy[-1, :, :] = 0.
-        self.fy[:, :, 0] = 0.
-        self.fy[:, :, -1] = 0.
-
-        # Apply PEC to fz
-        self.fz[0, :, :] = 0.
-        self.fz[-1, :, :] = 0.
-        self.fz[:, 0, :] = 0.
-        self.fz[:, -1, :] = 0.
 
     # INTERPOLATION
     def interpolate_to_grid(self, grid, **interpolate_opts):

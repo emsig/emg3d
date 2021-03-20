@@ -280,12 +280,9 @@ def test_restrict(njit):
     ffield = fields.Field(fgrid)
 
     # Put in values.
-    ffield.fx[:, :, :] = 1
-    ffield.fy[:, :, :] = 2
-    ffield.fz[:, :, :] = 4
-
-    # Ensure PEC.
-    ffield.ensure_pec
+    ffield.fx[:, 1:-1, 1:-1] = 1
+    ffield.fy[1:-1, :, 1:-1] = 2
+    ffield.fz[1:-1, 1:-1, :] = 4
 
     # Get weigths
     wlr = np.zeros(fgrid.shape_nodes[0], dtype=np.float_)
