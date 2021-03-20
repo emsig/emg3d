@@ -52,7 +52,6 @@ def test_save_and_load(tmpdir, capsys):
     field = fields.Field(grid)
     ne = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
     field.field = np.arange(ne)+1j*np.ones(ne)
-    field.ensure_pec
 
     # Some model.
     property_x = create_dummy(*grid.shape_cells, False)

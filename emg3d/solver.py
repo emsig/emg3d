@@ -171,6 +171,10 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         relaxation. The sslsolver is at times unstable with an initial guess,
         carrying out one multigrid cycle helps to stabilize it.
 
+        Note that the tangential field at the boundary of a provided efield is
+        set to zero ensuring the perfect electric conductor boundary condition
+        (PEC).
+
     tol : float, default: 1e-6
         Convergence tolerance.
 
@@ -327,6 +331,14 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         # source field.
         if efield.freq is None:
             efield._freq = sfield._freq
+
+        # Ensure PEC.
+        efield.fx[:, 0, :] = efield.fx[:, -1, :] = 0.
+        efield.fx[:, :, 0] = efield.fx[:, :, -1] = 0.
+        efield.fy[0, :, :] = efield.fy[-1, :, :] = 0.
+        efield.fy[:, :, 0] = efield.fy[:, :, -1] = 0.
+        efield.fz[0, :, :] = efield.fz[-1, :, :] = 0.
+        efield.fz[:, 0, :] = efield.fz[:, -1, :] = 0.
 
         # Set flag to NOT return the field.
         var.do_return = False
@@ -891,8 +903,7 @@ def restriction(model, sfield, residual, sc_dir):
     core.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
                   residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
-    # Ensure PEC and initiate empty e-field.
-    csfield.ensure_pec
+    # Initiate empty e-field.
     cefield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
 
     return cmodel, csfield, cefield
@@ -907,7 +918,8 @@ def prolongation(efield, cefield, sc_dir):
     added to the fine grid electric field, in-place. Piecewise constant
     interpolation is used in the direction of the field, and bilinear
     interpolation in the other two directions. See Equation 10 in [Muld06]_ and
-    surrounding text.
+    surrounding text. Perfect Electric Conductor (PEC) boundary condition is
+    enforced in this step.
 
     This function is called by :func:`emg3d.solver.multigrid`.
 
@@ -932,12 +944,12 @@ def prolongation(efield, cefield, sc_dir):
         hh = fn(cefield.fx[ixc, :, :]).reshape(
                 (grid.shape_nodes[1], grid.shape_nodes[2]), order='F')
 
-        # Piecewise constant interpolation in x-direction
+        # Piecewise constant interpolation in x-direction, ensuring PEC.
         if sc_dir not in [1, 5, 6]:
-            efield.fx[2*ixc, :, :] += hh
-            efield.fx[2*ixc+1, :, :] += hh
+            efield.fx[2*ixc, 1:-1, 1:-1] += hh[1:-1, 1:-1]
+            efield.fx[2*ixc+1, 1:-1, 1:-1] += hh[1:-1, 1:-1]
         else:
-            efield.fx[ixc, :, :] += hh
+            efield.fx[ixc, 1:-1, 1:-1] += hh[1:-1, 1:-1]
 
     # Interpolate ey in x-z-slices.
     fn = RegularGridProlongator(
@@ -948,12 +960,12 @@ def prolongation(efield, cefield, sc_dir):
         hh = fn(cefield.fy[:, iyc, :]).reshape(
                 (grid.shape_nodes[0], grid.shape_nodes[2]), order='F')
 
-        # Piecewise constant interpolation in y-direction
+        # Piecewise constant interpolation in y-direction, ensuring PEC.
         if sc_dir not in [2, 4, 6]:
-            efield.fy[:, 2*iyc, :] += hh
-            efield.fy[:, 2*iyc+1, :] += hh
+            efield.fy[1:-1, 2*iyc, 1:-1] += hh[1:-1, 1:-1]
+            efield.fy[1:-1, 2*iyc+1, 1:-1] += hh[1:-1, 1:-1]
         else:
-            efield.fy[:, iyc, :] += hh
+            efield.fy[1:-1, iyc, 1:-1] += hh[1:-1, 1:-1]
 
     # Interpolate ez in x-y-slices.
     fn = RegularGridProlongator(
@@ -964,15 +976,12 @@ def prolongation(efield, cefield, sc_dir):
         hh = fn(cefield.fz[:, :, izc]).reshape(
                 (grid.shape_nodes[0], grid.shape_nodes[1]), order='F')
 
-        # Piecewise constant interpolation in z-direction
+        # Piecewise constant interpolation in z-direction, ensuring PEC.
         if sc_dir not in [3, 4, 5]:
-            efield.fz[:, :, 2*izc] += hh
-            efield.fz[:, :, 2*izc+1] += hh
+            efield.fz[1:-1, 1:-1, 2*izc] += hh[1:-1, 1:-1]
+            efield.fz[1:-1, 1:-1, 2*izc+1] += hh[1:-1, 1:-1]
         else:
-            efield.fz[:, :, izc] += hh
-
-    # Ensure PEC boundaries
-    efield.ensure_pec
+            efield.fz[1:-1, 1:-1, izc] += hh[1:-1, 1:-1]
 
 
 def residual(model, sfield, efield, norm=False):

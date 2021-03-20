@@ -279,15 +279,6 @@ def test_field(tmpdir):
     ee3.fz = ee.fz
     assert_allclose(ee.field, ee3.field)
 
-    # Check PEC
-    ee.ensure_pec
-    assert abs(np.sum(ee.fx[:, 0, :] + ee.fx[:, -1, :])) == 0
-    assert abs(np.sum(ee.fx[:, :, 0] + ee.fx[:, :, -1])) == 0
-    assert abs(np.sum(ee.fy[0, :, :] + ee.fy[-1, :, :])) == 0
-    assert abs(np.sum(ee.fy[:, :, 0] + ee.fy[:, :, -1])) == 0
-    assert abs(np.sum(ee.fz[0, :, :] + ee.fz[-1, :, :])) == 0
-    assert abs(np.sum(ee.fz[:, 0, :] + ee.fz[:, -1, :])) == 0
-
     # Test copy
     e2 = ee.copy()
     assert_allclose(ee.field, e2.field)
