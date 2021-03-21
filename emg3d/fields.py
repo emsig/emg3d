@@ -27,8 +27,7 @@ from scipy.special import sindg, cosdg
 
 from emg3d import maps, meshes, models, utils
 
-__all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
-           'get_h_field']
+__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_h_field']
 
 
 class Field(np.ndarray):
@@ -80,8 +79,6 @@ class Field(np.ndarray):
         - `frequency` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
-        Just added as info if provided.
-
     """
 
     def __new__(cls, grid, field=None, dtype=np.complex128, frequency=None):
@@ -89,6 +86,22 @@ class Field(np.ndarray):
 
         if len(grid.shape_cells) != 3:
             raise ValueError("Provided grid must be a 3D grid.")
+
+        # Check frequency
+        if frequency is None and hasattr(field, 'frequency'):
+            frequency = field._frequency
+
+        # Check dtype
+        if frequency is not None:
+            if frequency > 0:
+                dtype = complex
+            elif frequency < 0:
+                dtype = float
+            else:
+                raise ValueError(
+                        "`frequency` must be >0 (frequency domain) "
+                        "or <0 (Laplace domain).\n"
+                        f"Provided frequency: {frequency} Hz.")
 
         # Collect field
         if field is None:
@@ -98,18 +111,9 @@ class Field(np.ndarray):
         # Store the field as object
         obj = np.asarray(field).view(cls)
 
-        # Store grid
+        # Store grid and frequency
         obj.grid = grid
-
-        # Store frequency
-        if frequency is None and hasattr(field, 'frequency'):
-            frequency = field._frequency
         obj._frequency = frequency
-        if frequency == 0.0:
-            raise ValueError(
-                    "`frequency` must be >0 (frequency domain) "
-                    "or <0 (Laplace domain).\n"
-                    f"Provided frequency: {frequency} Hz.")
 
         return obj
 
@@ -333,79 +337,6 @@ class Field(np.ndarray):
         return Field(grid, field, frequency=self._frequency)
 
 
-class SourceField(Field):
-    r"""Create a Source-Field instance with x-, y-, and z-views of the field.
-
-    A subclass of :class:`Field`. Additional properties are the real-valued
-    source vector (`vector`, `vx`, `vy`, `vz`), which sum is always one. For a
-    `SourceField` frequency is a mandatory  parameter, unlike for a `Field`
-    (recommended also for `Field` though),
-
-    Parameters
-    ----------
-
-    grid : :class:`emg3d.meshes.TensorMesh` or ndarray
-        Either a TensorMesh instance or an ndarray of shape grid.n_edges_x or
-        grid.shape_edges_x. See explanations above. Only mandatory parameter;
-        if the only one provided, it will initiate a zero-field of `dtype`.
-
-    field : :class:`Field` or ndarray, optional
-        Either a Field instance or an ndarray of shape grid.n_edges_y or
-        grid.shape_edges_y. See explanations above.
-
-    dtype : dtype, optional
-        Only used if ``field=None``; the initiated zero-field for the provided
-        TensorMesh has data type `dtype`. Default: complex.
-
-    frequency : float
-        Source frequency (Hz), used to compute the Laplace parameter `s`.
-        Either positive or negative:
-
-        - `frequency` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - `frequency` < 0: Laplace domain, hence
-          :math:`s = f` (real).
-
-        In difference to `Field`, the frequency has to be provided for
-        a `SourceField`.
-
-    """
-
-    def __new__(cls, grid, field=None, dtype=np.complex128, frequency=None):
-        """Initiate a new Source Field."""
-        # Ensure frequency is provided.
-        if frequency is None:
-            raise ValueError("SourceField requires the frequency.")
-
-        if frequency > 0:
-            dtype = complex
-        else:
-            dtype = float
-
-        return super().__new__(cls, grid, field=field, dtype=dtype,
-                               frequency=frequency)
-
-    @property
-    def vector(self):
-        """Entire vector, 1D [vx, vy, vz]."""
-        return np.real(self.field/self.smu0)
-
-    @property
-    def vx(self):
-        """View of the x-directed vector in the x-direction (nCx, nNy, nNz)."""
-        return np.real(self.field.fx/self.smu0)
-
-    @property
-    def vy(self):
-        """View of the vector in the y-direction (nNx, nCy, nNz)."""
-        return np.real(self.field.fy/self.smu0)
-
-    @property
-    def vz(self):
-        """View of the vector in the z-direction (nNx, nNy, nCz)."""
-        return np.real(self.field.fz/self.smu0)
-
-
 def get_source_field(grid, source, frequency, strength=0, electric=True,
                      length=1.0, decimals=6, **kwargs):
     r"""Return the source field.
@@ -481,7 +412,7 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
 
     Returns
     -------
-    sfield : :func:`SourceField` instance
+    sfield : :func:`Field` instance
         Source field, normalized to 1 A m.
 
     """
@@ -524,7 +455,7 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
             lengths = lengths*strength
 
         # Initiate a zero-valued source field and loop over segments.
-        sfield = SourceField(grid, frequency=frequency)
+        sfield = Field(grid, frequency=frequency)
         sfield.source = source
         sfield.strength = strength
         sfield.moment = np.array([0., 0, 0], dtype=lengths.dtype)
@@ -568,7 +499,7 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
         moment = strength*length
 
     # Initiate zero source field.
-    sfield = SourceField(grid, frequency=frequency)
+    sfield = Field(grid, frequency=frequency)
 
     # Return source-field for each direction.
     for xyz, field in enumerate([sfield.fx, sfield.fy, sfield.fz]):

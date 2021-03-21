@@ -210,7 +210,6 @@ def test_known_classes(tmpdir):
     frequency = 1.0
     grid = meshes.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
     field = fields.Field(grid)
-    sfield = fields.SourceField(grid, frequency=frequency)
     model = models.Model(grid, 1)
     pointdip = surveys.Dipole((0, 1000, -950, 0, 0))
 
@@ -218,7 +217,6 @@ def test_known_classes(tmpdir):
         'TensorMesh': grid,
         'Model': model,
         'Field': field,
-        'SourceField': sfield,
         'Dipole': pointdip,
         'MapConductivity': maps.MapConductivity(),
         'MapLgConductivity': maps.MapLgConductivity(),

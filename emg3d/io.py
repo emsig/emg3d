@@ -42,7 +42,6 @@ KNOWN_CLASSES = {
     'Survey': surveys.Survey,
     'Dipole': surveys.Dipole,
     'TensorMesh': meshes.TensorMesh,
-    'SourceField': fields.SourceField,
     'Simulation': simulations.Simulation,
 }
 

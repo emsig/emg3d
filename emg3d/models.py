@@ -461,7 +461,7 @@ class VolumeModel:
     model : Model
         Model to transform to volume-averaged values.
 
-    sfield : SourceField
+    sfield : Field
        A VolumeModel is frequency-dependent. The frequency-information is taken
        from the provided source field.
 

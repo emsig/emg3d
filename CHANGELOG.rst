@@ -113,6 +113,7 @@ latest: towards v1.0
     ``receiver`` in all functions and classes.
   - Field has no property ``ensure_pec`` any longer, it is ensured directly in
     ``solver.prolongation``.
+  - There is no ``SourceField`` any longer, it is just a regular field.
 
 
 - ``maps``:
@@ -136,6 +137,8 @@ latest: towards v1.0
     - ``interp3d`` to ``interp_spline_3d``.
 
 - Removed all deprecated features.
+
+- Reduced top namespace to principal functions.
 
 
 0.x-Series

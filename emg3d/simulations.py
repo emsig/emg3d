@@ -1156,7 +1156,7 @@ class Simulation:
         grid = self.get_grid(source, freq)
 
         # Initiate empty field
-        ResidualField = fields.SourceField(grid, frequency=float_freq)
+        ResidualField = fields.Field(grid, frequency=float_freq)
 
         # Loop over receivers, input as source.
         for name, rec in self.survey.receivers.items():

@@ -78,7 +78,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     model : Model
         The model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
+    sfield : Field
         The source field. See :func:`emg3d.fields.get_source_field`.
 
     sslsolver : {str, bool}, default: True
@@ -303,9 +303,9 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     # Check sfield.
     if sfield.frequency is None:
         raise ValueError(
-                "Source field is missing frequency information;\n"
-                "Create it with `emg3d.fields.get_source_field`, or\n"
-                "initiate it with `emg3d.fields.SourceField`.")
+                "Source field is missing frequency information; Create "
+                "it with `emg3d.fields.get_source_field`, or initiate it "
+                "with `emg3d.fields.Field`, providing frequency information.")
 
     # Initiate volume-averaged model values.
     vmodel = models.VolumeModel(model, sfield)
@@ -459,8 +459,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        The source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        The source field; a :class:`emg3d.fields.Field` instance.
 
 
     efield : Field
@@ -637,8 +637,8 @@ def krylov(model, sfield, efield, var):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        The source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        The source field; a :class:`emg3d.fields.Field` instance.
 
     efield : Field
         The electric field; a :class:`emg3d.fields.Field` instance.
@@ -776,8 +776,8 @@ def smoothing(model, sfield, efield, nu, lr_dir):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        Input source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        Input source field; a :class:`emg3d.fields.Field` instance.
 
     efield : Field
         Input electric field; a :class:`emg3d.fields.Field` instance.
@@ -834,8 +834,8 @@ def restriction(model, sfield, residual, sc_dir):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        Input source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        Input source field; a :class:`emg3d.fields.Field` instance.
 
     sc_dir : int
         Direction of semicoarsening.
@@ -846,7 +846,7 @@ def restriction(model, sfield, residual, sc_dir):
     cmodel : VolumeModel
         Coarse model.
 
-    csfield : SourceField
+    csfield : Field
         Coarse source field. Corresponds to restriction of fine-grid residual.
 
     cefield : Field
@@ -907,12 +907,6 @@ def restriction(model, sfield, residual, sc_dir):
                   residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Initiate empty e-field.
-    csfield.fx[:, 0, :] = csfield.fx[:, -1, :] = 0.
-    csfield.fx[:, :, 0] = csfield.fx[:, :, -1] = 0.
-    csfield.fy[0, :, :] = csfield.fy[-1, :, :] = 0.
-    csfield.fy[:, :, 0] = csfield.fy[:, :, -1] = 0.
-    csfield.fz[0, :, :] = csfield.fz[-1, :, :] = 0.
-    csfield.fz[:, 0, :] = csfield.fz[:, -1, :] = 0.
     cefield = fields.Field(cgrid, dtype=sfield.dtype,
                            frequency=sfield._frequency)
 
@@ -1010,8 +1004,8 @@ def residual(model, sfield, efield, norm=False):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        Input source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        Input source field; a :class:`emg3d.fields.Field` instance.
 
     efield : Field
         Input electric field; a :class:`emg3d.fields.Field` instance.
