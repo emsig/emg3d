@@ -30,7 +30,7 @@ from emg3d import maps, meshes, models, utils
 __all__ = ['Field', 'get_source_field', 'get_receiver', 'get_h_field']
 
 
-class Field(np.ndarray):
+class Field:
     r"""Create a Field instance with x-, y-, and z-views of the field.
 
     A `Field` is an `ndarray` with additional views of the x-, y-, and
@@ -81,7 +81,7 @@ class Field(np.ndarray):
 
     """
 
-    def __new__(cls, grid, field=None, dtype=np.complex128, frequency=None):
+    def __init__(self, grid, field=None, dtype=np.complex128, frequency=None):
         """Initiate a new Field instance."""
 
         if len(grid.shape_cells) != 3:
@@ -102,66 +102,36 @@ class Field(np.ndarray):
                         "`frequency` must be >0 (frequency domain) "
                         "or <0 (Laplace domain).\n"
                         f"Provided frequency: {frequency} Hz.")
+        elif field is not None:
+            dtype = field.dtype
 
         # Collect field
         if field is None:
             nc = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
             field = np.zeros(nc, dtype=dtype)
 
-        # Store the field as object
-        obj = np.asarray(field).view(cls)
+        # Store field, grid, and frequency
+        if hasattr(field, 'frequency'):
+            self._field = np.asarray(field.field, dtype=dtype)
+        else:
+            self._field = np.asarray(field, dtype=dtype)
+        self.grid = grid
+        self._frequency = frequency
 
-        # Store grid and frequency
-        obj.grid = grid
-        obj._frequency = frequency
-
-        return obj
-
-    def __array_finalize__(self, obj):
-        """Ensure relevant numbers are stored no matter how created."""
-        if obj is None:
-            return
-
-        self.grid = getattr(obj, 'grid', None)
-        self._frequency = getattr(obj, '_frequency', None)
-
-    def __reduce__(self):
-        """Customize __reduce__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Get the parent's __reduce__ tuple.
-        pickled_state = super().__reduce__()
-
-        # Create our own tuple to pass to __setstate__.
-        new_state = pickled_state[2]
-        new_state += (self.grid.h[0], self.grid.h[1], self.grid.h[2],
-                      self.grid.origin, self._frequency)
-
-        # Return tuple that replaces parent's __setstate__ tuple with our own.
-        return (pickled_state[0], pickled_state[1], new_state)
-
-    def __setstate__(self, state):
-        """Customize __setstate__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Set the necessary attributes (in reverse order).
-        self._frequency = state[-1]
-        origin = state[-2]
-        hz = state[-3]
-        hy = state[-4]
-        hx = state[-5]
-        self.grid = meshes.TensorMesh([hx, hy, hz], origin)
-
-        # Call the parent's __setstate__ with the other tuple elements.
-        super().__setstate__(state[0:-5])
+    def __eq__(self, field):
+        equal = field.__class__.__name__ == 'Field'
+        equal *= self.grid == field.grid
+        equal *= self._frequency == field._frequency
+        equal *= np.allclose(self._field, field._field, atol=0, rtol=1e-10)
+        return bool(equal)
 
     def copy(self):
         """Return a copy of the Field."""
-        return self.from_dict(self.to_dict(True))
+        return self.from_dict(self.to_dict(copy=True))
 
     def to_dict(self, copy=False):
         """Store the necessary information of the Field in a dict."""
-        out = {'field': np.array(self.field), 'frequency': self._frequency,
+        out = {'field': self._field, 'frequency': self._frequency,
                '__class__': self.__class__.__name__}
         out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
                        'hz': self.grid.h[2], 'origin': self.grid.origin}
@@ -196,71 +166,54 @@ class Field(np.ndarray):
             raise KeyError(f"Variable {e} missing in `inp`.") from e
 
     @property
+    def dtype(self):
+        return self._field.dtype
+
+    @property
     def field(self):
         """Entire field, 1D [fx, fy, fz]."""
-        return self.view()
+        return self._field
 
     @field.setter
     def field(self, field):
         """Update field, 1D [fx, fy, fz]."""
-        self.view()[:] = field
+        self._field[:] = field
 
     @property
     def fx(self):
         """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
-        return self.view()[:self.grid.n_edges_x].reshape(
-                self.grid.shape_edges_x, order='F')
+        ix = self.grid.n_edges_x
+        shape = self.grid.shape_edges_x
+        return utils.EMArray(self._field[:ix]).reshape(shape, order='F')
 
     @fx.setter
     def fx(self, fx):
         """Update field in x-direction."""
-        self.view()[:self.grid.n_edges_x] = fx.ravel('F')
+        self._field[:self.grid.n_edges_x] = fx.ravel('F')
 
     @property
     def fy(self):
         """View of the field in the y-direction (nNx, nCy, nNz)."""
-        return self.view()[self.grid.n_edges_x:-self.grid.n_edges_z].reshape(
-                self.grid.shape_edges_y, order='F')
+        return utils.EMArray(
+                self._field[self.grid.n_edges_x:-self.grid.n_edges_z].reshape(
+                    self.grid.shape_edges_y, order='F'))
 
     @fy.setter
     def fy(self, fy):
         """Update field in y-direction."""
-        self.view()[self.grid.n_edges_x:-self.grid.n_edges_z] = fy.ravel('F')
+        self._field[self.grid.n_edges_x:-self.grid.n_edges_z] = fy.ravel('F')
 
     @property
     def fz(self):
         """View of the field in the z-direction (nNx, nNy, nCz)."""
-        return self.view()[-self.grid.n_edges_z:].reshape(
-                self.grid.shape_edges_z, order='F')
+        return utils.EMArray(
+                self._field[-self.grid.n_edges_z:].reshape(
+                    self.grid.shape_edges_z, order='F'))
 
     @fz.setter
     def fz(self, fz):
         """Update electric field in z-direction."""
-        self.view()[-self.grid.n_edges_z:] = fz.ravel('F')
-
-    def amp(self):
-        """Amplitude of the electromagnetic field."""
-        return utils.EMArray(self.view()).amp()
-
-    def pha(self, deg=False, unwrap=True, lag=True):
-        """Phase of the electromagnetic field.
-
-        Parameters
-        ----------
-        deg : bool
-            If True the returned phase is in degrees, else in radians.
-            Default is False (radians).
-
-        unwrap : bool
-            If True the returned phase is unwrapped.
-            Default is True (unwrapped).
-
-        lag : bool
-            If True the returned phase is lag, else lead defined.
-            Default is True (lag defined).
-
-        """
-        return utils.EMArray(self.view()).pha(deg, unwrap, lag)
+        self._field[-self.grid.n_edges_z:] = fz.ravel('F')
 
     @property
     def frequency(self):
@@ -464,12 +417,12 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
         for i in range(sx.size-1):
             segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
             seg_field = get_source_field(grid, segment, frequency, lengths[i])
-            sfield += seg_field
+            sfield.field += seg_field.field
             sfield.moment += seg_field.moment
 
         # Check this with iw/-iw; source definition etc.
         if not electric:
-            sfield *= -1
+            sfield.field *= -1
 
         return sfield
 
@@ -573,7 +526,7 @@ def get_receiver(field, receiver):
                 f"Length of provided `receiver`: {len(receiver)}.")
 
     # Check field dimension to ensure it is not a particular field.
-    if field.field.ndim == 3:
+    if not hasattr(field, 'field'):
         raise ValueError("`field` must be a `Field`-instance, not a\n"
                          "particular field such as `field.fx`.")
 
@@ -724,7 +677,7 @@ def get_h_field(model, field):
 
     # Create a Field instance and divide by s*mu_0 and return.
     new = np.r_[e3d_hx.ravel('F'), e3d_hy.ravel('F'), e3d_hz.ravel('F')]
-    return -Field(grid, new, frequency=field._frequency)/field.smu0
+    return Field(grid, -new/field.smu0, frequency=field._frequency)
 
 
 def _finite_source_xyz(grid, source, field, xyz, decimals):

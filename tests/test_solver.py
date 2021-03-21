@@ -51,20 +51,20 @@ class TestSolve:
         assert "3.535e-03  after   2 F-cycles   [1.903e-08, 0.104]   0 " in out
 
         # Check all fields (ex, ey, and ez)
-        assert_allclose(dat['Fresult'], efield)
+        assert_allclose(dat['Fresult'].field, efield.field)
 
         # W-cycle
         wfield = solver.solve(model, sfield, plain=True, cycle='W')
 
         # Check all fields (ex, ey, and ez)
-        assert_allclose(dat['Wresult'], wfield)
+        assert_allclose(dat['Wresult'].field, wfield.field)
 
         # V-cycle
         vfield = solver.solve(model, sfield, plain=True, cycle='V')
         _, _ = capsys.readouterr()  # clear output
 
         # Check all fields (ex, ey, and ez)
-        assert_allclose(dat['Vresult'], vfield)
+        assert_allclose(dat['Vresult'].field, vfield.field)
 
         # BiCGSTAB with some print checking.
         efield = solver.solve(model, sfield, verb=4, sslsolver='bicgstab',
@@ -79,7 +79,7 @@ class TestSolve:
         assert ' emg3d END   :: ' in out
 
         # Check all fields (ex, ey, and ez)
-        assert_allclose(dat['bicresult'], efield)
+        assert_allclose(dat['bicresult'].field, efield.field)
 
         # Same as previous, without BiCGSTAB, but some print checking.
         efield = solver.solve(model, sfield, plain=True, verb=4)
@@ -122,7 +122,7 @@ class TestSolve:
         assert outarray is None
         assert "NOTHING DONE (provided efield already good enough)" in out
         # Ensure the field did not change.
-        assert_allclose(efield, efield_copy)
+        assert_allclose(efield.field, efield_copy.field)
 
         # Provide initial field and return info.
         info = solver.solve(model, sfield, plain=True, efield=efield_copy,
@@ -149,15 +149,17 @@ class TestSolve:
                     model, wrong_sfield, plain=True, efield=efield, verb=1)
 
         # Check stagnation by providing an almost zero source field.
-        _ = solver.solve(model, sfield*0+1e-20, plain=True, maxit=100)
+        sfield.field = 1e-10
+        _ = solver.solve(model, sfield, plain=True, maxit=100)
         out, _ = capsys.readouterr()
         assert "STAGNATED" in out
 
         # Check a zero field is returned for a zero source field.
-        efield = solver.solve(model, sfield*0, plain=True, maxit=100, verb=3)
+        sfield.field = 0
+        efield = solver.solve(model, sfield, plain=True, maxit=100, verb=3)
         out, _ = capsys.readouterr()
         assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
-        assert np.linalg.norm(efield) == 0.0
+        assert np.linalg.norm(efield.field) == 0.0
 
     def test_heterogeneous(self, capsys):
         # Regression test for heterogeneous case.
@@ -171,7 +173,7 @@ class TestSolve:
 
         efield = solver.solve(model, sfield, sslsolver=False, **inp)
 
-        assert_allclose(dat['result'], efield.field)
+        assert_allclose(dat['result'].field, efield.field)
 
         _, _ = capsys.readouterr()  # Clean up
 
@@ -183,7 +185,7 @@ class TestSolve:
         solver.solve(
                 model, sfield, plain=True, efield=efield3, maxit=2, verb=0)
 
-        assert_allclose(efield2, efield3)
+        assert efield2 == efield3
 
         _, _ = capsys.readouterr()  # Clean up
 
@@ -193,7 +195,7 @@ class TestSolve:
         efield5 = solver.solve(
                 model, sfield, maxit=20, nu_pre=4, nu_post=0, verb=4)
         # They don't converge, and hence don't agree. Just a lazy test.
-        assert_allclose(efield4, efield5, atol=1e-15, rtol=1e-5)
+        assert_allclose(efield4.field, efield5.field, atol=1e-15, rtol=1e-5)
 
         # Check the QC plot if it is too long.
         # Coincidently, this one also diverges if nu_pre=0!
@@ -247,14 +249,14 @@ class TestSolve:
         efield = solver.solve(model, sfield, plain=True)
 
         # Check all fields (ex, ey, and ez)
-        assert_allclose(dat['Fresult'], efield, atol=1e-14)
+        assert_allclose(dat['Fresult'].field, efield.field, atol=1e-14)
 
         # BiCGSTAB with some print checking.
         efield = solver.solve(
                 model, sfield, semicoarsening=False, linerelaxation=False)
 
         # Check all fields (ex, ey, and ez)
-        assert_allclose(dat['bicresult'], efield, atol=1e-14)
+        assert_allclose(dat['bicresult'].field, efield.field, atol=1e-14)
 
         # If efield is complex, assert it fails.
         efield = fields.Field(grid, dtype=np.complex_)
@@ -282,7 +284,7 @@ class TestMultigrid:
                 linerelaxation=True, shape_cells=grid.shape_cells, verb=5,
                 nu_init=2, maxit=-1,
         )
-        var.l2_refe = sl.norm(sfield, check_finite=False)
+        var.l2_refe = sl.norm(sfield.field, check_finite=False)
 
         # Call multigrid.
         solver.multigrid(vmodel, sfield, efield, var)
@@ -311,7 +313,7 @@ class TestKrylov:
                 linerelaxation=False, shape_cells=grid.shape_cells, verb=3,
                 maxit=-1,
         )
-        var.l2_refe = sl.norm(sfield, check_finite=False)
+        var.l2_refe = sl.norm(sfield.field, check_finite=False)
 
         # Call krylov and ensure it fails properly.
         solver.krylov(vmodel, sfield, efield, var)
@@ -334,7 +336,7 @@ class TestKrylov:
                 linerelaxation=False, shape_cells=grid.shape_cells, verb=4,
                 maxit=5,
         )
-        var.l2_refe = sl.norm(sfield, check_finite=False)
+        var.l2_refe = sl.norm(sfield.field, check_finite=False)
 
         # Call krylov and ensure it fails properly.
         solver.krylov(vmodel, sfield, efield, var)
@@ -357,7 +359,7 @@ class TestKrylov:
                 tol=1.0, linerelaxation=True, shape_cells=grid.shape_cells,
                 verb=4, maxit=2,
         )
-        var.l2_refe = sl.norm(sfield, check_finite=False)
+        var.l2_refe = sl.norm(sfield.field, check_finite=False)
 
         # Call krylov and ensure it fails properly.
         solver.krylov(vmodel, sfield, efield, var)
@@ -372,7 +374,7 @@ class TestKrylov:
                 linerelaxation=False, shape_cells=grid.shape_cells, verb=4,
                 maxit=1,
         )
-        var.l2_refe = sl.norm(sfield, check_finite=False)
+        var.l2_refe = sl.norm(sfield.field, check_finite=False)
         solver.krylov(vmodel, sfield, efield, var)
         out, _ = capsys.readouterr()
         assert 'MAX. ITERATION REACHED' in out
@@ -448,7 +450,7 @@ def test_smoothing():
             solver.smoothing(vmodel, sfield, ofield, nu, lr_dir)
 
             # Compare
-            assert_allclose(efield, ofield)
+            assert efield == ofield
 
 
 class TestRestrictionProlongation:
@@ -497,7 +499,7 @@ class TestRestrictionProlongation:
 
         # Add pi to the coarse e-field
         efield = fields.Field(grid)
-        cefield += np.pi
+        cefield.field += np.pi
 
         # Prolong it
         solver.prolongation(efield, cefield, sc_dir=sc)
@@ -555,7 +557,7 @@ class TestRestrictionProlongation:
 
         # Add pi to the coarse e-field
         efield = fields.Field(grid)
-        cefield += np.pi
+        cefield.field += np.pi
 
         # Prolong it
         solver.prolongation(efield, cefield, sc_dir=sc)
@@ -612,7 +614,7 @@ class TestRestrictionProlongation:
 
         # Add pi to the coarse e-field
         efield = fields.Field(grid)
-        cefield += np.pi
+        cefield.field += np.pi
 
         # Prolong it
         solver.prolongation(efield, cefield, sc_dir=sc)
@@ -661,8 +663,8 @@ def test_residual():
     outnorm = solver.residual(vmodel, sfield, efield, True)
 
     # Compare
-    assert_allclose(out, rfield)
-    assert_allclose(outnorm, np.linalg.norm(out))
+    assert_allclose(out.field, rfield.field)
+    assert_allclose(outnorm, np.linalg.norm(out.field))
 
 
 class TestMGParameters:

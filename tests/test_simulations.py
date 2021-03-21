@@ -52,12 +52,12 @@ class TestSimulation():
         sfield = fields.get_source_field(
                 self.grid, self.survey.sources['Tx1'].coordinates,
                 frequency=1.0, strength=0)
-        assert_allclose(self.simulation.get_sfield('Tx1', 'f0'), sfield)
+        assert self.simulation.get_sfield('Tx1', 'f0') == sfield
 
         # Check efield
         efield, info = solver.solve(
                 self.model, sfield, **self.simulation.solver_opts)
-        assert_allclose(self.simulation.get_efield('Tx1', 'f0'), efield)
+        assert self.simulation.get_efield('Tx1', 'f0') == efield
 
         # Unknown keyword
         with pytest.raises(TypeError, match='Unexpected '):
@@ -73,9 +73,9 @@ class TestSimulation():
 
         # Check hfield
         hfield = fields.get_h_field(self.model, efield)
-        assert_allclose(self.simulation.get_hfield('Tx1', 1.0), hfield)
+        assert self.simulation.get_hfield('Tx1', 1.0) == hfield
         s_hfield = self.simulation.get_hfield('Tx1', 1.0)
-        assert_allclose(s_hfield, hfield)
+        assert s_hfield == hfield
         assert_allclose(
                 self.simulation._dict_efield_info['Tx1']['f0']['abs_error'],
                 info['abs_error'])
@@ -132,8 +132,8 @@ class TestSimulation():
         sim2 = self.simulation.copy()
         assert self.simulation.name == sim2.name
         assert self.simulation.survey.sources == sim2.survey.sources
-        assert_allclose(self.simulation.get_efield('Tx1', 1.0),
-                        sim2.get_efield('Tx1', 1.0))
+        assert_allclose(self.simulation.get_efield('Tx1', 1.0).field,
+                        sim2.get_efield('Tx1', 1.0).field)
 
         # Also check to_file()/from_file().
         sim_dict = self.simulation.to_dict('all')

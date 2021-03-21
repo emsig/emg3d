@@ -141,7 +141,7 @@ def test_arbitrarily_shaped_source():
         np.r_[src[0]-0.5, src[0]-0.5, src[1]+0.5, src[1]-0.5, src[2], src[2]],
     ]
     for srcl in src4xxyyzz:
-        sman += fields.get_source_field(grid, srcl, freq, strength)
+        sman.field += fields.get_source_field(grid, srcl, freq, strength).field
 
     # Computed
     src5xyz = ([src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5, src[0]-0.5],
@@ -153,14 +153,14 @@ def test_arbitrarily_shaped_source():
     with pytest.raises(TypeError, match='Unexpected'):
         fields.get_source_field(grid, src, freq, strength, whatever=True)
 
-    assert_allclose(sman.field, scomp.field)
+    assert sman == scomp
 
     # Normalized
     sman = fields.Field(grid, frequency=freq)
     for srcl in src4xxyyzz:
-        sman += fields.get_source_field(grid, srcl, freq, 0.25)
+        sman.field += fields.get_source_field(grid, srcl, freq, 0.25).field
     scomp = fields.get_source_field(grid, src5xyz, freq)
-    assert_allclose(sman.field, scomp.field)
+    assert sman == scomp
 
 
 def test_get_source_field_point_vs_finite(capsys):
@@ -187,13 +187,13 @@ def test_get_source_field_point_vs_finite(capsys):
     d_src, f_src = get_f_src([0, 0., 0., 23, 15])
     dsf = fields.get_source_field(grid1, d_src, 1)
     fsf = fields.get_source_field(grid1, f_src, 1)
-    assert_allclose(fsf, dsf)
+    assert fsf == dsf
 
     # 1b. Source within one cell, source strength = pi.
     d_src, f_src = get_f_src([0, 0., 0., 32, 53])
     dsf = fields.get_source_field(grid1, d_src, 3.3, np.pi)
     fsf = fields.get_source_field(grid1, f_src, 3.3, np.pi)
-    assert_allclose(fsf, dsf)
+    assert fsf == dsf
 
     # 1c. Source over various cells, normalized.
     h = np.ones(8)*200
@@ -244,7 +244,7 @@ def test_field(tmpdir):
     # Test the views
     field = np.r_[ex.ravel('F'), ey.ravel('F'), ez.ravel('F')]
     ee = fields.Field(grid, field)
-    assert_allclose(ee, field)
+    assert_allclose(ee.field, field)
     assert_allclose(ee.fx, ex)
     assert_allclose(ee.fy, ey)
     assert_allclose(ee.fz, ez)
@@ -257,27 +257,27 @@ def test_field(tmpdir):
 
     # Test the other possibilities to initiate a Field-instance.
     ee2 = fields.Field(grid, ee.field)
-    assert_allclose(ee.field, ee2.field)
+    assert ee == ee2
     assert_allclose(ee.fx, ee2.fx)
 
     ee3 = fields.Field(grid)
-    assert ee.shape == ee3.shape
+    assert ee.field.size == ee3.field.size
 
     # Try setting values
     ee3.field = ee.field
-    assert_allclose(ee.field, ee3.field)
+    assert ee == ee3
     ee3.fx = ee.fx
     ee3.fy = ee.fy
     ee3.fz = ee.fz
-    assert_allclose(ee.field, ee3.field)
+    assert ee == ee3
 
     # Test copy
     e2 = ee.copy()
-    assert_allclose(ee.field, e2.field)
+    assert ee == e2
     assert_allclose(ee.fx, e2.fx)
     assert_allclose(ee.fy, e2.fy)
     assert_allclose(ee.fz, e2.fz)
-    assert ee.field.base is not e2.field.base
+    assert not np.may_share_memory(ee.field, e2.field)
 
     edict = ee.to_dict()
     del edict['field']
@@ -295,7 +295,7 @@ def test_field(tmpdir):
         db['field'] = ee2
     with shelve.open(tmpdir+'/test') as db:
         test = db['field']
-    assert_allclose(test, ee2)
+    assert test == ee2
 
 
 def test_source_field():
@@ -328,7 +328,7 @@ def test_get_h_field():
     hfield = dat['hresult']
 
     hout = fields.get_h_field(model, efield)
-    assert_allclose(hfield, hout)
+    assert hfield == hout
 
     # Add some mu_r - Just 1, to trigger, and compare.
     dat = REGRES['res']
@@ -338,13 +338,13 @@ def test_get_h_field():
 
     hout1 = fields.get_h_field(model1, efield)
     hout2 = fields.get_h_field(model2, efield)
-    assert_allclose(hout1, hout2)
+    assert hout1 == hout2
 
     # Ensure they are not the same if mu_r!=1/None provided
     model3 = models.Model(**dat['input_model'], mu_r=2.)
     hout3 = fields.get_h_field(model3, efield)
     with pytest.raises(AssertionError):
-        assert_allclose(hout1, hout3)
+        assert hout1 == hout3
 
 
 def test_get_receiver():
@@ -353,13 +353,13 @@ def test_get_receiver():
             [np.ones(4), np.array([1, 2, 3, 1]), np.array([2, 1, 1, 1])],
             [0, 0, 0])
     field = fields.Field(grid)
-    field.field = np.ones(field.size) + 1j*np.ones(field.size)
+    field.field = np.ones(field.field.size) + 1j*np.ones(field.field.size)
 
     grid = meshes.TensorMesh(
             [np.ones(6), np.array([1, 1, 2, 3, 1]), np.array([1, 2, 1, 1, 1])],
             [-1, -1, -1])
     efield = fields.Field(grid, frequency=1)
-    efield.field = np.ones(efield.size) + 1j*np.ones(efield.size)
+    efield.field = np.ones(efield.field.size) + 1j*np.ones(efield.field.size)
 
     # Provide wrong rec_loc input:
     with pytest.raises(ValueError, match='`receiver` needs to be in the form'):

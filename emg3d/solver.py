@@ -297,7 +297,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     var.cprint(var, 2)
 
     # Compute reference error for tolerance.
-    var.l2_refe = sl.norm(sfield, check_finite=False)
+    var.l2_refe = sl.norm(sfield.field, check_finite=False)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
@@ -325,7 +325,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
             raise ValueError(
                     "Source field and electric field must have the\n same "
                     "dtype; complex (f-domain) or real (s-domain).\n Provided:"
-                    f"sfield: {sfield.dtype}; efield: {efield.dtype}.")
+                    f"sfield: {sfield.dtype}; efield: "
+                    f"{efield.dtype}.")
 
         # If provided efield is missing frequency information, add it from the
         # source field.
@@ -668,7 +669,7 @@ def krylov(model, sfield, efield, var):
                 model.grid.h[0], model.grid.h[1], model.grid.h[2])
 
         # Return Field instance.
-        return -rfield
+        return -rfield.field
 
     # Initiate LinearOperator A x.
     A = ssl.LinearOperator(
@@ -687,7 +688,7 @@ def krylov(model, sfield, efield, var):
         # Solve for these fields.
         multigrid(model, sfield, efield, var)
 
-        return efield
+        return efield.field
 
     # Initiate LinearOperator M.
     M = None
@@ -730,8 +731,8 @@ def krylov(model, sfield, efield, var):
     # therefore throw an exception in `_terminate`, and catch it here.
     try:
         efield.field, i = getattr(ssl, var.sslsolver)(
-                A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
-                atol=1e-30, M=M, callback=callback)
+                A=A, b=sfield.field, x0=efield.field, tol=var.tol,
+                maxiter=var.ssl_maxit, atol=1e-30, M=M, callback=callback)
     except _ConvergenceError:
         i = -1  # Mark it as error; returned field is all zero.
         var.exit_message += " (returned field is zero)"
@@ -1032,7 +1033,7 @@ def residual(model, sfield, efield, norm=False):
 
     # Return error if norm.
     if norm:
-        return sl.norm(rfield, check_finite=False)
+        return sl.norm(rfield.field, check_finite=False)
 
     # Return residual if not norm.
     else:

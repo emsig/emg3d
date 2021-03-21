@@ -61,7 +61,7 @@ def test_amat_x(njit):
             grid.h[1], grid.h[2])
 
     # Check all fields (ex, ey, and ez)
-    assert_allclose(-rr1, rr2, atol=1e-23)
+    assert_allclose(-rr1.field, rr2.field, atol=1e-23)
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -135,7 +135,7 @@ def test_gauss_seidel(njit):
             gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
         # Check the resulting field.
-        assert_allclose(efield.field, cfield.field)
+        assert efield == cfield
 
 
 @pytest.mark.parametrize("njit", [True, False])

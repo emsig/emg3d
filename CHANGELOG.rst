@@ -103,6 +103,7 @@ latest: towards v1.0
 
 - ``fields``:
 
+  - ``Field`` is *not* a subclassed ndarray any longer.
   - The function ``emg3d.fields.get_receiver`` was removed and replaced by
     its successor ``emg3d.fields.get_receiver_response``;
     ``emg3d.fields.get_receiver_response`` does not exist any longer.

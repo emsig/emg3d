@@ -28,7 +28,7 @@ technique for the gradient.
 
 import numpy as np
 
-from emg3d import maps
+from emg3d import maps, fields
 
 __all__ = ['gradient', 'misfit']
 
@@ -178,10 +178,12 @@ def gradient(simulation):
         # This is the actual Equation (10), with:
         #   del S / del p = iwu0 V sigma / sigma,
         # where lambda and E are already volume averaged.
-        efield = -np.real(
-                simulation._dict_bfield[src][freq] *
-                simulation._dict_efield[src][freq] *
-                simulation._dict_efield[src][freq].smu0)
+        efield = fields.Field(
+                simulation._dict_bfield[src][freq].grid,
+                -np.real(simulation._dict_bfield[src][freq].field *
+                         simulation._dict_efield[src][freq].field *
+                         simulation._dict_efield[src][freq].smu0)
+                )
 
         # Pre-allocate the gradient for the computational grid.
         shape_cells = simulation._dict_grid[src][freq].shape_cells

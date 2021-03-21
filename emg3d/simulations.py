@@ -1182,13 +1182,13 @@ class Simulation:
             # return a normalized field for a unit source. However, in this
             # case we do not want that.
             if strength != 0:
-                ResidualField += fields.get_source_field(
+                ResidualField.field += fields.get_source_field(
                     grid=grid,
                     source=rec.coordinates,
                     frequency=float_freq,
                     strength=strength,
                     electric=rec.electric,
-                )
+                ).field
 
         return ResidualField
 

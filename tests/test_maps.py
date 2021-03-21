@@ -663,7 +663,7 @@ def test_interp_edges_to_vol_averages(njit):
 
     if discretize is not None:
         def volume_disc(grid, field):
-            out = grid.average_edge_to_cell*field*grid.cell_volumes
+            out = grid.average_edge_to_cell*field.field*grid.cell_volumes
             return out.reshape(grid.shape_cells, order='F')
 
         assert_allclose(grad, 3*volume_disc(grid, field))
