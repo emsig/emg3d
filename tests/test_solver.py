@@ -410,7 +410,7 @@ def test_smoothing():
         model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
 
         # Create a source field
-        sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
+        sfield = fields.get_source_field(grid=grid, source=src, frequency=freq)
 
         # Get volume-averaged model parameters.
         vmodel = models.VolumeModel(model, sfield)
@@ -641,7 +641,7 @@ def test_residual():
     model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
 
     # Create a source field
-    sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
+    sfield = fields.get_source_field(grid=grid, source=src, frequency=freq)
 
     # Get volume-averaged model parameters.
     vmodel = models.VolumeModel(model, sfield)
@@ -1099,7 +1099,8 @@ def test_print_one_liner(capsys):
     grid = meshes.TensorMesh(
             [np.ones(8), np.ones(8), np.ones(8)], origin=np.array([0, 0, 0]))
     model = models.Model(grid, property_x=1.5, property_y=1.8, property_z=3.3)
-    sfield = fields.get_source_field(grid, src=[4, 4, 4, 0, 0], freq=10.0)
+    sfield = fields.get_source_field(grid, source=[4, 4, 4, 0, 0],
+                                     frequency=10.0)
 
     # Dynamic one-liner.
     out, _ = capsys.readouterr()

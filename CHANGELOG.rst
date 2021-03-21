@@ -109,6 +109,10 @@ latest: towards v1.0
   - A ``Field`` knows now its ``grid``. As a consequence, all the functions
     that required the ``grid`` and the ``field`` require now only the
     ``field``; e.g., ``emg3d.fields.get_receiver``.
+  - Expanded ``src`` to ``source``, ``freq`` to ``frequency``, and ``rec`` to
+    ``receiver`` in all functions and classes.
+  - Field has no property ``ensure_pec`` any longer, it is ensured directly in
+    ``solver.prolongation``.
 
 
 - ``maps``:

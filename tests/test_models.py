@@ -36,7 +36,7 @@ class TestModel:
 
         _, _ = capsys.readouterr()  # Clean-up
         # Using defaults; check backwards compatibility for freq.
-        sfield = fields.SourceField(grid, freq=1)
+        sfield = fields.SourceField(grid, frequency=1)
         model1 = models.Model(grid)
 
         # Check representation of Model.

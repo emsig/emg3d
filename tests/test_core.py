@@ -37,7 +37,7 @@ def test_amat_x(njit):
             property_z=2*property_x)
 
     # Create a source field
-    sfield = fields.get_source_field(grid=grid, src=src, freq=freq)
+    sfield = fields.get_source_field(grid=grid, source=src, frequency=freq)
 
     # Get volume-averaged model parameters.
     vmodel = models.VolumeModel(model, sfield)

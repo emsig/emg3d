@@ -679,8 +679,8 @@ class Simulation:
 
             sfield = fields.get_source_field(
                     grid=self.get_grid(source, freq),
-                    src=src.coordinates,
-                    freq=self.survey.frequencies[freq],
+                    source=src.coordinates,
+                    frequency=self.survey.frequencies[freq],
                     strength=strength,
                     electric=src.electric)
 
@@ -767,7 +767,7 @@ class Simulation:
             erec = np.nonzero(rec_types)[0]
             resp = fields.get_receiver(
                     field=self.get_efield(source, freq),
-                    rec=tuple(np.array(rec_coords)[:, erec])
+                    receiver=tuple(np.array(rec_coords)[:, erec])
             )
 
             # Store the receiver response.
@@ -780,7 +780,7 @@ class Simulation:
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = fields.get_receiver(
                     field=self.get_hfield(source, freq),
-                    rec=tuple(np.array(rec_coords)[:, mrec])
+                    receiver=tuple(np.array(rec_coords)[:, mrec])
             )
 
             # Store the receiver response.
@@ -1156,7 +1156,7 @@ class Simulation:
         grid = self.get_grid(source, freq)
 
         # Initiate empty field
-        ResidualField = fields.SourceField(grid, freq=float_freq)
+        ResidualField = fields.SourceField(grid, frequency=float_freq)
 
         # Loop over receivers, input as source.
         for name, rec in self.survey.receivers.items():
@@ -1184,8 +1184,8 @@ class Simulation:
             if strength != 0:
                 ResidualField += fields.get_source_field(
                     grid=grid,
-                    src=rec.coordinates,
-                    freq=float_freq,
+                    source=rec.coordinates,
+                    frequency=float_freq,
                     strength=strength,
                     electric=rec.electric,
                 )
@@ -1389,8 +1389,8 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)
 
     # Frequency defaults to average frequency (log10).
-    freq = 10**np.mean(np.log10(survey._freq_array))
-    gopts['frequency'] = gridding_opts.pop('frequency', freq)
+    frequency = 10**np.mean(np.log10(survey._freq_array))
+    gopts['frequency'] = gridding_opts.pop('frequency', frequency)
 
     # Center defaults to center of all sources.
     center = tuple([np.mean(survey.src_coords[i]) for i in range(3)])

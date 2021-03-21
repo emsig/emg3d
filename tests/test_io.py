@@ -174,7 +174,7 @@ def test_compare_dicts(capsys):
     e2 = create_dummy(*grid.shape_edges_y)
     e3 = create_dummy(*grid.shape_edges_z)
     field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
-    ee = fields.Field(grid, field, freq=.938)
+    ee = fields.Field(grid, field, frequency=.938)
 
     dict1 = io._dict_serialize(
             {'model': model, 'grid': grid, 'field': ee,
@@ -210,7 +210,7 @@ def test_known_classes(tmpdir):
     frequency = 1.0
     grid = meshes.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
     field = fields.Field(grid)
-    sfield = fields.SourceField(grid, freq=frequency)
+    sfield = fields.SourceField(grid, frequency=frequency)
     model = models.Model(grid, 1)
     pointdip = surveys.Dipole((0, 1000, -950, 0, 0))
 

@@ -269,7 +269,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
        In [4]: # The source is a x-directed, horizontal dipole at (4, 4, 4)
           ...: # with a frequency of 10 Hz.
           ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azm, dip)
-          ...: sfield = emg3d.fields.get_source_field(grid, src=coo, freq=10)
+          ...: sfield = emg3d.fields.get_source_field(
+          ...:             grid, source=coo, frequency=10)
 
        In [5]: # Solve for the electric field.
           ...: efield = emg3d.solve(model, sfield, plain=True, verb=4)
@@ -300,7 +301,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
-    if sfield.freq is None:
+    if sfield.frequency is None:
         raise ValueError(
                 "Source field is missing frequency information;\n"
                 "Create it with `emg3d.fields.get_source_field`, or\n"
@@ -313,7 +314,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     if efield is None:
         # If not provided, initiate an empty one.
         efield = fields.Field(model.grid, dtype=sfield.dtype,
-                              freq=sfield._freq)
+                              frequency=sfield._frequency)
 
         # Set flag to return the field.
         var.do_return = True
@@ -328,8 +329,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
         # If provided efield is missing frequency information, add it from the
         # source field.
-        if efield.freq is None:
-            efield._freq = sfield._freq
+        if efield.frequency is None:
+            efield._frequency = sfield._frequency
 
         # Ensure PEC.
         efield.fx[:, 0, :] = efield.fx[:, -1, :] = 0.
@@ -370,7 +371,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
         # Zero-source means zero e-field.
         efield = fields.Field(model.grid, dtype=sfield.dtype,
-                              freq=sfield._freq)
+                              frequency=sfield._frequency)
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]  {'rel. error':<22}"
@@ -648,17 +649,18 @@ def krylov(model, sfield, efield, var):
 
     """
     # Get frequency
-    freq = sfield._freq
+    frequency = sfield._frequency
 
     # Define matrix operation A x as LinearOperator.
     def amatvec(efield):
-        """Compute A x for solver; residual is b-Ax = src-amatvec."""
+        """Compute A x for solver; residual is b-Ax = source - amatvec."""
 
         # Cast current efield to Field instance.
         efield = fields.Field(model.grid, efield)
 
         # Compute A x.
-        rfield = fields.Field(model.grid, dtype=efield.dtype, freq=freq)
+        rfield = fields.Field(model.grid, dtype=efield.dtype,
+                              frequency=frequency)
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
@@ -678,8 +680,9 @@ def krylov(model, sfield, efield, var):
         """Use multigrid as pre-conditioner."""
 
         # Cast current fields to Field instances.
-        sfield = fields.Field(model.grid, sfield, freq=freq)
-        efield = fields.Field(model.grid, dtype=sfield.dtype, freq=freq)
+        sfield = fields.Field(model.grid, sfield, frequency=frequency)
+        efield = fields.Field(model.grid, dtype=sfield.dtype,
+                              frequency=frequency)
 
         # Solve for these fields.
         multigrid(model, sfield, efield, var)
@@ -898,12 +901,20 @@ def restriction(model, sfield, residual, sc_dir):
 
     # Compute the source terms (Equation 8 in [Muld06]_).
     # Initiate zero field.
-    csfield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
+    csfield = fields.Field(cgrid, dtype=sfield.dtype,
+                           frequency=sfield._frequency)
     core.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
                   residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Initiate empty e-field.
-    cefield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
+    csfield.fx[:, 0, :] = csfield.fx[:, -1, :] = 0.
+    csfield.fx[:, :, 0] = csfield.fx[:, :, -1] = 0.
+    csfield.fy[0, :, :] = csfield.fy[-1, :, :] = 0.
+    csfield.fy[:, :, 0] = csfield.fy[:, :, -1] = 0.
+    csfield.fz[0, :, :] = csfield.fz[-1, :, :] = 0.
+    csfield.fz[:, 0, :] = csfield.fz[:, -1, :] = 0.
+    cefield = fields.Field(cgrid, dtype=sfield.dtype,
+                           frequency=sfield._frequency)
 
     return cmodel, csfield, cefield
 

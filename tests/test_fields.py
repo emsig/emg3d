@@ -70,8 +70,8 @@ def test_get_source_field(capsys):
     assert_allclose(np.sum(sfield.vx/x), 1)
     assert_allclose(np.sum(sfield.vy/y), 1)
     assert_allclose(np.sum(sfield.vz/z), 1)
-    assert sfield._freq == freq
-    assert sfield.freq == freq
+    assert sfield._frequency == freq
+    assert sfield.frequency == freq
     assert_allclose(sfield.smu0, -iomegamu)
 
     # Put source on final node, should still work.
@@ -123,8 +123,8 @@ def test_get_source_field(capsys):
     assert_allclose(np.sum(sfield.vx/x), 1)
     assert_allclose(np.sum(sfield.vy/y), 1)
     assert_allclose(np.sum(sfield.vz/z), 1)
-    assert sfield._freq == -freq
-    assert sfield.freq == freq
+    assert sfield._frequency == -freq
+    assert sfield.frequency == freq
     assert_allclose(sfield.smu0, -freq*constants.mu_0)
 
 
@@ -139,7 +139,7 @@ def test_arbitrarily_shaped_source():
         fields.get_source_field(grid, ([1, 2], 1, 1), freq, strength)
 
     # Manually
-    sman = fields.SourceField(grid, freq=freq)
+    sman = fields.SourceField(grid, frequency=freq)
     src4xxyyzz = [
         np.r_[src[0]-0.5, src[0]+0.5, src[1]-0.5, src[1]-0.5, src[2], src[2]],
         np.r_[src[0]+0.5, src[0]+0.5, src[1]-0.5, src[1]+0.5, src[2], src[2]],
@@ -164,7 +164,7 @@ def test_arbitrarily_shaped_source():
     assert_allclose(-scomp2.vector, scomp.vector, rtol=1e-6, atol=1e-15)
 
     # Normalized
-    sman = fields.SourceField(grid, freq=freq)
+    sman = fields.SourceField(grid, frequency=freq)
     for srcl in src4xxyyzz:
         sman += fields.get_source_field(grid, srcl, freq, 0.25)
     scomp = fields.get_source_field(grid, src5xyz, freq)
@@ -313,14 +313,14 @@ def test_source_field():
             np.zeros(3))
 
     freq = np.pi
-    ss = fields.SourceField(grid, freq=freq)
+    ss = fields.SourceField(grid, frequency=freq)
     assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
     assert hasattr(ss, 'vector')
     assert hasattr(ss, 'vx')
 
     # Check 0 Hz frequency.
-    with pytest.raises(ValueError, match='`freq` must be >0'):
-        ss = fields.SourceField(grid, freq=0)
+    with pytest.raises(ValueError, match='`frequency` must be >0'):
+        ss = fields.SourceField(grid, frequency=0)
 
     # Check no frequency.
     with pytest.raises(ValueError, match='SourceField requires the frequency'):
@@ -372,11 +372,11 @@ def test_get_receiver():
     grid = meshes.TensorMesh(
             [np.ones(6), np.array([1, 1, 2, 3, 1]), np.array([1, 2, 1, 1, 1])],
             [-1, -1, -1])
-    efield = fields.Field(grid, freq=1)
+    efield = fields.Field(grid, frequency=1)
     efield.field = np.ones(efield.size) + 1j*np.ones(efield.size)
 
     # Provide wrong rec_loc input:
-    with pytest.raises(ValueError, match='`rec` needs to be in the form'):
+    with pytest.raises(ValueError, match='`receiver` needs to be in the form'):
         fields.get_receiver(efield, (1, 1, 1))
 
     # Provide particular field instead of field instance:
@@ -418,7 +418,7 @@ def test_source_norm_warning():
     # This is a warning that should never be raised...
     hx, x0 = np.ones(4), -2
     mesh = meshes.TensorMesh([hx, hx, hx], (x0, x0, x0))
-    sfield = fields.SourceField(mesh, freq=1)
+    sfield = fields.SourceField(mesh, frequency=1)
     sfield.fx += 1  # Add something to the field.
     with pytest.warns(UserWarning, match="Normalizing Source: 101.0000000000"):
         _ = fields._finite_source_xyz(
