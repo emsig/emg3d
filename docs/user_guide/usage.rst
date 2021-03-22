@@ -105,7 +105,7 @@ input grid had 49,152 cells, and the coarsest grid had 12 cells.
 .. ipython::
 
     @savefig basic_example.png width=4in
-    In [6]: grid.plot_slice(efield, normal='Y', v_type='Ex', view='abs',
+    In [6]: grid.plot_slice(efield.field, normal='Y', v_type='Ex', view='abs',
        ...:                 pcolor_opts={'norm': LogNorm()});
 
 

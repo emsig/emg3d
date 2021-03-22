@@ -25,10 +25,9 @@ from scipy.constants import mu_0
 from emg3d import maps
 
 try:
-    from discretize import TensorMesh as dTensorMesh
+    import discretize
 except ImportError:
-    class dTensorMesh:
-        pass
+    discretize = None
 
 __all__ = ['BaseMesh', 'TensorMesh', 'construct_mesh', 'get_origin_widths',
            'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width']
@@ -97,7 +96,7 @@ class BaseMesh:
         return self._cell_volumes
 
 
-class TensorMesh(dTensorMesh, BaseMesh):
+class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
     """A slightly modified version of :class:`discretize.TensorMesh`.
 
     Adds a few attributes (``__eq__``, ``copy``, and ``{to;from}_dict``) to
@@ -151,9 +150,27 @@ class TensorMesh(dTensorMesh, BaseMesh):
         return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the TensorMesh in a dict."""
-        out = {'hx': self.h[0], 'hy': self.h[1], 'hz': self.h[2],
-               'origin': self.origin, '__class__': self.__class__.__name__}
+        """Store the necessary information in a dict for serialization.
+
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
+
+
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the TensorMesh.
+
+        """
+        out = {
+            'hx': self.h[0],
+            'hy': self.h[1],
+            'hz': self.h[2],
+            'origin': self.origin,
+            '__class__': self.__class__.__name__
+        }
         if copy:
             return deepcopy(out)
         else:
@@ -176,12 +193,7 @@ class TensorMesh(dTensorMesh, BaseMesh):
             A :class:`emg3d.meshes.TensorMesh` instance.
 
         """
-        try:
-            return cls(h=[inp['hx'], inp['hy'], inp['hz']],
-                       origin=inp['origin'])
-
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
+        return cls(h=[inp['hx'], inp['hy'], inp['hz']], origin=inp['origin'])
 
 
 def construct_mesh(frequency, properties, center, domain=None, vector=None,

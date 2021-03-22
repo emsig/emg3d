@@ -99,12 +99,8 @@ class Model:
     """
 
     def __init__(self, grid, property_x=1., property_y=None, property_z=None,
-                 mu_r=None, epsilon_r=None, mapping='Resistivity', **kwargs):
+                 mu_r=None, epsilon_r=None, mapping='Resistivity'):
         """Initiate a new model."""
-
-        # Ensure no kwargs left.
-        if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Store grid.
         self.grid = grid
@@ -202,7 +198,20 @@ class Model:
         return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the Model in a dict."""
+        """Store the necessary information in a dict for serialization.
+
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
+
+
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Model.
+
+        """
         # Initiate dict.
         out = {}
 
@@ -227,34 +236,30 @@ class Model:
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert dictionary into a Model instance.
+        """Convert dictionary into :class:`emg3d.models.Model` instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Model.to_dict`. The dictionary
-            needs the keys ``property_x``, ``property_y``, ``property_z``,
-            ``mu_r``, ``epsilon_r``, ``grid``, and ``mapping``; ``grid`` itself
-            is also a dict which needs the keys ``hx``, ``hy``, ``hz``, and
-            ``origin``.
+            Dictionary as obtained from :func:`emg3d.models.Model.to_dict`. The
+            dictionary needs the keys ``property_x``, ``property_y``,
+            ``property_z``, ``mu_r``, ``epsilon_r``, ``grid``, and ``mapping``;
+            ``grid`` itself is also a dict which needs the keys ``hx``, ``hy``,
+            ``hz``, and ``origin``.
 
         Returns
         -------
-        obj : Model
-            A new :class:`emg3d.models.Model` instance.
+        model : Model
+            A :class:`emg3d.models.Model` instance.
 
         """
-        try:
-            return cls(grid=meshes.TensorMesh.from_dict(inp['grid']),
-                       property_x=inp['property_x'],
-                       property_y=inp['property_y'],
-                       property_z=inp['property_z'],
-                       mu_r=inp['mu_r'],
-                       epsilon_r=inp['epsilon_r'],
-                       mapping=inp['mapping'])
-
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in ``inp``.") from e
+        return cls(grid=meshes.TensorMesh.from_dict(inp['grid']),
+                   property_x=inp['property_x'],
+                   property_y=inp['property_y'],
+                   property_z=inp['property_z'],
+                   mu_r=inp['mu_r'],
+                   epsilon_r=inp['epsilon_r'],
+                   mapping=inp['mapping'])
 
     # ELECTRICAL PROPERTIES
     @property

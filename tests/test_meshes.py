@@ -98,7 +98,7 @@ class TestTensorMesh:
         cdgrid = meshes.TensorMesh.from_dict(dgrid)
         assert_allclose(cdgrid.cell_volumes, emg3dgrid.cell_volumes)
         del dgrid['hx']
-        with pytest.raises(KeyError, match="Variable 'hx' missing in `inp`"):
+        with pytest.raises(KeyError, match="'hx'"):
             meshes.TensorMesh.from_dict(dgrid)
 
         # Check __eq__.

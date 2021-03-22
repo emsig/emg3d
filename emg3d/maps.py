@@ -98,12 +98,19 @@ class BaseMap:
         raise NotImplementedError("Derivative chain not implemented.")
 
     def to_dict(self):
-        """Store the map name in a dict for serialization."""
+        """Store the necessary information in a dict for serialization.
+
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Map.
+
+        """
         return {'name': self.name, '__class__': 'BaseMap'}  # Always BaseMap
 
     @classmethod
     def from_dict(cls, inp):
-        """Get :class:`BaseMap` instance from name in dict."""
+        """Convert dictionary into :class:`emg3d.maps.BaseMap` instance."""
         return MAPLIST['Map'+inp['name']]()
 
 

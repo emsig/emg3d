@@ -193,16 +193,6 @@ class TestModel:
         assert_allclose(model2out.mu_r,
                         10**(np.sum(np.log10(model2inp.mu_r))/8))
 
-    def test_kwargs(self):
-
-        # Create some dummy data
-        grid = meshes.TensorMesh(
-                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
-                np.zeros(3))
-
-        with pytest.raises(TypeError, match='Unexpected '):
-            models.Model(grid, somekeyword=None)
-
     def test_equal_mapping(self):
 
         # Create some dummy data
@@ -429,5 +419,5 @@ class TestModelOperators:
             assert_allclose(mdict[key], val)
 
         del mdict['property_x']
-        with pytest.raises(KeyError, match="Variable 'property_x' missing"):
+        with pytest.raises(KeyError, match="'property_x'"):
             models.Model.from_dict(mdict)
