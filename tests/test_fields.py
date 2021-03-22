@@ -42,7 +42,6 @@ def create_dummy(nx, ny, nz, imag=True):
 
 
 class TestField:
-    # Create some dummy data
     grid = meshes.TensorMesh([[.5, 8], [1, 4], [2, 8]], (0, 0, 0))
 
     ex = create_dummy(*grid.shape_edges_x, imag=True)
@@ -96,7 +95,8 @@ class TestField:
         with pytest.raises(ValueError, match="must be f>0"):
             _ = fields.Field(self.grid, frequency=0.0)
 
-        lp = fields.Field(self.grid, self.field, frequency=-1)
+        with pytest.warns(np.ComplexWarning, match="Casting complex values"):
+            lp = fields.Field(self.grid, self.field, frequency=-1)
         assert lp.field.dtype == np.float_
 
         ignore = fields.Field(self.grid, frequency=-1, dtype=np.int_)
@@ -158,243 +158,147 @@ class TestField:
         assert_allclose(resp, 323.5 + 647.0j)
 
 
-def test_get_source_field(capsys):
-    src = [100, 200, 300, 27, 31]
-    h = np.ones(4)
-    grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
-    freq = 1.2458
+class TestGetSourceField:
+    def test_get_source_field(self, capsys):
+        src = [100, 200, 300, 27, 31]
+        h = np.ones(4)
+        grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
+        freq = 1.2458
 
-    sfield = fields.get_source_field(grid, src, freq, strength=1+1j)
-    assert_array_equal(sfield.strength, complex(1+1j))
+        sfield = fields.get_source_field(grid, src, freq, strength=1+1j)
+        assert_array_equal(sfield.strength, complex(1+1j))
 
-    sfield = fields.get_source_field(grid, src, freq, strength=0)
-    assert_array_equal(sfield.strength, float(0))
-    iomegamu = 2j*np.pi*freq*constants.mu_0
+        sfield = fields.get_source_field(grid, src, freq, strength=0)
+        assert_array_equal(sfield.strength, float(0))
+        iomegamu = 2j*np.pi*freq*constants.mu_0
 
-    # Check number of edges
-    assert 4 == sfield.fx[sfield.fx != 0].size
-    assert 4 == sfield.fy[sfield.fy != 0].size
-    assert 4 == sfield.fz[sfield.fz != 0].size
+        # Check number of edges
+        assert 4 == sfield.fx[sfield.fx != 0].size
+        assert 4 == sfield.fy[sfield.fy != 0].size
+        assert 4 == sfield.fz[sfield.fz != 0].size
 
-    # Check source cells
-    h = np.cos(np.deg2rad(src[4]))
-    y = np.sin(np.deg2rad(src[3]))*h
-    x = np.cos(np.deg2rad(src[3]))*h
-    z = np.sin(np.deg2rad(src[4]))
-    assert_allclose(np.sum(sfield.fx/x/iomegamu).real, -1)
-    assert_allclose(np.sum(sfield.fy/y/iomegamu).real, -1)
-    assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
-    assert sfield._frequency == freq
-    assert sfield.frequency == freq
-    assert_allclose(sfield.smu0, -iomegamu)
+        # Check source cells
+        h = np.cos(np.deg2rad(src[4]))
+        y = np.sin(np.deg2rad(src[3]))*h
+        x = np.cos(np.deg2rad(src[3]))*h
+        z = np.sin(np.deg2rad(src[4]))
+        assert_allclose(np.sum(sfield.fx/x/iomegamu).real, -1)
+        assert_allclose(np.sum(sfield.fy/y/iomegamu).real, -1)
+        assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
+        assert sfield._frequency == freq
+        assert sfield.frequency == freq
+        assert_allclose(sfield.smu0, -iomegamu)
 
-    # Put source on final node, should still work.
-    src = [grid.nodes_x[0], grid.nodes_x[0]+1,
-           grid.nodes_y[-1]-1, grid.nodes_y[-1],
-           grid.nodes_z[0], grid.nodes_z[0]+1]
-    sfield = fields.get_source_field(grid, src, freq)
-    tot_field = np.linalg.norm(
-            [np.sum(sfield.fx), np.sum(sfield.fy), np.sum(sfield.fz)])
-    assert_allclose(tot_field/np.abs(np.sum(iomegamu)), 1.0)
+        # Put source on final node, should still work.
+        src = [grid.nodes_x[0], grid.nodes_x[0]+1,
+               grid.nodes_y[-1]-1, grid.nodes_y[-1],
+               grid.nodes_z[0], grid.nodes_z[0]+1]
+        sfield = fields.get_source_field(grid, src, freq)
+        tot_field = np.linalg.norm(
+                [np.sum(sfield.fx), np.sum(sfield.fy), np.sum(sfield.fz)])
+        assert_allclose(tot_field/np.abs(np.sum(iomegamu)), 1.0)
 
-    out, _ = capsys.readouterr()  # Empty capsys
+        out, _ = capsys.readouterr()  # Empty capsys
 
-    # Provide wrong source definition. Ensure it fails.
-    with pytest.raises(ValueError, match='Source is wrong defined'):
-        sfield = fields.get_source_field(grid, [0, 0, 0, 0], 1)
+        # Provide wrong source definition. Ensure it fails.
+        with pytest.raises(ValueError, match='Source is wrong defined'):
+            sfield = fields.get_source_field(grid, [0, 0, 0, 0], 1)
 
-    # Put source way out. Ensure it fails.
-    with pytest.raises(ValueError, match='Provided source outside grid'):
-        src = [1e10, 1e10, 1e10, 0, 0]
-        sfield = fields.get_source_field(grid, src, 1)
+        # Put finite dipole of zero length. Ensure it fails.
+        with pytest.raises(ValueError, match='Provided finite dipole has no '):
+            src = [0, 0, 100, 100, -200, -200]
+            sfield = fields.get_source_field(grid, src, 1)
 
-    # Put finite dipole of zero length. Ensure it fails.
-    with pytest.raises(ValueError, match='Provided finite dipole has no leng'):
-        src = [0, 0, 100, 100, -200, -200]
-        sfield = fields.get_source_field(grid, src, 1)
+        # Same for Laplace domain
+        src = [100, 200, 300, 27, 31]
+        h = np.ones(4)
+        grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
+        freq = 1.2458
+        sfield = fields.get_source_field(grid, src, -freq)
+        smu = freq*constants.mu_0
 
-    # Same for Laplace domain
-    src = [100, 200, 300, 27, 31]
-    h = np.ones(4)
-    grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
-    freq = 1.2458
-    sfield = fields.get_source_field(grid, src, -freq)
-    smu = freq*constants.mu_0
+        # Check number of edges
+        assert 4 == sfield.fx[sfield.fx != 0].size
+        assert 4 == sfield.fy[sfield.fy != 0].size
+        assert 4 == sfield.fz[sfield.fz != 0].size
 
-    # Check number of edges
-    assert 4 == sfield.fx[sfield.fx != 0].size
-    assert 4 == sfield.fy[sfield.fy != 0].size
-    assert 4 == sfield.fz[sfield.fz != 0].size
+        # Check source cells
+        h = np.cos(np.deg2rad(src[4]))
+        y = np.sin(np.deg2rad(src[3]))*h
+        x = np.cos(np.deg2rad(src[3]))*h
+        z = np.sin(np.deg2rad(src[4]))
+        assert_allclose(np.sum(sfield.fx/x/smu), -1)
+        assert_allclose(np.sum(sfield.fy/y/smu), -1)
+        assert_allclose(np.sum(sfield.fz/z/smu), -1)
+        assert sfield._frequency == -freq
+        assert sfield.frequency == freq
+        assert_allclose(sfield.smu0, -freq*constants.mu_0)
 
-    # Check source cells
-    h = np.cos(np.deg2rad(src[4]))
-    y = np.sin(np.deg2rad(src[3]))*h
-    x = np.cos(np.deg2rad(src[3]))*h
-    z = np.sin(np.deg2rad(src[4]))
-    assert_allclose(np.sum(sfield.fx/x/smu), -1)
-    assert_allclose(np.sum(sfield.fy/y/smu), -1)
-    assert_allclose(np.sum(sfield.fz/z/smu), -1)
-    assert sfield._frequency == -freq
-    assert sfield.frequency == freq
-    assert_allclose(sfield.smu0, -freq*constants.mu_0)
+    def test_arbitrarily_shaped_source(self):
+        h = np.ones(4)
+        grid = meshes.TensorMesh([h*200, h*400, h*800], [-400, -800, -1600])
+        freq = 1.11
+        strength = np.pi
+        src = (0, 0, 0, 0, 90)
 
+        with pytest.raises(ValueError, match='All source coordinates must ha'):
+            fields.get_source_field(grid, ([1, 2], 1, 1), freq, strength)
 
-def test_arbitrarily_shaped_source():
-    h = np.ones(4)
-    grid = meshes.TensorMesh([h*200, h*400, h*800], [-400, -800, -1600])
-    freq = 1.11
-    strength = np.pi
-    src = (0, 0, 0, 0, 90)
+        # Manually
+        sman = fields.Field(grid, frequency=freq)
+        src4xxyyzz = [
+            np.r_[src[0]-0.5, src[0]+0.5, src[1]-0.5,
+                  src[1]-0.5, src[2], src[2]],
+            np.r_[src[0]+0.5, src[0]+0.5, src[1]-0.5,
+                  src[1]+0.5, src[2], src[2]],
+            np.r_[src[0]+0.5, src[0]-0.5, src[1]+0.5,
+                  src[1]+0.5, src[2], src[2]],
+            np.r_[src[0]-0.5, src[0]-0.5, src[1]+0.5,
+                  src[1]-0.5, src[2], src[2]],
+        ]
+        for srcl in src4xxyyzz:
+            sman.field += fields.get_source_field(
+                    grid, srcl, freq, strength).field
 
-    with pytest.raises(ValueError, match='All source coordinates must have'):
-        fields.get_source_field(grid, ([1, 2], 1, 1), freq, strength)
+        # Computed
+        src5xyz = (
+            [src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5, src[0]-0.5],
+            [src[1]-0.5, src[1]-0.5, src[1]+0.5, src[1]+0.5, src[1]-0.5],
+            [src[2], src[2], src[2], src[2], src[2]]
+        )
+        scomp = fields.get_source_field(grid, src5xyz, freq, strength)
 
-    # Manually
-    sman = fields.Field(grid, frequency=freq)
-    src4xxyyzz = [
-        np.r_[src[0]-0.5, src[0]+0.5, src[1]-0.5, src[1]-0.5, src[2], src[2]],
-        np.r_[src[0]+0.5, src[0]+0.5, src[1]-0.5, src[1]+0.5, src[2], src[2]],
-        np.r_[src[0]+0.5, src[0]-0.5, src[1]+0.5, src[1]+0.5, src[2], src[2]],
-        np.r_[src[0]-0.5, src[0]-0.5, src[1]+0.5, src[1]-0.5, src[2], src[2]],
-    ]
-    for srcl in src4xxyyzz:
-        sman.field += fields.get_source_field(grid, srcl, freq, strength).field
+        # Computed 2
+        with pytest.raises(TypeError, match='Unexpected'):
+            fields.get_source_field(grid, src, freq, strength, whatever=True)
 
-    # Computed
-    src5xyz = ([src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5, src[0]-0.5],
-               [src[1]-0.5, src[1]-0.5, src[1]+0.5, src[1]+0.5, src[1]-0.5],
-               [src[2], src[2], src[2], src[2], src[2]])
-    scomp = fields.get_source_field(grid, src5xyz, freq, strength)
+        assert sman == scomp
 
-    # Computed 2
-    with pytest.raises(TypeError, match='Unexpected'):
-        fields.get_source_field(grid, src, freq, strength, whatever=True)
+        # Normalized
+        sman = fields.Field(grid, frequency=freq)
+        for srcl in src4xxyyzz:
+            sman.field += fields.get_source_field(grid, srcl, freq, 0.25).field
+        scomp = fields.get_source_field(grid, src5xyz, freq)
+        assert sman == scomp
 
-    assert sman == scomp
+    def test_source_field(self):
+        # Create some dummy data
+        grid = meshes.TensorMesh(
+                [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
+                np.zeros(3))
 
-    # Normalized
-    sman = fields.Field(grid, frequency=freq)
-    for srcl in src4xxyyzz:
-        sman.field += fields.get_source_field(grid, srcl, freq, 0.25).field
-    scomp = fields.get_source_field(grid, src5xyz, freq)
-    assert sman == scomp
+        freq = np.pi
+        ss = fields.Field(grid, frequency=freq)
+        assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
 
+        # Check 0 Hz frequency.
+        with pytest.raises(ValueError, match='`frequency` must be f>0'):
+            ss = fields.Field(grid, frequency=0)
 
-def test_get_source_field_point_vs_finite(capsys):
-    # === Point dipole to finite dipole comparisons ===
-    def get_xyz(d_src):
-        """Return dimensions corresponding to azimuth and dip."""
-        h = np.cos(np.deg2rad(d_src[4]))
-        dys = np.sin(np.deg2rad(d_src[3]))*h
-        dxs = np.cos(np.deg2rad(d_src[3]))*h
-        dzs = np.sin(np.deg2rad(d_src[4]))
-        return [dxs, dys, dzs]
-
-    def get_f_src(d_src, slen=1.0):
-        """Return d_src and f_src for d_src input."""
-        xyz = get_xyz(d_src)
-        f_src = [d_src[0]-xyz[0]*slen/2, d_src[0]+xyz[0]*slen/2,
-                 d_src[1]-xyz[1]*slen/2, d_src[1]+xyz[1]*slen/2,
-                 d_src[2]-xyz[2]*slen/2, d_src[2]+xyz[2]*slen/2]
-        return d_src, f_src
-
-    # 1a. Source within one cell, normalized.
-    h = np.ones(3)*500
-    grid1 = meshes.TensorMesh([h, h, h], np.array([-750, -750, -750]))
-    d_src, f_src = get_f_src([0, 0., 0., 23, 15])
-    dsf = fields.get_source_field(grid1, d_src, 1)
-    fsf = fields.get_source_field(grid1, f_src, 1)
-    assert fsf == dsf
-
-    # 1b. Source within one cell, source strength = pi.
-    d_src, f_src = get_f_src([0, 0., 0., 32, 53])
-    dsf = fields.get_source_field(grid1, d_src, 3.3, np.pi)
-    fsf = fields.get_source_field(grid1, f_src, 3.3, np.pi)
-    assert fsf == dsf
-
-    # 1c. Source over various cells, normalized.
-    h = np.ones(8)*200
-    grid2 = meshes.TensorMesh([h, h, h], np.array([-800, -800, -800]))
-    d_src, f_src = get_f_src([0, 0., 0., 40, 20], 300.0)
-    dsf = fields.get_source_field(grid2, d_src, 10.0, 0)
-    fsf = fields.get_source_field(grid2, f_src, 10.0, 0)
-    assert_allclose(fsf.fx.sum(), dsf.fx.sum())
-    assert_allclose(fsf.fy.sum(), dsf.fy.sum())
-    assert_allclose(fsf.fz.sum(), dsf.fz.sum())
-
-    # 1d. Source over various cells, source strength = pi.
-    slen = 300
-    strength = np.pi
-    d_src, f_src = get_f_src([0, 0., 0., 20, 30], slen)
-    dsf = fields.get_source_field(grid2, d_src, 1.3, slen*strength)
-    fsf = fields.get_source_field(grid2, f_src, 1.3, strength)
-    assert_allclose(fsf.fx.sum(), dsf.fx.sum())
-    assert_allclose(fsf.fy.sum(), dsf.fy.sum())
-    assert_allclose(fsf.fz.sum(), dsf.fz.sum())
-
-    # 1e. Source over various stretched cells, source strength = pi.
-    h1 = get_h(4, 2, 200, 1.1)
-    h2 = get_h(4, 2, 200, 1.2)
-    h3 = get_h(4, 2, 200, 1.2)
-    origin = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
-    grid3 = meshes.TensorMesh([h1, h2, h3], origin)
-    slen = 333
-    strength = np.pi
-    d_src, f_src = get_f_src([0, 0., 0., 50, 33], slen)
-    dsf = fields.get_source_field(grid3, d_src, 0.7, slen*strength)
-    fsf = fields.get_source_field(grid3, f_src, 0.7, strength)
-    assert_allclose(fsf.fx.sum(), dsf.fx.sum())
-    assert_allclose(fsf.fy.sum(), dsf.fy.sum())
-    assert_allclose(fsf.fz.sum(), dsf.fz.sum())
-
-
-def test_source_field():
-    # Create some dummy data
-    grid = meshes.TensorMesh(
-            [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
-            np.zeros(3))
-
-    freq = np.pi
-    ss = fields.Field(grid, frequency=freq)
-    assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
-
-    # Check 0 Hz frequency.
-    with pytest.raises(ValueError, match='`frequency` must be f>0'):
-        ss = fields.Field(grid, frequency=0)
-
-    sdict = ss.to_dict()
-    del sdict['field']
-    with pytest.raises(KeyError, match="'field'"):
-        fields.Field.from_dict(sdict)
-
-
-def test_get_magnetic_field():
-    # Mainly regression tests, not ideal.
-
-    # Check it does still the same (pure regression).
-    dat = REGRES['reg_2']
-    model = dat['model']
-    efield = dat['result']
-    hfield = dat['hresult']
-
-    hout = fields.get_magnetic_field(model, efield)
-    assert hfield == hout
-
-    # Add some mu_r - Just 1, to trigger, and compare.
-    dat = REGRES['res']
-    efield = dat['Fresult']
-    model1 = models.Model(**dat['input_model'])
-    model2 = models.Model(**dat['input_model'], mu_r=1.)
-
-    hout1 = fields.get_magnetic_field(model1, efield)
-    hout2 = fields.get_magnetic_field(model2, efield)
-    assert hout1 == hout2
-
-    # Ensure they are not the same if mu_r!=1/None provided
-    model3 = models.Model(**dat['input_model'], mu_r=2.)
-    hout3 = fields.get_magnetic_field(model3, efield)
-    with pytest.raises(AssertionError):
-        assert hout1 == hout3
+        sdict = ss.to_dict()
+        del sdict['field']
+        with pytest.raises(KeyError, match="'field'"):
+            fields.Field.from_dict(sdict)
 
 
 def test_get_receiver():
@@ -450,12 +354,176 @@ def test_get_receiver():
     assert_allclose(epm, e3d, rtol=0.1)
 
 
-def test_source_norm_warning():
-    # This is a warning that should never be raised...
-    hx, x0 = np.ones(4), -2
-    mesh = meshes.TensorMesh([hx, hx, hx], (x0, x0, x0))
-    sfield = fields.Field(mesh, frequency=1)
-    sfield.fx += 1  # Add something to the field.
-    with pytest.warns(UserWarning, match="Normalizing Source: 101.0000000000"):
-        _ = fields._finite_source_xyz(
-                mesh, (-0.5, 0.5, 0, 0, 0, 0), sfield.fx, 0, 30)
+def test_get_magnetic_field():
+    # Mainly regression tests, not ideal.
+
+    # Check it does still the same (pure regression).
+    dat = REGRES['reg_2']
+    model = dat['model']
+    efield = dat['result']
+    hfield = dat['hresult']
+
+    hout = fields.get_magnetic_field(model, efield)
+    assert hfield == hout
+
+    # Add some mu_r - Just 1, to trigger, and compare.
+    dat = REGRES['res']
+    efield = dat['Fresult']
+    model1 = models.Model(**dat['input_model'])
+    model2 = models.Model(**dat['input_model'], mu_r=1.)
+
+    hout1 = fields.get_magnetic_field(model1, efield)
+    hout2 = fields.get_magnetic_field(model2, efield)
+    assert hout1 == hout2
+
+    # Ensure they are not the same if mu_r!=1/None provided
+    model3 = models.Model(**dat['input_model'], mu_r=2.)
+    hout3 = fields.get_magnetic_field(model3, efield)
+    with pytest.raises(AssertionError):
+        assert hout1 == hout3
+
+
+class TestFiniteSourceXYZ:
+
+    def test_get_source_field_point_vs_finite(self, capsys):
+        # === Point dipole to finite dipole comparisons ===
+        def get_xyz(d_src):
+            """Return dimensions corresponding to azimuth and dip."""
+            h = np.cos(np.deg2rad(d_src[4]))
+            dys = np.sin(np.deg2rad(d_src[3]))*h
+            dxs = np.cos(np.deg2rad(d_src[3]))*h
+            dzs = np.sin(np.deg2rad(d_src[4]))
+            return [dxs, dys, dzs]
+
+        def get_f_src(d_src, slen=1.0):
+            """Return d_src and f_src for d_src input."""
+            xyz = get_xyz(d_src)
+            f_src = [d_src[0]-xyz[0]*slen/2, d_src[0]+xyz[0]*slen/2,
+                     d_src[1]-xyz[1]*slen/2, d_src[1]+xyz[1]*slen/2,
+                     d_src[2]-xyz[2]*slen/2, d_src[2]+xyz[2]*slen/2]
+            return d_src, f_src
+
+        # 1a. Source within one cell, normalized.
+        h = np.ones(3)*500
+        grid1 = meshes.TensorMesh([h, h, h], np.array([-750, -750, -750]))
+        d_src, f_src = get_f_src([0, 0., 0., 23, 15])
+        dsf = fields.get_source_field(grid1, d_src, 1)
+        fsf = fields.get_source_field(grid1, f_src, 1)
+        assert fsf == dsf
+
+        # 1b. Source within one cell, source strength = pi.
+        d_src, f_src = get_f_src([0, 0., 0., 32, 53])
+        dsf = fields.get_source_field(grid1, d_src, 3.3, np.pi)
+        fsf = fields.get_source_field(grid1, f_src, 3.3, np.pi)
+        assert fsf == dsf
+
+        # 1c. Source over various cells, normalized.
+        h = np.ones(8)*200
+        grid2 = meshes.TensorMesh([h, h, h], np.array([-800, -800, -800]))
+        d_src, f_src = get_f_src([0, 0., 0., 40, 20], 300.0)
+        dsf = fields.get_source_field(grid2, d_src, 10.0, 0)
+        fsf = fields.get_source_field(grid2, f_src, 10.0, 0)
+        assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+        assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+        assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+        # 1d. Source over various cells, source strength = pi.
+        slen = 300
+        strength = np.pi
+        d_src, f_src = get_f_src([0, 0., 0., 20, 30], slen)
+        dsf = fields.get_source_field(grid2, d_src, 1.3, slen*strength)
+        fsf = fields.get_source_field(grid2, f_src, 1.3, strength)
+        assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+        assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+        assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+        # 1e. Source over various stretched cells, source strength = pi.
+        h1 = get_h(4, 2, 200, 1.1)
+        h2 = get_h(4, 2, 200, 1.2)
+        h3 = get_h(4, 2, 200, 1.2)
+        origin = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
+        grid3 = meshes.TensorMesh([h1, h2, h3], origin)
+        slen = 333
+        strength = np.pi
+        d_src, f_src = get_f_src([0, 0., 0., 50, 33], slen)
+        dsf = fields.get_source_field(grid3, d_src, 0.7, slen*strength)
+        fsf = fields.get_source_field(grid3, f_src, 0.7, strength)
+        assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+        assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+        assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+    def test_source_norm_warning(self):
+        # This is a warning that should never be raised...
+        hx, x0 = np.ones(4), -2
+        mesh = meshes.TensorMesh([hx, hx, hx], (x0, x0, x0))
+        sfield = fields.Field(mesh, frequency=1)
+        sfield.fx += 1  # Add something to the field.
+        with pytest.warns(UserWarning, match="Normalizing Source: 101.000000"):
+            _ = fields._finite_source_xyz(
+                    mesh, (-0.5, 0.5, 0, 0, 0, 0), sfield.fx, 30)
+
+    def test_warnings(self):
+        h = np.ones(4)
+        grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
+        # Put source way out. Ensure it fails.
+        with pytest.raises(ValueError, match='Provided source outside grid'):
+            _ = fields.get_source_field(grid, [1e10, 1e10, 1e10, 0, 0], 1)
+
+
+def test_rotation():
+    assert_allclose(fields._rotation(0, 0), [1, 0, 0])
+    assert_allclose(fields._rotation(90, 0), [0, 1, 0])
+    assert_allclose(fields._rotation(-90, 0), [0, -1, 0])
+    assert_allclose(fields._rotation(0, 90), [0, 0, 1])
+    assert_allclose(fields._rotation(0, -90), [0, 0, -1])
+    dazm, ddip = 30, 60
+    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
+    assert_allclose(
+            fields._rotation(dazm, ddip),
+            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
+             np.sin(rdip)])
+    dazm, ddip = -45, 180
+    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
+    assert_allclose(
+            fields._rotation(dazm, ddip),
+            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
+             np.sin(rdip)],
+            atol=1e-14)
+
+
+def test_finite_dipole_from_point():
+    source = (10, 100, -1000, 0, 0)
+    length = 111.0
+    out = fields._finite_dipole_from_point(source, length)
+    assert out.shape == (6, )
+    assert out[0] == source[0]-length/2
+    assert out[1] == source[0]+length/2
+    assert out[2] == source[1]
+    assert out[3] == source[1]
+    assert out[4] == source[2]
+    assert out[5] == source[2]
+
+    source = (10, 100, -1000, 30, 60)
+    length = 2.0
+    out = fields._finite_dipole_from_point(source, length)
+    assert_allclose(
+        out,
+        [9.5669873, 10.4330127, 99.75, 100.25, -1000.8660254, -999.1339746]
+    )
+
+
+def test_square_loop_from_point():
+    source = (10, 100, -1000, 0, 0)
+    length = np.sqrt(2)
+    out = fields._square_loop_from_point(source, length)
+    assert out.shape == (3, 5)
+    assert_allclose(out[0, :], source[0])  # x-directed, all x the same
+    assert_allclose(out[1, :], [101, 100, 99, 100, 101])
+    assert_allclose(out[2, :], [-1000, -999, -1000, -1001, -1000])
+
+    source = (10, 100, -1000, 30, 60)
+    length = np.sqrt(2)
+    out = fields._square_loop_from_point(source, length)
+    assert_allclose(out[0, :], [9.5, 9.25, 10.5, 10.75, 9.5])
+    assert_allclose(out[2, :], [-1000, -999.5, -1000, -1000.5, -1000])
+    assert_allclose(out[:, 0], out[:, -1])  # first and last point identical

@@ -411,11 +411,11 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
     if source.shape == (5, ):  # Point dipole
 
         if not electric:  # Magnetic: convert to square loop perp. to dipole.
-            source = _square_loop_from_point_dipole(source, length)
+            source = _square_loop_from_point(source, length)
             # source.shape = (3, 5)
 
         else:  # Electric: convert to finite length.
-            source = _finite_dipole_from_point_dipole(source, length)
+            source = _finite_dipole_from_point(source, length)
             # source.shape = (6, )
 
     # Get arbitrary shaped sources recursively.
@@ -484,7 +484,7 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
     for xyz, field in enumerate([sfield.fx, sfield.fy, sfield.fz]):
 
         # Get source field for this direction.
-        _finite_source_xyz(grid, source, field, xyz, decimals)
+        _finite_source_xyz(grid, source, field, decimals)
 
         # Multiply by moment*s*mu
         field *= moment[xyz]*sfield.smu0
@@ -709,10 +709,26 @@ def get_magnetic_field(model, field):
     return Field(grid, -new/field.smu0, frequency=field._frequency)
 
 
-def _finite_source_xyz(grid, source, field, xyz, decimals):
+def _finite_source_xyz(grid, source, field, decimals):
     """Set finite dipole source using the adjoint interpolation method.
 
-    See :func:`get_source_field` for further details.
+    The result is placed directly in the provided ``field``-component.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+    source : ndarray
+        Source coordinates in the form of (x0, x1, y0, y1, z0, z1) (m).
+
+    field : ndarray
+        A particular component of the source field, one of ``field.f{x;y;z}``.
+
+    decimals: int, optional
+        Grid nodes and source coordinates are rounded to given number of
+        decimals. Default is 6 (micrometer).
 
     """
     # Round nodes and source coordinates (to avoid floating point issues etc).
@@ -782,17 +798,17 @@ def _finite_source_xyz(grid, source, field, xyz, decimals):
                 # Add to field (only if segment inside cell).
                 if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
 
-                    if xyz == 0:
+                    if field.shape == grid.shape_edges_x:
                         field[ix, iy, iz] += ey*ez*x_len
                         field[ix, iy+1, iz] += ry*ez*x_len
                         field[ix, iy, iz+1] += ey*rz*x_len
                         field[ix, iy+1, iz+1] += ry*rz*x_len
-                    if xyz == 1:
+                    elif field.shape == grid.shape_edges_y:
                         field[ix, iy, iz] += ex*ez*x_len
                         field[ix+1, iy, iz] += rx*ez*x_len
                         field[ix, iy, iz+1] += ex*rz*x_len
                         field[ix+1, iy, iz+1] += rx*rz*x_len
-                    if xyz == 2:
+                    else:
                         field[ix, iy, iz] += ex*ey*x_len
                         field[ix+1, iy, iz] += rx*ey*x_len
                         field[ix, iy+1, iz] += ex*ry*x_len
@@ -809,7 +825,7 @@ def _finite_source_xyz(grid, source, field, xyz, decimals):
 
 
 def _rotation(azimuth, dip):
-    """Rotation factors for RHS with positive z upwards.
+    """Rotation factors for RHS coordinate system with positive z upwards.
 
     Easting is x, Northing is y, and positive upwards is z. All functions
     should use this rotation to ensure they use all the same definition.
@@ -825,7 +841,7 @@ def _rotation(azimuth, dip):
 
     Returns
     -------
-    rot : ndarray (3,)
+    rot : ndarray
         Rotation factors (x, y, z).
 
     """
@@ -834,14 +850,49 @@ def _rotation(azimuth, dip):
                      sindg(dip)])
 
 
-def _finite_dipole_from_point_dipole(source, length):
-    """Return finite dipole of length given a point dipole."""
+def _finite_dipole_from_point(source, length):
+    """Return finite dipole of length given a point dipole.
+
+    Parameters
+    ----------
+    source : tuple
+        Source coordinates in the form of (x, y, z, azimuth, dip).
+
+    length : float
+        Dipole length (m).
+
+
+    Returns
+    -------
+    out : ndarray
+        Array of shape (6, ), corresponding to the finite length dipole
+        coordinates (x0, x1, y0, y1, z0, z1).
+
+    """
     factors = _rotation(*source[3:])*length/2
     return np.ravel(source[:3] + np.stack([-factors, factors]), 'F')
 
 
-def _square_loop_from_point_dipole(source, length):
-    """Return points of a square loop of length x length m perp. to dipole."""
+def _square_loop_from_point(source, length):
+    """Return points of a square loop of length x length m perp to dipole.
+
+    Parameters
+    ----------
+    source : tuple
+        Source coordinates in the form of (x, y, z, azimuth, dip).
+
+    length : float
+        Side-length of the square loop (m).
+
+
+    Returns
+    -------
+    out : ndarray
+        Array of shape (3, 5), corresponding to the x/y/z-coordinates for the
+        five points describing a closed rectangle perpendicular to the dipole,
+        of side-length length.
+
+    """
     half_diagonal = np.sqrt(2)*length/2
     rot_hor = _rotation(source[3]+90, 0)*half_diagonal
     rot_ver = _rotation(source[3], source[4]+90)*half_diagonal
