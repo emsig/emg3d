@@ -253,13 +253,15 @@ class Model:
             A :class:`emg3d.models.Model` instance.
 
         """
-        return cls(grid=meshes.TensorMesh.from_dict(inp['grid']),
-                   property_x=inp['property_x'],
-                   property_y=inp['property_y'],
-                   property_z=inp['property_z'],
-                   mu_r=inp['mu_r'],
-                   epsilon_r=inp['epsilon_r'],
-                   mapping=inp['mapping'])
+        return cls(
+            grid=meshes.TensorMesh.from_dict(inp['grid']),
+            property_x=inp['property_x'],
+            property_y=inp['property_y'],
+            property_z=inp['property_z'],
+            mu_r=inp['mu_r'],
+            epsilon_r=inp['epsilon_r'],
+            mapping=inp['mapping'],
+        )
 
     # ELECTRICAL PROPERTIES
     @property
@@ -390,8 +392,9 @@ class Model:
 
         # If it is None, it cannot be set.
         if hasattr(self, '_'+name) and getattr(self, '_'+name) is None:
-            msg = f"Model was initiated without `{name}`; cannot set values."
-            raise ValueError(msg)
+            raise ValueError(
+                f"Model was initiated without `{name}`; cannot set values."
+            )
 
         # Get mapped values; checks are carried out on conductivities.
         if 'property_' in name:

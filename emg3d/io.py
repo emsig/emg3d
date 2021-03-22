@@ -195,7 +195,7 @@ def load(fname, **kwargs):
     allow_pickle = kwargs.pop('allow_pickle', False)
     # Ensure no kwargs left.
     if kwargs:
-        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
     # Get absolute path.
     full_path = os.path.abspath(fname)

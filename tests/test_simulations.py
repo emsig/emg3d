@@ -72,7 +72,7 @@ class TestSimulation():
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in info['exit_message']
 
         # Check hfield
-        hfield = fields.get_h_field(self.model, efield)
+        hfield = fields.get_magnetic_field(self.model, efield)
         assert self.simulation.get_hfield('Tx1', 1.0) == hfield
         s_hfield = self.simulation.get_hfield('Tx1', 1.0)
         assert s_hfield == hfield

@@ -15,7 +15,7 @@
 # the License.
 
 from emg3d.fields import (Field, get_source_field,  # noqa
-                          get_receiver, get_h_field)
+                          get_receiver, get_magnetic_field)
 from emg3d.io import save, load  # noqa
 from emg3d.meshes import TensorMesh, construct_mesh  # noqa
 from emg3d.models import Model  # noqa

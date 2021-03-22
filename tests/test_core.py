@@ -123,7 +123,8 @@ def test_gauss_seidel(njit):
                vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
 
         # Get result from `gauss_seidel`.
-        cfield = fields.Field(grid, efield.copy())
+        cfield = fields.Field(grid, efield.field.copy(),
+                              frequency=efield._frequency)
         gauss_seidel(cfield.fx, cfield.fy, cfield.fz, *inp)
 
         # Get result from `gauss_seidel_x/y/z`.

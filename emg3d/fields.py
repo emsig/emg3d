@@ -27,99 +27,82 @@ from scipy.special import sindg, cosdg
 
 from emg3d import maps, meshes, models, utils
 
-__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_h_field']
+__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
 
 class Field:
-    r"""Create a Field instance with x-, y-, and z-views of the field.
+    r"""A Field contains the x-, y-, and z- directed electromagnetic fields.
 
-    A `Field` is an `ndarray` with additional views of the x-, y-, and
-    z-directed fields as attributes, stored as `fx`, `fy`, and `fz`. The
-    default array contains the whole field, which can be the electric field,
-    the source field, or the residual field, in a 1D array. A `Field` instance
-    has additionally the two attributes `amp` and `pha` for the amplitude and
-    phase, as common in frequency-domain CSEM.
+    A Field is a simple container that has a 1D array ``Field.field``
+    containing the x-, y-, and z-directed fields one after the other.
+    The field can be any field, such as an electric field, a magnetic field,
+    or a source field (which is an electric field).
 
-    A `Field` can be initiated in three ways:
-
-    1. ``Field(grid, dtype=np.complex128)``:
-       Calling it with a :class:`emg3d.meshes.TensorMesh` instance returns a
-       `Field` instance of correct dimensions initiated with zeroes of data
-       type `dtype`.
-    2. ``Field(grid, field)``:
-       Calling it with a :class:`emg3d.meshes.TensorMesh` instance and an
-       `ndarray` returns a `Field` instance of the provided `ndarray`, of same
-       data type.
-
-    Sort-order is 'F'.
+    The particular fields can be accessed via the ``Field.f{x;y;z}``
+    attributes, which are 3D arrays corresponding to the shape of the edges
+    in this direction; sort-order is Fortran-like ('F').
 
 
     Parameters
     ----------
 
-    grid : :class:`emg3d.meshes.TensorMesh` or ndarray
-        Either a TensorMesh instance or an ndarray of shape grid.n_edges_x or
-        grid.shape_edges_x. See explanations above. Only mandatory parameter;
-        if the only one provided, it will initiate a zero-field of `dtype`.
+    grid : TensorMesh
+        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    field : :class:`Field` or ndarray, optional
-        Either a Field instance or an ndarray of shape grid.n_edges_y or
-        grid.shape_edges_y. See explanations above.
+    data : ndarray, default: None
+        The actual data, a ``ndarray`` of size ``grid.n_edges_x`` +
+        ``grid.shape_edges_y`` + ``grid.shape_edges_z``. If ``None``, it is
+        initiated with zeros.
 
-    dtype : dtype, optional
-        Only used if ``field=None``; the initiated zero-field for the provided
-        TensorMesh has data type `dtype`. Default: complex.
-
-    frequency : float, optional
-        Source frequency (Hz), used to compute the Laplace parameter `s`.
+    frequency : float, default: None
+        Field frequency (Hz), used to compute the Laplace parameter ``s``.
         Either positive or negative:
 
-        - `frequency` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - `frequency` < 0: Laplace domain, hence
+        - ``frequency > 0``: Frequency domain, hence
+          :math:`s = \mathrm{i}\omega = 2\mathrm{i}\pi f` (complex);
+        - ``frequency < 0``: Laplace domain, hence
           :math:`s = f` (real).
+
+    dtype : dtype, default: complex
+        Data type of the initiated field; only used if both ``frequency`` and
+        ``data`` are None.
 
     """
 
-    def __init__(self, grid, field=None, dtype=np.complex128, frequency=None):
+    def __init__(self, grid, data=None, frequency=None, dtype=None):
         """Initiate a new Field instance."""
 
-        if len(grid.shape_cells) != 3:
-            raise ValueError("Provided grid must be a 3D grid.")
-
-        # Check frequency
-        if frequency is None and hasattr(field, 'frequency'):
-            frequency = field._frequency
-
-        # Check dtype
-        if frequency is not None:
+        # Get dtype.
+        if frequency is not None:  # Frequency is top priority.
             if frequency > 0:
-                dtype = complex
+                dtype = np.complex_
             elif frequency < 0:
-                dtype = float
+                dtype = np.float_
             else:
                 raise ValueError(
-                        "`frequency` must be >0 (frequency domain) "
-                        "or <0 (Laplace domain).\n"
-                        f"Provided frequency: {frequency} Hz.")
-        elif field is not None:
-            dtype = field.dtype
+                    "`frequency` must be f>0 (frequency domain) or f<0 "
+                    "(Laplace domain). Provided: {frequency} Hz."
+                )
+        elif data is not None:  # Data is second priority.
+            dtype = data.dtype
 
-        # Collect field
-        if field is None:
+        elif dtype is None:  # Default.
+            dtype = np.complex_
+
+        # Store field.
+        if data is None:
             nc = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
-            field = np.zeros(nc, dtype=dtype)
-
-        # Store field, grid, and frequency
-        if hasattr(field, 'frequency'):
-            self._field = np.asarray(field.field, dtype=dtype)
+            self._field = np.zeros(nc, dtype=dtype)
         else:
-            self._field = np.asarray(field, dtype=dtype)
+            self._field = np.asarray(data, dtype=dtype)
+
+        # Store grid and frequency.
         self.grid = grid
         self._frequency = frequency
 
     def __eq__(self, field):
-        equal = field.__class__.__name__ == 'Field'
+        """Compare two fields."""
+        equal = self.__class__.__name__ == field.__class__.__name__
         equal *= self.grid == field.grid
         equal *= self._frequency == field._frequency
         equal *= np.allclose(self._field, field._field, atol=0, rtol=1e-10)
@@ -130,11 +113,31 @@ class Field:
         return self.from_dict(self.to_dict(copy=True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the Field in a dict."""
-        out = {'field': self._field, 'frequency': self._frequency,
-               '__class__': self.__class__.__name__}
-        out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
-                       'hz': self.grid.h[2], 'origin': self.grid.origin}
+        """Store the necessary information of the Field in a dict.
+
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
+
+
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Field.
+
+        """
+        out = {
+            '__class__': self.__class__.__name__,
+            'field': self._field,
+            'frequency': self._frequency,
+            'grid': {
+                'hx': self.grid.h[0],
+                'hy': self.grid.h[1],
+                'hz': self.grid.h[2],
+                'origin': self.grid.origin,
+            },
+        }
         if copy:
             return deepcopy(out)
         else:
@@ -142,46 +145,41 @@ class Field:
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert dictionary into :class:`Field` instance.
+        """Convert dictionary into :class:`emg3d.fields.Field` instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Field.to_dict`.
-            The dictionary needs the keys `field`, `frequency`,
-            `shape_edges_x`, `shape_edges_y`, and `shape_edges_z`.
+            Dictionary as obtained from :func:`emg3d.fields.Field.to_dict`. The
+            dictionary needs the keys ``field``, ``frequency``, and ``grid``;
+            ``grid`` itself is also a dict which needs the keys ``hx``, ``hy``,
+            ``hz``, and ``origin``.
 
         Returns
         -------
-        obj : :class:`Field` instance
+        field : Field
+            A :class:`emg3d.fields.Field` instance.
 
         """
-
-        # Check and get the required keys from the input.
-        try:
-            grid = meshes.TensorMesh.from_dict(inp.pop('grid'))
-            return cls(grid=grid, field=inp['field'],
-                       frequency=inp['frequency'])
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
-
-    @property
-    def dtype(self):
-        return self._field.dtype
+        return cls(
+            grid=meshes.TensorMesh.from_dict(inp['grid']),
+            data=inp['field'],
+            frequency=inp['frequency'],
+        )
 
     @property
     def field(self):
-        """Entire field, 1D [fx, fy, fz]."""
+        """Entire field as 1D array [fx, fy, fz]."""
         return self._field
 
     @field.setter
     def field(self, field):
-        """Update field, 1D [fx, fy, fz]."""
+        """Update field as 1D array [fx, fy, fz]."""
         self._field[:] = field
 
     @property
     def fx(self):
-        """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
+        """Field in x direction; shape: (cell_centers_x, nodes_y, nodes_z)."""
         ix = self.grid.n_edges_x
         shape = self.grid.shape_edges_x
         return utils.EMArray(self._field[:ix]).reshape(shape, order='F')
@@ -193,10 +191,10 @@ class Field:
 
     @property
     def fy(self):
-        """View of the field in the y-direction (nNx, nCy, nNz)."""
-        return utils.EMArray(
-                self._field[self.grid.n_edges_x:-self.grid.n_edges_z].reshape(
-                    self.grid.shape_edges_y, order='F'))
+        """Field in y direction; shape: (nodes_x, cell_centers_y, nodes_z)."""
+        i0, i1 = self.grid.n_edges_x, self.grid.n_edges_z
+        shape = self.grid.shape_edges_y
+        return utils.EMArray(self._field[i0:-i1]).reshape(shape, order='F')
 
     @fy.setter
     def fy(self, fy):
@@ -205,10 +203,9 @@ class Field:
 
     @property
     def fz(self):
-        """View of the field in the z-direction (nNx, nNy, nCz)."""
-        return utils.EMArray(
-                self._field[-self.grid.n_edges_z:].reshape(
-                    self.grid.shape_edges_z, order='F'))
+        """Field in z direction; shape: (nodes_x, nodes_y, cell_centers_z)."""
+        i0, shape = self.grid.n_edges_z, self.grid.shape_edges_z
+        return utils.EMArray(self._field[-i0:].reshape(shape, order='F'))
 
     @fz.setter
     def fz(self, fz):
@@ -217,7 +214,7 @@ class Field:
 
     @property
     def frequency(self):
-        """Return frequency."""
+        """Return frequency (Hz)."""
         if self._frequency is None:
             return None
         else:
@@ -225,7 +222,7 @@ class Field:
 
     @property
     def smu0(self):
-        """Return s*mu_0; mu_0 = Magn. permeability of free space [H/m]."""
+        """Return s*mu_0; mu_0 = magn permeability of free space [H/m]."""
         if getattr(self, '_smu0', None) is None:
             if self.sval is not None:
                 self._smu0 = self.sval*mu_0
@@ -266,7 +263,7 @@ class Field:
 
         Returns
         -------
-        obj : Field
+        field : Field
             A new :class:`emg3d.fields.Field` instance on ``grid``.
 
         """
@@ -278,16 +275,42 @@ class Field:
             'log': True,
             **({} if interpolate_opts is None else interpolate_opts),
             'grid': self.grid,
-            'new_grid': grid,
+            'xi': grid,
         }
 
-        # Interpolate f{x;y;z} add to dict.
+        # Interpolate f{x;y;z}.
         field = np.r_[maps.interpolate(values=self.fx, **g2g_inp).ravel('F'),
                       maps.interpolate(values=self.fy, **g2g_inp).ravel('F'),
                       maps.interpolate(values=self.fz, **g2g_inp).ravel('F')]
 
-        # Assemble new field.
+        # Assemble and return new field.
         return Field(grid, field, frequency=self._frequency)
+
+    def get_receiver(self, receiver):
+        """Return the field at receiver locations.
+
+        Parameters
+        ----------
+        receiver : tuple
+            Receiver coordinates (m) and angles (°) in the format
+            ``(x, y, z, azimuth, dip)``.
+
+            All values can either be a scalar or having the same length as
+            number of receivers.
+
+            Angles:
+
+            - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
+            - dip (°): vertical deviation from xy-plane up-wards.
+
+
+        Returns
+        -------
+        responses : EMArray
+            Responses at receiver locations.
+
+        """
+        return get_receiver(self, receiver)
 
 
 def get_source_field(grid, source, frequency, strength=0, electric=True,
@@ -372,13 +395,14 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
 
     # Ensure no kwargs left.
     if kwargs:
-        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
     # Cast some parameters.
     if not np.allclose(np.size(source[0]), [np.size(c) for c in source]):
         raise ValueError(
-                "All source coordinates must have the same dimension."
-                f"Provided source: {source}.")
+            "All source coordinates must have the same dimension."
+            f"Provided source: {source}."
+        )
 
     source = np.asarray(source, dtype=np.float64)
     strength = np.asarray(strength)
@@ -430,19 +454,21 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
     # [x1, x2, y1, y2, z1, z2]. Ensure that:
     if source.shape != (6, ):
         raise ValueError(
-                "Source is wrong defined. It must be either\n- a point, "
-                "[x, y, z, azimuth, dip],\n- a finite dipole, "
-                "[x1, x2, y1, y2, z1, z2], or\n- an arbitrarily shaped "
-                "dipole, [[x-coo], [y-coo], [z-coo]].\n"
-                f"Provided source: {source}.")
+            "Source is wrong defined. It must be either (1) a point, "
+            "[x, y, z, azimuth, dip], (2) a finite dipole, "
+            "[x1, x2, y1, y2, z1, z2], or (3) an arbitrarily shaped "
+            f"dipole, [[x-coo], [y-coo], [z-coo]]. Provided: {source}."
+        )
 
     # Get length in each direction.
     length = source[1::2]-source[::2]
 
     # Ensure finite length dipole is not a point dipole.
     if np.allclose(length, 0, atol=1e-15):
-        raise ValueError("Provided finite dipole has no length; use "
-                         "the format [x, y, z, azimuth, dip] instead.")
+        raise ValueError(
+            "Provided finite dipole has no length; use "
+            "the format [x, y, z, azimuth, dip] instead."
+        )
 
     # Get source moment (individually for x, y, z).
     if strength == 0:  # 1 A m
@@ -522,13 +548,16 @@ def get_receiver(field, receiver):
     # Check receiver dimension.
     if len(receiver) != 5:
         raise ValueError(
-                "`receiver` needs to be in the form (x, y, z, azimuth, dip).\n"
-                f"Length of provided `receiver`: {len(receiver)}.")
+            "`receiver` needs to be in the form (x, y, z, azimuth, dip). "
+            f"Length of provided `receiver`: {len(receiver)}."
+        )
 
     # Check field dimension to ensure it is not a particular field.
     if not hasattr(field, 'field'):
-        raise ValueError("`field` must be a `Field`-instance, not a\n"
-                         "particular field such as `field.fx`.")
+        raise ValueError(
+            "`field` must be a `Field`-instance, not a "
+            "particular field such as `field.fx`."
+        )
 
     # Get the vectors corresponding to input data.
     grid = field.grid
@@ -542,7 +571,7 @@ def get_receiver(field, receiver):
     # Pre-allocate the response.
     _, xi, shape = maps._points_from_grids(
             field.grid, field.fx, receiver[:3], 'cubic')
-    resp = np.zeros(xi.shape[0], dtype=field.dtype)
+    resp = np.zeros(xi.shape[0], dtype=field.field.dtype)
 
     # Add the required responses.
     factors = _rotation(*receiver[3:])  # Geometrical weights from angles.
@@ -556,7 +585,7 @@ def get_receiver(field, receiver):
     return utils.EMArray(resp.reshape(shape, order='F'))
 
 
-def get_h_field(model, field):
+def get_magnetic_field(model, field):
     r"""Return magnetic field corresponding to provided electric field.
 
     - TODO REWORK THIS!

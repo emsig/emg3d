@@ -197,7 +197,7 @@ class Simulation:
 
         # Ensure no kwargs left.
         if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -216,7 +216,7 @@ class Simulation:
             self._grid_single = gridding_opts
         elif self.gridding == 'same':
             if gridding_opts:
-                msg = "`gridding_opts` is not permitted if `gridding='same'`"
+                msg = "`gridding_opts` is not permitted if `gridding='same'`."
                 raise TypeError(msg)
         else:
 
@@ -300,7 +300,7 @@ class Simulation:
         """
 
         if what not in ['computed', 'results', 'all', 'plain']:
-            raise TypeError(f"Unrecognized `what`: {what}")
+            raise TypeError(f"Unrecognized `what`: {what}.")
 
         # If to_dict is called from to_file, it has a _what_to_file attribute.
         if hasattr(self, '_what_to_file'):
@@ -697,7 +697,7 @@ class Simulation:
         call_from_compute = kwargs.pop('call_from_compute', False)
         call_from_hfield = kwargs.pop('call_from_hfield', False)
         if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
         # Compute electric field if it is not stored yet.
         if self._dict_efield[source][freq] is None:
@@ -741,7 +741,7 @@ class Simulation:
         # If magnetic field not computed yet compute it.
         if self._dict_hfield[source][freq] is None:
 
-            self._dict_hfield[source][freq] = fields.get_h_field(
+            self._dict_hfield[source][freq] = fields.get_magnetic_field(
                     self.get_model(source, freq),
                     self.get_efield(source, freq,
                                     call_from_hfield=True, **kwargs))
@@ -765,8 +765,7 @@ class Simulation:
 
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
-            resp = fields.get_receiver(
-                    field=self.get_efield(source, freq),
+            resp = self.get_efield(source, freq).get_receiver(
                     receiver=tuple(np.array(rec_coords)[:, erec])
             )
 
@@ -778,8 +777,7 @@ class Simulation:
 
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
-            resp = fields.get_receiver(
-                    field=self.get_hfield(source, freq),
+            resp = self.get_hfield(source, freq).get_receiver(
                     receiver=tuple(np.array(rec_coords)[:, mrec])
             )
 
@@ -944,7 +942,7 @@ class Simulation:
         """
 
         if what not in ['computed', 'keepresults', 'all']:
-            raise TypeError(f"Unrecognized `what`: {what}")
+            raise TypeError(f"Unrecognized `what`: {what}.")
 
         # Clean data/model/sfield-dicts.
         if what in ['keepresults', 'all']:
@@ -1528,7 +1526,8 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     if gridding_opts:
         print(gridding_opts)
         raise TypeError(
-                f"Unexpected gridding_opts: {list(gridding_opts.keys())}")
+            f"Unexpected gridding_opts: {list(gridding_opts.keys())}."
+        )
 
     # Return gridding_opts.
     return gopts

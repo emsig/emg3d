@@ -110,7 +110,7 @@ efield = solver.solve(
         linerelaxation=linerelaxation, tol=tol, maxit=maxit, nu_init=nu_init,
         nu_pre=nu_pre, nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
-hfield = fields.get_h_field(model, efield)
+hfield = fields.get_magnetic_field(model, efield)
 
 # Store input and result
 reg_2 = {

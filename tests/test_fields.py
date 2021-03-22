@@ -35,10 +35,127 @@ def create_dummy(nx, ny, nz, imag=True):
 
     """
     if imag:
-        out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
+        out = np.arange(1., nx*ny*nz+1) + 1j*np.arange(1., nx*ny*nz+1)/100.
     else:
-        out = np.arange(1, nx*ny*nz+1)
+        out = np.arange(1., nx*ny*nz+1)
     return out.reshape(nx, ny, nz)
+
+
+class TestField:
+    # Create some dummy data
+    grid = meshes.TensorMesh([[.5, 8], [1, 4], [2, 8]], (0, 0, 0))
+
+    ex = create_dummy(*grid.shape_edges_x, imag=True)
+    ey = create_dummy(*grid.shape_edges_y, imag=True)
+    ez = create_dummy(*grid.shape_edges_z, imag=True)
+
+    # Test the views
+    field = np.r_[ex.ravel('F'), ey.ravel('F'), ez.ravel('F')]
+
+    def test_basic(self):
+        ee = fields.Field(self.grid, self.field)
+        assert_allclose(ee.field, self.field)
+        assert_allclose(ee.fx, self.ex)
+        assert_allclose(ee.fy, self.ey)
+        assert_allclose(ee.fz, self.ez)
+        assert ee.smu0 is None
+        assert ee.sval is None
+        assert ee.frequency is None
+        assert ee.field.dtype == self.field.dtype
+
+        # Test amplitude and phase.
+
+        assert_allclose(ee.fx.amp(), np.abs(ee.fx))
+        assert_allclose(ee.fy.pha(unwrap=False), np.angle(ee.fy))
+
+        # Test the other possibilities to initiate a Field-instance.
+        frequency = 1.0
+        ee3 = fields.Field(self.grid, frequency=frequency,
+                           dtype=self.field.dtype)
+        assert ee.field.size == ee3.field.size
+        assert ee.field.dtype == np.complex_
+        assert ee3.frequency == frequency
+
+        # Try setting values
+        ee3.field = ee.field
+        assert ee3.smu0/ee3.sval == constants.mu_0
+        assert ee != ee3  # First has no frequency
+        ee3.fx = ee.fx
+        ee3.fy = ee.fy
+        ee3.fz = ee.fz
+
+        # Negative
+        ee4 = fields.Field(self.grid, frequency=-frequency)
+        assert ee.field.size == ee4.field.size
+        assert ee4.field.dtype == np.float_
+        assert ee4.frequency == frequency
+        assert ee4._frequency == -frequency
+        assert ee4.smu0/ee4.sval == constants.mu_0
+
+    def test_dtype(self):
+        with pytest.raises(ValueError, match="must be f>0"):
+            _ = fields.Field(self.grid, frequency=0.0)
+
+        lp = fields.Field(self.grid, self.field, frequency=-1)
+        assert lp.field.dtype == np.float_
+
+        ignore = fields.Field(self.grid, frequency=-1, dtype=np.int_)
+        assert ignore.field.dtype == np.float_
+
+        ignore = fields.Field(self.grid, self.field, dtype=np.int_)
+        assert ignore.field.dtype == np.complex_
+
+        respected = fields.Field(self.grid, dtype=np.int_)
+        assert respected.field.dtype == np.int_
+
+        default = fields.Field(self.grid)
+        assert default.field.dtype == np.complex_
+
+    def test_copy_dict(self, tmpdir):
+        ee = fields.Field(self.grid, self.field)
+        # Test copy
+        e2 = ee.copy()
+        assert ee == e2
+        assert_allclose(ee.fx, e2.fx)
+        assert_allclose(ee.fy, e2.fy)
+        assert_allclose(ee.fz, e2.fz)
+        assert not np.may_share_memory(ee.field, e2.field)
+
+        edict = ee.to_dict()
+        del edict['field']
+        with pytest.raises(KeyError, match="'field'"):
+            fields.Field.from_dict(edict)
+
+        # Ensure it can be pickled.
+        with shelve.open(tmpdir+'/test') as db:
+            db['field'] = ee
+        with shelve.open(tmpdir+'/test') as db:
+            test = db['field']
+        assert test == ee
+
+    def test_interpolate_to_grid(self):
+        # We only check here that it gives the same as calling the function
+        # itself; the rest should be tested in interpolate().
+        grid1 = meshes.TensorMesh(
+                [np.ones(8), np.ones(8), np.ones(8)], (0, 0, 0))
+        grid2 = meshes.TensorMesh([[2, 2, 2, 2], [3, 3], [4, 4]], (0, 0, 0))
+        ee = fields.Field(grid1)
+        ee.field = np.ones(ee.field.size) + 2j*np.ones(ee.field.size)
+        e2 = ee.interpolate_to_grid(grid2)
+        assert_allclose(e2.field, 1+2j)
+
+    def test_get_receiver(self):
+        # We only check here that it gives the same as calling the function
+        # itself; the rest should be tested in get_receiver().
+        grid1 = meshes.TensorMesh(
+                [np.ones(8), np.ones(8), np.ones(8)], (0, 0, 0))
+        ee = fields.Field(grid1)
+        ee.field = np.arange(ee.field.size) + 2j*np.arange(ee.field.size)
+        resp = ee.get_receiver((4, 4, 4, 0, 0))
+        print(80*'=')
+        print(resp)
+        print(80*'=')
+        assert_allclose(resp, 323.5 + 647.0j)
 
 
 def test_get_source_field(capsys):
@@ -231,73 +348,6 @@ def test_get_source_field_point_vs_finite(capsys):
     assert_allclose(fsf.fz.sum(), dsf.fz.sum())
 
 
-def test_field(tmpdir):
-    # Create some dummy data
-    grid = meshes.TensorMesh(
-            [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
-            np.zeros(3))
-
-    ex = create_dummy(*grid.shape_edges_x)
-    ey = create_dummy(*grid.shape_edges_y)
-    ez = create_dummy(*grid.shape_edges_z)
-
-    # Test the views
-    field = np.r_[ex.ravel('F'), ey.ravel('F'), ez.ravel('F')]
-    ee = fields.Field(grid, field)
-    assert_allclose(ee.field, field)
-    assert_allclose(ee.fx, ex)
-    assert_allclose(ee.fy, ey)
-    assert_allclose(ee.fz, ez)
-    assert ee.smu0 is None
-    assert ee.sval is None
-
-    # Test amplitude and phase.
-    assert_allclose(ee.fx.amp(), np.abs(ee.fx))
-    assert_allclose(ee.fy.pha(unwrap=False), np.angle(ee.fy))
-
-    # Test the other possibilities to initiate a Field-instance.
-    ee2 = fields.Field(grid, ee.field)
-    assert ee == ee2
-    assert_allclose(ee.fx, ee2.fx)
-
-    ee3 = fields.Field(grid)
-    assert ee.field.size == ee3.field.size
-
-    # Try setting values
-    ee3.field = ee.field
-    assert ee == ee3
-    ee3.fx = ee.fx
-    ee3.fy = ee.fy
-    ee3.fz = ee.fz
-    assert ee == ee3
-
-    # Test copy
-    e2 = ee.copy()
-    assert ee == e2
-    assert_allclose(ee.fx, e2.fx)
-    assert_allclose(ee.fy, e2.fy)
-    assert_allclose(ee.fz, e2.fz)
-    assert not np.may_share_memory(ee.field, e2.field)
-
-    edict = ee.to_dict()
-    del edict['field']
-    with pytest.raises(KeyError, match="Variable 'field' missing"):
-        fields.Field.from_dict(edict)
-
-    # Set a dimension from the mesh to None, ensure field fails.
-    if discretize:
-        grid = discretize.TensorMesh([1, 1], [1, 1])
-        with pytest.raises(ValueError, match='Provided grid must be a 3D gr'):
-            fields.Field(grid)
-
-    # Ensure it can be pickled.
-    with shelve.open(tmpdir+'/test') as db:
-        db['field'] = ee2
-    with shelve.open(tmpdir+'/test') as db:
-        test = db['field']
-    assert test == ee2
-
-
 def test_source_field():
     # Create some dummy data
     grid = meshes.TensorMesh(
@@ -309,16 +359,16 @@ def test_source_field():
     assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
 
     # Check 0 Hz frequency.
-    with pytest.raises(ValueError, match='`frequency` must be >0'):
+    with pytest.raises(ValueError, match='`frequency` must be f>0'):
         ss = fields.Field(grid, frequency=0)
 
     sdict = ss.to_dict()
     del sdict['field']
-    with pytest.raises(KeyError, match="Variable 'field' missing in `inp`"):
+    with pytest.raises(KeyError, match="'field'"):
         fields.Field.from_dict(sdict)
 
 
-def test_get_h_field():
+def test_get_magnetic_field():
     # Mainly regression tests, not ideal.
 
     # Check it does still the same (pure regression).
@@ -327,7 +377,7 @@ def test_get_h_field():
     efield = dat['result']
     hfield = dat['hresult']
 
-    hout = fields.get_h_field(model, efield)
+    hout = fields.get_magnetic_field(model, efield)
     assert hfield == hout
 
     # Add some mu_r - Just 1, to trigger, and compare.
@@ -336,13 +386,13 @@ def test_get_h_field():
     model1 = models.Model(**dat['input_model'])
     model2 = models.Model(**dat['input_model'], mu_r=1.)
 
-    hout1 = fields.get_h_field(model1, efield)
-    hout2 = fields.get_h_field(model2, efield)
+    hout1 = fields.get_magnetic_field(model1, efield)
+    hout2 = fields.get_magnetic_field(model2, efield)
     assert hout1 == hout2
 
     # Ensure they are not the same if mu_r!=1/None provided
     model3 = models.Model(**dat['input_model'], mu_r=2.)
-    hout3 = fields.get_h_field(model3, efield)
+    hout3 = fields.get_magnetic_field(model3, efield)
     with pytest.raises(AssertionError):
         assert hout1 == hout3
 

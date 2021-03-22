@@ -9,10 +9,159 @@ Changelog
 latest: towards v1.0
 --------------------
 
+Most important changes for end users
+''''''''''''''''''''''''''''''''''''
+
+TODO
+
+Various:
+
+- Removed all deprecated features.
+- Reduced top namespace to principal functions.
+
+
+Version 1 and API stability
+'''''''''''''''''''''''''''
+
+TODO: What is stable (most), what is still *experimental* (``utils.Fourier``,
+``optimize``).
+
+
+Detailed changes
+''''''''''''''''
+
+**Fields**
+
+- ``fields.Field``:
+
+  - Is *not* a subclassed ndarray any longer; with all its advantages and
+    disadvantages. E.g., operations on ``Field`` are not possible any longer
+    and have to be carried out on ``Field.field``. However, it should be easier
+    to maintain and expand in the future.
+  - Knows now its ``grid``. As a consequence, all functions that required the
+    ``grid`` and the ``field`` require now only the ``field``; e.g.,
+    ``emg3d.fields.get_receiver``.
+  - Has no property ``ensure_pec`` any longer, it is ensured directly in
+    ``solver.prolongation``.
+  - Has now the methods ``interpolate_to_grid`` and ``get_receiver``.
+
+- Renamed parameters in all functions:
+
+  - ``src`` to ``source``;
+  - ``freq`` to ``frequency``;
+  - ``rec`` to ``receiver``.
+
+
+- Removed functions and classes:
+
+  - ``SourceField``; it is just a regular ``Field`` now;
+  - ``get_receiver`` (the name still exists, but it is now what was before
+    ``fields.get_receiver_response``).
+
+- Renamed functions and classes:
+
+  - ``get_h_field`` to ``get_magnetic_field``;
+  - ``fields.get_receiver_response`` to ``fields.get_receiver``.
+
+
+**Maps**
+
+- Changed function and class names (most have also new signatures):
+
+  - ``_Map`` to ``BaseMap``;
+  - ``grid2grid`` to ``interpolate``;
+  - ``edges2cellaverages`` to ``interp_edges_to_vol_averages``;
+  - ``volume_average`` to ``interp_volume_average``;
+  - ``interp3d`` to ``interp_spline_3d``.
+
+- ``maps.interpolate``:
+
+  - Can now be used to interpolate values living on a grid to another grid or
+    to points defined either by a tuple or by an ndarray.
+  - The implemented interpolation methods are 'nearest' (new), 'linear',
+    'cubic', and 'volume'. Volume averaging ('volume') only works for
+    grid-to-grid interpolations, not for grid-to-points interpolations.
+  - Does not accept entire fields any longer. Entire fields can be mapped with
+    their own ``field.interpolate_to_grid`` method.
+
+
+**Meshes**
+
+- Changed function and class names:
+
+  - ``_TensorMesh`` to ``BaseMesh``;
+  - ``min_cell_width`` to ``cell_width``.
+
+- ``meshes.BaseMesh``:
+
+  - Reduced to the attributes ``origin``, ``h``, ``shape_{cells;nodes}``,
+    ``n_cells``, ``n_edges_{x;y;z}``, ``nodes_{x;y;z}``,
+    ``cell_centers_{x;y;y}``, ``shape_edges_{x;y;z}``, and ``cell_volumes``.
+    These are the only required attributes for ``emg3d``.
+
+
+**Models**
+
+- ``models.Model``:
+
+  - Knows now its ``grid``. As a consequence, all the functions that used to
+    require the ``grid`` and the ``model`` require now only the ``model``;
+    e.g., ``emg3d.solver.solve`` or ``emg3d.fields.get_h_field``.
+
+  - If ``property_y`` or ``property_z`` are not set they return now ``None``,
+    not ``property_x``.
+
+  - Has to be initiated with all desired properties; it cannot be changed
+    afterwards. E.g., if it was initiated without electric permittivity, it
+    cannot be added afterwards. However, it can be initiated with dummy values
+    and adjusted later.
+
+
+**Solver**
+
+- ``solver.solve``:
+
+  - New signature: ``def solve(model, sfield, sslsolver, semicoarsening,
+    linerelaxation, verb, **kwargs)`` (no ``grid`` any longer; ``efield`` and
+    ``cycle`` are moved to keyword arguments).
+
+  - The defaults for ``sslsolver``, ``semicoarsening``, and ``linerelaxation``
+    is new ``True`` (before it was ``False``). This is not necessarily the
+    fastest setting, but generally the most robust setting.
+
+  - New keyword parameter ``plain``, which is by default ``False``. If it is
+    set to ``True`` it uses plain multigrid, hence ``sslsolver=False``,
+    ``semicoarsening=False``, and ``linerelaxation=False``, unless these
+    parameters were set to anything different than ``True``.
+
+  - Some verbosity levels changed (for consistency reasons throughout module).
+    The new levels are [old level in brackets]:
+
+    - -1: Nothing [0]
+    - 0: Warnings [1]
+    - 1: One-liner at the end [2]
+    - 2: One-liner (dynamically updated) [-1]
+    - 3: Runtime and information about the method [same]
+    - 4: Additional information for each MG-cycle [same]
+    - 5: Everything (slower due to additional error computations) [same]
+
+    Level three updates now dynamically, just as level 2.
+
+- ``solver.RegularGridProlongator``:
+
+  - Changed signature from ``x, y, cxy`` to ``cx, cy, x, y``; it now
+    incorporates the function ``_get_prolongation_coordinates``.
+
+
+**Simulations**
+
 - ``Simulation``:
 
   - ``name`` is new optional.
   - New optional keyword ``info``.
+
+
+**Surveys**
 
 - ``Survey``:
 
@@ -33,113 +182,6 @@ latest: towards v1.0
 - ``Dipole``:
 
   - No ``name`` parameter any longer.
-
-- ``Model``:
-
-  - A ``Model`` knows now its ``grid``. As a consequence, all the functions
-    that required the ``grid`` and the ``model`` require now only the
-    ``model``; e.g., ``emg3d.solver.solve`` or ``emg3d.fields.get_h_field``.
-
-  - A ``Model`` has to be initiated with all desired properties; it cannot be
-    changed afterwards. E.g., if it was initiated without electric
-    permittivity, it cannot be added afterwards. However, it can be initiated
-    with dummy values and adjusted later.
-
-  - ``Model``: if ``property_y`` or ``property_z`` are not set they return now
-    ``None``, not ``property_x``. Also, only properties that have been
-    initiated can be changed afterwards.
-
-- ``meshes``:
-
-  - Renamed:
-
-    - ``_TensorMesh`` to ``BaseMesh``.
-    - ``min_cell_width`` to ``cell_width``.
-
-  - Reduced ``BaseMesh`` to the attributes ``origin``, ``h``, ``shape_cells``,
-    ``shape_nodes``, ``n_cells``, ``n_edges_x``, ``n_edges_y``, ``n_edges_z``,
-    ``nodes_x``, ``nodes_y``, ``nodes_z``, ``cell_centers_x``,
-    ``cell_centers_y``, ``cell_centers_z``, ``shape_edges_x``,
-    ``shape_edges_y``, ``shape_edges_z``, and ``cell_volumes``. These are the
-    only required attributes for ``emg3d``.
-
-- ``solver.solve``:
-
-  - New signature: ``def solve(model, sfield, sslsolver, semicoarsening,
-    linerelaxation, verb, **kwargs)`` (the old signature was ``def solve(grid,
-    model, sfield, efield, cycle, sslsolver, semicoarsening, linerelaxation,
-    verb, **kwargs)``):
-
-    - ``grid`` is no longer a parameter; it is contained in ``model``.
-    - ``efield`` and ``cycle`` are degraded to ``kwargs``.
-
-  - The defaults for ``sslsolver``, ``semicoarsening``, and ``linerelaxation``
-    is new ``True`` (before it was ``False``). This is not necessarily the
-    fastest setting, but generally the most robust setting.
-
-  - New parameter ``plain``, which is by default ``False``. If it is set to
-    ``True`` it uses plain multigrid, hence ``sslsolver=False``,
-    ``semicoarsening=False``, and ``linerelaxation=False``, unless these
-    parameters were set to anything different than ``True``.
-
-  - Some verbosity levels changed (consistency throughout module). The new
-    levels are [old level in brackets]:
-
-    - -1: Nothing. [0]
-    - 0: Warnings. [1]
-    - 1: One-liner at the end. [2]
-    - 2: One-liner (dynamically updated). [-1]
-    - 3: Runtime and information about the method. [same]
-    - 4: Additional information for each MG-cycle. [same]
-    - 5: Everything (slower due to additional error computations). [same]
-
-    Level three now updates dynamically just as level 2.
-
-- Other changes in ``solver``:
-
-  - ``RegularGridProlongator``: Changed signature from ``x, y, cxy`` to ``cx,
-    cy, x, y`` (it now incorporates the function
-    ``_get_prolongation_coordinates``.)
-
-- ``fields``:
-
-  - ``Field`` is *not* a subclassed ndarray any longer.
-  - The function ``emg3d.fields.get_receiver`` was removed and replaced by
-    its successor ``emg3d.fields.get_receiver_response``;
-    ``emg3d.fields.get_receiver_response`` does not exist any longer.
-  - A ``Field`` knows now its ``grid``. As a consequence, all the functions
-    that required the ``grid`` and the ``field`` require now only the
-    ``field``; e.g., ``emg3d.fields.get_receiver``.
-  - Expanded ``src`` to ``source``, ``freq`` to ``frequency``, and ``rec`` to
-    ``receiver`` in all functions and classes.
-  - Field has no property ``ensure_pec`` any longer, it is ensured directly in
-    ``solver.prolongation``.
-  - There is no ``SourceField`` any longer, it is just a regular field.
-
-
-- ``maps``:
-
-  - The entire interpolation got reworked. The principal routine
-    ``maps.interpolate`` can now be used to interpolate values living on a grid
-    to another grid or to points defined either by a tuple or by an ndarray.
-    The implemented methods are 'nearest' (new), 'linear', 'cubic', and
-    'volume'.
-
-  - The main interpolation routine ``maps.interpolate`` does not accept entire
-    fields any longer. Entire fields can be mapped with their own
-    ``field.interpolate_to_grid`` method.
-
-  - Renamed (most have also new signatures):
-
-    - ``_Map`` to ``BaseMap``;
-    - ``grid2grid`` to ``interpolate``;
-    - ``edges2cellaverages`` to ``interp_edges_to_vol_averages``;
-    - ``volume_average`` to ``interp_volume_average``;
-    - ``interp3d`` to ``interp_spline_3d``.
-
-- Removed all deprecated features.
-
-- Reduced top namespace to principal functions.
 
 
 0.x-Series

@@ -86,10 +86,11 @@ def misfit(simulation):
     # Raise warning if not set-up properly.
     if std is None:
         raise ValueError(
-            "Either `noise_floor` or `relative_error` or both must\n"
-            "be provided (>0) to compute the `standard_deviation`.\n"
-            "It can also be set directly (same shape as data).\n"
-            "The standard deviation is required to compute the misfit.")
+            "Either `noise_floor` or `relative_error` or both must "
+            "be provided (>0) to compute the `standard_deviation`. "
+            "It can also be set directly (same shape as data). "
+            "The standard deviation is required to compute the misfit."
+        )
 
     # Ensure all fields have been computed.
     test_efield = sum([1 if simulation._dict_efield[src][freq] is None else 0
@@ -154,7 +155,8 @@ def gradient(simulation):
     # Check limitation 1: So far only isotropic models.
     if simulation.model.case != 'isotropic':
         raise NotImplementedError(
-                "Gradient only implemented for isotropic models.")
+            "Gradient only implemented for isotropic models."
+        )
 
     # Check limitation 2: No epsilon_r, mu_r.
     var = (simulation.model.epsilon_r, simulation.model.mu_r)

@@ -427,7 +427,7 @@ def test_smoothing():
         func = ['', '_x', '_y', '_z']
         for lr_dir in range(8):
             # Get it directly from core
-            efield = fields.Field(grid, field)
+            efield = fields.Field(grid, field.field)
             if lr_dir < 4:
                 getattr(core, 'gauss_seidel'+func[lr_dir])(
                         efield.fx, efield.fy, efield.fz, *inp)
@@ -446,7 +446,7 @@ def test_smoothing():
                 core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
 
             # Use solver.smoothing
-            ofield = fields.Field(grid, field)
+            ofield = fields.Field(grid, field.field)
             solver.smoothing(vmodel, sfield, ofield, nu, lr_dir)
 
             # Compare

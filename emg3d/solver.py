@@ -303,9 +303,10 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     # Check sfield.
     if sfield.frequency is None:
         raise ValueError(
-                "Source field is missing frequency information; Create "
-                "it with `emg3d.fields.get_source_field`, or initiate it "
-                "with `emg3d.fields.Field`, providing frequency information.")
+            "Source field is missing frequency information; Create "
+            "it with `emg3d.fields.get_source_field`, or initiate it "
+            "with `emg3d.fields.Field`, providing frequency information."
+        )
 
     # Initiate volume-averaged model values.
     vmodel = models.VolumeModel(model, sfield)
@@ -313,7 +314,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     # Get efield.
     if efield is None:
         # If not provided, initiate an empty one.
-        efield = fields.Field(model.grid, dtype=sfield.dtype,
+        efield = fields.Field(model.grid, dtype=sfield.field.dtype,
                               frequency=sfield._frequency)
 
         # Set flag to return the field.
@@ -321,12 +322,12 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     else:
 
         # Ensure efield has same data type as sfield.
-        if sfield.dtype != efield.dtype:
+        if sfield.field.dtype != efield.field.dtype:
             raise ValueError(
-                    "Source field and electric field must have the\n same "
-                    "dtype; complex (f-domain) or real (s-domain).\n Provided:"
-                    f"sfield: {sfield.dtype}; efield: "
-                    f"{efield.dtype}.")
+                "Source field and electric field must have the same "
+                "dtype; complex (f-domain) or real (s-domain). Provided:"
+                f"sfield: {sfield.field.dtype}; efield: {efield.field.dtype}."
+            )
 
         # If provided efield is missing frequency information, add it from the
         # source field.
@@ -371,7 +372,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         info = "   > RETURN ZERO E-FIELD (provided sfield is zero)\n"
 
         # Zero-source means zero e-field.
-        efield = fields.Field(model.grid, dtype=sfield.dtype,
+        efield = fields.Field(model.grid, dtype=sfield.field.dtype,
                               frequency=sfield._frequency)
 
     # Print header for iteration log.
@@ -660,7 +661,7 @@ def krylov(model, sfield, efield, var):
         efield = fields.Field(model.grid, efield)
 
         # Compute A x.
-        rfield = fields.Field(model.grid, dtype=efield.dtype,
+        rfield = fields.Field(model.grid, dtype=efield.field.dtype,
                               frequency=frequency)
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
@@ -674,7 +675,7 @@ def krylov(model, sfield, efield, var):
     # Initiate LinearOperator A x.
     A = ssl.LinearOperator(
             shape=(sfield.field.size, sfield.field.size),
-            dtype=sfield.dtype, matvec=amatvec)
+            dtype=sfield.field.dtype, matvec=amatvec)
 
     # Define multigrid pre-conditioner as LinearOperator, if `var.cycle`.
     def mg_matvec(sfield):
@@ -682,7 +683,7 @@ def krylov(model, sfield, efield, var):
 
         # Cast current fields to Field instances.
         sfield = fields.Field(model.grid, sfield, frequency=frequency)
-        efield = fields.Field(model.grid, dtype=sfield.dtype,
+        efield = fields.Field(model.grid, dtype=sfield.field.dtype,
                               frequency=frequency)
 
         # Solve for these fields.
@@ -695,7 +696,7 @@ def krylov(model, sfield, efield, var):
     if var.cycle:
         M = ssl.LinearOperator(
                 shape=(sfield.field.size, sfield.field.size),
-                dtype=sfield.dtype, matvec=mg_matvec)
+                dtype=sfield.field.dtype, matvec=mg_matvec)
 
     # Define callback to keep track of sslsolver-iterations.
     def callback(x):
@@ -902,13 +903,13 @@ def restriction(model, sfield, residual, sc_dir):
 
     # Compute the source terms (Equation 8 in [Muld06]_).
     # Initiate zero field.
-    csfield = fields.Field(cgrid, dtype=sfield.dtype,
+    csfield = fields.Field(cgrid, dtype=sfield.field.dtype,
                            frequency=sfield._frequency)
     core.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
                   residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Initiate empty e-field.
-    cefield = fields.Field(cgrid, dtype=sfield.dtype,
+    cefield = fields.Field(cgrid, dtype=sfield.field.dtype,
                            frequency=sfield._frequency)
 
     return cmodel, csfield, cefield
@@ -1235,10 +1236,10 @@ class MGParameters:
         # Check at least two cells in each direction
         if np.any(np.array(self.shape_cells) < 2):
             raise ValueError(
-                    "Nr. of cells must be at least two in each direction\n"
-                    "Provided shape: "
-                    f"({self.shape_cells[0]}, {self.shape_cells[1]}, "
-                    f"{self.shape_cells[2]}).")
+                "Nr. of cells must be at least two in each direction "
+                "Provided shape: ({self.shape_cells[0]}, "
+                f"{self.shape_cells[1]}, {self.shape_cells[2]})."
+            )
 
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
@@ -1258,11 +1259,10 @@ class MGParameters:
             # Ensure numbers are within 0 <= sc_dir <= 3
             if np.any(sc_cycle < 0) or np.any(sc_cycle > 3):
                 raise ValueError(
-                        "`semicoarsening` must be one of "
-                        "(False, True, 0, 1, 2, 3).\n"
-                        f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle,"
-                        f" e.g. 1213.\n{'Provided:':>23} "
-                        f"semicoarsening={self.semicoarsening}.")
+                    "`semicoarsening` must be one of {False;True;0;1;2;3}. "
+                    "Or a combination of {0;1;2;3} to cycle, e.g. 1213. "
+                    f"Provided: {self.semicoarsening}."
+                )
 
         # Get first (or only) direction.
         if self.sc_cycle:
@@ -1293,11 +1293,11 @@ class MGParameters:
             # Ensure numbers are within 0 <= lr_dir <= 7
             if np.any(lr_cycle < 0) or np.any(lr_cycle > 7):
                 raise ValueError(
-                        "`linerelaxation` must be one of "
-                        f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
-                        f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
-                        f"to cycle, e.g. 1213.\n{'Provided:':>23} "
-                        f"linerelaxation={self.linerelaxation}.")
+                    "`linerelaxation` must be one of "
+                    "{False;True;0;1;2;3;4;5;6;7}. Or a combination of "
+                    "{1;2;3;4;5;6;7} to cycle, e.g. 1213. "
+                    f"Provided: {self.linerelaxation}."
+                )
 
         # Get first (only) direction
         if self.lr_cycle:
@@ -1319,13 +1319,15 @@ class MGParameters:
             self.sslsolver = 'bicgstab'
         elif self.sslsolver is not False and self.sslsolver not in solvers:
             raise ValueError(
-                    f"`sslsolver` must be True, False, or one of {solvers}.\n"
-                    f"Provided: sslsolver={self.sslsolver!r}.")
+                f"`sslsolver` must be True, False, or one of {solvers}. "
+                f"Provided: {self.sslsolver!r}."
+            )
 
         if self.cycle not in ['F', 'V', 'W', None]:
             raise ValueError(
-                    "`cycle` must be one of {'F', 'V', 'W', None}.\n"
-                    f"Provided: cycle={self.cycle}.")
+                "`cycle` must be one of {'F';'V';'W';None}. "
+                f"Provided: {self.cycle}."
+            )
 
         # Add maximum multigrid cycles depending on cycle
         if self.cycle in ['F', 'W']:
@@ -1336,8 +1338,9 @@ class MGParameters:
         # Ensure at least cycle or sslsolver is set
         if not self.sslsolver and not self.cycle:
             raise ValueError(
-                    "At least `cycle` or `sslsolver` is required.\nProvided"
-                    f"input: cycle={self.cycle}; sslsolver={self.sslsolver}.")
+                "At least `cycle` or `sslsolver` is required. Provided"
+                f"input: cycle={self.cycle}; sslsolver={self.sslsolver}."
+            )
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
         self.ssl_maxit = 0             # Maximum iteration
