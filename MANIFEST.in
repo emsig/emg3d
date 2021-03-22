@@ -7,6 +7,7 @@ exclude Makefile
 exclude requirements.txt
 exclude requirements-dev.txt
 exclude runtests.sh
+exclude setup.cfg
 exclude .gitignore
 exclude .coveragerc
 exclude .readthedocs.yml

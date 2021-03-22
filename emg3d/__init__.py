@@ -14,12 +14,11 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from emg3d.fields import (Field, get_source_field,  # noqa
-                          get_receiver, get_magnetic_field)
-from emg3d.io import save, load  # noqa
-from emg3d.meshes import TensorMesh, construct_mesh  # noqa
-from emg3d.models import Model  # noqa
-from emg3d.simulations import Simulation  # noqa
-from emg3d.solver import solve  # noqa
-from emg3d.surveys import Survey  # noqa
-from emg3d.utils import Report, Fourier, __version__  # noqa
+from emg3d.fields import Field, get_source_field, get_magnetic_field
+from emg3d.io import save, load
+from emg3d.meshes import TensorMesh, construct_mesh
+from emg3d.models import Model
+from emg3d.simulations import Simulation
+from emg3d.solver import solve
+from emg3d.surveys import Survey
+from emg3d.utils import Report, Fourier, __version__

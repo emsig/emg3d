@@ -14,4 +14,4 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from emg3d.cli.main import main  # noqa
+from emg3d.cli.main import main
