@@ -29,11 +29,8 @@ from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
 try:
-    import scooby
     from scooby import Report as ScoobyReport
 except ImportError:
-    scooby = None
-
     class ScoobyReport:
         pass
 

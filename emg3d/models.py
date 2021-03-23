@@ -180,7 +180,7 @@ class Model:
         # Check input.
         if equal:
             try:
-                _ = self._operator_test(model)
+                self._operator_test(model)
             except ValueError:
                 equal = False
 
