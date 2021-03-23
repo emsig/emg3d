@@ -571,7 +571,9 @@ class Simulation:
             if source not in self._grid_source.keys():
 
                 # Get grid and store it.
-                center = self.survey.sources[source].coordinates[:3]
+                center = (self.survey.sources[source].xco,
+                          self.survey.sources[source].yco,
+                          self.survey.sources[source].zco)
                 inp = {**self.gridding_opts, 'center': center}
                 self._grid_source[source] = meshes.construct_mesh(**inp)
 
@@ -581,7 +583,9 @@ class Simulation:
         elif self.gridding == 'both':  # Src- & freq-dependent grids.
 
             # Get grid and store it.
-            center = self.survey.sources[source].coordinates[:3]
+            center = (self.survey.sources[source].xco,
+                      self.survey.sources[source].yco,
+                      self.survey.sources[source].zco)
             inp = {**self.gridding_opts, 'frequency':
                    self.survey.frequencies[freq], 'center': center}
             self._dict_grid[source][freq] = meshes.construct_mesh(**inp)

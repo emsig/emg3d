@@ -364,7 +364,7 @@ def test_get_magnetic_field():
     hfield = dat['hresult']
 
     hout = fields.get_magnetic_field(model, efield)
-    assert hfield == hout
+    assert_allclose(hfield.field, hout.field)
 
     # Add some mu_r - Just 1, to trigger, and compare.
     dat = REGRES['res']
@@ -374,13 +374,13 @@ def test_get_magnetic_field():
 
     hout1 = fields.get_magnetic_field(model1, efield)
     hout2 = fields.get_magnetic_field(model2, efield)
-    assert hout1 == hout2
+    assert_allclose(hout1.field, hout2.field)
 
     # Ensure they are not the same if mu_r!=1/None provided
     model3 = models.Model(**dat['input_model'], mu_r=2.)
     hout3 = fields.get_magnetic_field(model3, efield)
     with pytest.raises(AssertionError):
-        assert hout1 == hout3
+        assert_allclose(hout1.field, hout3.field)
 
 
 class TestFiniteSourceXYZ:
