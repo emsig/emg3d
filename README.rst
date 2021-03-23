@@ -1,8 +1,8 @@
 .. image:: https://raw.githubusercontent.com/emsig/emg3d-logo/master/logo-emg3d-transp-web250px.png
    :target: https://emsig.github.io
    :alt: emg3d logo
-   
-----
+
+|
 
 .. image:: https://img.shields.io/pypi/v/emg3d.svg
    :target: https://pypi.python.org/pypi/emg3d/

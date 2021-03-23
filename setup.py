@@ -10,7 +10,7 @@ if not sys.version_info[:2] >= (3, 7):
 
 # Get README and remove badges.
 readme = open('README.rst').read()
-readme = re.sub('----.*\|', '----', readme, flags=re.DOTALL)
+readme = re.sub('\|.*\|', '', readme, flags=re.DOTALL)
 
 setup(
     name="emg3d",
