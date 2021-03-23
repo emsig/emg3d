@@ -212,23 +212,17 @@ class Model:
             Dictionary containing all information to re-create the Model.
 
         """
-        # Initiate dict.
-        out = {}
-
-        # Properties.
-        for prop in self._properties:
-            out[prop] = getattr(self, prop)
-
-        # Grid info.
-        out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
-                       'hz': self.grid.h[2], 'origin': self.grid.origin}
-
-        # Map.
-        out['mapping'] = self.map.name
-
-        # Name
-        out['__class__'] = self.__class__.__name__
-
+        out = {
+            '__class__': self.__class__.__name__,
+            'grid': {
+                'hx': self.grid.h[0],
+                'hy': self.grid.h[1],
+                'hz': self.grid.h[2],
+                'origin': self.grid.origin,
+            },
+            **{prop: getattr(self, prop) for prop in self._properties},
+            'mapping': self.map.name,
+        }
         if copy:
             return deepcopy(out)
         else:

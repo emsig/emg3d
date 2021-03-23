@@ -35,16 +35,6 @@ __all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 
-# MAPS
-MAPLIST = {}  # Dict containing all mappings.
-
-
-def register_map(func):
-    """Decorator to register maps."""
-    MAPLIST[func.__name__] = func
-    return func
-
-
 class BaseMap:
     """Maps variable `x` to computational variable `σ` (conductivity).
 
@@ -97,24 +87,7 @@ class BaseMap:
         """Chain rule to map gradient from conductivity to mapping space."""
         raise NotImplementedError("Derivative chain not implemented.")
 
-    def to_dict(self):
-        """Store the necessary information in a dict for serialization.
 
-        Returns
-        -------
-        out : dict
-            Dictionary containing all information to re-create the Map.
-
-        """
-        return {'name': self.name, '__class__': 'BaseMap'}  # Always BaseMap
-
-    @classmethod
-    def from_dict(cls, inp):
-        """Convert dictionary into :class:`emg3d.maps.BaseMap` instance."""
-        return MAPLIST['Map'+inp['name']]()
-
-
-@register_map
 class MapConductivity(BaseMap):
     """Maps `σ` to computational variable `σ` (conductivity).
 
@@ -136,7 +109,6 @@ class MapConductivity(BaseMap):
         pass
 
 
-@register_map
 class MapLgConductivity(BaseMap):
     """Maps `log_10(σ)` to computational variable `σ` (conductivity).
 
@@ -158,7 +130,6 @@ class MapLgConductivity(BaseMap):
         gradient *= self.backward(mapped)*np.log(10)
 
 
-@register_map
 class MapLnConductivity(BaseMap):
     """Maps `log_e(σ)` to computational variable `σ` (conductivity).
 
@@ -180,7 +151,6 @@ class MapLnConductivity(BaseMap):
         gradient *= self.backward(mapped)
 
 
-@register_map
 class MapResistivity(BaseMap):
     """Maps `ρ` to computational variable `σ` (conductivity).
 
@@ -202,7 +172,6 @@ class MapResistivity(BaseMap):
         gradient *= -self.backward(mapped)**2
 
 
-@register_map
 class MapLgResistivity(BaseMap):
     """Maps `log_10(ρ)` to computational variable `σ` (conductivity).
 
@@ -224,7 +193,6 @@ class MapLgResistivity(BaseMap):
         gradient *= -self.backward(mapped)*np.log(10)
 
 
-@register_map
 class MapLnResistivity(BaseMap):
     """Maps `log_e(ρ)` to computational variable `σ` (conductivity).
 

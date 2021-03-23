@@ -84,6 +84,9 @@ Detailed changes
   - Does not accept entire fields any longer. Entire fields can be mapped with
     their own ``field.interpolate_to_grid`` method.
 
+- Maps cannot be (de-)serialized any longer (``{to;from_dict}``); simply store
+  its name, which can be provided to ``models.Model``.
+
 
 **Meshes**
 

@@ -22,9 +22,8 @@ class TestMaps:
 
     values = np.array([0.01, 10, 3, 4])
 
-    def test_basic(self):
+    def test_new(self):
 
-        @maps.register_map
         class MapNew(maps.BaseMap):
             def __init__(self):
                 super().__init__(description='my new map')
@@ -41,16 +40,6 @@ class TestMaps:
 
         with pytest.raises(NotImplementedError, match='Derivative chain not '):
             testmap.derivative_chain(1, 1)
-
-        # Check to_dict/from_dict
-        mmap = testmap.to_dict()
-        new1 = MapNew.from_dict(mmap)
-        new2 = maps.BaseMap.from_dict(mmap)
-
-        assert new1.__class__.__name__ == 'MapNew'
-        assert new1.name == 'New'
-        assert new2.__class__.__name__ == 'MapNew'
-        assert new2.name == 'New'
 
     def test_conductivity(self):
         model = models.Model(self.mesh, self.values, mapping='Conductivity')
@@ -157,12 +146,6 @@ class TestMaps:
         derivative = gradient.copy()
         model.map.derivative_chain(gradient, model.property_x)
         assert_allclose(gradient, -derivative*np.exp(-model.property_x))
-
-    def test_to_from_dict(self):
-        m = maps.MapLgResistivity()
-        d = m.to_dict()
-        n = maps.MapLgResistivity.from_dict(d)
-        assert m.name == n.name
 
 
 # INTERPOLATIONS
