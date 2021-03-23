@@ -32,6 +32,10 @@ from emg3d import utils
 __all__ = ['Survey', 'Dipole', 'PointDipole']
 
 
+# List of electrodes
+ELECTRODELIST = {}
+
+
 class Survey:
     """Create a survey with sources, receivers, and data.
 
@@ -859,6 +863,270 @@ class Dipole(PointDipole):
                        electric=inp['electric'], **kwargs)
         except KeyError as e:
             raise KeyError(f"Variable {e} missing in `inp`.") from e
+
+
+def register_electrode(func):
+    ELECTRODELIST[func.__name__] = func
+    __all__.append(func.__name__)
+    return func
+
+
+class Electrodes:
+
+    _serialize = {'coordinates', }
+
+    def __init__(self, coordinates, xtype):
+
+        # Coordinates can either be
+        #       [x, y, z, azm, dip]: (5, )
+        # or
+        #       [[x0, y0, z0], [...], [xN, yN, zN]]: (x, 3)
+
+        is_point = coordinates.size == 5
+        is_points = coordinates.ndim == 2 and coordinates.shape[1] == 3
+
+        if not is_point and not is_points:
+            raise ValueError(
+                "`coordinates` must be of shape (5,) or (x, 3), provided: "
+                f"{coordinates.shape}"
+            )
+
+        self._coordinates = np.asarray(coordinates, dtype=float)
+        self._xtype = str(xtype)
+
+    def copy(self):
+        """Return a copy of the Survey."""
+        return self.from_dict(self.to_dict(True))
+
+    def to_dict(self, copy=False):
+        out = {
+            '__class__': self.__class__.__name__,
+            **{prop: getattr(self, prop) for prop in self._serialize},
+        }
+        if copy:
+            return deepcopy(out)
+        else:
+            return out
+
+    @classmethod
+    def from_dict(cls, inp):
+        return cls(**{k: v for k, v in inp.items() if k != '__class__'})
+
+    @property
+    def coordinates(self):
+        return self._coordinates
+
+    @property
+    def xtype(self):
+        return self._xtype
+
+
+class DipoleSource(Electrodes):
+
+    _serialize = {*Electrodes._serialize, 'strength', 'length'}
+
+    def __init__(self, coordinates, xtype, strength, length):
+
+        # TODO either x, y, z, azm, dip or x0, x1, y0, y1, z0, z1
+
+        coordinates = np.squeeze(coordinates)
+
+        # Check size => finite or point dipole?
+        if coordinates.size == 5:
+            self._center = tuple(coordinates[:3])
+            self._azimuth = coordinates[3]
+            self._dip = coordinates[4]
+            self._length = float(length)
+
+        elif coordinates.size == 6:
+            if coordinates.ndim == 1:
+                coordinates = np.array([coordinates[::2], coordinates[1::2]])
+
+            # Ensure the two poles are distinct.
+            if np.allclose(coordinates[0, :], coordinates[1, :]):
+                raise ValueError(
+                    "The two poles are identical, use the format "
+                    "(x, y, z, azimuth, dip) instead. "
+                    f"Provided coordinates: {coordinates}."
+                )
+
+        else:
+            raise ValueError(
+                "Dipole coordinates are wrong defined. They must be "
+                "defined either as a point, (x, y, z, azimuth, dip), or "
+                "as two poles, (x0, x1, y0, y1, z0, z1) or "
+                "[(x0, y0, z0), (x1, y1, z1)] , all floats. "
+                f"Provided coordinates: {coordinates}."
+            )
+
+        self._strength = float(strength)
+
+        super().__init__(coordinates, xtype)
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}("
+                f"x={self.center[0]:,.1f}m, "
+                f"y={self.center[1]:,.1f}m, "
+                f"z={self.center[2]:,.1f}m, "
+                f"θ={self.azimuth:.1f}°, "
+                f"φ={self.dip:.1f}°"
+                f"'; {self.length}m; {self.strength})")
+
+    @property
+    def strength(self):
+        return self._strength
+
+    @property
+    def center(self):
+        if not hasattr(self, '_center'):
+            self._center = tuple(np.sum(self._coordinates, 0)/2)
+        return self._center
+
+    @property
+    def azimuth(self):
+        if not hasattr(self, '_azimuth'):
+            dx = np.diff(self._coordinates[:, 0])
+            dy = np.diff(self._coordinates[:, 1])
+            # Horizontal deviation from x-axis.
+            self._azimuth = np.round(np.rad2deg(np.arctan2(dy, dx)), 5)
+        return self._azimuth
+
+    @property
+    def dip(self):
+        if not hasattr(self, '_dip'):
+            dz = np.diff(self._coordinates[:, 2])
+            # Vertical deviation from xy-plane down.
+            self._dip = np.round(
+                    np.rad2deg(np.pi/2-np.arccos(dz/self.length)), 5)
+        return self._dip
+
+    @property
+    def length(self):
+        if not hasattr(self, '_length'):
+            self._length = np.linalg.norm(
+                self.coordinates[1, :] - self.coordinates[0, :]
+            )
+        return self._length
+
+
+class WireSource(Electrodes):
+    # For both TxElectricLoop and TxElectricWire
+    # - NO center/azimuth/dip
+    # - length (make area a NotImplemented attribute)
+    # - ONLY accepts coordinates of shape=(x, 3), ndim=2
+    pass
+
+
+@register_electrode
+class TxElectricDipole(DipoleSource):
+
+    def __init__(self, coordinates, strength=1.0, length=1.0):
+
+        super().__init__(coordinates, 'electric', strength, length)
+
+
+@register_electrode
+class TxMagneticDipole(DipoleSource):
+    # - quantity is 'magnetic' ?
+    pass
+
+
+@register_electrode
+class TxElectricWire(WireSource):
+    # - has length, area (NotImplemented) attributes
+    # - ensures no point coincides
+    # - quantity is 'electric'
+    pass
+
+
+@register_electrode
+class TxElectricLoop(WireSource):
+    # - has length, area (NotImplemented) attributes
+    # - ensures no point coincides except first and last
+    # - quantity is 'flux' ?
+    # - factor ?
+    pass
+
+
+class PointReceiver(Electrodes):
+
+    _serialize = {*Electrodes._serialize, 'relative'}
+
+    def __init__(self, coordinates, relative, xtype):
+
+        coordinates = np.squeeze(coordinates)
+
+        if coordinates.ndim != 1 or coordinates.size != 5:
+            raise ValueError(
+                "`coordinates` for a point receiver must be of shape (5,); "
+                f"provided: {coordinates.shape}."
+            )
+
+        self._relative = bool(relative)  # TODO: only works within Survey
+        # TODO Move out from here to survey or simulation
+
+        super().__init__(coordinates, xtype)
+
+    def __repr__(self):
+        return (f"{self.__class__.__name__}("
+                f"x={self.center[0]:,.1f}m, "
+                f"y={self.center[1]:,.1f}m, "
+                f"z={self.center[2]:,.1f}m, "
+                f"θ={self.azimuth:.1f}°, "
+                f"φ={self.dip:.1f}°"
+                f"{'; relative' if self.relative else ''})")
+
+    @property
+    def center(self):
+        return tuple(self._coordinates[:3])
+
+    @property
+    def azimuth(self):
+        return self._coordinates[3]
+
+    @property
+    def dip(self):
+        return self._coordinates[4]
+
+    @property
+    def relative(self):
+        return self._relative
+
+
+@register_electrode
+class RxPointElectricField(PointReceiver):
+
+    def __init__(self, coordinates, relative=False):
+
+        super().__init__(coordinates, relative, 'electric')
+
+
+@register_electrode
+class RxPointMagneticField(PointReceiver):
+
+    def __init__(self, coordinates, relative=False):
+
+        super().__init__(coordinates, relative, 'magnetic')
+
+
+@register_electrode
+class RxPointElectricCurrentDensity(PointReceiver):
+
+    def __init__(self, coordinates, relative=False):
+
+        self.factor = NotImplemented
+
+        super().__init__(coordinates, relative, 'current')
+
+
+@register_electrode
+class RxPointMagneticFluxDensity(PointReceiver):
+
+    def __init__(self, coordinates, relative=False):
+
+        self.factor = NotImplemented
+
+        super().__init__(coordinates, relative, 'flux')
 
 
 # # Helper routines ##

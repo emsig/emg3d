@@ -42,6 +42,7 @@ KNOWN_CLASSES = {
     'Dipole': surveys.Dipole,
     'TensorMesh': meshes.TensorMesh,
     'Simulation': simulations.Simulation,
+    **surveys.ELECTRODELIST,
 }
 
 
