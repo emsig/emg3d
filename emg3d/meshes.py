@@ -25,10 +25,9 @@ from scipy.constants import mu_0
 from emg3d import maps
 
 try:
-    from discretize import TensorMesh as dTensorMesh
+    import discretize
 except ImportError:
-    class dTensorMesh:
-        pass
+    discretize = None
 
 __all__ = ['BaseMesh', 'TensorMesh', 'construct_mesh', 'get_origin_widths',
            'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width']
@@ -97,7 +96,7 @@ class BaseMesh:
         return self._cell_volumes
 
 
-class TensorMesh(dTensorMesh, BaseMesh):
+class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
     """A slightly modified version of :class:`discretize.TensorMesh`.
 
     Adds a few attributes (``__eq__``, ``copy``, and ``{to;from}_dict``) to
@@ -151,9 +150,27 @@ class TensorMesh(dTensorMesh, BaseMesh):
         return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the TensorMesh in a dict."""
-        out = {'hx': self.h[0], 'hy': self.h[1], 'hz': self.h[2],
-               'origin': self.origin, '__class__': self.__class__.__name__}
+        """Store the necessary information in a dict for serialization.
+
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
+
+
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the TensorMesh.
+
+        """
+        out = {
+            'hx': self.h[0],
+            'hy': self.h[1],
+            'hz': self.h[2],
+            'origin': self.origin,
+            '__class__': self.__class__.__name__
+        }
         if copy:
             return deepcopy(out)
         else:
@@ -176,12 +193,7 @@ class TensorMesh(dTensorMesh, BaseMesh):
             A :class:`emg3d.meshes.TensorMesh` instance.
 
         """
-        try:
-            return cls(h=[inp['hx'], inp['hy'], inp['hz']],
-                       origin=inp['origin'])
-
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
+        return cls(h=[inp['hx'], inp['hy'], inp['hz']], origin=inp['origin'])
 
 
 def construct_mesh(frequency, properties, center, domain=None, vector=None,
@@ -542,7 +554,7 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
 
     # Ensure no kwargs left.
     if kwargs:
-        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
     # Get property map from string.
     if isinstance(pmap, str):
@@ -562,8 +574,10 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
     # Survey domain: if not provided get from vector or distance.
     # Priority: domain > vector > distance.
     if domain is None and vector is None and distance is None:
-        raise ValueError("At least one of `domain`, `distance`, "
-                         "and `vector` must be provided.")
+        raise ValueError(
+            "At least one of `domain`, `distance`, "
+            "and `vector` must be provided."
+        )
     elif domain is None:
         if vector is None:
             domain = np.array([center-abs(distance[0]),
@@ -574,8 +588,10 @@ def get_origin_widths(frequency, properties, center, domain=None, vector=None,
         domain = np.array(domain, dtype=np.float64)
         if vector is not None:
             if domain[0] < vector.min() or domain[1] > vector.max():
-                raise ValueError("Provided vector MUST at least include "
-                                 "all of the survey domain.")
+                raise ValueError(
+                    "Provided vector MUST at least include "
+                    "all of the survey domain."
+                )
 
     # Seasurface related checks.
     if seasurface is not None:
@@ -817,7 +833,8 @@ def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
     # Sanity check; 19 is already ridiculously high.
     if max_prime > primes[-1]:
         raise ValueError(
-                f"Highest prime is {max_prime}, please use a value < 20.")
+            f"Highest prime is {max_prime}, please use a value < 20."
+        )
 
     # Restrict to max_prime.
     primes = primes[primes <= max_prime]

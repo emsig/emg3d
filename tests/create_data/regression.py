@@ -32,24 +32,24 @@ model = models.Model(**input_model)
 
 input_source = {
     'grid': grid,
-    'src': [0, 0, 250., 30, 10],  # A rotated source to include all
-    'freq': freq
+    'source': [0, 0, 250., 30, 10],  # A rotated source to include all
+    'frequency': freq
     }
 
 # Fields
 sfield = fields.get_source_field(**input_source)
 
 # F-cycle
-fefield = solver.solve(model, sfield)
+fefield = solver.solve(model, sfield, plain=True)
 
 # W-cycle
-wefield = solver.solve(model, sfield, cycle='W')
+wefield = solver.solve(model, sfield, cycle='W', plain=True)
 
 # V-cycle
-vefield = solver.solve(model, sfield, cycle='V')
+vefield = solver.solve(model, sfield, cycle='V', plain=True)
 
 # BiCGSTAB; F-cycle
-bicefield = solver.solve(model, sfield, sslsolver=True)
+bicefield = solver.solve(model, sfield, sslsolver='bicgstab', plain=True)
 
 out = {
     'input_grid': input_grid,
@@ -106,11 +106,11 @@ nu_post = 2
 clevel = 10  # Way to high
 
 efield = solver.solve(
-        model, sfield, semicoarsening=semicoarsening,
+        model, sfield, sslsolver=False, semicoarsening=semicoarsening,
         linerelaxation=linerelaxation, tol=tol, maxit=maxit, nu_init=nu_init,
         nu_pre=nu_pre, nu_coarse=nu_coarse, nu_post=nu_post, clevel=clevel)
 
-hfield = fields.get_h_field(model, efield)
+hfield = fields.get_magnetic_field(model, efield)
 
 # Store input and result
 reg_2 = {
@@ -189,18 +189,18 @@ model_l = models.Model(**input_model_l)
 
 input_source_l = {
     'grid': grid_l,
-    'src': [0, 0, 250., 30, 10],  # A rotated source to include all
-    'freq': freq
+    'source': [0, 0, 250., 30, 10],  # A rotated source to include all
+    'frequency': freq
     }
 
 # Fields
 sfield_l = fields.get_source_field(**input_source_l)
 
 # F-cycle
-fefield_l = solver.solve(model_l, sfield_l)
+fefield_l = solver.solve(model_l, sfield_l, plain=True)
 
 # BiCGSTAB; F-cycle
-bicefield_l = solver.solve(model_l, sfield_l, sslsolver=True)
+bicefield_l = solver.solve(model_l, sfield_l, sslsolver='bicgstab', plain=True)
 
 out_l = {
     'input_grid': input_grid_l,

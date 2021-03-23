@@ -78,7 +78,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     model : Model
         The model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
+    sfield : Field
         The source field. See :func:`emg3d.fields.get_source_field`.
 
     sslsolver : {str, bool}, default: True
@@ -269,7 +269,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
        In [4]: # The source is a x-directed, horizontal dipole at (4, 4, 4)
           ...: # with a frequency of 10 Hz.
           ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azm, dip)
-          ...: sfield = emg3d.fields.get_source_field(grid, src=coo, freq=10)
+          ...: sfield = emg3d.fields.get_source_field(
+          ...:             grid, source=coo, frequency=10)
 
        In [5]: # Solve for the electric field.
           ...: efield = emg3d.solve(model, sfield, plain=True, verb=4)
@@ -296,15 +297,16 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     var.cprint(var, 2)
 
     # Compute reference error for tolerance.
-    var.l2_refe = sl.norm(sfield, check_finite=False)
+    var.l2_refe = sl.norm(sfield.field, check_finite=False)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
-    if sfield.freq is None:
+    if sfield.frequency is None:
         raise ValueError(
-                "Source field is missing frequency information;\n"
-                "Create it with `emg3d.fields.get_source_field`, or\n"
-                "initiate it with `emg3d.fields.SourceField`.")
+            "Source field is missing frequency information; Create "
+            "it with `emg3d.fields.get_source_field`, or initiate it "
+            "with `emg3d.fields.Field`, providing frequency information."
+        )
 
     # Initiate volume-averaged model values.
     vmodel = models.VolumeModel(model, sfield)
@@ -312,24 +314,25 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     # Get efield.
     if efield is None:
         # If not provided, initiate an empty one.
-        efield = fields.Field(model.grid, dtype=sfield.dtype,
-                              freq=sfield._freq)
+        efield = fields.Field(model.grid, dtype=sfield.field.dtype,
+                              frequency=sfield._frequency)
 
         # Set flag to return the field.
         var.do_return = True
     else:
 
         # Ensure efield has same data type as sfield.
-        if sfield.dtype != efield.dtype:
+        if sfield.field.dtype != efield.field.dtype:
             raise ValueError(
-                    "Source field and electric field must have the\n same "
-                    "dtype; complex (f-domain) or real (s-domain).\n Provided:"
-                    f"sfield: {sfield.dtype}; efield: {efield.dtype}.")
+                "Source field and electric field must have the same "
+                "dtype; complex (f-domain) or real (s-domain). Provided:"
+                f"sfield: {sfield.field.dtype}; efield: {efield.field.dtype}."
+            )
 
         # If provided efield is missing frequency information, add it from the
         # source field.
-        if efield.freq is None:
-            efield._freq = sfield._freq
+        if efield.frequency is None:
+            efield._frequency = sfield._frequency
 
         # Ensure PEC.
         efield.fx[:, 0, :] = efield.fx[:, -1, :] = 0.
@@ -369,8 +372,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         info = "   > RETURN ZERO E-FIELD (provided sfield is zero)\n"
 
         # Zero-source means zero e-field.
-        efield = fields.Field(model.grid, dtype=sfield.dtype,
-                              freq=sfield._freq)
+        efield = fields.Field(model.grid, dtype=sfield.field.dtype,
+                              frequency=sfield._frequency)
 
     # Print header for iteration log.
     header = f"   [hh:mm:ss]  {'rel. error':<22}"
@@ -458,8 +461,8 @@ def multigrid(model, sfield, efield, var, **kwargs):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        The source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        The source field; a :class:`emg3d.fields.Field` instance.
 
 
     efield : Field
@@ -636,8 +639,8 @@ def krylov(model, sfield, efield, var):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        The source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        The source field; a :class:`emg3d.fields.Field` instance.
 
     efield : Field
         The electric field; a :class:`emg3d.fields.Field` instance.
@@ -648,17 +651,18 @@ def krylov(model, sfield, efield, var):
 
     """
     # Get frequency
-    freq = sfield._freq
+    frequency = sfield._frequency
 
     # Define matrix operation A x as LinearOperator.
     def amatvec(efield):
-        """Compute A x for solver; residual is b-Ax = src-amatvec."""
+        """Compute A x for solver; residual is b-Ax = source - amatvec."""
 
         # Cast current efield to Field instance.
         efield = fields.Field(model.grid, efield)
 
         # Compute A x.
-        rfield = fields.Field(model.grid, dtype=efield.dtype, freq=freq)
+        rfield = fields.Field(model.grid, dtype=efield.field.dtype,
+                              frequency=frequency)
         core.amat_x(
                 rfield.fx, rfield.fy, rfield.fz,
                 efield.fx, efield.fy, efield.fz, model.eta_x, model.eta_y,
@@ -666,32 +670,33 @@ def krylov(model, sfield, efield, var):
                 model.grid.h[0], model.grid.h[1], model.grid.h[2])
 
         # Return Field instance.
-        return -rfield
+        return -rfield.field
 
     # Initiate LinearOperator A x.
     A = ssl.LinearOperator(
             shape=(sfield.field.size, sfield.field.size),
-            dtype=sfield.dtype, matvec=amatvec)
+            dtype=sfield.field.dtype, matvec=amatvec)
 
     # Define multigrid pre-conditioner as LinearOperator, if `var.cycle`.
     def mg_matvec(sfield):
         """Use multigrid as pre-conditioner."""
 
         # Cast current fields to Field instances.
-        sfield = fields.Field(model.grid, sfield, freq=freq)
-        efield = fields.Field(model.grid, dtype=sfield.dtype, freq=freq)
+        sfield = fields.Field(model.grid, sfield, frequency=frequency)
+        efield = fields.Field(model.grid, dtype=sfield.field.dtype,
+                              frequency=frequency)
 
         # Solve for these fields.
         multigrid(model, sfield, efield, var)
 
-        return efield
+        return efield.field
 
     # Initiate LinearOperator M.
     M = None
     if var.cycle:
         M = ssl.LinearOperator(
                 shape=(sfield.field.size, sfield.field.size),
-                dtype=sfield.dtype, matvec=mg_matvec)
+                dtype=sfield.field.dtype, matvec=mg_matvec)
 
     # Define callback to keep track of sslsolver-iterations.
     def callback(x):
@@ -727,8 +732,8 @@ def krylov(model, sfield, efield, var):
     # therefore throw an exception in `_terminate`, and catch it here.
     try:
         efield.field, i = getattr(ssl, var.sslsolver)(
-                A=A, b=sfield, x0=efield, tol=var.tol, maxiter=var.ssl_maxit,
-                atol=1e-30, M=M, callback=callback)
+                A=A, b=sfield.field, x0=efield.field, tol=var.tol,
+                maxiter=var.ssl_maxit, atol=1e-30, M=M, callback=callback)
     except _ConvergenceError:
         i = -1  # Mark it as error; returned field is all zero.
         var.exit_message += " (returned field is zero)"
@@ -773,8 +778,8 @@ def smoothing(model, sfield, efield, nu, lr_dir):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        Input source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        Input source field; a :class:`emg3d.fields.Field` instance.
 
     efield : Field
         Input electric field; a :class:`emg3d.fields.Field` instance.
@@ -831,8 +836,8 @@ def restriction(model, sfield, residual, sc_dir):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        Input source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        Input source field; a :class:`emg3d.fields.Field` instance.
 
     sc_dir : int
         Direction of semicoarsening.
@@ -843,7 +848,7 @@ def restriction(model, sfield, residual, sc_dir):
     cmodel : VolumeModel
         Coarse model.
 
-    csfield : SourceField
+    csfield : Field
         Coarse source field. Corresponds to restriction of fine-grid residual.
 
     cefield : Field
@@ -898,12 +903,14 @@ def restriction(model, sfield, residual, sc_dir):
 
     # Compute the source terms (Equation 8 in [Muld06]_).
     # Initiate zero field.
-    csfield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
+    csfield = fields.Field(cgrid, dtype=sfield.field.dtype,
+                           frequency=sfield._frequency)
     core.restrict(csfield.fx, csfield.fy, csfield.fz, residual.fx,
                   residual.fy, residual.fz, wx, wy, wz, sc_dir)
 
     # Initiate empty e-field.
-    cefield = fields.Field(cgrid, dtype=sfield.dtype, freq=sfield._freq)
+    cefield = fields.Field(cgrid, dtype=sfield.field.dtype,
+                           frequency=sfield._frequency)
 
     return cmodel, csfield, cefield
 
@@ -999,8 +1006,8 @@ def residual(model, sfield, efield, norm=False):
     model : VolumeModel
         Input model; a :class:`emg3d.models.Model` instance.
 
-    sfield : SourceField
-        Input source field; a :class:`emg3d.fields.SourceField` instance.
+    sfield : Field
+        Input source field; a :class:`emg3d.fields.Field` instance.
 
     efield : Field
         Input electric field; a :class:`emg3d.fields.Field` instance.
@@ -1027,7 +1034,7 @@ def residual(model, sfield, efield, norm=False):
 
     # Return error if norm.
     if norm:
-        return sl.norm(rfield, check_finite=False)
+        return sl.norm(rfield.field, check_finite=False)
 
     # Return residual if not norm.
     else:
@@ -1229,10 +1236,10 @@ class MGParameters:
         # Check at least two cells in each direction
         if np.any(np.array(self.shape_cells) < 2):
             raise ValueError(
-                    "Nr. of cells must be at least two in each direction\n"
-                    "Provided shape: "
-                    f"({self.shape_cells[0]}, {self.shape_cells[1]}, "
-                    f"{self.shape_cells[2]}).")
+                "Nr. of cells must be at least two in each direction "
+                "Provided shape: ({self.shape_cells[0]}, "
+                f"{self.shape_cells[1]}, {self.shape_cells[2]})."
+            )
 
     def _semicoarsening(self):
         """Set everything related to semicoarsening."""
@@ -1252,11 +1259,10 @@ class MGParameters:
             # Ensure numbers are within 0 <= sc_dir <= 3
             if np.any(sc_cycle < 0) or np.any(sc_cycle > 3):
                 raise ValueError(
-                        "`semicoarsening` must be one of "
-                        "(False, True, 0, 1, 2, 3).\n"
-                        f"{' ':>13} Or a combination of (0, 1, 2, 3) to cycle,"
-                        f" e.g. 1213.\n{'Provided:':>23} "
-                        f"semicoarsening={self.semicoarsening}.")
+                    "`semicoarsening` must be one of {False;True;0;1;2;3}. "
+                    "Or a combination of {0;1;2;3} to cycle, e.g. 1213. "
+                    f"Provided: {self.semicoarsening}."
+                )
 
         # Get first (or only) direction.
         if self.sc_cycle:
@@ -1287,11 +1293,11 @@ class MGParameters:
             # Ensure numbers are within 0 <= lr_dir <= 7
             if np.any(lr_cycle < 0) or np.any(lr_cycle > 7):
                 raise ValueError(
-                        "`linerelaxation` must be one of "
-                        f"(False, True, 0, 1, 2, 3, 4, 5, 6, 7).\n"
-                        f"{' ':>13} Or a combination of (1, 2, 3, 4, 5, 6, 7) "
-                        f"to cycle, e.g. 1213.\n{'Provided:':>23} "
-                        f"linerelaxation={self.linerelaxation}.")
+                    "`linerelaxation` must be one of "
+                    "{False;True;0;1;2;3;4;5;6;7}. Or a combination of "
+                    "{1;2;3;4;5;6;7} to cycle, e.g. 1213. "
+                    f"Provided: {self.linerelaxation}."
+                )
 
         # Get first (only) direction
         if self.lr_cycle:
@@ -1313,13 +1319,15 @@ class MGParameters:
             self.sslsolver = 'bicgstab'
         elif self.sslsolver is not False and self.sslsolver not in solvers:
             raise ValueError(
-                    f"`sslsolver` must be True, False, or one of {solvers}.\n"
-                    f"Provided: sslsolver={self.sslsolver!r}.")
+                f"`sslsolver` must be True, False, or one of {solvers}. "
+                f"Provided: {self.sslsolver!r}."
+            )
 
         if self.cycle not in ['F', 'V', 'W', None]:
             raise ValueError(
-                    "`cycle` must be one of {'F', 'V', 'W', None}.\n"
-                    f"Provided: cycle={self.cycle}.")
+                "`cycle` must be one of {'F';'V';'W';None}. "
+                f"Provided: {self.cycle}."
+            )
 
         # Add maximum multigrid cycles depending on cycle
         if self.cycle in ['F', 'W']:
@@ -1330,8 +1338,9 @@ class MGParameters:
         # Ensure at least cycle or sslsolver is set
         if not self.sslsolver and not self.cycle:
             raise ValueError(
-                    "At least `cycle` or `sslsolver` is required.\nProvided"
-                    f"input: cycle={self.cycle}; sslsolver={self.sslsolver}.")
+                "At least `cycle` or `sslsolver` is required. Provided"
+                f"input: cycle={self.cycle}; sslsolver={self.sslsolver}."
+            )
 
         # Store maxit in ssl_maxit and adjust maxit if sslsolver.
         self.ssl_maxit = 0             # Maximum iteration

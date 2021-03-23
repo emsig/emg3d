@@ -14,36 +14,11 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# Import modules
-from emg3d import io
-from emg3d import maps
-from emg3d import utils
-from emg3d import solver
-from emg3d import fields
-from emg3d import meshes
-from emg3d import models
-from emg3d import surveys
-from emg3d import optimize
-from emg3d import simulations
-
-# Import most important functions and classes
-from emg3d.solver import solve
-from emg3d.utils import Report
+from emg3d.fields import Field, get_source_field, get_magnetic_field
 from emg3d.io import save, load
-
-# # For top-namespace
-from emg3d import core  # noqa
-from emg3d.models import Model  # noqa
-from emg3d.utils import Fourier  # noqa
-from emg3d.surveys import Survey  # noqa
-from emg3d.simulations import Simulation  # noqa
-from emg3d.meshes import TensorMesh, construct_mesh  # noqa
-from emg3d.fields import (Field, get_source_field,  # noqa
-                          get_receiver, get_h_field)
-
-__all__ = ['solve', 'solver', 'utils', 'io', 'fields', 'maps', 'meshes',
-           'models', 'Report', 'save', 'load', 'surveys', 'simulations',
-           'optimize']
-
-# Version defined in utils, so we can easier use it within the package itself.
-__version__ = utils.__version__
+from emg3d.meshes import TensorMesh, construct_mesh
+from emg3d.models import Model
+from emg3d.simulations import Simulation
+from emg3d.solver import solve
+from emg3d.surveys import Survey
+from emg3d.utils import Report, Fourier, __version__

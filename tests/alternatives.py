@@ -383,7 +383,7 @@ def get_source_field(grid, src, freq, strength=0):
         s[ix1, iy1, iz1] = rx*ry*rz
 
     # Initiate zero source field.
-    sfield = emg3d.fields.SourceField(grid, freq=freq)
+    sfield = emg3d.fields.Field(grid, frequency=freq)
 
     # Return source-field depending if point or finite dipole.
     vec1 = (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)

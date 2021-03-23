@@ -1,25 +1,23 @@
 .. image:: https://raw.githubusercontent.com/emsig/emg3d-logo/master/logo-emg3d-transp-web250px.png
    :target: https://emsig.github.io
    :alt: emg3d logo
-   
-----
 
-.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3229006.svg
-   :target: https://doi.org/10.5281/zenodo.3229006
-   :alt: Zenodo DOI
-.. image:: https://img.shields.io/badge/Slack-simpeg-4A154B.svg?logo=slack
-    :target: http://slack.simpeg.xyz
-.. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
-   :target: https://emg3d.readthedocs.io/en/latest
-   :alt: Documentation Status
-.. image:: https://github.com/emsig/emg3d/workflows/pytest/badge.svg?branch=master
-   :target: https://github.com/emsig/emg3d/actions
-   :alt: GitHub Actions
+|
 
-====
+.. image:: https://img.shields.io/pypi/v/emg3d.svg
+   :target: https://pypi.python.org/pypi/emg3d/
+   :alt: PyPI
+.. image:: https://img.shields.io/conda/v/conda-forge/emg3d.svg
+   :target: https://anaconda.org/conda-forge/emg3d/
+   :alt: conda-forge
+.. image:: https://img.shields.io/badge/python-3.7+-blue.svg
+   :target: https://www.python.org/downloads/
+   :alt: Supported Python Versions
+.. image:: https://img.shields.io/badge/platform-linux,win,osx-blue.svg
+   :target: https://anaconda.org/conda-forge/emg3d/
+   :alt: Linux, Windows, OSX
 
-.. sphinx-inclusion-marker
-
+|
 
 A multigrid solver for 3D electromagnetic diffusion in Python.
 
@@ -28,10 +26,12 @@ A multigrid solver for 3D electromagnetic diffusion in Python.
 - **Source Code:** https://github.com/emsig/emg3d
 - **Bug reports:** https://github.com/emsig/emg3d/issues
 - **Contributing:** https://emg3d.readthedocs.io/en/latest/development
+- **Contact:** http://slack.simpeg.xyz
+- **Zenodo:** https://doi.org/10.5281/zenodo.3229006
 
 
 Features
---------
+========
 
 - **Iterative, matrix-free multigrid solver**, scaling linearly (CPU & RAM)
   with the number of unknowns, O(N).
@@ -53,7 +53,7 @@ Features
 
 
 Installation
-============
+------------
 
 Installable with ``pip`` from PyPI and with ``conda`` through the
 ``conda-forge`` channel. Minimum requirements are Python version 3.7 or higher

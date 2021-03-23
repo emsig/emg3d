@@ -27,140 +27,117 @@ from scipy.special import sindg, cosdg
 
 from emg3d import maps, meshes, models, utils
 
-__all__ = ['Field', 'SourceField', 'get_source_field', 'get_receiver',
-           'get_h_field']
+__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
 
-class Field(np.ndarray):
-    r"""Create a Field instance with x-, y-, and z-views of the field.
+class Field:
+    r"""A Field contains the x-, y-, and z- directed electromagnetic fields.
 
-    A `Field` is an `ndarray` with additional views of the x-, y-, and
-    z-directed fields as attributes, stored as `fx`, `fy`, and `fz`. The
-    default array contains the whole field, which can be the electric field,
-    the source field, or the residual field, in a 1D array. A `Field` instance
-    has additionally the two attributes `amp` and `pha` for the amplitude and
-    phase, as common in frequency-domain CSEM.
+    A Field is a simple container that has a 1D array ``Field.field``
+    containing the x-, y-, and z-directed fields one after the other.
+    The field can be any field, such as an electric field, a magnetic field,
+    or a source field (which is an electric field).
 
-    A `Field` can be initiated in three ways:
-
-    1. ``Field(grid, dtype=np.complex128)``:
-       Calling it with a :class:`emg3d.meshes.TensorMesh` instance returns a
-       `Field` instance of correct dimensions initiated with zeroes of data
-       type `dtype`.
-    2. ``Field(grid, field)``:
-       Calling it with a :class:`emg3d.meshes.TensorMesh` instance and an
-       `ndarray` returns a `Field` instance of the provided `ndarray`, of same
-       data type.
-
-    Sort-order is 'F'.
+    The particular fields can be accessed via the ``Field.f{x;y;z}``
+    attributes, which are 3D arrays corresponding to the shape of the edges
+    in this direction; sort-order is Fortran-like ('F').
 
 
     Parameters
     ----------
 
-    grid : :class:`emg3d.meshes.TensorMesh` or ndarray
-        Either a TensorMesh instance or an ndarray of shape grid.n_edges_x or
-        grid.shape_edges_x. See explanations above. Only mandatory parameter;
-        if the only one provided, it will initiate a zero-field of `dtype`.
+    grid : TensorMesh
+        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    field : :class:`Field` or ndarray, optional
-        Either a Field instance or an ndarray of shape grid.n_edges_y or
-        grid.shape_edges_y. See explanations above.
+    data : ndarray, default: None
+        The actual data, a ``ndarray`` of size ``grid.n_edges_x`` +
+        ``grid.shape_edges_y`` + ``grid.shape_edges_z``. If ``None``, it is
+        initiated with zeros.
 
-    dtype : dtype, optional
-        Only used if ``field=None``; the initiated zero-field for the provided
-        TensorMesh has data type `dtype`. Default: complex.
-
-    freq : float, optional
-        Source frequency (Hz), used to compute the Laplace parameter `s`.
+    frequency : float, default: None
+        Field frequency (Hz), used to compute the Laplace parameter ``s``.
         Either positive or negative:
 
-        - `freq` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - `freq` < 0: Laplace domain, hence
+        - ``frequency > 0``: Frequency domain, hence
+          :math:`s = \mathrm{i}\omega = 2\mathrm{i}\pi f` (complex);
+        - ``frequency < 0``: Laplace domain, hence
           :math:`s = f` (real).
 
-        Just added as info if provided.
+    dtype : dtype, default: complex
+        Data type of the initiated field; only used if both ``frequency`` and
+        ``data`` are None.
 
     """
 
-    def __new__(cls, grid, field=None, dtype=np.complex128, freq=None):
+    def __init__(self, grid, data=None, frequency=None, dtype=None):
         """Initiate a new Field instance."""
 
-        if len(grid.shape_cells) != 3:
-            raise ValueError("Provided grid must be a 3D grid.")
+        # Get dtype.
+        if frequency is not None:  # Frequency is top priority.
+            if frequency > 0:
+                dtype = np.complex_
+            elif frequency < 0:
+                dtype = np.float_
+            else:
+                raise ValueError(
+                    "`frequency` must be f>0 (frequency domain) or f<0 "
+                    "(Laplace domain). Provided: {frequency} Hz."
+                )
+        elif data is not None:  # Data is second priority.
+            dtype = data.dtype
 
-        # Collect field
-        if field is None:
+        elif dtype is None:  # Default.
+            dtype = np.complex_
+
+        # Store field.
+        if data is None:
             nc = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
-            field = np.zeros(nc, dtype=dtype)
+            self._field = np.zeros(nc, dtype=dtype)
+        else:
+            self._field = np.asarray(data, dtype=dtype)
 
-        # Store the field as object
-        obj = np.asarray(field).view(cls)
+        # Store grid and frequency.
+        self.grid = grid
+        self._frequency = frequency
 
-        # Store grid
-        obj.grid = grid
-
-        # Store frequency
-        if freq is None and hasattr(field, 'freq'):
-            freq = field._freq
-        obj._freq = freq
-        if freq == 0.0:
-            raise ValueError(
-                    "`freq` must be >0 (frequency domain) "
-                    "or <0 (Laplace domain).\n"
-                    f"Provided frequency: {freq} Hz.")
-
-        return obj
-
-    def __array_finalize__(self, obj):
-        """Ensure relevant numbers are stored no matter how created."""
-        if obj is None:
-            return
-
-        self.grid = getattr(obj, 'grid', None)
-        self._freq = getattr(obj, '_freq', None)
-
-    def __reduce__(self):
-        """Customize __reduce__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Get the parent's __reduce__ tuple.
-        pickled_state = super().__reduce__()
-
-        # Create our own tuple to pass to __setstate__.
-        new_state = pickled_state[2]
-        new_state += (self.grid.h[0], self.grid.h[1], self.grid.h[2],
-                      self.grid.origin, self._freq)
-
-        # Return tuple that replaces parent's __setstate__ tuple with our own.
-        return (pickled_state[0], pickled_state[1], new_state)
-
-    def __setstate__(self, state):
-        """Customize __setstate__ to make `Field` work with pickle.
-        => https://stackoverflow.com/a/26599346
-        """
-        # Set the necessary attributes (in reverse order).
-        self._freq = state[-1]
-        origin = state[-2]
-        hz = state[-3]
-        hy = state[-4]
-        hx = state[-5]
-        self.grid = meshes.TensorMesh([hx, hy, hz], origin)
-
-        # Call the parent's __setstate__ with the other tuple elements.
-        super().__setstate__(state[0:-5])
+    def __eq__(self, field):
+        """Compare two fields."""
+        equal = self.__class__.__name__ == field.__class__.__name__
+        equal *= self.grid == field.grid
+        equal *= self._frequency == field._frequency
+        equal *= np.allclose(self._field, field._field, atol=0, rtol=1e-10)
+        return bool(equal)
 
     def copy(self):
         """Return a copy of the Field."""
-        return self.from_dict(self.to_dict(True))
+        return self.from_dict(self.to_dict(copy=True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the Field in a dict."""
-        out = {'field': np.array(self.field), 'freq': self._freq,
-               '__class__': self.__class__.__name__}
-        out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
-                       'hz': self.grid.h[2], 'origin': self.grid.origin}
+        """Store the necessary information of the Field in a dict.
+
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
+
+
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Field.
+
+        """
+        out = {
+            '__class__': self.__class__.__name__,
+            'field': self._field,
+            'frequency': self._frequency,
+            'grid': {
+                'hx': self.grid.h[0],
+                'hy': self.grid.h[1],
+                'hz': self.grid.h[2],
+                'origin': self.grid.origin,
+            },
+        }
         if copy:
             return deepcopy(out)
         else:
@@ -168,106 +145,84 @@ class Field(np.ndarray):
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert dictionary into :class:`Field` instance.
+        """Convert dictionary into :class:`emg3d.fields.Field` instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Field.to_dict`.
-            The dictionary needs the keys `field`, `freq`, `shape_edges_x`,
-            `shape_edges_y`, and `shape_edges_z`.
+            Dictionary as obtained from :func:`emg3d.fields.Field.to_dict`. The
+            dictionary needs the keys ``field``, ``frequency``, and ``grid``;
+            ``grid`` itself is also a dict which needs the keys ``hx``, ``hy``,
+            ``hz``, and ``origin``.
 
         Returns
         -------
-        obj : :class:`Field` instance
+        field : Field
+            A :class:`emg3d.fields.Field` instance.
 
         """
-
-        # Check and get the required keys from the input.
-        try:
-            grid = meshes.TensorMesh.from_dict(inp.pop('grid'))
-            return cls(grid=grid, field=inp['field'], freq=inp['freq'])
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
+        return cls(
+            grid=meshes.TensorMesh.from_dict(inp['grid']),
+            data=inp['field'],
+            frequency=inp['frequency'],
+        )
 
     @property
     def field(self):
-        """Entire field, 1D [fx, fy, fz]."""
-        return self.view()
+        """Entire field as 1D array [fx, fy, fz]."""
+        return self._field
 
     @field.setter
     def field(self, field):
-        """Update field, 1D [fx, fy, fz]."""
-        self.view()[:] = field
+        """Update field as 1D array [fx, fy, fz]."""
+        self._field[:] = field
 
     @property
     def fx(self):
-        """View of the x-directed field in the x-direction (nCx, nNy, nNz)."""
-        return self.view()[:self.grid.n_edges_x].reshape(
-                self.grid.shape_edges_x, order='F')
+        """Field in x direction; shape: (cell_centers_x, nodes_y, nodes_z)."""
+        ix = self.grid.n_edges_x
+        shape = self.grid.shape_edges_x
+        return utils.EMArray(self._field[:ix]).reshape(shape, order='F')
 
     @fx.setter
     def fx(self, fx):
         """Update field in x-direction."""
-        self.view()[:self.grid.n_edges_x] = fx.ravel('F')
+        self._field[:self.grid.n_edges_x] = fx.ravel('F')
 
     @property
     def fy(self):
-        """View of the field in the y-direction (nNx, nCy, nNz)."""
-        return self.view()[self.grid.n_edges_x:-self.grid.n_edges_z].reshape(
-                self.grid.shape_edges_y, order='F')
+        """Field in y direction; shape: (nodes_x, cell_centers_y, nodes_z)."""
+        i0, i1 = self.grid.n_edges_x, self.grid.n_edges_z
+        shape = self.grid.shape_edges_y
+        return utils.EMArray(self._field[i0:-i1]).reshape(shape, order='F')
 
     @fy.setter
     def fy(self, fy):
         """Update field in y-direction."""
-        self.view()[self.grid.n_edges_x:-self.grid.n_edges_z] = fy.ravel('F')
+        self._field[self.grid.n_edges_x:-self.grid.n_edges_z] = fy.ravel('F')
 
     @property
     def fz(self):
-        """View of the field in the z-direction (nNx, nNy, nCz)."""
-        return self.view()[-self.grid.n_edges_z:].reshape(
-                self.grid.shape_edges_z, order='F')
+        """Field in z direction; shape: (nodes_x, nodes_y, cell_centers_z)."""
+        i0, shape = self.grid.n_edges_z, self.grid.shape_edges_z
+        return utils.EMArray(self._field[-i0:].reshape(shape, order='F'))
 
     @fz.setter
     def fz(self, fz):
         """Update electric field in z-direction."""
-        self.view()[-self.grid.n_edges_z:] = fz.ravel('F')
-
-    def amp(self):
-        """Amplitude of the electromagnetic field."""
-        return utils.EMArray(self.view()).amp()
-
-    def pha(self, deg=False, unwrap=True, lag=True):
-        """Phase of the electromagnetic field.
-
-        Parameters
-        ----------
-        deg : bool
-            If True the returned phase is in degrees, else in radians.
-            Default is False (radians).
-
-        unwrap : bool
-            If True the returned phase is unwrapped.
-            Default is True (unwrapped).
-
-        lag : bool
-            If True the returned phase is lag, else lead defined.
-            Default is True (lag defined).
-
-        """
-        return utils.EMArray(self.view()).pha(deg, unwrap, lag)
+        self._field[-self.grid.n_edges_z:] = fz.ravel('F')
 
     @property
-    def freq(self):
-        """Return frequency."""
-        if self._freq is None:
+    def frequency(self):
+        """Return frequency (Hz)."""
+        if self._frequency is None:
             return None
         else:
-            return abs(self._freq)
+            return abs(self._frequency)
 
     @property
     def smu0(self):
-        """Return s*mu_0; mu_0 = Magn. permeability of free space [H/m]."""
+        """Return s*mu_0; mu_0 = magn permeability of free space [H/m]."""
         if getattr(self, '_smu0', None) is None:
             if self.sval is not None:
                 self._smu0 = self.sval*mu_0
@@ -278,14 +233,14 @@ class Field(np.ndarray):
 
     @property
     def sval(self):
-        """Return s; s=iw in frequency domain; s=freq in Laplace domain."""
+        """Return s=iw in frequency domain and s=f in Laplace domain."""
 
         if getattr(self, '_sval', None) is None:
-            if self._freq is not None:
-                if self._freq < 0:  # Laplace domain; s.
-                    self._sval = np.array(self._freq)
+            if self._frequency is not None:
+                if self._frequency < 0:  # Laplace domain; s.
+                    self._sval = np.array(self._frequency)
                 else:  # Frequency domain; s = iw = 2i*pi*f.
-                    self._sval = np.array(-2j*np.pi*self._freq)
+                    self._sval = np.array(-2j*np.pi*self._frequency)
             else:
                 self._sval = None
 
@@ -308,7 +263,7 @@ class Field(np.ndarray):
 
         Returns
         -------
-        obj : Field
+        field : Field
             A new :class:`emg3d.fields.Field` instance on ``grid``.
 
         """
@@ -320,92 +275,46 @@ class Field(np.ndarray):
             'log': True,
             **({} if interpolate_opts is None else interpolate_opts),
             'grid': self.grid,
-            'new_grid': grid,
+            'xi': grid,
         }
 
-        # Interpolate f{x;y;z} add to dict.
+        # Interpolate f{x;y;z}.
         field = np.r_[maps.interpolate(values=self.fx, **g2g_inp).ravel('F'),
                       maps.interpolate(values=self.fy, **g2g_inp).ravel('F'),
                       maps.interpolate(values=self.fz, **g2g_inp).ravel('F')]
 
-        # Assemble new field.
-        return Field(grid, field, freq=self._freq)
+        # Assemble and return new field.
+        return Field(grid, field, frequency=self._frequency)
+
+    def get_receiver(self, receiver):
+        """Return the field at receiver locations.
+
+        Parameters
+        ----------
+        receiver : tuple
+            Receiver coordinates (m) and angles (°) in the format
+            ``(x, y, z, azimuth, dip)``.
+
+            All values can either be a scalar or having the same length as
+            number of receivers.
+
+            Angles:
+
+            - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
+            - dip (°): vertical deviation from xy-plane up-wards.
 
 
-class SourceField(Field):
-    r"""Create a Source-Field instance with x-, y-, and z-views of the field.
+        Returns
+        -------
+        responses : EMArray
+            Responses at receiver locations.
 
-    A subclass of :class:`Field`. Additional properties are the real-valued
-    source vector (`vector`, `vx`, `vy`, `vz`), which sum is always one. For a
-    `SourceField` frequency is a mandatory  parameter, unlike for a `Field`
-    (recommended also for `Field` though),
-
-    Parameters
-    ----------
-
-    grid : :class:`emg3d.meshes.TensorMesh` or ndarray
-        Either a TensorMesh instance or an ndarray of shape grid.n_edges_x or
-        grid.shape_edges_x. See explanations above. Only mandatory parameter;
-        if the only one provided, it will initiate a zero-field of `dtype`.
-
-    field : :class:`Field` or ndarray, optional
-        Either a Field instance or an ndarray of shape grid.n_edges_y or
-        grid.shape_edges_y. See explanations above.
-
-    dtype : dtype, optional
-        Only used if ``field=None``; the initiated zero-field for the provided
-        TensorMesh has data type `dtype`. Default: complex.
-
-    freq : float
-        Source frequency (Hz), used to compute the Laplace parameter `s`.
-        Either positive or negative:
-
-        - `freq` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - `freq` < 0: Laplace domain, hence
-          :math:`s = f` (real).
-
-        In difference to `Field`, the frequency has to be provided for
-        a `SourceField`.
-
-    """
-
-    def __new__(cls, grid, field=None, dtype=np.complex128, freq=None):
-        """Initiate a new Source Field."""
-        # Ensure frequency is provided.
-        if freq is None:
-            raise ValueError("SourceField requires the frequency.")
-
-        if freq > 0:
-            dtype = complex
-        else:
-            dtype = float
-
-        return super().__new__(cls, grid, field=field, dtype=dtype, freq=freq)
-
-    @property
-    def vector(self):
-        """Entire vector, 1D [vx, vy, vz]."""
-        return np.real(self.field/self.smu0)
-
-    @property
-    def vx(self):
-        """View of the x-directed vector in the x-direction (nCx, nNy, nNz)."""
-        return np.real(self.field.fx/self.smu0)
-
-    @property
-    def vy(self):
-        """View of the vector in the y-direction (nNx, nCy, nNz)."""
-        return np.real(self.field.fy/self.smu0)
-
-    @property
-    def vz(self):
-        """View of the vector in the z-direction (nNx, nNy, nCz)."""
-        return np.real(self.field.fz/self.smu0)
+        """
+        return get_receiver(self, receiver)
 
 
-def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
-                     decimals=6, **kwargs):
+def get_source_field(grid, source, frequency, strength=0, electric=True,
+                     length=1.0, decimals=6, **kwargs):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -430,7 +339,7 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
     grid : TensorMesh
         Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    src : list of floats
+    source : list of floats
         Source coordinates (m). There are three formats:
 
           - Finite length dipole: ``[x0, x1, y0, y1, z0, z1]``.
@@ -442,13 +351,13 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
         ``electric=False``, which will create a square loop of
         ``length``x``length`` perpendicular to the dipole.
 
-    freq : float
+    frequency : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
         Either positive or negative:
 
-        - `freq` > 0: Frequency domain, hence
+        - `frequency` > 0: Frequency domain, hence
           :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - `freq` < 0: Laplace domain, hence
+        - `frequency` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
     strength : float or complex, optional
@@ -461,10 +370,10 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
         Default is 0.
 
     electric : bool, optional
-        Shortcut to create a magnetic source. If False, the format of ``src``
-        must be that of a point dipole: ``[x, y, z, azimuth, dip]`` (for the
-        other formats setting ``electric`` has no effect). It then creates a
-        square loop perpendicular to this dipole, with side-length 1.
+        Shortcut to create a magnetic source. If False, the format of
+        ``source`` must be that of a point dipole: ``[x, y, z, azimuth, dip]``
+        (for the other formats setting ``electric`` has no effect). It then
+        creates a square loop perpendicular to this dipole, with side-length 1.
         Default is True, meaning an electric source.
 
     length : float, optional
@@ -479,84 +388,87 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
 
     Returns
     -------
-    sfield : :func:`SourceField` instance
+    sfield : :func:`Field` instance
         Source field, normalized to 1 A m.
 
     """
 
     # Ensure no kwargs left.
     if kwargs:
-        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
     # Cast some parameters.
-    if not np.allclose(np.size(src[0]), [np.size(c) for c in src]):
+    if not np.allclose(np.size(source[0]), [np.size(c) for c in source]):
         raise ValueError(
-                "All source coordinates must have the same dimension."
-                f"Provided source: {src}.")
+            "All source coordinates must have the same dimension."
+            f"Provided source: {source}."
+        )
 
-    src = np.asarray(src, dtype=np.float64)
+    source = np.asarray(source, dtype=np.float64)
     strength = np.asarray(strength)
 
     # Convert point dipole sources to finite dipoles or loops (electric).
-    if src.shape == (5, ):  # Point dipole
+    if source.shape == (5, ):  # Point dipole
 
         if not electric:  # Magnetic: convert to square loop perp. to dipole.
-            src = _square_loop_from_point_dipole(src, length)
-            # src.shape = (3, 5)
+            source = _square_loop_from_point(source, length)
+            # source.shape = (3, 5)
 
         else:  # Electric: convert to finite length.
-            src = _finite_dipole_from_point_dipole(src, length)
-            # src.shape = (6, )
+            source = _finite_dipole_from_point(source, length)
+            # source.shape = (6, )
 
     # Get arbitrary shaped sources recursively.
-    if src.shape[0] == 3 and src.ndim > 1:
+    if source.shape[0] == 3 and source.ndim > 1:
 
         # Get arbitrarily shaped dipole source using recursion.
-        sx, sy, sz = src
+        sx, sy, sz = source
 
         # Get normalized segment lengths.
-        lengths = np.sqrt(np.sum((src[:, :-1] - src[:, 1:])**2, axis=0))
+        lengths = np.sqrt(np.sum((source[:, :-1] - source[:, 1:])**2, axis=0))
         if strength == 0:
             lengths /= lengths.sum()
         else:  # (Not in-place multiplication, as strength can be complex.)
             lengths = lengths*strength
 
         # Initiate a zero-valued source field and loop over segments.
-        sfield = SourceField(grid, freq=freq)
-        sfield.src = src
+        sfield = Field(grid, frequency=frequency)
+        sfield.source = source
         sfield.strength = strength
         sfield.moment = np.array([0., 0, 0], dtype=lengths.dtype)
 
         # Loop over elements.
         for i in range(sx.size-1):
             segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
-            seg_field = get_source_field(grid, segment, freq, lengths[i])
-            sfield += seg_field
+            seg_field = get_source_field(grid, segment, frequency, lengths[i])
+            sfield.field += seg_field.field
             sfield.moment += seg_field.moment
 
         # Check this with iw/-iw; source definition etc.
         if not electric:
-            sfield *= -1
+            sfield.field *= -1
 
         return sfield
 
-    # From here onwards `src` has to be a finite length dipole  of format
+    # From here onwards `source` has to be a finite length dipole  of format
     # [x1, x2, y1, y2, z1, z2]. Ensure that:
-    if src.shape != (6, ):
+    if source.shape != (6, ):
         raise ValueError(
-                "Source is wrong defined. It must be either\n- a point, "
-                "[x, y, z, azimuth, dip],\n- a finite dipole, "
-                "[x1, x2, y1, y2, z1, z2], or\n- an arbitrarily shaped "
-                "dipole, [[x-coo], [y-coo], [z-coo]].\n"
-                f"Provided source: {src}.")
+            "Source is wrong defined. It must be either (1) a point, "
+            "[x, y, z, azimuth, dip], (2) a finite dipole, "
+            "[x1, x2, y1, y2, z1, z2], or (3) an arbitrarily shaped "
+            f"dipole, [[x-coo], [y-coo], [z-coo]]. Provided: {source}."
+        )
 
     # Get length in each direction.
-    length = src[1::2]-src[::2]
+    length = source[1::2]-source[::2]
 
     # Ensure finite length dipole is not a point dipole.
     if np.allclose(length, 0, atol=1e-15):
-        raise ValueError("Provided finite dipole has no length; use "
-                         "the format [x, y, z, azimuth, dip] instead.")
+        raise ValueError(
+            "Provided finite dipole has no length; use "
+            "the format [x, y, z, azimuth, dip] instead."
+        )
 
     # Get source moment (individually for x, y, z).
     if strength == 0:  # 1 A m
@@ -566,26 +478,26 @@ def get_source_field(grid, src, freq, strength=0, electric=True, length=1.0,
         moment = strength*length
 
     # Initiate zero source field.
-    sfield = SourceField(grid, freq=freq)
+    sfield = Field(grid, frequency=frequency)
 
     # Return source-field for each direction.
-    for xyz, sf in enumerate([sfield.fx, sfield.fy, sfield.fz]):
+    for xyz, field in enumerate([sfield.fx, sfield.fy, sfield.fz]):
 
         # Get source field for this direction.
-        _finite_source_xyz(grid, src, sf, xyz, decimals)
+        _finite_source_xyz(grid, source, field, decimals)
 
         # Multiply by moment*s*mu
-        sf *= moment[xyz]*sfield.smu0
+        field *= moment[xyz]*sfield.smu0
 
-    # Add src and moment information.
-    sfield.src = src
+    # Add source and moment information.
+    sfield.source = source
     sfield.strength = strength
     sfield.moment = moment
 
     return sfield
 
 
-def get_receiver(field, rec):
+def get_receiver(field, receiver):
     """Return the field (response) at receiver coordinates.
 
     - TODO :: check, simplify, document
@@ -603,7 +515,7 @@ def get_receiver(field, rec):
     field : :class:`Field`
         The electric or magnetic field.
 
-    rec : tuple (x, y, z, azimuth, dip)
+    receiver : tuple (x, y, z, azimuth, dip)
         Receiver coordinates and angles (m, °).
 
         All values can either be a scalar or having the same length as number
@@ -634,15 +546,18 @@ def get_receiver(field, rec):
     """
 
     # Check receiver dimension.
-    if len(rec) != 5:
+    if len(receiver) != 5:
         raise ValueError(
-                "`rec` needs to be in the form (x, y, z, azimuth, dip).\n"
-                f"Length of provided `rec`: {len(rec)}.")
+            "`receiver` needs to be in the form (x, y, z, azimuth, dip). "
+            f"Length of provided `receiver`: {len(receiver)}."
+        )
 
     # Check field dimension to ensure it is not a particular field.
-    if field.field.ndim == 3:
-        raise ValueError("`field` must be a `Field`-instance, not a\n"
-                         "particular field such as `field.fx`.")
+    if not hasattr(field, 'field'):
+        raise ValueError(
+            "`field` must be a `Field`-instance, not a "
+            "particular field such as `field.fx`."
+        )
 
     # Get the vectors corresponding to input data.
     grid = field.grid
@@ -655,11 +570,11 @@ def get_receiver(field, rec):
 
     # Pre-allocate the response.
     _, xi, shape = maps._points_from_grids(
-            field.grid, field.fx, rec[:3], 'cubic')
-    resp = np.zeros(xi.shape[0], dtype=field.dtype)
+            field.grid, field.fx, receiver[:3], 'cubic')
+    resp = np.zeros(xi.shape[0], dtype=field.field.dtype)
 
     # Add the required responses.
-    factors = _rotation(*rec[3:])  # Geometrical weights from angles.
+    factors = _rotation(*receiver[3:])  # Geometrical weights from angles.
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interp_spline_3d(
@@ -670,7 +585,7 @@ def get_receiver(field, rec):
     return utils.EMArray(resp.reshape(shape, order='F'))
 
 
-def get_h_field(model, field):
+def get_magnetic_field(model, field):
     r"""Return magnetic field corresponding to provided electric field.
 
     - TODO REWORK THIS!
@@ -791,45 +706,61 @@ def get_h_field(model, field):
 
     # Create a Field instance and divide by s*mu_0 and return.
     new = np.r_[e3d_hx.ravel('F'), e3d_hy.ravel('F'), e3d_hz.ravel('F')]
-    return -Field(grid, new, freq=field._freq)/field.smu0
+    return Field(grid, -new/field.smu0, frequency=field._frequency)
 
 
-def _finite_source_xyz(grid, src, s, xyz, decimals):
+def _finite_source_xyz(grid, source, field, decimals):
     """Set finite dipole source using the adjoint interpolation method.
 
-    See :func:`get_source_field` for further details.
+    The result is placed directly in the provided ``field``-component.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+    source : ndarray
+        Source coordinates in the form of (x0, x1, y0, y1, z0, z1) (m).
+
+    field : ndarray
+        A particular component of the source field, one of ``field.f{x;y;z}``.
+
+    decimals: int, optional
+        Grid nodes and source coordinates are rounded to given number of
+        decimals. Default is 6 (micrometer).
 
     """
-    # Round nodes and src coordinates (to avoid floating point issues etc).
+    # Round nodes and source coordinates (to avoid floating point issues etc).
     nodes_x = np.round(grid.nodes_x, decimals)
     nodes_y = np.round(grid.nodes_y, decimals)
     nodes_z = np.round(grid.nodes_z, decimals)
-    src = np.round(src, decimals)
+    source = np.round(source, decimals)
 
     # Ensure source is within nodes.
-    outside = (src[0] < nodes_x[0] or src[1] > nodes_x[-1] or
-               src[2] < nodes_y[0] or src[3] > nodes_y[-1] or
-               src[4] < nodes_z[0] or src[5] > nodes_z[-1])
+    outside = (source[0] < nodes_x[0] or source[1] > nodes_x[-1] or
+               source[2] < nodes_y[0] or source[3] > nodes_y[-1] or
+               source[4] < nodes_z[0] or source[5] > nodes_z[-1])
     if outside:
-        raise ValueError(f"Provided source outside grid: {src}.")
+        raise ValueError(f"Provided source outside grid: {source}.")
 
     # Source lengths in x-, y-, and z-directions.
-    d_xyz = src[1::2]-src[::2]
+    d_xyz = source[1::2]-source[::2]
 
     # Inverse source lengths.
     id_xyz = d_xyz.copy()
     id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
 
     # Cell fractions.
-    a1 = (nodes_x-src[0])*id_xyz[0]
-    a2 = (nodes_y-src[2])*id_xyz[1]
-    a3 = (nodes_z-src[4])*id_xyz[2]
+    a1 = (nodes_x-source[0])*id_xyz[0]
+    a2 = (nodes_y-source[2])*id_xyz[1]
+    a3 = (nodes_z-source[4])*id_xyz[2]
 
     # Get range of indices of cells in which source resides.
     def min_max_ind(vector, i):
         """Return [min, max]-index of cells in which source resides."""
-        vmin = min(src[2*i:2*i+2])
-        vmax = max(src[2*i:2*i+2])
+        vmin = min(source[2*i:2*i+2])
+        vmax = max(source[2*i:2*i+2])
         return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
                 max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
 
@@ -850,10 +781,10 @@ def _finite_source_xyz(grid, src, s, xyz, decimals):
                 ar = min(1, aa[:, 1].min())  # elements.
 
                 # Characteristics of this cell.
-                xmin = src[::2]+al*d_xyz
-                xmax = src[::2]+ar*d_xyz
+                xmin = source[::2]+al*d_xyz
+                xmax = source[::2]+ar*d_xyz
                 x_c = (xmin+xmax)/2.0
-                slen = np.linalg.norm(src[1::2]-src[::2])
+                slen = np.linalg.norm(source[1::2]-source[::2])
                 x_len = np.linalg.norm(xmax-xmin)/slen
 
                 # Contribution to edge (coordinate xyz)
@@ -867,41 +798,41 @@ def _finite_source_xyz(grid, src, s, xyz, decimals):
                 # Add to field (only if segment inside cell).
                 if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
 
-                    if xyz == 0:
-                        s[ix, iy, iz] += ey*ez*x_len
-                        s[ix, iy+1, iz] += ry*ez*x_len
-                        s[ix, iy, iz+1] += ey*rz*x_len
-                        s[ix, iy+1, iz+1] += ry*rz*x_len
-                    if xyz == 1:
-                        s[ix, iy, iz] += ex*ez*x_len
-                        s[ix+1, iy, iz] += rx*ez*x_len
-                        s[ix, iy, iz+1] += ex*rz*x_len
-                        s[ix+1, iy, iz+1] += rx*rz*x_len
-                    if xyz == 2:
-                        s[ix, iy, iz] += ex*ey*x_len
-                        s[ix+1, iy, iz] += rx*ey*x_len
-                        s[ix, iy+1, iz] += ex*ry*x_len
-                        s[ix+1, iy+1, iz] += rx*ry*x_len
+                    if field.shape == grid.shape_edges_x:
+                        field[ix, iy, iz] += ey*ez*x_len
+                        field[ix, iy+1, iz] += ry*ez*x_len
+                        field[ix, iy, iz+1] += ey*rz*x_len
+                        field[ix, iy+1, iz+1] += ry*rz*x_len
+                    elif field.shape == grid.shape_edges_y:
+                        field[ix, iy, iz] += ex*ez*x_len
+                        field[ix+1, iy, iz] += rx*ez*x_len
+                        field[ix, iy, iz+1] += ex*rz*x_len
+                        field[ix+1, iy, iz+1] += rx*rz*x_len
+                    else:
+                        field[ix, iy, iz] += ex*ey*x_len
+                        field[ix+1, iy, iz] += rx*ey*x_len
+                        field[ix, iy+1, iz] += ex*ry*x_len
+                        field[ix+1, iy+1, iz] += rx*ry*x_len
 
     # Ensure unity (should not be necessary).
-    sum_s = abs(s.sum())
+    sum_s = abs(field.sum())
     if abs(sum_s-1) > 1e-6:
         # Print is always shown and simpler, warn for the CLI logs.
         msg = f"Normalizing Source: {sum_s:.10f}."
         print(f"* WARNING :: {msg}")
         warnings.warn(msg, UserWarning)
-        s /= sum_s
+        field /= sum_s
 
 
-def _rotation(azm, dip):
-    """Rotation factors for RHS with positive z upwards.
+def _rotation(azimuth, dip):
+    """Rotation factors for RHS coordinate system with positive z upwards.
 
     Easting is x, Northing is y, and positive upwards is z. All functions
     should use this rotation to ensure they use all the same definition.
 
     Parameters
     ----------
-    azm : float
+    azimuth : float
         Azimuth (°): horizontal deviation from x-axis, anti-clockwise.
 
     dip: float
@@ -910,23 +841,61 @@ def _rotation(azm, dip):
 
     Returns
     -------
-    rot : ndarray (3,)
+    rot : ndarray
         Rotation factors (x, y, z).
 
     """
-    return np.array([cosdg(azm)*cosdg(dip), sindg(azm)*cosdg(dip), sindg(dip)])
+    return np.array([cosdg(azimuth)*cosdg(dip),
+                     sindg(azimuth)*cosdg(dip),
+                     sindg(dip)])
 
 
-def _finite_dipole_from_point_dipole(src, length):
-    """Return finite dipole of length given a point dipole."""
-    factors = _rotation(*src[3:])*length/2
-    return np.ravel(src[:3] + np.stack([-factors, factors]), 'F')
+def _finite_dipole_from_point(source, length):
+    """Return finite dipole of length given a point dipole.
+
+    Parameters
+    ----------
+    source : tuple
+        Source coordinates in the form of (x, y, z, azimuth, dip).
+
+    length : float
+        Dipole length (m).
 
 
-def _square_loop_from_point_dipole(src, length):
-    """Return points of a square loop of length x length m perp. to dipole."""
+    Returns
+    -------
+    out : ndarray
+        Array of shape (6, ), corresponding to the finite length dipole
+        coordinates (x0, x1, y0, y1, z0, z1).
+
+    """
+    factors = _rotation(*source[3:])*length/2
+    return np.ravel(source[:3] + np.stack([-factors, factors]), 'F')
+
+
+def _square_loop_from_point(source, length):
+    """Return points of a square loop of length x length m perp to dipole.
+
+    Parameters
+    ----------
+    source : tuple
+        Source coordinates in the form of (x, y, z, azimuth, dip).
+
+    length : float
+        Side-length of the square loop (m).
+
+
+    Returns
+    -------
+    out : ndarray
+        Array of shape (3, 5), corresponding to the x/y/z-coordinates for the
+        five points describing a closed rectangle perpendicular to the dipole,
+        of side-length length.
+
+    """
     half_diagonal = np.sqrt(2)*length/2
-    rot_hor = _rotation(src[3]+90, 0)*half_diagonal
-    rot_ver = _rotation(src[3], src[4]+90)*half_diagonal
-    points = src[:3]+np.stack([rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
+    rot_hor = _rotation(source[3]+90, 0)*half_diagonal
+    rot_ver = _rotation(source[3], source[4]+90)*half_diagonal
+    points = source[:3] + np.stack(
+            [rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
     return points.T

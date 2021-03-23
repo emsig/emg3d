@@ -148,7 +148,7 @@ class Survey:
 
         # Ensure no kwargs left.
         if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
     @utils._requires('xarray')
     def _initiate_dataset(self, data):
@@ -550,7 +550,8 @@ class Survey:
             if np.any(standard_deviation <= 0.0):
                 raise ValueError(
                     "All values of `standard_deviation` must be bigger "
-                    "than zero.")
+                    "than zero."
+                )
             self._data['standard_deviation'] = self.data.observed.copy(
                     data=standard_deviation)
 
@@ -578,7 +579,8 @@ class Survey:
             # Ensure all values are bigger than zero.
             if np.any(noise_floor <= 0.0):
                 raise ValueError(
-                    "All values of `noise_floor` must be bigger than zero.")
+                    "All values of `noise_floor` must be bigger than zero."
+                )
 
             # Store relative error.
             if noise_floor.size == 1:
@@ -617,7 +619,8 @@ class Survey:
             # Ensure all values are bigger than zero.
             if np.any(relative_error <= 0.0):
                 raise ValueError(
-                    "All values of `relative_error` must be bigger than zero.")
+                    "All values of `relative_error` must be bigger than zero."
+                )
 
             # Store relative error.
             if relative_error.size == 1:
@@ -722,7 +725,7 @@ class Dipole(PointDipole):
             if key in kwargs:
                 setattr(self, key, kwargs.pop(key))
         if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
         # Conversion to float-array fails if there are lists and tuples within
         # the tuple, or similar. This should also catch many wrong inputs.
@@ -738,16 +741,18 @@ class Dipole(PointDipole):
             # Ensure the two poles are distinct.
             if np.allclose(coords[::2], coords[1::2]):
                 raise ValueError(
-                        "The two poles are identical, use the format\n"
-                        "(x, y, z, azimuth, dip) instead.\n"
-                        f"Provided coordinates: {coordinates}.")
+                    "The two poles are identical, use the format "
+                    "(x, y, z, azimuth, dip) instead. "
+                    f"Provided coordinates: {coordinates}."
+                )
 
         else:
             raise ValueError(
-                    "Dipole coordinates are wrong defined. They must be\n"
-                    "defined either as a point, (x, y, z, azimuth, dip), or\n"
-                    "as two poles, (x0, x1, y0, y1, z0, z1), all floats.\n"
-                    f"Provided coordinates: {coordinates}.")
+                "Dipole coordinates are wrong defined. They must be "
+                "defined either as a point, (x, y, z, azimuth, dip), or "
+                "as two poles, (x0, x1, y0, y1, z0, z1), all floats. "
+                f"Provided coordinates: {coordinates}."
+            )
 
         # Angles: Very small angles are set to zero, because, e.g.,
         #         cos(pi/2) is roughly 6.12e-17, not 0.
@@ -899,7 +904,8 @@ def _dipole_info_to_dict(inp, name):
 
     else:
         raise TypeError(
-                f"Input format of <{name}s> not recognized: {type(inp)}.")
+            f"Input format of <{name}s> not recognized: {type(inp)}."
+        )
 
     return out
 

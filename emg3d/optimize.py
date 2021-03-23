@@ -28,7 +28,7 @@ technique for the gradient.
 
 import numpy as np
 
-from emg3d import maps
+from emg3d import maps, fields
 
 __all__ = ['gradient', 'misfit']
 
@@ -86,10 +86,11 @@ def misfit(simulation):
     # Raise warning if not set-up properly.
     if std is None:
         raise ValueError(
-            "Either `noise_floor` or `relative_error` or both must\n"
-            "be provided (>0) to compute the `standard_deviation`.\n"
-            "It can also be set directly (same shape as data).\n"
-            "The standard deviation is required to compute the misfit.")
+            "Either `noise_floor` or `relative_error` or both must "
+            "be provided (>0) to compute the `standard_deviation`. "
+            "It can also be set directly (same shape as data). "
+            "The standard deviation is required to compute the misfit."
+        )
 
     # Ensure all fields have been computed.
     test_efield = sum([1 if simulation._dict_efield[src][freq] is None else 0
@@ -154,7 +155,8 @@ def gradient(simulation):
     # Check limitation 1: So far only isotropic models.
     if simulation.model.case != 'isotropic':
         raise NotImplementedError(
-                "Gradient only implemented for isotropic models.")
+            "Gradient only implemented for isotropic models."
+        )
 
     # Check limitation 2: No epsilon_r, mu_r.
     var = (simulation.model.epsilon_r, simulation.model.mu_r)
@@ -178,10 +180,12 @@ def gradient(simulation):
         # This is the actual Equation (10), with:
         #   del S / del p = iwu0 V sigma / sigma,
         # where lambda and E are already volume averaged.
-        efield = -np.real(
-                simulation._dict_bfield[src][freq] *
-                simulation._dict_efield[src][freq] *
-                simulation._dict_efield[src][freq].smu0)
+        efield = fields.Field(
+                simulation._dict_bfield[src][freq].grid,
+                -np.real(simulation._dict_bfield[src][freq].field *
+                         simulation._dict_efield[src][freq].field *
+                         simulation._dict_efield[src][freq].smu0)
+                )
 
         # Pre-allocate the gradient for the computational grid.
         shape_cells = simulation._dict_grid[src][freq].shape_cells

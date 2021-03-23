@@ -99,12 +99,8 @@ class Model:
     """
 
     def __init__(self, grid, property_x=1., property_y=None, property_z=None,
-                 mu_r=None, epsilon_r=None, mapping='Resistivity', **kwargs):
+                 mu_r=None, epsilon_r=None, mapping='Resistivity'):
         """Initiate a new model."""
-
-        # Ensure no kwargs left.
-        if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
 
         # Store grid.
         self.grid = grid
@@ -184,7 +180,7 @@ class Model:
         # Check input.
         if equal:
             try:
-                _ = self._operator_test(model)
+                self._operator_test(model)
             except ValueError:
                 equal = False
 
@@ -202,24 +198,31 @@ class Model:
         return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the Model in a dict."""
-        # Initiate dict.
-        out = {}
+        """Store the necessary information in a dict for serialization.
 
-        # Properties.
-        for prop in self._properties:
-            out[prop] = getattr(self, prop)
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
 
-        # Grid info.
-        out['grid'] = {'hx': self.grid.h[0], 'hy': self.grid.h[1],
-                       'hz': self.grid.h[2], 'origin': self.grid.origin}
 
-        # Map.
-        out['mapping'] = self.map.name
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Model.
 
-        # Name
-        out['__class__'] = self.__class__.__name__
-
+        """
+        out = {
+            '__class__': self.__class__.__name__,
+            'grid': {
+                'hx': self.grid.h[0],
+                'hy': self.grid.h[1],
+                'hz': self.grid.h[2],
+                'origin': self.grid.origin,
+            },
+            **{prop: getattr(self, prop) for prop in self._properties},
+            'mapping': self.map.name,
+        }
         if copy:
             return deepcopy(out)
         else:
@@ -227,34 +230,32 @@ class Model:
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert dictionary into a Model instance.
+        """Convert dictionary into :class:`emg3d.models.Model` instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Model.to_dict`. The dictionary
-            needs the keys ``property_x``, ``property_y``, ``property_z``,
-            ``mu_r``, ``epsilon_r``, ``grid``, and ``mapping``; ``grid`` itself
-            is also a dict which needs the keys ``hx``, ``hy``, ``hz``, and
-            ``origin``.
+            Dictionary as obtained from :func:`emg3d.models.Model.to_dict`. The
+            dictionary needs the keys ``property_x``, ``property_y``,
+            ``property_z``, ``mu_r``, ``epsilon_r``, ``grid``, and ``mapping``;
+            ``grid`` itself is also a dict which needs the keys ``hx``, ``hy``,
+            ``hz``, and ``origin``.
 
         Returns
         -------
-        obj : Model
-            A new :class:`emg3d.models.Model` instance.
+        model : Model
+            A :class:`emg3d.models.Model` instance.
 
         """
-        try:
-            return cls(grid=meshes.TensorMesh.from_dict(inp['grid']),
-                       property_x=inp['property_x'],
-                       property_y=inp['property_y'],
-                       property_z=inp['property_z'],
-                       mu_r=inp['mu_r'],
-                       epsilon_r=inp['epsilon_r'],
-                       mapping=inp['mapping'])
-
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in ``inp``.") from e
+        return cls(
+            grid=meshes.TensorMesh.from_dict(inp['grid']),
+            property_x=inp['property_x'],
+            property_y=inp['property_y'],
+            property_z=inp['property_z'],
+            mu_r=inp['mu_r'],
+            epsilon_r=inp['epsilon_r'],
+            mapping=inp['mapping'],
+        )
 
     # ELECTRICAL PROPERTIES
     @property
@@ -385,8 +386,9 @@ class Model:
 
         # If it is None, it cannot be set.
         if hasattr(self, '_'+name) and getattr(self, '_'+name) is None:
-            msg = f"Model was initiated without `{name}`; cannot set values."
-            raise ValueError(msg)
+            raise ValueError(
+                f"Model was initiated without `{name}`; cannot set values."
+            )
 
         # Get mapped values; checks are carried out on conductivities.
         if 'property_' in name:
@@ -461,7 +463,7 @@ class VolumeModel:
     model : Model
         Model to transform to volume-averaged values.
 
-    sfield : SourceField
+    sfield : Field
        A VolumeModel is frequency-dependent. The frequency-information is taken
        from the provided source field.
 

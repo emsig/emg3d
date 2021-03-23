@@ -197,7 +197,7 @@ class Simulation:
 
         # Ensure no kwargs left.
         if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -216,7 +216,7 @@ class Simulation:
             self._grid_single = gridding_opts
         elif self.gridding == 'same':
             if gridding_opts:
-                msg = "`gridding_opts` is not permitted if `gridding='same'`"
+                msg = "`gridding_opts` is not permitted if `gridding='same'`."
                 raise TypeError(msg)
         else:
 
@@ -300,7 +300,7 @@ class Simulation:
         """
 
         if what not in ['computed', 'results', 'all', 'plain']:
-            raise TypeError(f"Unrecognized `what`: {what}")
+            raise TypeError(f"Unrecognized `what`: {what}.")
 
         # If to_dict is called from to_file, it has a _what_to_file attribute.
         if hasattr(self, '_what_to_file'):
@@ -571,7 +571,9 @@ class Simulation:
             if source not in self._grid_source.keys():
 
                 # Get grid and store it.
-                center = self.survey.sources[source].coordinates[:3]
+                center = (self.survey.sources[source].xco,
+                          self.survey.sources[source].yco,
+                          self.survey.sources[source].zco)
                 inp = {**self.gridding_opts, 'center': center}
                 self._grid_source[source] = meshes.construct_mesh(**inp)
 
@@ -581,7 +583,9 @@ class Simulation:
         elif self.gridding == 'both':  # Src- & freq-dependent grids.
 
             # Get grid and store it.
-            center = self.survey.sources[source].coordinates[:3]
+            center = (self.survey.sources[source].xco,
+                      self.survey.sources[source].yco,
+                      self.survey.sources[source].zco)
             inp = {**self.gridding_opts, 'frequency':
                    self.survey.frequencies[freq], 'center': center}
             self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
@@ -679,8 +683,8 @@ class Simulation:
 
             sfield = fields.get_source_field(
                     grid=self.get_grid(source, freq),
-                    src=src.coordinates,
-                    freq=self.survey.frequencies[freq],
+                    source=src.coordinates,
+                    frequency=self.survey.frequencies[freq],
                     strength=strength,
                     electric=src.electric)
 
@@ -697,7 +701,7 @@ class Simulation:
         call_from_compute = kwargs.pop('call_from_compute', False)
         call_from_hfield = kwargs.pop('call_from_hfield', False)
         if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
         # Compute electric field if it is not stored yet.
         if self._dict_efield[source][freq] is None:
@@ -741,7 +745,7 @@ class Simulation:
         # If magnetic field not computed yet compute it.
         if self._dict_hfield[source][freq] is None:
 
-            self._dict_hfield[source][freq] = fields.get_h_field(
+            self._dict_hfield[source][freq] = fields.get_magnetic_field(
                     self.get_model(source, freq),
                     self.get_efield(source, freq,
                                     call_from_hfield=True, **kwargs))
@@ -765,9 +769,8 @@ class Simulation:
 
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
-            resp = fields.get_receiver(
-                    field=self.get_efield(source, freq),
-                    rec=tuple(np.array(rec_coords)[:, erec])
+            resp = self.get_efield(source, freq).get_receiver(
+                    receiver=tuple(np.array(rec_coords)[:, erec])
             )
 
             # Store the receiver response.
@@ -778,9 +781,8 @@ class Simulation:
 
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
-            resp = fields.get_receiver(
-                    field=self.get_hfield(source, freq),
-                    rec=tuple(np.array(rec_coords)[:, mrec])
+            resp = self.get_hfield(source, freq).get_receiver(
+                    receiver=tuple(np.array(rec_coords)[:, mrec])
             )
 
             # Store the receiver response.
@@ -944,7 +946,7 @@ class Simulation:
         """
 
         if what not in ['computed', 'keepresults', 'all']:
-            raise TypeError(f"Unrecognized `what`: {what}")
+            raise TypeError(f"Unrecognized `what`: {what}.")
 
         # Clean data/model/sfield-dicts.
         if what in ['keepresults', 'all']:
@@ -1156,7 +1158,7 @@ class Simulation:
         grid = self.get_grid(source, freq)
 
         # Initiate empty field
-        ResidualField = fields.SourceField(grid, freq=float_freq)
+        ResidualField = fields.Field(grid, frequency=float_freq)
 
         # Loop over receivers, input as source.
         for name, rec in self.survey.receivers.items():
@@ -1182,13 +1184,13 @@ class Simulation:
             # return a normalized field for a unit source. However, in this
             # case we do not want that.
             if strength != 0:
-                ResidualField += fields.get_source_field(
+                ResidualField.field += fields.get_source_field(
                     grid=grid,
-                    src=rec.coordinates,
-                    freq=float_freq,
+                    source=rec.coordinates,
+                    frequency=float_freq,
                     strength=strength,
                     electric=rec.electric,
-                )
+                ).field
 
         return ResidualField
 
@@ -1389,8 +1391,8 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)
 
     # Frequency defaults to average frequency (log10).
-    freq = 10**np.mean(np.log10(survey._freq_array))
-    gopts['frequency'] = gridding_opts.pop('frequency', freq)
+    frequency = 10**np.mean(np.log10(survey._freq_array))
+    gopts['frequency'] = gridding_opts.pop('frequency', frequency)
 
     # Center defaults to center of all sources.
     center = tuple([np.mean(survey.src_coords[i]) for i in range(3)])
@@ -1528,7 +1530,8 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     if gridding_opts:
         print(gridding_opts)
         raise TypeError(
-                f"Unexpected gridding_opts: {list(gridding_opts.keys())}")
+            f"Unexpected gridding_opts: {list(gridding_opts.keys())}."
+        )
 
     # Return gridding_opts.
     return gopts

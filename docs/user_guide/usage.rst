@@ -57,7 +57,7 @@ origin, with a 10 Hz signal of 1 A.
        ...: model
     Out[3]:    Model [resistivity]; triaxial; 48 x 32 x 32 (49,152)
 
-    In [4]: sfield = emg3d.get_source_field(grid=grid, src=[0, 0, 0, 0, 0], freq=10)
+    In [4]: sfield = emg3d.get_source_field(grid=grid, source=[0, 0, 0, 0, 0], frequency=10)
 
 Now we can compute the electric field with ``emg3d``:
 
@@ -105,7 +105,7 @@ input grid had 49,152 cells, and the coarsest grid had 12 cells.
 .. ipython::
 
     @savefig basic_example.png width=4in
-    In [6]: grid.plot_slice(efield, normal='Y', v_type='Ex', view='abs',
+    In [6]: grid.plot_slice(efield.field, normal='Y', v_type='Ex', view='abs',
        ...:                 pcolor_opts={'norm': LogNorm()});
 
 

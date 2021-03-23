@@ -36,7 +36,7 @@ class TestModel:
 
         _, _ = capsys.readouterr()  # Clean-up
         # Using defaults; check backwards compatibility for freq.
-        sfield = fields.SourceField(grid, freq=1)
+        sfield = fields.Field(grid, frequency=1)
         model1 = models.Model(grid)
 
         # Check representation of Model.
@@ -193,16 +193,6 @@ class TestModel:
         assert_allclose(model2out.mu_r,
                         10**(np.sum(np.log10(model2inp.mu_r))/8))
 
-    def test_kwargs(self):
-
-        # Create some dummy data
-        grid = meshes.TensorMesh(
-                [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
-                np.zeros(3))
-
-        with pytest.raises(TypeError, match='Unexpected '):
-            models.Model(grid, somekeyword=None)
-
     def test_equal_mapping(self):
 
         # Create some dummy data
@@ -339,11 +329,9 @@ class TestModelOperators:
         a = self.mod_hti_a + self.mod_hti_a
         assert_allclose(a.property_x, self.mod_hti_b.property_x)
         assert_allclose(a.property_y, self.mod_hti_b.property_y)
-        # assert a.property_z.base is a.property_x.base
 
         a = self.mod_vti_a + self.mod_vti_a
         assert_allclose(a.property_x, self.mod_vti_b.property_x)
-        # assert a.property_y.base is a.property_x.base
         assert_allclose(a.property_z, self.mod_vti_b.property_z)
 
         a = self.mod_tri_a + self.mod_tri_a
@@ -366,11 +354,9 @@ class TestModelOperators:
         a = self.mod_hti_b - self.mod_hti_a
         assert_allclose(a.property_x, self.mod_hti_a.property_x)
         assert_allclose(a.property_y, self.mod_hti_a.property_y)
-        # assert a.property_z.base is a.property_x.base
 
         a = self.mod_vti_b - self.mod_vti_a
         assert_allclose(a.property_x, self.mod_vti_a.property_x)
-        # assert a.property_y.base is a.property_x.base
         assert_allclose(a.property_z, self.mod_vti_a.property_z)
 
         a = self.mod_tri_b - self.mod_tri_a
@@ -411,13 +397,15 @@ class TestModelOperators:
         assert model_new3 == self.mod_mu_a
         assert model_new4 == self.mod_epsilon_a
 
-        assert (model_new1.property_x.base is not
-                self.mod_shape.property_x.base)
-        assert model_new2.property_y.base is not self.mod_tri_a.property_y.base
-        assert model_new2.property_z.base is not self.mod_tri_a.property_z.base
-        assert model_new3.mu_r.base is not self.mod_mu_a.mu_r.base
-        assert (model_new4.epsilon_r.base is not
-                self.mod_epsilon_a.epsilon_r.base)
+        assert not np.may_share_memory(model_new1.property_x,
+                                       self.mod_shape.property_x)
+        assert not np.may_share_memory(model_new2.property_y,
+                                       self.mod_tri_a.property_y)
+        assert not np.may_share_memory(model_new2.property_z,
+                                       self.mod_tri_a.property_z)
+        assert not np.may_share_memory(model_new3.mu_r, self.mod_mu_a.mu_r)
+        assert not np.may_share_memory(model_new4.epsilon_r,
+                                       self.mod_epsilon_a.epsilon_r)
 
     def test_dict(self):
         # dict is already tested via copy. Just the other cases here.
@@ -431,5 +419,5 @@ class TestModelOperators:
             assert_allclose(mdict[key], val)
 
         del mdict['property_x']
-        with pytest.raises(KeyError, match="Variable 'property_x' missing"):
+        with pytest.raises(KeyError, match="'property_x'"):
             models.Model.from_dict(mdict)

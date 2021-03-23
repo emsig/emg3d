@@ -3,7 +3,7 @@ import numpy as np
 from copy import deepcopy as dc
 from numpy.testing import assert_allclose
 
-from emg3d import meshes, models, fields, utils, io, surveys, simulations, maps
+from emg3d import meshes, models, fields, utils, io, surveys, simulations
 
 # Soft dependencies
 try:
@@ -174,7 +174,7 @@ def test_compare_dicts(capsys):
     e2 = create_dummy(*grid.shape_edges_y)
     e3 = create_dummy(*grid.shape_edges_z)
     field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
-    ee = fields.Field(grid, field, freq=.938)
+    ee = fields.Field(grid, field, frequency=.938)
 
     dict1 = io._dict_serialize(
             {'model': model, 'grid': grid, 'field': ee,
@@ -197,6 +197,9 @@ def test_compare_dicts(capsys):
     out = io._compare_dicts(dict1, dict2, True)
     assert out is False
     outstr, _ = capsys.readouterr()
+    print(80*'=')
+    print(outstr)
+    print(80*'=')
     assert " True  :: model      > property_x" in outstr
     assert "  {1}  ::              mu_r" in outstr
     assert " False ::              hy" in outstr
@@ -210,7 +213,6 @@ def test_known_classes(tmpdir):
     frequency = 1.0
     grid = meshes.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
     field = fields.Field(grid)
-    sfield = fields.SourceField(grid, freq=frequency)
     model = models.Model(grid, 1)
     pointdip = surveys.Dipole((0, 1000, -950, 0, 0))
 
@@ -218,14 +220,7 @@ def test_known_classes(tmpdir):
         'TensorMesh': grid,
         'Model': model,
         'Field': field,
-        'SourceField': sfield,
         'Dipole': pointdip,
-        'MapConductivity': maps.MapConductivity(),
-        'MapLgConductivity': maps.MapLgConductivity(),
-        'MapLnConductivity': maps.MapLnConductivity(),
-        'MapResistivity': maps.MapResistivity(),
-        'MapLgResistivity': maps.MapLgResistivity(),
-        'MapLnResistivity': maps.MapLnResistivity(),
     }
 
     if xarray:

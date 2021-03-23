@@ -29,11 +29,8 @@ from scipy.interpolate import PchipInterpolator as Pchip
 from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 
 try:
-    import scooby
     from scooby import Report as ScoobyReport
 except ImportError:
-    scooby = None
-
     class ScoobyReport:
         pass
 
@@ -302,7 +299,7 @@ class Fourier:
 
         # Ensure no kwargs left.
         if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}")
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
         # Ensure freq_inp and every_x_freq are not both set.
         self._check_coarse_inputs(keep_freq_inp=True)
