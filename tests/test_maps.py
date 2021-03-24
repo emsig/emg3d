@@ -520,7 +520,7 @@ def test_interp_volume_average(njit):
             [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
             origin=np.array([0.5, 3.33, 5]))
 
-    values = np.arange(grid_in.n_cells, dtype=np.float_).reshape(
+    values = np.arange(grid_in.n_cells, dtype=np.float64).reshape(
             grid_in.shape_cells, order='F')
 
     points = (grid_in.nodes_x, grid_in.nodes_y, grid_in.nodes_z)

@@ -72,7 +72,7 @@ class TestField:
         ee3 = fields.Field(self.grid, frequency=frequency,
                            dtype=self.field.dtype)
         assert ee.field.size == ee3.field.size
-        assert ee.field.dtype == np.complex_
+        assert ee.field.dtype == np.complex128
         assert ee3.frequency == frequency
 
         # Try setting values
@@ -86,7 +86,7 @@ class TestField:
         # Negative
         ee4 = fields.Field(self.grid, frequency=-frequency)
         assert ee.field.size == ee4.field.size
-        assert ee4.field.dtype == np.float_
+        assert ee4.field.dtype == np.float64
         assert ee4.frequency == frequency
         assert ee4._frequency == -frequency
         assert ee4.smu0/ee4.sval == constants.mu_0
@@ -97,19 +97,19 @@ class TestField:
 
         with pytest.warns(np.ComplexWarning, match="Casting complex values"):
             lp = fields.Field(self.grid, self.field, frequency=-1)
-        assert lp.field.dtype == np.float_
+        assert lp.field.dtype == np.float64
 
-        ignore = fields.Field(self.grid, frequency=-1, dtype=np.int_)
-        assert ignore.field.dtype == np.float_
+        ignore = fields.Field(self.grid, frequency=-1, dtype=np.int64)
+        assert ignore.field.dtype == np.float64
 
-        ignore = fields.Field(self.grid, self.field, dtype=np.int_)
-        assert ignore.field.dtype == np.complex_
+        ignore = fields.Field(self.grid, self.field, dtype=np.int64)
+        assert ignore.field.dtype == np.complex128
 
-        respected = fields.Field(self.grid, dtype=np.int_)
-        assert respected.field.dtype == np.int_
+        respected = fields.Field(self.grid, dtype=np.int64)
+        assert respected.field.dtype == np.int64
 
         default = fields.Field(self.grid)
-        assert default.field.dtype == np.complex_
+        assert default.field.dtype == np.complex128
 
     def test_copy_dict(self, tmpdir):
         ee = fields.Field(self.grid, self.field)

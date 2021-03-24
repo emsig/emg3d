@@ -1183,7 +1183,7 @@ class MGParameters:
         # Store maximum division-by-two level for each dimension.
         # After that, clevel = [nx, ny, nz], where nx, ny, and nz are the
         # number of times you can divide by two in this dimension.
-        clevel = np.zeros(3, dtype=np.int_)
+        clevel = np.zeros(3, dtype=np.int64)
         for i in range(3):
             n = self.shape_cells[i]
             while n % 2 == 0 and n > 2:
@@ -1791,7 +1791,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
     if var.first_cycle:
 
         # Cast levels into array, get maximum.
-        _lvl_all = np.array(var.level_all, dtype=np.int_)
+        _lvl_all = np.array(var.level_all, dtype=np.int64)
         lvl_max = np.max(_lvl_all)
 
         # Get levels, multiply by difference to get +/-.

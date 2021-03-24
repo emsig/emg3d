@@ -74,9 +74,9 @@ class Field:
         # Get dtype.
         if frequency is not None:  # Frequency is top priority.
             if frequency > 0:
-                dtype = np.complex_
+                dtype = np.complex128
             elif frequency < 0:
-                dtype = np.float_
+                dtype = np.float64
             else:
                 raise ValueError(
                     "`frequency` must be f>0 (frequency domain) or f<0 "
@@ -86,7 +86,7 @@ class Field:
             dtype = data.dtype
 
         elif dtype is None:  # Default.
-            dtype = np.complex_
+            dtype = np.complex128
 
         # Store field.
         if data is None:

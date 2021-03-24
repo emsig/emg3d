@@ -259,7 +259,7 @@ class TestSolve:
         assert_allclose(dat['bicresult'].field, efield.field, atol=1e-14)
 
         # If efield is complex, assert it fails.
-        efield = fields.Field(grid, dtype=np.complex_)
+        efield = fields.Field(grid, dtype=np.complex128)
 
         with pytest.raises(ValueError, match='Source field and electric fiel'):
             efield = solver.solve(model, sfield, plain=True, efield=efield)
@@ -471,11 +471,11 @@ class TestRestrictionProlongation:
         # Get volume-averaged model parameters.
         vmodel = models.VolumeModel(model, sfield)
 
-        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+        rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
-        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+        ry = np.arange(sfield.fy.size, dtype=np.complex128).reshape(
                 sfield.fy.shape)
-        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+        rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
         rr = fields.Field(grid, field)
@@ -524,11 +524,11 @@ class TestRestrictionProlongation:
         # Get volume-averaged model parameters.
         vmodel = models.VolumeModel(model, sfield)
 
-        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+        rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
-        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+        ry = np.arange(sfield.fy.size, dtype=np.complex128).reshape(
                 sfield.fy.shape)
-        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+        rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
         rr = fields.Field(grid, field)
@@ -582,11 +582,11 @@ class TestRestrictionProlongation:
         # Get volume-averaged model parameters.
         vmodel = models.VolumeModel(model, sfield)
 
-        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+        rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
-        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+        ry = np.arange(sfield.fy.size, dtype=np.complex128).reshape(
                 sfield.fy.shape)
-        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+        rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
         rr = fields.Field(grid, field)
