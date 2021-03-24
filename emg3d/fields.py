@@ -50,9 +50,8 @@ class Field:
         The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     data : ndarray, default: None
-        The actual data, a ``ndarray`` of size ``grid.n_edges_x`` +
-        ``grid.shape_edges_y`` + ``grid.shape_edges_z``. If ``None``, it is
-        initiated with zeros.
+        The actual data, a ``ndarray`` of size ``grid.n_edges``. If ``None``,
+        it is initiated with zeros.
 
     frequency : float, default: None
         Field frequency (Hz), used to compute the Laplace parameter ``s``.
@@ -91,8 +90,7 @@ class Field:
 
         # Store field.
         if data is None:
-            nc = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
-            self._field = np.zeros(nc, dtype=dtype)
+            self._field = np.zeros(grid.n_edges, dtype=dtype)
         else:
             self._field = np.asarray(data, dtype=dtype)
 
@@ -129,7 +127,7 @@ class Field:
         """
         out = {
             '__class__': self.__class__.__name__,
-            'field': self._field,
+            'data': self._field,
             'frequency': self._frequency,
             'grid': {
                 'hx': self.grid.h[0],
@@ -161,11 +159,9 @@ class Field:
             A :class:`emg3d.fields.Field` instance.
 
         """
-        return cls(
-            grid=meshes.TensorMesh.from_dict(inp['grid']),
-            data=inp['field'],
-            frequency=inp['frequency'],
-        )
+        inp.pop('__class__', None)
+        grid = meshes.TensorMesh.from_dict(inp.pop('grid'))
+        return cls(grid=grid, **inp)
 
     @property
     def field(self):

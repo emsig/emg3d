@@ -303,7 +303,6 @@ class Survey:
         """
         from emg3d import io
         kwargs[name] = self                # Add survey to dict.
-        kwargs['collect_classes'] = False  # Ensure classes are not collected.
         return io.save(fname, **kwargs)
 
     @classmethod
@@ -910,7 +909,8 @@ class Electrodes:
 
     @classmethod
     def from_dict(cls, inp):
-        return cls(**{k: v for k, v in inp.items() if k != '__class__'})
+        inp.pop('__class__', None)
+        return cls(**inp)
 
     @property
     def coordinates(self):

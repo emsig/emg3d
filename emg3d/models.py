@@ -247,15 +247,9 @@ class Model:
             A :class:`emg3d.models.Model` instance.
 
         """
-        return cls(
-            grid=meshes.TensorMesh.from_dict(inp['grid']),
-            property_x=inp['property_x'],
-            property_y=inp['property_y'],
-            property_z=inp['property_z'],
-            mu_r=inp['mu_r'],
-            epsilon_r=inp['epsilon_r'],
-            mapping=inp['mapping'],
-        )
+        inp.pop('__class__', None)
+        grid = meshes.TensorMesh.from_dict(inp.pop('grid'))
+        return cls(grid=grid, **inp)
 
     # ELECTRICAL PROPERTIES
     @property

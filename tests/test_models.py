@@ -418,6 +418,6 @@ class TestModelOperators:
             val = getattr(self.mod_tri_b, key)
             assert_allclose(mdict[key], val)
 
-        del mdict['property_x']
-        with pytest.raises(KeyError, match="'property_x'"):
+        del mdict['grid']
+        with pytest.raises(KeyError, match="'grid'"):
             models.Model.from_dict(mdict)

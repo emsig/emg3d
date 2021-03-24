@@ -412,9 +412,9 @@ class Simulation:
             # Initiate class.
             out = cls(
                     name=inp['name'],
-                    survey=surveys.Survey.from_dict(inp['survey']),
-                    grid=meshes.TensorMesh.from_dict(inp['grid']),
-                    model=models.Model.from_dict(inp['model']),
+                    survey=surveys.Survey.from_dict(inp['survey'].copy()),
+                    grid=meshes.TensorMesh.from_dict(inp['grid'].copy()),
+                    model=models.Model.from_dict(inp['model'].copy()),
                     max_workers=inp['max_workers'],
                     gridding=gridding,
                     solver_opts=inp['solver_opts'],
@@ -489,7 +489,6 @@ class Simulation:
         self._what_to_file = what
 
         kwargs[name] = self                # Add simulation to dict.
-        kwargs['collect_classes'] = False  # Ensure classes are not collected.
         # If verb is not defined, use verbosity of simulation.
         if 'verb' not in kwargs:
             kwargs['verb'] = self.verb

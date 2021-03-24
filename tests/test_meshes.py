@@ -95,7 +95,7 @@ class TestTensorMesh:
         cgrid = emg3dgrid.copy()
         assert_allclose(cgrid.cell_volumes, emg3dgrid.cell_volumes)
         dgrid = emg3dgrid.to_dict()
-        cdgrid = meshes.TensorMesh.from_dict(dgrid)
+        cdgrid = meshes.TensorMesh.from_dict(dgrid.copy())
         assert_allclose(cdgrid.cell_volumes, emg3dgrid.cell_volumes)
         del dgrid['hx']
         with pytest.raises(KeyError, match="'hx'"):

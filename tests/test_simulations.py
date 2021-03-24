@@ -137,7 +137,7 @@ class TestSimulation():
 
         # Also check to_file()/from_file().
         sim_dict = self.simulation.to_dict('all')
-        sim2 = simulations.Simulation.from_dict(sim_dict)
+        sim2 = simulations.Simulation.from_dict(sim_dict.copy())
         assert self.simulation.name == sim2.name
         assert self.simulation.survey.name == sim2.survey.name
         assert self.simulation.max_workers == sim2.max_workers

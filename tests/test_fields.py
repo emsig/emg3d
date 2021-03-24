@@ -122,8 +122,8 @@ class TestField:
         assert not np.may_share_memory(ee.field, e2.field)
 
         edict = ee.to_dict()
-        del edict['field']
-        with pytest.raises(KeyError, match="'field'"):
+        del edict['grid']
+        with pytest.raises(KeyError, match="'grid'"):
             fields.Field.from_dict(edict)
 
         # Ensure it can be pickled.
@@ -296,8 +296,8 @@ class TestGetSourceField:
             ss = fields.Field(grid, frequency=0)
 
         sdict = ss.to_dict()
-        del sdict['field']
-        with pytest.raises(KeyError, match="'field'"):
+        del sdict['grid']
+        with pytest.raises(KeyError, match="'grid'"):
             fields.Field.from_dict(sdict)
 
 

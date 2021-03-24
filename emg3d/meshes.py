@@ -80,6 +80,7 @@ class BaseMesh:
         self.n_edges_x = np.prod(self.shape_edges_x)
         self.n_edges_y = np.prod(self.shape_edges_y)
         self.n_edges_z = np.prod(self.shape_edges_z)
+        self.n_edges = self.n_edges_x + self.n_edges_y + self.n_edges_z
 
     def __repr__(self):
         """Simple representation."""
@@ -193,7 +194,9 @@ class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
             A :class:`emg3d.meshes.TensorMesh` instance.
 
         """
-        return cls(h=[inp['hx'], inp['hy'], inp['hz']], origin=inp['origin'])
+        inp.pop('__class__', None)
+        h = [inp.pop('hx'), inp.pop('hy'), inp.pop('hz')]
+        return cls(h=h, **inp)
 
 
 def construct_mesh(frequency, properties, center, domain=None, vector=None,
