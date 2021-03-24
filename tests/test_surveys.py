@@ -231,7 +231,8 @@ def test_Dipole(capsys):
             (-0.14809906635, 0.14809906635, 999.91449496415,
              1000.08550503585, -950.4698463104, -949.5301536896))
 
-    assert pointdip2 == finitdip2
+    assert_allclose(pointdip2.electrode1, finitdip2.electrode1)
+    assert_allclose(pointdip2.electrode2, finitdip2.electrode2)
 
     # Check wrong number of points fails.
     with pytest.raises(ValueError, match="Dipole coordinates are wrong"):

@@ -3,7 +3,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from . import alternatives
-from emg3d import fields, maps, meshes, models
+from emg3d import fields, maps, meshes, models, electrodes
 
 # Import soft dependencies.
 try:
@@ -663,3 +663,67 @@ def test_interp_edges_to_vol_averages(njit):
         assert_allclose(grad_x, out_x.reshape(grid.shape_cells, order='F'))
         assert_allclose(grad_y, out_y.reshape(grid.shape_cells, order='F'))
         assert_allclose(grad_z, out_z.reshape(grid.shape_cells, order='F'))
+
+
+def test_rotation():
+    assert_allclose(maps.rotation(0, 0), [1, 0, 0])
+    assert_allclose(maps.rotation(90, 0), [0, 1, 0])
+    assert_allclose(maps.rotation(-90, 0), [0, -1, 0])
+    assert_allclose(maps.rotation(0, 90), [0, 0, 1])
+    assert_allclose(maps.rotation(0, -90), [0, 0, -1])
+    dazm, ddip = 30, 60
+    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
+    assert_allclose(
+            maps.rotation(dazm, ddip),
+            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
+             np.sin(rdip)])
+    dazm, ddip = -45, 180
+    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
+    assert_allclose(
+            maps.rotation(dazm, ddip),
+            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
+             np.sin(rdip)],
+            atol=1e-14)
+
+    azm, dip = np.pi/3, np.pi/4
+    rot1 = maps.rotation(azm, dip, rad=True)
+    rot2 = maps.rotation(np.rad2deg(azm), np.rad2deg(dip), rad=False)
+    assert_allclose(rot1, rot2)
+
+
+def test_get_angles():
+
+    # TODO all possibilities
+    points = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0),  # 6 axes
+              (0, 0, 1), (0, 0, -1),
+              (1, 1, 0), (-1, 1, 0), (1, -1, 0), (-1, -1, 0),  # 12 faces
+              (0, 1, 1), (0, -1, 1), (0, 1, -1), (0, -1, -1),
+              (1, 0, 1), (-1, 0, 1), (1, 0, -1), (-1, 0, -1),
+              (1, 1, 1), (-1, 1, 1), (1, -1, 1), (-1, -1, 1),  # 8 quadrants
+              (1, 1, -1), (-1, 1, -1), (1, -1, -1), (-1, -1, -1)]
+
+    for pts in points:
+        coo = np.array([[0, 0, 0], pts])
+        s = electrodes.TxElectricDipole(coo)
+        azm, dip = maps._get_angles(coo)
+        assert_allclose(s.azimuth, azm, rtol=1e-4)
+        assert_allclose(s.dip, dip, rtol=1e-4)
+
+
+def test_get_electrodes():
+
+    # Radians
+    i_azm1, i_dip1 = np.pi/2, np.pi
+    coords1 = maps._get_electrodes(0, 0, 0, i_azm1, i_dip1, 0.5, rad=True)
+    o_azm1, o_dip1 = maps._get_angles(coords1, rad=True)
+    assert_allclose(i_azm1, o_azm1)
+    assert_allclose(i_dip1, o_dip1)
+
+    # Degrees
+    i_azm2, i_dip2 = -25, 90
+    coords2 = maps._get_electrodes(1e6, 1e-6, 10, i_azm2, i_dip2, 1e6)
+    o_azm2, o_dip2 = maps._get_angles(coords2)
+    assert_allclose(i_azm2, o_azm2)
+    assert_allclose(i_dip2, o_dip2)
+
+    # TODO all possibilities

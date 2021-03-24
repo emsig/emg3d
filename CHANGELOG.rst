@@ -30,6 +30,11 @@ TODO: What is stable (most), what is still *experimental* (``utils.Fourier``,
 Detailed changes
 ''''''''''''''''
 
+**Electrodes**
+
+- New module containing all sources and receivers.
+
+
 **Fields**
 
 - ``fields.Field``:
@@ -86,6 +91,9 @@ Detailed changes
 
 - Maps cannot be (de-)serialized any longer (``{to;from_dict}``); simply store
   its name, which can be provided to ``models.Model``.
+
+- Function ``rotation`` should be used for anything involving angles to use
+  the defined coordinate system consistently.
 
 
 **Meshes**
@@ -185,6 +193,8 @@ Detailed changes
 - ``Dipole``:
 
   - No ``name`` parameter any longer.
+
+- Sources and receivers moved to new module ``electrodes``.
 
 
 0.x-Series

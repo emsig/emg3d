@@ -22,3 +22,9 @@ from emg3d.simulations import Simulation
 from emg3d.solver import solve
 from emg3d.surveys import Survey
 from emg3d.utils import Report, Fourier, __version__
+
+# Import all electrodes, but delete the base classes.
+# They are in __all__ so they appear in the API-documentation, but we don't
+# want them in the top namespace.
+from emg3d.electrodes import *
+del Electrode, Point, Dipole

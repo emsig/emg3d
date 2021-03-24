@@ -37,16 +37,8 @@ def test_save_and_load(tmpdir, capsys):
             [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
             np.zeros(3))
 
-    # TensorMesh grid to 'simulate' discretize TensorMesh without `to_dict`.
-    class TensorMesh:
-        pass
-
-    grid2 = TensorMesh()
-    grid2.h = grid.h
-    grid2.origin = grid.origin
-
-    grid3 = TensorMesh()  # "Broken" mesh
-    grid3.origin = grid.origin
+    # TODO Add conditional discretize test, if installed
+    # grid2 = discretize.TensorMesh()
 
     # Some field.
     field = fields.Field(grid)
@@ -61,10 +53,8 @@ def test_save_and_load(tmpdir, capsys):
     model = models.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
 
     # Save it.
-    with pytest.warns(UserWarning, match="Could not serialize"):
-        io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
-                broken=grid3, a=None, b=True,
-                field=field, what={'f': field.fx, 12: 12})
+    io.save(tmpdir+'/test.npz', emg3d=grid, model=model,  # discretize=grid2,
+            a=None, b=True, field=field, what={'f': field.fx, 12: 12})
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
     assert utils.__version__ in outstr
@@ -87,7 +77,7 @@ def test_save_and_load(tmpdir, capsys):
     assert out_npz['model'] == model
     assert_allclose(field.fx, out_npz['field'].fx)
     assert_allclose(grid.cell_volumes, out_npz['emg3d'].cell_volumes)
-    assert_allclose(grid.cell_volumes, out_npz['discretize'].cell_volumes)
+    # assert_allclose(grid.cell_volumes, out_npz['discretize'].cell_volumes)
     assert_allclose(out_npz['what']['f'], field.fx)
     assert out_npz['b'] is True
 
@@ -122,7 +112,7 @@ def test_save_and_load(tmpdir, capsys):
 
     # Test h5py.
     if h5py:
-        io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
+        io.save(tmpdir+'/test.h5', emg3d=grid,  # discretize=grid2,
                 a=1.0, b=1+1j, c=True,
                 d=['1', '2', '3'],
                 model=model, field=field, what={'f': field.fx})
@@ -134,7 +124,7 @@ def test_save_and_load(tmpdir, capsys):
         assert out_h5['d'] == ['1', '2', '3']
         assert_allclose(field.fx, out_h5['field'].fx)
         assert_allclose(grid.cell_volumes, out_h5['emg3d'].cell_volumes)
-        assert_allclose(grid.cell_volumes, out_h5['discretize'].cell_volumes)
+        # assert_allclose(grid.cell_volumes, out_h5['discretize'].cell_volumes)
         assert_allclose(out_h5['what']['f'], field.fx)
 
         # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO
@@ -146,7 +136,7 @@ def test_save_and_load(tmpdir, capsys):
             io.load(str(tmpdir+'/test-h5.h5'))
 
     # Test json.
-    io.save(tmpdir+'/test.json', emg3d=grid, discretize=grid2,
+    io.save(tmpdir+'/test.json', emg3d=grid,  # discretize=grid2,
             a=1.0, b=1+1j, model=model, field=field, what={'f': field.fx})
     out_json = io.load(str(tmpdir+'/test.json'))
     assert out_json['model'] == model
@@ -154,7 +144,7 @@ def test_save_and_load(tmpdir, capsys):
     assert out_json['b'] == 1+1j
     assert_allclose(field.fx, out_json['field'].fx)
     assert_allclose(grid.cell_volumes, out_json['emg3d'].cell_volumes)
-    assert_allclose(grid.cell_volumes, out_json['discretize'].cell_volumes)
+    # assert_allclose(grid.cell_volumes, out_json['discretize'].cell_volumes)
     assert_allclose(out_json['what']['f'], field.fx)
 
     # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO

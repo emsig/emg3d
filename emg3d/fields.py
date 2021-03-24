@@ -23,7 +23,6 @@ from copy import deepcopy
 
 import numpy as np
 from scipy.constants import mu_0
-from scipy.special import sindg, cosdg
 
 from emg3d import maps, meshes, models, utils
 
@@ -126,8 +125,8 @@ class Field:
 
         """
         out = {
-            '__class__': self.__class__.__name__,
-            'grid': self.grid.to_dict(),
+            '__class__': self.__class__.__name__,  # v ensure emg3d-TensorMesh
+            'grid': meshes.TensorMesh(self.grid.h, self.grid.origin).to_dict(),
             'data': self._field,
             'frequency': self._frequency,
         }
@@ -565,7 +564,7 @@ def get_receiver(field, receiver):
     resp = np.zeros(xi.shape[0], dtype=field.field.dtype)
 
     # Add the required responses.
-    factors = _rotation(*receiver[3:])  # Geometrical weights from angles.
+    factors = maps.rotation(*receiver[3:])  # Geometrical weights from angles.
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interp_spline_3d(
@@ -815,32 +814,6 @@ def _finite_source_xyz(grid, source, field, decimals):
         field /= sum_s
 
 
-def _rotation(azimuth, dip):
-    """Rotation factors for RHS coordinate system with positive z upwards.
-
-    Easting is x, Northing is y, and positive upwards is z. All functions
-    should use this rotation to ensure they use all the same definition.
-
-    Parameters
-    ----------
-    azimuth : float
-        Azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-
-    dip: float
-        Dip (°): vertical deviation from xy-plane up-wards.
-
-
-    Returns
-    -------
-    rot : ndarray
-        Rotation factors (x, y, z).
-
-    """
-    return np.array([cosdg(azimuth)*cosdg(dip),
-                     sindg(azimuth)*cosdg(dip),
-                     sindg(dip)])
-
-
 def _finite_dipole_from_point(source, length):
     """Return finite dipole of length given a point dipole.
 
@@ -860,7 +833,7 @@ def _finite_dipole_from_point(source, length):
         coordinates (x0, x1, y0, y1, z0, z1).
 
     """
-    factors = _rotation(*source[3:])*length/2
+    factors = maps.rotation(*source[3:])*length/2
     return np.ravel(source[:3] + np.stack([-factors, factors]), 'F')
 
 
@@ -885,8 +858,8 @@ def _square_loop_from_point(source, length):
 
     """
     half_diagonal = np.sqrt(2)*length/2
-    rot_hor = _rotation(source[3]+90, 0)*half_diagonal
-    rot_ver = _rotation(source[3], source[4]+90)*half_diagonal
+    rot_hor = maps.rotation(source[3]+90, 0)*half_diagonal
+    rot_ver = maps.rotation(source[3], source[4]+90)*half_diagonal
     points = source[:3] + np.stack(
             [rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
     return points.T

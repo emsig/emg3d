@@ -213,8 +213,8 @@ class Model:
 
         """
         out = {
-            '__class__': self.__class__.__name__,
-            'grid': self.grid.to_dict(),
+            '__class__': self.__class__.__name__,  # v ensure emg3d-TensorMesh
+            'grid': meshes.TensorMesh(self.grid.h, self.grid.origin).to_dict(),
             **{prop: getattr(self, prop) for prop in self._properties},
             'mapping': self.map.name,
         }

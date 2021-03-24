@@ -30,7 +30,8 @@ except ImportError:
     h5py = ("'.h5'-files require `h5py`. Install it via\n"
             "`pip install h5py` or `conda install -c conda-forge h5py`.")
 
-from emg3d import fields, models, utils, meshes, surveys, simulations
+from emg3d import (electrodes, fields, meshes, models, simulations, surveys,
+                   utils)
 
 __all__ = ['save', 'load']
 
@@ -42,7 +43,7 @@ KNOWN_CLASSES = {
     'Dipole': surveys.Dipole,
     'TensorMesh': meshes.TensorMesh,
     'Simulation': simulations.Simulation,
-    **surveys.ELECTRODELIST,
+    **electrodes.ELECTRODE_LIST,
 }
 
 
@@ -307,29 +308,13 @@ def _dict_serialize(inp, out=None):
 
         # Take care of the following instances
         # (if we are in the root-directory they get their own category):
-        if (isinstance(value, tuple(KNOWN_CLASSES.values())) or
-                hasattr(value, 'origin')):
+        if isinstance(value, tuple(KNOWN_CLASSES.values())):
 
-            # Name of the instance
-            name = value.__class__.__name__
+            # Workaround for discretize.TensorMesh (store as emg3d.TensorMesh)
+            if hasattr(value, 'face_areas'):
+                value = meshes.TensorMesh(value.h, value.origin)
 
-            # Workaround for discretize.TensorMesh -> stored as if TensorMesh.
-            if hasattr(value, 'to_dict'):
-                to_dict = value.to_dict()
-            else:
-
-                try:
-                    to_dict = {'hx': value.h[0], 'hy': value.h[1],
-                               'hz': value.h[2],
-                               'origin': value.origin, '__class__': name}
-                except AttributeError as e:  # Gracefully fail.
-                    # Print is always shown and simpler, warn for the CLI logs.
-                    msg = f"Could not serialize <{key}>: {e}"
-                    print(f"* WARNING :: {msg}")
-                    warnings.warn(msg, UserWarning)
-                    continue
-
-            value = to_dict
+            value = value.to_dict()
 
         # Initiate if necessary.
         if key not in out.keys():

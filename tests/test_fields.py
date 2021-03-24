@@ -470,27 +470,6 @@ class TestFiniteSourceXYZ:
             _ = fields.get_source_field(grid, [1e10, 1e10, 1e10, 0, 0], 1)
 
 
-def test_rotation():
-    assert_allclose(fields._rotation(0, 0), [1, 0, 0])
-    assert_allclose(fields._rotation(90, 0), [0, 1, 0])
-    assert_allclose(fields._rotation(-90, 0), [0, -1, 0])
-    assert_allclose(fields._rotation(0, 90), [0, 0, 1])
-    assert_allclose(fields._rotation(0, -90), [0, 0, -1])
-    dazm, ddip = 30, 60
-    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
-    assert_allclose(
-            fields._rotation(dazm, ddip),
-            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
-             np.sin(rdip)])
-    dazm, ddip = -45, 180
-    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
-    assert_allclose(
-            fields._rotation(dazm, ddip),
-            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
-             np.sin(rdip)],
-            atol=1e-14)
-
-
 def test_finite_dipole_from_point():
     source = (10, 100, -1000, 0, 0)
     length = 111.0

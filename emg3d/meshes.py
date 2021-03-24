@@ -29,13 +29,94 @@ try:
 except ImportError:
     discretize = None
 
-__all__ = ['TensorMesh', 'BaseMesh', 'MeshMixin', 'construct_mesh',
-           'get_origin_widths', 'good_mg_cell_nr', 'skin_depth', 'wavelength',
-           'cell_width']
+__all__ = ['TensorMesh', 'BaseMesh', 'construct_mesh', 'get_origin_widths',
+           'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width']
 
 
-class MeshMixin:
-    """Add custom attributes to {Base;Tensor}Mesh."""
+class BaseMesh:
+    """Minimal TensorMesh for internal multigrid computation.
+
+    The base mesh has everything that is needed within
+    :func:`emg3d.solver.solve`, but nothing more.
+
+    Parameters
+    ----------
+    h : [array_like, array_like, array_like]
+        Cell widths in x, y, and z directions.
+
+    origin : array_like
+        Origin (x, y, z).
+
+    """
+
+    def __init__(self, h, origin, **kwargs):
+        """Initialize the mesh."""
+
+        # Store origin.
+        self.origin = np.array(origin)
+
+        # Width of cells, cast to arrays.
+        self.h = [np.array(h[0]), np.array(h[1]), np.array(h[2])]
+
+        # Node related properties.
+        shape_nodes = (self.h[0].size+1, self.h[1].size+1, self.h[2].size+1)
+        self.shape_nodes = shape_nodes
+        self.nodes_x = np.r_[0., self.h[0].cumsum()] + self.origin[0]
+        self.nodes_y = np.r_[0., self.h[1].cumsum()] + self.origin[1]
+        self.nodes_z = np.r_[0., self.h[2].cumsum()] + self.origin[2]
+
+        # Cell related properties.
+        shape_cells = (self.h[0].size, self.h[1].size, self.h[2].size)
+        self.shape_cells = shape_cells
+        self.n_cells = np.prod(shape_cells)
+        self.cell_centers_x = (self.nodes_x[1:] + self.nodes_x[:-1])/2
+        self.cell_centers_y = (self.nodes_y[1:] + self.nodes_y[:-1])/2
+        self.cell_centers_z = (self.nodes_z[1:] + self.nodes_z[:-1])/2
+
+        # Edge related properties.
+        self.shape_edges_x = (shape_cells[0], shape_nodes[1], shape_nodes[2])
+        self.shape_edges_y = (shape_nodes[0], shape_cells[1], shape_nodes[2])
+        self.shape_edges_z = (shape_nodes[0], shape_nodes[1], shape_cells[2])
+        self.n_edges_x = np.prod(self.shape_edges_x)
+        self.n_edges_y = np.prod(self.shape_edges_y)
+        self.n_edges_z = np.prod(self.shape_edges_z)
+        self.n_edges = self.n_edges_x + self.n_edges_y + self.n_edges_z
+
+    def __repr__(self):
+        """Simple representation."""
+        return (f"TensorMesh: {self.shape_cells[0]} x {self.shape_cells[1]} x "
+                f"{self.shape_cells[2]} ({self.n_cells:,})")
+
+    @property
+    def cell_volumes(self):
+        """Construct cell volumes of the 3D model as 1D array."""
+        if getattr(self, '_cell_volumes', None) is None:
+            self._cell_volumes = (
+                    self.h[0][None, None, :]*self.h[1][None, :, None] *
+                    self.h[2][:, None, None]).ravel()
+        return self._cell_volumes
+
+
+class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
+    """A slightly modified version of :class:`discretize.TensorMesh`.
+
+    Adds a few custom attributes (``__eq__``, ``copy``, and ``{to;from}_dict``)
+    to :class:`discretize.TensorMesh`.
+
+    It falls back to a minimal :class:`emg3d.meshes.BaseMesh` if discretize is
+    not installed. Nothing fancy is possible with the minimal TensorMesh,
+    particularly *no* plotting.
+
+
+    Parameters
+    ----------
+    h : [array_like, array_like, array_like]
+        Cell widths in x, y, and z directions.
+
+    origin : array_like
+        Origin (x, y, z).
+
+    """
 
     def __eq__(self, mesh):
         """Compare two meshes.
@@ -115,93 +196,6 @@ class MeshMixin:
         """
         inp.pop('__class__', None)
         return cls(h=[inp.pop('hx'), inp.pop('hy'), inp.pop('hz')], **inp)
-
-
-class BaseMesh(MeshMixin):
-    """Minimal TensorMesh for internal multigrid computation.
-
-    The base mesh has everything that is needed within
-    :func:`emg3d.solver.solve`, but nothing more.
-
-    Parameters
-    ----------
-    h : [array_like, array_like, array_like]
-        Cell widths in x, y, and z directions.
-
-    origin : array_like
-        Origin (x, y, z).
-
-    """
-
-    def __init__(self, h, origin, **kwargs):
-        """Initialize the mesh."""
-
-        # Store origin.
-        self.origin = np.array(origin)
-
-        # Width of cells, cast to arrays.
-        self.h = [np.array(h[0]), np.array(h[1]), np.array(h[2])]
-
-        # Node related properties.
-        shape_nodes = (self.h[0].size+1, self.h[1].size+1, self.h[2].size+1)
-        self.shape_nodes = shape_nodes
-        self.nodes_x = np.r_[0., self.h[0].cumsum()] + self.origin[0]
-        self.nodes_y = np.r_[0., self.h[1].cumsum()] + self.origin[1]
-        self.nodes_z = np.r_[0., self.h[2].cumsum()] + self.origin[2]
-
-        # Cell related properties.
-        shape_cells = (self.h[0].size, self.h[1].size, self.h[2].size)
-        self.shape_cells = shape_cells
-        self.n_cells = np.prod(shape_cells)
-        self.cell_centers_x = (self.nodes_x[1:] + self.nodes_x[:-1])/2
-        self.cell_centers_y = (self.nodes_y[1:] + self.nodes_y[:-1])/2
-        self.cell_centers_z = (self.nodes_z[1:] + self.nodes_z[:-1])/2
-
-        # Edge related properties.
-        self.shape_edges_x = (shape_cells[0], shape_nodes[1], shape_nodes[2])
-        self.shape_edges_y = (shape_nodes[0], shape_cells[1], shape_nodes[2])
-        self.shape_edges_z = (shape_nodes[0], shape_nodes[1], shape_cells[2])
-        self.n_edges_x = np.prod(self.shape_edges_x)
-        self.n_edges_y = np.prod(self.shape_edges_y)
-        self.n_edges_z = np.prod(self.shape_edges_z)
-        self.n_edges = self.n_edges_x + self.n_edges_y + self.n_edges_z
-
-    def __repr__(self):
-        """Simple representation."""
-        return (f"TensorMesh: {self.shape_cells[0]} x {self.shape_cells[1]} x "
-                f"{self.shape_cells[2]} ({self.n_cells:,})")
-
-    @property
-    def cell_volumes(self):
-        """Construct cell volumes of the 3D model as 1D array."""
-        if getattr(self, '_cell_volumes', None) is None:
-            self._cell_volumes = (
-                    self.h[0][None, None, :]*self.h[1][None, :, None] *
-                    self.h[2][:, None, None]).ravel()
-        return self._cell_volumes
-
-
-class TensorMesh(discretize.TensorMesh if discretize else BaseMesh, MeshMixin):
-    """A slightly modified version of :class:`discretize.TensorMesh`.
-
-    Adds a few custom attributes (``__eq__``, ``copy``, and ``{to;from}_dict``)
-    to :class:`discretize.TensorMesh` through :class:`emg3d.meshes.MeshMixin`.
-
-    It falls back to a minimal :class:`emg3d.meshes.BaseMesh` if discretize is
-    not installed. Nothing fancy is possible with the minimal TensorMesh,
-    particularly *no* plotting.
-
-
-    Parameters
-    ----------
-    h : [array_like, array_like, array_like]
-        Cell widths in x, y, and z directions.
-
-    origin : array_like
-        Origin (x, y, z).
-
-    """
-    pass
 
 
 def construct_mesh(frequency, properties, center, domain=None, vector=None,

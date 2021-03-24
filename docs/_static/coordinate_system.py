@@ -1,7 +1,10 @@
 import numpy as np
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import proj3d
 from matplotlib.patches import FancyArrowPatch
+
+from emg3d.maps import rotation
 
 
 class Arrow3D(FancyArrowPatch):
@@ -29,53 +32,53 @@ ax.axis('off')
 
 # Point centered around (0, 0, 0);
 # distances in positive directions.
-P = (6, 10, -4)
+P = (6, 8, 5)
 
 # Coordinate system
 # The first three are not visible, but for the aspect ratio of the plot.
-ax.plot([-2, 12], [0, 0], [0, 0], c='w')
+ax.plot([-2, 10], [0, 0], [0, 0], c='w')
 ax.plot([0, 0], [-2, 12], [0, 0], c='w')
-ax.plot([0, 0], [0, 0], [-7, 7], c='w')
-ax.add_artist(Arrow3D([-2, 12], [0, 0], [0, 0]))
-ax.add_artist(Arrow3D([0, 0], [-2, 16], [0, 0]))
-ax.add_artist(Arrow3D([0, 0], [0, 0], [-5, 4]))
-ax.plot([0, P[0]], [P[1], P[1]], [P[2], P[2]], ':', c='.8')
-ax.plot([0, P[0]], [0, 0], [P[2], P[2]], ':', c='.8')
-ax.plot([P[0], P[0]], [0, P[1]], [P[2], P[2]], ':', c='.8')
-ax.plot([0, 0], [0, P[1]], [P[2], P[2]], ':', c='.8')
-ax.plot([P[0], P[0]], [P[1], P[1]], [0, P[2]], '--', c='.6')
-
-# Annotate it
-ax.text(9, 3, 0, r'$x$ / Easting')
-ax.text(0, 10, 1, r'$y$ / Northing')
-ax.text(-1, 0, 4.5, r'$z$ / Elevation')
+ax.plot([0, 0], [0, 0], [-2, 7], c='w')
+ax.add_artist(Arrow3D([-2, 10], [0, 0], [0, 0]))
+ax.add_artist(Arrow3D([0, 0], [-2, 12], [0, 0]))
+ax.add_artist(Arrow3D([0, 0], [0, 0], [-2, 5]))
 
 # Helper lines
+ax.plot([0, P[0]], [P[1], P[1]], [0, 0], ':', c='.8')
+ax.plot([P[0], P[0]], [0, P[1]], [0, 0], ':', c='.8')
+ax.plot([P[0], P[0]], [P[1], P[1]], [0, P[2]], '--', c='.6')
 ax.plot([0, P[0]], [0, P[1]], [0, 0], '--', c='.6')
 
-fact = 7
+# Annotate it
+ax.text(11, -4, 0, r'$x$ / Easting')
+ax.text(0, 11, 0.8, r'$y$ / Northing')
+ax.text(0, 0, 5, r'$z$ / Elevation')
+
+fact = 5
 
 # Theta
 azm = np.arcsin(P[1]/np.sqrt(P[0]**2+P[1]**2))
 lazm = np.linspace(0, azm, 31)
-ax.plot(np.cos(lazm)*fact, np.sin(lazm)*fact, 0, c='C2')
-ax.text(6.8, 2.5, 0, r"$\theta$", color='C2', fontsize=14)
+rot1 = rotation(lazm, lazm*0, rad=True)
+ax.plot(*(rot1*fact), c='C2')
+ax.text(5.5, 1.5, 0, r"$\theta$", color='C2', fontsize=14)
 
-# Phi
+# Theta and Phi
 dip = np.pi/2-np.arcsin(
         np.sqrt(P[0]**2+P[1]**2)/np.sqrt(P[0]**2+P[1]**2+P[2]**2))
 # print(f"theta = {np.rad2deg(azm):.1f}°; phi = {np.rad2deg(dip):.1f}°")
 ldip = np.linspace(0, dip, 31)
-ax.plot(np.cos(azm)*np.cos(ldip)*fact,
-        np.sin(azm)*np.cos(ldip)*fact, -np.sin(ldip)*fact, c='C0')
-ax.text(4.5, 4, -1.5, r"$\varphi$", color='C0', fontsize=14)
+
+rot2 = rotation(azm, ldip, rad=True)
+ax.plot(*(rot2*fact), c='C0')
+ax.text(3.5, 3.5, 1.5, r"$\varphi$", color='C0', fontsize=14)
 
 # Resulting trajectory
-ax.plot([-P[0], P[0]], [-P[1], P[1]], [-P[2], P[2]], 'C3', lw=2)
+ax.plot([0, P[0]], [0, P[1]], [0, P[2]], 'C3', lw=2)
 
-ax.view_init(azim=-70, elev=10)
+ax.view_init(azim=-50, elev=10)
 ax.dist = 6
 plt.title('RHS coordinate system', y=0.9)
 plt.tight_layout()
-plt.savefig('./coordinate_system.png', bbox_inches='tight', pad_inches=0)
+plt.savefig('./coordinate_system.svg', bbox_inches='tight', pad_inches=0)
 plt.show()
