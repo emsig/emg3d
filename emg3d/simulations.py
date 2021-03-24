@@ -410,10 +410,11 @@ class Simulation:
                             gridding_opts[key] = out
 
             # Initiate class.
+            MeshClass = getattr(meshes, inp['grid']['__class__'])
             out = cls(
                     name=inp['name'],
                     survey=surveys.Survey.from_dict(inp['survey'].copy()),
-                    grid=meshes.TensorMesh.from_dict(inp['grid'].copy()),
+                    grid=MeshClass.from_dict(inp['grid'].copy()),
                     model=models.Model.from_dict(inp['model'].copy()),
                     max_workers=inp['max_workers'],
                     gridding=gridding,

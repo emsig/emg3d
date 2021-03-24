@@ -214,12 +214,7 @@ class Model:
         """
         out = {
             '__class__': self.__class__.__name__,
-            'grid': {
-                'hx': self.grid.h[0],
-                'hy': self.grid.h[1],
-                'hz': self.grid.h[2],
-                'origin': self.grid.origin,
-            },
+            'grid': self.grid.to_dict(),
             **{prop: getattr(self, prop) for prop in self._properties},
             'mapping': self.map.name,
         }
@@ -248,8 +243,8 @@ class Model:
 
         """
         inp.pop('__class__', None)
-        grid = meshes.TensorMesh.from_dict(inp.pop('grid'))
-        return cls(grid=grid, **inp)
+        MeshClass = getattr(meshes, inp['grid']['__class__'])
+        return cls(grid=MeshClass.from_dict(inp.pop('grid')), **inp)
 
     # ELECTRICAL PROPERTIES
     @property

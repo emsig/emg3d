@@ -127,14 +127,9 @@ class Field:
         """
         out = {
             '__class__': self.__class__.__name__,
+            'grid': self.grid.to_dict(),
             'data': self._field,
             'frequency': self._frequency,
-            'grid': {
-                'hx': self.grid.h[0],
-                'hy': self.grid.h[1],
-                'hz': self.grid.h[2],
-                'origin': self.grid.origin,
-            },
         }
         if copy:
             return deepcopy(out)
@@ -160,8 +155,8 @@ class Field:
 
         """
         inp.pop('__class__', None)
-        grid = meshes.TensorMesh.from_dict(inp.pop('grid'))
-        return cls(grid=grid, **inp)
+        MeshClass = getattr(meshes, inp['grid']['__class__'])
+        return cls(grid=MeshClass.from_dict(inp.pop('grid')), **inp)
 
     @property
     def field(self):
