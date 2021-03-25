@@ -665,65 +665,146 @@ def test_interp_edges_to_vol_averages(njit):
         assert_allclose(grad_z, out_z.reshape(grid.shape_cells, order='F'))
 
 
-def test_rotation():
-    assert_allclose(maps.rotation(0, 0), [1, 0, 0])
-    assert_allclose(maps.rotation(90, 0), [0, 1, 0])
-    assert_allclose(maps.rotation(-90, 0), [0, -1, 0])
-    assert_allclose(maps.rotation(0, 90), [0, 0, 1])
-    assert_allclose(maps.rotation(0, -90), [0, 0, -1])
-    dazm, ddip = 30, 60
-    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
-    assert_allclose(
-            maps.rotation(dazm, ddip),
-            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
-             np.sin(rdip)])
-    dazm, ddip = -45, 180
-    razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
-    assert_allclose(
-            maps.rotation(dazm, ddip),
-            [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
-             np.sin(rdip)],
-            atol=1e-14)
+class TestRotation:
+    def test_rotation(self):
+        assert_allclose(maps.rotation(0, 0), [1, 0, 0])
+        assert_allclose(maps.rotation(90, 0), [0, 1, 0])
+        assert_allclose(maps.rotation(-90, 0), [0, -1, 0])
+        assert_allclose(maps.rotation(0, 90), [0, 0, 1])
+        assert_allclose(maps.rotation(0, -90), [0, 0, -1])
+        dazm, ddip = 30, 60
+        razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
+        assert_allclose(
+                maps.rotation(dazm, ddip),
+                [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
+                 np.sin(rdip)])
+        dazm, ddip = -45, 180
+        razm, rdip = np.deg2rad(dazm), np.deg2rad(ddip)
+        assert_allclose(
+                maps.rotation(dazm, ddip),
+                [np.cos(razm)*np.cos(rdip), np.sin(razm)*np.cos(rdip),
+                 np.sin(rdip)],
+                atol=1e-14)
 
-    azm, dip = np.pi/3, np.pi/4
-    rot1 = maps.rotation(azm, dip, rad=True)
-    rot2 = maps.rotation(np.rad2deg(azm), np.rad2deg(dip), rad=False)
-    assert_allclose(rot1, rot2)
+        azm, dip = np.pi/3, np.pi/4
+        rot1 = maps.rotation(azm, dip, rad=True)
+        rot2 = maps.rotation(np.rad2deg(azm), np.rad2deg(dip), rad=False)
+        assert_allclose(rot1, rot2)
 
+    def test_get_angles_get_points(self):
+        pi_1 = np.pi
+        pi_2 = np.pi/2
+        pi_4 = np.pi/4
+        pi_34 = 3*np.pi/4
 
-def test_get_angles():
+        # We test here an extensive list of simple cases:
+        # - dipoles along the principal axes
+        # - dipoles in the middle between two axes (faces)
+        # - dipoles into the middle of three axes (quadrants)
 
-    # TODO all possibilities
-    points = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0),  # 6 axes
-              (0, 0, 1), (0, 0, -1),
-              (1, 1, 0), (-1, 1, 0), (1, -1, 0), (-1, -1, 0),  # 12 faces
-              (0, 1, 1), (0, -1, 1), (0, 1, -1), (0, -1, -1),
-              (1, 0, 1), (-1, 0, 1), (1, 0, -1), (-1, 0, -1),
-              (1, 1, 1), (-1, 1, 1), (1, -1, 1), (-1, -1, 1),  # 8 quadrants
-              (1, 1, -1), (-1, 1, -1), (1, -1, -1), (-1, -1, -1)]
+        # Format: (x, y, z): azm_deg, dip_deg, azm_rad, dip_rad
+        data = {
+            # 6 axes
+            (+1, +0, +0): [0, 0, 0, 0],
+            (+0, +1, +0): [90, 0, pi_2, 0],
+            (-1, +0, +0): [180, 0, pi_1, 0],
+            (+0, -1, +0): [-90, 0, -pi_2, 0],
+            (+0, +0, +1): [0, 90, 0, pi_2],
+            (+0, +0, -1): [0, -90, 0, -pi_2],
+            # 12 faces
+            (+1, +1, +0): [45, 0, pi_4, 0],
+            (-1, +1, +0): [135, 0, pi_34, 0],
+            (-1, -1, +0): [-135, 0, -pi_34, 0],
+            (+1, -1, +0): [-45, 0, -pi_4, 0],
+            # --
+            (+1, +0, +1): [0, 45, 0, pi_4],
+            (-1, +0, +1): [180, 45, pi_1, pi_4],
+            (-1, +0, -1): [180, -45, pi_1, -pi_4],
+            (+1, +0, -1): [0, -45, 0, -pi_4],
+            # --
+            (+0, +1, +1): [90, 45, pi_2, pi_4],
+            (+0, -1, +1): [-90, 45, -pi_2, pi_4],
+            (+0, -1, -1): [-90, -45, -pi_2, -pi_4],
+            (+0, +1, -1): [90, -45, pi_2, -pi_4],
+            # 8 quadrants
+            (+1, +1, +np.sqrt(2)): [45, 45, pi_4, pi_4],
+            (-1, +1, +np.sqrt(2)): [135, 45, pi_34, pi_4],
+            (-1, -1, +np.sqrt(2)): [-135, 45, -pi_34, pi_4],
+            (+1, -1, +np.sqrt(2)): [-45, 45, -pi_4, pi_4],
+            # --
+            (+1, +1, -np.sqrt(2)): [45, -45, pi_4, -pi_4],
+            (-1, +1, -np.sqrt(2)): [135, -45, pi_34, -pi_4],
+            (-1, -1, -np.sqrt(2)): [-135, -45, -pi_34, -pi_4],
+            (+1, -1, -np.sqrt(2)): [-45, -45, -pi_4, -pi_4],
+        }
 
-    for pts in points:
-        coo = np.array([[0, 0, 0], pts])
-        s = electrodes.TxElectricDipole(coo)
-        azm, dip = maps._get_angles(coo)
-        assert_allclose(s.azimuth, azm, rtol=1e-4)
-        assert_allclose(s.dip, dip, rtol=1e-4)
+        for points, values in data.items():
 
+            # 1. Check get_angles
 
-def test_get_electrodes():
+            # 1.a Check angles degree
+            coo = np.array([[0, 0, 0], points])
+            azm, dip = maps.get_angles(coo)
+            assert_allclose(azm, values[0])
+            assert_allclose(dip, values[1])
 
-    # Radians
-    i_azm1, i_dip1 = np.pi/2, np.pi
-    coords1 = maps._get_electrodes(0, 0, 0, i_azm1, i_dip1, 0.5, rad=True)
-    o_azm1, o_dip1 = maps._get_angles(coords1, rad=True)
-    assert_allclose(i_azm1, o_azm1)
-    assert_allclose(i_dip1, o_dip1)
+            # 1.b Check angles radians
+            azm, dip = maps.get_angles(coo, rad=True)
+            assert_allclose(azm, values[2])
+            assert_allclose(dip, values[3])
 
-    # Degrees
-    i_azm2, i_dip2 = -25, 90
-    coords2 = maps._get_electrodes(1e6, 1e-6, 10, i_azm2, i_dip2, 1e6)
-    o_azm2, o_dip2 = maps._get_angles(coords2)
-    assert_allclose(i_azm2, o_azm2)
-    assert_allclose(i_dip2, o_dip2)
+            # 2. Check get_points
+            # Center (0, 0, 0); 2*length, so we can compare 2nd point.
+            length = 2*np.linalg.norm(points)
 
-    # TODO all possibilities
+            # Check points degree
+            coo = maps.get_points(0, 0, 0, values[0], values[1], length)
+            assert_allclose(coo[1, :], points)
+
+            # Check points radians
+            coo = maps.get_points(
+                    0, 0, 0, values[2], values[3], length, rad=True)
+            assert_allclose(coo[1, :], points, atol=1e-14)
+
+    def test_get_angles(self):
+
+        points = [
+            (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0),  # 6 axes
+            (0, 0, 1), (0, 0, -1),
+            (1, 1, 0), (-1, 1, 0), (1, -1, 0), (-1, -1, 0),  # 12 faces
+            (0, 1, 1), (0, -1, 1), (0, 1, -1), (0, -1, -1),
+            (1, 0, 1), (-1, 0, 1), (1, 0, -1), (-1, 0, -1),
+            (1, 1, 1), (-1, 1, 1), (1, -1, 1), (-1, -1, 1),  # 8 quadrants
+            (1, 1, -1), (-1, 1, -1), (1, -1, -1), (-1, -1, -1)
+        ]
+
+        # This is just a test that electrodes.Dipole does the right thing.
+        for pts in points:
+            coo = np.array([[0, 0, 0], pts])
+            s = electrodes.TxElectricDipole(coo)
+            azm, dip = maps.get_angles(coo)
+            assert_allclose(s.azimuth, azm, rtol=1e-4)
+            assert_allclose(s.dip, dip, rtol=1e-4)
+
+    def test_get_points(self):
+
+        # Radians
+        i_azm1, i_dip1 = 2*np.pi/3, np.pi/3
+        coords1 = maps.get_points(0, 0, 0, i_azm1, i_dip1, 0.5, rad=True)
+        o_azm1, o_dip1 = maps.get_angles(coords1, rad=True)
+        assert_allclose(i_azm1, o_azm1)
+        assert_allclose(i_dip1, o_dip1)
+
+        # Degrees
+        i_azm2, i_dip2 = -25, 88
+        coords2 = maps.get_points(1e6, 1e-6, 10, i_azm2, i_dip2, 1e6)
+        o_azm2, o_dip2 = maps.get_angles(coords2)
+        assert_allclose(i_azm2, o_azm2)
+        assert_allclose(i_dip2, o_dip2)
+
+        # Degrees: For dip = +/- 90, azm is not defined and returns 0.0
+        i_azm4, i_dip4 = -33.3, 90  # <= azm != 0.0
+        coords4 = maps.get_points(1e6, -50, 3.33, i_azm4, i_dip4, 2)
+        o_azm4, o_dip4 = maps.get_angles(coords4)
+        assert_allclose(0.0, o_azm4)  # <= azm == 0.0
+        assert_allclose(i_dip4, o_dip4)

@@ -770,7 +770,7 @@ class Dipole(PointDipole):
             self.length = np.linalg.norm(electrode1 - electrode2)
 
             # Angles.
-            azm, dip = maps._get_angles(np.array([electrode1, electrode2]))
+            azm, dip = maps.get_angles(np.array([electrode1, electrode2]))
 
             # Store electrodes.
             self.electrode1 = tuple(electrode1)
@@ -782,7 +782,7 @@ class Dipole(PointDipole):
             self.length = 1.0
 
             # Get the two separate electrodes.
-            electrodes = maps._get_electrodes(*coords, self.length)
+            electrodes = maps.get_points(*coords, self.length)
             self.electrode1 = tuple(electrodes[0, :])
             self.electrode2 = tuple(electrodes[1, :])
 

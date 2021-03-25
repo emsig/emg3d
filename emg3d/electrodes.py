@@ -41,23 +41,31 @@ class Electrode:
 
     _serialize = {'coordinates', }
 
-    def __init__(self, coordinates):
+    def __init__(self, points, coordinates=None):
         """
 
-        Coordinates must be in the form of
+        Points must be in the form of
             [[x0, y0, z0], [...], [xN, yN, zN]]: (x, 3)
 
+        Coordinates can be different, it is what the given class uses.
+        If not provided, it is set to coordinates.
+
         """
 
-        coordinates = np.atleast_2d(coordinates)
+        points = np.atleast_2d(points)
 
-        if not (coordinates.ndim == 2 and coordinates.shape[1] == 3):
+        if not (points.ndim == 2 and points.shape[1] == 3):
             raise ValueError(
-                "`coordinates` must be of shape (x, 3), provided: "
-                f"{coordinates.shape}"
+                "`points` must be of shape (x, 3), provided: "
+                f"{points.shape}"
             )
 
-        self._coordinates = np.asarray(coordinates, dtype=float)
+        self._points = np.asarray(points, dtype=float)
+
+        if coordinates is None:
+            self._coordinates = points
+        else:
+            self._coordinates = coordinates
 
     def copy(self):
         """Return a copy of the Survey."""
@@ -79,6 +87,10 @@ class Electrode:
         return cls(**inp)
 
     @property
+    def points(self):
+        return self._points
+
+    @property
     def coordinates(self):
         return self._coordinates
 
@@ -87,7 +99,7 @@ class Electrode:
         if not hasattr(self, '_xtype'):
             if 'Current' in self.__class__.__name__:
                 self._xtype = 'current'
-            elif ('Current' in self.__class__.__name__ or
+            elif ('Flux' in self.__class__.__name__ or
                   'Loop' in self.__class__.__name__):
                 self._xtype = 'flux'
             elif 'Magnetic' in self.__class__.__name__:
@@ -99,14 +111,10 @@ class Electrode:
 
 class Point(Electrode):
 
-    _serialize = {*Electrode._serialize, 'azimuth', 'dip'}
+    def __init__(self, coordinates):
 
-    def __init__(self, coordinates, azimuth, dip):
-
-        self._azimuth = float(azimuth)
-        self._dip = float(dip)
-
-        super().__init__(coordinates)
+        coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
+        super().__init__(points=coordinates[:3], coordinates=coordinates)
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
@@ -118,17 +126,16 @@ class Point(Electrode):
 
     @property
     def center(self):
-        if not hasattr(self, '_center'):
-            self._center = tuple(self._coordinates[0, :])
-        return self._center
+        return self._coordinates[:3]
 
     @property
     def azimuth(self):
-        return self._azimuth
+        return self._coordinates[3]
 
     @property
     def dip(self):
-        return self._dip
+        return self._coordinates[4]
+
 
 # Create own Source class, adjust for multiple inheritance
 #
@@ -142,7 +149,7 @@ class Dipole(Electrode):
 
     def __init__(self, coordinates, strength, length):
 
-        coordinates = np.squeeze(coordinates)
+        coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
 
         # TODO either (x, y, z, azimuth, dip), length or
         #             (x0, x1, y0, y1, z0, z1) or
@@ -166,14 +173,18 @@ class Dipole(Electrode):
                 length = 1.0
 
             # Get the two separate electrodes.
-            coordinates = maps._get_electrodes(*coordinates, length)
+            points = maps.get_points(*coordinates, length)
 
         elif coordinates.size == 6:
             if coordinates.ndim == 1:
-                coordinates = np.array([coordinates[::2], coordinates[1::2]])
+                points = np.array([coordinates[::2], coordinates[1::2]])
+
+            else:
+                points = coordinates
+                coordinates = None
 
             # Ensure the two poles are distinct.
-            if np.allclose(coordinates[0, :], coordinates[1, :]):
+            if np.allclose(points[0, :], points[1, :]):
                 raise ValueError(
                     "The two poles are identical, use the format "
                     "(x, y, z, azimuth, dip) instead. "
@@ -194,7 +205,7 @@ class Dipole(Electrode):
 
         self._strength = float(strength)
 
-        super().__init__(coordinates)
+        super().__init__(points=points, coordinates=coordinates)
 
     def __repr__(self):
         return (f"{self.__class__.__name__}("
@@ -212,26 +223,25 @@ class Dipole(Electrode):
     @property
     def center(self):
         if not hasattr(self, '_center'):
-            self._center = tuple(np.sum(self._coordinates, 0)/2)
+            self._center = tuple(np.sum(self._points, 0)/2)
         return self._center
 
     @property
     def azimuth(self):
         if not hasattr(self, '_azimuth'):
-            self._azimuth, self._dip = maps._get_angles(self._coordinates)
+            self._azimuth, self._dip = maps.get_angles(self._points)
         return self._azimuth
 
     @property
     def dip(self):
         if not hasattr(self, '_dip'):
-            self._azimuth, self._dip = maps._get_angles(self._coordinates)
+            self._azimuth, self._dip = maps.get_angles(self._points)
         return self._dip
 
     @property
     def length(self):
         if not hasattr(self, '_length'):
-            self._length = np.linalg.norm(
-                self.coordinates[1, :]-self.coordinates[0, :])
+            self._length = np.linalg.norm(self.points[1, :]-self.points[0, :])
         return self._length
 
 
@@ -283,60 +293,33 @@ class TxElectricLoop(Wire):
 
 
 @register_electrode
-class RxPointElectricField(Point):
+class RxElectricPoint(Point):
 
-    def __init__(self, coordinates, **kwargs):
+    def __init__(self, coordinates):
         """
         (x, y, z, azimuth, dip)
         """
-        out = _check_point_coordinates(coordinates, **kwargs)
-
-        super().__init__(*out)
+        super().__init__(coordinates)
 
 
 @register_electrode
-class RxPointMagneticField(Point):
+class RxMagneticPoint(Point):
 
-    def __init__(self, coordinates, **kwargs):
-
-        out = _check_point_coordinates(coordinates, **kwargs)
-
-        super().__init__(*out)
+    def __init__(self, coordinates):
+        super().__init__(coordinates)
 
 
 @register_electrode
-class RxPointElectricCurrentDensity(Point):
+class RxCurrentPoint(Point):
 
-    def __init__(self, coordinates, **kwargs):
-
+    def __init__(self, coordinates):
         self.factor = NotImplemented
-
-        out = _check_point_coordinates(coordinates, **kwargs)
-
-        super().__init__(*out)
+        super().__init__(coordinates)
 
 
 @register_electrode
-class RxPointMagneticFluxDensity(Point):
+class RxFluxPoint(Point):
 
     def __init__(self, coordinates, **kwargs):
-
         self.factor = NotImplemented
-
-        out = _check_point_coordinates(coordinates, **kwargs)
-
-        super().__init__(*out)
-
-
-def _check_point_coordinates(coordinates, azimuth=None, dip=None):
-    coordinates = np.squeeze(coordinates)
-    wrong = azimuth is None and dip is not None
-    wrong *= azimuth is not None and dip is None
-    if wrong:
-        raise ValueError("Either both or None")
-
-    elif azimuth is None:
-        azimuth, dip = coordinates[3:]
-        coordinates = coordinates[:3]
-
-    return coordinates, azimuth, dip
+        super().__init__(coordinates)

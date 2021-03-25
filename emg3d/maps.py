@@ -717,6 +717,10 @@ def rotation(azimuth, dip, rad=False):
     All functions should use this rotation to ensure they use all the same
     definition.
 
+    The rotation factors correspond to the general 3D rotation matrix
+    multiplied by a unit vector in x direction, which corresponds to
+    azimuth=dip=0 in our coordinate system.
+
     Parameters
     ----------
     azimuth : float
@@ -743,7 +747,7 @@ def rotation(azimuth, dip, rad=False):
     return np.array([cos(azimuth)*cos(dip), sin(azimuth)*cos(dip), sin(dip)])
 
 
-def _get_angles(electrodes, rad=False):
+def get_angles(electrodes, rad=False):
     """Return azimuth and dip for given electrode pair.
 
     Parameters
@@ -769,8 +773,7 @@ def _get_angles(electrodes, rad=False):
     azimuth = np.arctan2(dy, dx)
 
     # Dip
-    length = np.linalg.norm([dx, dy, dz], axis=0)
-    dip = np.pi/2-np.arccos(dz/length)
+    dip = np.arctan2(dz, np.sqrt(dx**2+dy**2))
 
     if not rad:
         azimuth, dip = np.rad2deg(azimuth), np.rad2deg(dip)
@@ -778,8 +781,8 @@ def _get_angles(electrodes, rad=False):
     return azimuth, dip
 
 
-def _get_electrodes(x, y, z, azimuth, dip, length, rad=False):
-    """Return coordinates of the two electrodes defined by the input.
+def get_points(x, y, z, azimuth, dip, length, rad=False):
+    """Return coordinates of dipole points defined by center and angles.
 
     Parameters
     ----------
