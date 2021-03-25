@@ -23,14 +23,13 @@ Interpolation routines mapping values between different grids.
 
 import numba as nb
 import numpy as np
-from scipy.special import sindg, cosdg
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import RegularGridInterpolator, interpnd, interp1d
 
 __all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
            'MapLnResistivity', 'interpolate', 'interp_spline_3d',
-           'interp_volume_average', 'interp_edges_to_vol_averages', 'rotation']
+           'interp_volume_average', 'interp_edges_to_vol_averages']
 
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
@@ -700,115 +699,3 @@ def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
                     oz[ixp, iym, iz] += volumes[ixp, iym, iz]*ez[ix, iy, iz]/4
                     oz[ixm, iyp, iz] += volumes[ixm, iyp, iz]*ez[ix, iy, iz]/4
                     oz[ixp, iyp, iz] += volumes[ixp, iyp, iz]*ez[ix, iy, iz]/4
-
-
-# ROTATION
-def rotation(azimuth, dip, rad=False):
-    """Rotation factors for RHS coordinate system with positive z upwards.
-
-    Definition:
-
-    - x is Easting;
-    - y is Northing;
-    - z is positive upwards.
-    - azimuth is horizontal deviation from x-axis, anti-clockwise.
-    - dip is vertical deviation from xy-plane upwards.
-
-    All functions should use this rotation to ensure they use all the same
-    definition.
-
-    The rotation factors correspond to the general 3D rotation matrix
-    multiplied by a unit vector in x direction, which corresponds to
-    azimuth=dip=0 in our coordinate system.
-
-    Parameters
-    ----------
-    azimuth : float
-        Azimuth (° or rad): horizontal deviation from x-axis, anti-clockwise.
-
-    dip : float
-        Dip (° or rad): vertical deviation from xy-plane upwards.
-
-    rad : bool, default: False
-        If True, input are taken as radian, if False, as degree.
-
-
-    Returns
-    -------
-    rot : ndarray
-        Rotation factors (x, y, z).
-
-    """
-    if rad:
-        cos, sin = np.cos, np.sin
-    else:
-        cos, sin = cosdg, sindg
-
-    return np.array([cos(azimuth)*cos(dip), sin(azimuth)*cos(dip), sin(dip)])
-
-
-def get_angles(electrodes, rad=False):
-    """Return azimuth and dip for given electrode pair.
-
-    Parameters
-    ----------
-    electrodes : ndarray
-        Coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
-
-    rad : bool, default: False
-        If True, returned angles are in radians, if False, in degrees.
-
-
-    Returns
-    -------
-    azimuth, dip : float
-        Azimuth and dip of the given electrode pair.
-
-    """
-
-    # Distances
-    dx, dy, dz = electrodes[1, :] - electrodes[0, :]
-
-    # Azimuth
-    azimuth = np.arctan2(dy, dx)
-
-    # Dip
-    dip = np.arctan2(dz, np.sqrt(dx**2+dy**2))
-
-    if not rad:
-        azimuth, dip = np.rad2deg(azimuth), np.rad2deg(dip)
-
-    return azimuth, dip
-
-
-def get_points(x, y, z, azimuth, dip, length, rad=False):
-    """Return coordinates of dipole points defined by center and angles.
-
-    Parameters
-    ----------
-    x, y, z : float
-        Center location of the dipole.
-
-    azimuth, dip : float
-        Azimuth and dip (° or rad) of the dipole.
-
-    length : float
-        Dipole length (m).
-
-    rad : bool, default: False
-        If True, azimuth and dip are taken as radian, if False, as degree.
-
-
-    Returns
-    -------
-    electrodes : ndarray
-        Coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
-
-    """
-
-    # Get rotation factors and widths.
-    rot = rotation(azimuth, dip, rad)
-    dx, dy, dz = rot*length/2
-
-    # Get the two separate electrodes.
-    return np.array([[x-dx, y-dy, z-dz], [x+dx, y+dy, z+dz]])

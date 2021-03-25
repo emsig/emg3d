@@ -27,7 +27,7 @@ try:
 except ImportError:
     xarray = None
 
-from emg3d import maps, utils
+from emg3d import electrodes, utils
 
 __all__ = ['Survey', 'Dipole', 'PointDipole']
 
@@ -770,7 +770,8 @@ class Dipole(PointDipole):
             self.length = np.linalg.norm(electrode1 - electrode2)
 
             # Angles.
-            azm, dip = maps.get_angles(np.array([electrode1, electrode2]))
+            azm, dip = electrodes._get_angles_from_dipole(
+                    np.array([electrode1, electrode2]))
 
             # Store electrodes.
             self.electrode1 = tuple(electrode1)
@@ -782,9 +783,9 @@ class Dipole(PointDipole):
             self.length = 1.0
 
             # Get the two separate electrodes.
-            electrodes = maps.get_points(*coords, self.length)
-            self.electrode1 = tuple(electrodes[0, :])
-            self.electrode2 = tuple(electrodes[1, :])
+            points = electrodes._get_dipole_from_point(coords, self.length)
+            self.electrode1 = tuple(points[0, :])
+            self.electrode2 = tuple(points[1, :])
 
         super().__init__(xco, yco, zco, azm, dip, bool(electric))
 

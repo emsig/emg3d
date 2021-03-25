@@ -21,10 +21,9 @@ from copy import deepcopy
 # TODO from dataclasses import dataclass
 
 import numpy as np
+from scipy.special import sindg, cosdg
 
-from emg3d import maps
-
-__all__ = ['Electrode', 'Point', 'Dipole', ]
+__all__ = ['Electrode', 'Point', 'Dipole', 'rotation', ]
 
 
 # List of electrodes
@@ -173,7 +172,7 @@ class Dipole(Electrode):
                 length = 1.0
 
             # Get the two separate electrodes.
-            points = maps.get_points(*coordinates, length)
+            points = _get_dipole_from_point(coordinates, length)
 
         elif coordinates.size == 6:
             if coordinates.ndim == 1:
@@ -229,13 +228,13 @@ class Dipole(Electrode):
     @property
     def azimuth(self):
         if not hasattr(self, '_azimuth'):
-            self._azimuth, self._dip = maps.get_angles(self._points)
+            self._azimuth, self._dip = _get_angles_from_dipole(self._points)
         return self._azimuth
 
     @property
     def dip(self):
         if not hasattr(self, '_dip'):
-            self._azimuth, self._dip = maps.get_angles(self._points)
+            self._azimuth, self._dip = _get_angles_from_dipole(self._points)
         return self._dip
 
     @property
@@ -323,3 +322,133 @@ class RxFluxPoint(Point):
     def __init__(self, coordinates, **kwargs):
         self.factor = NotImplemented
         super().__init__(coordinates)
+
+
+def _square_loop_from_point(source, length):
+    """Return points of a square loop of length x length m perp to dipole.
+
+    Parameters
+    ----------
+    source : tuple
+        Source coordinates in the form of (x, y, z, azimuth, dip).
+
+    length : float
+        Side-length of the square loop (m).
+
+
+    Returns
+    -------
+    out : ndarray
+        Array of shape (3, 5), corresponding to the x/y/z-coordinates for the
+        five points describing a closed rectangle perpendicular to the dipole,
+        of side-length length.
+
+    """
+    half_diagonal = np.sqrt(2)*length/2
+    rot_hor = rotation(source[3]+90, 0)*half_diagonal
+    rot_ver = rotation(source[3], source[4]+90)*half_diagonal
+    points = source[:3] + np.stack(
+            [rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
+    return points.T
+
+
+# ROTATION RELATED
+def rotation(azimuth, dip, deg=True):
+    """Rotation factors for RHS coordinate system with positive z upwards.
+
+    Definition:
+
+    - x is Easting;
+    - y is Northing;
+    - z is positive upwards.
+    - azimuth is horizontal deviation from x-axis, anti-clockwise.
+    - dip is vertical deviation from xy-plane upwards.
+
+    All functions should use this rotation to ensure they use all the same
+    definition.
+
+    The rotation factors correspond to the general 3D rotation matrix
+    multiplied by a unit vector in x direction, which corresponds to
+    azimuth=dip=0 in our coordinate system.
+
+    Parameters
+    ----------
+    azimuth : float
+        Azimuth (° or rad): horizontal deviation from x-axis, anti-clockwise.
+
+    dip : float
+        Dip (° or rad): vertical deviation from xy-plane upwards.
+
+    deg : bool, default: True
+        Angles are in degrees if True, radians if False.
+
+
+    Returns
+    -------
+    rot : ndarray
+        Rotation factors (x, y, z).
+
+    """
+    if deg:
+        cos, sin = cosdg, sindg
+    else:
+        cos, sin = np.cos, np.sin
+
+    return np.array([cos(azimuth)*cos(dip), sin(azimuth)*cos(dip), sin(dip)])
+
+
+def _get_angles_from_dipole(dipole, deg=True):
+    """Return azimuth and dip for given electrode pair.
+
+    Parameters
+    ----------
+    dipole : ndarray
+        Dipole coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
+
+    deg : bool, default: True
+        Return angles in degrees if True, radians if False.
+
+
+    Returns
+    -------
+    azimuth, dip : float
+        Azimuth and dip of the given electrode pair.
+
+    """
+    # Get distances between coordinates.
+    dx, dy, dz = np.diff(dipole.T).squeeze()
+
+    # Get angles from complex planes.
+    azimuth = np.angle(dx + 1j*dy, deg=deg)
+    dip = np.angle(np.sqrt(dx**2+dy**2) + 1j*dz, deg=deg)
+
+    return azimuth, dip
+
+
+def _get_dipole_from_point(point, length, deg=True):
+    """Return coordinates of dipole points defined by center, angles, length.
+
+    Parameters
+    ----------
+    point : tuple
+        Point coordinates in the form of (x, y, z, azimuth, dip).
+
+    length : float
+        Dipole length (m).
+
+    deg : bool, default: True
+        Angles are in degrees if True, radians if False.
+
+
+    Returns
+    -------
+    dipole : ndarray
+        Coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
+
+    """
+
+    # Get rotation factors and multiply with half the dipole length.
+    rot = rotation(point[3], point[4], deg=deg)*length/2
+
+    # Add half a dipole on both sides of the center.
+    return point[:3] + np.array([-rot, rot])

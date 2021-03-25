@@ -24,7 +24,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.constants import mu_0
 
-from emg3d import maps, meshes, models, utils
+from emg3d import maps, meshes, models, utils, electrodes
 
 __all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
@@ -401,11 +401,12 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
     if source.shape == (5, ):  # Point dipole
 
         if not electric:  # Magnetic: convert to square loop perp. to dipole.
-            source = _square_loop_from_point(source, length)
+            source = electrodes._square_loop_from_point(source, length)
             # source.shape = (3, 5)
 
         else:  # Electric: convert to finite length.
-            source = _finite_dipole_from_point(source, length)
+            source = electrodes._get_dipole_from_point(
+                    source, length).ravel('F')
             # source.shape = (6, )
 
     # Get arbitrary shaped sources recursively.
@@ -564,7 +565,7 @@ def get_receiver(field, receiver):
     resp = np.zeros(xi.shape[0], dtype=field.field.dtype)
 
     # Add the required responses.
-    factors = maps.rotation(*receiver[3:])  # Geometrical weights from angles.
+    factors = electrodes.rotation(*receiver[3:])  # Geom. weights from angles.
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interp_spline_3d(
@@ -812,54 +813,3 @@ def _finite_source_xyz(grid, source, field, decimals):
         print(f"* WARNING :: {msg}")
         warnings.warn(msg, UserWarning)
         field /= sum_s
-
-
-def _finite_dipole_from_point(source, length):
-    """Return finite dipole of length given a point dipole.
-
-    Parameters
-    ----------
-    source : tuple
-        Source coordinates in the form of (x, y, z, azimuth, dip).
-
-    length : float
-        Dipole length (m).
-
-
-    Returns
-    -------
-    out : ndarray
-        Array of shape (6, ), corresponding to the finite length dipole
-        coordinates (x0, x1, y0, y1, z0, z1).
-
-    """
-    factors = maps.rotation(*source[3:])*length/2
-    return np.ravel(source[:3] + np.stack([-factors, factors]), 'F')
-
-
-def _square_loop_from_point(source, length):
-    """Return points of a square loop of length x length m perp to dipole.
-
-    Parameters
-    ----------
-    source : tuple
-        Source coordinates in the form of (x, y, z, azimuth, dip).
-
-    length : float
-        Side-length of the square loop (m).
-
-
-    Returns
-    -------
-    out : ndarray
-        Array of shape (3, 5), corresponding to the x/y/z-coordinates for the
-        five points describing a closed rectangle perpendicular to the dipole,
-        of side-length length.
-
-    """
-    half_diagonal = np.sqrt(2)*length/2
-    rot_hor = maps.rotation(source[3]+90, 0)*half_diagonal
-    rot_ver = maps.rotation(source[3], source[4]+90)*half_diagonal
-    points = source[:3] + np.stack(
-            [rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
-    return points.T
