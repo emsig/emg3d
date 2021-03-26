@@ -464,7 +464,6 @@ def multigrid(model, sfield, efield, var, **kwargs):
     sfield : Field
         The source field; a :class:`emg3d.fields.Field` instance.
 
-
     efield : Field
         The electric field; a :class:`emg3d.fields.Field` instance.
 

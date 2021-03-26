@@ -497,86 +497,91 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
 def get_receiver(field, receiver):
     """Return the field (response) at receiver coordinates.
 
-    - TODO :: check, simplify, document
-    - TODO :: incorporate into Field
-    - TODO :: Improve tests!
-
-    Note that in order to avoid boundary effects the first and last value in
-    each direction is neglected. Field values for coordinates outside of the
-    grid are set to NaN's. However, all receivers should be much further away
-    from the boundary.
+    Note that in order to avoid boundary effects from the PEC boundary the
+    outermost cells are neglected. Field values for coordinates outside of the
+    grid are set to NaN's. However, take into account that for good results all
+    receivers should be far away from the boundary.
 
 
     Parameters
     ----------
-    field : :class:`Field`
-        The electric or magnetic field.
+    field : Field
+        The electric or magnetic field; a :class:`emg3d.fields.Field` instance.
 
-    receiver : tuple (x, y, z, azimuth, dip)
-        Receiver coordinates and angles (m, °).
+    receiver : {Rx*, list, tuple}
+        Receiver coordinates. The following formats are accepted:
 
-        All values can either be a scalar or having the same length as number
-        of receivers.
+        - ``Rx*`` instance, any receiver object from :mod:`emg3d.electrodes`.
+        - ``list``: A list of ``Rx*`` instances.
+        - ``tuple``: ``(x, y, z, azimuth, dip)``; receiver coordinates and
+          angles (m, °). All values can either be a scalar or having the same
+          length as number of receivers.
 
-        Angles:
-
-        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-        - dip (°): vertical deviation from xy-plane up-wards.
+        Note that the actual receiver type has no effect here, it just takes
+        the locations from the receiver instances.
 
 
     Returns
     -------
-    responses : :class:`utils.EMArray`
+    responses : EMArray
         Responses at receiver.
-
-
-    .. note::
-
-        Currently only implemented for point receivers, not for finite length
-        dipoles.
-
-
-    See Also
-    --------
-    get_receiver : Get values at coordinates (fields and models).
 
     """
 
+    # Rx* instance.
+    if hasattr(receiver, 'coordinates'):
+        coordinates = receiver.coordinates
+
+    # List of Rx* instances.
+    elif hasattr(tuple(receiver)[0], 'coordinates'):
+        nrec = len(receiver)
+        coordinates = np.zeros((nrec, 5))
+        for i, r in enumerate(receiver):
+            coordinates[i, :] = r.coordinates
+        coordinates = tuple(coordinates.T)
+
+    # Tuple of coordinates.
+    else:
+        coordinates = receiver
+
     # Check receiver dimension.
-    if len(receiver) != 5:
+    if len(coordinates) != 5:
         raise ValueError(
             "`receiver` needs to be in the form (x, y, z, azimuth, dip). "
-            f"Length of provided `receiver`: {len(receiver)}."
+            f"Length of provided `receiver`: {len(coordinates)}."
         )
 
     # Check field dimension to ensure it is not a particular field.
-    if not hasattr(field, 'field'):
+    if not isinstance(field, Field):
         raise ValueError(
             "`field` must be a `Field`-instance, not a "
             "particular field such as `field.fx`."
         )
 
-    # Get the vectors corresponding to input data.
+    # Grid.
     grid = field.grid
-    points = ((grid.cell_centers_x, grid.nodes_y, grid.nodes_z),
-              (grid.nodes_x, grid.cell_centers_y, grid.nodes_z),
-              (grid.nodes_x, grid.nodes_y, grid.cell_centers_z))
-
-    # Remove first and last value in each direction.
-    points = tuple([tuple([p[1:-1] for p in pp]) for pp in points])
 
     # Pre-allocate the response.
     _, xi, shape = maps._points_from_grids(
-            field.grid, field.fx, receiver[:3], 'cubic')
+            grid, field.fx, coordinates[:3], 'cubic')
     resp = np.zeros(xi.shape[0], dtype=field.field.dtype)
 
+    # Get weighting factors per direction.
+    factors = electrodes._rotation(*coordinates[3:])
+
     # Add the required responses.
-    factors = electrodes._rotation(*receiver[3:])
+    opts = {'method': 'cubic', 'extrapolate': False, 'log': False, 'mode':
+            'constant', 'cval': np.nan}
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
-            resp += factors[i]*maps.interp_spline_3d(
-                        points[i], ff[1:-1, 1:-1, 1:-1], xi,
-                        mode='constant', cval=np.nan)
+            resp += factors[i]*maps.interpolate(grid, ff, xi, **opts)
+
+    # PEC: If receivers are in the outermost cell, set them to NaN.
+    # Note: Receivers should be MUCH further away from the boundary.
+    ind = ((xi[:, 0] < grid.nodes_x[1]) | (xi[:, 0] > grid.nodes_x[-2]) |
+           (xi[:, 1] < grid.nodes_y[1]) | (xi[:, 1] > grid.nodes_y[-2]) |
+           (xi[:, 2] < grid.nodes_z[1]) | (xi[:, 2] > grid.nodes_z[-2]))
+    resp[ind] = np.nan
 
     # Return response.
     return utils.EMArray(resp.reshape(shape, order='F'))

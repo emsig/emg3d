@@ -15,7 +15,7 @@ try:
 except ImportError:
     discretize = None
 
-from emg3d import io, meshes, models, fields, solver
+from emg3d import electrodes, io, meshes, models, fields, solver
 
 # Data generated with tests/create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
@@ -305,6 +305,10 @@ class TestGetSourceField:
 
 
 def test_get_receiver():
+    # The interpolation happens in maps.interp_spline_3d.
+    # Here we just check the 'other' things: warning and errors, and that
+    # it is composed correctly.
+
     # Check cubic spline runs fine (NOT CHECKING ACTUAL VALUES!.
     grid = meshes.TensorMesh(
             [np.ones(4), np.array([1, 2, 3, 1]), np.array([2, 1, 1, 1])],
@@ -355,6 +359,28 @@ def test_get_receiver():
 
     # 10 % is still OK, grid is very coarse for fast comp (2s)
     assert_allclose(epm, e3d, rtol=0.1)
+
+    # Test with a list of receiver instance.
+    rec_inst = [electrodes.RxElectricPoint((rec[0][i], rec[1][i], *rec[2:]))
+                for i in range(rec[0].size)]
+    e3d_inst = fields.get_receiver(efield, rec_inst)
+    assert_allclose(e3d_inst, e3d)
+
+    # Only one receiver
+    e3d_inst = fields.get_receiver(efield, rec_inst[0])
+    assert_allclose(e3d_inst, e3d[0])
+
+    # Ensure responses outside and in the last cell are set to NaN.
+    h = np.ones(4)*100
+    grid = meshes.TensorMesh([h, h, h], (-200, -200, -200))
+    model = models.Model(grid)
+    sfield = fields.get_source_field(
+            grid=grid, source=[0, 0, 0, 0, 0], frequency=10)
+    out = solver.solve(model=model, sfield=sfield, plain=True, verb=0)
+    off = np.arange(11)*50-250
+    resp = out.get_receiver((off, off, off, 0, 0))
+    assert_allclose(np.isfinite(resp),
+                    np.r_[3*[False, ], 5*[True, ], 3*[False, ]])
 
 
 def test_get_magnetic_field():
