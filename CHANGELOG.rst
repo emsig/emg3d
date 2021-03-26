@@ -33,6 +33,8 @@ Detailed changes
 **Electrodes**
 
 - New module containing all sources and receivers.
+- ``dip`` is new called ``elevation`` to make it clear that it is the angle
+  positive upwards (anticlockwise from the horizontal plane).
 
 
 **Fields**

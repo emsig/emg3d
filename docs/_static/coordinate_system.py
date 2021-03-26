@@ -64,12 +64,12 @@ ax.plot(*(rot1*fact), c='C2')
 ax.text(5.5, 1.5, 0, r"$\theta$", color='C2', fontsize=14)
 
 # Theta and Phi
-dip = np.pi/2-np.arcsin(
+elevation = np.pi/2-np.arcsin(
         np.sqrt(P[0]**2+P[1]**2)/np.sqrt(P[0]**2+P[1]**2+P[2]**2))
-# print(f"theta = {np.rad2deg(azm):.1f}°; phi = {np.rad2deg(dip):.1f}°")
-ldip = np.linspace(0, dip, 31)
+# print(f"theta = {np.rad2deg(azm):.1f}°; phi = {np.rad2deg(elevation):.1f}°")
+lelevation = np.linspace(0, elevation, 31)
 
-rot2 = rotation(azm, ldip, rad=True)
+rot2 = rotation(azm, lelevation, rad=True)
 ax.plot(*(rot2*fact), c='C0')
 ax.text(3.5, 3.5, 1.5, r"$\varphi$", color='C0', fontsize=14)
 

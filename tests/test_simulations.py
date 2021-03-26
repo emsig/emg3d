@@ -115,14 +115,14 @@ class TestSimulation():
         assert "*Simulation* «Test1»" in test
         assert "of Survey «Test»" in test
         assert "Survey: 3 sources; 12 receivers; 2 frequencies" in test
-        assert "Model [resistivity]; isotropic; 32 x 16 x 16 (8,192)" in test
+        assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
         assert "Gridding: Same grid as for model" in test
 
         test = self.simulation._repr_html_()
         assert "Simulation «Test1»" in test
         assert "of Survey «Test»" in test
         assert "Survey: 3 sources; 12 receivers; 2 frequencies" in test
-        assert "Model [resistivity]; isotropic; 32 x 16 x 16 (8,192)" in test
+        assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
         assert "Gridding: Same grid as for model" in test
 
     def test_copy(self, tmpdir):

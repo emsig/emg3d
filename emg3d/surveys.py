@@ -766,11 +766,8 @@ class Dipole(PointDipole):
             # Compute center.
             xco, yco, zco = np.sum(coords.reshape(3, -1), 1)/2
 
-            # Length of bipole.
-            self.length = np.linalg.norm(electrode1 - electrode2)
-
             # Angles.
-            azm, dip = electrodes._get_angles_from_dipole(
+            azm, dip, self.length = electrodes._dipole_to_point(
                     np.array([electrode1, electrode2]))
 
             # Store electrodes.
@@ -783,7 +780,7 @@ class Dipole(PointDipole):
             self.length = 1.0
 
             # Get the two separate electrodes.
-            points = electrodes._get_dipole_from_point(coords, self.length)
+            points = electrodes._point_to_dipole(coords, self.length)
             self.electrode1 = tuple(points[0, :])
             self.electrode2 = tuple(points[1, :])
 

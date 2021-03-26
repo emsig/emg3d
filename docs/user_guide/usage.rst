@@ -115,8 +115,8 @@ Coordinate System
 The coordinate system is shown in :numref:`Figure %s <coordinate_system>`. It
 is a right-handed system (RHS) with x pointing East, y pointing North, and z
 pointing upwards. The azimuth is defined as the anticlockwise rotation from
-Easting towards Northing, and dip is defined as the anticlockwise rotation from
-the horizontal plane up.
+Easting towards Northing, and elevation is defined as the anticlockwise
+rotation from the horizontal plane up.
 
 .. figure:: ../_static/coordinate_system.svg
    :align: center

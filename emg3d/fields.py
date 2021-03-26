@@ -97,6 +97,12 @@ class Field:
         self.grid = grid
         self._frequency = frequency
 
+    def __repr__(self):
+        """Simple representation."""
+        return (f"{self.__class__.__name__}: {self.grid.shape_cells[0]} x "
+                f"{self.grid.shape_cells[1]} x {self.grid.shape_cells[2]}; "
+                f"{self.field.size:,}")
+
     def __eq__(self, field):
         """Compare two fields."""
         equal = self.__class__.__name__ == field.__class__.__name__
@@ -401,11 +407,11 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
     if source.shape == (5, ):  # Point dipole
 
         if not electric:  # Magnetic: convert to square loop perp. to dipole.
-            source = electrodes._square_loop_from_point(source, length)
+            source = electrodes._point_to_square_loop(source, length)
             # source.shape = (3, 5)
 
         else:  # Electric: convert to finite length.
-            source = electrodes._get_dipole_from_point(
+            source = electrodes._point_to_dipole(
                     source, length).ravel('F')
             # source.shape = (6, )
 
@@ -565,7 +571,7 @@ def get_receiver(field, receiver):
     resp = np.zeros(xi.shape[0], dtype=field.field.dtype)
 
     # Add the required responses.
-    factors = electrodes.rotation(*receiver[3:])  # Geom. weights from angles.
+    factors = electrodes._rotation(*receiver[3:])
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interp_spline_3d(

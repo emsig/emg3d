@@ -40,7 +40,7 @@ class TestModel:
         model1 = models.Model(grid)
 
         # Check representation of Model.
-        assert 'Model [resistivity]; isotropic' in model1.__repr__()
+        assert 'Model: resistivity; isotropic' in model1.__repr__()
 
         vmodel1 = models.VolumeModel(model1, sfield)
         assert_allclose(model1.size, grid.n_cells)

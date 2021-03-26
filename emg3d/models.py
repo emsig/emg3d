@@ -133,8 +133,8 @@ class Model:
 
     def __repr__(self):
         """Simple representation."""
-        return (f"Model [{self.map.description}]; {self.case}"
-                f"{'' if self.mu_r is None else '; mu_r'}"
+        return (f"{self.__class__.__name__}: {self.map.description}; "
+                f"{self.case}{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}"
                 f"; {self.shape[0]} x {self.shape[1]} x {self.shape[2]} "
                 f"({self.size:,})")

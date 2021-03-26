@@ -62,6 +62,9 @@ class TestField:
         assert ee.frequency is None
         assert ee.field.dtype == self.field.dtype
 
+        # Check representation of Field.
+        assert f"Field: {ee.grid.shape_cells[0]} x" in ee.__repr__()
+
         # Test amplitude and phase.
 
         assert_allclose(ee.fx.amp(), np.abs(ee.fx))

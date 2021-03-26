@@ -18,12 +18,11 @@ A survey stores a set of sources, receivers, and the measured data.
 # the License.
 
 from copy import deepcopy
-# TODO from dataclasses import dataclass
 
 import numpy as np
 from scipy.special import sindg, cosdg
 
-__all__ = ['Electrode', 'Point', 'Dipole', 'rotation', ]
+__all__ = ['Electrode', 'Point', 'Dipole']
 
 
 # List of electrodes
@@ -38,7 +37,7 @@ def register_electrode(func):
 
 class Electrode:
 
-    _serialize = {'coordinates', }
+    _serialize = ('coordinates', )
 
     def __init__(self, points, coordinates=None):
         """
@@ -116,12 +115,11 @@ class Point(Electrode):
         super().__init__(points=coordinates[:3], coordinates=coordinates)
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}("
-                f"x={self.center[0]:,.1f}m, "
-                f"y={self.center[1]:,.1f}m, "
-                f"z={self.center[2]:,.1f}m, "
-                f"θ={self.azimuth:.1f}°, "
-                f"φ={self.dip:.1f}°)")
+        s0 = f"{self.__class__.__name__}: \n"
+        s1 = (f"    x={self.center[0]:,.1f}m, "
+              f"y={self.center[1]:,.1f}m, z={self.center[2]:,.1f}m, ")
+        s2 = f"θ={self.azimuth:.1f}°, φ={self.elevation:.1f}°"
+        return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
 
     @property
     def center(self):
@@ -132,25 +130,17 @@ class Point(Electrode):
         return self._coordinates[3]
 
     @property
-    def dip(self):
+    def elevation(self):
         return self._coordinates[4]
-
-
-# Create own Source class, adjust for multiple inheritance
-#
-# class Source(Electrode):
-#     _serialize = {*Electrode._serialize, 'strength'}
 
 
 class Dipole(Electrode):
 
-    _serialize = {*Electrode._serialize, 'strength'}
-
-    def __init__(self, coordinates, strength, length):
+    def __init__(self, coordinates, length):
 
         coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
 
-        # TODO either (x, y, z, azimuth, dip), length or
+        # TODO either (x, y, z, azimuth, elevation), length or
         #             (x0, x1, y0, y1, z0, z1) or
         #             ([x0, y0, z0], [x1, y1, z1])
 
@@ -172,7 +162,7 @@ class Dipole(Electrode):
                 length = 1.0
 
             # Get the two separate electrodes.
-            points = _get_dipole_from_point(coordinates, length)
+            points = _point_to_dipole(coordinates, length)
 
         elif coordinates.size == 6:
             if coordinates.ndim == 1:
@@ -186,7 +176,7 @@ class Dipole(Electrode):
             if np.allclose(points[0, :], points[1, :]):
                 raise ValueError(
                     "The two poles are identical, use the format "
-                    "(x, y, z, azimuth, dip) instead. "
+                    "(x, y, z, azimuth, elevation) instead. "
                     f"Provided coordinates: {coordinates}."
                 )
 
@@ -196,28 +186,28 @@ class Dipole(Electrode):
         else:
             raise ValueError(
                 "Dipole coordinates are wrong defined. They must be "
-                "defined either as a point, (x, y, z, azimuth, dip), or "
+                "defined either as a point, (x, y, z, azimuth, elevation), or "
                 "as two poles, (x0, x1, y0, y1, z0, z1) or "
                 "[(x0, y0, z0), (x1, y1, z1)] , all floats. "
                 f"Provided coordinates: {coordinates}."
             )
 
-        self._strength = float(strength)
-
         super().__init__(points=points, coordinates=coordinates)
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}("
-                f"x={self.center[0]:,.1f}m, "
-                f"y={self.center[1]:,.1f}m, "
-                f"z={self.center[2]:,.1f}m, "
-                f"θ={self.azimuth:.1f}°, "
-                f"φ={self.dip:.1f}°"
-                f"; {self.length}m; {self.strength})")
-
-    @property
-    def strength(self):
-        return self._strength
+        s0 = (f"{self.__class__.__name__}: "
+              f"{self._repr_add if hasattr(self, '_repr_add') else ''}\n")
+        if self._coordinates.size == 5:
+            s1 = (f"    center={{{self.center[0]:,.1f}; "
+                  f"{self.center[1]:,.1f}; {self.center[2]:,.1f}}}m; ")
+            s2 = (f"θ={self.azimuth:.1f}°, φ={self.elevation:.1f}°; "
+                  f"l={self.length:,.1f}m")
+        else:
+            s1 = (f"    e1={{{self.points[0, 0]:,.1f}; "
+                  f"{self.points[0, 1]:,.1f}; {self.points[0, 2]:,.1f}}}m; ")
+            s2 = (f"e2={{{self.points[1, 0]:,.1f}; "
+                  f"{self.points[1, 1]:,.1f}; {self.points[1, 2]:,.1f}}}m")
+        return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
 
     @property
     def center(self):
@@ -228,19 +218,20 @@ class Dipole(Electrode):
     @property
     def azimuth(self):
         if not hasattr(self, '_azimuth'):
-            self._azimuth, self._dip = _get_angles_from_dipole(self._points)
+            out = _dipole_to_point(self._points)
+            self._azimuth, self._elevation, self._length = out
         return self._azimuth
 
     @property
-    def dip(self):
-        if not hasattr(self, '_dip'):
-            self._azimuth, self._dip = _get_angles_from_dipole(self._points)
-        return self._dip
+    def elevation(self):
+        if not hasattr(self, '_elevation'):
+            _ = self.azimuth  # Sets azimuth, elevation, and length
+        return self._elevation
 
     @property
     def length(self):
         if not hasattr(self, '_length'):
-            self._length = np.linalg.norm(self.points[1, :]-self.points[0, :])
+            _ = self.azimuth  # Sets azimuth, elevation, and length
         return self._length
 
 
@@ -263,40 +254,66 @@ class Wire(Electrode):
     pass
 
 
+# SOURCES
+class Source:
+
+    _serialize = (*Electrode._serialize, 'strength')
+
+    def __init__(self, strength, **kwargs):
+        self._strength = float(strength)
+        self._repr_add = f"{self.strength:,.1f}A"
+        super().__init__(**kwargs)
+
+    @property
+    def strength(self):
+        return self._strength
+
+
 @register_electrode
-class TxElectricDipole(Dipole):
+class TxElectricDipole(Source, Dipole):
 
     def __init__(self, coordinates, strength=1.0, length=None):
 
-        super().__init__(coordinates, strength, length)
+        super().__init__(coordinates=coordinates, strength=strength,
+                         length=length)
 
 
 @register_electrode
-class TxMagneticDipole(Dipole):
-    pass
+class TxMagneticDipole(Source, Dipole):
+    def __init__(self, coordinates, strength):
+        raise NotImplementedError(
+            "Magnetic dipole source not yet fully implemented"
+        )
 
 
 @register_electrode
-class TxElectricWire(Wire):
+class TxElectricWire(Source, Wire):
     # - has length, area (NotImplemented) attributes
     # - ensures no point coincides
-    pass
+    def __init__(self, coordinates, strength):
+        raise NotImplementedError(
+            "Electric wire source not yet fully implemented"
+        )
 
 
 @register_electrode
-class TxElectricLoop(Wire):
+class TxElectricLoop(Source, Wire):
     # - has length, area (NotImplemented) attributes
     # - ensures no point coincides except first and last
     # - factor ?
-    pass
+    def __init__(self, coordinates, strength):
+        raise NotImplementedError(
+            "Electric loop source not yet fully implemented"
+        )
 
 
+# RECEIVERS
 @register_electrode
 class RxElectricPoint(Point):
 
     def __init__(self, coordinates):
         """
-        (x, y, z, azimuth, dip)
+        (x, y, z, azimuth, elevation)
         """
         super().__init__(coordinates)
 
@@ -312,25 +329,97 @@ class RxMagneticPoint(Point):
 class RxCurrentPoint(Point):
 
     def __init__(self, coordinates):
-        self.factor = NotImplemented
-        super().__init__(coordinates)
+        raise NotImplementedError(
+            "Electric current density receiver not yet fully implemented"
+        )
+        # self.factor = NotImplemented
+        # super().__init__(coordinates)
 
 
 @register_electrode
 class RxFluxPoint(Point):
 
-    def __init__(self, coordinates, **kwargs):
-        self.factor = NotImplemented
-        super().__init__(coordinates)
+    def __init__(self, coordinates):
+        raise NotImplementedError(
+            "Magnetic flux density receiver not yet fully implemented"
+        )
+        # self.factor = NotImplemented
+        # super().__init__(coordinates)
 
 
-def _square_loop_from_point(source, length):
+def _point_to_dipole(point, length, deg=True):
+    """Return coordinates of dipole points defined by center, angles, length.
+
+    Spherical to Cartesian.
+
+    Parameters
+    ----------
+    point : tuple
+        Point coordinates in the form of (x, y, z, azimuth, elevation).
+
+    length : float
+        Dipole length (m).
+
+    deg : bool, default: True
+        Angles are in degrees if True, radians if False.
+
+
+    Returns
+    -------
+    dipole : ndarray
+        Coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
+
+    """
+
+    # Get coordinates relative to centrum.
+    xyz = _rotation(point[3], point[4], deg=deg)*length/2
+
+    # Add half a dipole on both sides of the center.
+    return point[:3] + np.array([-xyz, xyz])
+
+
+def _dipole_to_point(dipole, deg=True):
+    """Return azimuth and elevation for given electrode pair.
+
+    Parameters
+    ----------
+    dipole : ndarray
+        Dipole coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
+
+    deg : bool, default: True
+        Return angles in degrees if True, radians if False.
+
+
+    Returns
+    -------
+    azimuth : float
+        Anticlockwise angle from x-axis towards y-axis.
+
+    elevation : float
+        Anticlockwise (upwards) angle from the xy-plane towards z-axis.
+
+    length : float, default: 1.0
+        Dipole length (m).
+
+    """
+    # Get distances between coordinates.
+    dx, dy, dz = np.diff(dipole.T).squeeze()
+    length = np.linalg.norm([dx, dy, dz])
+
+    # Get angles from complex planes.
+    azimuth = np.angle(dx + 1j*dy, deg=deg)  # same as:  np.arctan2(dy, dx)
+    elevation = np.angle(np.sqrt(dx**2+dy**2) + 1j*dz, deg=deg)  # (dz, dxy)
+
+    return azimuth, elevation, length
+
+
+def _point_to_square_loop(source, length):
     """Return points of a square loop of length x length m perp to dipole.
 
     Parameters
     ----------
     source : tuple
-        Source coordinates in the form of (x, y, z, azimuth, dip).
+        Source coordinates in the form of (x, y, z, azimuth, elevation).
 
     length : float
         Side-length of the square loop (m).
@@ -344,40 +433,41 @@ def _square_loop_from_point(source, length):
         of side-length length.
 
     """
-    half_diagonal = np.sqrt(2)*length/2
-    rot_hor = rotation(source[3]+90, 0)*half_diagonal
-    rot_ver = rotation(source[3], source[4]+90)*half_diagonal
+    half_length = np.sqrt(2)*length/2
+    xyz_hor = _rotation(source[3]+90, 0)*half_length
+    xyz_ver = _rotation(source[3], source[4]+90)*half_length
     points = source[:3] + np.stack(
-            [rot_hor, rot_ver, -rot_hor, -rot_ver, rot_hor])
+            [xyz_hor, xyz_ver, -xyz_hor, -xyz_ver, xyz_hor])
     return points.T
 
 
-# ROTATION RELATED
-def rotation(azimuth, dip, deg=True):
+def _rotation(azimuth, elevation, deg=True):
     """Rotation factors for RHS coordinate system with positive z upwards.
 
-    Definition:
+    The rotation factors multiplied with the length yield the corresponding
+    Cartesian coordinates. (The rotation factors correspond to the rotation of
+    a unit radius of length 1.)
+
+    Definition of spherical coordinates:
+    - azimuth θ: anticlockwise from x-axis towards y-axis, (-180°, +180°].
+    - elevation φ: anticlockwise (upwards) from the xy-plane towards z-axis
+      [-90°, +90°].
+    - radius (m).
+
+    Definition Cartesian coordinates:
 
     - x is Easting;
     - y is Northing;
-    - z is positive upwards.
-    - azimuth is horizontal deviation from x-axis, anti-clockwise.
-    - dip is vertical deviation from xy-plane upwards.
+    - z is positive upwards (RHS).
 
-    All functions should use this rotation to ensure they use all the same
-    definition.
-
-    The rotation factors correspond to the general 3D rotation matrix
-    multiplied by a unit vector in x direction, which corresponds to
-    azimuth=dip=0 in our coordinate system.
 
     Parameters
     ----------
     azimuth : float
-        Azimuth (° or rad): horizontal deviation from x-axis, anti-clockwise.
+        Anticlockwise angle from x-axis towards y-axis.
 
-    dip : float
-        Dip (° or rad): vertical deviation from xy-plane upwards.
+    elevation : float
+        Anticlockwise (upwards) angle from the xy-plane towards z-axis.
 
     deg : bool, default: True
         Angles are in degrees if True, radians if False.
@@ -394,61 +484,6 @@ def rotation(azimuth, dip, deg=True):
     else:
         cos, sin = np.cos, np.sin
 
-    return np.array([cos(azimuth)*cos(dip), sin(azimuth)*cos(dip), sin(dip)])
-
-
-def _get_angles_from_dipole(dipole, deg=True):
-    """Return azimuth and dip for given electrode pair.
-
-    Parameters
-    ----------
-    dipole : ndarray
-        Dipole coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
-
-    deg : bool, default: True
-        Return angles in degrees if True, radians if False.
-
-
-    Returns
-    -------
-    azimuth, dip : float
-        Azimuth and dip of the given electrode pair.
-
-    """
-    # Get distances between coordinates.
-    dx, dy, dz = np.diff(dipole.T).squeeze()
-
-    # Get angles from complex planes.
-    azimuth = np.angle(dx + 1j*dy, deg=deg)
-    dip = np.angle(np.sqrt(dx**2+dy**2) + 1j*dz, deg=deg)
-
-    return azimuth, dip
-
-
-def _get_dipole_from_point(point, length, deg=True):
-    """Return coordinates of dipole points defined by center, angles, length.
-
-    Parameters
-    ----------
-    point : tuple
-        Point coordinates in the form of (x, y, z, azimuth, dip).
-
-    length : float
-        Dipole length (m).
-
-    deg : bool, default: True
-        Angles are in degrees if True, radians if False.
-
-
-    Returns
-    -------
-    dipole : ndarray
-        Coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
-
-    """
-
-    # Get rotation factors and multiply with half the dipole length.
-    rot = rotation(point[3], point[4], deg=deg)*length/2
-
-    # Add half a dipole on both sides of the center.
-    return point[:3] + np.array([-rot, rot])
+    return np.array([cos(azimuth)*cos(elevation),
+                     sin(azimuth)*cos(elevation),
+                     sin(elevation)])
