@@ -49,6 +49,10 @@ jobs:
             name: full
             os: ubuntu
             conda: "xarray tqdm empymod h5py scooby discretize matplotlib"
+          - python-version: 3.9
+            name: plain
+            os: ubuntu
+            conda: ""
 
     env:
       # Used to for coveralls flag
