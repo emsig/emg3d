@@ -125,19 +125,19 @@ class TestDipoleToPoint:
 
 def test_point_to_square_loop():
     source = (10, 100, -1000, 0, 0)
-    length = np.sqrt(2)
+    length = 4
     out = electrodes._point_to_square_loop(source, length)
-    assert out.shape == (3, 5)
-    assert_allclose(out[0, :], source[0])  # x-directed, all x the same
-    assert_allclose(out[1, :], [101, 100, 99, 100, 101])
-    assert_allclose(out[2, :], [-1000, -999, -1000, -1001, -1000])
+    assert out.shape == (5, 3)
+    assert_allclose(out[:, 0], source[0])  # x-directed, all x the same
+    assert_allclose(out[:, 1], [101, 100, 99, 100, 101])
+    assert_allclose(out[:, 2], [-1000, -999, -1000, -1001, -1000])
 
     source = (10, 100, -1000, 30, 60)
-    length = np.sqrt(2)
+    length = 4
     out = electrodes._point_to_square_loop(source, length)
-    assert_allclose(out[0, :], [9.5, 9.25, 10.5, 10.75, 9.5])
-    assert_allclose(out[2, :], [-1000, -999.5, -1000, -1000.5, -1000])
-    assert_allclose(out[:, 0], out[:, -1])  # first and last point identical
+    assert_allclose(out[:, 0], [9.5, 9.25, 10.5, 10.75, 9.5])
+    assert_allclose(out[:, 2], [-1000, -999.5, -1000, -1000.5, -1000])
+    assert_allclose(out[0, :], out[-1, :])  # first and last point identical
 
 
 def test_rotation():

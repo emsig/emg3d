@@ -129,8 +129,8 @@ class Point(Electrode):
 
     def __repr__(self):
         s0 = f"{self.__class__.__name__}: \n"
-        s1 = (f"    x={self.center[0]:,.1f}m, "
-              f"y={self.center[1]:,.1f}m, z={self.center[2]:,.1f}m, ")
+        s1 = (f"    x={self.center[0]:,.1f} m, "
+              f"y={self.center[1]:,.1f} m, z={self.center[2]:,.1f} m, ")
         s2 = f"θ={self.azimuth:.1f}°, φ={self.elevation:.1f}°"
         return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
 
@@ -148,6 +148,8 @@ class Point(Electrode):
 
 
 class Dipole(Electrode):
+
+    _serialize = {'length'} | Electrode._serialize
 
     def __init__(self, coordinates, length):
 
@@ -175,7 +177,10 @@ class Dipole(Electrode):
                 length = 1.0
 
             # Get the two separate electrodes.
-            points = _point_to_dipole(coordinates, length)
+            if self.xtype == 'magnetic':
+                points = _point_to_square_loop(coordinates, length)
+            else:
+                points = _point_to_dipole(coordinates, length)
 
         elif coordinates.size == 6:
             if coordinates.ndim == 1:
@@ -212,27 +217,36 @@ class Dipole(Electrode):
               f"{self._repr_add if hasattr(self, '_repr_add') else ''}\n")
         if self._coordinates.size == 5:
             s1 = (f"    center={{{self.center[0]:,.1f}; "
-                  f"{self.center[1]:,.1f}; {self.center[2]:,.1f}}}m; ")
+                  f"{self.center[1]:,.1f}; {self.center[2]:,.1f}}} m; ")
             s2 = (f"θ={self.azimuth:.1f}°, φ={self.elevation:.1f}°; "
-                  f"l={self.length:,.1f}m")
+                  f"l={self.length:,.1f} m")
         else:
             s1 = (f"    e1={{{self.points[0, 0]:,.1f}; "
-                  f"{self.points[0, 1]:,.1f}; {self.points[0, 2]:,.1f}}}m; ")
+                  f"{self.points[0, 1]:,.1f}; {self.points[0, 2]:,.1f}}} m; ")
             s2 = (f"e2={{{self.points[1, 0]:,.1f}; "
-                  f"{self.points[1, 1]:,.1f}; {self.points[1, 2]:,.1f}}}m")
+                  f"{self.points[1, 1]:,.1f}; {self.points[1, 2]:,.1f}}} m")
         return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
 
     @property
     def center(self):
         if not hasattr(self, '_center'):
-            self._center = tuple(np.sum(self._points, 0)/2)
+            if self._coordinates.size == 5:
+                self._center = tuple(self._coordinates[:3])
+            else:
+                self._center = tuple(np.sum(self._points, 0)/2)
         return self._center
 
     @property
     def azimuth(self):
         if not hasattr(self, '_azimuth'):
-            out = _dipole_to_point(self._points)
-            self._azimuth, self._elevation, self._length = out
+            if self._points.shape[0] == 5:
+                self._azimuth = self._coordinates[3]
+                self._elevation = self._coordinates[4]
+                self._length = np.linalg.norm(
+                        self._points[0, :] - self._points[2, :])**2
+            else:
+                out = _dipole_to_point(self._points)
+                self._azimuth, self._elevation, self._length = out
         return self._azimuth
 
     @property
@@ -273,8 +287,8 @@ class Source:
     _serialize = {'strength'} | Electrode._serialize
 
     def __init__(self, strength, **kwargs):
-        self._strength = float(strength)
-        self._repr_add = f"{self.strength:,.1f}A"
+        self._strength = strength
+        self._repr_add = f"{self.strength:,.1f} A"
         super().__init__(**kwargs)
 
     @property
@@ -285,7 +299,9 @@ class Source:
 @register_electrode
 class TxElectricDipole(Source, Dipole):
 
-    def __init__(self, coordinates, strength=1.0, length=None):
+    _serialize = Source._serialize | Dipole._serialize
+
+    def __init__(self, coordinates, strength=0.0, length=None):
 
         super().__init__(coordinates=coordinates, strength=strength,
                          length=length)
@@ -293,24 +309,36 @@ class TxElectricDipole(Source, Dipole):
 
 @register_electrode
 class TxMagneticDipole(Source, Dipole):
-    def __init__(self, coordinates, strength):
-        raise NotImplementedError(
-            "Magnetic dipole source not yet fully implemented"
-        )
+    """Approximated by a square loop perpendicular to dipole."""
+
+    _serialize = Source._serialize | Dipole._serialize
+
+    def __init__(self, coordinates, strength=0.0, length=None):
+        """Length is taken as area of the perpendicular loop."""
+
+        super().__init__(coordinates=coordinates, strength=strength,
+                         length=length)
 
 
 @register_electrode
 class TxElectricWire(Source, Wire):
+
+    _serialize = Source._serialize | Wire._serialize
+
     # - has length, area (NotImplemented) attributes
     # - ensures no point coincides
-    def __init__(self, coordinates, strength):
-        raise NotImplementedError(
-            "Electric wire source not yet fully implemented"
-        )
+
+    def __init__(self, coordinates, strength=0.0):
+        """Length is taken as area of the perpendicular loop."""
+
+        super().__init__(coordinates=coordinates, strength=strength)
 
 
 @register_electrode
 class TxElectricLoop(Source, Wire):
+
+    _serialize = Source._serialize | Wire._serialize
+
     # - has length, area (NotImplemented) attributes
     # - ensures no point coincides except first and last
     # - factor ?
@@ -426,16 +454,16 @@ def _dipole_to_point(dipole, deg=True):
     return azimuth, elevation, length
 
 
-def _point_to_square_loop(source, length):
-    """Return points of a square loop of length x length m perp to dipole.
+def _point_to_square_loop(source, area):
+    """Return points of area m^2 perp to dipole.
 
     Parameters
     ----------
     source : tuple
         Source coordinates in the form of (x, y, z, azimuth, elevation).
 
-    length : float
-        Side-length of the square loop (m).
+    area : float
+        Area of the square loop (m).
 
 
     Returns
@@ -446,12 +474,12 @@ def _point_to_square_loop(source, length):
         of side-length length.
 
     """
-    half_length = np.sqrt(2)*length/2
-    xyz_hor = _rotation(source[3]+90, 0)*half_length
-    xyz_ver = _rotation(source[3], source[4]+90)*half_length
+    half_length = np.sqrt(area)/2
+    xyz_hor = _rotation(source[3]+90.0, 0.0)*half_length
+    xyz_ver = _rotation(source[3], source[4]+90.0)*half_length
     points = source[:3] + np.stack(
             [xyz_hor, xyz_ver, -xyz_hor, -xyz_ver, xyz_hor])
-    return points.T
+    return points
 
 
 def _rotation(azimuth, elevation, deg=True):
