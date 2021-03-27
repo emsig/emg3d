@@ -291,7 +291,7 @@ class Field:
         ----------
         receiver : tuple
             Receiver coordinates (m) and angles (°) in the format
-            ``(x, y, z, azimuth, dip)``.
+            ``(x, y, z, azimuth, elevation)``.
 
             All values can either be a scalar or having the same length as
             number of receivers.
@@ -299,7 +299,7 @@ class Field:
             Angles:
 
             - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-            - dip (°): vertical deviation from xy-plane up-wards.
+            - elevation (°): vertical deviation from xy-plane up-wards.
 
 
         Returns
@@ -312,7 +312,7 @@ class Field:
 
 
 def get_source_field(grid, source, frequency, strength=0, electric=True,
-                     length=1.0, decimals=6, **kwargs):
+                     length=1.0, decimals=6):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -341,7 +341,7 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
         Source coordinates (m). There are three formats:
 
           - Finite length dipole: ``[x0, x1, y0, y1, z0, z1]``.
-          - Point dipole: ``[x, y, z, azimuth, dip]``.
+          - Point dipole: ``[x, y, z, azimuth, elevation]``.
           - Arbitrarily shaped source: ``[[x-coo], [y-coo], [z-coo]]``.
 
         Point dipoles will be converted internally to finite length dipoles
@@ -369,10 +369,11 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
 
     electric : bool, optional
         Shortcut to create a magnetic source. If False, the format of
-        ``source`` must be that of a point dipole: ``[x, y, z, azimuth, dip]``
-        (for the other formats setting ``electric`` has no effect). It then
-        creates a square loop perpendicular to this dipole, with side-length 1.
-        Default is True, meaning an electric source.
+        ``source`` must be that of a point dipole:
+        ``[x, y, z, azimuth, elevation]`` (for the other formats setting
+        ``electric`` has no effect). It then creates a square loop
+        perpendicular to this dipole, with side-length 1. Default is True,
+        meaning an electric source.
 
     length : float, optional
         Length (m) of the point dipole when converted to a finite length
@@ -390,10 +391,6 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
         Source field, normalized to 1 A m.
 
     """
-
-    # Ensure no kwargs left.
-    if kwargs:
-        raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
     # Cast some parameters.
     if not np.allclose(np.size(source[0]), [np.size(c) for c in source]):
@@ -454,7 +451,7 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
     if source.shape != (6, ):
         raise ValueError(
             "Source is wrong defined. It must be either (1) a point, "
-            "[x, y, z, azimuth, dip], (2) a finite dipole, "
+            "[x, y, z, azimuth, elevation], (2) a finite dipole, "
             "[x1, x2, y1, y2, z1, z2], or (3) an arbitrarily shaped "
             f"dipole, [[x-coo], [y-coo], [z-coo]]. Provided: {source}."
         )
@@ -466,7 +463,7 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
     if np.allclose(length, 0, atol=1e-15):
         raise ValueError(
             "Provided finite dipole has no length; use "
-            "the format [x, y, z, azimuth, dip] instead."
+            "the format [x, y, z, azimuth, elevation] instead."
         )
 
     # Get source moment (individually for x, y, z).
@@ -515,9 +512,9 @@ def get_receiver(field, receiver):
 
         - ``Rx*`` instance, any receiver object from :mod:`emg3d.electrodes`.
         - ``list``: A list of ``Rx*`` instances.
-        - ``tuple``: ``(x, y, z, azimuth, dip)``; receiver coordinates and
-          angles (m, °). All values can either be a scalar or having the same
-          length as number of receivers.
+        - ``tuple``: ``(x, y, z, azimuth, elevation)``; receiver coordinates
+          and angles (m, °). All values can either be a scalar or having the
+          same length as number of receivers.
 
         Note that the actual receiver type has no effect here, it just takes
         the locations from the receiver instances.
@@ -549,8 +546,8 @@ def get_receiver(field, receiver):
     # Check receiver dimension.
     if len(coordinates) != 5:
         raise ValueError(
-            "`receiver` needs to be in the form (x, y, z, azimuth, dip). "
-            f"Length of provided `receiver`: {len(coordinates)}."
+            "`receiver` needs to be in the form (x, y, z, azimuth, elevation)."
+            f" Length of provided `receiver`: {len(coordinates)}."
         )
 
     # Check field dimension to ensure it is not a particular field.

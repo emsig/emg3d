@@ -75,7 +75,7 @@ class Survey:
 
         - Tuples: Coordinates in one of the two following formats:
 
-          - `(x, y, z, azimuth, dip)` [m, m, m, °, °];
+          - `(x, y, z, azimuth, elevation)` [m, m, m, °, °];
           - `(x0, x1, y0, y1, z0, z1)` [m, m, m, m, m, m].
 
           Dimensions will be expanded (hence, if `n` dipoles, each parameter
@@ -83,8 +83,8 @@ class Survey:
           with `Tx###` and `Rx###`.
 
           The tuple can additionally contain an additional element at the end
-          (after `dip` or `z1`), `electric`, a boolean of length 1 or `n`, that
-          indicates if the dipoles are electric or magnetic.
+          (after `elevation` or `z1`), `electric`, a boolean of length 1 or
+          `n`, that indicates if the dipoles are electric or magnetic.
 
         - Dictionary: A dict where the values are :class:`Dipole`-instances,
           de-serialized or not.
@@ -424,7 +424,8 @@ class Survey:
     def src_coords(self):
         """Return source coordinates.
 
-        The returned format is `(x, y, z, azm, dip)`, a tuple of 5 tuples.
+        The returned format is `(x, y, z, azimuth, elevation)`, a tuple of 5
+        tuples.
         """
 
         return tuple(
@@ -434,7 +435,7 @@ class Survey:
 
     @property
     def rec_coords(self):
-        """Return receiver coordinates as `(x, y, z, azm, dip)`."""
+        """Return receiver coordinates as `(x, y, z, azimuth, elevation)`."""
         return tuple(
             np.array([[r.center[0], r.center[1], r.center[2], r.azimuth,
                        r.elevation] for r in self.receivers.values()]).T

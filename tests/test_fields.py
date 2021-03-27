@@ -252,11 +252,6 @@ class TestGetSourceField:
             [src[2], src[2], src[2], src[2], src[2]]
         )
         scomp = fields.get_source_field(grid, src5xyz, freq, strength)
-
-        # Computed 2
-        with pytest.raises(TypeError, match='Unexpected'):
-            fields.get_source_field(grid, src, freq, strength, whatever=True)
-
         assert sman == scomp
 
         # Normalized

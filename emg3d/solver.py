@@ -268,7 +268,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
        In [4]: # The source is a x-directed, horizontal dipole at (4, 4, 4)
           ...: # with a frequency of 10 Hz.
-          ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azm, dip)
+          ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azimuth, elevation)
           ...: sfield = emg3d.fields.get_source_field(
           ...:             grid, source=coo, frequency=10)
 
