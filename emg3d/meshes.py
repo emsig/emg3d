@@ -194,7 +194,7 @@ class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
             A :class:`emg3d.meshes.TensorMesh` instance.
 
         """
-        inp.pop('__class__', None)
+        inp = {k: v for k, v in inp.items() if k != '__class__'}
         return cls(h=[inp.pop('hx'), inp.pop('hy'), inp.pop('hz')], **inp)
 
 

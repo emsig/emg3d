@@ -571,9 +571,7 @@ class Simulation:
             if source not in self._grid_source.keys():
 
                 # Get grid and store it.
-                center = (self.survey.sources[source].xco,
-                          self.survey.sources[source].yco,
-                          self.survey.sources[source].zco)
+                center = self.survey.sources[source].center
                 inp = {**self.gridding_opts, 'center': center}
                 self._grid_source[source] = meshes.construct_mesh(**inp)
 
@@ -583,9 +581,7 @@ class Simulation:
         elif self.gridding == 'both':  # Src- & freq-dependent grids.
 
             # Get grid and store it.
-            center = (self.survey.sources[source].xco,
-                      self.survey.sources[source].yco,
-                      self.survey.sources[source].zco)
+            center = self.survey.sources[source].center
             inp = {**self.gridding_opts, 'frequency':
                    self.survey.frequencies[freq], 'center': center}
             self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
@@ -686,7 +682,7 @@ class Simulation:
                     source=src.coordinates,
                     frequency=self.survey.frequencies[freq],
                     strength=strength,
-                    electric=src.electric)
+                    electric=src.xtype == 'electric')
 
             self._dict_sfield[source][freq] = sfield
 
@@ -1177,7 +1173,7 @@ class Simulation:
             # magnetic receivers we take M instead, which does not have the
             # factor iwmu; we scale here the source strength accordingly.
             # Or, because of loop (B not H).
-            if not rec.electric:
+            if rec.xtype != 'electric':
                 strength /= ResidualField.smu0
 
             # If strength is zero (very unlikely), get_source_field would
@@ -1189,7 +1185,7 @@ class Simulation:
                     source=rec.coordinates,
                     frequency=float_freq,
                     strength=strength,
-                    electric=rec.electric,
+                    electric=rec.xtype == 'electric',
                 ).field
 
         return ResidualField

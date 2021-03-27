@@ -3,7 +3,8 @@ import numpy as np
 from copy import deepcopy as dc
 from numpy.testing import assert_allclose
 
-from emg3d import meshes, models, fields, utils, io, surveys, simulations
+import emg3d
+from emg3d import io
 
 from . import helpers
 
@@ -21,7 +22,7 @@ except ImportError:
 def test_save_and_load(tmpdir, capsys):
 
     # Create some dummy data
-    grid = meshes.TensorMesh(
+    grid = emg3d.meshes.TensorMesh(
             [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
             np.zeros(3))
 
@@ -29,7 +30,7 @@ def test_save_and_load(tmpdir, capsys):
     # grid2 = discretize.TensorMesh()
 
     # Some field.
-    field = fields.Field(grid)
+    field = emg3d.Field(grid)
     ne = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
     field.field = np.arange(ne)+1j*np.ones(ne)
 
@@ -38,14 +39,14 @@ def test_save_and_load(tmpdir, capsys):
     property_y = property_x/2.0
     property_z = property_x*1.4
     mu_r = property_x*1.11
-    model = models.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
+    model = emg3d.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
 
     # Save it.
     io.save(tmpdir+'/test.npz', emg3d=grid, model=model,  # discretize=grid2,
             a=None, b=True, field=field, what={'f': field.fx, 12: 12})
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
-    assert utils.__version__ in outstr
+    assert emg3d.__version__ in outstr
 
     # Save it with other verbosity.
     _, _ = capsys.readouterr()
@@ -60,7 +61,7 @@ def test_save_and_load(tmpdir, capsys):
     outstr, _ = capsys.readouterr()
     assert 'Data loaded from «' in outstr
     assert 'test.npz' in outstr
-    assert utils.__version__ in outstr
+    assert emg3d.__version__ in outstr
 
     assert out_npz['model'] == model
     assert_allclose(field.fx, out_npz['field'].fx)
@@ -141,18 +142,18 @@ def test_save_and_load(tmpdir, capsys):
 
 def test_compare_dicts(capsys):
     # Create test data
-    grid = meshes.TensorMesh(
+    grid = emg3d.meshes.TensorMesh(
             [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
             np.zeros(3))
 
-    model = models.Model(grid, property_x=1., property_y=2.,
-                         property_z=3., mu_r=4.)
+    model = emg3d.Model(grid, property_x=1., property_y=2.,
+                        property_z=3., mu_r=4.)
 
     e1 = helpers.dummy_field(*grid.shape_edges_x)
     e2 = helpers.dummy_field(*grid.shape_edges_y)
     e3 = helpers.dummy_field(*grid.shape_edges_z)
     field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
-    ee = fields.Field(grid, field, frequency=.938)
+    ee = emg3d.Field(grid, field, frequency=.938)
 
     dict1 = io._dict_serialize(
             {'model': model, 'grid': grid, 'field': ee,
@@ -189,10 +190,10 @@ def test_compare_dicts(capsys):
 def test_known_classes(tmpdir):
 
     frequency = 1.0
-    grid = meshes.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
-    field = fields.Field(grid)
-    model = models.Model(grid, 1)
-    pointdip = surveys.Dipole((0, 1000, -950, 0, 0))
+    grid = emg3d.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
+    field = emg3d.Field(grid)
+    model = emg3d.Model(grid, 1)
+    pointdip = emg3d.TxElectricDipole((0, 1000, -950, 0, 0))
 
     out = {
         'TensorMesh': grid,
@@ -202,9 +203,9 @@ def test_known_classes(tmpdir):
     }
 
     if xarray:
-        survey = surveys.Survey((0, 1000, -950, 0, 0),
-                                (-0.5, 0.5, 1000, 1000, -950, -950), frequency)
-        simulation = simulations.Simulation(
+        survey = emg3d.Survey((0, 1000, -950, 0, 0),
+                              (-0.5, 0.5, 1000, 1000, -950, -950), frequency)
+        simulation = emg3d.Simulation(
                 survey, grid, model, gridding='same')
         out['Survey'] = survey
         out['Simulation'] = simulation

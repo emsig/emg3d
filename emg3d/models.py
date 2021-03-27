@@ -242,7 +242,7 @@ class Model:
             A :class:`emg3d.models.Model` instance.
 
         """
-        inp.pop('__class__', None)
+        inp = {k: v for k, v in inp.items() if k != '__class__'}
         MeshClass = getattr(meshes, inp['grid']['__class__'])
         return cls(grid=MeshClass.from_dict(inp.pop('grid')), **inp)
 

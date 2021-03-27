@@ -40,7 +40,6 @@ KNOWN_CLASSES = {
     'Model': models.Model,
     'Field': fields.Field,
     'Survey': surveys.Survey,
-    'Dipole': surveys.Dipole,
     'TensorMesh': meshes.TensorMesh,
     'Simulation': simulations.Simulation,
     **electrodes.ELECTRODE_LIST,

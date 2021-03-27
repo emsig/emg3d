@@ -192,11 +192,8 @@ Detailed changes
     coordinates.
   - ``data`` can be a dict containing many data set.
 
-- ``Dipole``:
-
-  - No ``name`` parameter any longer.
-
-- Sources and receivers moved to new module ``electrodes``.
+- ``Dipole``: Replaced by the new source and receiver classes in the new module
+  ``electrodes``.
 
 
 0.x-Series

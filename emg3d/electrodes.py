@@ -65,6 +65,20 @@ class Electrode:
         else:
             self._coordinates = coordinates
 
+    def __eq__(self, electrode):
+        """Compare two electrodes."""
+
+        # Check if same Type.
+        equal = self.__class__.__name__ == electrode.__class__.__name__
+
+        # Check input.
+        if equal:
+            for name in self._serialize:
+                equal *= np.allclose(getattr(self, name),
+                                     getattr(electrode, name))
+
+        return bool(equal)
+
     def copy(self):
         """Return a copy of the Survey."""
         return self.from_dict(self.to_dict(True))
@@ -81,8 +95,7 @@ class Electrode:
 
     @classmethod
     def from_dict(cls, inp):
-        inp.pop('__class__', None)
-        return cls(**inp)
+        return cls(**{k: v for k, v in inp.items() if k != '__class__'})
 
     @property
     def points(self):

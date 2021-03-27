@@ -8,7 +8,8 @@ try:
 except ImportError:
     xarray = None
 
-from emg3d import meshes, models, surveys, simulations, fields, solver, io
+import emg3d
+from emg3d import simulations
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -19,14 +20,15 @@ class TestSimulation():
         receivers = (np.arange(12)*500, 0, -1000, 0, 0)
         frequencies = (1.0, 2.0)
 
-        survey = surveys.Survey(sources, receivers, frequencies, name='Test',
-                                noise_floor=1e-15, relative_error=0.05)
+        survey = emg3d.Survey(
+                sources, receivers, frequencies, name='Test',
+                noise_floor=1e-15, relative_error=0.05)
 
         # Create a simple grid and model
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
                 np.array([-1250, -1250, -2250]))
-        model = models.Model(grid, 1)
+        model = emg3d.Model(grid, 1)
 
         # Create a simulation, compute all fields.
         simulation = simulations.Simulation(
@@ -49,13 +51,13 @@ class TestSimulation():
 
     def test_fields(self, capsys):
         # Check sfield
-        sfield = fields.get_source_field(
+        sfield = emg3d.get_source_field(
                 self.grid, self.survey.sources['Tx1'].coordinates,
                 frequency=1.0, strength=0)
         assert self.simulation.get_sfield('Tx1', 'f0') == sfield
 
         # Check efield
-        efield, info = solver.solve(
+        efield, info = emg3d.solve(
                 self.model, sfield, **self.simulation.solver_opts)
         assert self.simulation.get_efield('Tx1', 'f0') == efield
 
@@ -72,7 +74,7 @@ class TestSimulation():
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in info['exit_message']
 
         # Check hfield
-        hfield = fields.get_magnetic_field(self.model, efield)
+        hfield = emg3d.get_magnetic_field(self.model, efield)
         assert self.simulation.get_hfield('Tx1', 1.0) == hfield
         s_hfield = self.simulation.get_hfield('Tx1', 1.0)
         assert s_hfield == hfield
@@ -86,8 +88,8 @@ class TestSimulation():
         assert exit == info['exit'] == 1
 
     def test_responses(self):
-        rec_resp = fields.get_receiver(
-                self.simulation.get_efield('Tx1', 1.0), self.survey.rec_coords)
+        rec_resp = self.simulation.get_efield('Tx1', 1.0).get_receiver(
+                self.survey.rec_coords)
         assert_allclose(
                 self.simulation.data.synthetic[1, :, 0].data,
                 rec_resp, atol=1e-16)
@@ -217,7 +219,7 @@ class TestSimulation():
 
     def test_input_gradient(self):
         # Create another mesh, so there will be a difference.
-        newgrid = meshes.TensorMesh(
+        newgrid = emg3d.TensorMesh(
                 [np.ones(16)*500, np.ones(8)*1000, np.ones(8)*1000],
                 np.array([-1250, -1250, -2250]))
 
@@ -250,14 +252,15 @@ def test_simulation_automatic(capsys):
     receivers = ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0)
     frequencies = (0.1, 1.0, 10.0)
 
-    survey = surveys.Survey(sources, receivers, frequencies, name='Test',
-                            noise_floor=1e-15, relative_error=0.05)
+    survey = emg3d.Survey(
+            sources, receivers, frequencies, name='Test', noise_floor=1e-15,
+            relative_error=0.05)
 
     # Create a simple grid and model
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             [np.ones(32)*250, np.ones(16)*500, np.ones(4)*500],
             np.array([-1250, -1250, -2250]))
-    model = models.Model(grid, 1)
+    model = emg3d.Model(grid, 1)
 
     # Create a simulation, compute all fields.
     inp = {'survey': survey, 'grid': grid, 'model': model,
@@ -330,16 +333,16 @@ def test_simulation_automatic(capsys):
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_print_solver(capsys):
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             h=[[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
                [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
                [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
             origin='CCC')
 
-    model = models.Model(grid, property_x=1.5, property_y=1.8,
-                         property_z=3.3, mapping='Resistivity')
+    model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
+                        property_z=3.3, mapping='Resistivity')
 
-    survey = surveys.Survey(
+    survey = emg3d.Survey(
         name='Test', sources=(0, 0, 0, 0, 0),
         receivers=([-10000, 10000], 0, 0, 0, 0),
         frequencies=1.0, noise_floor=1e-15, relative_error=0.05,
@@ -387,17 +390,18 @@ def test_source_strength():
     # Create a simple survey; source with and source without strength.
     strength = 5.678
     srccoords = (0, 3000, -950, 0, 0)
-    sources = {'Strength': surveys.Dipole(srccoords),
-               'NoStrength': surveys.Dipole(srccoords, strength=strength)}
+    sources = {'Strength': emg3d.TxElectricDipole(srccoords),
+               'NoStrength': emg3d.TxElectricDipole(
+                   srccoords, strength=strength)}
     receivers = (np.arange(12)*500, 0, -1000, 0, 0)
     frequencies = 1.0
-    survey = surveys.Survey(sources, receivers, frequencies, name='Test')
+    survey = emg3d.Survey(sources, receivers, frequencies, name='Test')
 
     # Create a simple grid and model.
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
             np.array([-1250, -1250, -2250]))
-    model = models.Model(grid, 1)
+    model = emg3d.Model(grid, 1)
 
     # Create a simulation, compute all fields.
     simulation = simulations.Simulation(
@@ -413,9 +417,9 @@ def test_source_strength():
 
 
 def test_expand_grid_model():
-    grid = meshes.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))
-    model = models.Model(grid, 1, np.ones(grid.shape_cells)*2, mu_r=3,
-                         epsilon_r=5)
+    grid = emg3d.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))
+    model = emg3d.Model(grid, 1, np.ones(grid.shape_cells)*2, mu_r=3,
+                        epsilon_r=5)
 
     og, om = simulations.expand_grid_model(grid, model, [2, 3], 5)
 
@@ -456,14 +460,15 @@ class TestEstimateGriddingOpts():
         receivers = (np.arange(11)*500, 2000, -1000, 0, 0)
         frequencies = (0.1, 10.0)
 
-        survey = surveys.Survey(sources, receivers, frequencies,
-                                noise_floor=1e-15, relative_error=0.05)
+        survey = emg3d.Survey(
+                sources, receivers, frequencies, noise_floor=1e-15,
+                relative_error=0.05)
 
         # Create a simple grid and model
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
                 np.array([-1250, -1250, -2250]))
-        model = models.Model(grid, 0.1, np.ones(grid.shape_cells)*10)
+        model = emg3d.Model(grid, 0.1, np.ones(grid.shape_cells)*10)
         model.property_y[5, 8, 3] = 100000  # Cell at source center
 
     def test_empty_dict(self):
@@ -520,7 +525,7 @@ class TestEstimateGriddingOpts():
 
         # Check that all parameters passed unchanged.
         gdict2 = {k: gdict[k] for k, _ in gridding_opts.items()}
-        assert io._compare_dicts(gdict2, gridding_opts)
+        assert emg3d.io._compare_dicts(gdict2, gridding_opts)
 
     def test_factor(self):
 
@@ -528,9 +533,9 @@ class TestEstimateGriddingOpts():
         receivers = (0, 3000, -1000, 0, 0)
 
         # Adjusted x-domain.
-        survey = surveys.Survey(self.sources, receivers,
-                                self.frequencies, noise_floor=1e-15,
-                                relative_error=0.05)
+        survey = emg3d.Survey(
+                self.sources, receivers, self.frequencies, noise_floor=1e-15,
+                relative_error=0.05)
 
         gdict = simulations.estimate_gridding_opts(
                     {}, self.grid, self.model, survey)
@@ -538,9 +543,9 @@ class TestEstimateGriddingOpts():
         assert_allclose(gdict['domain'][0], (-800, 800))
 
         # Adjusted x-domain.
-        survey = surveys.Survey(sources, self.receivers,
-                                self.frequencies, noise_floor=1e-15,
-                                relative_error=0.05)
+        survey = emg3d.Survey(
+                sources, self.receivers, self.frequencies, noise_floor=1e-15,
+                relative_error=0.05)
 
         gdict = simulations.estimate_gridding_opts(
                     {}, self.grid, self.model, survey)

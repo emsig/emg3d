@@ -18,7 +18,6 @@ A survey stores a set of sources, receivers, and the measured data.
 # the License.
 
 from copy import deepcopy
-from dataclasses import dataclass
 
 import numpy as np
 
@@ -29,7 +28,7 @@ except ImportError:
 
 from emg3d import electrodes, utils
 
-__all__ = ['Survey', 'Dipole', 'PointDipole']
+__all__ = ['Survey', ]
 
 
 class Survey:
@@ -428,19 +427,23 @@ class Survey:
         The returned format is `(x, y, z, azm, dip)`, a tuple of 5 tuples.
         """
 
-        return tuple(np.array([[s.xco, s.yco, s.zco, s.azm, s.dip] for s
-                     in self.sources.values()]).T)
+        return tuple(
+            np.array([[s.center[0], s.center[1], s.center[2], s.azimuth,
+                       s.elevation] for s in self.sources.values()]).T
+        )
 
     @property
     def rec_coords(self):
         """Return receiver coordinates as `(x, y, z, azm, dip)`."""
-        return tuple(np.array([[r.xco, r.yco, r.zco, r.azm, r.dip] for r
-                               in self.receivers.values()]).T)
+        return tuple(
+            np.array([[r.center[0], r.center[1], r.center[2], r.azimuth,
+                       r.elevation] for r in self.receivers.values()]).T
+        )
 
     @property
     def rec_types(self):
         """Return receiver flags if electric, as tuple."""
-        return tuple([r.electric for r in self.receivers.values()])
+        return tuple([r.xtype == 'electric' for r in self.receivers.values()])
 
     @property
     def frequencies(self):
@@ -635,224 +638,6 @@ class Survey:
         self._data.attrs['relative_error'] = relative_error
 
 
-# # Sources and Receivers # #
-@dataclass(order=True, unsafe_hash=True)
-class PointDipole:
-    """Infinitesimal small electric or magnetic point dipole.
-
-    Defined by its coordinates (xco, yco, zco), its azimuth (azm), its dip, and
-    its type (electric).
-
-    Not meant to be used directly. Use :class:`Dipole` instead.
-
-
-    Parameters
-    ----------
-    xco, yco, zco : float
-        x-, y-, and z-coordinates (m).
-
-    azm, dip : float
-        Angles (in degrees °); coordinate system is right-handed with positive
-        z up; East-North-Depth:
-
-        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-        - +/-dip (°): vertical deviation from xy-plane down/up-wards.
-
-    electric : bool
-        Electric dipole if True, magnetic dipole otherwise. Default is True.
-
-    """
-    __slots__ = ['xco', 'yco', 'zco', 'azm', 'dip', 'electric']
-    xco: float
-    yco: float
-    zco: float
-    azm: float
-    dip: float
-    electric: bool
-
-
-class Dipole(PointDipole):
-    """Finite length dipole or point dipole.
-
-    Expansion of the basic :class:`PointDipole` to allow for finite length
-    dipoles, and to provide coordinate inputs in the form of
-    (x, y, z, azimuth, dip) or (x0, x1, y0, y1, z0, z1).
-
-    Adds attributes `is_finite`, `electrode1`, `electrode2`, `length`, and
-    `coordinates` to the class.
-
-    For *point dipoles*, this gives it a length of unity (1 m), takes its
-    coordinates as center, and computes the two electrode positions.
-
-    For *finite length dipoles* it sets the coordinates to its center and
-    computes its length, azimuth, and dip.
-
-    Finite length dipoles and point dipoles have therefore the exactly same
-    signature, and can only be distinguished by the attribute `is_finite`.
-
-
-    Parameters
-    ----------
-    coordinates : tuple of floats
-        Source coordinates, one of the following:
-
-        - (x0, x1, y0, y1, z0, z1): finite length dipole,
-        - (x, y, z, azimuth, dip): point dipole.
-
-        The coordinates x, y, and z are in meters (m), the azimuth and dip in
-        degree (°).
-
-        Angles (coordinate system is right-handed with positive z up;
-        East-North-Depth):
-
-        - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-        - +/-dip (°): vertical deviation from xy-plane down/up-wards.
-
-    electric : bool
-        Electric dipole if True, magnetic dipole otherwise. Default is True.
-
-    """
-    # These are the only kwargs that do not raise a warning.
-    # These are also the only ones which are (de-)serialized.
-    accepted_keys = ['strength', ]
-
-    def __init__(self, coordinates, electric=True, **kwargs):
-        """Check coordinates and kwargs."""
-
-        # Add additional info to the dipole.
-        for key in self.accepted_keys:
-            if key in kwargs:
-                setattr(self, key, kwargs.pop(key))
-        if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
-
-        # Conversion to float-array fails if there are lists and tuples within
-        # the tuple, or similar. This should also catch many wrong inputs.
-        coords = np.array(coordinates, dtype=np.float64)
-
-        # Check size => finite or point dipole?
-        if coords.size == 5:
-            self.is_finite = False
-
-        elif coords.size == 6:
-            self.is_finite = True
-
-            # Ensure the two poles are distinct.
-            if np.allclose(coords[::2], coords[1::2]):
-                raise ValueError(
-                    "The two poles are identical, use the format "
-                    "(x, y, z, azimuth, dip) instead. "
-                    f"Provided coordinates: {coordinates}."
-                )
-
-        else:
-            raise ValueError(
-                "Dipole coordinates are wrong defined. They must be "
-                "defined either as a point, (x, y, z, azimuth, dip), or "
-                "as two poles, (x0, x1, y0, y1, z0, z1), all floats. "
-                f"Provided coordinates: {coordinates}."
-            )
-
-        # Angles: Very small angles are set to zero, because, e.g.,
-        #         cos(pi/2) is roughly 6.12e-17, not 0.
-
-        # Get xco, yco, zco, azm, and dip.
-        if self.is_finite:
-
-            # Get the two separate electrodes.
-            electrode1 = np.array(coords[::2])
-            electrode2 = np.array(coords[1::2])
-
-            # Compute center.
-            xco, yco, zco = np.sum(coords.reshape(3, -1), 1)/2
-
-            # Angles.
-            azm, dip, self.length = electrodes._dipole_to_point(
-                    np.array([electrode1, electrode2]))
-
-            # Store electrodes.
-            self.electrode1 = tuple(electrode1)
-            self.electrode2 = tuple(electrode2)
-
-        else:
-            # Get coordinates, angles, and set length.
-            xco, yco, zco, azm, dip = tuple(coords)
-            self.length = 1.0
-
-            # Get the two separate electrodes.
-            points = electrodes._point_to_dipole(coords, self.length)
-            self.electrode1 = tuple(points[0, :])
-            self.electrode2 = tuple(points[1, :])
-
-        super().__init__(xco, yco, zco, azm, dip, bool(electric))
-
-    def __repr__(self):
-        return (f"{self.__class__.__name__}("
-                f"{['H', 'E'][self.electric]}, "
-                f"{{{self.xco:,.1f}m; {self.yco:,.1f}m; {self.zco:,.1f}m}}, "
-                f"θ={self.azm:.1f}°, φ={self.dip:.1f}°, "
-                f"l={self.length:,.1f}m)")
-
-    @property
-    def coordinates(self):
-        """Return coordinates.
-
-        Returns
-        -------
-        coords : tuple
-            Coordinates in the format (x, y, z, azimuth, dip) or (x0, x1, y0,
-            y1, z0, z1). This format is used in many other routines.
-        """
-        if self.is_finite:
-            return (self.electrode1[0], self.electrode2[0],
-                    self.electrode1[1], self.electrode2[1],
-                    self.electrode1[2], self.electrode2[2])
-        else:
-            return (self.xco, self.yco, self.zco, self.azm, self.dip)
-
-    def copy(self):
-        """Return a copy of the Dipole."""
-        return self.from_dict(self.to_dict(True))
-
-    def to_dict(self, copy=False):
-        """Store the necessary information of the Dipole in a dict."""
-        out = {'coordinates': self.coordinates, 'electric': self.electric,
-               '__class__': self.__class__.__name__}
-
-        # Add accepted kwargs.
-        for key in self.accepted_keys:
-            if hasattr(self, key):
-                out[key] = getattr(self, key)
-
-        if copy:
-            return deepcopy(out)
-        else:
-            return out
-
-    @classmethod
-    def from_dict(cls, inp):
-        """Convert dictionary into :class:`Dipole` instance.
-
-        Parameters
-        ----------
-        inp : dict
-            Dictionary as obtained from :func:`Dipole.to_dict`. The dictionary
-            needs the keys `coordinates` and `electric`.
-
-        Returns
-        -------
-        obj : :class:`Dipole` instance
-
-        """
-        try:
-            kwargs = {k: v for k, v in inp.items() if k in cls.accepted_keys}
-            return cls(coordinates=inp['coordinates'],
-                       electric=inp['electric'], **kwargs)
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
-
-
-# # Helper routines ##
 def _dipole_info_to_dict(inp, name):
     """Create dict with provided source/receiver information."""
 
@@ -885,11 +670,16 @@ def _dipole_info_to_dict(inp, name):
         names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
 
         # Create Dipole-dict.
-        out = {names[i]: Dipole(coo[:, i], elmag[i]) for i in range(nd)}
+        if name == 'source':
+            TxRx = [electrodes.TxMagneticDipole, electrodes.TxElectricDipole]
+        else:
+            TxRx = [electrodes.RxMagneticPoint, electrodes.RxElectricPoint]
+        out = {names[i]: TxRx[int(elmag[i])](coo[:, i]) for i in range(nd)}
 
     elif isinstance(inp, dict):
         if isinstance(inp[list(inp)[0]], dict):  # Dict of de-ser. Dipoles.
-            out = {k: Dipole.from_dict(v) for k, v in inp.items()}
+            out = {k: getattr(electrodes, v['__class__']).from_dict(v)
+                   for k, v in inp.items()}
         else:  # Assumed dict of dipoles.
             out = inp
 
