@@ -2,8 +2,9 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from . import alternatives
 from emg3d import fields, maps, meshes, models
+
+from . import alternatives
 
 # Import soft dependencies.
 try:

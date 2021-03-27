@@ -5,6 +5,10 @@ from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose, assert_array_equal
 
+from emg3d import electrodes, io, meshes, models, fields, solver
+
+from . import alternatives, helpers
+
 # Import soft dependencies.
 try:
     import discretize
@@ -15,38 +19,16 @@ try:
 except ImportError:
     discretize = None
 
-from emg3d import electrodes, io, meshes, models, fields, solver
-
 # Data generated with tests/create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
-
-
-def get_h(ncore, npad, width, factor):
-    """Get cell widths for TensorMesh."""
-    pad = ((np.ones(npad)*np.abs(factor))**(np.arange(npad)+1))*width
-    return np.r_[pad[::-1], np.ones(ncore)*width, pad]
-
-
-def create_dummy(nx, ny, nz, imag=True):
-    """Return complex dummy arrays of shape nx*ny*nz.
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    if imag:
-        out = np.arange(1., nx*ny*nz+1) + 1j*np.arange(1., nx*ny*nz+1)/100.
-    else:
-        out = np.arange(1., nx*ny*nz+1)
-    return out.reshape(nx, ny, nz)
 
 
 class TestField:
     grid = meshes.TensorMesh([[.5, 8], [1, 4], [2, 8]], (0, 0, 0))
 
-    ex = create_dummy(*grid.shape_edges_x, imag=True)
-    ey = create_dummy(*grid.shape_edges_y, imag=True)
-    ez = create_dummy(*grid.shape_edges_z, imag=True)
+    ex = helpers.dummy_field(*grid.shape_edges_x, imag=True)
+    ey = helpers.dummy_field(*grid.shape_edges_y, imag=True)
+    ez = helpers.dummy_field(*grid.shape_edges_z, imag=True)
 
     # Test the views
     field = np.r_[ex.ravel('F'), ey.ravel('F'), ez.ravel('F')]
@@ -384,8 +366,6 @@ def test_get_receiver():
 
 
 def test_get_magnetic_field():
-    # Mainly regression tests, not ideal.
-
     # Check it does still the same (pure regression).
     dat = REGRES['reg_2']
     model = dat['model']
@@ -405,11 +385,42 @@ def test_get_magnetic_field():
     hout2 = fields.get_magnetic_field(model2, efield)
     assert_allclose(hout1.field, hout2.field)
 
-    # Ensure they are not the same if mu_r!=1/None provided
+    # Test division by mu_r.
     model3 = models.Model(**dat['input_model'], mu_r=2.)
     hout3 = fields.get_magnetic_field(model3, efield)
-    with pytest.raises(AssertionError):
-        assert_allclose(hout1.field, hout3.field)
+    assert_allclose(hout1.field, hout3.field*2)
+
+    # Comparison to alternative.
+    # Using very unrealistic value, unrealistic stretching, to test.
+    grid = meshes.TensorMesh(
+        h=[[1, 100, 25, 33], [1, 1, 33.3, 0.3, 1, 1], [2, 4, 8, 16]],
+        origin=(88, 20, 9))
+    model = models.Model(grid, mu_r=np.arange(1, grid.n_cells+1)/10)
+    new = 10**np.arange(grid.n_edges)-grid.n_edges/2
+    efield = fields.Field(grid, data=new, frequency=np.pi)
+    hfield_nb = fields.get_magnetic_field(model, efield)
+    hfield_np = alternatives.alt_get_magnetic_field(model, efield)
+    assert_allclose(hfield_nb.field, hfield_np.field)
+
+    # Test using discretize
+    if discretize:
+        h = np.ones(4)
+        grid = meshes.TensorMesh([h*200, h*300, h*400], (0, 0, 0))
+        model = models.Model(grid, property_x=3.24)
+        sfield = fields.get_source_field(
+                grid, (350, 550, 750, 30, 30), frequency=10)
+        efield = solver.solve(model, sfield, plain=True, verb=0)
+        mfield = fields.get_magnetic_field(model, efield)
+        dfield = -grid.edge_curl*efield.field/sfield.smu0
+        assert_allclose(
+                dfield[:80].reshape((5, 4, 4), order='F')[1:-1, :, :],
+                mfield.fx)
+        assert_allclose(
+                dfield[80:160].reshape((4, 5, 4), order='F')[:, 1:-1, :],
+                mfield.fy)
+        assert_allclose(
+                dfield[160:].reshape((4, 4, 5), order='F')[:, :, 1:-1],
+                mfield.fz)
 
 
 class TestFiniteSourceXYZ:
@@ -467,9 +478,9 @@ class TestFiniteSourceXYZ:
         assert_allclose(fsf.fz.sum(), dsf.fz.sum())
 
         # 1e. Source over various stretched cells, source strength = pi.
-        h1 = get_h(4, 2, 200, 1.1)
-        h2 = get_h(4, 2, 200, 1.2)
-        h3 = get_h(4, 2, 200, 1.2)
+        h1 = helpers.get_h(4, 2, 200, 1.1)
+        h2 = helpers.get_h(4, 2, 200, 1.2)
+        h3 = helpers.get_h(4, 2, 200, 1.2)
         origin = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
         grid3 = meshes.TensorMesh([h1, h2, h3], origin)
         slen = 333
@@ -497,3 +508,27 @@ class TestFiniteSourceXYZ:
         # Put source way out. Ensure it fails.
         with pytest.raises(ValueError, match='Provided source outside grid'):
             _ = fields.get_source_field(grid, [1e10, 1e10, 1e10, 0, 0], 1)
+
+
+@pytest.mark.parametrize("njit", [True, False])
+def test_edge_curl_factor(njit):
+    if njit:
+        edge_curl_factor = fields._edge_curl_factor
+    else:
+        edge_curl_factor = fields._edge_curl_factor.py_func
+
+    ex = 1*np.arange(1, 19).reshape((2, 3, 3), order='F')
+    ey = 2*np.arange(1, 19).reshape((3, 2, 3), order='F')
+    ez = 3*np.arange(1, 19).reshape((3, 3, 2), order='F')
+    mx = np.zeros((1, 2, 2))
+    my = np.zeros((2, 1, 2))
+    mz = np.zeros((2, 2, 1))
+    hx = np.array([10., 10])
+    hy = np.array([20., 20])
+    hz = np.array([30., 30])
+    factor = 0.1*np.ones((2, 2, 2))
+
+    edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, factor)
+    assert_allclose(mx, 0.5)  # (9/20 - 12/30) * 2 / 0.2
+    assert_allclose(my, -1)  # (6/30 - 3/10) / 0.2 * 2
+    assert_allclose(mz, 1)  # (2/10 - 2/20) / 0.2 * 2

@@ -5,6 +5,8 @@ from numpy.testing import assert_allclose
 
 from emg3d import meshes, models, fields, utils, io, surveys, simulations
 
+from . import helpers
+
 # Soft dependencies
 try:
     import h5py
@@ -14,20 +16,6 @@ try:
     import xarray
 except ImportError:
     xarray = None
-
-
-def create_dummy(nx, ny, nz, imag=True):
-    """Return complex dummy arrays of shape nx*ny*nz.
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    if imag:
-        out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
-    else:
-        out = np.arange(1, nx*ny*nz+1)
-    return out.reshape(nx, ny, nz)
 
 
 def test_save_and_load(tmpdir, capsys):
@@ -46,7 +34,7 @@ def test_save_and_load(tmpdir, capsys):
     field.field = np.arange(ne)+1j*np.ones(ne)
 
     # Some model.
-    property_x = create_dummy(*grid.shape_cells, False)
+    property_x = helpers.dummy_field(*grid.shape_cells, False)
     property_y = property_x/2.0
     property_z = property_x*1.4
     mu_r = property_x*1.11
@@ -160,9 +148,9 @@ def test_compare_dicts(capsys):
     model = models.Model(grid, property_x=1., property_y=2.,
                          property_z=3., mu_r=4.)
 
-    e1 = create_dummy(*grid.shape_edges_x)
-    e2 = create_dummy(*grid.shape_edges_y)
-    e3 = create_dummy(*grid.shape_edges_z)
+    e1 = helpers.dummy_field(*grid.shape_edges_x)
+    e2 = helpers.dummy_field(*grid.shape_edges_y)
+    e3 = helpers.dummy_field(*grid.shape_edges_z)
     field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
     ee = fields.Field(grid, field, frequency=.938)
 

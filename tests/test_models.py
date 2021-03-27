@@ -4,19 +4,7 @@ from numpy.testing import assert_allclose
 
 from emg3d import fields, meshes, models
 
-
-def create_dummy(nx, ny, nz, imag=True):
-    """Return complex dummy arrays of shape nx*ny*nz.
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    if imag:
-        out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
-    else:
-        out = np.arange(1, nx*ny*nz+1)
-    return out.reshape(nx, ny, nz)
+from . import helpers
 
 
 class TestModel:
@@ -29,7 +17,7 @@ class TestModel:
                 [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
                 np.zeros(3))
 
-        property_x = create_dummy(*grid.shape_cells, False)
+        property_x = helpers.dummy_field(*grid.shape_cells, False)
         property_y = property_x/2.0
         property_z = property_x*1.4
         mu_r = property_x*1.11
@@ -161,7 +149,7 @@ class TestModel:
                 [np.array([2]), np.array([4]), np.array([5])],
                 np.array([1, 2, 2.5]))
 
-        property_x = create_dummy(*grid.shape_cells, False)
+        property_x = helpers.dummy_field(*grid.shape_cells, False)
         property_y = property_x/2.0
         property_z = property_x*1.4
         mu_r = property_x*1.11

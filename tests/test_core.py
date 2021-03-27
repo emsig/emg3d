@@ -2,10 +2,9 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from . import alternatives
-from .test_meshes import get_h
-
 from emg3d import solver, core, models, meshes, fields
+
+from . import alternatives, helpers
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -19,7 +18,7 @@ def test_amat_x(njit):
 
     # Create a grid
     src = [200, 300, -50., 5, 60]
-    hx = get_h(8, 4, 100, 1.2)
+    hx = helpers.get_h(8, 4, 100, 1.2)
     hy = np.ones(8)*800
     hz = np.ones(4)*500
     grid = meshes.TensorMesh(
@@ -95,9 +94,9 @@ def test_gauss_seidel(njit):
         nz = [4, 4, 1][lr_dir-1]
 
         # Get this grid.
-        hx = get_h(0, nx, 80, 1.1)
-        hy = get_h(0, ny, 100, 1.3)
-        hz = get_h(0, nz, 200, 1.2)
+        hx = helpers.get_h(0, nx, 80, 1.1)
+        hy = helpers.get_h(0, ny, 100, 1.3)
+        hz = helpers.get_h(0, nz, 200, 1.2)
         grid = meshes.TensorMesh(
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
@@ -480,9 +479,9 @@ def test_restrict_weights(njit):
     # 2. Test with stretched grid and compare with alternative formulation
 
     # Create a highly stretched, non-centered grid
-    hx = get_h(2, 2, 200, 1.8)
-    hy = get_h(0, 8, 800, 1.2)
-    hz = get_h(0, 4, 400, 1.4)
+    hx = helpers.get_h(2, 2, 200, 1.8)
+    hy = helpers.get_h(0, 8, 800, 1.2)
+    hz = helpers.get_h(0, 4, 400, 1.4)
     grid = meshes.TensorMesh(
             [hx, hy, hz], np.array([-100000, 3000, 100]))
 

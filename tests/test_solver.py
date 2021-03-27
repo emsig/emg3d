@@ -7,22 +7,10 @@ from numpy.testing import assert_allclose
 
 from emg3d import solver, core, meshes, models, fields, io
 
-from . import alternatives
-from .test_meshes import get_h
+from . import alternatives, helpers
 
 # Data generated with tests/create_data/regression.py
 REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
-
-
-def create_dummy(nx, ny, nz):
-    """Return complex dummy arrays of shape (nx, ny, nz).
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
-    return out.reshape(nx, ny, nz)
 
 
 class TestSolve:
@@ -203,7 +191,7 @@ class TestSolve:
         mesh = meshes.TensorMesh(
                 [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
                 origin=np.array([-0.5, -1, -1]))
-        sfield = alternatives.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
+        sfield = alternatives.alt_get_source_field(mesh, [0, 0, 0, 0, 0], 1)
         model = models.Model(mesh)
         _ = solver.solve(model, sfield, plain=True, verb=4, nu_pre=0)
         out, _ = capsys.readouterr()
@@ -387,7 +375,8 @@ def test_smoothing():
 
     nu = 2
 
-    widths = [np.ones(2)*100, get_h(10, 27, 10, 1.1), get_h(2, 1, 50, 1.2)]
+    widths = [np.ones(2)*100, helpers.get_h(10, 27, 10, 1.1),
+              helpers.get_h(2, 1, 50, 1.2)]
     origin = [-w.sum()/2 for w in widths]
     src = [0, -10, -10, 43, 13]
 
@@ -631,7 +620,7 @@ def test_residual():
     # Create a grid
     src = [90, 1600, 25., 45, 45]
     grid = meshes.TensorMesh(
-        [get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
+        [helpers.get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
         origin=np.zeros(3))
 
     # Create some resistivity model

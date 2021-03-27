@@ -26,13 +26,12 @@ import numpy as np
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import RegularGridInterpolator, interpnd, interp1d
 
+from emg3d.core import _numba_setting
+
 __all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
            'MapLnResistivity', 'interpolate', 'interp_spline_3d',
            'interp_volume_average', 'interp_edges_to_vol_averages']
-
-# Numba-settings
-_numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 
 class BaseMap:

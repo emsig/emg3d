@@ -21,10 +21,12 @@ electric and magnetic fields, and fields at receivers.
 import warnings
 from copy import deepcopy
 
+import numba as nb
 import numpy as np
 from scipy.constants import mu_0
 
-from emg3d import maps, meshes, models, utils, electrodes
+from emg3d.core import _numba_setting
+from emg3d import maps, meshes, utils, electrodes
 
 __all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
@@ -552,7 +554,7 @@ def get_receiver(field, receiver):
         )
 
     # Check field dimension to ensure it is not a particular field.
-    if not isinstance(field, Field):
+    if not hasattr(field, 'fx'):
         raise ValueError(
             "`field` must be a `Field`-instance, not a "
             "particular field such as `field.fx`."
@@ -587,14 +589,8 @@ def get_receiver(field, receiver):
     return utils.EMArray(resp.reshape(shape, order='F'))
 
 
-def get_magnetic_field(model, field):
+def get_magnetic_field(model, efield):
     r"""Return magnetic field corresponding to provided electric field.
-
-    - TODO REWORK THIS!
-
-    - TODO Decide if to remove outermost layer or not
-
-    - TODO :: incorporate into Field
 
     Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
     :math:`\mathbf{E}` using Farady's law, given by
@@ -603,112 +599,52 @@ def get_magnetic_field(model, field):
 
         \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
 
-    Note that the magnetic field in x-direction is defined in the center of the
-    face defined by the electric field in y- and z-directions, and similar for
-    the other field directions. This means that the provided electric field and
-    the returned magnetic field have different dimensions::
-
-       E-field:  x: [grid.cell_centers_x, grid.nodes_y, grid.nodes_z]
-                 y: [grid.nodes_x, grid.cell_centers_y, grid.nodes_z]
-                 z: [grid.nodes_x, grid.nodes_y, grid.cell_centers_z]
-
-       H-field:  x: [grid.nodes_x, grid.cell_centers_y, grid.cell_centers_z]
-                 y: [grid.cell_centers_x, grid.nodes_y, grid.cell_centers_z]
-                 z: [grid.cell_centers_x, grid.cell_centers_y, grid.nodes_z]
+    Note that the magnetic field is defined on the faces of the grid, or on the
+    edges of the so-called dual grid. The grid of the returned magnetic field
+    is the dual grid and has therefore one cell less in each direction.
 
 
     Parameters
     ----------
     model : Model
-        Model; :class:`Model` instance.
+        The model; a :class:`emg3d.models.Model` instance.
 
-    field : Field
-        Electric field; :class:`Field` instance.
+    efield : Field
+        The electric field; a :class:`emg3d.fields.Field` instance.
 
 
     Returns
     -------
     hfield : Field
-        Magnetic field; :class:`Field` instance.
+        The magnetic field; a :class:`emg3d.fields.Field` instance.
 
     """
 
-    # Carry out the curl (^ corresponds to differentiation axis):
-    # H_x = (E_z^1 - E_y^2)
-    e3d_hx = (np.diff(field.fz, axis=1)/field.grid.h[1][None, :, None] -
-              np.diff(field.fy, axis=2)/field.grid.h[2][None, None, :])
+    # Create magnetic grid - cell centers become nodes.
+    grid = meshes.TensorMesh(
+            [np.diff(efield.grid.cell_centers_x),
+             np.diff(efield.grid.cell_centers_y),
+             np.diff(efield.grid.cell_centers_z)],
+            (efield.grid.cell_centers_x[0],
+             efield.grid.cell_centers_y[0],
+             efield.grid.cell_centers_z[0]))
 
-    # H_y = (E_x^2 - E_z^0)
-    e3d_hy = (np.diff(field.fx, axis=2)/field.grid.h[2][None, None, :] -
-              np.diff(field.fz, axis=0)/field.grid.h[0][:, None, None])
+    # Initiate magnetic field with zeros.
+    hfield = Field(grid, frequency=efield._frequency)
 
-    # H_z = (E_y^0 - E_x^1)
-    e3d_hz = (np.diff(field.fy, axis=0)/field.grid.h[0][:, None, None] -
-              np.diff(field.fx, axis=1)/field.grid.h[1][None, :, None])
+    # Get smu (i omega mu_r mu_0).
+    if model.mu_r is None:
+        smu = -np.ones(efield.grid.shape_cells)*efield.smu0
+    else:
+        smu = -model.mu_r*efield.smu0
 
-    # If relative magnetic permeability is not one, we have to take the volume
-    # into account, as mu_r is volume-averaged.
-    if model.mu_r is not None:
+    # Compute magnetic field.
+    _edge_curl_factor(
+            hfield.fx, hfield.fy, hfield.fz,
+            efield.fx, efield.fy, efield.fz,
+            efield.grid.h[0], efield.grid.h[1], efield.grid.h[2], smu)
 
-        # Get volume-averaged values.
-        vmodel = models.VolumeModel(model, field)
-
-        # Plus and minus indices.
-        ixm = np.r_[0, np.arange(model.shape[0])]
-        ixp = np.r_[np.arange(model.shape[0]), model.shape[0]-1]
-        iym = np.r_[0, np.arange(model.shape[1])]
-        iyp = np.r_[np.arange(model.shape[1]), model.shape[1]-1]
-        izm = np.r_[0, np.arange(model.shape[2])]
-        izp = np.r_[np.arange(model.shape[2]), model.shape[2]-1]
-
-        # Average mu_r for dual-grid.
-        zeta_x = (vmodel.zeta[ixm, :, :] + vmodel.zeta[ixp, :, :])/2.
-        zeta_y = (vmodel.zeta[:, iym, :] + vmodel.zeta[:, iyp, :])/2.
-        zeta_z = (vmodel.zeta[:, :, izm] + vmodel.zeta[:, :, izp])/2.
-
-        hvx = field.grid.h[0][:, None, None]
-        hvy = field.grid.h[1][None, :, None]
-        hvz = field.grid.h[2][None, None, :]
-
-        # Define the widths of the dual grid.
-        dx = (np.r_[0., field.grid.h[0]] + np.r_[field.grid.h[0], 0.])/2.
-        dy = (np.r_[0., field.grid.h[1]] + np.r_[field.grid.h[1], 0.])/2.
-        dz = (np.r_[0., field.grid.h[2]] + np.r_[field.grid.h[2], 0.])/2.
-
-        # Multiply fields by mu_r.
-        e3d_hx *= zeta_x/(dx[:, None, None]*hvy*hvz)
-        e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
-        e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
-
-    # TODO change to Magnetic Field
-
-    # Create magnetic grid.
-    hx = np.diff((field.grid.nodes_x[:-1] + field.grid.nodes_x[1:])/2)
-    hx = np.r_[field.grid.h[0][0], hx, field.grid.h[0][-1]]
-    hy = np.diff((field.grid.nodes_y[:-1] + field.grid.nodes_y[1:])/2)
-    hy = np.r_[field.grid.h[1][0], hy, field.grid.h[1][-1]]
-    hz = np.diff((field.grid.nodes_z[:-1] + field.grid.nodes_z[1:])/2)
-    hz = np.r_[field.grid.h[2][0], hz, field.grid.h[2][-1]]
-    origin = (field.grid.origin[0] - field.grid.h[0][0]/2,
-              field.grid.origin[1] - field.grid.h[1][0]/2,
-              field.grid.origin[2] - field.grid.h[2][0]/2)
-    grid = meshes.TensorMesh([hx, hy, hz], origin)
-
-    n_e3d_hx = np.zeros(grid.shape_edges_x, dtype=e3d_hx.dtype)
-    n_e3d_hx[:, 1:-1, 1:-1] = e3d_hx
-    e3d_hx = n_e3d_hx
-
-    n_e3d_hy = np.zeros(grid.shape_edges_y, dtype=e3d_hy.dtype)
-    n_e3d_hy[1:-1, :, 1:-1] = e3d_hy
-    e3d_hy = n_e3d_hy
-
-    n_e3d_hz = np.zeros(grid.shape_edges_z, dtype=e3d_hz.dtype)
-    n_e3d_hz[1:-1, 1:-1, :] = e3d_hz
-    e3d_hz = n_e3d_hz
-
-    # Create a Field instance and divide by s*mu_0 and return.
-    new = np.r_[e3d_hx.ravel('F'), e3d_hy.ravel('F'), e3d_hz.ravel('F')]
-    return Field(grid, -new/field.smu0, frequency=field._frequency)
+    return hfield
 
 
 def _finite_source_xyz(grid, source, field, decimals):
@@ -824,3 +760,62 @@ def _finite_source_xyz(grid, source, field, decimals):
         print(f"* WARNING :: {msg}")
         warnings.warn(msg, UserWarning)
         field /= sum_s
+
+
+@nb.njit(**_numba_setting)
+def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, smu):
+    r"""Magnetic field corresponding to electric field.
+
+    Called from :func:`emg3d.fields.get_magnetic_field`; the result is put
+    into ``{mx;my;mz}``.
+
+
+    Parameters
+    ----------
+    mx, my, mz : ndarray
+        Pre-allocated zero magnetic field in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`). The magnetic field grid has one cell
+        less in each direction than the electric field grid.
+
+    ex, ey, ez : ndarray
+        Electric fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
+
+    hx, hy, hz : ndarray
+        Cell widths in x-, y-, and z-directions
+        (:class:`emg3d.meshes.TensorMesh`).
+
+    smu0 : ndarray
+        Factor by which the nabla x E will be divided. Shape of
+        ``efield.grid.shape_cells``.
+
+    """
+
+    # Get dimensions
+    nx = len(hx)
+    ny = len(hy)
+    nz = len(hz)
+
+    # Loop over dimensions; x-fastest, then y, z
+    for iz in range(nz):
+        izm = max(0, iz-1)
+        izp = iz+1
+        for iy in range(ny):
+            iym = max(0, iy-1)
+            iyp = iy+1
+            for ix in range(nx):
+                ixm = max(0, ix-1)
+                ixp = ix+1
+
+                # Nabla x E.
+                fx = ((ez[ix, iyp, iz] - ez[ix, iy, iz])/hy[iy] -
+                      (ey[ix, iy, izp] - ey[ix, iy, iz])/hz[iz])
+                fy = ((ex[ix, iy, izp] - ex[ix, iy, iz])/hz[iz] -
+                      (ez[ixp, iy, iz] - ez[ix, iy, iz])/hx[ix])
+                fz = ((ey[ixp, iy, iz] - ey[ix, iy, iz])/hx[ix] -
+                      (ex[ix, iyp, iz] - ex[ix, iy, iz])/hy[iy])
+
+                # Divide by smu (averaged over the two cells) and store.
+                mx[ixm, iy, iz] = 2*fx/(smu[ixm, iy, iz] + smu[ix, iy, iz])
+                my[ix, iym, iz] = 2*fy/(smu[ix, iym, iz] + smu[ix, iy, iz])
+                mz[ix, iy, izm] = 2*fz/(smu[ix, iy, izm] + smu[ix, iy, iz])

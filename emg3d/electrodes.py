@@ -37,7 +37,7 @@ def register_electrode(func):
 
 class Electrode:
 
-    _serialize = ('coordinates', )
+    _serialize = {'coordinates'}
 
     def __init__(self, points, coordinates=None):
         """
@@ -257,7 +257,7 @@ class Wire(Electrode):
 # SOURCES
 class Source:
 
-    _serialize = (*Electrode._serialize, 'strength')
+    _serialize = {'strength'} | Electrode._serialize
 
     def __init__(self, strength, **kwargs):
         self._strength = float(strength)
