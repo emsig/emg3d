@@ -160,6 +160,10 @@ Detailed changes
 
     Level three updates now dynamically, just as level 2.
 
+- ``solver.solve_source``: New function, a shortcut for ``solver.solve``. It
+  takes a ``source`` and a ``frequency`` instead of a ``sfield``, gets the
+  ``sfield`` from it, and forwards everything to ``solver.solve``.
+
 - ``solver.RegularGridProlongator``:
 
   - Changed signature from ``x, y, cxy`` to ``cx, cy, x, y``; it now

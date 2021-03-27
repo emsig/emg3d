@@ -36,12 +36,12 @@ import scipy.sparse.linalg as ssl
 
 from emg3d import core, meshes, models, fields, utils
 
-__all__ = ['solve', 'multigrid', 'krylov', 'smoothing', 'restriction',
-           'prolongation', 'residual', 'MGParameters',
+__all__ = ['solve', 'solve_source', 'multigrid', 'krylov', 'smoothing',
+           'restriction', 'prolongation', 'residual', 'MGParameters',
            'RegularGridProlongator']
 
 
-# MAIN USER-FACING FUNCTION
+# MAIN USER-FACING FUNCTIONS
 def solve(model, sfield, sslsolver=True, semicoarsening=True,
           linerelaxation=True, verb=0, **kwargs):
     r"""Solver for three-dimensional electromagnetic diffusion.
@@ -435,6 +435,24 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         return efield
     elif var.return_info:                  # info.
         return info_dict
+
+
+def solve_source(model, source, frequency, **kwargs):
+    """Return electric field for a given source and frequency.
+
+    This function is a simple shortcut for the following::
+
+       sfield = emg3d.get_source_field(grid, source, frequency, **kwargs)
+       efield = emg3d.solve(model, sfield, **kwargs)
+
+    See the documentation of :func:`emg3d.fields.get_source_field` for the
+    description of ``model``, ``source``, and ``frequency``, and
+    the documentation of :func:`emg3d.solver.solve` for all other
+    input and output parameters.
+
+    """
+    sfield = fields.get_source_field(model.grid, source, frequency)
+    return solve(model, sfield, **kwargs)
 
 
 # SOLVERS

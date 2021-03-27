@@ -253,6 +253,15 @@ class TestSolve:
             efield = solver.solve(model, sfield, plain=True, efield=efield)
 
 
+def test_solve_source():
+    dat = REGRES['res']
+    model = models.Model(**dat['input_model'])
+    efield = solver.solve_source(
+            model=model, source=dat['input_source']['source'],
+            frequency=dat['input_source']['frequency'], plain=True)
+    assert_allclose(dat['Fresult'].field, efield.field)
+
+
 class TestMultigrid:
     # Everything should be tested just fine in `test_solver`. Just check here
     # that all code is reached.
