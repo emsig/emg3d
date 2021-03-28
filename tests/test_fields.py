@@ -5,7 +5,8 @@ from scipy import constants
 from os.path import join, dirname
 from numpy.testing import assert_allclose, assert_array_equal
 
-from emg3d import electrodes, io, meshes, models, fields, solver
+import emg3d
+from emg3d import fields
 
 from . import alternatives, helpers
 
@@ -20,11 +21,11 @@ except ImportError:
     discretize = None
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
+REGRES = emg3d.load(join(dirname(__file__), 'data/regression.npz'))
 
 
 class TestField:
-    grid = meshes.TensorMesh([[.5, 8], [1, 4], [2, 8]], (0, 0, 0))
+    grid = emg3d.TensorMesh([[.5, 8], [1, 4], [2, 8]], (0, 0, 0))
 
     ex = helpers.dummy_field(*grid.shape_edges_x, imag=True)
     ey = helpers.dummy_field(*grid.shape_edges_y, imag=True)
@@ -121,9 +122,9 @@ class TestField:
     def test_interpolate_to_grid(self):
         # We only check here that it gives the same as calling the function
         # itself; the rest should be tested in interpolate().
-        grid1 = meshes.TensorMesh(
+        grid1 = emg3d.TensorMesh(
                 [np.ones(8), np.ones(8), np.ones(8)], (0, 0, 0))
-        grid2 = meshes.TensorMesh([[2, 2, 2, 2], [3, 3], [4, 4]], (0, 0, 0))
+        grid2 = emg3d.TensorMesh([[2, 2, 2, 2], [3, 3], [4, 4]], (0, 0, 0))
         ee = fields.Field(grid1)
         ee.field = np.ones(ee.field.size) + 2j*np.ones(ee.field.size)
         e2 = ee.interpolate_to_grid(grid2)
@@ -132,7 +133,7 @@ class TestField:
     def test_get_receiver(self):
         # We only check here that it gives the same as calling the function
         # itself; the rest should be tested in get_receiver().
-        grid1 = meshes.TensorMesh(
+        grid1 = emg3d.TensorMesh(
                 [np.ones(8), np.ones(8), np.ones(8)], (0, 0, 0))
         ee = fields.Field(grid1)
         ee.field = np.arange(ee.field.size) + 2j*np.arange(ee.field.size)
@@ -147,14 +148,11 @@ class TestGetSourceField:
     def test_get_source_field(self, capsys):
         src = [100, 200, 300, 27, 31]
         h = np.ones(4)
-        grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
+        grid = emg3d.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
         freq = 1.2458
 
         sfield = fields.get_source_field(grid, src, freq, strength=1+1j)
-        assert_array_equal(sfield.strength, complex(1+1j))
-
         sfield = fields.get_source_field(grid, src, freq, strength=0)
-        assert_array_equal(sfield.strength, float(0))
         iomegamu = 2j*np.pi*freq*constants.mu_0
 
         # Check number of edges
@@ -167,9 +165,9 @@ class TestGetSourceField:
         y = np.sin(np.deg2rad(src[3]))*h
         x = np.cos(np.deg2rad(src[3]))*h
         z = np.sin(np.deg2rad(src[4]))
-# TODO  assert_allclose(np.sum(sfield.fx/x/iomegamu).real, -1)
-# TODO  assert_allclose(np.sum(sfield.fy/y/iomegamu).real, -1)
-# TODO  assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
+        assert_allclose(np.sum(sfield.fx/x/iomegamu).real, -1)
+        assert_allclose(np.sum(sfield.fy/y/iomegamu).real, -1)
+        assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
         assert sfield._frequency == freq
         assert sfield.frequency == freq
         assert_allclose(sfield.smu0, -iomegamu)
@@ -181,23 +179,19 @@ class TestGetSourceField:
         sfield = fields.get_source_field(grid, src, freq)
         tot_field = np.linalg.norm(
                 [np.sum(sfield.fx), np.sum(sfield.fy), np.sum(sfield.fz)])
-# TODO  assert_allclose(tot_field/np.abs(np.sum(iomegamu)), 1.0)
+        assert_allclose(tot_field/np.abs(np.sum(iomegamu)), 1.0)
 
         out, _ = capsys.readouterr()  # Empty capsys
 
-        # Provide wrong source definition. Ensure it fails.
-        with pytest.raises(ValueError, match='`coordinates` must be of shap'):
-            sfield = fields.get_source_field(grid, [0, 0, 0, 0], 1)
-
         # Put finite dipole of zero length. Ensure it fails.
-        with pytest.raises(ValueError, match='The two poles are identical'):
+        with pytest.raises(ValueError, match='finite dipole has no length'):
             src = [0, 0, 100, 100, -200, -200]
             sfield = fields.get_source_field(grid, src, 1)
 
         # Same for Laplace domain
         src = [100, 200, 300, 27, 31]
         h = np.ones(4)
-        grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
+        grid = emg3d.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
         freq = 1.2458
         sfield = fields.get_source_field(grid, src, -freq)
         smu = freq*constants.mu_0
@@ -212,16 +206,85 @@ class TestGetSourceField:
         y = np.sin(np.deg2rad(src[3]))*h
         x = np.cos(np.deg2rad(src[3]))*h
         z = np.sin(np.deg2rad(src[4]))
-# TODO  assert_allclose(np.sum(sfield.fx/x/smu), -1)
-# TODO  assert_allclose(np.sum(sfield.fy/y/smu), -1)
-# TODO  assert_allclose(np.sum(sfield.fz/z/smu), -1)
+        assert_allclose(np.sum(sfield.fx/x/smu), -1)
+        assert_allclose(np.sum(sfield.fy/y/smu), -1)
+        assert_allclose(np.sum(sfield.fz/z/smu), -1)
         assert sfield._frequency == -freq
         assert sfield.frequency == freq
         assert_allclose(sfield.smu0, -freq*constants.mu_0)
 
+    def test_get_source_field_point_vs_finite(self, capsys):
+        # === Point dipole to finite dipole comparisons ===
+        def get_xyz(d_src):
+            """Return dimensions corresponding to azimuth and dip."""
+            h = np.cos(np.deg2rad(d_src[4]))
+            dys = np.sin(np.deg2rad(d_src[3]))*h
+            dxs = np.cos(np.deg2rad(d_src[3]))*h
+            dzs = np.sin(np.deg2rad(d_src[4]))
+            return [dxs, dys, dzs]
+
+        def get_f_src(d_src, slen=1.0):
+            """Return d_src and f_src for d_src input."""
+            xyz = get_xyz(d_src)
+            f_src = [d_src[0]-xyz[0]*slen/2, d_src[0]+xyz[0]*slen/2,
+                     d_src[1]-xyz[1]*slen/2, d_src[1]+xyz[1]*slen/2,
+                     d_src[2]-xyz[2]*slen/2, d_src[2]+xyz[2]*slen/2]
+            return d_src, f_src
+
+        # 1a. Source within one cell, normalized.
+        h = np.ones(3)*500
+        grid1 = emg3d.TensorMesh([h, h, h], np.array([-750, -750, -750]))
+        d_src, f_src = get_f_src([0, 0., 0., 23, 15])
+        dsf = fields.get_source_field(grid1, d_src, 1)
+        fsf = fields.get_source_field(grid1, f_src, 1)
+        assert fsf == dsf
+
+        # 1b. Source within one cell, source strength = pi.
+        d_src, f_src = get_f_src([0, 0., 0., 32, 53])
+        dsf = fields.get_source_field(grid1, d_src, 3.3, strength=np.pi)
+        fsf = fields.get_source_field(grid1, f_src, 3.3, strength=np.pi)
+        assert fsf == dsf
+
+        # 1c. Source over various cells, normalized.
+        h = np.ones(8)*200
+        grid2 = emg3d.TensorMesh([h, h, h], np.array([-800, -800, -800]))
+        d_src, f_src = get_f_src([0, 0., 0., 40, 20], 300.0)
+        dsf = fields.get_source_field(grid2, d_src, 10.0, strength=0)
+        fsf = fields.get_source_field(grid2, f_src, 10.0, strength=0)
+        assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+        assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+        assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+        # 1d. Source over various cells, source strength = pi.
+        slen = 300
+        strength = np.pi
+        d_src, f_src = get_f_src([0, 0., 0., 20, 30], slen)
+        dsf = fields.get_source_field(
+                grid2, d_src, 1.3, strength=slen*strength)
+        fsf = fields.get_source_field(grid2, f_src, 1.3, strength=strength)
+        assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+        assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+        assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
+        # 1e. Source over various stretched cells, source strength = pi.
+        h1 = helpers.get_h(4, 2, 200, 1.1)
+        h2 = helpers.get_h(4, 2, 200, 1.2)
+        h3 = helpers.get_h(4, 2, 200, 1.2)
+        origin = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
+        grid3 = emg3d.TensorMesh([h1, h2, h3], origin)
+        slen = 333
+        strength = np.pi
+        d_src, f_src = get_f_src([0, 0., 0., 50, 33], slen)
+        dsf = fields.get_source_field(
+                grid3, d_src, 0.7, strength=slen*strength)
+        fsf = fields.get_source_field(grid3, f_src, 0.7, strength=strength)
+        assert_allclose(fsf.fx.sum(), dsf.fx.sum())
+        assert_allclose(fsf.fy.sum(), dsf.fy.sum())
+        assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+
     def test_arbitrarily_shaped_source(self):
         h = np.ones(4)
-        grid = meshes.TensorMesh([h*200, h*400, h*800], [-400, -800, -1600])
+        grid = emg3d.TensorMesh([h*200, h*400, h*800], [-400, -800, -1600])
         freq = 1.11
         strength = np.pi
         src = (0, 0, 0, 0, 90)
@@ -260,7 +323,7 @@ class TestGetSourceField:
 
     def test_source_field(self):
         # Create some dummy data
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.array([.5, 8]), np.array([1, 4]), np.array([2, 8])],
                 np.zeros(3))
 
@@ -284,13 +347,13 @@ def test_get_receiver():
     # it is composed correctly.
 
     # Check cubic spline runs fine (NOT CHECKING ACTUAL VALUES!.
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             [np.ones(4), np.array([1, 2, 3, 1]), np.array([2, 1, 1, 1])],
             [0, 0, 0])
     field = fields.Field(grid)
     field.field = np.ones(field.field.size) + 1j*np.ones(field.field.size)
 
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             [np.ones(6), np.array([1, 1, 2, 3, 1]), np.array([1, 2, 1, 1, 1])],
             [-1, -1, -1])
     efield = fields.Field(grid, frequency=1)
@@ -311,7 +374,7 @@ def test_get_receiver():
     src = (0, 0, 0, 0, 0)
     freq = 10
 
-    grid = meshes.construct_mesh(
+    grid = emg3d.construct_mesh(
             frequency=freq,
             center=(0, 0, 0),
             properties=res,
@@ -319,10 +382,10 @@ def test_get_receiver():
             min_width_limits=20,
     )
 
-    model = models.Model(grid, res)
+    model = emg3d.Model(grid, res)
     sfield = fields.get_source_field(grid, src, freq)
-    efield = solver.solve(model, sfield, semicoarsening=True,
-                          sslsolver=True, linerelaxation=True, verb=1)
+    efield = emg3d.solve(model, sfield, semicoarsening=True,
+                         sslsolver=True, linerelaxation=True, verb=1)
 
     # epm = empymod.bipole(src, rec, [], res, freq, verb=1)
     epm = np.array([-1.27832028e-11+1.21383502e-11j,
@@ -335,7 +398,7 @@ def test_get_receiver():
     assert_allclose(epm, e3d, rtol=0.1)
 
     # Test with a list of receiver instance.
-    rec_inst = [electrodes.RxElectricPoint((rec[0][i], rec[1][i], *rec[2:]))
+    rec_inst = [emg3d.RxElectricPoint((rec[0][i], rec[1][i], *rec[2:]))
                 for i in range(rec[0].size)]
     e3d_inst = fields.get_receiver(efield, rec_inst)
     assert_allclose(e3d_inst, e3d)
@@ -346,11 +409,11 @@ def test_get_receiver():
 
     # Ensure responses outside and in the last cell are set to NaN.
     h = np.ones(4)*100
-    grid = meshes.TensorMesh([h, h, h], (-200, -200, -200))
-    model = models.Model(grid)
+    grid = emg3d.TensorMesh([h, h, h], (-200, -200, -200))
+    model = emg3d.Model(grid)
     sfield = fields.get_source_field(
             grid=grid, source=[0, 0, 0, 0, 0], frequency=10)
-    out = solver.solve(model=model, sfield=sfield, plain=True, verb=0)
+    out = emg3d.solve(model=model, sfield=sfield, plain=True, verb=0)
     off = np.arange(11)*50-250
     resp = out.get_receiver((off, off, off, 0, 0))
     assert_allclose(np.isfinite(resp),
@@ -370,24 +433,24 @@ def test_get_magnetic_field():
     # Add some mu_r - Just 1, to trigger, and compare.
     dat = REGRES['res']
     efield = dat['Fresult']
-    model1 = models.Model(**dat['input_model'])
-    model2 = models.Model(**dat['input_model'], mu_r=1.)
+    model1 = emg3d.Model(**dat['input_model'])
+    model2 = emg3d.Model(**dat['input_model'], mu_r=1.)
 
     hout1 = fields.get_magnetic_field(model1, efield)
     hout2 = fields.get_magnetic_field(model2, efield)
     assert_allclose(hout1.field, hout2.field)
 
     # Test division by mu_r.
-    model3 = models.Model(**dat['input_model'], mu_r=2.)
+    model3 = emg3d.Model(**dat['input_model'], mu_r=2.)
     hout3 = fields.get_magnetic_field(model3, efield)
     assert_allclose(hout1.field, hout3.field*2)
 
     # Comparison to alternative.
     # Using very unrealistic value, unrealistic stretching, to test.
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
         h=[[1, 100, 25, 33], [1, 1, 33.3, 0.3, 1, 1], [2, 4, 8, 16]],
         origin=(88, 20, 9))
-    model = models.Model(grid, mu_r=np.arange(1, grid.n_cells+1)/10)
+    model = emg3d.Model(grid, mu_r=np.arange(1, grid.n_cells+1)/10)
     new = 10**np.arange(grid.n_edges)-grid.n_edges/2
     efield = fields.Field(grid, data=new, frequency=np.pi)
     hfield_nb = fields.get_magnetic_field(model, efield)
@@ -397,11 +460,11 @@ def test_get_magnetic_field():
     # Test using discretize
     if discretize:
         h = np.ones(4)
-        grid = meshes.TensorMesh([h*200, h*300, h*400], (0, 0, 0))
-        model = models.Model(grid, property_x=3.24)
+        grid = emg3d.TensorMesh([h*200, h*300, h*400], (0, 0, 0))
+        model = emg3d.Model(grid, property_x=3.24)
         sfield = fields.get_source_field(
                 grid, (350, 550, 750, 30, 30), frequency=10)
-        efield = solver.solve(model, sfield, plain=True, verb=0)
+        efield = emg3d.solve(model, sfield, plain=True, verb=0)
         mfield = fields.get_magnetic_field(model, efield)
         dfield = -grid.edge_curl*efield.field/sfield.smu0
         assert_allclose(
@@ -415,93 +478,186 @@ def test_get_magnetic_field():
                 mfield.fz)
 
 
-class TestFiniteSourceXYZ:
-
-    def test_get_source_field_point_vs_finite(self, capsys):
-        # === Point dipole to finite dipole comparisons ===
-        def get_xyz(d_src):
-            """Return dimensions corresponding to azimuth and dip."""
-            h = np.cos(np.deg2rad(d_src[4]))
-            dys = np.sin(np.deg2rad(d_src[3]))*h
-            dxs = np.cos(np.deg2rad(d_src[3]))*h
-            dzs = np.sin(np.deg2rad(d_src[4]))
-            return [dxs, dys, dzs]
-
-        def get_f_src(d_src, slen=1.0):
-            """Return d_src and f_src for d_src input."""
-            xyz = get_xyz(d_src)
-            f_src = [d_src[0]-xyz[0]*slen/2, d_src[0]+xyz[0]*slen/2,
-                     d_src[1]-xyz[1]*slen/2, d_src[1]+xyz[1]*slen/2,
-                     d_src[2]-xyz[2]*slen/2, d_src[2]+xyz[2]*slen/2]
-            return d_src, f_src
-
-        # 1a. Source within one cell, normalized.
-        h = np.ones(3)*500
-        grid1 = meshes.TensorMesh([h, h, h], np.array([-750, -750, -750]))
-        d_src, f_src = get_f_src([0, 0., 0., 23, 15])
-        dsf = fields.get_source_field(grid1, d_src, 1)
-        fsf = fields.get_source_field(grid1, f_src, 1)
-        assert fsf == dsf
-
-        # 1b. Source within one cell, source strength = pi.
-        d_src, f_src = get_f_src([0, 0., 0., 32, 53])
-        dsf = fields.get_source_field(grid1, d_src, 3.3, strength=np.pi)
-        fsf = fields.get_source_field(grid1, f_src, 3.3, strength=np.pi)
-        assert fsf == dsf
-
-        # 1c. Source over various cells, normalized.
-        h = np.ones(8)*200
-        grid2 = meshes.TensorMesh([h, h, h], np.array([-800, -800, -800]))
-        d_src, f_src = get_f_src([0, 0., 0., 40, 20], 300.0)
-        dsf = fields.get_source_field(grid2, d_src, 10.0, strength=0)
-        fsf = fields.get_source_field(grid2, f_src, 10.0, strength=0)
-# TODO  assert_allclose(fsf.fx.sum(), dsf.fx.sum())
-# TODO  assert_allclose(fsf.fy.sum(), dsf.fy.sum())
-# TODO  assert_allclose(fsf.fz.sum(), dsf.fz.sum())
-
-        # 1d. Source over various cells, source strength = pi.
-        slen = 300
+class TestGetDipoleSourceField:
+    # This is just a wrapper taking care of the moment for
+    # TestUnitDipoleSource.
+    def test_base(self):
+        h = [2, 2, 2, 2, 2, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-6, -6, -6))
+        # Set frequency to -mu_0 => field corresponds to "vector"
+        frequency = constants.mu_0
+        smu0 = -2j*np.pi*constants.mu_0*frequency
+        # Diagonal source in the middle
+        source = np.array([[-3, 0, 0], [3, 0, 0]])
+        length = source[1, :] - source[0, :]
+        # Strength
         strength = np.pi
-        d_src, f_src = get_f_src([0, 0., 0., 20, 30], slen)
-        dsf = fields.get_source_field(
-                grid2, d_src, 1.3, strength=slen*strength)
-        fsf = fields.get_source_field(grid2, f_src, 1.3, strength=strength)
-# TODO  assert_allclose(fsf.fx.sum(), dsf.fx.sum())
-# TODO  assert_allclose(fsf.fy.sum(), dsf.fy.sum())
-# TODO  assert_allclose(fsf.fz.sum(), dsf.fz.sum())
 
-        # 1e. Source over various stretched cells, source strength = pi.
-        h1 = helpers.get_h(4, 2, 200, 1.1)
-        h2 = helpers.get_h(4, 2, 200, 1.2)
-        h3 = helpers.get_h(4, 2, 200, 1.2)
-        origin = np.array([-h1.sum()/2, -h2.sum()/2, -h3.sum()/2])
-        grid3 = meshes.TensorMesh([h1, h2, h3], origin)
-        slen = 333
+        # _unit_dipole_vector
+        sfield1 = emg3d.Field(grid, frequency=frequency)
+        fields._unit_dipole_vector(source, sfield1)
+
+        # get_dipole_source_field
+        sfield2 = fields.get_dipole_source_field(
+            grid=grid, source=source, frequency=frequency, strength=strength,
+            decimals=6
+        )
+
+        assert_allclose(sfield1.fx*length[0]*strength*smu0, sfield2.fx)
+        assert_allclose(sfield1.fy.sum(), 1)
+        assert_allclose(sfield2.fy.sum(), 0)
+        assert_allclose(sfield1.fz.sum(), 1)
+        assert_allclose(sfield2.fz.sum(), 0)
+
+    def test_diag(self):
+        h = [2, 2, 2, 2, 2, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-6, -6, -6))
+        # Set frequency to -mu_0 => field corresponds to "vector"
+        frequency = constants.mu_0
+        smu0 = -2j*np.pi*constants.mu_0*frequency
+        # Diagonal source in the middle
+        source = np.array([[-3, -3, -3], [3, 3, 3]])
+        length = source[1, :] - source[0, :]
+        # Strength
         strength = np.pi
-        d_src, f_src = get_f_src([0, 0., 0., 50, 33], slen)
-        dsf = fields.get_source_field(
-                grid3, d_src, 0.7, strength=slen*strength)
-        fsf = fields.get_source_field(grid3, f_src, 0.7, strength=strength)
-# TODO  assert_allclose(fsf.fx.sum(), dsf.fx.sum())
-# TODO  assert_allclose(fsf.fy.sum(), dsf.fy.sum())
-# TODO  assert_allclose(fsf.fz.sum(), dsf.fz.sum())
 
-    def test_source_norm_warning(self):
-        # This is a warning that should never be raised...
-        hx, x0 = np.ones(4), -2
-        mesh = meshes.TensorMesh([hx, hx, hx], (x0, x0, x0))
-        sfield = fields.Field(mesh, frequency=1)
-        sfield.fx += 1  # Add something to the field.
-        with pytest.warns(UserWarning, match="Normalizing Source: 101.000000"):
-            _ = fields._finite_source_xyz(
-                    mesh, (-0.5, 0.5, 0, 0, 0, 0), sfield.fx, 30)
+        # _unit_dipole_vector
+        sfield1 = emg3d.Field(grid, frequency=frequency)
+        fields._unit_dipole_vector(source, sfield1)
+
+        # get_dipole_source_field
+        sfield2 = fields.get_dipole_source_field(
+            grid=grid, source=source, frequency=frequency, strength=strength,
+            decimals=6
+        )
+
+        assert_allclose(sfield1.fx*length[0]*strength*smu0, sfield2.fx)
+        assert_allclose(sfield1.fy*length[1]*strength*smu0, sfield2.fy)
+        assert_allclose(sfield1.fz*length[2]*strength*smu0, sfield2.fz)
+
+    def test_warnings(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+        source = np.array([[-10, 0, 0], [0, 0, 0]])
+        with pytest.raises(ValueError, match='Provided source outside grid'):
+            fields.get_dipole_source_field(grid, source, 1)
+
+
+class TestUnitDipoleVector:
+    def test_basics_xdir_on_x(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+
+        # Set frequency to -mu_0 => field corresponds to "vector"
+        sfield = emg3d.Field(grid, frequency=-constants.mu_0)
+
+        # x-directed source in the middle
+        source = np.array([[-0.5, 0, 0], [0.5, 0, 0]])
+        fields._unit_dipole_vector(source, sfield)
+
+        # x: exact in the middle on the two edges
+        assert_allclose(sfield.fx[1:-1, 2:-2, 2:-2].ravel(), [0.5, 0.5])
+        # y: as exact "on" x-grid, falls to the right
+        assert_allclose(sfield.fy[1:-1, 2:-1, 2:-2].ravel(),
+                        [0.125, 0.75, 0.125])
+        # z: as exact "on" x-grid, falls to top
+        assert_allclose(sfield.fz[1:-1, 2:-2, 2:-1].ravel(),
+                        [0.125, 0.75, 0.125])
+
+    def test_basics_diag(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+
+        # Set frequency to -mu_0 => field corresponds to "vector"
+        sfield = emg3d.Field(grid, frequency=-constants.mu_0)
+
+        # Diagonal source in the middle
+        source = np.array([[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]])
+        fields._unit_dipole_vector(source, sfield)
+
+        # x: exact in the middle on the two edges
+        assert_allclose(sfield.fx[1:-2, 1:-2, 1:-2].ravel(),
+                        [0.03125, 0.09375, 0.09375, 0.28125])
+        # compare lower-left-front with upper-right-back
+        assert_allclose(sfield.fx[1:-2, 1:-2, 1:-2].ravel(),
+                        sfield.fx[2:-1, 2:-1, 2:-1].ravel()[::-1])
+
+        # Source is 3D symmetric, compare all fields are the same
+        assert_allclose(sfield.fx[1:-2, 1:-2, 1:-2].ravel(),
+                        sfield.fy[1:-2, 1:-2, 1:-2].ravel())
+
+        assert_allclose(sfield.fx[1:-2, 1:-2, 1:-2].ravel(),
+                        sfield.fz[1:-2, 1:-2, 1:-2].ravel())
+
+        assert_allclose(sfield.fx[2:-1, 2:-1, 2:-1].ravel(),
+                        sfield.fy[2:-1, 2:-1, 2:-1].ravel())
+
+        assert_allclose(sfield.fx[2:-1, 2:-1, 2:-1].ravel(),
+                        sfield.fz[2:-1, 2:-1, 2:-1].ravel())
+
+    def test_basics_diag_large(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+
+        # Set frequency to -mu_0 => field corresponds to "vector"
+        sfield = emg3d.Field(grid, frequency=-constants.mu_0)
+
+        # Large diagonal source in the middle
+        source = np.array([[-2.5, -2.5, -2.5], [2.5, 2.5, 2.5]])
+        fields._unit_dipole_vector(source, sfield)
+
+        # Source is 3D symmetric, compare all fields are the same
+        assert_allclose(sfield.fx[0, :2, :2].ravel(),
+                        sfield.fy[:2, 0, :2].ravel())
+        assert_allclose(sfield.fx[0, :2, :2].ravel(),
+                        sfield.fz[:2, :2, 0].ravel())
+
+        assert_allclose(sfield.fx[1, 1:3, 1:3].ravel(),
+                        sfield.fy[1:3, 1, 1:3].ravel())
+        assert_allclose(sfield.fx[1, 1:3, 1:3].ravel(),
+                        sfield.fz[1:3, 1:3, 1].ravel())
+
+        assert_allclose(sfield.fx[0, :2, :2].ravel(),
+                        sfield.fx[3, 3:, 3:].ravel()[::-1])
+
+        assert_allclose(sfield.fx[1, 1:3, 1:3].ravel(),
+                        sfield.fx[2, 2:4, 2:4].ravel()[::-1])
+
+    def test_decimals(self):
+        h1 = [2, 1, 1, 2]
+        h2 = [2, 1.04, 1.04, 2]
+        grid1 = emg3d.TensorMesh([h1, h1, h1], (-3, -3, -3))
+        grid2 = emg3d.TensorMesh([h2, h2, h2], (-3, -3, -3))
+        source = np.array([[-0.5, 0, 0], [0.5, 0, 0]])
+
+        sfield1 = emg3d.Field(grid1, frequency=-constants.mu_0)
+        fields._unit_dipole_vector(source, sfield1)
+        sfield2a = emg3d.Field(grid2, frequency=-constants.mu_0)
+        fields._unit_dipole_vector(source, sfield2a, decimals=1)
+        sfield2b = emg3d.Field(grid2, frequency=-constants.mu_0)
+        fields._unit_dipole_vector(source, sfield2b)
+
+        assert_allclose(sfield1.fx, sfield2a.fx)
+        with pytest.raises(AssertionError, match='Not equal to tolerance'):
+            assert_allclose(sfield1.fx, sfield2b.fx)
 
     def test_warnings(self):
         h = np.ones(4)
-        grid = meshes.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
+        grid = emg3d.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
+        sfield = fields.Field(grid, frequency=1)
+        source = np.array([[1e10, 1e10, 1e10], [1e10+1, 1e10, 1e10]])
         # Put source way out. Ensure it fails.
         with pytest.raises(ValueError, match='Provided source outside grid'):
-            _ = fields.get_source_field(grid, [1e10, 1e10, 1e10, 0, 0], 1)
+            fields._unit_dipole_vector(source, sfield)
+
+        # This is a warning that should never be raised...
+        hx, x0 = np.ones(4), -2
+        grid = emg3d.TensorMesh([hx, hx, hx], (x0, x0, x0))
+        sfield = fields.Field(grid, frequency=1)
+        sfield.fx += 1  # Add something to the field.
+        source = np.array([[-0.5, 0, 0], [0.5, 0, 0]])
+        with pytest.warns(UserWarning, match="Normalizing Source: 101.000000"):
+            fields._unit_dipole_vector(source, sfield, 30)
 
 
 @pytest.mark.parametrize("njit", [True, False])

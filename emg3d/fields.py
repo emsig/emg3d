@@ -28,7 +28,8 @@ from scipy.constants import mu_0
 from emg3d.core import _numba_setting
 from emg3d import maps, meshes, utils, electrodes
 
-__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
+__all__ = ['Field', 'get_source_field', 'get_dipole_source_field',
+           'get_receiver', 'get_magnetic_field']
 
 
 class Field:
@@ -311,7 +312,79 @@ class Field:
         return get_receiver(self, receiver)
 
 
-def get_source_field(grid, source, frequency, **kwargs):
+def get_source_field(grid, source, frequency, strength=0, electric=True,
+                     length=1.0, decimals=6):
+    r"""OLD Return the source field."""
+
+    # Cast some parameters.
+    if not np.allclose(np.size(source[0]), [np.size(c) for c in source]):
+        raise ValueError(
+            "All source coordinates must have the same dimension."
+            f"Provided source: {source}."
+        )
+
+    source = np.asarray(source, dtype=np.float64)
+    strength = np.asarray(strength)
+
+    # Convert point dipole sources to finite dipoles or loops (electric).
+    if source.shape == (5, ):  # Point dipole
+
+        if not electric:  # Magnetic: convert to square loop perp. to dipole.
+            source = electrodes._point_to_square_loop(source, length)
+            # source.shape = (3, 5)
+
+        else:  # Electric: convert to finite length.
+            source = electrodes._point_to_dipole(
+                    source, length).ravel('F')
+            # source.shape = (6, )
+
+    # Get arbitrary shaped sources recursively.
+    if source.shape[0] == 3 and source.ndim > 1:
+
+        # Get arbitrarily shaped dipole source using recursion.
+        sx, sy, sz = source
+
+        # Get normalized segment lengths.
+        lengths = np.sqrt(np.sum((source[:, :-1] - source[:, 1:])**2, axis=0))
+        if strength == 0:
+            lengths /= lengths.sum()
+        else:  # (Not in-place multiplication, as strength can be complex.)
+            lengths = lengths*strength
+
+        # Initiate a zero-valued source field and loop over segments.
+        sfield = Field(grid, frequency=frequency)
+        sfield.strength = strength
+
+        # Loop over elements.
+        for i in range(sx.size-1):
+            segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
+            seg_field = get_source_field(grid, segment, frequency, lengths[i])
+            sfield.field += seg_field.field
+
+        # Check this with iw/-iw; source definition etc.
+        if not electric:
+            sfield.field *= -1
+
+        return sfield
+
+    # From here onwards `source` has to be a finite length dipole  of format
+    # [x1, x2, y1, y2, z1, z2]. Ensure that:
+    if source.shape != (6, ):
+        raise ValueError(
+            "Source is wrong defined. It must be either (1) a point, "
+            "[x, y, z, azimuth, elevation], (2) a finite dipole, "
+            "[x1, x2, y1, y2, z1, z2], or (3) an arbitrarily shaped "
+            f"dipole, [[x-coo], [y-coo], [z-coo]]. Provided: {source}."
+        )
+
+    source = np.array([[source[0], source[2], source[4]],
+                       [source[1], source[3], source[5]]])
+
+    return get_dipole_source_field(
+            grid, source, frequency, strength, decimals)
+
+
+def new_get_source_field(grid, source, frequency, **kwargs):
     r"""Return the source field.
 
     The source field is given in Equation 2 in [Muld06]_,
@@ -410,19 +483,15 @@ def get_source_field(grid, source, frequency, **kwargs):
 
     # Initiate a zero-valued source field and loop over segments.
     sfield = Field(grid, frequency=frequency)
-    sfield.source = source
-    sfield.strength = source.strength
-    sfield.moment = np.array([0., 0, 0], dtype=lengths.dtype)
 
     # Loop over elements.
     for i in range(sx.size-1):
         segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
 
-        seg_field = _finite_source(
+        seg_field = get_dipole_source_field(
                 grid, segment, frequency, lengths[i], decimals)
 
         sfield.field += seg_field.field
-        sfield.moment += seg_field.moment
 
     # Check this with iw/-iw; source definition etc.
     if source.xtype == 'magnetic':
@@ -582,110 +651,129 @@ def get_magnetic_field(model, efield):
     return hfield
 
 
-def _finite_source(grid, source, frequency, strength, decimals):
-    r"""Return the source field.
+def get_dipole_source_field(grid, source, frequency, strength=0.0, decimals=6):
+    """Get dipole source field using the adjoint interpolation method.
 
-    TODO
+    The recommended high-level function to obtain any source field is
+    :func:`emg3d.fields.get_source_field`, which uses this function internally.
+    This function returns the electric source field for a dipole.
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+    source : ndarray
+        Source coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]] (m).
+
+    frequency : float
+        Field frequency (Hz), put through to :class:`emg3d.fields.Field`.
+
+    strength : {float, complex}, default: 0.0
+        Source strength (A):
+
+          - If 0, output is normalized to a source of 1 m length, and source
+            strength of 1 A.
+          - If != 0, output is returned for given source length and strength.
+
+    decimals : int, default: 6
+        Grid nodes and source coordinates are rounded to given number of
+        decimals. It must be at least 1 (decimeters), the default is
+        micrometers.
+
+
+    Returns
+    -------
+    sfield : Field
+        Source field, a :class:`emg3d.fields.Field` instance.
 
     """
 
-    # Cast some parameters.
-    if not np.allclose(np.size(source[0]), [np.size(c) for c in source]):
-        raise ValueError(
-            "All source coordinates must have the same dimension."
-            f"Provided source: {source}."
-        )
+    # This is just a wrapper for `_unit_dipole_vector`, taking care of the
+    # source moment (length*strength).
 
-    source = np.asarray(source, dtype=np.float64)
-    strength = np.asarray(strength)
-    length = source[1::2]-source[::2]
+    # Cast some parameters.
+    length = source[1, :] - source[0, :]
+    lnorm = np.linalg.norm(length)
 
     # Ensure finite length dipole is not a point dipole.
-    if np.allclose(length, 0, atol=1e-15):
+    if lnorm < 1e-15:
         raise ValueError(
             "Provided finite dipole has no length; use "
             "the format [x, y, z, azimuth, elevation] instead."
         )
 
-    # Get source moment (individually for x, y, z).
-    if strength == 0:  # 1 A m
-        length /= np.linalg.norm(length)
-        moment = length
-    else:              # Multiply source length with source strength
-        moment = strength*length
-
-    # Initiate zero source field.
+    # Get unit source field.
     sfield = Field(grid, frequency=frequency)
+    _unit_dipole_vector(source, sfield, decimals)
 
-    # Return source-field for each direction.
-    for xyz, field in enumerate([sfield.fx, sfield.fy, sfield.fz]):
+    # Multiply by moment*s*mu
+    if strength == 0:  # 1 A m
+        moment = length / lnorm * sfield.smu0
+    else:              # Multiply source length with source strength
+        moment = strength * length * sfield.smu0
 
-        # Get source field for this direction.
-        _finite_source_xyz(grid, source, field, decimals)
-
-        # Multiply by moment*s*mu
-        field *= moment[xyz]*sfield.smu0
-
-    # Add source and moment information.
-    sfield.source = source
-    sfield.strength = strength
-    sfield.moment = moment
+    sfield.fx *= moment[0]
+    sfield.fy *= moment[1]
+    sfield.fz *= moment[2]
 
     return sfield
 
 
-def _finite_source_xyz(grid, source, field, decimals):
-    """Set finite dipole source using the adjoint interpolation method.
+def _unit_dipole_vector(source, sfield, decimals=6):
+    """Get unit dipole source field using the adjoint interpolation method.
 
-    The result is placed directly in the provided ``field``-component.
+    The result is placed directly in the provided ``sfield`` instance.
 
 
     Parameters
     ----------
-    grid : TensorMesh
-        Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
-
     source : ndarray
-        Source coordinates in the form of (x0, x1, y0, y1, z0, z1) (m).
+        Source coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]] (m).
 
-    field : ndarray
-        A particular component of the source field, one of ``field.f{x;y;z}``.
+    sfield : Field
+        Source field, a :class:`emg3d.fields.Field` instance.
 
-    decimals: int, optional
+    decimals : int, default: 6
         Grid nodes and source coordinates are rounded to given number of
-        decimals. Default is 6 (micrometer).
+        decimals. It must be at least 1 (decimeters), the default is
+        micrometers.
 
     """
+    grid = sfield.grid
+
     # Round nodes and source coordinates (to avoid floating point issues etc).
+    decimals = max(decimals, 1)
     nodes_x = np.round(grid.nodes_x, decimals)
     nodes_y = np.round(grid.nodes_y, decimals)
     nodes_z = np.round(grid.nodes_z, decimals)
-    source = np.round(source, decimals)
+    source = np.round(np.asarray(source, dtype=float), decimals)
 
     # Ensure source is within nodes.
-    outside = (source[0] < nodes_x[0] or source[1] > nodes_x[-1] or
-               source[2] < nodes_y[0] or source[3] > nodes_y[-1] or
-               source[4] < nodes_z[0] or source[5] > nodes_z[-1])
+    outside = (source[0, 0] < nodes_x[0] or source[1, 0] > nodes_x[-1] or
+               source[0, 1] < nodes_y[0] or source[1, 1] > nodes_y[-1] or
+               source[0, 2] < nodes_z[0] or source[1, 2] > nodes_z[-1])
     if outside:
         raise ValueError(f"Provided source outside grid: {source}.")
 
     # Source lengths in x-, y-, and z-directions.
-    d_xyz = source[1::2]-source[::2]
+    d_xyz = source[1, :] - source[0, :]
+    slen = np.linalg.norm(d_xyz)
 
     # Inverse source lengths.
     id_xyz = d_xyz.copy()
     id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
 
     # Cell fractions.
-    a1 = (nodes_x-source[0])*id_xyz[0]
-    a2 = (nodes_y-source[2])*id_xyz[1]
-    a3 = (nodes_z-source[4])*id_xyz[2]
+    a1 = (nodes_x - source[0, 0]) * id_xyz[0]
+    a2 = (nodes_y - source[0, 1]) * id_xyz[1]
+    a3 = (nodes_z - source[0, 2]) * id_xyz[2]
 
     # Get range of indices of cells in which source resides.
     def min_max_ind(vector, i):
         """Return [min, max]-index of cells in which source resides."""
-        vmin = min(source[2*i:2*i+2])
-        vmax = max(source[2*i:2*i+2])
+        vmin = min(source[:, i])
+        vmax = max(source[:, i])
         return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
                 max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
 
@@ -706,47 +794,46 @@ def _finite_source_xyz(grid, source, field, decimals):
                 ar = min(1, aa[:, 1].min())  # elements.
 
                 # Characteristics of this cell.
-                xmin = source[::2]+al*d_xyz
-                xmax = source[::2]+ar*d_xyz
-                x_c = (xmin+xmax)/2.0
-                slen = np.linalg.norm(source[1::2]-source[::2])
-                x_len = np.linalg.norm(xmax-xmin)/slen
+                xmin = source[0, :] + al*d_xyz
+                xmax = source[0, :] + ar*d_xyz
+                x_c = (xmin + xmax) / 2.0
+                x_len = np.linalg.norm(xmax - xmin) / slen
 
                 # Contribution to edge (coordinate xyz)
-                rx = (x_c[0]-nodes_x[ix])/grid.h[0][ix]
-                ex = 1-rx
-                ry = (x_c[1]-nodes_y[iy])/grid.h[1][iy]
-                ey = 1-ry
-                rz = (x_c[2]-nodes_z[iz])/grid.h[2][iz]
-                ez = 1-rz
+                rx = (x_c[0] - nodes_x[ix]) / grid.h[0][ix]
+                ex = 1 - rx
+                ry = (x_c[1] - nodes_y[iy]) / grid.h[1][iy]
+                ey = 1 - ry
+                rz = (x_c[2] - nodes_z[iz]) / grid.h[2][iz]
+                ez = 1 - rz
 
                 # Add to field (only if segment inside cell).
                 if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
 
-                    if field.shape == grid.shape_edges_x:
-                        field[ix, iy, iz] += ey*ez*x_len
-                        field[ix, iy+1, iz] += ry*ez*x_len
-                        field[ix, iy, iz+1] += ey*rz*x_len
-                        field[ix, iy+1, iz+1] += ry*rz*x_len
-                    elif field.shape == grid.shape_edges_y:
-                        field[ix, iy, iz] += ex*ez*x_len
-                        field[ix+1, iy, iz] += rx*ez*x_len
-                        field[ix, iy, iz+1] += ex*rz*x_len
-                        field[ix+1, iy, iz+1] += rx*rz*x_len
-                    else:
-                        field[ix, iy, iz] += ex*ey*x_len
-                        field[ix+1, iy, iz] += rx*ey*x_len
-                        field[ix, iy+1, iz] += ex*ry*x_len
-                        field[ix+1, iy+1, iz] += rx*ry*x_len
+                    sfield.fx[ix, iy, iz] += ey*ez*x_len
+                    sfield.fx[ix, iy+1, iz] += ry*ez*x_len
+                    sfield.fx[ix, iy, iz+1] += ey*rz*x_len
+                    sfield.fx[ix, iy+1, iz+1] += ry*rz*x_len
+
+                    sfield.fy[ix, iy, iz] += ex*ez*x_len
+                    sfield.fy[ix+1, iy, iz] += rx*ez*x_len
+                    sfield.fy[ix, iy, iz+1] += ex*rz*x_len
+                    sfield.fy[ix+1, iy, iz+1] += rx*rz*x_len
+
+                    sfield.fz[ix, iy, iz] += ex*ey*x_len
+                    sfield.fz[ix+1, iy, iz] += rx*ey*x_len
+                    sfield.fz[ix, iy+1, iz] += ex*ry*x_len
+                    sfield.fz[ix+1, iy+1, iz] += rx*ry*x_len
 
     # Ensure unity (should not be necessary).
-    sum_s = abs(field.sum())
-    if abs(sum_s-1) > 1e-6:
-        # Print is always shown and simpler, warn for the CLI logs.
-        msg = f"Normalizing Source: {sum_s:.10f}."
-        print(f"* WARNING :: {msg}")
-        warnings.warn(msg, UserWarning)
-        field /= sum_s
+    for field in [sfield.fx, sfield.fy, sfield.fz]:
+        sum_s = abs(field.sum())
+        if abs(sum_s-1) > 1e-6:
+            # Print is always shown and simpler, warn for the CLI logs.
+            msg = f"Normalizing Source: {sum_s:.10f}."
+            print(f"* WARNING :: {msg}")
+            warnings.warn(msg, UserWarning)
+            field /= sum_s
 
 
 @nb.njit(**_numba_setting)
