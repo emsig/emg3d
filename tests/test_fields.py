@@ -3,7 +3,7 @@ import shelve
 import numpy as np
 from scipy import constants
 from os.path import join, dirname
-from numpy.testing import assert_allclose, assert_array_equal
+from numpy.testing import assert_allclose
 
 import emg3d
 from emg3d import fields

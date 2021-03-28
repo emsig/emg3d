@@ -331,12 +331,16 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
 
         if not electric:  # Magnetic: convert to square loop perp. to dipole.
             source = electrodes._point_to_square_loop(source, length)
+            source = source.T  # TODO New Change
             # source.shape = (3, 5)
 
         else:  # Electric: convert to finite length.
             source = electrodes._point_to_dipole(
                     source, length).ravel('F')
             # source.shape = (6, )
+
+    if hasattr(source, '_points'):  # TODO New Change
+        source = source.points.T  # TODO New Change
 
     # Get arbitrary shaped sources recursively.
     if source.shape[0] == 3 and source.ndim > 1:
@@ -357,8 +361,12 @@ def get_source_field(grid, source, frequency, strength=0, electric=True,
 
         # Loop over elements.
         for i in range(sx.size-1):
-            segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
-            seg_field = get_source_field(grid, segment, frequency, lengths[i])
+            # segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
+            # seg_field = get_source_field(grid, segment, frequency, lengths[i])
+            segment = np.array([[sx[i], sy[i], sz[i]],
+                                [sx[i+1], sy[i+1], sz[i+1]]])
+            seg_field = get_dipole_source_field(
+                    grid, segment, frequency, lengths[i], decimals)
             sfield.field += seg_field.field
 
         # Check this with iw/-iw; source definition etc.
