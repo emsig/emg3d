@@ -5,6 +5,68 @@ from numpy.testing import assert_allclose
 from emg3d import electrodes
 
 
+def test_inst_to_from_dict():
+
+    # RxElectricPoint
+    r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15))
+    r1b = electrodes.RxElectricPoint.from_dict(r1a.to_dict())
+    assert r1a == r1b
+
+    # RxMagneticPoint
+    r2a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
+    r2b = electrodes.RxMagneticPoint.from_dict(r2a.to_dict())
+    assert r2a == r2b
+
+    # TxElectricDipole - 3 formats
+    s1a = electrodes.TxElectricDipole(
+            (0, 0, 0, 45, 45), strength=np.pi, length=4)
+    s1b = electrodes.TxElectricDipole.from_dict(s1a.to_dict())
+    assert s1a == s1b
+    s2a = electrodes.TxElectricDipole(
+            (-1, 1, -1, 1, -np.sqrt(2), np.sqrt(2)), strength=np.pi)
+    s2b = electrodes.TxElectricDipole.from_dict(s2a.to_dict())
+    assert s2a == s2b
+    s3a = electrodes.TxElectricDipole(
+            [[-1, -1, -np.sqrt(2)], [1, 1, np.sqrt(2)]], strength=np.pi)
+    s3b = electrodes.TxElectricDipole.from_dict(s3a.to_dict())
+    assert s3a == s3b
+    assert_allclose(s1b.points, s2b.points)
+    assert_allclose(s1b.points, s3b.points)
+    assert_allclose(s1b.strength, s2b.strength)
+    assert_allclose(s1b.strength, s3b.strength)
+    assert_allclose(s1b.length, s2b.length)
+    assert_allclose(s1b.length, s3b.length)
+
+    # TxMagneticDipole - 3 formats
+    s4a = electrodes.TxElectricDipole(
+            (0, 0, 0, 45, 45), strength=np.pi, length=4)
+    s4b = electrodes.TxElectricDipole.from_dict(s4a.to_dict())
+    assert s4a == s4b
+    s5a = electrodes.TxElectricDipole(
+            (-1, 1, -1, 1, -np.sqrt(2), np.sqrt(2)), strength=np.pi)
+    s5b = electrodes.TxElectricDipole.from_dict(s5a.to_dict())
+    assert s5a == s5b
+    s6a = electrodes.TxElectricDipole(
+            [[-1, -1, -np.sqrt(2)], [1, 1, np.sqrt(2)]], strength=np.pi)
+    s6b = electrodes.TxElectricDipole.from_dict(s6a.to_dict())
+    assert s6a == s6b
+    assert_allclose(s4b.points, s5b.points)
+    assert_allclose(s4b.points, s6b.points)
+    assert_allclose(s4b.strength, s5b.strength)
+    assert_allclose(s4b.strength, s6b.strength)
+    assert_allclose(s4b.length, s5b.length)
+    assert_allclose(s4b.length, s6b.length)
+
+    # TxElectricWire
+    n = np.sqrt(2)/2
+    coo = np.array([[0, -n, 0], [n, 0, 0], [0, n, 0],
+                    [-n, 0, n], [0, 0, -n]])
+    s7a = electrodes.TxElectricWire(coo, np.pi)
+    s7b = electrodes.TxElectricWire.from_dict(s7a.to_dict())
+    assert s7a == s7b
+    assert_allclose(s7a.center, 0)
+
+
 def test_point_to_dipole():
     source = (10, 100, -1000, 0, 0)
     length = 111.0

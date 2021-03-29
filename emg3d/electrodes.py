@@ -119,11 +119,30 @@ class Electrode:
                 self._xtype = 'electric'
         return self._xtype
 
+    @property
+    def center(self):
+        if not hasattr(self, '_center'):
+            self._center = self.points.mean(axis=0)
+        return self._center
+
+    @property
+    def length(self):
+        if not hasattr(self, '_length'):
+            self._length = np.linalg.norm(
+                    np.diff(self.points, axis=0), axis=1).sum()
+        return self._length
+
 
 class Point(Electrode):
 
     def __init__(self, coordinates):
 
+        if len(coordinates) != 5:
+            raise ValueError(
+                "Point coordinates are wrong defined. They must be "
+                "defined as (x, y, z, azimuth, elevation)."
+                f"Provided coordinates: {coordinates}."
+            )
         coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
         super().__init__(points=coordinates[:3], coordinates=coordinates)
 
@@ -133,10 +152,6 @@ class Point(Electrode):
               f"y={self.center[1]:,.1f} m, z={self.center[2]:,.1f} m, ")
         s2 = f"θ={self.azimuth:.1f}°, φ={self.elevation:.1f}°"
         return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
-
-    @property
-    def center(self):
-        return self._coordinates[:3]
 
     @property
     def azimuth(self):
@@ -149,9 +164,9 @@ class Point(Electrode):
 
 class Dipole(Electrode):
 
-    _serialize = {'length'} | Electrode._serialize
-
     def __init__(self, coordinates, length):
+        # These are dipoles, this format (x, y, z, azimuth, elevation), length
+        # is changed to ([x0, y0, z0], [x1, y1, z1])
 
         coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
 
@@ -172,6 +187,8 @@ class Dipole(Electrode):
         # Check size => finite or point dipole?
         if coordinates.size == 5:
 
+            self._serialize = {'length'} | self._serialize
+
             # Get lengths in each direction.
             if length is None:
                 length = 1.0
@@ -182,13 +199,26 @@ class Dipole(Electrode):
             else:
                 points = _point_to_dipole(coordinates, length)
 
+            self._length = length
+
         elif coordinates.size == 6:
+
+            if length is not None:
+                raise ValueError("length must be zero for this format")
+
             if coordinates.ndim == 1:
                 points = np.array([coordinates[::2], coordinates[1::2]])
+                coordinates = coordinates
 
             else:
                 points = coordinates
                 coordinates = None
+
+            if self.xtype == 'magnetic':
+                azimuth, elevation, length = _dipole_to_point(points)
+                center = tuple(np.sum(points, 0)/2)
+                coo = (*center, azimuth, elevation)
+                points = _point_to_square_loop(coo, length)
 
             # Ensure the two poles are distinct.
             if np.allclose(points[0, :], points[1, :]):
@@ -228,57 +258,47 @@ class Dipole(Electrode):
         return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
 
     @property
-    def center(self):
-        if not hasattr(self, '_center'):
-            if self._coordinates.size == 5:
-                self._center = tuple(self._coordinates[:3])
-            else:
-                self._center = tuple(np.sum(self._points, 0)/2)
-        return self._center
-
-    @property
     def azimuth(self):
         if not hasattr(self, '_azimuth'):
             if self._points.shape[0] == 5:
                 self._azimuth = self._coordinates[3]
                 self._elevation = self._coordinates[4]
-                self._length = np.linalg.norm(
-                        self._points[0, :] - self._points[2, :])**2
             else:
                 out = _dipole_to_point(self._points)
-                self._azimuth, self._elevation, self._length = out
+                self._azimuth, self._elevation, _ = out
         return self._azimuth
 
     @property
     def elevation(self):
         if not hasattr(self, '_elevation'):
-            _ = self.azimuth  # Sets azimuth, elevation, and length
+            _ = self.azimuth  # Sets azimuth and elevation
         return self._elevation
-
-    @property
-    def length(self):
-        if not hasattr(self, '_length'):
-            _ = self.azimuth  # Sets azimuth, elevation, and length
-        return self._length
 
 
 class Wire(Electrode):
     # For both TxElectricLoop and TxElectricWire
-    #
     # - ONLY accepts coordinates of shape=(x, 3), ndim=2
-    #
-    # def __repr__(self):
-    #
-    # @property
-    # def center(self):
-    #
-    # @property
-    # def length(self):
-    #
-    # @property
-    # def area(self):
-    #     NotImplemented
-    pass
+    def __init__(self, coordinates):
+        super().__init__(points=coordinates)
+
+    def __repr__(self):
+        s0 = (f"{self.__class__.__name__}: "
+              f"{self._repr_add if hasattr(self, '_repr_add') else ''}\n")
+        s1 = (f"    center={{{self.center[0]:,.1f}; "
+              f"{self.center[1]:,.1f}; {self.center[2]:,.1f}}} m; ")
+        s2 = (f"n={self.segments_n}; l={self.length:,.1f} m")
+        return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
+
+    @property
+    def segment_lengths(self):
+        if not hasattr(self, '_segment_lengths'):
+            self._segment_lengths = np.linalg.norm(
+                    np.diff(self.points, axis=0), axis=1)
+        return self._segment_lengths
+
+    @property
+    def segments_n(self):
+        return len(self.segment_lengths)
 
 
 # SOURCES
@@ -330,6 +350,12 @@ class TxElectricWire(Source, Wire):
 
     def __init__(self, coordinates, strength=0.0):
         """Length is taken as area of the perpendicular loop."""
+
+        if len(np.unique(coordinates, axis=0)) != coordinates.shape[0]:
+            raise ValueError(
+                "All provided points must be unique. "
+                f"Provided coordinates:\n{coordinates}."
+            )
 
         super().__init__(coordinates=coordinates, strength=strength)
 
