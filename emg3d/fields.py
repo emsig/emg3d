@@ -312,104 +312,18 @@ class Field:
         return get_receiver(self, receiver)
 
 
-def get_source_field(grid, source, frequency, strength=0, electric=True,
-                     length=1.0, decimals=6):
-    r"""OLD Return the source field."""
+def get_source_field(grid, source, frequency, **kwargs):
+    r"""Return source field for provided source and frequency.
 
-    # Cast some parameters.
-    if not np.allclose(np.size(source[0]), [np.size(c) for c in source]):
-        raise ValueError(
-            "All source coordinates must have the same dimension."
-            f"Provided source: {source}."
-        )
-
-    source = np.asarray(source, dtype=np.float64)
-    strength = np.asarray(strength)
-
-    # Convert point dipole sources to finite dipoles or loops (electric).
-    if source.shape == (5, ):  # Point dipole
-
-        if not electric:  # Magnetic: convert to square loop perp. to dipole.
-            source = electrodes._point_to_square_loop(source, length)
-            source = source.T  # TODO New Change
-            # source.shape = (3, 5)
-
-        else:  # Electric: convert to finite length.
-            source = electrodes._point_to_dipole(
-                    source, length).ravel('F')
-            # source.shape = (6, )
-
-    if hasattr(source, '_points'):  # TODO New Change
-        source = source.points.T  # TODO New Change
-
-    # Get arbitrary shaped sources recursively.
-    if source.shape[0] == 3 and source.ndim > 1:
-
-        # Get arbitrarily shaped dipole source using recursion.
-        sx, sy, sz = source
-
-        # Get normalized segment lengths.
-        lengths = np.sqrt(np.sum((source[:, :-1] - source[:, 1:])**2, axis=0))
-        if strength == 0:
-            lengths /= lengths.sum()
-        else:  # (Not in-place multiplication, as strength can be complex.)
-            lengths = lengths*strength
-
-        # Initiate a zero-valued source field and loop over segments.
-        sfield = Field(grid, frequency=frequency)
-        sfield.strength = strength
-
-        # Loop over elements.
-        for i in range(sx.size-1):
-            # segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
-            # seg_field = get_source_field(grid, segment, frequency, lengths[i])
-            segment = np.array([[sx[i], sy[i], sz[i]],
-                                [sx[i+1], sy[i+1], sz[i+1]]])
-            seg_field = get_dipole_source_field(
-                    grid, segment, frequency, lengths[i], decimals)
-            sfield.field += seg_field.field
-
-        # Check this with iw/-iw; source definition etc.
-        if not electric:
-            sfield.field *= -1
-
-        return sfield
-
-    # From here onwards `source` has to be a finite length dipole  of format
-    # [x1, x2, y1, y2, z1, z2]. Ensure that:
-    if source.shape != (6, ):
-        raise ValueError(
-            "Source is wrong defined. It must be either (1) a point, "
-            "[x, y, z, azimuth, elevation], (2) a finite dipole, "
-            "[x1, x2, y1, y2, z1, z2], or (3) an arbitrarily shaped "
-            f"dipole, [[x-coo], [y-coo], [z-coo]]. Provided: {source}."
-        )
-
-    source = np.array([[source[0], source[2], source[4]],
-                       [source[1], source[3], source[5]]])
-
-    return get_dipole_source_field(
-            grid, source, frequency, strength, decimals)
-
-
-def new_get_source_field(grid, source, frequency, **kwargs):
-    r"""Return the source field.
-
-    The source field is given in Equation 2 in [Muld06]_,
+    The source field is given in Equation 2 of [Muld06]_,
 
     .. math::
 
-        s \mu_0 \mathbf{J}_\mathrm{s} ,
+        \mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} \, .
 
-    where :math:`s = \mathrm{i} \omega`. Either finite length dipoles,
-    infinitesimal small point dipoles, or arbitrarily shaped segments can be
-    defined, whereas the returned source field corresponds to a normalized
-    (1 Am) source distributed within the cell(s) it resides (can be changed
-    with the `strength`-parameter).
-
-    The adjoint of the trilinear interpolation is used to distribute the
-    point(s) to the grid edges, which corresponds to the discretization of a
-    Dirac ([PlDM07]_).
+    The adjoint of the trilinear interpolation is used to distribute the points
+    to the grid edges, which corresponds to the discretization of a Dirac
+    ([PlDM07]_).
 
 
     Parameters
@@ -418,11 +332,11 @@ def new_get_source_field(grid, source, frequency, **kwargs):
         Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     source : {Tx*, tuple, list, ndarray)
-        Any source object from :mod:`emg3d.electrodes`.
 
-        If it is a list, tuple or ndarray it is put through
-        :class:`emg3d.electrodes.TxElectricDipole` or, if ``electric=True``,
-        to :class:`emg3d.electrodes.TxMagneticDipole`.
+        - Any source object from :mod:`emg3d.electrodes` (recommended usage).
+        - If it is a list, tuple, or ndarray it is put through to
+          :class:`emg3d.electrodes.TxElectricDipole` or, if ``electric=False``,
+          to :class:`emg3d.electrodes.TxMagneticDipole`.
 
     frequency : float
         Source frequency (Hz), used to compute the Laplace parameter `s`.
@@ -433,73 +347,68 @@ def new_get_source_field(grid, source, frequency, **kwargs):
         - `frequency` < 0: Laplace domain, hence
           :math:`s = f` (real).
 
-    strength : float or complex, optional
-        Source strength (A):
-
-          - If 0, output is normalized to a source of 1 m length, and source
-            strength of 1 A.
-          - If != 0, output is returned for given source length and strength.
-
-        Default is 0.
-
-    electric : bool, optional
-        Shortcut to create a magnetic source. If False, the format of
-        ``source`` must be that of a point dipole:
-        ``[x, y, z, azimuth, elevation]`` (for the other formats setting
-        ``electric`` has no effect). It then creates a square loop
-        perpendicular to this dipole, with side-length 1. Default is True,
-        meaning an electric source.
-
-    length : float, optional
-        Length (m) of the point dipole when converted to a finite length
-        dipole, or edge-length (m) of the square loop if ``electric=False``.
-        Default is 1.0.
-
-    decimals: int, optional
+    decimals : int, default: 6
         Grid nodes and source coordinates are rounded to given number of
-        decimals. Default is 6 (micrometer).
+        decimals. It must be at least 1 (decimeters), the default is
+        micrometers.
+
+    strength : {float, complex}, default: 0.0
+        Source strength (A), put through to
+        :class:`emg3d.electrodes.TxElectricDipole` or, if ``electric=False``,
+        to :class:`emg3d.electrodes.TxMagneticDipole`.
+
+        | *Only used if the provided source is not a source instance.*
+
+    length : float, default: None
+        Dipole length (m), put through to
+        :class:`emg3d.electrodes.TxElectricDipole` or, if ``electric=False``,
+        to :class:`emg3d.electrodes.TxMagneticDipole`.
+
+        | *Only used if the provided source is not a source instance.*
+
+    electric : bool, default: True
+        If True, :class:`emg3d.electrodes.TxElectricDipole` is used to get the
+        source instance, else :class:`emg3d.electrodes.TxMagneticDipole`.
+
+        | *Only used if the provided source is not a source instance.*
 
 
     Returns
     -------
-    sfield : :func:`Field` instance
-        Source field, normalized to 1 A m.
+    sfield : Field
+        Source field, a :class:`emg3d.fields.Field` instance.
 
     """
 
     if isinstance(source, (tuple, list, np.ndarray)):
-        inp = {'strength': kwargs.pop('strength', 0.0)}
-        if len(source) < 6:
-            inp['length'] = kwargs.pop('length', 1.0)
-        if kwargs.pop('electric', True):
+        inp = {'strength': kwargs.get('strength', 0.0)}
+        source = np.asarray(source)
+
+        if source.size == 5:
+            inp['length'] = kwargs.get('length', None)
+
+        if kwargs.get('electric', True):
             source = electrodes.TxElectricDipole(source, **inp)
         else:
             source = electrodes.TxMagneticDipole(source, **inp)
 
-    decimals = kwargs.pop('decimals', 6)
-
-    # Get arbitrarily shaped dipole source using recursion.
-    sx, sy, sz = source.points.T
-
-    # Get normalized segment lengths.
-    lengths = np.sqrt(np.sum((source.points[:-1, :] -
-                              source.points[1:, :])**2, axis=0))
-    if np.isclose(source.strength, 0):
-        lengths /= lengths.sum()
-    else:  # (Not in-place multiplication, as strength can be complex.)
-        lengths = lengths*source.strength
+    # Get kwargs
+    decimals = kwargs.get('decimals', 6)
 
     # Initiate a zero-valued source field and loop over segments.
     sfield = Field(grid, frequency=frequency)
 
     # Loop over elements.
-    for i in range(sx.size-1):
-        segment = (sx[i], sx[i+1], sy[i], sy[i+1], sz[i], sz[i+1])
+    for i in range(source.points.shape[0]-1):
+        sfield.field += get_dipole_source_field(
+            grid, source.points[i:i+2, :], frequency, decimals).field
 
-        seg_field = get_dipole_source_field(
-                grid, segment, frequency, lengths[i], decimals)
-
-        sfield.field += seg_field.field
+    # Normalize by total length of all segments if strength=0.
+    if np.isclose(source.strength, 0):
+        lengths = np.linalg.norm(np.diff(source.points, axis=0), axis=1)
+        sfield.field /= lengths.sum()
+    else:
+        sfield.field *= source.strength
 
     # Check this with iw/-iw; source definition etc.
     if source.xtype == 'magnetic':
@@ -659,12 +568,13 @@ def get_magnetic_field(model, efield):
     return hfield
 
 
-def get_dipole_source_field(grid, source, frequency, strength=0.0, decimals=6):
-    """Get dipole source field using the adjoint interpolation method.
+def get_dipole_source_field(grid, source, frequency, decimals=6):
+    """Return source field for a dipole using adjoint trilinear interpolation.
 
     The recommended high-level function to obtain any source field is
     :func:`emg3d.fields.get_source_field`, which uses this function internally.
-    This function returns the electric source field for a dipole.
+    This function returns the electric source field for a dipole of strength
+    1A.
 
     Parameters
     ----------
@@ -676,13 +586,6 @@ def get_dipole_source_field(grid, source, frequency, strength=0.0, decimals=6):
 
     frequency : float
         Field frequency (Hz), put through to :class:`emg3d.fields.Field`.
-
-    strength : {float, complex}, default: 0.0
-        Source strength (A):
-
-          - If 0, output is normalized to a source of 1 m length, and source
-            strength of 1 A.
-          - If != 0, output is returned for given source length and strength.
 
     decimals : int, default: 6
         Grid nodes and source coordinates are rounded to given number of
@@ -700,30 +603,22 @@ def get_dipole_source_field(grid, source, frequency, strength=0.0, decimals=6):
     # This is just a wrapper for `_unit_dipole_vector`, taking care of the
     # source moment (length*strength).
 
-    # Cast some parameters.
-    length = source[1, :] - source[0, :]
-    lnorm = np.linalg.norm(length)
+    # Dipole lengths in x-, y-, and z-directions, and overall.
+    dxdydz = source[1, :] - source[0, :]
+    length = np.linalg.norm(dxdydz)
 
     # Ensure finite length dipole is not a point dipole.
-    if lnorm < 1e-15:
-        raise ValueError(
-            "Provided finite dipole has no length; use "
-            "the format [x, y, z, azimuth, elevation] instead."
-        )
+    if length < 1e-15:
+        raise ValueError(f"Provided finite dipole has no length: {source}.")
 
     # Get unit source field.
     sfield = Field(grid, frequency=frequency)
     _unit_dipole_vector(source, sfield, decimals)
 
-    # Multiply by moment*s*mu
-    if strength == 0:  # 1 A m
-        moment = length / lnorm * sfield.smu0
-    else:              # Multiply source length with source strength
-        moment = strength * length * sfield.smu0
-
-    sfield.fx *= moment[0]
-    sfield.fy *= moment[1]
-    sfield.fz *= moment[2]
+    # Multiply by length * s * mu0
+    sfield.fx *= dxdydz[0] * sfield.smu0
+    sfield.fy *= dxdydz[1] * sfield.smu0
+    sfield.fz *= dxdydz[2] * sfield.smu0
 
     return sfield
 
@@ -764,12 +659,12 @@ def _unit_dipole_vector(source, sfield, decimals=6):
     if outside:
         raise ValueError(f"Provided source outside grid: {source}.")
 
-    # Source lengths in x-, y-, and z-directions.
-    d_xyz = source[1, :] - source[0, :]
-    slen = np.linalg.norm(d_xyz)
+    # Dipole lengths in x-, y-, and z-directions, and overall.
+    dxdydz = source[1, :] - source[0, :]
+    length = np.linalg.norm(dxdydz)
 
     # Inverse source lengths.
-    id_xyz = d_xyz.copy()
+    id_xyz = dxdydz.copy()
     id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
 
     # Cell fractions.
@@ -797,15 +692,15 @@ def _unit_dipole_vector(source, sfield, decimals=6):
                 # Determine centre of gravity of line segment in cell.
                 aa = np.vstack([[a1[ix], a1[ix+1]], [a2[iy], a2[iy+1]],
                                 [a3[iz], a3[iz+1]]])
-                aa = np.sort(aa[d_xyz != 0, :], 1)
+                aa = np.sort(aa[dxdydz != 0, :], 1)
                 al = max(0, aa[:, 0].max())  # Left and right
                 ar = min(1, aa[:, 1].min())  # elements.
 
                 # Characteristics of this cell.
-                xmin = source[0, :] + al*d_xyz
-                xmax = source[0, :] + ar*d_xyz
+                xmin = source[0, :] + al*dxdydz
+                xmax = source[0, :] + ar*dxdydz
                 x_c = (xmin + xmax) / 2.0
-                x_len = np.linalg.norm(xmax - xmin) / slen
+                x_len = np.linalg.norm(xmax - xmin) / length
 
                 # Contribution to edge (coordinate xyz)
                 rx = (x_c[0] - nodes_x[ix]) / grid.h[0][ix]

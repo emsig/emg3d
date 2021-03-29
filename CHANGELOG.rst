@@ -216,6 +216,8 @@ v0.17.0: Magnetics in Simulation
 
 - ``fields.get_source_field``:
 
+  - The recommended way to use ``get_source_field`` is new to provide a
+    ``Tx*``-source instance.
   - The ``msrc`` argument introduced in v0.16.0 is renamed to ``electric``, and
     has the opposite meaning. If True, the source is electric, if False, the
     source is magnetic. This was made to streamline the meaning with the

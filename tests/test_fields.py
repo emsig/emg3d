@@ -176,17 +176,12 @@ class TestGetSourceField:
         src = [grid.nodes_x[0], grid.nodes_x[0]+1,
                grid.nodes_y[-1]-1, grid.nodes_y[-1],
                grid.nodes_z[0], grid.nodes_z[0]+1]
-        sfield = fields.get_source_field(grid, src, freq)
+        sfield = fields.get_source_field(grid, src, freq, strength=0.0)
         tot_field = np.linalg.norm(
                 [np.sum(sfield.fx), np.sum(sfield.fy), np.sum(sfield.fz)])
         assert_allclose(tot_field/np.abs(np.sum(iomegamu)), 1.0)
 
         out, _ = capsys.readouterr()  # Empty capsys
-
-        # Put finite dipole of zero length. Ensure it fails.
-        with pytest.raises(ValueError, match='finite dipole has no length'):
-            src = [0, 0, 100, 100, -200, -200]
-            sfield = fields.get_source_field(grid, src, 1)
 
         # Same for Laplace domain
         src = [100, 200, 300, 27, 31]
@@ -306,11 +301,11 @@ class TestGetSourceField:
                     grid, srcl, freq, strength=strength).field
 
         # Computed
-        src5xyz = (
-            [src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5, src[0]-0.5],
-            [src[1]-0.5, src[1]-0.5, src[1]+0.5, src[1]+0.5, src[1]-0.5],
-            [src[2], src[2], src[2], src[2], src[2]]
-        )
+        src5xyz = np.array(
+            [[src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5, src[0]-0.5],
+             [src[1]-0.5, src[1]-0.5, src[1]+0.5, src[1]+0.5, src[1]-0.5],
+             [src[2], src[2], src[2], src[2], src[2]]]
+        ).T
         scomp = fields.get_source_field(grid, src5xyz, freq, strength=strength)
         assert sman == scomp
 
@@ -490,8 +485,6 @@ class TestGetDipoleSourceField:
         # Diagonal source in the middle
         source = np.array([[-3, 0, 0], [3, 0, 0]])
         length = source[1, :] - source[0, :]
-        # Strength
-        strength = np.pi
 
         # _unit_dipole_vector
         sfield1 = emg3d.Field(grid, frequency=frequency)
@@ -499,11 +492,10 @@ class TestGetDipoleSourceField:
 
         # get_dipole_source_field
         sfield2 = fields.get_dipole_source_field(
-            grid=grid, source=source, frequency=frequency, strength=strength,
-            decimals=6
+            grid=grid, source=source, frequency=frequency, decimals=6
         )
 
-        assert_allclose(sfield1.fx*length[0]*strength*smu0, sfield2.fx)
+        assert_allclose(sfield1.fx*length[0]*smu0, sfield2.fx)
         assert_allclose(sfield1.fy.sum(), 1)
         assert_allclose(sfield2.fy.sum(), 0)
         assert_allclose(sfield1.fz.sum(), 1)
@@ -518,8 +510,6 @@ class TestGetDipoleSourceField:
         # Diagonal source in the middle
         source = np.array([[-3, -3, -3], [3, 3, 3]])
         length = source[1, :] - source[0, :]
-        # Strength
-        strength = np.pi
 
         # _unit_dipole_vector
         sfield1 = emg3d.Field(grid, frequency=frequency)
@@ -527,13 +517,12 @@ class TestGetDipoleSourceField:
 
         # get_dipole_source_field
         sfield2 = fields.get_dipole_source_field(
-            grid=grid, source=source, frequency=frequency, strength=strength,
-            decimals=6
+            grid=grid, source=source, frequency=frequency, decimals=6
         )
 
-        assert_allclose(sfield1.fx*length[0]*strength*smu0, sfield2.fx)
-        assert_allclose(sfield1.fy*length[1]*strength*smu0, sfield2.fy)
-        assert_allclose(sfield1.fz*length[2]*strength*smu0, sfield2.fz)
+        assert_allclose(sfield1.fx*length[0]*smu0, sfield2.fx)
+        assert_allclose(sfield1.fy*length[1]*smu0, sfield2.fy)
+        assert_allclose(sfield1.fz*length[2]*smu0, sfield2.fz)
 
     def test_warnings(self):
         h = [2, 1, 1, 2]
