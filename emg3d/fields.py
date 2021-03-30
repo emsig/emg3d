@@ -416,12 +416,7 @@ def get_source_field(grid, source, frequency, **kwargs):
     sfield.field *= sfield.smu0
 
     # Multiply by source moment
-    sfield.field *= source.moment
-
-    # TODO has to move to moment of the source type
-    # Check this with iw/-iw; source definition etc.
-    if source.xtype == 'magnetic':
-        sfield.field *= -1
+    sfield.field *= source.moment(sfield.smu0)
 
     return sfield
 

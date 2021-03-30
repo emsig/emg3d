@@ -1,5 +1,5 @@
 """
-A survey stores a set of sources, receivers, and the measured data.
+Electrodes defines any type of sources and receivers required for a survey.
 """
 # Copyright 2018-2021 The emg3d Developers.
 #
@@ -30,25 +30,34 @@ ELECTRODE_LIST = {}
 
 
 def register_electrode(func):
+    """Decorator to register sources and receivers.
+
+    Adds them to both, the list ``emg3d.electrodes.ELECTRODE_LIST``, and
+    ``emg3d.electrodes.__all__``.
+
+    """
     ELECTRODE_LIST[func.__name__] = func
     __all__.append(func.__name__)
     return func
 
 
+# BASE ELECTRODE TYPES
 class Electrode:
+    """TODO
+
+    Points must be in the form of::
+
+        [[x0, y0, z0], [...], [xN, yN, zN]]: (x, 3)
+
+    Coordinates can be different, it is what the given class uses.
+    If not provided, it is set to coordinates.
+
+    """
 
     _serialize = {'coordinates'}
 
     def __init__(self, points, coordinates=None):
-        """
-
-        Points must be in the form of
-            [[x0, y0, z0], [...], [xN, yN, zN]]: (x, 3)
-
-        Coordinates can be different, it is what the given class uses.
-        If not provided, it is set to coordinates.
-
-        """
+        """Initiate an electrode."""
 
         points = np.atleast_2d(points)
 
@@ -134,8 +143,10 @@ class Electrode:
 
 
 class Point(Electrode):
+    """TODO"""
 
     def __init__(self, coordinates):
+        """Initiate an electric point."""
 
         if len(coordinates) != 5:
             raise ValueError(
@@ -163,16 +174,21 @@ class Point(Electrode):
 
 
 class Dipole(Electrode):
+    """TODO
+
+    These are dipoles, this format (x, y, z, azimuth, elevation), length
+    is changed to ([x0, y0, z0], [x1, y1, z1])
+
+    TODO either (x, y, z, azimuth, elevation), length or
+                (x0, x1, y0, y1, z0, z1) or
+                ([x0, y0, z0], [x1, y1, z1])
+
+    """
 
     def __init__(self, coordinates, length):
-        # These are dipoles, this format (x, y, z, azimuth, elevation), length
-        # is changed to ([x0, y0, z0], [x1, y1, z1])
+        """Initiate an electric dipole."""
 
         coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
-
-        # TODO either (x, y, z, azimuth, elevation), length or
-        #             (x0, x1, y0, y1, z0, z1) or
-        #             ([x0, y0, z0], [x1, y1, z1])
 
         is_point = coordinates.size == 5
         is_points_a = coordinates.ndim == 2 and coordinates.shape[1] == 3
@@ -277,9 +293,17 @@ class Dipole(Electrode):
 
 
 class Wire(Electrode):
-    # For both TxElectricLoop and TxElectricWire
-    # - ONLY accepts coordinates of shape=(x, 3), ndim=2
+    """TODO
+
+    Electric Wire.
+
+    For both TxElectricLoop and TxElectricWire
+    - ONLY accepts coordinates of shape=(x, 3), ndim=2
+    """
+
     def __init__(self, coordinates):
+        """Initiate an electric wire."""
+
         super().__init__(points=coordinates)
 
     def __repr__(self):
@@ -303,63 +327,69 @@ class Wire(Electrode):
 
 
 # SOURCES
-class Source:
+@register_electrode
+class TxElectricDipole(Dipole):
+    """TODO"""
 
-    # TODO Get rid of Source, implement directly in the sources
+    _serialize = {'strength'} | Dipole._serialize
 
-    _serialize = {'strength'} | Electrode._serialize
+    def __init__(self, coordinates, strength=0.0, length=None):
+        """Initiate an electric dipole source."""
 
-    def __init__(self, strength, **kwargs):
         self._strength = strength
-        super().__init__(**kwargs)
-        self._repr_add = f"{self.moment:,.1f} Am"  # TODO adjust for loops
+        super().__init__(coordinates=coordinates, length=length)
+
+        self._repr_add = f"{self.moment():,.1f} Am"
 
     @property
     def strength(self):
         return self._strength
 
+    def moment(self, smu0=None):
+        return self.length*self.strength if self.strength != 0 else 1.0
+
+
+@register_electrode
+class TxMagneticDipole(Dipole):
+    """TODO
+
+    Approximated by a square loop perpendicular to dipole.
+
+    Length is taken as area of the perpendicular loop.
+
+    """
+
+    _serialize = {'strength'} | Dipole._serialize
+
+    def __init__(self, coordinates, strength=0.0, length=None):
+        """Initiate a magnetic source."""
+
+        self._strength = strength
+        super().__init__(coordinates=coordinates, length=length)
+
+        # Currently only works for mu_r=1
+        self._repr_add = f"i w mu {self.moment(1):,.1f} A"
+
     @property
-    def moment(self):  # TODO adjust for loops
-        if 'Loop' in self.__class__.__name__:
-            raise NotImplementedError
-            # Take center, and compute triangles to the points.
-        else:
-            return self.length*self.strength if self.strength != 0 else 1.0
+    def strength(self):
+        return self._strength
+
+    def moment(self, smu0=None):
+        moment = self.length*self.strength if self.strength != 0 else 1.0
+        return -moment/smu0
 
 
 @register_electrode
-class TxElectricDipole(Source, Dipole):
+class TxElectricWire(Wire):
+    """TODO"""
 
-    _serialize = Source._serialize | Dipole._serialize
-
-    def __init__(self, coordinates, strength=0.0, length=None):
-
-        super().__init__(coordinates=coordinates, strength=strength,
-                         length=length)
-
-
-@register_electrode
-class TxMagneticDipole(Source, Dipole):
-    """Approximated by a square loop perpendicular to dipole."""
-
-    _serialize = Source._serialize | Dipole._serialize
-
-    def __init__(self, coordinates, strength=0.0, length=None):
-        """Length is taken as area of the perpendicular loop."""
-
-        super().__init__(coordinates=coordinates, strength=strength,
-                         length=length)
-
-
-@register_electrode
-class TxElectricWire(Source, Wire):
-
-    _serialize = Source._serialize | Wire._serialize
+    _serialize = {'strength'} | Wire._serialize
 
     # - has length, area (NotImplemented) attributes
     # - ensures no point coincides
 
     def __init__(self, coordinates, strength=0.0):
+        """Initiate an electric wire source."""
 
         if len(np.unique(coordinates, axis=0)) != coordinates.shape[0]:
             raise ValueError(
@@ -367,18 +397,30 @@ class TxElectricWire(Source, Wire):
                 f"Provided coordinates:\n{coordinates}."
             )
 
-        super().__init__(coordinates=coordinates, strength=strength)
+        self._strength = strength
+        super().__init__(coordinates=coordinates)
+
+        self._repr_add = f"{self.moment():,.1f} Am"
+
+    @property
+    def strength(self):
+        return self._strength
+
+    def moment(self, smu0=None):
+        return self.length*self.strength if self.strength != 0 else 1.0
 
 
 @register_electrode
-class TxElectricLoop(Source, Wire):
+class TxElectricLoop(Wire):
+    """TODO"""
 
-    _serialize = Source._serialize | Wire._serialize
+    _serialize = {'strength'} | Wire._serialize
 
     # - has length, area (NotImplemented) attributes
     # - ensures no point coincides except first and last
     # - factor ?
     def __init__(self, coordinates, strength=0.0):
+        """Initiate an electric loop source."""
 
         if not np.allclose(coordinates[0, :], coordinates[-1, :]):
             raise ValueError(
@@ -392,49 +434,76 @@ class TxElectricLoop(Source, Wire):
                 f"Provided coordinates:\n{coordinates}."
             )
 
-        super().__init__(coordinates=coordinates, strength=strength)
+        self._strength = strength
+        super().__init__(coordinates=coordinates)
+
+        # TODO adjust for loops etc, +/- iw check
+        raise NotImplementedError
+
+    @property
+    def strength(self):
+        return self._strength
+
+    # TODO adjust for loops etc, +/- iw check
+    def moment(self, smu0=None):
+        # Take center, and compute triangles to the points.
+        raise NotImplementedError
 
 
 # RECEIVERS
 @register_electrode
 class RxElectricPoint(Point):
+    """TODO
+
+    (x, y, z, azimuth, elevation)
+
+    """
 
     def __init__(self, coordinates):
-        """
-        (x, y, z, azimuth, elevation)
-        """
+        """Initiate an electric point receiver."""
         super().__init__(coordinates)
 
 
 @register_electrode
 class RxMagneticPoint(Point):
+    """TODO"""
 
     def __init__(self, coordinates):
+        """Initiate a magnetic point receiver."""
         super().__init__(coordinates)
 
 
 @register_electrode
 class RxCurrentPoint(Point):
+    """TODO"""
 
     def __init__(self, coordinates):
+        """Initiate an electric current density point receiver."""
+
+        # self.factor = NotImplemented
+        # super().__init__(coordinates)
+
         raise NotImplementedError(
             "Electric current density receiver not yet fully implemented"
         )
-        # self.factor = NotImplemented
-        # super().__init__(coordinates)
 
 
 @register_electrode
 class RxFluxPoint(Point):
+    """TODO"""
 
     def __init__(self, coordinates):
-        raise NotImplementedError(
-            "Magnetic flux density receiver not yet fully implemented"
-        )
+        """Initiate a magnetic flux density point receiver."""
+
         # self.factor = NotImplemented
         # super().__init__(coordinates)
 
+        raise NotImplementedError(
+            "Magnetic flux density receiver not yet fully implemented"
+        )
 
+
+# CONVERSIONS
 def _point_to_dipole(point, length, deg=True):
     """Return coordinates of dipole points defined by center, angles, length.
 

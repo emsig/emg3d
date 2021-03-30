@@ -206,4 +206,7 @@ def test_derivative(capsys):
         nrmsd = random_fd_gradient(
                 False, survey, model_init, mesh, grad, data_misfit, sim_inp)
 
-        assert nrmsd < 1.0
+        if electric:
+            assert nrmsd < 1.0
+        else:
+            assert nrmsd < 5.0
