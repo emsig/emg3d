@@ -327,19 +327,19 @@ class Wire(Electrode):
 
 
 # SOURCES
-@register_electrode
-class TxElectricDipole(Dipole):
+class Source(Electrode):
     """TODO"""
 
-    _serialize = {'strength'} | Dipole._serialize
+    _serialize = {'strength'} | Electrode._serialize
 
-    def __init__(self, coordinates, strength=0.0, length=None):
-        """Initiate an electric dipole source."""
+    def __init__(self, coordinates, strength=0.0, **kwargs):
+        """Initiate an electric  source."""
 
         self._strength = strength
-        super().__init__(coordinates=coordinates, length=length)
 
-        self._repr_add = f"{self.moment:,.1f} Am"
+        self._repr_add = f"{self.strength:,.1f} A"
+
+        super().__init__(coordinates=coordinates, **kwargs)
 
     @property
     def strength(self):
@@ -351,7 +351,20 @@ class TxElectricDipole(Dipole):
 
 
 @register_electrode
-class TxMagneticDipole(Dipole):
+class TxElectricDipole(Source, Dipole):
+    """TODO"""
+
+    _serialize = Source._serialize | Dipole._serialize
+
+    def __init__(self, coordinates, strength=0.0, length=None):
+        """Initiate an electric dipole source."""
+
+        super().__init__(coordinates=coordinates, strength=strength,
+                         length=length)
+
+
+@register_electrode
+class TxMagneticDipole(Source, Dipole):
     """TODO
 
     Approximated by a square loop perpendicular to dipole.
@@ -360,97 +373,25 @@ class TxMagneticDipole(Dipole):
 
     """
 
-    _serialize = {'strength'} | Dipole._serialize
+    _serialize = Source._serialize | Dipole._serialize
 
     def __init__(self, coordinates, strength=0.0, length=None):
         """Initiate a magnetic source."""
 
-        self._strength = strength
-        super().__init__(coordinates=coordinates, length=length)
-
-        # Currently only works for mu_r=1
-        self._repr_add = f"i w mu {self.moment:,.1f} A"
-
-    @property
-    def strength(self):
-        return self._strength
-
-    @property
-    def moment(self):
-        return self.length*self.strength if self.strength != 0 else 1.0
+        super().__init__(coordinates=coordinates, strength=strength,
+                         length=length)
 
 
 @register_electrode
-class TxElectricWire(Wire):
+class TxElectricWire(Source, Wire):
     """TODO"""
 
-    _serialize = {'strength'} | Wire._serialize
-
-    # - has length, area (NotImplemented) attributes
-    # - ensures no point coincides
+    _serialize = Source._serialize | Wire._serialize
 
     def __init__(self, coordinates, strength=0.0):
         """Initiate an electric wire source."""
 
-        if len(np.unique(coordinates, axis=0)) != coordinates.shape[0]:
-            raise ValueError(
-                "All provided points must be unique. "
-                f"Provided coordinates:\n{coordinates}."
-            )
-
-        self._strength = strength
-        super().__init__(coordinates=coordinates)
-
-        self._repr_add = f"{self.moment:,.1f} Am"
-
-    @property
-    def strength(self):
-        return self._strength
-
-    @property
-    def moment(self):
-        return self.length*self.strength if self.strength != 0 else 1.0
-
-
-@register_electrode
-class TxElectricLoop(Wire):
-    """TODO"""
-
-    _serialize = {'strength'} | Wire._serialize
-
-    # - has length, area (NotImplemented) attributes
-    # - ensures no point coincides except first and last
-    # - factor ?
-    def __init__(self, coordinates, strength=0.0):
-        """Initiate an electric loop source."""
-
-        if not np.allclose(coordinates[0, :], coordinates[-1, :]):
-            raise ValueError(
-                "First and last point must be coincident. "
-                f"Provided coordinates:\n{coordinates}."
-            )
-
-        if len(np.unique(coordinates, axis=0)) != coordinates.shape[0]-1:
-            raise ValueError(
-                "All provided points except first/last must be unique. "
-                f"Provided coordinates:\n{coordinates}."
-            )
-
-        self._strength = strength
-        super().__init__(coordinates=coordinates)
-
-        # TODO adjust for loops etc, +/- iw check
-        raise NotImplementedError
-
-    @property
-    def strength(self):
-        return self._strength
-
-    # TODO adjust for loops etc, +/- iw check
-    @property
-    def moment(self):
-        # Take center, and compute triangles to the points.
-        raise NotImplementedError
+        super().__init__(coordinates=coordinates, strength=strength)
 
 
 # RECEIVERS
