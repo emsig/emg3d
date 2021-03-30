@@ -195,6 +195,7 @@ class Dipole(Electrode):
 
             # Get the two separate electrodes.
             if self.xtype == 'magnetic':
+                # square loop of area corresponding to length
                 points = _point_to_square_loop(coordinates, length)
             else:
                 points = _point_to_dipole(coordinates, length)
@@ -489,7 +490,7 @@ def _point_to_square_loop(source, area):
         Source coordinates in the form of (x, y, z, azimuth, elevation).
 
     area : float
-        Area of the square loop (m).
+        Area of the square loop (m^2).
 
 
     Returns
@@ -500,9 +501,9 @@ def _point_to_square_loop(source, area):
         of side-length length.
 
     """
-    half_length = np.sqrt(area)/2
-    xyz_hor = _rotation(source[3]+90.0, 0.0)*half_length
-    xyz_ver = _rotation(source[3], source[4]+90.0)*half_length
+    half_diag = np.sqrt(area/2)
+    xyz_hor = _rotation(source[3]+90.0, 0.0)*half_diag
+    xyz_ver = _rotation(source[3], source[4]+90.0)*half_diag
     points = source[:3] + np.stack(
             [xyz_hor, xyz_ver, -xyz_hor, -xyz_ver, xyz_hor])
     return points

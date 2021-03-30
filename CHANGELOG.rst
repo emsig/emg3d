@@ -35,6 +35,8 @@ Detailed changes
 - New module containing all sources and receivers.
 - ``dip`` is new called ``elevation`` to make it clear that it is the angle
   positive upwards (anticlockwise from the horizontal plane).
+- Bugfix of the loop area for a magnetic dipole (the area was previously wrong 
+  except for dipole length of 1).
 
 
 **Fields**

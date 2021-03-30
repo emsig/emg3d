@@ -293,8 +293,6 @@ class TestGetSourceField:
                   src[1]+0.5, src[2], src[2]],
             np.r_[src[0]+0.5, src[0]-0.5, src[1]+0.5,
                   src[1]+0.5, src[2], src[2]],
-            np.r_[src[0]-0.5, src[0]-0.5, src[1]+0.5,
-                  src[1]-0.5, src[2], src[2]],
         ]
         for srcl in src4xxyyzz:
             sman.field += fields.get_source_field(
@@ -302,9 +300,9 @@ class TestGetSourceField:
 
         # Computed
         src5xyz = np.array(
-            [[src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5, src[0]-0.5],
-             [src[1]-0.5, src[1]-0.5, src[1]+0.5, src[1]+0.5, src[1]-0.5],
-             [src[2], src[2], src[2], src[2], src[2]]]
+            [[src[0]-0.5, src[0]+0.5, src[0]+0.5, src[0]-0.5],
+             [src[1]-0.5, src[1]-0.5, src[1]+0.5, src[1]+0.5],
+             [src[2], src[2], src[2], src[2]]]
         ).T
         scomp = fields.get_source_field(grid, src5xyz, freq, strength=strength)
         assert sman == scomp
@@ -312,9 +310,10 @@ class TestGetSourceField:
         # Normalized
         sman = fields.Field(grid, frequency=freq)
         for srcl in src4xxyyzz:
-            sman.field += fields.get_source_field(grid, srcl, freq, 0.25).field
-        scomp = fields.get_source_field(grid, src5xyz, freq)
-        assert sman == scomp
+            sman.field += fields.get_source_field(
+                    grid, srcl, freq, strength=1/3).field
+        scomp = fields.get_source_field(grid, src5xyz, freq, strength=0)
+        assert_allclose(sman.field, scomp.field)
 
     def test_source_field(self):
         # Create some dummy data

@@ -186,19 +186,29 @@ class TestDipoleToPoint:
 
 
 def test_point_to_square_loop():
-    source = (10, 100, -1000, 0, 0)
+    source = (10, 100, -1000, 45, 90)
     length = 4
     out = electrodes._point_to_square_loop(source, length)
     assert out.shape == (5, 3)
-    assert_allclose(out[:, 0], source[0])  # x-directed, all x the same
-    assert_allclose(out[:, 1], [101, 100, 99, 100, 101])
-    assert_allclose(out[:, 2], [-1000, -999, -1000, -1001, -1000])
+    assert_allclose(out[:, 0], [9, 9, 11, 11, 9])
+    assert_allclose(out[:, 1], [101, 99, 99, 101, 101])
+    assert_allclose(out[:, 2], source[2])
+
+    source = (0, 0, 0, 0, 0)
+    length = 8
+    out = electrodes._point_to_square_loop(source, length)
+    assert out.shape == (5, 3)
+    assert_allclose(out[:, 0], 0)
+    assert_allclose(out[:, 1], [2, 0, -2, 0, 2])
+    assert_allclose(out[:, 2], [0, 2, 0, -2, 0])
 
     source = (10, 100, -1000, 30, 60)
     length = 4
     out = electrodes._point_to_square_loop(source, length)
-    assert_allclose(out[:, 0], [9.5, 9.25, 10.5, 10.75, 9.5])
-    assert_allclose(out[:, 2], [-1000, -999.5, -1000, -1000.5, -1000])
+    assert_allclose(out[:, 0],
+                    [9.292893, 8.93934, 10.707107, 11.06066, 9.292893])
+    assert_allclose(out[:, 2],
+                    [-1000., -999.292893, -1000., -1000.707107, -1000.])
     assert_allclose(out[0, :], out[-1, :])  # first and last point identical
 
 

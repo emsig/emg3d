@@ -387,7 +387,9 @@ def get_source_field(grid, source, frequency, **kwargs):
         if source.size == 5:
             inp['length'] = kwargs.get('length', None)
 
-        if kwargs.get('electric', True):
+        if source.size > 6:
+            source = electrodes.TxElectricWire(source, **inp)
+        elif kwargs.get('electric', True):
             source = electrodes.TxElectricDipole(source, **inp)
         else:
             source = electrodes.TxMagneticDipole(source, **inp)
