@@ -350,7 +350,6 @@ class TxElectricWire(Source, Wire):
     # - ensures no point coincides
 
     def __init__(self, coordinates, strength=0.0):
-        """Length is taken as area of the perpendicular loop."""
 
         if len(np.unique(coordinates, axis=0)) != coordinates.shape[0]:
             raise ValueError(
@@ -369,10 +368,21 @@ class TxElectricLoop(Source, Wire):
     # - has length, area (NotImplemented) attributes
     # - ensures no point coincides except first and last
     # - factor ?
-    def __init__(self, coordinates, strength):
-        raise NotImplementedError(
-            "Electric loop source not yet fully implemented"
-        )
+    def __init__(self, coordinates, strength=0.0):
+
+        if not np.allclose(coordinates[0, :], coordinates[-1, :]):
+            raise ValueError(
+                "First and last point must be coincident. "
+                f"Provided coordinates:\n{coordinates}."
+            )
+
+        if len(np.unique(coordinates, axis=0)) != coordinates.shape[0]-1:
+            raise ValueError(
+                "All provided points except first/last must be unique. "
+                f"Provided coordinates:\n{coordinates}."
+            )
+
+        super().__init__(coordinates=coordinates, strength=strength)
 
 
 # RECEIVERS

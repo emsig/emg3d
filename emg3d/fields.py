@@ -388,7 +388,10 @@ def get_source_field(grid, source, frequency, **kwargs):
             inp['length'] = kwargs.get('length', None)
 
         if source.size > 6:
-            source = electrodes.TxElectricWire(source, **inp)
+            if np.allclose(source[0, :], source[-1, :]):
+                source = electrodes.TxElectricLoop(source, **inp)
+            else:
+                source = electrodes.TxElectricWire(source, **inp)
         elif kwargs.get('electric', True):
             source = electrodes.TxElectricDipole(source, **inp)
         else:
