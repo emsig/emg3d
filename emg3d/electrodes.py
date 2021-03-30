@@ -305,16 +305,26 @@ class Wire(Electrode):
 # SOURCES
 class Source:
 
+    # TODO Get rid of Source, implement directly in the sources
+
     _serialize = {'strength'} | Electrode._serialize
 
     def __init__(self, strength, **kwargs):
         self._strength = strength
-        self._repr_add = f"{self.strength:,.1f} A"
         super().__init__(**kwargs)
+        self._repr_add = f"{self.moment:,.1f} Am"  # TODO adjust for loops
 
     @property
     def strength(self):
         return self._strength
+
+    @property
+    def moment(self):  # TODO adjust for loops
+        if 'Loop' in self.__class__.__name__:
+            raise NotImplementedError
+            # Take center, and compute triangles to the points.
+        else:
+            return self.length*self.strength if self.strength != 0 else 1.0
 
 
 @register_electrode

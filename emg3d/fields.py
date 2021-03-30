@@ -28,7 +28,7 @@ from scipy.constants import mu_0
 from emg3d.core import _numba_setting
 from emg3d import maps, meshes, utils, electrodes
 
-__all__ = ['Field', 'get_source_field', 'get_dipole_source_field',
+__all__ = ['Field', 'get_source_field', 'get_dipole_source_vector',
            'get_receiver', 'get_magnetic_field']
 
 
@@ -380,13 +380,16 @@ def get_source_field(grid, source, frequency, **kwargs):
 
     """
 
+    # Convert tuples, lists, and ndarrays to Source instances.
     if isinstance(source, (tuple, list, np.ndarray)):
+
+        # Get optional kwargs and cast source.
         inp = {'strength': kwargs.get('strength', 0.0)}
         source = np.asarray(source)
-
         if source.size == 5:
             inp['length'] = kwargs.get('length', None)
 
+        # Call Tx*-class depending on provided source shape and `electric`.
         if source.size > 6:
             if np.allclose(source[0, :], source[-1, :]):
                 source = electrodes.TxElectricLoop(source, **inp)
@@ -400,21 +403,22 @@ def get_source_field(grid, source, frequency, **kwargs):
     # Get kwargs
     decimals = kwargs.get('decimals', 6)
 
-    # Initiate a zero-valued source field and loop over segments.
-    sfield = Field(grid, frequency=frequency)
+    # Get total vector field by looping over segments.
+    vfield = np.zeros(grid.n_edges)
+    for p1, p2 in zip(source.points[:-1, :], source.points[1:, :]):
+        vfield += get_dipole_source_vector(
+                    grid, np.r_[[p1, p2]], decimals).field/source.length
 
-    # Loop over elements.
-    for i in range(source.points.shape[0]-1):
-        sfield.field += get_dipole_source_field(
-            grid, source.points[i:i+2, :], frequency, decimals).field
+    # Initiate field with the normalized vector field.
+    sfield = Field(grid, data=vfield, frequency=frequency)
 
-    # Normalize by total length of all segments if strength=0.
-    if np.isclose(source.strength, 0):
-        lengths = np.linalg.norm(np.diff(source.points, axis=0), axis=1)
-        sfield.field /= lengths.sum()
-    else:
-        sfield.field *= source.strength
+    # Multiply by i*w*mu_0
+    sfield.field *= sfield.smu0
 
+    # Multiply by source moment
+    sfield.field *= source.moment
+
+    # TODO has to move to moment of the source type
     # Check this with iw/-iw; source definition etc.
     if source.xtype == 'magnetic':
         sfield.field *= -1
@@ -573,13 +577,13 @@ def get_magnetic_field(model, efield):
     return hfield
 
 
-def get_dipole_source_field(grid, source, frequency, decimals=6):
-    """Return source field for a dipole using adjoint trilinear interpolation.
+def get_dipole_source_vector(grid, source, decimals=6):
+    """Return source vector for a dipole using adjoint trilinear interpolation.
 
     The recommended high-level function to obtain any source field is
     :func:`emg3d.fields.get_source_field`, which uses this function internally.
-    This function returns the electric source field for a dipole of strength
-    1A.
+    This function returns the electric source vector field for a dipole.
+
 
     Parameters
     ----------
@@ -589,9 +593,6 @@ def get_dipole_source_field(grid, source, frequency, decimals=6):
     source : ndarray
         Source coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]] (m).
 
-    frequency : float
-        Field frequency (Hz), put through to :class:`emg3d.fields.Field`.
-
     decimals : int, default: 6
         Grid nodes and source coordinates are rounded to given number of
         decimals. It must be at least 1 (decimeters), the default is
@@ -600,13 +601,15 @@ def get_dipole_source_field(grid, source, frequency, decimals=6):
 
     Returns
     -------
-    sfield : Field
-        Source field, a :class:`emg3d.fields.Field` instance.
+    vfield : Field
+        Source vector, a :class:`emg3d.fields.Field` instance. It is a
+        real-valued vector having the source weights on the edges (independent
+        of frequency).
 
     """
 
     # This is just a wrapper for `_unit_dipole_vector`, taking care of the
-    # source moment (length*strength).
+    # trigonometric weights in x, y, and z.
 
     # Dipole lengths in x-, y-, and z-directions, and overall.
     dxdydz = source[1, :] - source[0, :]
@@ -617,15 +620,15 @@ def get_dipole_source_field(grid, source, frequency, decimals=6):
         raise ValueError(f"Provided finite dipole has no length: {source}.")
 
     # Get unit source field.
-    sfield = Field(grid, frequency=frequency)
-    _unit_dipole_vector(source, sfield, decimals)
+    vfield = Field(grid, dtype=float)
+    _unit_dipole_vector(source, vfield, decimals)
 
-    # Multiply by length * s * mu0
-    sfield.fx *= dxdydz[0] * sfield.smu0
-    sfield.fy *= dxdydz[1] * sfield.smu0
-    sfield.fz *= dxdydz[2] * sfield.smu0
+    # Multiply by length in corresponding direction.
+    vfield.fx *= dxdydz[0]
+    vfield.fy *= dxdydz[1]
+    vfield.fz *= dxdydz[2]
 
-    return sfield
+    return vfield
 
 
 def _unit_dipole_vector(source, sfield, decimals=6):
