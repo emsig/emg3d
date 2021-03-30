@@ -1168,6 +1168,11 @@ class Simulation:
             strength *= self.data.weights.loc[source, name, freq].data.conj()
             strength /= ResidualField.smu0
 
+            # Our data are from a magnetic point, but the source will be a
+            # loop, so we have to undo the factor smu0 here. (iwB vs H).
+            if rec.xtype != 'electric':
+                strength /= ResidualField.smu0
+
             # If strength is zero (very unlikely), get_source_field would
             # return a normalized field for a unit source. However, in this
             # case we do not want that.

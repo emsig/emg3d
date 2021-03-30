@@ -170,7 +170,7 @@ class TestGetSourceField:
         assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
         assert sfield._frequency == freq
         assert sfield.frequency == freq
-        assert_allclose(sfield.smu0, -iomegamu)
+        assert_allclose(sfield.smu0, iomegamu)
 
         # Put source on final node, should still work.
         src = [grid.nodes_x[0], grid.nodes_x[0]+1,
@@ -206,7 +206,7 @@ class TestGetSourceField:
         assert_allclose(np.sum(sfield.fz/z/smu), -1)
         assert sfield._frequency == -freq
         assert sfield.frequency == freq
-        assert_allclose(sfield.smu0, -freq*constants.mu_0)
+        assert_allclose(sfield.smu0, freq*constants.mu_0)
 
     def test_get_source_field_point_vs_finite(self, capsys):
         # === Point dipole to finite dipole comparisons ===
@@ -323,7 +323,7 @@ class TestGetSourceField:
 
         freq = np.pi
         ss = fields.Field(grid, frequency=freq)
-        assert_allclose(ss.smu0, -2j*np.pi*freq*constants.mu_0)
+        assert_allclose(ss.smu0, 2j*np.pi*freq*constants.mu_0)
 
         # Check 0 Hz frequency.
         with pytest.raises(ValueError, match='`frequency` must be f>0'):
@@ -460,7 +460,7 @@ def test_get_magnetic_field():
                 grid, (350, 550, 750, 30, 30), frequency=10)
         efield = emg3d.solve(model, sfield, plain=True, verb=0)
         mfield = fields.get_magnetic_field(model, efield)
-        dfield = -grid.edge_curl*efield.field/sfield.smu0
+        dfield = grid.edge_curl*efield.field/sfield.smu0
         assert_allclose(
                 dfield[:80].reshape((5, 4, 4), order='F')[1:-1, :, :],
                 mfield.fx)

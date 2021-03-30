@@ -339,13 +339,14 @@ class TxElectricDipole(Dipole):
         self._strength = strength
         super().__init__(coordinates=coordinates, length=length)
 
-        self._repr_add = f"{self.moment():,.1f} Am"
+        self._repr_add = f"{self.moment:,.1f} Am"
 
     @property
     def strength(self):
         return self._strength
 
-    def moment(self, smu0=None):
+    @property
+    def moment(self):
         return self.length*self.strength if self.strength != 0 else 1.0
 
 
@@ -368,15 +369,15 @@ class TxMagneticDipole(Dipole):
         super().__init__(coordinates=coordinates, length=length)
 
         # Currently only works for mu_r=1
-        self._repr_add = f"i w mu {self.moment(1):,.1f} A"
+        self._repr_add = f"i w mu {self.moment:,.1f} A"
 
     @property
     def strength(self):
         return self._strength
 
-    def moment(self, smu0=None):
-        moment = self.length*self.strength if self.strength != 0 else 1.0
-        return -moment/smu0
+    @property
+    def moment(self):
+        return self.length*self.strength if self.strength != 0 else 1.0
 
 
 @register_electrode
@@ -400,13 +401,14 @@ class TxElectricWire(Wire):
         self._strength = strength
         super().__init__(coordinates=coordinates)
 
-        self._repr_add = f"{self.moment():,.1f} Am"
+        self._repr_add = f"{self.moment:,.1f} Am"
 
     @property
     def strength(self):
         return self._strength
 
-    def moment(self, smu0=None):
+    @property
+    def moment(self):
         return self.length*self.strength if self.strength != 0 else 1.0
 
 
@@ -445,7 +447,8 @@ class TxElectricLoop(Wire):
         return self._strength
 
     # TODO adjust for loops etc, +/- iw check
-    def moment(self, smu0=None):
+    @property
+    def moment(self):
         # Take center, and compute triangles to the points.
         raise NotImplementedError
 

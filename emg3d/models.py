@@ -482,12 +482,12 @@ class VolumeModel:
 
                 # Diffusive approximation.
                 if model.epsilon_r is None:
-                    eta = sfield.smu0*vol*cond
+                    eta = -sfield.smu0*vol*cond
 
                 # Complete version.
                 else:
-                    eta = sfield.smu0*vol*(
-                            cond - sfield.sval*epsilon_0*model.epsilon_r)
+                    eta = -sfield.smu0*vol*(
+                            cond + sfield.sval*epsilon_0*model.epsilon_r)
 
             setattr(self, '_eta_' + name[-1], eta)
 

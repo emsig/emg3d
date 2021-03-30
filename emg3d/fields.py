@@ -237,9 +237,9 @@ class Field:
         if getattr(self, '_sval', None) is None:
             if self._frequency is not None:
                 if self._frequency < 0:  # Laplace domain; s.
-                    self._sval = np.array(self._frequency)
+                    self._sval = np.array(-self._frequency)
                 else:  # Frequency domain; s = iw = 2i*pi*f.
-                    self._sval = np.array(-2j*np.pi*self._frequency)
+                    self._sval = np.array(2j*np.pi*self._frequency)
             else:
                 self._sval = None
 
@@ -319,7 +319,7 @@ def get_source_field(grid, source, frequency, **kwargs):
 
     .. math::
 
-        \mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} \, .
+        -\mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} \, .
 
     The adjoint of the trilinear interpolation is used to distribute the points
     to the grid edges, which corresponds to the discretization of a Dirac
@@ -413,10 +413,10 @@ def get_source_field(grid, source, frequency, **kwargs):
     sfield = Field(grid, data=vfield, frequency=frequency)
 
     # Multiply by i*w*mu_0
-    sfield.field *= sfield.smu0
+    sfield.field *= -sfield.smu0
 
     # Multiply by source moment
-    sfield.field *= source.moment(sfield.smu0)
+    sfield.field *= source.moment
 
     return sfield
 
@@ -559,9 +559,9 @@ def get_magnetic_field(model, efield):
 
     # Get smu (i omega mu_r mu_0).
     if model.mu_r is None:
-        smu = -np.ones(efield.grid.shape_cells)*efield.smu0
+        smu = np.ones(efield.grid.shape_cells)*efield.smu0
     else:
-        smu = -model.mu_r*efield.smu0
+        smu = model.mu_r*efield.smu0
 
     # Compute magnetic field.
     _edge_curl_factor(
@@ -765,7 +765,7 @@ def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, smu):
         Cell widths in x-, y-, and z-directions
         (:class:`emg3d.meshes.TensorMesh`).
 
-    smu0 : ndarray
+    smu : ndarray
         Factor by which the nabla x E will be divided. Shape of
         ``efield.grid.shape_cells``.
 

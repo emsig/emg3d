@@ -471,7 +471,7 @@ def alt_get_magnetic_field(model, efield):
 
     # Create a Field instance and divide by s*mu_0 and return.
     new = np.r_[e3d_hx.ravel('F'), e3d_hy.ravel('F'), e3d_hz.ravel('F')]
-    new *= -1/efield.smu0
+    new *= 1/efield.smu0
 
     # Initiate and return.
     return emg3d.Field(grid, data=new, frequency=efield._frequency)
