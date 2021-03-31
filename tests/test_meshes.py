@@ -14,7 +14,7 @@ except ImportError:
     discretize = None
 
 # Data generated with create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
+REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 def test_BaseMesh():
