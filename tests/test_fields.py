@@ -11,8 +11,6 @@ from emg3d import fields
 
 from . import alternatives, helpers
 
-pytestmark = pytest.mark.skipif(sys.platform == 'win32',
-                                reason="does not run on windows")
 
 # Import soft dependencies.
 try:
@@ -25,8 +23,7 @@ except ImportError:
     discretize = None
 
 # Data generated with tests/create_data/regression.py
-if sys.platform != 'win32':
-    REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
+REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 class TestField:
@@ -102,6 +99,8 @@ class TestField:
         default = fields.Field(self.grid)
         assert default.field.dtype == np.complex128
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_copy_dict(self, tmpdir):
         ee = fields.Field(self.grid, self.field)
         # Test copy
@@ -435,8 +434,6 @@ class TestGetReceiver:
                         np.r_[3*[False, ], 5*[True, ], 3*[False, ]])
 
 
-@pytest.mark.skipif(sys.platform == 'win32',
-                    reason="does not run on windows")
 def test_get_magnetic_field():
     # Check it does still the same (pure regression).
     dat = REGRES['reg_2']
