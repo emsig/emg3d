@@ -1,4 +1,3 @@
-import sys
 import pytest
 import numpy as np
 import scipy.linalg as sl

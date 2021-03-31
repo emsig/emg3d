@@ -74,8 +74,8 @@ jobs:
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
           conda config --show
-          conda install numpy pytest pytest-console-scripts pip
-          pip install setuptools_scm pytest-flake8
+          conda install numpy pytest pip
+          pip install setuptools_scm
           conda info -a
           conda list
 
@@ -83,4 +83,4 @@ jobs:
         shell: bash -l {0}
         run: |
           python setup.py install
-          pytest --flake8
+          pytest

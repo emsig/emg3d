@@ -1,4 +1,3 @@
-import sys
 from os.path import join, dirname
 
 import pytest
@@ -8,9 +7,6 @@ from numpy.testing import assert_allclose
 
 from emg3d import meshes, io
 
-pytestmark = pytest.mark.skipif(sys.platform == 'win32',
-                                reason="does not run on windows")
-
 # Import soft dependencies.
 try:
     import discretize
@@ -18,8 +14,7 @@ except ImportError:
     discretize = None
 
 # Data generated with create_data/regression.py
-if sys.platform != 'win32':
-    REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
+REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 def test_BaseMesh():
@@ -58,8 +53,6 @@ def test_BaseMesh():
 
 
 class TestTensorMesh:
-    @pytest.mark.skipif(sys.platform == 'win32',
-                        reason="does not run on windows")
     def test_TensorMesh(self):
         # Load mesh created with discretize.TensorMesh.
         grid = REGRES['grid']
