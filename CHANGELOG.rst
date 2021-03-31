@@ -38,6 +38,7 @@ Detailed changes
 - Bugfix of the loop area for a magnetic dipole (the area was previously wrong 
   except for dipole length of 1).
 - Source strength cannot be zero.
+- New class ``TxElectricWire`` for an arbitrary electric wire.
 
 
 **Fields**
