@@ -59,7 +59,7 @@ __all__ = ['Fourier', 'Time', 'Report', 'EMArray']
 KNOWN_CLASSES = {}
 
 
-def register_class(func):
+def known_class(func):
     """Decorator to register class as known for I/O."""
     KNOWN_CLASSES[func.__name__] = func
     return func

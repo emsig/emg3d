@@ -1,6 +1,7 @@
 """
-Everything related to the multigrid solver that is a field: source field,
-electric and magnetic fields, and fields at receivers.
+Everything that is related to fields: storing the electric field, obtaining the
+magnetic field, generating the source field; obtaining the fields at receiver
+locations.
 """
 # Copyright 2018-2021 The emg3d Developers.
 #
@@ -28,11 +29,10 @@ from scipy.constants import mu_0
 from emg3d.core import _numba_setting
 from emg3d import maps, meshes, utils, electrodes
 
-__all__ = ['Field', 'get_source_field', 'get_dipole_source_vector',
-           'get_receiver', 'get_magnetic_field']
+__all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
 
-@utils.register_class
+@utils.known_class
 class Field:
     r"""A Field contains the x-, y-, and z- directed electromagnetic fields.
 
@@ -64,6 +64,10 @@ class Field:
           :math:`s = \mathrm{i}\omega = 2\mathrm{i}\pi f` (complex);
         - ``frequency < 0``: Laplace domain, hence
           :math:`s = f` (real).
+
+        This is primarily important for source fields. However, frequency
+        information is also required to obtain the magnetic field from an
+        electric field.
 
     dtype : dtype, default: complex
         Data type of the initiated field; only used if both ``frequency`` and
@@ -214,7 +218,7 @@ class Field:
 
     @property
     def frequency(self):
-        """Return frequency (Hz)."""
+        """Frequency (Hz)."""
         if self._frequency is None:
             return None
         else:
@@ -222,7 +226,7 @@ class Field:
 
     @property
     def smu0(self):
-        """Return s*mu_0; mu_0 = magn permeability of free space [H/m]."""
+        """s*mu_0; mu_0 = magn permeability of free space [H/m]."""
         if getattr(self, '_smu0', None) is None:
             if self.sval is not None:
                 self._smu0 = self.sval*mu_0
@@ -233,7 +237,7 @@ class Field:
 
     @property
     def sval(self):
-        """Return s=iw in frequency domain and s=f in Laplace domain."""
+        """Laplace parameter; s=iw in f-domain and s=f in Laplace-domain."""
 
         if getattr(self, '_sval', None) is None:
             if self._frequency is not None:
@@ -254,7 +258,7 @@ class Field:
         Parameters
         ----------
         grid : TensorMesh
-            Grid of the new model; a :class:`emg3d.meshes.TensorMesh` instance.
+            New grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
         interpolate_opts : dict
             Passed through to :func:`emg3d.maps.interpolate`. Defaults are
@@ -287,27 +291,34 @@ class Field:
         return Field(grid, field, frequency=self._frequency)
 
     def get_receiver(self, receiver):
-        """Return the field at receiver locations.
+        """Return the field (response) at receiver coordinates.
+
+        Note that in order to avoid boundary effects from the PEC boundary the
+        outermost cells are neglected. Field values for coordinates outside of
+        the grid are set to NaN's. However, take into account that for good
+        results all receivers should be far away from the boundary.
 
         Parameters
         ----------
-        receiver : tuple
-            Receiver coordinates (m) and angles (°) in the format
-            ``(x, y, z, azimuth, elevation)``.
+        receiver : {Rx*, list, tuple}
+            Receiver coordinates. The following formats are accepted:
 
-            All values can either be a scalar or having the same length as
-            number of receivers.
+            - ``Rx*`` instance, any receiver object from
+              :mod:`emg3d.electrodes`.
+            - ``list``: A list of ``Rx*`` instances.
+            - ``tuple``: ``(x, y, z, azimuth, elevation)``; receiver
+              coordinates and angles (m, °). All values can either be a scalar
+              or having the same length as number of receivers.
 
-            Angles:
-
-            - azimuth (°): horizontal deviation from x-axis, anti-clockwise.
-            - elevation (°): vertical deviation from xy-plane up-wards.
+            Note that the actual receiver type of the ``Rx*`` instances has no
+            effect here, it just takes the coordinates from the receiver
+            instances.
 
 
         Returns
         -------
         responses : EMArray
-            Responses at receiver locations.
+            Responses at receiver.
 
         """
         return get_receiver(self, receiver)
@@ -316,7 +327,7 @@ class Field:
 def get_source_field(grid, source, frequency, **kwargs):
     r"""Return source field for provided source and frequency.
 
-    The source field is given in Equation 2 of [Muld06]_,
+    The source term is given in Equation 2 of [Muld06]_,
 
     .. math::
 
@@ -333,34 +344,33 @@ def get_source_field(grid, source, frequency, **kwargs):
         Model grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     source : {Tx*, tuple, list, ndarray)
+        Any source object from :mod:`emg3d.electrodes` (recommended usage).
 
-        - Any source object from :mod:`emg3d.electrodes` (recommended usage).
-        - If it is a list, tuple, or ndarray it is put through to
-          :class:`emg3d.electrodes.TxElectricDipole` or, if ``electric=False``,
-          to :class:`emg3d.electrodes.TxMagneticDipole`.
+        If it is a list, tuple, or ndarray it is in the case of a dipole put
+        through to :class:`emg3d.electrodes.TxElectricDipole` or, if
+        ``electric=False``, to :class:`emg3d.electrodes.TxMagneticDipole`. If
+        it has more than two points it is put through to
+        :class:`emg3d.electrodes.TxElectricWire`. Consult the documentation of
+        the respective classes for the format, but it is recommended to provide
+        directly the classes.
 
-    frequency : float
-        Source frequency (Hz), used to compute the Laplace parameter `s`.
+    frequency : float, default: None
+        Source frequency (Hz), used to compute the Laplace parameter ``s``.
         Either positive or negative:
 
-        - `frequency` > 0: Frequency domain, hence
-          :math:`s = -\mathrm{i}\omega = -2\mathrm{i}\pi f` (complex);
-        - `frequency` < 0: Laplace domain, hence
+        - ``frequency > 0``: Frequency domain, hence
+          :math:`s = \mathrm{i}\omega = 2\mathrm{i}\pi f` (complex);
+        - ``frequency < 0``: Laplace domain, hence
           :math:`s = f` (real).
 
-    decimals : int, default: 6
-        Grid nodes and source coordinates are rounded to given number of
-        decimals. It must be at least 1 (decimeters), the default is
-        micrometers.
-
-    strength : {float, complex}, default: 0.0
+    strength : {float, complex}, default: 1.0
         Source strength (A), put through to
         :class:`emg3d.electrodes.TxElectricDipole` or, if ``electric=False``,
         to :class:`emg3d.electrodes.TxMagneticDipole`.
 
         | *Only used if the provided source is not a source instance.*
 
-    length : float, default: None
+    length : float, default: 1.0
         Dipole length (m), put through to
         :class:`emg3d.electrodes.TxElectricDipole` or, if ``electric=False``,
         to :class:`emg3d.electrodes.TxMagneticDipole`.
@@ -392,25 +402,20 @@ def get_source_field(grid, source, frequency, **kwargs):
 
         # Call Tx*-class depending on provided source shape and `electric`.
         if source.size > 6:
-            if np.allclose(source[0, :], source[-1, :]):
-                source = electrodes.TxElectricLoop(source, **inp)
-            else:
-                source = electrodes.TxElectricWire(source, **inp)
+            source = electrodes.TxElectricWire(source, **inp)
         elif kwargs.get('electric', True):
             source = electrodes.TxElectricDipole(source, **inp)
         else:
             source = electrodes.TxMagneticDipole(source, **inp)
 
-    # Get kwargs
-    decimals = kwargs.get('decimals', 6)
-
     # Get total vector field by looping over segments.
     vfield = np.zeros(grid.n_edges)
-    for p1, p2 in zip(source.points[:-1, :], source.points[1:, :]):
-        vfield += get_dipole_source_vector(
-                grid=grid, source=np.r_[[p1, p2]], decimals=decimals).field
+    for p0, p1 in zip(source.points[:-1, :], source.points[1:, :]):
 
-    # Initiate field with the normalized vector field.
+        # Add this segments' vector field to total vector field.
+        vfield += _dipole_vector(grid, source=np.r_[[p0, p1]]).field
+
+    # Initiate field with the total vector field.
     sfield = Field(grid, data=vfield, frequency=frequency)
 
     # Multiply by source strength
@@ -445,8 +450,8 @@ def get_receiver(field, receiver):
           and angles (m, °). All values can either be a scalar or having the
           same length as number of receivers.
 
-        Note that the actual receiver type has no effect here, it just takes
-        the locations from the receiver instances.
+        Note that the actual receiver type of the ``Rx*`` instances has no
+        effect here, it just takes the coordinates from the receiver instances.
 
 
     Returns
@@ -472,19 +477,13 @@ def get_receiver(field, receiver):
     else:
         coordinates = receiver
 
-    # Check receiver dimension.
-    if len(coordinates) != 5:
-        raise ValueError(
-            "`receiver` needs to be in the form (x, y, z, azimuth, elevation)."
-            f" Length of provided `receiver`: {len(coordinates)}."
-        )
-
-    # Check field dimension to ensure it is not a particular field.
-    if not hasattr(field, 'fx'):
-        raise ValueError(
-            "`field` must be a `Field`-instance, not a "
-            "particular field such as `field.fx`."
-        )
+        # Check receiver dimension.
+        if len(coordinates) != 5:
+            raise ValueError(
+                "`receiver` needs to be in the form "
+                "(x, y, z, azimuth, elevation). "
+                f"Length of provided `receiver`: {len(coordinates)}."
+            )
 
     # Grid.
     grid = field.grid
@@ -527,7 +526,8 @@ def get_magnetic_field(model, efield):
 
     Note that the magnetic field is defined on the faces of the grid, or on the
     edges of the so-called dual grid. The grid of the returned magnetic field
-    is the dual grid and has therefore one cell less in each direction.
+    is the dual grid and has therefore one cell less in each direction (cell
+    centers become cell edges).
 
 
     Parameters
@@ -573,12 +573,8 @@ def get_magnetic_field(model, efield):
     return hfield
 
 
-def get_dipole_source_vector(grid, source, decimals=6):
-    """Return source vector for a dipole using adjoint trilinear interpolation.
-
-    The recommended high-level function to obtain any source field is
-    :func:`emg3d.fields.get_source_field`, which uses this function internally.
-    This function returns the electric source vector field for a dipole.
+def _dipole_vector(grid, source, decimals=9):
+    """Get unit dipole source vector using the adjoint interpolation method.
 
 
     Parameters
@@ -588,24 +584,36 @@ def get_dipole_source_vector(grid, source, decimals=6):
 
     source : ndarray
         Source coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]] (m).
+        Source field, a :class:`emg3d.fields.Field` instance; created if not
+        provided.
 
-    decimals : int, default: 6
+    decimals : int, default: 9
         Grid nodes and source coordinates are rounded to given number of
-        decimals. It must be at least 1 (decimeters), the default is
-        micrometers.
+        decimals. Default is nanometers.
 
 
     Returns
     -------
     vfield : Field
-        Source vector, a :class:`emg3d.fields.Field` instance. It is a
-        real-valued vector having the source weights on the edges (independent
-        of frequency).
+        Source field, a :class:`emg3d.fields.Field` instance.
 
     """
+    vfield = Field(grid, dtype=float)
 
-    # This is just a wrapper for `_unit_dipole_vector`, taking care of the
-    # trigonometric weights in x, y, and z.
+    # Round nodes and source coordinates (to avoid floating point issues etc).
+    nodes_x = np.round(grid.nodes_x, decimals)
+    nodes_y = np.round(grid.nodes_y, decimals)
+    nodes_z = np.round(grid.nodes_z, decimals)
+    source = np.round(np.asarray(source, dtype=float), decimals)
+
+    # Ensure source is within nodes.
+    outside = (
+        min(source[:, 0]) < nodes_x[0] or max(source[:, 0]) > nodes_x[-1] or
+        min(source[:, 1]) < nodes_y[0] or max(source[:, 1]) > nodes_y[-1] or
+        min(source[:, 2]) < nodes_z[0] or max(source[:, 2]) > nodes_z[-1]
+    )
+    if outside:
+        raise ValueError(f"Provided source outside grid: {source}.")
 
     # Dipole lengths in x-, y-, and z-directions, and overall.
     dxdydz = source[1, :] - source[0, :]
@@ -614,58 +622,6 @@ def get_dipole_source_vector(grid, source, decimals=6):
     # Ensure finite length dipole is not a point dipole.
     if length < 1e-15:
         raise ValueError(f"Provided finite dipole has no length: {source}.")
-
-    # Get unit source field.
-    vfield = Field(grid, dtype=float)
-    _unit_dipole_vector(source, vfield, decimals)
-
-    # Multiply by length in corresponding direction.
-    vfield.fx *= dxdydz[0]
-    vfield.fy *= dxdydz[1]
-    vfield.fz *= dxdydz[2]
-
-    return vfield
-
-
-def _unit_dipole_vector(source, sfield, decimals=6):
-    """Get unit dipole source field using the adjoint interpolation method.
-
-    The result is placed directly in the provided ``sfield`` instance.
-
-
-    Parameters
-    ----------
-    source : ndarray
-        Source coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]] (m).
-
-    sfield : Field
-        Source field, a :class:`emg3d.fields.Field` instance.
-
-    decimals : int, default: 6
-        Grid nodes and source coordinates are rounded to given number of
-        decimals. It must be at least 1 (decimeters), the default is
-        micrometers.
-
-    """
-    grid = sfield.grid
-
-    # Round nodes and source coordinates (to avoid floating point issues etc).
-    decimals = max(decimals, 1)
-    nodes_x = np.round(grid.nodes_x, decimals)
-    nodes_y = np.round(grid.nodes_y, decimals)
-    nodes_z = np.round(grid.nodes_z, decimals)
-    source = np.round(np.asarray(source, dtype=float), decimals)
-
-    # Ensure source is within nodes.
-    outside = (source[0, 0] < nodes_x[0] or source[1, 0] > nodes_x[-1] or
-               source[0, 1] < nodes_y[0] or source[1, 1] > nodes_y[-1] or
-               source[0, 2] < nodes_z[0] or source[1, 2] > nodes_z[-1])
-    if outside:
-        raise ValueError(f"Provided source outside grid: {source}.")
-
-    # Dipole lengths in x-, y-, and z-directions, and overall.
-    dxdydz = source[1, :] - source[0, :]
-    length = np.linalg.norm(dxdydz)
 
     # Inverse source lengths.
     id_xyz = dxdydz.copy()
@@ -717,23 +673,23 @@ def _unit_dipole_vector(source, sfield, decimals=6):
                 # Add to field (only if segment inside cell).
                 if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
 
-                    sfield.fx[ix, iy, iz] += ey*ez*x_len
-                    sfield.fx[ix, iy+1, iz] += ry*ez*x_len
-                    sfield.fx[ix, iy, iz+1] += ey*rz*x_len
-                    sfield.fx[ix, iy+1, iz+1] += ry*rz*x_len
+                    vfield.fx[ix, iy, iz] += ey*ez*x_len
+                    vfield.fx[ix, iy+1, iz] += ry*ez*x_len
+                    vfield.fx[ix, iy, iz+1] += ey*rz*x_len
+                    vfield.fx[ix, iy+1, iz+1] += ry*rz*x_len
 
-                    sfield.fy[ix, iy, iz] += ex*ez*x_len
-                    sfield.fy[ix+1, iy, iz] += rx*ez*x_len
-                    sfield.fy[ix, iy, iz+1] += ex*rz*x_len
-                    sfield.fy[ix+1, iy, iz+1] += rx*rz*x_len
+                    vfield.fy[ix, iy, iz] += ex*ez*x_len
+                    vfield.fy[ix+1, iy, iz] += rx*ez*x_len
+                    vfield.fy[ix, iy, iz+1] += ex*rz*x_len
+                    vfield.fy[ix+1, iy, iz+1] += rx*rz*x_len
 
-                    sfield.fz[ix, iy, iz] += ex*ey*x_len
-                    sfield.fz[ix+1, iy, iz] += rx*ey*x_len
-                    sfield.fz[ix, iy+1, iz] += ex*ry*x_len
-                    sfield.fz[ix+1, iy+1, iz] += rx*ry*x_len
+                    vfield.fz[ix, iy, iz] += ex*ey*x_len
+                    vfield.fz[ix+1, iy, iz] += rx*ey*x_len
+                    vfield.fz[ix, iy+1, iz] += ex*ry*x_len
+                    vfield.fz[ix+1, iy+1, iz] += rx*ry*x_len
 
     # Ensure unity (should not be necessary).
-    for field in [sfield.fx, sfield.fy, sfield.fz]:
+    for field in [vfield.fx, vfield.fy, vfield.fz]:
         sum_s = abs(field.sum())
         if abs(sum_s-1) > 1e-6:
             # Print is always shown and simpler, warn for the CLI logs.
@@ -742,13 +698,20 @@ def _unit_dipole_vector(source, sfield, decimals=6):
             warnings.warn(msg, UserWarning)
             field /= sum_s
 
+    # Multiply by distance in each direction to obtain length.
+    vfield.fx *= dxdydz[0]
+    vfield.fy *= dxdydz[1]
+    vfield.fz *= dxdydz[2]
+
+    return vfield
+
 
 @nb.njit(**_numba_setting)
 def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, smu):
-    r"""Magnetic field corresponding to electric field.
+    r"""Curl of values living on edges yielding values on faces.
 
-    Called from :func:`emg3d.fields.get_magnetic_field`; the result is put
-    into ``{mx;my;mz}``.
+    Used by :func:`emg3d.fields.get_magnetic_field` to compute the magnetic
+    field from the electric field. The result is put into ``{mx;my;mz}``.
 
 
     Parameters
@@ -767,8 +730,9 @@ def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, smu):
         (:class:`emg3d.meshes.TensorMesh`).
 
     smu : ndarray
-        Factor by which the nabla x E will be divided. Shape of
-        ``efield.grid.shape_cells``.
+        Factor by which nabla x E will be divided. Shape of
+        ``efield.grid.shape_cells``. In the case of Farady's law this is
+        i*w*mu.
 
     """
 

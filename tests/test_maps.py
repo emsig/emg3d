@@ -379,6 +379,40 @@ class TestInterpolate:
         with pytest.raises(ValueError, match="only implemented for TensorM"):
             maps.interpolate(grid, field.fx, xi, method='volume')
 
+    def test_2d_arrays(self):
+        hx = [1, 1, 1, 2, 4, 8]
+        grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))
+        field = fields.Field(grid)
+        field.fx = np.arange(1, field.fx.size+1).reshape(
+                field.fx.shape, order='F')
+        model = models.Model(grid, 1, 2, 3)
+
+        model.property_x[1, :, :] = 2
+        model.property_x[2, :, :] = 3
+        model.property_x[3, :, :] = 4
+        model.property_x[4, :, :] = np.arange(1, 37).reshape((6, 6), order='F')
+        model.property_x[5, :, :] = 200
+
+        xi = (np.ones((3, 2)), 5, np.ones((3, 2)))
+
+        # == NEAREST ==
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='nearest')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='nearest')
+
+        # == LINEAR ==
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='linear')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='linear')
+
+        # == CUBIC ==
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='cubic')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='cubic')
+
 
 def test_points_from_grids():
     hx = [1, 1, 1, 2, 4, 8]

@@ -29,7 +29,7 @@ try:
 except ImportError:
     discretize = None
 
-__all__ = ['TensorMesh', 'BaseMesh', 'construct_mesh', 'get_origin_widths',
+__all__ = ['TensorMesh', 'BaseMesh', 'construct_mesh', 'origin_and_widths',
            'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width']
 
 
@@ -97,7 +97,7 @@ class BaseMesh:
         return self._cell_volumes
 
 
-@utils.register_class
+@utils.known_class
 class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
     """A slightly modified version of :class:`discretize.TensorMesh`.
 
@@ -481,9 +481,9 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                 kwargs[name] = value
 
     # Get origins and widths in all directions.
-    x0, hx, xinfo = get_origin_widths(**kwargs, **xparams)
-    y0, hy, yinfo = get_origin_widths(**kwargs, **yparams)
-    z0, hz, zinfo = get_origin_widths(**kwargs, **zparams)
+    x0, hx, xinfo = origin_and_widths(**kwargs, **xparams)
+    y0, hy, yinfo = origin_and_widths(**kwargs, **yparams)
+    z0, hz, zinfo = origin_and_widths(**kwargs, **zparams)
 
     # Throw message if no solution was found.
     if any([out is None for out in [x0, y0, z0]]):
@@ -503,7 +503,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     return mesh
 
 
-def get_origin_widths(frequency, properties, center, domain=None, vector=None,
+def origin_and_widths(frequency, properties, center, domain=None, vector=None,
                       seasurface=None, **kwargs):
     r"""Return origin and cell widths for given parameters.
 

@@ -107,6 +107,7 @@ Detailed changes
 
   - ``_TensorMesh`` to ``BaseMesh``;
   - ``min_cell_width`` to ``cell_width``.
+  - ``get_origin_widths`` to ``origin_and_widths``.
 
 - ``meshes.BaseMesh``:
 

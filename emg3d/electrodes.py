@@ -331,7 +331,7 @@ class Source(Electrode):
         return fields.get_source_field(grid, self, frequency)
 
 
-@utils.register_class
+@utils.known_class
 class TxElectricDipole(Source, Dipole):
     """TODO"""
 
@@ -344,7 +344,7 @@ class TxElectricDipole(Source, Dipole):
                          length=length)
 
 
-@utils.register_class
+@utils.known_class
 class TxMagneticDipole(Source, Dipole):
     """TODO
 
@@ -363,7 +363,7 @@ class TxMagneticDipole(Source, Dipole):
                          length=length)
 
 
-@utils.register_class
+@utils.known_class
 class TxElectricWire(Source, Wire):
     """TODO"""
 
@@ -376,7 +376,7 @@ class TxElectricWire(Source, Wire):
 
 
 # RECEIVERS
-@utils.register_class
+@utils.known_class
 class RxElectricPoint(Point):
     """TODO
 
@@ -389,7 +389,7 @@ class RxElectricPoint(Point):
         super().__init__(coordinates)
 
 
-@utils.register_class
+@utils.known_class
 class RxMagneticPoint(Point):
     """TODO"""
 

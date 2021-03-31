@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-from copy import deepcopy as dc
 from numpy.testing import assert_allclose
 
 import emg3d
@@ -117,7 +116,7 @@ def test_save_and_load(tmpdir, capsys):
         assert_allclose(out_h5['what']['f'], field.fx)
 
         # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO
-        # assert io._compare_dicts(out_h5, out_npz) is True
+        # assert helpers.compare_dicts(out_h5, out_npz) is True
     else:
         with pytest.raises(ImportError):
             io.save(tmpdir+'/test.h5', grid=grid)
@@ -137,54 +136,7 @@ def test_save_and_load(tmpdir, capsys):
     assert_allclose(out_json['what']['f'], field.fx)
 
     # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO
-    # assert io._compare_dicts(out_json, out_npz) is True
-
-
-def test_compare_dicts(capsys):
-    # Create test data
-    grid = emg3d.meshes.TensorMesh(
-            [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
-            np.zeros(3))
-
-    model = emg3d.Model(grid, property_x=1., property_y=2.,
-                        property_z=3., mu_r=4.)
-
-    e1 = helpers.dummy_field(*grid.shape_edges_x)
-    e2 = helpers.dummy_field(*grid.shape_edges_y)
-    e3 = helpers.dummy_field(*grid.shape_edges_z)
-    field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
-    ee = emg3d.Field(grid, field, frequency=.938)
-
-    dict1 = io._dict_serialize(
-            {'model': model, 'grid': grid, 'field': ee,
-             'a': 1, 'b': None, 'c': 1e-9+1j*1e13,
-             'd': {'aa': np.arange(10), 'bb': np.sqrt(1.0),
-                   'cc': {'another': 1}, 'dd': None}
-             },
-            )
-
-    dict2 = dc(dict1)
-    assert io._compare_dicts(dict1, dict2)
-
-    del dict1['d']['bb']
-    del dict2['field']
-    del dict2['model']['mu_r']
-    dict2['grid']['hy'] *= 2
-    dict2['whatever'] = 'whatever'
-    dict2['2onlydict'] = {'booh': 12}
-
-    out = io._compare_dicts(dict1, dict2, True)
-    assert out is False
-    outstr, _ = capsys.readouterr()
-    print(80*'=')
-    print(outstr)
-    print(80*'=')
-    assert " True  :: model      > property_x" in outstr
-    assert "  {1}  ::              mu_r" in outstr
-    assert " False ::              hy" in outstr
-    assert " True  ::              cc         > another" in outstr
-    assert "  {2}  :: d          > bb" in outstr
-    assert "  {2}  :: 2onlydict" in outstr
+    # assert helpers.compare_dicts(out_json, out_npz) is True
 
 
 def test_known_classes(tmpdir):

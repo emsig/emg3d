@@ -11,6 +11,8 @@ except ImportError:
 import emg3d
 from emg3d import simulations
 
+from . import helpers
+
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestSimulation():
@@ -525,7 +527,7 @@ class TestEstimateGriddingOpts():
 
         # Check that all parameters passed unchanged.
         gdict2 = {k: gdict[k] for k, _ in gridding_opts.items()}
-        assert emg3d.io._compare_dicts(gdict2, gridding_opts)
+        assert helpers.compare_dicts(gdict2, gridding_opts)
 
     def test_factor(self):
 

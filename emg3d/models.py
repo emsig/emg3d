@@ -28,7 +28,7 @@ __all__ = ['Model', 'VolumeModel']
 
 
 # MODEL
-@utils.register_class
+@utils.known_class
 class Model:
     r"""A model containing the electromagnetic properties of the Earth.
 

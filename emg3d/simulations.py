@@ -43,7 +43,7 @@ from emg3d import (fields, io, solver, surveys, maps, models, meshes, optimize,
 __all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
 
 
-@utils.register_class
+@utils.known_class
 class Simulation:
     """Create a simulation for a given survey on a given model.
 

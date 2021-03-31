@@ -31,7 +31,7 @@ from emg3d import electrodes, utils, io
 __all__ = ['Survey', ]
 
 
-@utils.register_class
+@utils.known_class
 class Survey:
     """Create a survey with sources, receivers, and data.
 

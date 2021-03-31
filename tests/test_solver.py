@@ -384,8 +384,8 @@ def test_smoothing():
 
     nu = 2
 
-    widths = [np.ones(2)*100, helpers.get_h(10, 27, 10, 1.1),
-              helpers.get_h(2, 1, 50, 1.2)]
+    widths = [np.ones(2)*100, helpers.widths(10, 27, 10, 1.1),
+              helpers.widths(2, 1, 50, 1.2)]
     origin = [-w.sum()/2 for w in widths]
     src = [0, -10, -10, 43, 13]
 
@@ -629,7 +629,7 @@ def test_residual():
     # Create a grid
     src = [90, 1600, 25., 45, 45]
     grid = meshes.TensorMesh(
-        [helpers.get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
+        [helpers.widths(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
         origin=np.zeros(3))
 
     # Create some resistivity model
