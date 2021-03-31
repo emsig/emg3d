@@ -10,9 +10,6 @@ from emg3d import solver, core, meshes, models, fields, io
 
 from . import alternatives, helpers
 
-pytestmark = pytest.mark.skipif(sys.platform == 'win32',
-                                reason="does not run on windows")
-
 # Data generated with tests/create_data/regression.py
 if sys.platform != 'win32':
     REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))

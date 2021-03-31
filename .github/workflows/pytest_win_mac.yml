@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos, windows]
+        os: [windows, ]
         python: [3.8, ]
 
     steps:
