@@ -14,16 +14,6 @@ try:
 except ImportError:
     xarray = None
 
-msg = ""
-try:
-    import discretize
-    # Backwards compatibility; remove latest for version 1.0.0.
-    dv = discretize.__version__.split('.')
-    if int(dv[0]) == 0 and int(dv[1]) < 6:
-        msg = "`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`;"
-except ImportError:
-    pass
-
 
 class disable_numba(ContextDecorator):
     """Context decorator to disable-enable JIT and remove log file."""
@@ -47,11 +37,6 @@ def test_basic(script_runner):
     ret = script_runner.run('emg3d', '-h')
     assert ret.success
     assert "emg3d is a multigrid solver for 3D EM diffusion" in ret.stdout
-
-    if msg:
-        assert msg in ret.stderr
-    else:
-        assert ret.stderr == ""
 
     # Test the info printed if called without anything.
     ret = script_runner.run('emg3d')

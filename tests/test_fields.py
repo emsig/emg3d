@@ -1,6 +1,5 @@
 import sys
 import pytest
-import shelve
 import numpy as np
 from scipy import constants
 from os.path import join, dirname
@@ -11,22 +10,15 @@ from emg3d import fields
 
 from . import alternatives, helpers
 
-pytestmark = pytest.mark.skipif(sys.platform == 'win32',
-                                reason="does not run on windows")
 
 # Import soft dependencies.
 try:
     import discretize
-    # Backwards compatibility; remove latest for version 1.0.0.
-    dv = discretize.__version__.split('.')
-    if int(dv[0]) == 0 and int(dv[1]) < 6:
-        discretize = None
 except ImportError:
     discretize = None
 
 # Data generated with tests/create_data/regression.py
-if sys.platform != 'win32':
-    REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
+REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 class TestField:
@@ -116,13 +108,6 @@ class TestField:
         del edict['grid']
         with pytest.raises(KeyError, match="'grid'"):
             fields.Field.from_dict(edict)
-
-        # Ensure it can be pickled.
-        with shelve.open(join(tmpdir, 'test')) as db:
-            db['field'] = ee
-        with shelve.open(join(tmpdir, 'test')) as db:
-            test = db['field']
-        assert test == ee
 
     def test_interpolate_to_grid(self):
         # We only check here that it gives the same as calling the function
@@ -380,6 +365,8 @@ class TestGetReceiver:
         with pytest.raises(ValueError, match='`receiver` needs to be in the'):
             fields.get_receiver(efield, (1, 1, 1))
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_basics(self):
 
         # Coarse check with emg3d.solve and empymod.
@@ -435,8 +422,6 @@ class TestGetReceiver:
                         np.r_[3*[False, ], 5*[True, ], 3*[False, ]])
 
 
-@pytest.mark.skipif(sys.platform == 'win32',
-                    reason="does not run on windows")
 def test_get_magnetic_field():
     # Check it does still the same (pure regression).
     dat = REGRES['reg_2']

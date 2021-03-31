@@ -9,10 +9,6 @@ from . import alternatives
 # Import soft dependencies.
 try:
     import discretize
-    # Backwards compatibility; remove latest for version 1.0.0.
-    dv = discretize.__version__.split('.')
-    if int(dv[0]) == 0 and int(dv[1]) < 6:
-        discretize = None
 except ImportError:
     discretize = None
 
