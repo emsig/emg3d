@@ -8,6 +8,9 @@ from numpy.testing import assert_allclose
 
 from emg3d import meshes, io
 
+pytestmark = pytest.mark.skipif(sys.platform == 'win32',
+                                reason="does not run on windows"))
+
 # Import soft dependencies.
 try:
     import discretize

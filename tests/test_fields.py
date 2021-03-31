@@ -11,6 +11,9 @@ from emg3d import fields
 
 from . import alternatives, helpers
 
+pytestmark = pytest.mark.skipif(sys.platform == 'win32',
+                                reason="does not run on windows"))
+
 # Import soft dependencies.
 try:
     import discretize
