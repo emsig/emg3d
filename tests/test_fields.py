@@ -22,7 +22,8 @@ except ImportError:
     discretize = None
 
 # Data generated with tests/create_data/regression.py
-REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
+if sys.platform != 'win32':
+    REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 class TestField:

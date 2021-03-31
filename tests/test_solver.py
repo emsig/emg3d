@@ -11,7 +11,8 @@ from emg3d import solver, core, meshes, models, fields, io
 from . import alternatives, helpers
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
+if sys.platform != 'win32':
+    REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 class TestSolve:
