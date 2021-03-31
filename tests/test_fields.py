@@ -113,9 +113,9 @@ class TestField:
             fields.Field.from_dict(edict)
 
         # Ensure it can be pickled.
-        with shelve.open(tmpdir+'/test') as db:
+        with shelve.open(join(tmpdir, 'test')) as db:
             db['field'] = ee
-        with shelve.open(tmpdir+'/test') as db:
+        with shelve.open(join(tmpdir, 'test')) as db:
             test = db['field']
         assert test == ee
 
