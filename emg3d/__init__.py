@@ -14,20 +14,9 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# Import modules
-from emg3d import electrodes
-from emg3d import fields
-from emg3d import io
-from emg3d import maps
-from emg3d import meshes
-from emg3d import models
-from emg3d import optimize
-from emg3d import simulations
-from emg3d import solver
-from emg3d import surveys
-from emg3d import utils
-
 # Import most important functions and classes
+from emg3d.electrodes import (TxElectricDipole, TxMagneticDipole,
+                              TxElectricWire, RxElectricPoint, RxMagneticPoint)
 from emg3d.fields import Field, get_source_field, get_magnetic_field
 from emg3d.io import save, load
 from emg3d.meshes import TensorMesh, construct_mesh
@@ -36,9 +25,3 @@ from emg3d.simulations import Simulation
 from emg3d.solver import solve, solve_source
 from emg3d.surveys import Survey
 from emg3d.utils import Report, Fourier, __version__
-
-# Import all electrodes, but delete the base classes.
-# They are in __all__ so they appear in the API-documentation, but we don't
-# want them in the top namespace.
-from emg3d.electrodes import *
-del Electrode, Point, Dipole

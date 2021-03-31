@@ -152,7 +152,7 @@ class TestGetSourceField:
         freq = 1.2458
 
         sfield = fields.get_source_field(grid, src, freq, strength=1+1j)
-        sfield = fields.get_source_field(grid, src, freq, strength=0)
+        sfield = fields.get_source_field(grid, src, freq, strength=1)
         iomegamu = 2j*np.pi*freq*constants.mu_0
 
         # Check number of edges
@@ -176,10 +176,10 @@ class TestGetSourceField:
         src = [grid.nodes_x[0], grid.nodes_x[0]+1,
                grid.nodes_y[-1]-1, grid.nodes_y[-1],
                grid.nodes_z[0], grid.nodes_z[0]+1]
-        sfield = fields.get_source_field(grid, src, freq, strength=0.0)
+        sfield = fields.get_source_field(grid, src, freq, strength=1.0)
         tot_field = np.linalg.norm(
                 [np.sum(sfield.fx), np.sum(sfield.fy), np.sum(sfield.fz)])
-        assert_allclose(tot_field/np.abs(np.sum(iomegamu)), 1.0)
+        assert_allclose(tot_field/np.abs(np.sum(iomegamu)), np.sqrt(3))
 
         out, _ = capsys.readouterr()  # Empty capsys
 
@@ -240,15 +240,15 @@ class TestGetSourceField:
         fsf = fields.get_source_field(grid1, f_src, 3.3, strength=np.pi)
         assert fsf == dsf
 
-        # 1c. Source over various cells, normalized.
+        # 1c. Source over various cells.
         h = np.ones(8)*200
         grid2 = emg3d.TensorMesh([h, h, h], np.array([-800, -800, -800]))
         d_src, f_src = get_f_src([0, 0., 0., 40, 20], 300.0)
-        dsf = fields.get_source_field(grid2, d_src, 10.0, strength=0)
-        fsf = fields.get_source_field(grid2, f_src, 10.0, strength=0)
-        assert_allclose(fsf.fx.sum(), dsf.fx.sum())
-        assert_allclose(fsf.fy.sum(), dsf.fy.sum())
-        assert_allclose(fsf.fz.sum(), dsf.fz.sum())
+        dsf = fields.get_source_field(grid2, d_src, 10.0, strength=1.0)
+        fsf = fields.get_source_field(grid2, f_src, 10.0, strength=1.0)
+        assert_allclose(fsf.fx.sum()/300, dsf.fx.sum())
+        assert_allclose(fsf.fy.sum()/300, dsf.fy.sum())
+        assert_allclose(fsf.fz.sum()/300, dsf.fz.sum())
 
         # 1d. Source over various cells, source strength = pi.
         slen = 300
@@ -312,7 +312,7 @@ class TestGetSourceField:
         for srcl in src4xxyyzz:
             sman.field += fields.get_source_field(
                     grid, srcl, freq, strength=1/3).field
-        scomp = fields.get_source_field(grid, src5xyz, freq, strength=0)
+        scomp = fields.get_source_field(grid, src5xyz, freq, strength=1/3)
         assert_allclose(sman.field, scomp.field)
 
     def test_source_field(self):

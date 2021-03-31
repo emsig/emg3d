@@ -22,12 +22,13 @@ from copy import deepcopy
 import numpy as np
 from scipy.constants import epsilon_0
 
-from emg3d import maps, meshes
+from emg3d import maps, meshes, utils
 
 __all__ = ['Model', 'VolumeModel']
 
 
 # MODEL
+@utils.register_class
 class Model:
     r"""A model containing the electromagnetic properties of the Earth.
 

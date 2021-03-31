@@ -22,23 +22,11 @@ from copy import deepcopy
 import numpy as np
 from scipy.special import sindg, cosdg
 
-__all__ = ['Electrode', 'Point', 'Dipole']
+from emg3d import fields, utils
 
-
-# List of electrodes
-ELECTRODE_LIST = {}
-
-
-def register_electrode(func):
-    """Decorator to register sources and receivers.
-
-    Adds them to both, the list ``emg3d.electrodes.ELECTRODE_LIST``, and
-    ``emg3d.electrodes.__all__``.
-
-    """
-    ELECTRODE_LIST[func.__name__] = func
-    __all__.append(func.__name__)
-    return func
+__all__ = ['Electrode', 'Point', 'Dipole', 'Source', 'TxElectricDipole',
+           'TxMagneticDipole', 'TxElectricWire', 'RxElectricPoint',
+           'RxMagneticPoint']
 
 
 # BASE ELECTRODE TYPES
@@ -205,10 +193,6 @@ class Dipole(Electrode):
 
             self._serialize = {'length'} | self._serialize
 
-            # Get lengths in each direction.
-            if length is None:
-                length = 1.0
-
             # Get the two separate electrodes.
             if self.xtype == 'magnetic':
                 # square loop of area corresponding to length
@@ -219,9 +203,6 @@ class Dipole(Electrode):
             self._length = length
 
         elif coordinates.size == 6:
-
-            if length is not None:
-                raise ValueError("length must be zero for this format")
 
             if coordinates.ndim == 1:
                 points = np.array([coordinates[::2], coordinates[1::2]])
@@ -244,9 +225,6 @@ class Dipole(Electrode):
                     "(x, y, z, azimuth, elevation) instead. "
                     f"Provided coordinates: {coordinates}."
                 )
-
-            if length is not None:
-                raise ValueError("No length with this format")
 
         else:
             raise ValueError(
@@ -332,11 +310,15 @@ class Source(Electrode):
 
     _serialize = {'strength'} | Electrode._serialize
 
-    def __init__(self, coordinates, strength=0.0, **kwargs):
+    def __init__(self, coordinates, strength, **kwargs):
         """Initiate an electric  source."""
 
-        self._strength = strength
+        if abs(strength) == 0.0:
+            raise ValueError(
+                f"Source strength cannot be zero. Provided: {strength}."
+            )
 
+        self._strength = strength
         self._repr_add = f"{self.strength:,.1f} A"
 
         super().__init__(coordinates=coordinates, **kwargs)
@@ -345,25 +327,24 @@ class Source(Electrode):
     def strength(self):
         return self._strength
 
-    @property
-    def moment(self):
-        return self.length*self.strength if self.strength != 0 else 1.0
+    def get_field(self, grid, frequency):
+        return fields.get_source_field(grid, self, frequency)
 
 
-@register_electrode
+@utils.register_class
 class TxElectricDipole(Source, Dipole):
     """TODO"""
 
     _serialize = Source._serialize | Dipole._serialize
 
-    def __init__(self, coordinates, strength=0.0, length=None):
+    def __init__(self, coordinates, strength=1.0, length=1.0):
         """Initiate an electric dipole source."""
 
         super().__init__(coordinates=coordinates, strength=strength,
                          length=length)
 
 
-@register_electrode
+@utils.register_class
 class TxMagneticDipole(Source, Dipole):
     """TODO
 
@@ -375,27 +356,27 @@ class TxMagneticDipole(Source, Dipole):
 
     _serialize = Source._serialize | Dipole._serialize
 
-    def __init__(self, coordinates, strength=0.0, length=None):
+    def __init__(self, coordinates, strength=1.0, length=1.0):
         """Initiate a magnetic source."""
 
         super().__init__(coordinates=coordinates, strength=strength,
                          length=length)
 
 
-@register_electrode
+@utils.register_class
 class TxElectricWire(Source, Wire):
     """TODO"""
 
     _serialize = Source._serialize | Wire._serialize
 
-    def __init__(self, coordinates, strength=0.0):
+    def __init__(self, coordinates, strength=1.0):
         """Initiate an electric wire source."""
 
         super().__init__(coordinates=coordinates, strength=strength)
 
 
 # RECEIVERS
-@register_electrode
+@utils.register_class
 class RxElectricPoint(Point):
     """TODO
 
@@ -408,43 +389,13 @@ class RxElectricPoint(Point):
         super().__init__(coordinates)
 
 
-@register_electrode
+@utils.register_class
 class RxMagneticPoint(Point):
     """TODO"""
 
     def __init__(self, coordinates):
         """Initiate a magnetic point receiver."""
         super().__init__(coordinates)
-
-
-@register_electrode
-class RxCurrentPoint(Point):
-    """TODO"""
-
-    def __init__(self, coordinates):
-        """Initiate an electric current density point receiver."""
-
-        # self.factor = NotImplemented
-        # super().__init__(coordinates)
-
-        raise NotImplementedError(
-            "Electric current density receiver not yet fully implemented"
-        )
-
-
-@register_electrode
-class RxFluxPoint(Point):
-    """TODO"""
-
-    def __init__(self, coordinates):
-        """Initiate a magnetic flux density point receiver."""
-
-        # self.factor = NotImplemented
-        # super().__init__(coordinates)
-
-        raise NotImplementedError(
-            "Magnetic flux density receiver not yet fully implemented"
-        )
 
 
 # CONVERSIONS

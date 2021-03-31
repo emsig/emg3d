@@ -22,7 +22,7 @@ from copy import deepcopy
 import numpy as np
 from scipy.constants import mu_0
 
-from emg3d import maps
+from emg3d import maps, utils
 
 try:
     import discretize
@@ -97,6 +97,7 @@ class BaseMesh:
         return self._cell_volumes
 
 
+@utils.register_class
 class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
     """A slightly modified version of :class:`discretize.TensorMesh`.
 

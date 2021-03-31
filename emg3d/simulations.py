@@ -37,11 +37,13 @@ except ImportError:
     # `emg3d.simulation.process_map = emg3d.utils._process_map`.
     from emg3d.utils import _process_map as process_map
 
-from emg3d import fields, solver, surveys, maps, models, meshes, optimize
+from emg3d import (fields, io, solver, surveys, maps, models, meshes, optimize,
+                   utils)
 
 __all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
 
 
+@utils.register_class
 class Simulation:
     """Create a simulation for a given survey on a given model.
 
@@ -388,8 +390,6 @@ class Simulation:
         obj : :class:`Simulation` instance
 
         """
-        from emg3d import io
-
         try:
 
             # gridding options, backwards compatible.
@@ -484,8 +484,6 @@ class Simulation:
             Passed through to :func:`emg3d.io.save`.
 
         """
-        from emg3d import io
-
         # Add what to self, will be removed in to_dict.
         self._what_to_file = what
 
@@ -522,7 +520,6 @@ class Simulation:
             The simulation that was stored in the file.
 
         """
-        from emg3d import io
         out = io.load(fname, **kwargs)
         if 'verb' in kwargs and kwargs['verb'] < 0:
             return out[0][name], out[1]

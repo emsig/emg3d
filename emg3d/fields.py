@@ -32,6 +32,7 @@ __all__ = ['Field', 'get_source_field', 'get_dipole_source_vector',
            'get_receiver', 'get_magnetic_field']
 
 
+@utils.register_class
 class Field:
     r"""A Field contains the x-, y-, and z- directed electromagnetic fields.
 
@@ -384,10 +385,10 @@ def get_source_field(grid, source, frequency, **kwargs):
     if isinstance(source, (tuple, list, np.ndarray)):
 
         # Get optional kwargs and cast source.
-        inp = {'strength': kwargs.get('strength', 0.0)}
+        inp = {'strength': kwargs.get('strength', 1.0)}
         source = np.asarray(source)
         if source.size == 5:
-            inp['length'] = kwargs.get('length', None)
+            inp['length'] = kwargs.get('length', 1.0)
 
         # Call Tx*-class depending on provided source shape and `electric`.
         if source.size > 6:
@@ -407,16 +408,16 @@ def get_source_field(grid, source, frequency, **kwargs):
     vfield = np.zeros(grid.n_edges)
     for p1, p2 in zip(source.points[:-1, :], source.points[1:, :]):
         vfield += get_dipole_source_vector(
-                    grid, np.r_[[p1, p2]], decimals).field/source.length
+                grid=grid, source=np.r_[[p1, p2]], decimals=decimals).field
 
     # Initiate field with the normalized vector field.
     sfield = Field(grid, data=vfield, frequency=frequency)
 
-    # Multiply by i*w*mu_0
-    sfield.field *= -sfield.smu0
+    # Multiply by source strength
+    sfield.field *= source.strength
 
-    # Multiply by source moment
-    sfield.field *= source.moment
+    # Multiply by -i*w*mu_0 to obtain the full source term.
+    sfield.field *= -sfield.smu0
 
     return sfield
 

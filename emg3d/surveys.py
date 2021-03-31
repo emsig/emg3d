@@ -26,11 +26,12 @@ try:
 except ImportError:
     xarray = None
 
-from emg3d import electrodes, utils
+from emg3d import electrodes, utils, io
 
 __all__ = ['Survey', ]
 
 
+@utils.register_class
 class Survey:
     """Create a survey with sources, receivers, and data.
 
@@ -296,7 +297,6 @@ class Survey:
             Passed through to :func:`io.save`.
 
         """
-        from emg3d import io
         kwargs[name] = self                # Add survey to dict.
         return io.save(fname, **kwargs)
 
@@ -328,7 +328,6 @@ class Survey:
             The survey that was stored in the file.
 
         """
-        from emg3d import io
         out = io.load(fname, **kwargs)
         if 'verb' in kwargs and kwargs['verb'] < 0:
             return out[0][name], out[1]

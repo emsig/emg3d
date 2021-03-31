@@ -37,6 +37,7 @@ Detailed changes
   positive upwards (anticlockwise from the horizontal plane).
 - Bugfix of the loop area for a magnetic dipole (the area was previously wrong 
   except for dipole length of 1).
+- Source strength cannot be zero.
 
 
 **Fields**
