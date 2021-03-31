@@ -1,3 +1,4 @@
+import sys
 import pytest
 import shelve
 import numpy as np
@@ -25,6 +26,8 @@ except ImportError:
 REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
+@pytest.mark.skipif(sys.platform == 'win32',
+                    reason="does not run on windows")
 class TestGetReceiver:
     def test_runs_warnings(self):
         # The interpolation happens in maps.interp_spline_3d.
