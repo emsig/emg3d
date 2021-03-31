@@ -1,9 +1,11 @@
 import pytest
 import numpy as np
-from copy import deepcopy as dc
 from numpy.testing import assert_allclose
 
-from emg3d import meshes, models, fields, utils, io, surveys, simulations
+import emg3d
+from emg3d import io
+
+from . import helpers
 
 # Soft dependencies
 try:
@@ -16,58 +18,34 @@ except ImportError:
     xarray = None
 
 
-def create_dummy(nx, ny, nz, imag=True):
-    """Return complex dummy arrays of shape nx*ny*nz.
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    if imag:
-        out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
-    else:
-        out = np.arange(1, nx*ny*nz+1)
-    return out.reshape(nx, ny, nz)
-
-
 def test_save_and_load(tmpdir, capsys):
 
     # Create some dummy data
-    grid = meshes.TensorMesh(
+    grid = emg3d.meshes.TensorMesh(
             [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
             np.zeros(3))
 
-    # TensorMesh grid to 'simulate' discretize TensorMesh without `to_dict`.
-    class TensorMesh:
-        pass
-
-    grid2 = TensorMesh()
-    grid2.h = grid.h
-    grid2.origin = grid.origin
-
-    grid3 = TensorMesh()  # "Broken" mesh
-    grid3.origin = grid.origin
+    # TODO Add conditional discretize test, if installed
+    # grid2 = discretize.TensorMesh()
 
     # Some field.
-    field = fields.Field(grid)
+    field = emg3d.Field(grid)
     ne = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
     field.field = np.arange(ne)+1j*np.ones(ne)
 
     # Some model.
-    property_x = create_dummy(*grid.shape_cells, False)
+    property_x = helpers.dummy_field(*grid.shape_cells, False)
     property_y = property_x/2.0
     property_z = property_x*1.4
     mu_r = property_x*1.11
-    model = models.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
+    model = emg3d.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
 
     # Save it.
-    with pytest.warns(UserWarning, match="Could not serialize"):
-        io.save(tmpdir+'/test.npz', emg3d=grid, discretize=grid2, model=model,
-                broken=grid3, a=None, b=True,
-                field=field, what={'f': field.fx, 12: 12})
+    io.save(tmpdir+'/test.npz', emg3d=grid, model=model,  # discretize=grid2,
+            a=None, b=True, field=field, what={'f': field.fx, 12: 12})
     outstr, _ = capsys.readouterr()
     assert 'Data saved to «' in outstr
-    assert utils.__version__ in outstr
+    assert emg3d.__version__ in outstr
 
     # Save it with other verbosity.
     _, _ = capsys.readouterr()
@@ -82,12 +60,12 @@ def test_save_and_load(tmpdir, capsys):
     outstr, _ = capsys.readouterr()
     assert 'Data loaded from «' in outstr
     assert 'test.npz' in outstr
-    assert utils.__version__ in outstr
+    assert emg3d.__version__ in outstr
 
     assert out_npz['model'] == model
     assert_allclose(field.fx, out_npz['field'].fx)
     assert_allclose(grid.cell_volumes, out_npz['emg3d'].cell_volumes)
-    assert_allclose(grid.cell_volumes, out_npz['discretize'].cell_volumes)
+    # assert_allclose(grid.cell_volumes, out_npz['discretize'].cell_volumes)
     assert_allclose(out_npz['what']['f'], field.fx)
     assert out_npz['b'] is True
 
@@ -122,7 +100,7 @@ def test_save_and_load(tmpdir, capsys):
 
     # Test h5py.
     if h5py:
-        io.save(tmpdir+'/test.h5', emg3d=grid, discretize=grid2,
+        io.save(tmpdir+'/test.h5', emg3d=grid,  # discretize=grid2,
                 a=1.0, b=1+1j, c=True,
                 d=['1', '2', '3'],
                 model=model, field=field, what={'f': field.fx})
@@ -134,11 +112,11 @@ def test_save_and_load(tmpdir, capsys):
         assert out_h5['d'] == ['1', '2', '3']
         assert_allclose(field.fx, out_h5['field'].fx)
         assert_allclose(grid.cell_volumes, out_h5['emg3d'].cell_volumes)
-        assert_allclose(grid.cell_volumes, out_h5['discretize'].cell_volumes)
+        # assert_allclose(grid.cell_volumes, out_h5['discretize'].cell_volumes)
         assert_allclose(out_h5['what']['f'], field.fx)
 
         # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO
-        # assert io._compare_dicts(out_h5, out_npz) is True
+        # assert helpers.compare_dicts(out_h5, out_npz) is True
     else:
         with pytest.raises(ImportError):
             io.save(tmpdir+'/test.h5', grid=grid)
@@ -146,7 +124,7 @@ def test_save_and_load(tmpdir, capsys):
             io.load(str(tmpdir+'/test-h5.h5'))
 
     # Test json.
-    io.save(tmpdir+'/test.json', emg3d=grid, discretize=grid2,
+    io.save(tmpdir+'/test.json', emg3d=grid,  # discretize=grid2,
             a=1.0, b=1+1j, model=model, field=field, what={'f': field.fx})
     out_json = io.load(str(tmpdir+'/test.json'))
     assert out_json['model'] == model
@@ -154,67 +132,20 @@ def test_save_and_load(tmpdir, capsys):
     assert out_json['b'] == 1+1j
     assert_allclose(field.fx, out_json['field'].fx)
     assert_allclose(grid.cell_volumes, out_json['emg3d'].cell_volumes)
-    assert_allclose(grid.cell_volumes, out_json['discretize'].cell_volumes)
+    # assert_allclose(grid.cell_volumes, out_json['discretize'].cell_volumes)
     assert_allclose(out_json['what']['f'], field.fx)
 
     # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO
-    # assert io._compare_dicts(out_json, out_npz) is True
-
-
-def test_compare_dicts(capsys):
-    # Create test data
-    grid = meshes.TensorMesh(
-            [np.array([100, 4]), np.array([100, 8]), np.array([100, 16])],
-            np.zeros(3))
-
-    model = models.Model(grid, property_x=1., property_y=2.,
-                         property_z=3., mu_r=4.)
-
-    e1 = create_dummy(*grid.shape_edges_x)
-    e2 = create_dummy(*grid.shape_edges_y)
-    e3 = create_dummy(*grid.shape_edges_z)
-    field = np.r_[e1.ravel('F'), e2.ravel('F'), e3.ravel('F')]
-    ee = fields.Field(grid, field, frequency=.938)
-
-    dict1 = io._dict_serialize(
-            {'model': model, 'grid': grid, 'field': ee,
-             'a': 1, 'b': None, 'c': 1e-9+1j*1e13,
-             'd': {'aa': np.arange(10), 'bb': np.sqrt(1.0),
-                   'cc': {'another': 1}, 'dd': None}
-             },
-            )
-
-    dict2 = dc(dict1)
-    assert io._compare_dicts(dict1, dict2)
-
-    del dict1['d']['bb']
-    del dict2['field']
-    del dict2['model']['mu_r']
-    dict2['grid']['hy'] *= 2
-    dict2['whatever'] = 'whatever'
-    dict2['2onlydict'] = {'booh': 12}
-
-    out = io._compare_dicts(dict1, dict2, True)
-    assert out is False
-    outstr, _ = capsys.readouterr()
-    print(80*'=')
-    print(outstr)
-    print(80*'=')
-    assert " True  :: model      > property_x" in outstr
-    assert "  {1}  ::              mu_r" in outstr
-    assert " False ::              hy" in outstr
-    assert " True  ::              cc         > another" in outstr
-    assert "  {2}  :: d          > bb" in outstr
-    assert "  {2}  :: 2onlydict" in outstr
+    # assert helpers.compare_dicts(out_json, out_npz) is True
 
 
 def test_known_classes(tmpdir):
 
     frequency = 1.0
-    grid = meshes.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
-    field = fields.Field(grid)
-    model = models.Model(grid, 1)
-    pointdip = surveys.Dipole((0, 1000, -950, 0, 0))
+    grid = emg3d.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
+    field = emg3d.Field(grid)
+    model = emg3d.Model(grid, 1)
+    pointdip = emg3d.TxElectricDipole((0, 1000, -950, 0, 0))
 
     out = {
         'TensorMesh': grid,
@@ -224,9 +155,9 @@ def test_known_classes(tmpdir):
     }
 
     if xarray:
-        survey = surveys.Survey((0, 1000, -950, 0, 0),
-                                (-0.5, 0.5, 1000, 1000, -950, -950), frequency)
-        simulation = simulations.Simulation(
+        survey = emg3d.Survey((-0.5, 0.5, 1000, 1000, -950, -950),
+                              (0, 1000, -950, 0, 0), frequency)
+        simulation = emg3d.Simulation(
                 survey, grid, model, gridding='same')
         out['Survey'] = survey
         out['Simulation'] = simulation

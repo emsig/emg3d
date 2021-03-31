@@ -1,3 +1,4 @@
+import sys
 import pytest
 import numpy as np
 import scipy.linalg as sl
@@ -7,26 +8,19 @@ from numpy.testing import assert_allclose
 
 from emg3d import solver, core, meshes, models, fields, io
 
-from . import alternatives
-from .test_meshes import get_h
+from . import alternatives, helpers
+
+pytestmark = pytest.mark.skipif(sys.platform == 'win32',
+                                reason="does not run on windows")
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
-
-
-def create_dummy(nx, ny, nz):
-    """Return complex dummy arrays of shape (nx, ny, nz).
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
-    return out.reshape(nx, ny, nz)
+if sys.platform != 'win32':
+    REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 class TestSolve:
-
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_homogeneous(self, capsys):
         # Regression test for homogeneous halfspace.
         dat = REGRES['res']
@@ -161,6 +155,8 @@ class TestSolve:
         assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
         assert np.linalg.norm(efield.field) == 0.0
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_heterogeneous(self, capsys):
         # Regression test for heterogeneous case.
         dat = REGRES['reg_2']
@@ -203,13 +199,15 @@ class TestSolve:
         mesh = meshes.TensorMesh(
                 [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
                 origin=np.array([-0.5, -1, -1]))
-        sfield = alternatives.get_source_field(mesh, [0, 0, 0, 0, 0], 1)
+        sfield = alternatives.alt_get_source_field(mesh, [0, 0, 0, 0, 0], 1)
         model = models.Model(mesh)
         _ = solver.solve(model, sfield, plain=True, verb=4, nu_pre=0)
         out, _ = capsys.readouterr()
         assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
         assert "DIVERGED" in out
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_log(self, capsys):
         dat = REGRES['res']
 
@@ -236,6 +234,8 @@ class TestSolve:
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in out
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in info['log']
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_laplace(self, ):
         # Regression test for homogeneous halfspace in Laplace domain.
         # Not very sophisticated; replace/extend by more detailed tests.
@@ -259,16 +259,29 @@ class TestSolve:
         assert_allclose(dat['bicresult'].field, efield.field, atol=1e-14)
 
         # If efield is complex, assert it fails.
-        efield = fields.Field(grid, dtype=np.complex_)
+        efield = fields.Field(grid, dtype=np.complex128)
 
         with pytest.raises(ValueError, match='Source field and electric fiel'):
             efield = solver.solve(model, sfield, plain=True, efield=efield)
+
+
+@pytest.mark.skipif(sys.platform == 'win32',
+                    reason="does not run on windows")
+def test_solve_source():
+    dat = REGRES['res']
+    model = models.Model(**dat['input_model'])
+    efield = solver.solve_source(
+            model=model, source=dat['input_source']['source'],
+            frequency=dat['input_source']['frequency'], plain=True)
+    assert_allclose(dat['Fresult'].field, efield.field)
 
 
 class TestMultigrid:
     # Everything should be tested just fine in `test_solver`. Just check here
     # that all code is reached.
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_basic(self, capsys):
         # This should reach every line of solver.multigrid.
         dat = REGRES['res']
@@ -296,6 +309,8 @@ class TestKrylov:
     # Everything should be tested just fine in `test_solver`. Just check here
     # for bicgstab-error, and that all code is reached.
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_bicgstab_error(self, capsys):
         # Load any case.
         dat = REGRES['res']
@@ -320,6 +335,8 @@ class TestKrylov:
         out, _ = capsys.readouterr()
         assert '* ERROR   :: Error in bicgstab' in out
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_cycle_gcrotmk(self, capsys):
 
         # Load any case.
@@ -343,6 +360,8 @@ class TestKrylov:
         out, _ = capsys.readouterr()
         assert 'DIVERGED' in out
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_cycle(self, capsys):
 
         # Load any case.
@@ -387,7 +406,8 @@ def test_smoothing():
 
     nu = 2
 
-    widths = [np.ones(2)*100, get_h(10, 27, 10, 1.1), get_h(2, 1, 50, 1.2)]
+    widths = [np.ones(2)*100, helpers.widths(10, 27, 10, 1.1),
+              helpers.widths(2, 1, 50, 1.2)]
     origin = [-w.sum()/2 for w in widths]
     src = [0, -10, -10, 43, 13]
 
@@ -471,11 +491,11 @@ class TestRestrictionProlongation:
         # Get volume-averaged model parameters.
         vmodel = models.VolumeModel(model, sfield)
 
-        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+        rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
-        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+        ry = np.arange(sfield.fy.size, dtype=np.complex128).reshape(
                 sfield.fy.shape)
-        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+        rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
         rr = fields.Field(grid, field)
@@ -524,11 +544,11 @@ class TestRestrictionProlongation:
         # Get volume-averaged model parameters.
         vmodel = models.VolumeModel(model, sfield)
 
-        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+        rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
-        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+        ry = np.arange(sfield.fy.size, dtype=np.complex128).reshape(
                 sfield.fy.shape)
-        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+        rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
         rr = fields.Field(grid, field)
@@ -582,11 +602,11 @@ class TestRestrictionProlongation:
         # Get volume-averaged model parameters.
         vmodel = models.VolumeModel(model, sfield)
 
-        rx = np.arange(sfield.fx.size, dtype=np.complex_).reshape(
+        rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
-        ry = np.arange(sfield.fy.size, dtype=np.complex_).reshape(
+        ry = np.arange(sfield.fy.size, dtype=np.complex128).reshape(
                 sfield.fy.shape)
-        rz = np.arange(sfield.fz.size, dtype=np.complex_).reshape(
+        rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
         rr = fields.Field(grid, field)
@@ -631,7 +651,7 @@ def test_residual():
     # Create a grid
     src = [90, 1600, 25., 45, 45]
     grid = meshes.TensorMesh(
-        [get_h(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
+        [helpers.widths(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
         origin=np.zeros(3))
 
     # Create some resistivity model

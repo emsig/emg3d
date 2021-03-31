@@ -95,24 +95,25 @@ resulting system of equations is
 .. math::
     :label: fdomain
 
-    -s \mu_0(\sigma + s\varepsilon) \mathbf{\hat{E}} - \nabla \times
-    \mu_r^{-1} \nabla \times \mathbf{\hat{E}} =
-    s\mu_0\mathbf{\hat{J}}_s ,
+    \mathrm{i}\omega \mu_0(\sigma - \mathrm{i}\omega\varepsilon)
+    \mathbf{\hat{E}} -
+    \nabla \times \mu_r^{-1} \nabla \times \mathbf{\hat{E}} =
+    -\mathrm{i}\omega\mu_0\mathbf{\hat{J}}_s .
 
-where :math:`s = -\mathrm{i}\omega``. The multigrid method converges in the
-case of the diffusive approximation (with its smoothing and approximation
-properties), but not in the high-frequency range (at least not in the
-implemented form of the multigrid method in ``emg3d``). The code ``emg3d``
-assumes therefore the diffusive approximation, hence only low frequencies are
-considered that obey :math:`|\omega\varepsilon| \ll \sigma`. In this case we
-can set :math:`\varepsilon=0`, and Equation :eq:`fdomain` simplifies to
+The multigrid method converges in the case of the diffusive approximation (with
+its smoothing and approximation properties), but not in the high-frequency
+range (at least not in the implemented form of the multigrid method in
+``emg3d``). The code ``emg3d`` assumes therefore the diffusive approximation,
+hence only low frequencies are considered that obey :math:`|\omega\varepsilon|
+\ll \sigma`. In this case we can set :math:`\varepsilon=0`, and Equation
+:eq:`fdomain` simplifies to
 
 .. math::
     :label: fdomaindiff
 
-    -s \mu_0 \sigma \mathbf{\hat{E}} - \nabla \times
+    \mathrm{i}\omega \mu_0 \sigma \mathbf{\hat{E}} - \nabla \times
     \mu_r^{-1} \nabla \times \mathbf{\hat{E}} =
-    s\mu_0\mathbf{\hat{J}}_s ,
+    -\mathrm{i}\omega\mu_0\mathbf{\hat{J}}_s ,
 
 
 From here on, the hats are omitted. We use the perfectly electrically
@@ -123,7 +124,6 @@ conducting boundary
 
     \mathbf{n}\times\mathbf{E} = 0 \quad \text{and} \quad
     \mathbf{n}\cdot\mathbf{H} = 0 ,
-     \label{eq:sample}
 
 where :math:`\mathbf{n}` is the outward normal on the boundary of the domain.
 
@@ -135,17 +135,25 @@ transform.
 .. note::
 
     [Muld06]_ uses the time convention :math:`e^{-\mathrm{i}\omega t}`, see
-    Equation :eq:`fourierdef`, with :math:`s=-\mathrm{i}\omega`. However, the
-    code `emg3d` uses the convention :math:`e^{\mathrm{i}\omega t}`, hence
-    :math:`s=\mathrm{i}\omega`. This is the same convention as used in
-    `empymod`, and commonly in CSEM.
+    Equation :eq:`fourierdef`. However, the code ``emg3d`` uses the convention
+    :math:`e^{\mathrm{i}\omega t}`. This is the same convention as used in
+    ``empymod`` and generally in the CSEM community. This change in Fourier
+    convention can be simply obtained in these equations by replacing
+    :math:`-\mathrm{i}\omega` with :math:`+\mathrm{i}\omega`.
+    Equation :eq:`fdomain`, for instance, becomes
 
+    .. math::
+
+        -\mathrm{i}\omega \mu_0(\sigma + \mathrm{i}\omega\varepsilon)
+        \mathbf{\hat{E}} -
+        \nabla \times \mu_r^{-1} \nabla \times \mathbf{\hat{E}} =
+        \mathrm{i}\omega\mu_0\mathbf{\hat{J}}_s .
 
 Laplace domain
 ``````````````
 It is also possible to solve the problem in the **Laplace domain**, by
 using a real value for :math:`s` in Equation :eq:`fdomaindiff`, instead of the
-complex value :math:`-\mathrm{i}\omega``. This simplifies the problem from
+complex value :math:`\mathrm{i}\omega``. This simplifies the problem from
 complex numbers to real numbers, which accelerates the computation. It also
 improves the convergence rate, as the solution is a smoother function. The
 solver :func:`emg3d.solver.solve` is agnostic to the data type of the provided
@@ -209,11 +217,12 @@ The averages and point-values are the same within second-order accuracy.
    taking the curl of the electric field.
 
 
-For the discretisation of the term :math:`-s\mu_0\sigma\mathbf{E}` related to
-Ohm's law, dual volumes related to edges are introduced. For a given edge, the
-dual volume is a quarter of the total volume of the four adjacent cells. An
-example for :math:`E_1` is shown in :numref:`Figure %s(b) <Muld06_Fig2>`. The
-vertices of the dual cell are located at the midpoints of the cell faces.
+For the discretisation of the term
+:math:`\mathrm{i}\omega\mu_0\sigma\mathbf{E}` related to Ohm's law, dual
+volumes related to edges are introduced. For a given edge, the dual volume is a
+quarter of the total volume of the four adjacent cells. An example for
+:math:`E_1` is shown in :numref:`Figure %s(b) <Muld06_Fig2>`. The vertices of
+the dual cell are located at the midpoints of the cell faces.
 
 .. figure:: ../_static/Muld06_Fig2.png
    :scale: 100 %
@@ -281,9 +290,9 @@ the boundaries. We may simply take :math:`d^x_0 = h^x_{1/2}` at :math:`k = 0`,
 :math:`d^x_{N_x} = h^x_{N_x-1/2}` at :math:`k = N_x` and so on, or use half of
 these values as was done by [MoSu94]_.
 
-The discrete form of the term :math:`-s\mu_0\sigma\mathbf{E}` in Equation
-:eq:`fdomaindiff`, with each component multiplied by the corresponding dual
-volume, becomes :math:`\mathcal{S}_{k+1/2, l, m}\ E_{1, k+1/2, l, m}`,
+The discrete form of the term :math:`\mathrm{i}\omega\mu_0\sigma\mathbf{E}` in
+Equation :eq:`fdomaindiff`, with each component multiplied by the corresponding
+dual volume, becomes :math:`\mathcal{S}_{k+1/2, l, m}\ E_{1, k+1/2, l, m}`,
 :math:`\mathcal{S}_{k, l+1/2, m}\ E_{2, k, l+1/2, m}` and
 :math:`\mathcal{S}_{k, l, m+1/2}\ E_{3, k, l, m+1/2}` for the first, second and
 third components, respectively. Here :math:`\mathcal{S} = -s\mu_0\sigma V` is
@@ -413,7 +422,7 @@ solution to the problem be defined as
     :label: residualeq
 
     \mathbf{r} = V \left(\mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} +
-    -s\mu_0\sigma \mathbf{E} -
+    \mathrm{i}\omega\mu_0\sigma \mathbf{E} -
     \nabla \times \mu^{-1}_\mathrm{r} \nabla \times \mathbf{E}\right) .
 
 Its discretisation is

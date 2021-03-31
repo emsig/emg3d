@@ -2,10 +2,9 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from . import alternatives
-from .test_meshes import get_h
-
 from emg3d import solver, core, models, meshes, fields
+
+from . import alternatives, helpers
 
 
 @pytest.mark.parametrize("njit", [True, False])
@@ -19,7 +18,7 @@ def test_amat_x(njit):
 
     # Create a grid
     src = [200, 300, -50., 5, 60]
-    hx = get_h(8, 4, 100, 1.2)
+    hx = helpers.widths(8, 4, 100, 1.2)
     hy = np.ones(8)*800
     hz = np.ones(4)*500
     grid = meshes.TensorMesh(
@@ -95,9 +94,9 @@ def test_gauss_seidel(njit):
         nz = [4, 4, 1][lr_dir-1]
 
         # Get this grid.
-        hx = get_h(0, nx, 80, 1.1)
-        hy = get_h(0, ny, 100, 1.3)
-        hz = get_h(0, nz, 200, 1.2)
+        hx = helpers.widths(0, nx, 80, 1.1)
+        hy = helpers.widths(0, ny, 100, 1.3)
+        hz = helpers.widths(0, nz, 200, 1.2)
         grid = meshes.TensorMesh(
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
@@ -205,7 +204,7 @@ def test_solve(njit):
     # vector.
 
     # Create real symmetric matrix A.
-    avec_real = np.zeros(36, dtype=np.float_)
+    avec_real = np.zeros(36, dtype=np.float64)
     avec_real[::6] = np.array([100, 1, 1, 1, 2, 40])
     avec_real[1:-6:6] = np.array([2, 2, 2, 3, 3])
     avec_real[2:-12:6] = np.array([3, 10, 4, 4])
@@ -213,7 +212,7 @@ def test_solve(njit):
     avec_real[4:-24:6] = np.array([5, 6])
 
     # Create complex symmetric matrix A.
-    avec_complex = np.zeros(36, dtype=np.complex_)
+    avec_complex = np.zeros(36, dtype=np.complex128)
     avec_complex[::6] = np.array([100+100j, 1, 1, 1, 2, 40+3j])
     avec_complex[1:-6:6] = np.array([2, 2, 2+10j, 3, 3+6j])
     avec_complex[2:-12:6] = np.array([3j, 10+10j, 4, 4])
@@ -286,8 +285,8 @@ def test_restrict(njit):
     ffield.fz[1:-1, 1:-1, :] = 4
 
     # Get weigths
-    wlr = np.zeros(fgrid.shape_nodes[0], dtype=np.float_)
-    w0 = np.ones(fgrid.shape_nodes[0], dtype=np.float_)
+    wlr = np.zeros(fgrid.shape_nodes[0], dtype=np.float64)
+    w0 = np.ones(fgrid.shape_nodes[0], dtype=np.float64)
     fw = (wlr, w0, wlr)
 
     # # CASE 0 -- regular # #
@@ -480,9 +479,9 @@ def test_restrict_weights(njit):
     # 2. Test with stretched grid and compare with alternative formulation
 
     # Create a highly stretched, non-centered grid
-    hx = get_h(2, 2, 200, 1.8)
-    hy = get_h(0, 8, 800, 1.2)
-    hz = get_h(0, 4, 400, 1.4)
+    hx = helpers.widths(2, 2, 200, 1.8)
+    hy = helpers.widths(0, 8, 800, 1.2)
+    hz = helpers.widths(0, 4, 400, 1.4)
     grid = meshes.TensorMesh(
             [hx, hy, hz], np.array([-100000, 3000, 100]))
 

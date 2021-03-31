@@ -30,19 +30,9 @@ except ImportError:
     h5py = ("'.h5'-files require `h5py`. Install it via\n"
             "`pip install h5py` or `conda install -c conda-forge h5py`.")
 
-from emg3d import fields, models, utils, meshes, surveys, simulations
+from emg3d import meshes, utils
 
 __all__ = ['save', 'load']
-
-# Known classes to serialize and de-serialize.
-KNOWN_CLASSES = {
-    'Model': models.Model,
-    'Field': fields.Field,
-    'Survey': surveys.Survey,
-    'Dipole': surveys.Dipole,
-    'TensorMesh': meshes.TensorMesh,
-    'Simulation': simulations.Simulation,
-}
 
 
 def save(fname, **kwargs):
@@ -83,9 +73,9 @@ def save(fname, **kwargs):
 
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The classes listed in
-        `emg3d.io.KNOWN_CLASSES will be properly serialized: and de-serialized
-        again if loaded with :func:`load`. These instances are collected in
-        their own group if h5py is used.
+        `emg3d.utils.KNOWN_CLASSES` will be properly serialized: and
+        de-serialized again if loaded with :func:`load`. These instances are
+        collected in their own group if h5py is used.
 
         Note that the provided data cannot contain the before described
         parameters as keys.
@@ -107,8 +97,8 @@ def save(fname, **kwargs):
 
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
-    kwargs['_version'] = 'emg3d v' + utils.__version__
-    kwargs['_format'] = '0.13.0'  # File format; version of emg3d when changed.
+    kwargs['_version'] = f"emg3d v{utils.__version__}"
+    kwargs['_format'] = "0.13.0"  # File format; version of emg3d when changed.
 
     # Get hierarchical dictionary with serialized and
     # sorted TensorMesh, Field, and Model instances.
@@ -158,7 +148,7 @@ def save(fname, **kwargs):
 def load(fname, **kwargs):
     """Load meshes, models, fields, and other data from disk.
 
-    Load and de-serialize classes listed in `emg3d.io.KNOWN_CLASSES`
+    Load and de-serialize classes listed in `emg3d.utils.KNOWN_CLASSES`
     and add arbitrary other data that were saved with :func:`save`.
 
 
@@ -260,8 +250,8 @@ def _dict_serialize(inp, out=None):
     """Serialize emg3d-classes and other objects in inp-dict.
 
     Returns a serialized dictionary <out> of <inp>, where all members of
-    `emg3d.io.KNOWN_CLASSES` are serialized with their respective `to_dict()`
-    methods.
+    `emg3d.utils.KNOWN_CLASSES` are serialized with their respective
+    `to_dict()` methods.
 
     Any other (non-emg3d) object can be added too, as long as it knows how to
     serialize itself.
@@ -306,29 +296,13 @@ def _dict_serialize(inp, out=None):
 
         # Take care of the following instances
         # (if we are in the root-directory they get their own category):
-        if (isinstance(value, tuple(KNOWN_CLASSES.values())) or
-                hasattr(value, 'origin')):
+        if isinstance(value, tuple(utils.KNOWN_CLASSES.values())):
 
-            # Name of the instance
-            name = value.__class__.__name__
+            # Workaround for discretize.TensorMesh (store as emg3d.TensorMesh)
+            if hasattr(value, 'face_areas'):
+                value = meshes.TensorMesh(value.h, value.origin)
 
-            # Workaround for discretize.TensorMesh -> stored as if TensorMesh.
-            if hasattr(value, 'to_dict'):
-                to_dict = value.to_dict()
-            else:
-
-                try:
-                    to_dict = {'hx': value.h[0], 'hy': value.h[1],
-                               'hz': value.h[2],
-                               'origin': value.origin, '__class__': name}
-                except AttributeError as e:  # Gracefully fail.
-                    # Print is always shown and simpler, warn for the CLI logs.
-                    msg = f"Could not serialize <{key}>: {e}"
-                    print(f"* WARNING :: {msg}")
-                    warnings.warn(msg, UserWarning)
-                    continue
-
-            value = to_dict
+            value = value.to_dict()
 
         # Initiate if necessary.
         if key not in out.keys():
@@ -353,7 +327,7 @@ def _dict_deserialize(inp, first_call=True):
     """De-serialize emg3d-classes and other objects in inp-dict.
 
     De-serializes in-place dictionary <inp>, where all members of
-    `emg3d.io.KNOWN_CLASSES` are de-serialized with their respective
+    `emg3d.utils.KNOWN_CLASSES` are de-serialized with their respective
     `from_dict()` methods. It also converts back `'NoneType'`-strings to
     `None`, and `np.bool_` to `bool`.
 
@@ -380,7 +354,7 @@ def _dict_deserialize(inp, first_call=True):
 
                 # De-serialize, overwriting all the existing entries.
                 try:
-                    inst = KNOWN_CLASSES[value['__class__']]
+                    inst = utils.KNOWN_CLASSES[value['__class__']]
                     inp[key] = inst.from_dict(value)
                     continue
 
@@ -655,97 +629,3 @@ def _hdf5_get_from(h5file):
             data[key] = _hdf5_get_from(value)
 
     return data
-
-
-def _compare_dicts(dict1, dict2, verb=False, **kwargs):
-    """Return True if the two dicts `dict1` and `dict2` are the same.
-
-    Private method, not foolproof. Useful for developing new extensions.
-
-    If `verb=True`, it prints it key starting with the following legend:
-
-      - True : Values are the same.
-      - False : Values are not the same.
-      - {1} : Key is only in dict1 present.
-      - {2} : Key is only in dict2 present.
-
-    Private keys (starting with an underscore) are ignored.
-
-
-    Parameters
-    ----------
-    dict1, dict2 : dicts
-        Dictionaries to compare.
-
-    verb : bool
-        If True, prints all keys and if they are the  same for that key.
-
-    kwargs : dict
-        For recursion.
-
-
-    Returns
-    -------
-    same : bool
-        True if dicts are the same, False otherwise.
-
-    """
-    # Get recursion kwargs.
-    s = kwargs.pop('s', '')
-    reverse = kwargs.pop('reverse', False)
-    gsame = kwargs.pop('gsame', True)
-
-    # Check if we are at the base level and in reverse mode or not.
-    do_reverse = len(s) == 0 and reverse is False
-
-    # Loop over key-value pairs.
-    for key, value in dict1.items():
-
-        # Recursion if value is dict and present in both dicts.
-        if isinstance(value, dict) and key in dict2.keys():
-
-            # Add current key to string.
-            s += f"{key[:10]:11}> "
-
-            # Recursion.
-            _compare_dicts(dict1[key], dict2[key], verb=verb, s=s,
-                           reverse=reverse, gsame=gsame)
-
-            # Remove current key.
-            s = s[:-13]
-
-        elif key.startswith('_'):  # Ignoring private keys.
-            pass
-
-        else:  # Do actual comparison.
-
-            # Check if key in both dicts.
-            if key in dict2.keys():
-
-                # If reverse, the key has already been checked.
-                if reverse is False:
-
-                    # Compare.
-                    same = np.all(value == dict2[key])
-
-                    # Update global bool.
-                    gsame *= same
-
-                    if verb:
-                        print(f"{bool(same)!s:^7}:: {s}{key}")
-
-                    # Clean string.
-                    s = len(s)*' '
-
-            else:  # If only in one dict -> False.
-
-                gsame = False
-
-                if verb:
-                    print(f"  {{{2 if reverse else 1}}}  :: {s}{key}")
-
-    # Do the same reverse, do check for keys in dict2 which are not in dict1.
-    if do_reverse:
-        gsame = _compare_dicts(dict2, dict1, verb, reverse=True, gsame=gsame)
-
-    return gsame

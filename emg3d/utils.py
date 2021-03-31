@@ -55,6 +55,16 @@ except ImportError:
 __all__ = ['Fourier', 'Time', 'Report', 'EMArray']
 
 
+# List of known classes for (de-)serialization
+KNOWN_CLASSES = {}
+
+
+def known_class(func):
+    """Decorator to register class as known for I/O."""
+    KNOWN_CLASSES[func.__name__] = func
+    return func
+
+
 # SOFT DEPENDENCIES CHECK
 def _requires(*args, **kwargs):
     """Decorator to wrap functions with extra dependencies.

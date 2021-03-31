@@ -1,6 +1,7 @@
 import os
 import pytest
 import numpy as np
+from os.path import join, sep
 from numpy.testing import assert_allclose
 from contextlib import suppress, ContextDecorator
 
@@ -67,18 +68,20 @@ def test_basic(script_runner):
     assert emg3d.utils.Report().__repr__()[115:475] in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - I.
-    ret = script_runner.run('python', 'emg3d/cli/main.py', '--version')
+    ret = script_runner.run(
+            'python', join('emg3d', 'cli', 'main.py'), '--version')
     assert ret.success
     assert "emg3d v" in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - II.
-    ret = script_runner.run('python', 'emg3d/cli/main.py', '--report')
+    ret = script_runner.run(
+            'python', join('emg3d', 'cli', 'main.py'), '--report')
     assert ret.success
     # Exclude time to avoid errors.
     assert emg3d.utils.Report().__repr__()[115:475] in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - III.
-    ret = script_runner.run('python', 'emg3d/cli/main.py', '-d')
+    ret = script_runner.run('python', join('emg3d', 'cli', 'main.py'), '-d')
     assert not ret.success
     assert "* ERROR   :: Config file not found: " in ret.stderr
 
@@ -116,10 +119,10 @@ class TestParser:
 
         # Check some default values.
         assert term['function'] == 'forward'
-        assert cfg['files']['survey'] == tmpdir+'/survey.h5'
-        assert cfg['files']['model'] == tmpdir+'/model.h5'
-        assert cfg['files']['output'] == tmpdir+'/emg3d_out.h5'
-        assert cfg['files']['log'] == tmpdir+'/emg3d_out.log'
+        assert cfg['files']['survey'] == join(tmpdir, 'survey.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'model.h5')
+        assert cfg['files']['output'] == join(tmpdir, 'emg3d_out.h5')
+        assert cfg['files']['log'] == join(tmpdir, 'emg3d_out.log')
 
         # Provide file names
         args_dict = self.args_dict.copy()
@@ -128,9 +131,9 @@ class TestParser:
         args_dict['output'] = 'out.npz'
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['files']['survey'] == tmpdir+'/test.h5'
-        assert cfg['files']['model'] == tmpdir+'/unkno.h5'
-        assert cfg['files']['output'] == tmpdir+'/out.npz'
+        assert cfg['files']['survey'] == join(tmpdir, 'test.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'unkno.h5')
+        assert cfg['files']['output'] == join(tmpdir, 'out.npz')
 
         # .-trick.
         args_dict = self.args_dict.copy()
@@ -142,7 +145,7 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = 'bla'
         _, term = cli.parser.parse_config_file(args_dict)
-        assert '/bla' in term['config_file']
+        assert sep + 'bla' in term['config_file']
 
     def test_term_various(self, tmpdir):
 
@@ -160,10 +163,10 @@ class TestParser:
         assert term['dry_run'] is True
         assert term['function'] == 'gradient'
         assert cfg['simulation_options']['max_workers'] == 1
-        assert cfg['files']['survey'] == tmpdir+'/testit.h5'
-        assert cfg['files']['model'] == tmpdir+'/model.json'
-        assert cfg['files']['output'] == tmpdir+'/output.npz'
-        assert cfg['files']['log'] == tmpdir+'/output.log'
+        assert cfg['files']['survey'] == join(tmpdir, 'testit.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'model.json')
+        assert cfg['files']['output'] == join(tmpdir, 'output.npz')
+        assert cfg['files']['log'] == join(tmpdir, 'output.log')
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             args_dict = self.args_dict.copy()
@@ -185,10 +188,10 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['files']['survey'] == tmpdir+'/testit.json'
-        assert cfg['files']['model'] == tmpdir+'/thismodel.h5'
-        assert cfg['files']['output'] == tmpdir+'/results.npz'
-        assert cfg['files']['log'] == tmpdir+'/results.log'
+        assert cfg['files']['survey'] == join(tmpdir, 'testit.json')
+        assert cfg['files']['model'] == join(tmpdir, 'thismodel.h5')
+        assert cfg['files']['output'] == join(tmpdir, 'results.npz')
+        assert cfg['files']['log'] == join(tmpdir, 'results.log')
         assert cfg['files']['store_simulation'] is False
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
@@ -420,12 +423,12 @@ class TestRun:
         # Missing output directory.
         args_dict = self.args_dict.copy()
         args_dict['path'] = tmpdir
-        args_dict['output'] = 'phantom/output/dir.npz'
+        args_dict['output'] = join('phantom', 'output', 'dir.npz')
         with pytest.raises(SystemExit) as e:
             cli.run.simulation(args_dict)
         assert e.type == SystemExit
         assert "* ERROR   :: Output directory does not exist: " in e.value.code
-        assert "phantom/output" in e.value.code
+        assert join("phantom", "output") in e.value.code
 
     def test_run(self, tmpdir, capsys):
 

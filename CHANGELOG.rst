@@ -30,6 +30,17 @@ TODO: What is stable (most), what is still *experimental* (``utils.Fourier``,
 Detailed changes
 ''''''''''''''''
 
+**Electrodes**
+
+- New module containing all sources and receivers.
+- ``dip`` is new called ``elevation`` to make it clear that it is the angle
+  positive upwards (anticlockwise from the horizontal plane).
+- Bugfix of the loop area for a magnetic dipole (the area was previously wrong 
+  except for dipole length of 1).
+- Source strength cannot be zero.
+- New class ``TxElectricWire`` for an arbitrary electric wire.
+
+
 **Fields**
 
 - ``fields.Field``:
@@ -87,6 +98,9 @@ Detailed changes
 - Maps cannot be (de-)serialized any longer (``{to;from_dict}``); simply store
   its name, which can be provided to ``models.Model``.
 
+- Function ``rotation`` should be used for anything involving angles to use
+  the defined coordinate system consistently.
+
 
 **Meshes**
 
@@ -94,6 +108,7 @@ Detailed changes
 
   - ``_TensorMesh`` to ``BaseMesh``;
   - ``min_cell_width`` to ``cell_width``.
+  - ``get_origin_widths`` to ``origin_and_widths``.
 
 - ``meshes.BaseMesh``:
 
@@ -150,6 +165,10 @@ Detailed changes
 
     Level three updates now dynamically, just as level 2.
 
+- ``solver.solve_source``: New function, a shortcut for ``solver.solve``. It
+  takes a ``source`` and a ``frequency`` instead of a ``sfield``, gets the
+  ``sfield`` from it, and forwards everything to ``solver.solve``.
+
 - ``solver.RegularGridProlongator``:
 
   - Changed signature from ``x, y, cxy`` to ``cx, cy, x, y``; it now
@@ -182,9 +201,8 @@ Detailed changes
     coordinates.
   - ``data`` can be a dict containing many data set.
 
-- ``Dipole``:
-
-  - No ``name`` parameter any longer.
+- ``Dipole``: Replaced by the new source and receiver classes in the new module
+  ``electrodes``.
 
 
 0.x-Series
@@ -203,6 +221,8 @@ v0.17.0: Magnetics in Simulation
 
 - ``fields.get_source_field``:
 
+  - The recommended way to use ``get_source_field`` is new to provide a
+    ``Tx*``-source instance.
   - The ``msrc`` argument introduced in v0.16.0 is renamed to ``electric``, and
     has the opposite meaning. If True, the source is electric, if False, the
     source is magnetic. This was made to streamline the meaning with the

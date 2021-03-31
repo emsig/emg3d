@@ -36,12 +36,12 @@ import scipy.sparse.linalg as ssl
 
 from emg3d import core, meshes, models, fields, utils
 
-__all__ = ['solve', 'multigrid', 'krylov', 'smoothing', 'restriction',
-           'prolongation', 'residual', 'MGParameters',
+__all__ = ['solve', 'solve_source', 'multigrid', 'krylov', 'smoothing',
+           'restriction', 'prolongation', 'residual', 'MGParameters',
            'RegularGridProlongator']
 
 
-# MAIN USER-FACING FUNCTION
+# MAIN USER-FACING FUNCTIONS
 def solve(model, sfield, sslsolver=True, semicoarsening=True,
           linerelaxation=True, verb=0, **kwargs):
     r"""Solver for three-dimensional electromagnetic diffusion.
@@ -268,7 +268,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
        In [4]: # The source is a x-directed, horizontal dipole at (4, 4, 4)
           ...: # with a frequency of 10 Hz.
-          ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azm, dip)
+          ...: coo = (4, 4, 4, 0, 0)  # (x, y, z, azimuth, elevation)
           ...: sfield = emg3d.fields.get_source_field(
           ...:             grid, source=coo, frequency=10)
 
@@ -437,6 +437,24 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         return info_dict
 
 
+def solve_source(model, source, frequency, **kwargs):
+    """Return electric field for a given source and frequency.
+
+    This function is a simple shortcut for the following::
+
+       sfield = emg3d.get_source_field(grid, source, frequency, **kwargs)
+       efield = emg3d.solve(model, sfield, **kwargs)
+
+    See the documentation of :func:`emg3d.fields.get_source_field` for the
+    description of ``model``, ``source``, and ``frequency``, and
+    the documentation of :func:`emg3d.solver.solve` for all other
+    input and output parameters.
+
+    """
+    sfield = fields.get_source_field(model.grid, source, frequency)
+    return solve(model, sfield, **kwargs)
+
+
 # SOLVERS
 def multigrid(model, sfield, efield, var, **kwargs):
     """Multigrid solver for three-dimensional electromagnetic diffusion.
@@ -463,7 +481,6 @@ def multigrid(model, sfield, efield, var, **kwargs):
 
     sfield : Field
         The source field; a :class:`emg3d.fields.Field` instance.
-
 
     efield : Field
         The electric field; a :class:`emg3d.fields.Field` instance.
@@ -1183,7 +1200,7 @@ class MGParameters:
         # Store maximum division-by-two level for each dimension.
         # After that, clevel = [nx, ny, nz], where nx, ny, and nz are the
         # number of times you can divide by two in this dimension.
-        clevel = np.zeros(3, dtype=np.int_)
+        clevel = np.zeros(3, dtype=np.int64)
         for i in range(3):
             n = self.shape_cells[i]
             while n % 2 == 0 and n > 2:
@@ -1791,7 +1808,7 @@ def _print_cycle_info(var, l2_last, l2_prev):
     if var.first_cycle:
 
         # Cast levels into array, get maximum.
-        _lvl_all = np.array(var.level_all, dtype=np.int_)
+        _lvl_all = np.array(var.level_all, dtype=np.int64)
         lvl_max = np.max(_lvl_all)
 
         # Get levels, multiply by difference to get +/-.

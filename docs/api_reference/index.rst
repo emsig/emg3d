@@ -14,6 +14,7 @@ API reference
    :hidden:
 
    core
+   electrodes
    fields
    io
    maps

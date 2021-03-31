@@ -4,19 +4,7 @@ from numpy.testing import assert_allclose
 
 from emg3d import fields, meshes, models
 
-
-def create_dummy(nx, ny, nz, imag=True):
-    """Return complex dummy arrays of shape nx*ny*nz.
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    if imag:
-        out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
-    else:
-        out = np.arange(1, nx*ny*nz+1)
-    return out.reshape(nx, ny, nz)
+from . import helpers
 
 
 class TestModel:
@@ -29,7 +17,7 @@ class TestModel:
                 [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
                 np.zeros(3))
 
-        property_x = create_dummy(*grid.shape_cells, False)
+        property_x = helpers.dummy_field(*grid.shape_cells, False)
         property_y = property_x/2.0
         property_z = property_x*1.4
         mu_r = property_x*1.11
@@ -40,7 +28,7 @@ class TestModel:
         model1 = models.Model(grid)
 
         # Check representation of Model.
-        assert 'Model [resistivity]; isotropic' in model1.__repr__()
+        assert 'Model: resistivity; isotropic' in model1.__repr__()
 
         vmodel1 = models.VolumeModel(model1, sfield)
         assert_allclose(model1.size, grid.n_cells)
@@ -119,9 +107,9 @@ class TestModel:
 
         # Check eta
         iomep = sfield.sval*models.epsilon_0
-        eta_x = sfield.smu0*(1./model3.property_x + iomep)*gridvol
-        eta_y = sfield.smu0*(1./model3.property_y + iomep)*gridvol
-        eta_z = sfield.smu0*(1./model3.property_z + iomep)*gridvol
+        eta_x = -sfield.smu0*(1./model3.property_x - iomep)*gridvol
+        eta_y = -sfield.smu0*(1./model3.property_y - iomep)*gridvol
+        eta_z = -sfield.smu0*(1./model3.property_z - iomep)*gridvol
         vmodel3 = models.VolumeModel(model3, sfield)
         assert_allclose(vmodel3.eta_x, eta_x)
         assert_allclose(vmodel3.eta_y, eta_y)
@@ -161,7 +149,7 @@ class TestModel:
                 [np.array([2]), np.array([4]), np.array([5])],
                 np.array([1, 2, 2.5]))
 
-        property_x = create_dummy(*grid.shape_cells, False)
+        property_x = helpers.dummy_field(*grid.shape_cells, False)
         property_y = property_x/2.0
         property_z = property_x*1.4
         mu_r = property_x*1.11
@@ -418,6 +406,6 @@ class TestModelOperators:
             val = getattr(self.mod_tri_b, key)
             assert_allclose(mdict[key], val)
 
-        del mdict['property_x']
-        with pytest.raises(KeyError, match="'property_x'"):
+        del mdict['grid']
+        with pytest.raises(KeyError, match="'grid'"):
             models.Model.from_dict(mdict)

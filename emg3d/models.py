@@ -22,12 +22,13 @@ from copy import deepcopy
 import numpy as np
 from scipy.constants import epsilon_0
 
-from emg3d import maps, meshes
+from emg3d import maps, meshes, utils
 
 __all__ = ['Model', 'VolumeModel']
 
 
 # MODEL
+@utils.known_class
 class Model:
     r"""A model containing the electromagnetic properties of the Earth.
 
@@ -133,8 +134,8 @@ class Model:
 
     def __repr__(self):
         """Simple representation."""
-        return (f"Model [{self.map.description}]; {self.case}"
-                f"{'' if self.mu_r is None else '; mu_r'}"
+        return (f"{self.__class__.__name__}: {self.map.description}; "
+                f"{self.case}{'' if self.mu_r is None else '; mu_r'}"
                 f"{'' if self.epsilon_r is None else '; epsilon_r'}"
                 f"; {self.shape[0]} x {self.shape[1]} x {self.shape[2]} "
                 f"({self.size:,})")
@@ -213,13 +214,8 @@ class Model:
 
         """
         out = {
-            '__class__': self.__class__.__name__,
-            'grid': {
-                'hx': self.grid.h[0],
-                'hy': self.grid.h[1],
-                'hz': self.grid.h[2],
-                'origin': self.grid.origin,
-            },
+            '__class__': self.__class__.__name__,  # v ensure emg3d-TensorMesh
+            'grid': meshes.TensorMesh(self.grid.h, self.grid.origin).to_dict(),
             **{prop: getattr(self, prop) for prop in self._properties},
             'mapping': self.map.name,
         }
@@ -247,15 +243,9 @@ class Model:
             A :class:`emg3d.models.Model` instance.
 
         """
-        return cls(
-            grid=meshes.TensorMesh.from_dict(inp['grid']),
-            property_x=inp['property_x'],
-            property_y=inp['property_y'],
-            property_z=inp['property_z'],
-            mu_r=inp['mu_r'],
-            epsilon_r=inp['epsilon_r'],
-            mapping=inp['mapping'],
-        )
+        inp = {k: v for k, v in inp.items() if k != '__class__'}
+        MeshClass = getattr(meshes, inp['grid']['__class__'])
+        return cls(grid=MeshClass.from_dict(inp.pop('grid')), **inp)
 
     # ELECTRICAL PROPERTIES
     @property
@@ -493,12 +483,12 @@ class VolumeModel:
 
                 # Diffusive approximation.
                 if model.epsilon_r is None:
-                    eta = sfield.smu0*vol*cond
+                    eta = -sfield.smu0*vol*cond
 
                 # Complete version.
                 else:
-                    eta = sfield.smu0*vol*(
-                            cond - sfield.sval*epsilon_0*model.epsilon_r)
+                    eta = -sfield.smu0*vol*(
+                            cond + sfield.sval*epsilon_0*model.epsilon_r)
 
             setattr(self, '_eta_' + name[-1], eta)
 

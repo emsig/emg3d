@@ -37,11 +37,13 @@ except ImportError:
     # `emg3d.simulation.process_map = emg3d.utils._process_map`.
     from emg3d.utils import _process_map as process_map
 
-from emg3d import fields, solver, surveys, maps, models, meshes, optimize
+from emg3d import (fields, io, solver, surveys, maps, models, meshes, optimize,
+                   utils)
 
 __all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
 
 
+@utils.known_class
 class Simulation:
     """Create a simulation for a given survey on a given model.
 
@@ -388,8 +390,6 @@ class Simulation:
         obj : :class:`Simulation` instance
 
         """
-        from emg3d import io
-
         try:
 
             # gridding options, backwards compatible.
@@ -410,11 +410,12 @@ class Simulation:
                             gridding_opts[key] = out
 
             # Initiate class.
+            MeshClass = getattr(meshes, inp['grid']['__class__'])
             out = cls(
                     name=inp['name'],
-                    survey=surveys.Survey.from_dict(inp['survey']),
-                    grid=meshes.TensorMesh.from_dict(inp['grid']),
-                    model=models.Model.from_dict(inp['model']),
+                    survey=surveys.Survey.from_dict(inp['survey'].copy()),
+                    grid=MeshClass.from_dict(inp['grid'].copy()),
+                    model=models.Model.from_dict(inp['model'].copy()),
                     max_workers=inp['max_workers'],
                     gridding=gridding,
                     solver_opts=inp['solver_opts'],
@@ -483,13 +484,10 @@ class Simulation:
             Passed through to :func:`emg3d.io.save`.
 
         """
-        from emg3d import io
-
         # Add what to self, will be removed in to_dict.
         self._what_to_file = what
 
         kwargs[name] = self                # Add simulation to dict.
-        kwargs['collect_classes'] = False  # Ensure classes are not collected.
         # If verb is not defined, use verbosity of simulation.
         if 'verb' not in kwargs:
             kwargs['verb'] = self.verb
@@ -522,7 +520,6 @@ class Simulation:
             The simulation that was stored in the file.
 
         """
-        from emg3d import io
         out = io.load(fname, **kwargs)
         if 'verb' in kwargs and kwargs['verb'] < 0:
             return out[0][name], out[1]
@@ -571,9 +568,7 @@ class Simulation:
             if source not in self._grid_source.keys():
 
                 # Get grid and store it.
-                center = (self.survey.sources[source].xco,
-                          self.survey.sources[source].yco,
-                          self.survey.sources[source].zco)
+                center = self.survey.sources[source].center
                 inp = {**self.gridding_opts, 'center': center}
                 self._grid_source[source] = meshes.construct_mesh(**inp)
 
@@ -583,9 +578,7 @@ class Simulation:
         elif self.gridding == 'both':  # Src- & freq-dependent grids.
 
             # Get grid and store it.
-            center = (self.survey.sources[source].xco,
-                      self.survey.sources[source].yco,
-                      self.survey.sources[source].zco)
+            center = self.survey.sources[source].center
             inp = {**self.gridding_opts, 'frequency':
                    self.survey.frequencies[freq], 'center': center}
             self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
@@ -686,7 +679,7 @@ class Simulation:
                     source=src.coordinates,
                     frequency=self.survey.frequencies[freq],
                     strength=strength,
-                    electric=src.electric)
+                    electric=src.xtype == 'electric')
 
             self._dict_sfield[source][freq] = sfield
 
@@ -1172,12 +1165,9 @@ class Simulation:
             strength *= self.data.weights.loc[source, name, freq].data.conj()
             strength /= ResidualField.smu0
 
-            # Magnetic receivers: the adjoint gradient is formulated for the
-            # electric fields with ``S`` in Equation (1) of [PlMu08]_. For
-            # magnetic receivers we take M instead, which does not have the
-            # factor iwmu; we scale here the source strength accordingly.
-            # Or, because of loop (B not H).
-            if not rec.electric:
+            # Our data are from a magnetic point, but the source will be a
+            # loop, so we have to undo the factor smu0 here. (iwB vs H).
+            if rec.xtype != 'electric':
                 strength /= ResidualField.smu0
 
             # If strength is zero (very unlikely), get_source_field would
@@ -1189,7 +1179,7 @@ class Simulation:
                     source=rec.coordinates,
                     frequency=float_freq,
                     strength=strength,
-                    electric=rec.electric,
+                    electric=rec.xtype == 'electric',
                 ).field
 
         return ResidualField

@@ -22,14 +22,14 @@ from copy import deepcopy
 import numpy as np
 from scipy.constants import mu_0
 
-from emg3d import maps
+from emg3d import maps, utils
 
 try:
     import discretize
 except ImportError:
     discretize = None
 
-__all__ = ['BaseMesh', 'TensorMesh', 'construct_mesh', 'get_origin_widths',
+__all__ = ['TensorMesh', 'BaseMesh', 'construct_mesh', 'origin_and_widths',
            'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width']
 
 
@@ -80,6 +80,7 @@ class BaseMesh:
         self.n_edges_x = np.prod(self.shape_edges_x)
         self.n_edges_y = np.prod(self.shape_edges_y)
         self.n_edges_z = np.prod(self.shape_edges_z)
+        self.n_edges = self.n_edges_x + self.n_edges_y + self.n_edges_z
 
     def __repr__(self):
         """Simple representation."""
@@ -96,15 +97,16 @@ class BaseMesh:
         return self._cell_volumes
 
 
+@utils.known_class
 class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
     """A slightly modified version of :class:`discretize.TensorMesh`.
 
-    Adds a few attributes (``__eq__``, ``copy``, and ``{to;from}_dict``) to
-    :class:`discretize.TensorMesh`.
+    Adds a few custom attributes (``__eq__``, ``copy``, and ``{to;from}_dict``)
+    to :class:`discretize.TensorMesh`.
 
-    It falls back to a minimal TensorMesh if discretize is not installed.
-    Nothing fancy is possible with the minimal TensorMesh, particularly *no*
-    plotting.
+    It falls back to a minimal :class:`emg3d.meshes.BaseMesh` if discretize is
+    not installed. Nothing fancy is possible with the minimal TensorMesh,
+    particularly *no* plotting.
 
 
     Parameters
@@ -193,7 +195,8 @@ class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
             A :class:`emg3d.meshes.TensorMesh` instance.
 
         """
-        return cls(h=[inp['hx'], inp['hy'], inp['hz']], origin=inp['origin'])
+        inp = {k: v for k, v in inp.items() if k != '__class__'}
+        return cls(h=[inp.pop('hx'), inp.pop('hy'), inp.pop('hz')], **inp)
 
 
 def construct_mesh(frequency, properties, center, domain=None, vector=None,
@@ -478,9 +481,9 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                 kwargs[name] = value
 
     # Get origins and widths in all directions.
-    x0, hx, xinfo = get_origin_widths(**kwargs, **xparams)
-    y0, hy, yinfo = get_origin_widths(**kwargs, **yparams)
-    z0, hz, zinfo = get_origin_widths(**kwargs, **zparams)
+    x0, hx, xinfo = origin_and_widths(**kwargs, **xparams)
+    y0, hy, yinfo = origin_and_widths(**kwargs, **yparams)
+    z0, hz, zinfo = origin_and_widths(**kwargs, **zparams)
 
     # Throw message if no solution was found.
     if any([out is None for out in [x0, y0, z0]]):
@@ -500,7 +503,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     return mesh
 
 
-def get_origin_widths(frequency, properties, center, domain=None, vector=None,
+def origin_and_widths(frequency, properties, center, domain=None, vector=None,
                       seasurface=None, **kwargs):
     r"""Return origin and cell widths for given parameters.
 

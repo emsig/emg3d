@@ -317,7 +317,7 @@ def alt_volume_average(edges_x, edges_y, edges_z, values,
                 new_values[ix, iy, iz] /= hxyz
 
 
-def get_source_field(grid, src, freq, strength=0):
+def alt_get_source_field(grid, src, freq, strength=0):
     r"""Return the source field for point dipole sources."""
     # Cast some parameters.
     src = np.asarray(src, dtype=np.float64)
@@ -404,3 +404,74 @@ def get_source_field(grid, src, freq, strength=0):
     sfield.moment = moment
 
     return sfield
+
+
+def alt_get_magnetic_field(model, efield):
+    r"""Return magnetic field corresponding to provided electric field.
+
+    Retrieve the magnetic field :math:`\mathbf{H}` from the electric field
+    :math:`\mathbf{E}` using Farady's law, given by
+
+    .. math::
+
+        \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
+
+    Note that the magnetic field is defined on the faces of the grid, or on the
+    edges of the so-called dual grid. The grid of the returned magnetic field
+    is the dual grid and has therefore one cell less in each direction.
+
+
+    Parameters
+    ----------
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance.
+
+    efield : Field
+        The electric field; a :class:`emg3d.fields.Field` instance.
+
+
+    Returns
+    -------
+    hfield : Field
+        The magnetic field; a :class:`emg3d.fields.Field` instance.
+
+    """
+
+    # Carry out the curl (^ corresponds to differentiation axis):
+    # H_x = (E_z^1 - E_y^2)
+    e3d_hx = (np.diff(efield.fz, axis=1)/efield.grid.h[1][None, :, None] -
+              np.diff(efield.fy, axis=2)/efield.grid.h[2][None, None, :])
+    e3d_hx = e3d_hx[1:-1, :, :]
+
+    # H_y = (E_x^2 - E_z^0)
+    e3d_hy = (np.diff(efield.fx, axis=2)/efield.grid.h[2][None, None, :] -
+              np.diff(efield.fz, axis=0)/efield.grid.h[0][:, None, None])
+    e3d_hy = e3d_hy[:, 1:-1, :]
+
+    # H_z = (E_y^0 - E_x^1)
+    e3d_hz = (np.diff(efield.fy, axis=0)/efield.grid.h[0][:, None, None] -
+              np.diff(efield.fx, axis=1)/efield.grid.h[1][None, :, None])
+    e3d_hz = e3d_hz[:, :, 1:-1]
+
+    # Divide by averaged relative magnetic permeability, if not not None.
+    if model.mu_r is not None:
+
+        e3d_hx /= (model.mu_r[:-1, :, :] + model.mu_r[1:, :, :])/2.
+        e3d_hy /= (model.mu_r[:, :-1, :] + model.mu_r[:, 1:, :])/2.
+        e3d_hz /= (model.mu_r[:, :, :-1] + model.mu_r[:, :, 1:])/2.
+
+    # Create magnetic grid - cell centers become nodes.
+    grid = emg3d.meshes.TensorMesh(
+            [np.diff(efield.grid.cell_centers_x),
+             np.diff(efield.grid.cell_centers_y),
+             np.diff(efield.grid.cell_centers_z)],
+            (efield.grid.cell_centers_x[0],
+             efield.grid.cell_centers_y[0],
+             efield.grid.cell_centers_z[0]))
+
+    # Create a Field instance and divide by s*mu_0 and return.
+    new = np.r_[e3d_hx.ravel('F'), e3d_hy.ravel('F'), e3d_hz.ravel('F')]
+    new *= 1/efield.smu0
+
+    # Initiate and return.
+    return emg3d.Field(grid, data=new, frequency=efield._frequency)

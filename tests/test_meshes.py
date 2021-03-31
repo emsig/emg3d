@@ -1,3 +1,4 @@
+import sys
 from os.path import join, dirname
 
 import pytest
@@ -7,6 +8,9 @@ from numpy.testing import assert_allclose
 
 from emg3d import meshes, io
 
+pytestmark = pytest.mark.skipif(sys.platform == 'win32',
+                                reason="does not run on windows")
+
 # Import soft dependencies.
 try:
     import discretize
@@ -14,27 +18,8 @@ except ImportError:
     discretize = None
 
 # Data generated with create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data/regression.npz'))
-
-
-def get_h(ncore, npad, width, factor):
-    """Get cell widths for TensorMesh."""
-    pad = ((np.ones(npad)*np.abs(factor))**(np.arange(npad)+1))*width
-    return np.r_[pad[::-1], np.ones(ncore)*width, pad]
-
-
-def create_dummy(nx, ny, nz, imag=True):
-    """Return complex dummy arrays of shape nx*ny*nz.
-
-    Numbers are from 1..nx*ny*nz for the real part, and 1/100 of it for the
-    imaginary part.
-
-    """
-    if imag:
-        out = np.arange(1, nx*ny*nz+1) + 1j*np.arange(1, nx*ny*nz+1)/100.
-    else:
-        out = np.arange(1, nx*ny*nz+1)
-    return out.reshape(nx, ny, nz)
+if sys.platform != 'win32':
+    REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 def test_BaseMesh():
@@ -73,6 +58,8 @@ def test_BaseMesh():
 
 
 class TestTensorMesh:
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_TensorMesh(self):
         # Load mesh created with discretize.TensorMesh.
         grid = REGRES['grid']
@@ -95,7 +82,7 @@ class TestTensorMesh:
         cgrid = emg3dgrid.copy()
         assert_allclose(cgrid.cell_volumes, emg3dgrid.cell_volumes)
         dgrid = emg3dgrid.to_dict()
-        cdgrid = meshes.TensorMesh.from_dict(dgrid)
+        cdgrid = meshes.TensorMesh.from_dict(dgrid.copy())
         assert_allclose(cdgrid.cell_volumes, emg3dgrid.cell_volumes)
         del dgrid['hx']
         with pytest.raises(KeyError, match="'hx'"):
@@ -152,9 +139,9 @@ class TestConstructMesh:
         p = 9*mu_0
         c = (1, 2, 3)
         d = [-1, 1]
-        x0, hx = meshes.get_origin_widths(f, p, c[0], d, stretching=[1, 1.3])
-        y0, hy = meshes.get_origin_widths(f, p, c[1], d, stretching=[1.5, 1])
-        z0, hz = meshes.get_origin_widths(f, p, c[2], d, stretching=[1, 1])
+        x0, hx = meshes.origin_and_widths(f, p, c[0], d, stretching=[1, 1.3])
+        y0, hy = meshes.origin_and_widths(f, p, c[1], d, stretching=[1.5, 1])
+        z0, hz = meshes.origin_and_widths(f, p, c[2], d, stretching=[1, 1])
         m = meshes.construct_mesh(
                 f, [p, p, p, p], c, d, stretching=([1, 1.3], [1.5, 1], [1, 1]))
 
@@ -165,11 +152,11 @@ class TestConstructMesh:
 
     def test_compare_to_gow2(self):
         vz = np.arange(100)[::-1]*-20
-        x0, hx = meshes.get_origin_widths(
+        x0, hx = meshes.origin_and_widths(
                 0.77, [0.3, 1, 2], 0, [-1000, 1000], min_width_limits=[20, 40])
-        y0, hy = meshes.get_origin_widths(
+        y0, hy = meshes.origin_and_widths(
                 0.77, [0.3, 2, 1], 0, [-2000, 2000], min_width_limits=[20, 40])
-        z0, hz = meshes.get_origin_widths(
+        z0, hz = meshes.origin_and_widths(
                 0.77, [0.3, 2, 1e8], 0, vector=vz, min_width_limits=[20, 40])
         m = meshes.construct_mesh(
                 frequency=0.77,
@@ -186,11 +173,11 @@ class TestConstructMesh:
         assert_allclose(m.h[2], hz)
 
     def test_compare_to_gow3(self):
-        x0, hx = meshes.get_origin_widths(
+        x0, hx = meshes.origin_and_widths(
                 0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
-        y0, hy = meshes.get_origin_widths(
+        y0, hy = meshes.origin_and_widths(
                 0.2, [1.0, 2.0], 16, [-1234, 8956], min_width_limits=20)
-        z0, hz = meshes.get_origin_widths(
+        z0, hz = meshes.origin_and_widths(
                 0.2, [1.0, 3.0], -33.3333, [-100, 100], min_width_limits=20)
         m = meshes.construct_mesh(
                 frequency=0.2,
@@ -217,25 +204,25 @@ class TestConstructMesh:
         assert_allclose(m3.h[2], m4.h[2])
 
 
-class TestGetOriginWidths:
+class TestOriginAndWidths:
     def test_errors(self, capsys):
         with pytest.raises(TypeError, match='Unexpected '):
-            meshes.get_origin_widths(1, 1, 0, [-1, 1], unknown=True)
+            meshes.origin_and_widths(1, 1, 0, [-1, 1], unknown=True)
 
         with pytest.raises(ValueError, match="At least one of `domain`, `d"):
-            meshes.get_origin_widths(1, 1, 0)
+            meshes.origin_and_widths(1, 1, 0)
 
         with pytest.raises(ValueError, match="Provided vector MUST at least"):
-            meshes.get_origin_widths(1, 1, 0, [-1, 1], np.array([0, 1, 2]))
+            meshes.origin_and_widths(1, 1, 0, [-1, 1], np.array([0, 1, 2]))
 
         with pytest.raises(ValueError, match="The `seasurface` must be bigge"):
-            meshes.get_origin_widths(1, 1, 0, [-1, 1], seasurface=-2)
+            meshes.origin_and_widths(1, 1, 0, [-1, 1], seasurface=-2)
 
         # No suitable grid warning.
         with pytest.raises(RuntimeError, match="No suitable grid found; "):
-            meshes.get_origin_widths(1, 1, 0, [-100, 100], cell_numbers=[1, ])
+            meshes.origin_and_widths(1, 1, 0, [-100, 100], cell_numbers=[1, ])
 
-        out = meshes.get_origin_widths(
+        out = meshes.origin_and_widths(
                 1, 1, 0, [-100, 100], cell_numbers=[1, ], raise_error=False,
                 verb=1)
         outstr, _ = capsys.readouterr()
@@ -245,14 +232,14 @@ class TestGetOriginWidths:
         assert "No suitable grid found; relax your criteria." in outstr
 
         # Stretching warning.
-        meshes.get_origin_widths(
+        meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, -0.2, [-1, 2], stretching=[1, 1],
                 seasurface=1.2, verb=3)
         out, _ = capsys.readouterr()
         assert "Note: Stretching in DS >> 1.0.\nThe reason " in out
 
     def test_basics(self, capsys):
-        x0, hx = meshes.get_origin_widths(
+        x0, hx = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
@@ -267,14 +254,14 @@ class TestGetOriginWidths:
         assert "Number of cells    : 40 (4 / 36 / 0)  [Total (DS/" in out
         assert "Max stretching     : 1.000 (1.000) / 1.000  [DS (" in out
 
-        _ = meshes.get_origin_widths(
+        _ = meshes.origin_and_widths(
                 1/np.pi, [8.9*mu_0, 9*mu_0], 0.0, [-1, 1],
                 stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
         assert "2.98 / 3.00  [corr. to `properties`]" in out
 
-        _ = meshes.get_origin_widths(
+        _ = meshes.origin_and_widths(
                 1/np.pi, [8.9*mu_0, 9*mu_0, 9.1*mu_0], 0.0, [-1, 1],
                 stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
@@ -282,23 +269,23 @@ class TestGetOriginWidths:
         assert "2.98 / 3.00 / 3.02  [corr. to `properties`]" in out
 
     def test_domain_vector(self):
-        x01, hx1 = meshes.get_origin_widths(
+        x01, hx1 = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1])
-        x02, hx2 = meshes.get_origin_widths(
+        x02, hx2 = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, 0.0, vector=np.array([-1, 0, 1]),
                 stretching=[1, 1])
         assert_allclose(x01, x02)
         assert_allclose(hx1, hx2)
 
-        x03, hx3 = meshes.get_origin_widths(
+        x03, hx3 = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, 0.0, distance=[1, 1], stretching=[1, 1])
         assert_allclose(x01, x03)
         assert_allclose(hx1, hx3)
 
     def test_seasurface(self):
-        x01, hx1 = meshes.get_origin_widths(
+        x01, hx1 = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1])
-        x02, hx2 = meshes.get_origin_widths(
+        x02, hx2 = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, -0.5, [-1, 0], seasurface=0.0,
                 stretching=[1, 1])
         assert_allclose(x01, x02)
@@ -306,7 +293,7 @@ class TestGetOriginWidths:
 
     def test_status_quo_with_all(self, capsys):
         # Defaults.
-        meshes.get_origin_widths(
+        meshes.origin_and_widths(
             frequency=0.2,
             properties=[0.3, 1, 50],
             center=-950,
@@ -325,7 +312,7 @@ class TestGetOriginWidths:
         assert "Max stretching     : 1.000 (1.000) / 1.290" in out
 
         # All set.
-        meshes.get_origin_widths(
+        meshes.origin_and_widths(
             frequency=0.2,
             properties=[3.3, 1, 500],
             center=-950,
@@ -355,7 +342,7 @@ class TestGetOriginWidths:
         assert "Max stretching     : 1.000 (1.000) / 1.370" in out
 
         # High frequencies.
-        _, _, out = meshes.get_origin_widths(
+        _, _, out = meshes.origin_and_widths(
             frequency=1e8,
             properties=[5, 1, 50],
             center=0,
