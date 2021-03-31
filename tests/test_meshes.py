@@ -1,3 +1,4 @@
+import sys
 from os.path import join, dirname
 
 import pytest
@@ -53,6 +54,8 @@ def test_BaseMesh():
 
 
 class TestTensorMesh:
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_TensorMesh(self):
         # Load mesh created with discretize.TensorMesh.
         grid = REGRES['grid']

@@ -1,3 +1,4 @@
+import sys
 import pytest
 import shelve
 import numpy as np
@@ -430,6 +431,8 @@ class TestGetReceiver:
                         np.r_[3*[False, ], 5*[True, ], 3*[False, ]])
 
 
+@pytest.mark.skipif(sys.platform == 'win32',
+                    reason="does not run on windows")
 def test_get_magnetic_field():
     # Check it does still the same (pure regression).
     dat = REGRES['reg_2']

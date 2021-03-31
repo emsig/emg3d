@@ -1,3 +1,4 @@
+import sys
 import pytest
 import numpy as np
 import scipy.linalg as sl
@@ -14,7 +15,8 @@ REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 class TestSolve:
-
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_homogeneous(self, capsys):
         # Regression test for homogeneous halfspace.
         dat = REGRES['res']
@@ -149,6 +151,8 @@ class TestSolve:
         assert "RETURN ZERO E-FIELD (provided sfield is zero)" in out
         assert np.linalg.norm(efield.field) == 0.0
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_heterogeneous(self, capsys):
         # Regression test for heterogeneous case.
         dat = REGRES['reg_2']
@@ -198,6 +202,8 @@ class TestSolve:
         assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
         assert "DIVERGED" in out
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_log(self, capsys):
         dat = REGRES['res']
 
@@ -224,6 +230,8 @@ class TestSolve:
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in out
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in info['log']
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_laplace(self, ):
         # Regression test for homogeneous halfspace in Laplace domain.
         # Not very sophisticated; replace/extend by more detailed tests.
@@ -253,6 +261,8 @@ class TestSolve:
             efield = solver.solve(model, sfield, plain=True, efield=efield)
 
 
+@pytest.mark.skipif(sys.platform == 'win32',
+                    reason="does not run on windows")
 def test_solve_source():
     dat = REGRES['res']
     model = models.Model(**dat['input_model'])
@@ -266,6 +276,8 @@ class TestMultigrid:
     # Everything should be tested just fine in `test_solver`. Just check here
     # that all code is reached.
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_basic(self, capsys):
         # This should reach every line of solver.multigrid.
         dat = REGRES['res']
@@ -293,6 +305,8 @@ class TestKrylov:
     # Everything should be tested just fine in `test_solver`. Just check here
     # for bicgstab-error, and that all code is reached.
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_bicgstab_error(self, capsys):
         # Load any case.
         dat = REGRES['res']
@@ -317,6 +331,8 @@ class TestKrylov:
         out, _ = capsys.readouterr()
         assert '* ERROR   :: Error in bicgstab' in out
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_cycle_gcrotmk(self, capsys):
 
         # Load any case.
@@ -340,6 +356,8 @@ class TestKrylov:
         out, _ = capsys.readouterr()
         assert 'DIVERGED' in out
 
+    @pytest.mark.skipif(sys.platform == 'win32',
+                        reason="does not run on windows")
     def test_cycle(self, capsys):
 
         # Load any case.
