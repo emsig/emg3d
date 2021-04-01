@@ -1,4 +1,4 @@
-name: pytest
+name: linux
 
 # Only build PRs, the master branch, and releases.
 on:

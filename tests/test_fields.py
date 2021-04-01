@@ -1,4 +1,3 @@
-import sys
 import pytest
 import numpy as np
 from scipy import constants
@@ -365,8 +364,6 @@ class TestGetReceiver:
         with pytest.raises(ValueError, match='`receiver` needs to be in the'):
             fields.get_receiver(efield, (1, 1, 1))
 
-    @pytest.mark.skipif(sys.platform == 'win32',
-                        reason="does not run on windows")
     def test_basics(self):
 
         # Coarse check with emg3d.solve and empymod.
@@ -386,8 +383,7 @@ class TestGetReceiver:
 
         model = emg3d.Model(grid, res)
         sfield = fields.get_source_field(grid, src, freq)
-        efield = emg3d.solve(model, sfield, semicoarsening=True,
-                             sslsolver=True, linerelaxation=True, verb=1)
+        efield = emg3d.solve(model, sfield, plain=True, verb=1)
 
         # epm = empymod.bipole(src, rec, [], res, freq, verb=1)
         epm = np.array([-1.27832028e-11+1.21383502e-11j,
