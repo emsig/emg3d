@@ -200,14 +200,14 @@ class TestGetSourceField:
         h = np.ones(3)*500
         grid1 = emg3d.TensorMesh([h, h, h], np.array([-750, -750, -750]))
         d_src = (0, 0., 0., 23, 15)
-        f_src = emg3d.electrodes._point_to_dipole(d_src, 1.0)
+        f_src = emg3d.electrodes.point_to_dipole(d_src, 1.0)
         dsf = fields.get_source_field(grid1, d_src, 1)
         fsf = fields.get_source_field(grid1, f_src, 1)
         assert fsf == dsf
 
         # 1b. Source within one cell, source strength = pi.
         d_src = (0, 0., 0., 32, 53)
-        f_src = emg3d.electrodes._point_to_dipole(d_src, 1.0)
+        f_src = emg3d.electrodes.point_to_dipole(d_src, 1.0)
         dsf = fields.get_source_field(grid1, d_src, 3.3, strength=np.pi)
         fsf = fields.get_source_field(grid1, f_src, 3.3, strength=np.pi)
         assert fsf == dsf
@@ -217,7 +217,7 @@ class TestGetSourceField:
         grid2 = emg3d.TensorMesh([h, h, h], np.array([-800, -800, -800]))
         d_src = (0, 0., 0., 40, 20)
         length = 300.0
-        f_src = emg3d.electrodes._point_to_dipole(d_src, length)
+        f_src = emg3d.electrodes.point_to_dipole(d_src, length)
         dsf = fields.get_source_field(grid2, d_src, 10.0, strength=1.0)
         fsf = fields.get_source_field(grid2, f_src, 10.0, strength=1.0)
         assert_allclose(fsf.fx.sum()/length, dsf.fx.sum())
@@ -228,7 +228,7 @@ class TestGetSourceField:
         slen = 300
         strength = np.pi
         d_src = (0, 0., 0., 20, 30)
-        f_src = emg3d.electrodes._point_to_dipole(d_src, slen)
+        f_src = emg3d.electrodes.point_to_dipole(d_src, slen)
         dsf = fields.get_source_field(
                 grid2, d_src, 1.3, strength=slen*strength)
         fsf = fields.get_source_field(grid2, f_src, 1.3, strength=strength)
@@ -245,7 +245,7 @@ class TestGetSourceField:
         slen = 333
         strength = np.pi
         d_src = (0, 0., 0., 50, 33)
-        f_src = emg3d.electrodes._point_to_dipole(d_src, slen)
+        f_src = emg3d.electrodes.point_to_dipole(d_src, slen)
         dsf = fields.get_source_field(
                 grid3, d_src, 0.7, strength=slen*strength)
         fsf = fields.get_source_field(grid3, f_src, 0.7, strength=strength)

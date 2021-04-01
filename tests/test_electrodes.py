@@ -1,12 +1,62 @@
-# import pytest
+import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
 from emg3d import electrodes
 
 
-def test_inst_to_from_dict():
+class TestElectrodes:
+    def test_basics(self):
 
+        p1 = [[0, 0, 0], [1, 1, 1]]
+        p2 = [0.5, 0.5, 0.5]
+
+        e1 = electrodes.Electrode(p1)
+        e2 = electrodes.Electrode(p2)
+
+        assert e1 == e1
+        assert e1 != e2
+        assert_allclose(e1.points, e1.coordinates)
+        assert e1.xtype == 'electric'
+        assert_allclose(e2.center, p2)
+        assert e2.length == 0
+
+        e3 = e1.copy()
+        assert e1 == e3
+
+        de3 = e3.to_dict()
+        assert_allclose(de3['coordinates'], p1)
+
+    def test_warnings(self):
+
+        # Too long 1D array.
+        with pytest.raises(ValueError, match="`coordinates` must be of shape"):
+            electrodes.Electrode((0, 1, 2, 3, 4, 5, 6))
+
+        # 3D array.
+        with pytest.raises(ValueError, match="`coordinates` must be of shape"):
+            electrodes.Electrode(np.ones((3, 3, 3)))
+
+
+def test_point():
+    p1 = (100, 0, -20, 15, 70.1234)
+    e1 = electrodes.Point(p1)
+    assert_allclose(e1.points, [p1[:3]])
+    assert_allclose(e1.center, p1[:3])
+    assert e1.azimuth == p1[3]
+    assert e1.elevation == p1[4]
+
+    r1 = e1.__repr__()
+    assert 'Point' in r1
+    assert 'x=100.0 m, y=0.0 m, z=-20.0 m' in r1
+    assert '15.0°' in r1
+    assert '70.1°' in r1
+
+    with pytest.raises(ValueError, match="Point coordinates are wrong "):
+        electrodes.Point((0, 1, 2, 3, 4, 5, 6))
+
+
+def test_inst_to_from_dict():
     # RxElectricPoint
     r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15))
     r1b = electrodes.RxElectricPoint.from_dict(r1a.to_dict())
@@ -70,7 +120,7 @@ def test_inst_to_from_dict():
 def test_point_to_dipole():
     source = (10, 100, -1000, 0, 0)
     length = 111.0
-    out = electrodes._point_to_dipole(source, length)
+    out = electrodes.point_to_dipole(source, length)
     assert out.shape == (2, 3)
     assert out[0, 0] == source[0]-length/2
     assert out[1, 0] == source[0]+length/2
@@ -81,7 +131,7 @@ def test_point_to_dipole():
 
     source = (10, 100, -1000, 30, 60)
     length = 2.0
-    out = electrodes._point_to_dipole(source, length)
+    out = electrodes.point_to_dipole(source, length)
     assert_allclose(
         out,
         [[9.5669873, 99.75, -1000.8660254], [10.4330127, 100.25, -999.1339746]]
@@ -142,13 +192,13 @@ class TestDipoleToPoint:
             coo = np.array([[0, 0, 0], points])
 
             # 1.a Check angles degree
-            azm, elv, rad = electrodes._dipole_to_point(coo)
+            azm, elv, rad = electrodes.dipole_to_point(coo)
             assert_allclose(azm, values[0])
             assert_allclose(elv, values[1])
             assert_allclose(rad, np.linalg.norm(points))
 
             # 1.b Check angles radians
-            azm, elv, _ = electrodes._dipole_to_point(coo, deg=False)
+            azm, elv, _ = electrodes.dipole_to_point(coo, deg=False)
             assert_allclose(azm, values[2])
             assert_allclose(elv, values[3])
 
@@ -157,29 +207,29 @@ class TestDipoleToPoint:
             length = 2*np.linalg.norm(points)
 
             # 2.a Check points degree
-            coo = electrodes._point_to_dipole(
+            coo = electrodes.point_to_dipole(
                     (0, 0, 0, values[0], values[1]), length)
             assert_allclose(coo[1, :], points)
 
             # 2.b Check points radians
-            coo = electrodes._point_to_dipole(
+            coo = electrodes.point_to_dipole(
                     (0, 0, 0, values[2], values[3]), length, deg=False)
             assert_allclose(coo[1, :], points, atol=1e-15)
 
     def test_arbitrary(self):
 
         i_azm1, i_elv1, i_rad1 = -25, 88, 1e6
-        coords1 = electrodes._point_to_dipole(
+        coords1 = electrodes.point_to_dipole(
                 (1e6, 1e-6, 10, i_azm1, i_elv1), i_rad1)
-        o_azm1, o_elv1, o_rad1 = electrodes._dipole_to_point(coords1)
+        o_azm1, o_elv1, o_rad1 = electrodes.dipole_to_point(coords1)
         assert_allclose(i_azm1, o_azm1)
         assert_allclose(i_elv1, o_elv1)
         assert_allclose(i_rad1, o_rad1)
 
         i_azm2, i_elv2, i_rad2 = -33.3, 90, 2  # <= azm != 0.0
-        coords2 = electrodes._point_to_dipole(
+        coords2 = electrodes.point_to_dipole(
                 (1e6, -50, 3.33, i_azm2, i_elv2), i_rad2)
-        o_azm2, o_elv2, o_rad2 = electrodes._dipole_to_point(coords2)
+        o_azm2, o_elv2, o_rad2 = electrodes.dipole_to_point(coords2)
         assert_allclose(0.0, o_azm2)  # <= azm == 0.0
         assert_allclose(i_elv2, o_elv2)
         assert_allclose(i_rad2, o_rad2)
@@ -188,7 +238,7 @@ class TestDipoleToPoint:
 def test_point_to_square_loop():
     source = (10, 100, -1000, 45, 90)
     length = 4
-    out = electrodes._point_to_square_loop(source, length)
+    out = electrodes.point_to_square_loop(source, length)
     assert out.shape == (5, 3)
     assert_allclose(out[:, 0], [9, 9, 11, 11, 9])
     assert_allclose(out[:, 1], [101, 99, 99, 101, 101])
@@ -196,7 +246,7 @@ def test_point_to_square_loop():
 
     source = (0, 0, 0, 0, 0)
     length = 8
-    out = electrodes._point_to_square_loop(source, length)
+    out = electrodes.point_to_square_loop(source, length)
     assert out.shape == (5, 3)
     assert_allclose(out[:, 0], 0)
     assert_allclose(out[:, 1], [2, 0, -2, 0, 2])
@@ -204,7 +254,7 @@ def test_point_to_square_loop():
 
     source = (10, 100, -1000, 30, 60)
     length = 4
-    out = electrodes._point_to_square_loop(source, length)
+    out = electrodes.point_to_square_loop(source, length)
     assert_allclose(out[:, 0],
                     [9.292893, 8.93934, 10.707107, 11.06066, 9.292893])
     assert_allclose(out[:, 2],
@@ -213,28 +263,28 @@ def test_point_to_square_loop():
 
 
 def test_rotation():
-    assert_allclose(electrodes._rotation(0, 0), [1, 0, 0])
-    assert_allclose(electrodes._rotation(180, 0), [-1, 0, 0])
-    assert_allclose(electrodes._rotation(90, 0), [0, 1, 0])
-    assert_allclose(electrodes._rotation(-90, 0), [0, -1, 0])
-    assert_allclose(electrodes._rotation(0, 90), [0, 0, 1])
-    assert_allclose(electrodes._rotation(0, -90), [0, 0, -1])
+    assert_allclose(electrodes.rotation(0, 0), [1, 0, 0])
+    assert_allclose(electrodes.rotation(180, 0), [-1, 0, 0])
+    assert_allclose(electrodes.rotation(90, 0), [0, 1, 0])
+    assert_allclose(electrodes.rotation(-90, 0), [0, -1, 0])
+    assert_allclose(electrodes.rotation(0, 90), [0, 0, 1])
+    assert_allclose(electrodes.rotation(0, -90), [0, 0, -1])
 
     dazm, delv = 30, 60
     razm, relv = np.deg2rad(dazm), np.deg2rad(delv)
     assert_allclose(
-        electrodes._rotation(dazm, delv),
+        electrodes.rotation(dazm, delv),
         [np.cos(razm)*np.cos(relv), np.sin(razm)*np.cos(relv), np.sin(relv)])
 
     dazm, delv = -45, 180
     razm, relv = np.deg2rad(dazm), np.deg2rad(delv)
     assert_allclose(
-        electrodes._rotation(dazm, delv),
+        electrodes.rotation(dazm, delv),
         [np.cos(razm)*np.cos(relv), np.sin(razm)*np.cos(relv), np.sin(relv)],
         atol=1e-14)
 
     # Radians
     azm, elv = np.pi/3, np.pi/4
-    rot1 = electrodes._rotation(azm, elv, deg=False)
-    rot2 = electrodes._rotation(np.rad2deg(azm), np.rad2deg(elv))
+    rot1 = electrodes.rotation(azm, elv, deg=False)
+    rot2 = electrodes.rotation(np.rad2deg(azm), np.rad2deg(elv))
     assert_allclose(rot1, rot2)

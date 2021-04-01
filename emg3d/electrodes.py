@@ -1,5 +1,5 @@
 """
-Electrodes defines any type of sources and receivers required for a survey.
+Electrodes define any type of sources and receivers used in a survey.
 """
 # Copyright 2018-2021 The emg3d Developers.
 #
@@ -26,41 +26,40 @@ from emg3d import fields, utils
 
 __all__ = ['Electrode', 'Point', 'Dipole', 'Source', 'TxElectricDipole',
            'TxMagneticDipole', 'TxElectricWire', 'RxElectricPoint',
-           'RxMagneticPoint']
+           'RxMagneticPoint', 'rotation', 'point_to_dipole', 'dipole_to_point',
+           'point_to_square_loop']
 
 
 # BASE ELECTRODE TYPES
 class Electrode:
-    """TODO
+    """Electrode is the BaseClass on which any source or receiver is built.
 
-    Points must be in the form of::
+    .. note::
 
-        [[x0, y0, z0], [...], [xN, yN, zN]]: (x, 3)
+        Use any of the Tx*/Rx* classes to create sources and receivers, not
+        this class.
 
-    Coordinates can be different, it is what the given class uses.
-    If not provided, it is set to coordinates.
+
+    Parameters
+    ----------
+    coordinates : ndarray
+        Electrode locations of shape (n, 3), where n is the number of
+        electrodes: ``[[x1, y1, z1], [...], [xn, yn, zn]]``.
 
     """
 
     _serialize = {'coordinates'}
 
-    def __init__(self, points, coordinates=None):
+    def __init__(self, coordinates):
         """Initiate an electrode."""
 
-        points = np.atleast_2d(points)
-
-        if not (points.ndim == 2 and points.shape[1] == 3):
+        # Cast and check dimension and shape.
+        self._points = np.asarray(np.atleast_2d(coordinates), dtype=float)
+        if not (self._points.ndim == 2 and self._points.shape[1] == 3):
             raise ValueError(
-                "`points` must be of shape (x, 3), provided: "
-                f"{points.shape}"
+                "`coordinates` must be of shape (x, 3), provided: "
+                f"{coordinates}"
             )
-
-        self._points = np.asarray(points, dtype=float)
-
-        if coordinates is None:
-            self._coordinates = points
-        else:
-            self._coordinates = coordinates
 
     def __eq__(self, electrode):
         """Compare two electrodes."""
@@ -81,6 +80,20 @@ class Electrode:
         return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
+        """Store the necessary information of the Electrode in a dict.
+
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
+
+
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Electrode.
+
+        """
         out = {
             '__class__': self.__class__.__name__,
             **{prop: getattr(self, prop) for prop in self._serialize},
@@ -92,25 +105,44 @@ class Electrode:
 
     @classmethod
     def from_dict(cls, inp):
+        """Convert dictionary into its class instance.
+
+        Parameters
+        ----------
+        inp : dict
+            Dictionary as obtained from the classes' ``to_dict``.
+
+        Returns
+        -------
+        electrode : {Tx*, Rx*}
+            A source or receiver instance.
+
+        """
         return cls(**{k: v for k, v in inp.items() if k != '__class__'})
 
     @property
     def points(self):
+        """Electrode locations (n, 3)."""
         return self._points
 
     @property
     def coordinates(self):
-        return self._coordinates
+        """Electrode coordinate as accepted by its class."""
+        if hasattr(self, '_coordinates'):
+            return self._coordinates
+        else:
+            return self._points
 
     @property
     def xtype(self):
+        """Flag of the type of electrodes.
+
+        In reality, all electrodes are electric. But we do idealize some loops
+        as theoretical "magnetic dipoles". ``xtype`` is a flag for this.
+
+        """
         if not hasattr(self, '_xtype'):
-            if 'Current' in self.__class__.__name__:
-                self._xtype = 'current'
-            elif ('Flux' in self.__class__.__name__ or
-                  'Loop' in self.__class__.__name__):
-                self._xtype = 'flux'
-            elif 'Magnetic' in self.__class__.__name__:
+            if 'Magnetic' in self.__class__.__name__:
                 self._xtype = 'magnetic'
             else:  # Default
                 self._xtype = 'electric'
@@ -118,12 +150,14 @@ class Electrode:
 
     @property
     def center(self):
+        """Center point of all electrodes."""
         if not hasattr(self, '_center'):
             self._center = self.points.mean(axis=0)
         return self._center
 
     @property
     def length(self):
+        """Total length of all dipoles formed by the electrodes."""
         if not hasattr(self, '_length'):
             self._length = np.linalg.norm(
                     np.diff(self.points, axis=0), axis=1).sum()
@@ -131,7 +165,20 @@ class Electrode:
 
 
 class Point(Electrode):
-    """TODO"""
+    """A point electrode is defined by its center, azimuth, and elevation.
+
+    .. note::
+
+        Use any of the Tx*/Rx* classes to create sources and receivers, not
+        this class.
+
+
+    Parameters
+    ----------
+    coordinates : array_like
+        Point defined as (x, y, z, azimuth, elevation)
+
+    """
 
     def __init__(self, coordinates):
         """Initiate an electric point."""
@@ -142,10 +189,15 @@ class Point(Electrode):
                 "defined as (x, y, z, azimuth, elevation)."
                 f"Provided coordinates: {coordinates}."
             )
-        coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
-        super().__init__(points=coordinates[:3], coordinates=coordinates)
+
+        # Cast and store input coordinates.
+        self._coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
+
+        # Provide center to `Electrode`.
+        super().__init__(coordinates[:3])
 
     def __repr__(self):
+        """Simple representation."""
         s0 = f"{self.__class__.__name__}: \n"
         s1 = (f"    x={self.center[0]:,.1f} m, "
               f"y={self.center[1]:,.1f} m, z={self.center[2]:,.1f} m, ")
@@ -154,26 +206,41 @@ class Point(Electrode):
 
     @property
     def azimuth(self):
+        """Anticlockwise rotation (°) from x-axis towards y-axis."""
         return self._coordinates[3]
 
     @property
     def elevation(self):
+        """Anticlockwise (upwards) rotation (°) from the xy-plane."""
         return self._coordinates[4]
 
 
 class Dipole(Electrode):
-    """TODO
+    """A dipole consists of two electrodes in a straight line.
 
-    These are dipoles, this format (x, y, z, azimuth, elevation), length
-    is changed to ([x0, y0, z0], [x1, y1, z1])
+    .. note::
 
-    TODO either (x, y, z, azimuth, elevation), length or
-                (x0, x1, y0, y1, z0, z1) or
-                ([x0, y0, z0], [x1, y1, z1])
+        Use any of the Tx*/Rx* classes to create sources and receivers, not
+        this class.
+
+
+    Parameters
+    ----------
+    coordinates : array_like
+        Dipole coordinates. Three formats are accepted:
+
+        - [[x1, y1, z1], [x2, y2, z2]];
+        - (x1, x2, y1, y2, z1, z2);
+        - (x, y, z, azimuth, elevation); this format takes also the ``length``
+          parameter.
+
+    length : float, default: 1.0
+        Length of the dipole (m). This parameter is only used if the provided
+        coordinates are in the format (x, y, z, azimuth, elevation).
 
     """
 
-    def __init__(self, coordinates, length):
+    def __init__(self, coordinates, length=1.0):
         """Initiate an electric dipole."""
 
         coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
@@ -196,48 +263,49 @@ class Dipole(Electrode):
             # Get the two separate electrodes.
             if self.xtype == 'magnetic':
                 # square loop of area corresponding to length
-                points = _point_to_square_loop(coordinates, length)
+                points = point_to_square_loop(coordinates, length)
             else:
-                points = _point_to_dipole(coordinates, length)
+                points = point_to_dipole(coordinates, length)
 
             self._length = length
+            self._coordinates = coordinates
 
         elif coordinates.size == 6:
 
             if coordinates.ndim == 1:
                 points = np.array([coordinates[::2], coordinates[1::2]])
-                coordinates = coordinates
+                self._coordinates = coordinates
 
             else:
                 points = coordinates
-                coordinates = None
 
             if self.xtype == 'magnetic':
-                azimuth, elevation, length = _dipole_to_point(points)
+                azimuth, elevation, length = dipole_to_point(points)
                 center = tuple(np.sum(points, 0)/2)
                 coo = (*center, azimuth, elevation)
-                points = _point_to_square_loop(coo, length)
+                points = point_to_square_loop(coo, length)
 
             # Ensure the two poles are distinct.
             if np.allclose(points[0, :], points[1, :]):
                 raise ValueError(
                     "The two poles are identical, use the format "
                     "(x, y, z, azimuth, elevation) instead. "
-                    f"Provided coordinates: {coordinates}."
+                    f"Provided coordinates: {self._coordinates}."
                 )
 
         else:
             raise ValueError(
                 "Dipole coordinates are wrong defined. They must be "
                 "defined either as a point, (x, y, z, azimuth, elevation), or "
-                "as two poles, (x0, x1, y0, y1, z0, z1) or "
-                "[(x0, y0, z0), (x1, y1, z1)] , all floats. "
-                f"Provided coordinates: {coordinates}."
+                "as two poles, (x1, x2, y1, y2, z1, z2) or "
+                "[(x1, y1, z1), (x2, y2, z2)] , all floats. "
+                f"Provided coordinates: {self._coordinates}."
             )
 
-        super().__init__(points=points, coordinates=coordinates)
+        super().__init__(points)
 
     def __repr__(self):
+        """Simple representation."""
         s0 = (f"{self.__class__.__name__}: "
               f"{self._repr_add if hasattr(self, '_repr_add') else ''}\n")
         if self._coordinates.size == 5:
@@ -254,17 +322,19 @@ class Dipole(Electrode):
 
     @property
     def azimuth(self):
+        """Anticlockwise rotation (°) from x-axis towards y-axis."""
         if not hasattr(self, '_azimuth'):
             if self._points.shape[0] == 5:
                 self._azimuth = self._coordinates[3]
                 self._elevation = self._coordinates[4]
             else:
-                out = _dipole_to_point(self._points)
+                out = dipole_to_point(self._points)
                 self._azimuth, self._elevation, _ = out
         return self._azimuth
 
     @property
     def elevation(self):
+        """Anticlockwise (upwards) rotation (°) from the xy-plane."""
         if not hasattr(self, '_elevation'):
             _ = self.azimuth  # Sets azimuth and elevation
         return self._elevation
@@ -272,6 +342,11 @@ class Dipole(Electrode):
 
 class Wire(Electrode):
     """TODO
+
+    .. note::
+
+        Use any of the Tx*/Rx* classes to create sources and receivers, not
+        this class.
 
     Electric Wire.
 
@@ -281,8 +356,9 @@ class Wire(Electrode):
 
     def __init__(self, coordinates):
         """Initiate an electric wire."""
+        self._coordinates = np.asarray(coordinates, dtype=np.float64).squeeze()
 
-        super().__init__(points=coordinates)
+        super().__init__(coordinates)
 
     def __repr__(self):
         s0 = (f"{self.__class__.__name__}: "
@@ -306,7 +382,14 @@ class Wire(Electrode):
 
 # SOURCES
 class Source(Electrode):
-    """TODO"""
+    """TODO
+
+    .. note::
+
+        Use any of the Tx* classes to create sources, not this class.
+
+
+    """
 
     _serialize = {'strength'} | Electrode._serialize
 
@@ -399,10 +482,11 @@ class RxMagneticPoint(Point):
 
 
 # CONVERSIONS
-def _point_to_dipole(point, length, deg=True):
+def point_to_dipole(point, length, deg=True):
     """Return coordinates of dipole points defined by center, angles, length.
 
     Spherical to Cartesian.
+
 
     Parameters
     ----------
@@ -419,24 +503,27 @@ def _point_to_dipole(point, length, deg=True):
     Returns
     -------
     dipole : ndarray
-        Coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
+        Coordinates of shape (2, 3): [[x1, y1, z1], [x2, y2, z2]].
 
     """
 
     # Get coordinates relative to centrum.
-    xyz = _rotation(point[3], point[4], deg=deg)*length/2
+    xyz = rotation(point[3], point[4], deg=deg)*length/2
 
     # Add half a dipole on both sides of the center.
     return point[:3] + np.array([-xyz, xyz])
 
 
-def _dipole_to_point(dipole, deg=True):
+def dipole_to_point(dipole, deg=True):
     """Return azimuth and elevation for given electrode pair.
+
+    Cartesian to spherical.
+
 
     Parameters
     ----------
     dipole : ndarray
-        Dipole coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]].
+        Dipole coordinates of shape (2, 3): [[x1, y1, z1], [x2, y2, z2]].
 
     deg : bool, default: True
         Return angles in degrees if True, radians if False.
@@ -450,7 +537,7 @@ def _dipole_to_point(dipole, deg=True):
     elevation : float
         Anticlockwise (upwards) angle from the xy-plane towards z-axis.
 
-    length : float, default: 1.0
+    length : float
         Dipole length (m).
 
     """
@@ -465,13 +552,14 @@ def _dipole_to_point(dipole, deg=True):
     return azimuth, elevation, length
 
 
-def _point_to_square_loop(source, area):
-    """Return points of area m^2 perp to dipole.
+def point_to_square_loop(source, area):
+    """Return points of a loop of area perpendicular to source dipole.
+
 
     Parameters
     ----------
     source : tuple
-        Source coordinates in the form of (x, y, z, azimuth, elevation).
+        Source dipole coordinates in the form of (x, y, z, azimuth, elevation).
 
     area : float
         Area of the square loop (m^2).
@@ -480,33 +568,35 @@ def _point_to_square_loop(source, area):
     Returns
     -------
     out : ndarray
-        Array of shape (3, 5), corresponding to the x/y/z-coordinates for the
+        Array of shape (5, 3), corresponding to the x/y/z-coordinates for the
         five points describing a closed rectangle perpendicular to the dipole,
         of side-length length.
 
     """
     half_diag = np.sqrt(area/2)
-    xyz_hor = _rotation(source[3]+90.0, 0.0)*half_diag
-    xyz_ver = _rotation(source[3], source[4]+90.0)*half_diag
+    xyz_hor = rotation(source[3]+90.0, 0.0)*half_diag
+    xyz_ver = rotation(source[3], source[4]+90.0)*half_diag
     points = source[:3] + np.stack(
             [xyz_hor, xyz_ver, -xyz_hor, -xyz_ver, xyz_hor])
     return points
 
 
-def _rotation(azimuth, elevation, deg=True):
+def rotation(azimuth, elevation, deg=True):
     """Rotation factors for RHS coordinate system with positive z upwards.
+
 
     The rotation factors multiplied with the length yield the corresponding
     Cartesian coordinates. (The rotation factors correspond to the rotation of
     a unit radius of length 1.)
 
     Definition of spherical coordinates:
+
     - azimuth θ: anticlockwise from x-axis towards y-axis, (-180°, +180°].
     - elevation φ: anticlockwise (upwards) from the xy-plane towards z-axis
       [-90°, +90°].
     - radius (m).
 
-    Definition Cartesian coordinates:
+    Definition of Cartesian coordinates:
 
     - x is Easting;
     - y is Northing;

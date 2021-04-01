@@ -494,7 +494,7 @@ def get_receiver(field, receiver):
     resp = np.zeros(xi.shape[0], dtype=field.field.dtype)
 
     # Get weighting factors per direction.
-    factors = electrodes._rotation(*coordinates[3:])
+    factors = electrodes.rotation(*coordinates[3:])
 
     # Add the required responses.
     opts = {'method': 'cubic', 'extrapolate': False, 'log': False, 'mode':
@@ -583,7 +583,7 @@ def _dipole_vector(grid, source, decimals=9):
         The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     source : ndarray
-        Source coordinates of shape (2, 3): [[x0, y0, z0], [x1, y1, z1]] (m).
+        Source coordinates of shape (2, 3): [[x1, y1, z1], [x2, y2, z2]] (m).
         Source field, a :class:`emg3d.fields.Field` instance; created if not
         provided.
 
