@@ -113,8 +113,6 @@ def _requires(*args, **kwargs):
                            f" missing soft dependencies: {missing}.")
                     print(f"* WARNING :: {msg}")
                     warnings.warn(msg, UserWarning)
-                else:
-                    pass
             return passer
 
     return inner
