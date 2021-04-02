@@ -4,10 +4,15 @@ Maintenance
 Quick overview / QC
 -------------------
 
-
-- .. image:: https://github.com/emsig/emg3d/workflows/pytest/badge.svg?branch=master
-     :target: https://github.com/emsig/emg3d/actions
-     :alt: GitHub Actions
+- .. image:: https://github.com/emsig/emg3d/actions/workflows/linux.yml/badge.svg
+     :target: https://github.com/emsig/emg3d/actions/workflows/linux.yml
+     :alt: GitHub Actions linux
+  .. image:: https://github.com/emsig/emg3d/actions/workflows/macos_windows.yml/badge.svg
+     :target: https://github.com/emsig/emg3d/actions/workflows/macos_windows.yml
+     :alt: GitHub Actions macos & windows
+  .. image:: https://github.com/emsig/emg3d/actions/workflows/linkcheck.yml/badge.svg
+     :target: https://github.com/emsig/emg3d/actions/workflows/linkcheck.yml
+     :alt: GitHub Actions linkcheck
   .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
      :target: https://emg3d.readthedocs.io/en/latest
      :alt: Documentation Status
