@@ -1771,7 +1771,6 @@ def _get_restriction_weights(grid, cgrid, sc_dir):
 
 class _ConvergenceError(Exception):
     """Custom exception for convergence issues with SSL solvers."""
-    pass
 
 
 # VERBOSITY HELPER ROUTINES (private, undocumented)

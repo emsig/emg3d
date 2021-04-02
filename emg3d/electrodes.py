@@ -518,7 +518,6 @@ class RxElectricPoint(Point):
         Point defined as (x, y, z, azimuth, elevation)
 
     """
-    pass
 
 
 @utils.known_class
@@ -532,7 +531,6 @@ class RxMagneticPoint(Point):
         Point defined as (x, y, z, azimuth, elevation)
 
     """
-    pass
 
 
 # CONVERSIONS
