@@ -2,17 +2,29 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
+import emg3d
 from emg3d import electrodes
 
 
-class TestElectrodes:
+class TestWire:
+
+    class Magnetic(electrodes.Dipole):
+        def __init__(self, coordinates, *args, **kwargs):
+            self._coordinates = coordinates
+            super().__init__(coordinates, *args, **kwargs)
+
+    class Electric(electrodes.Dipole):
+        def __init__(self, coordinates, *args, **kwargs):
+            self._coordinates = coordinates
+            super().__init__(coordinates, *args, **kwargs)
+
     def test_basics(self):
 
         p1 = [[0, 0, 0], [1, 1, 1]]
         p2 = [0.5, 0.5, 0.5]
 
-        e1 = electrodes.Electrode(p1)
-        e2 = electrodes.Electrode(p2)
+        e1 = electrodes.Wire(p1)
+        e2 = electrodes.Wire(p2)
 
         assert e1 == e1
         assert e1 != e2
@@ -20,6 +32,10 @@ class TestElectrodes:
         assert e1.xtype == 'electric'
         assert_allclose(e2.center, p2)
         assert e2.length == 0
+        assert e1.segment_n == 1
+        assert e2.segment_n == 0
+        assert e1.segment_lengths == np.sqrt(3)
+        assert np.empty(e2.segment_lengths)
 
         e3 = e1.copy()
         assert e1 == e3
@@ -27,15 +43,32 @@ class TestElectrodes:
         de3 = e3.to_dict()
         assert_allclose(de3['coordinates'], p1)
 
+        # Dummy test
+        e4 = self.Magnetic(p1)
+        assert e4.xtype == 'magnetic'
+        assert e4.coordinates.shape != e4.points.shape
+
+        e5 = self.Electric(p1)
+        assert e5.xtype == 'electric'
+        assert_allclose(e5.coordinates, e5.points)
+
+    def test_basic_repr(self):
+        p1 = np.array([[-10, -10, -10], [10, 10, 10]])
+        e1 = electrodes.Wire(p1)
+        r1 = e1.__repr__()
+        assert 'Wire' in r1
+        assert 'center={0.0; 0.0; 0.0} m' in r1
+        assert 'n=1; l=' in r1
+
     def test_warnings(self):
 
         # Too long 1D array.
         with pytest.raises(ValueError, match="`coordinates` must be of shape"):
-            electrodes.Electrode((0, 1, 2, 3, 4, 5, 6))
+            electrodes.Wire((0, 1, 2, 3, 4, 5, 6))
 
         # 3D array.
         with pytest.raises(ValueError, match="`coordinates` must be of shape"):
-            electrodes.Electrode(np.ones((3, 3, 3)))
+            electrodes.Wire(np.ones((3, 3, 3)))
 
 
 def test_point():
@@ -56,20 +89,110 @@ def test_point():
         electrodes.Point((0, 1, 2, 3, 4, 5, 6))
 
 
-def test_inst_to_from_dict():
-    # RxElectricPoint
-    r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15))
-    r1b = electrodes.RxElectricPoint.from_dict(r1a.to_dict())
-    assert r1a == r1b
+class TestDipole:
 
-    # RxMagneticPoint
-    r2a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
-    r2b = electrodes.RxMagneticPoint.from_dict(r2a.to_dict())
-    assert r2a == r2b
+    class Magnetic(electrodes.Dipole):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
 
-    # TxElectricDipole - 3 formats
+    def test_point(self):
+        p1 = (100, 2, 6, 0, 90)
+        e1 = electrodes.Dipole(p1)
+        assert e1.length == 1.0
+        assert_allclose(p1, e1.coordinates)
+        assert_allclose([p1[0], p1[1], p1[2]-0.5], e1.points[0, :])
+        assert e1.azimuth == 0
+        assert e1.elevation == 90
+
+        e2 = electrodes.Dipole(p1, np.pi)
+        assert e2.length == np.pi
+
+        # Dummy test
+        e3 = self.Magnetic(p1)
+        assert e3.xtype == 'magnetic'
+        assert e3.points.shape == (5, 3)
+
+    def test_flat(self):
+        p1 = (-10, 10, -10, 10, -10, 10)
+        e1 = electrodes.Dipole(p1)
+        assert_allclose(e1.length, 20*np.sqrt(3))
+        assert_allclose(p1, e1.coordinates)
+        assert_allclose(p1[::2], e1.points[0, :])
+        assert e1.elevation == 35.264389682754654
+        assert e1.azimuth == 45
+
+    def test_dipole(self):
+        p1 = np.array([[-10, -10, -10], [10, 10, 10]])
+        e1 = electrodes.Dipole(p1)
+        assert_allclose(e1.length, 20*np.sqrt(3))
+        assert_allclose(p1, e1.coordinates)
+        assert_allclose(p1, e1.points)
+        assert e1.azimuth == 45
+        assert e1.elevation == 35.264389682754654
+
+        # Dummy test
+        e2 = self.Magnetic(p1)
+        assert e2.xtype == 'magnetic'
+        assert e2.points.shape == (5, 3)
+
+    def test_to_from_dict(self):
+        p1 = np.array([[-10, -10, -10], [10, 10, 10]])
+        e1 = electrodes.Dipole(p1)
+        e2 = e1.copy()
+        assert e1 == e2
+
+    def test_basic_repr(self):
+        p1 = (100, 2, 6, 0, 90)
+        e1 = electrodes.Dipole(p1)
+        r1 = e1.__repr__()
+        assert 'Dipole' in r1
+        assert 'center={100.0; 2.0; 6.0} m' in r1
+        assert '0.0°' in r1
+        assert '90.0°' in r1
+        assert 'l=1.0 m' in r1
+
+        p2 = np.array([[-10, -10, -10], [10, 10, 10]])
+        e2 = electrodes.Dipole(p2)
+        r2 = e2.__repr__()
+        assert 'Dipole' in r2
+        assert 'e1={-10.0; -10.0; -10.0} m' in r2
+        assert 'e2={10.0; 10.0; 10.0} m' in r2
+
+    def test_warnings(self):
+
+        with pytest.raises(ValueError, match="The two electrodes are identic"):
+            electrodes.Dipole((0, 0, 0, 0, 0, 0))
+
+        with pytest.raises(ValueError, match="The two electrodes are identic"):
+            electrodes.Dipole([[0, 0, 0], [0, 0, 0]])
+
+        with pytest.raises(ValueError, match="Coordinates are wrong defined."):
+            electrodes.Dipole((0, 1, 2))
+
+        with pytest.raises(ValueError, match="Coordinates are wrong defined."):
+            electrodes.Dipole(np.zeros((2, 4)))
+
+        with pytest.raises(ValueError, match="Coordinates are wrong defined."):
+            electrodes.Dipole(np.zeros((5, 3)))
+
+
+def test_source():
+    p1 = [[0, 0, 0], [1, 0, 0]]
+    strength = np.pi
+    freq = 1.234
+
+    s1 = electrodes.Source(strength, coordinates=p1)
+    assert s1.strength == strength
+
+    grid = emg3d.TensorMesh([[1, 1], [1, 1], [1, 1]], (0, 0, 0))
+    sfield = emg3d.fields.get_source_field(grid, s1, freq)
+    assert s1.get_field(grid, freq) == sfield
+
+
+def test_tx_electric_dipole():
     s1a = electrodes.TxElectricDipole(
             (0, 0, 0, 45, 45), strength=np.pi, length=4)
+    assert s1a.xtype == 'electric'
     s1b = electrodes.TxElectricDipole.from_dict(s1a.to_dict())
     assert s1a == s1b
     s2a = electrodes.TxElectricDipole(
@@ -87,34 +210,52 @@ def test_inst_to_from_dict():
     assert_allclose(s1b.length, s2b.length)
     assert_allclose(s1b.length, s3b.length)
 
-    # TxMagneticDipole - 3 formats
-    s4a = electrodes.TxElectricDipole(
+
+def test_tx_magnetic_dipole():
+    s4a = electrodes.TxMagneticDipole(
             (0, 0, 0, 45, 45), strength=np.pi, length=4)
-    s4b = electrodes.TxElectricDipole.from_dict(s4a.to_dict())
+    assert s4a.xtype == 'magnetic'
+    s4b = electrodes.TxMagneticDipole.from_dict(s4a.to_dict())
     assert s4a == s4b
-    s5a = electrodes.TxElectricDipole(
+    s5a = electrodes.TxMagneticDipole(
             (-1, 1, -1, 1, -np.sqrt(2), np.sqrt(2)), strength=np.pi)
-    s5b = electrodes.TxElectricDipole.from_dict(s5a.to_dict())
+    s5b = electrodes.TxMagneticDipole.from_dict(s5a.to_dict())
     assert s5a == s5b
-    s6a = electrodes.TxElectricDipole(
+    s6a = electrodes.TxMagneticDipole(
             [[-1, -1, -np.sqrt(2)], [1, 1, np.sqrt(2)]], strength=np.pi)
-    s6b = electrodes.TxElectricDipole.from_dict(s6a.to_dict())
+    s6b = electrodes.TxMagneticDipole.from_dict(s6a.to_dict())
     assert s6a == s6b
     assert_allclose(s4b.points, s5b.points)
     assert_allclose(s4b.points, s6b.points)
     assert_allclose(s4b.strength, s5b.strength)
     assert_allclose(s4b.strength, s6b.strength)
-    assert_allclose(s4b.length, s5b.length)
-    assert_allclose(s4b.length, s6b.length)
+    assert_allclose(s4b.length*2, s5b.length)
+    assert_allclose(s4b.length*2, s6b.length)
 
-    # TxElectricWire
+
+def test_tx_electric_wire():
     n = np.sqrt(2)/2
     coo = np.array([[0, -n, 0], [n, 0, 0], [0, n, 0],
                     [-n, 0, n], [0, 0, -n]])
     s7a = electrodes.TxElectricWire(coo, np.pi)
+    assert s7a.xtype == 'electric'
     s7b = electrodes.TxElectricWire.from_dict(s7a.to_dict())
     assert s7a == s7b
     assert_allclose(s7a.center, 0)
+
+
+def test_rx_electric_point():
+    r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15))
+    assert r1a.xtype == 'electric'
+    r1b = electrodes.RxElectricPoint.from_dict(r1a.to_dict())
+    assert r1a == r1b
+
+
+def test_rx_magnetic_point():
+    r2a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
+    assert r2a.xtype == 'magnetic'
+    r2b = electrodes.RxMagneticPoint.from_dict(r2a.to_dict())
+    assert r2a == r2b
 
 
 def test_point_to_dipole():
