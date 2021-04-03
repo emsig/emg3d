@@ -3,7 +3,7 @@ Everything that is related to fields: storing the electric field, obtaining the
 magnetic field, generating the source field; obtaining the fields at receiver
 locations.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #

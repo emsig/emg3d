@@ -16,7 +16,7 @@ License of Text and Website
 License of Code
 ---------------
 
-Copyright 2018-2021 The emg3d Developers.
+Copyright 2018-2021 The EMSiG community.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

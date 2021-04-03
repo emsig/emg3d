@@ -12,7 +12,18 @@ latest: towards v1.0
 Most important changes for end users
 ''''''''''''''''''''''''''''''''''''
 
-TODO
+- New solver routine ``solve_source()``, which takes a model, a source, and
+  a frequency (in contrast to ``solve()`` which takes a model and a source
+  field).
+- It is recommended to create sources (Tx*) and use those to either create
+  source fields or directly use ``solve_source``.
+- Renamed functions:
+
+  - ``get_h_field`` to ``get_magnetic_field``
+
+- Many functions do not take a grid instance any longer: ``solve``,
+  ``get_magnetic_field``, ...
+
 
 Various:
 

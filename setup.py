@@ -16,7 +16,7 @@ setup(
     name="emg3d",
     description="A multigrid solver for 3D electromagnetic diffusion.",
     long_description=readme,
-    author="The emg3d Developers",
+    author="The EMSiG community",
     author_email="dieter@werthmuller.org",
     url="https://emsig.github.io",
     license="Apache-2.0",

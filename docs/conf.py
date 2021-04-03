@@ -55,7 +55,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emg3d'
-author = 'The emg3d Developers'
+author = 'The EMSiG community'
 copyright = f'2018-{time.strftime("%Y")}, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).

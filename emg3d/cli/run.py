@@ -1,7 +1,7 @@
 """
 Functions that actually call emg3d within the CLI interface.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
