@@ -12,12 +12,16 @@ emg3d Documentation
 ----
 
 .. toctree::
-   :maxdepth: 1
+   :hidden:
 
    user_guide/index
-   gallery
    api_reference/index
    development/index
+
+-  :ref:`user_guide`
+-  `Gallery <https://emsig.github.io/emg3d-gallery>`_
+-  :ref:`api_refs`
+-  :ref:`development`
 
 ----
 
