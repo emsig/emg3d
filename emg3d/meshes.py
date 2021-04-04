@@ -82,6 +82,15 @@ class BaseMesh:
         self.n_edges_z = np.prod(self.shape_edges_z)
         self.n_edges = self.n_edges_x + self.n_edges_y + self.n_edges_z
 
+        # Face related properties.
+        self.shape_faces_x = (shape_nodes[0], shape_cells[1], shape_cells[2])
+        self.shape_faces_y = (shape_cells[0], shape_nodes[1], shape_cells[2])
+        self.shape_faces_z = (shape_cells[0], shape_cells[1], shape_nodes[2])
+        self.n_faces_x = np.prod(self.shape_faces_x)
+        self.n_faces_y = np.prod(self.shape_faces_y)
+        self.n_faces_z = np.prod(self.shape_faces_z)
+        self.n_faces = self.n_faces_x + self.n_faces_y + self.n_faces_z
+
     def __repr__(self):
         """Simple representation."""
         return (f"TensorMesh: {self.shape_cells[0]} x {self.shape_cells[1]} x "

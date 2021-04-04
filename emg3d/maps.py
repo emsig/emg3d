@@ -247,7 +247,7 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
         The method of interpolation to perform.
 
         - ``'nearest', 'linear'``: Fastest methods; work for model properties
-          and fields living on edges. Carried out with
+          and fields living on edges or faces. Carried out with
           :class:`scipy.interpolate.RegularGridInterpolator`.
 
         - ``'cubic'``: Cubic spline interpolation using
@@ -264,8 +264,8 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
           resistivities.
 
           This method is only implemented for quantities living on cell
-          centers, not on edges (hence not for fields); and only for grids as
-          input to ``xi``.
+          centers, not on edges/faces (hence not for fields); and only for
+          grids as input to ``xi``.
 
     extrapolate : bool, default: True
         This parameter controls the default parameters provided to the
@@ -399,11 +399,17 @@ def _points_from_grids(grid, values, xi, method):
 
     # General dimensionality check.
     else:
-        if values.shape not in [grid.shape_cells, grid.shape_edges_x,
-                                grid.shape_edges_y, grid.shape_edges_z]:
-            msg = ("``values`` must be a 3D ndarray living on cell centers "
-                   "or edges of the ``grid``.")
+        electric = [grid.shape_edges_x, grid.shape_faces_y, grid.shape_edges_z]
+        magnetic = [grid.shape_faces_x, grid.shape_edges_y, grid.shape_faces_z]
+        centered = [grid.shape_cells, ]
+        if values.shape not in np.r_[electric, magnetic, centered]:
+            msg = ("``values`` must be a 3D ndarray living on cell centers, "
+                   "edges, or faces of the ``grid``.")
             raise ValueError(msg)
+
+    # Get electric flag (living on edges vs living on faces).
+    electric = values.shape not in [grid.shape_faces_x, grid.shape_edges_y,
+                                    grid.shape_faces_z]
 
     # Check if 'xi' is a TensorMesh.
     xi_is_grid = hasattr(xi, 'nodes_x')
@@ -420,16 +426,19 @@ def _points_from_grids(grid, values, xi, method):
     for i, coord in enumerate(['x', 'y', 'z']):
 
         # Cell nodes.
-        if method == 'volume' or values.shape[i] == grid.shape_nodes[i]:
-            pts = getattr(grid, 'nodes_'+coord)
+        comp_shape = [grid.shape_cells[i], grid.shape_nodes[i]][electric]
+        if method == 'volume' or values.shape[i] == comp_shape:
+            prop = ['cell_centers_', 'nodes_'][electric]
+            pts = getattr(grid, prop + coord)
             if xi_is_grid:
-                new_pts = getattr(xi, 'nodes_'+coord)
+                new_pts = getattr(xi, prop + coord)
 
         # Cell centers.
         else:
-            pts = getattr(grid, 'cell_centers_'+coord)
+            prop = ['nodes_', 'cell_centers_'][electric]
+            pts = getattr(grid, prop + coord)
             if xi_is_grid:
-                new_pts = getattr(xi, 'cell_centers_'+coord)
+                new_pts = getattr(xi, prop + coord)
 
         # Add to points.
         points += (pts, )

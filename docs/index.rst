@@ -11,8 +11,6 @@ emg3d Documentation
 
 ----
 
-.. TODO: Adjust README, include here (?)
-
 .. toctree::
    :maxdepth: 1
 

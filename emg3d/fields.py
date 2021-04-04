@@ -43,7 +43,8 @@ class Field:
 
     The particular fields can be accessed via the ``Field.f{x;y;z}``
     attributes, which are 3D arrays corresponding to the shape of the edges
-    in this direction; sort-order is Fortran-like ('F').
+    (electric fields) or the faces (magnetic fields) in this direction;
+    sort-order is Fortran-like ('F').
 
 
     Parameters
@@ -53,8 +54,9 @@ class Field:
         The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     data : ndarray, default: None
-        The actual data, a ``ndarray`` of size ``grid.n_edges``. If ``None``,
-        it is initiated with zeros.
+        The actual data, a ``ndarray`` of size ``grid.n_edges`` (electric
+        fields) or ``grid.n_faces`` (magnetic fields). If ``None``, it is
+        initiated with zeros.
 
     frequency : float, default: None
         Field frequency (Hz), used to compute the Laplace parameter ``s``.
@@ -73,9 +75,14 @@ class Field:
         Data type of the initiated field; only used if both ``frequency`` and
         ``data`` are None.
 
+    electric : bool, default: True
+        If electric, the properties live on the edges of the grid, if magnetic,
+        they live on the faces.
+
     """
 
-    def __init__(self, grid, data=None, frequency=None, dtype=None):
+    def __init__(self, grid, data=None, frequency=None, dtype=None,
+                 electric=True):
         """Initiate a new Field instance."""
 
         # Get dtype.
@@ -95,28 +102,32 @@ class Field:
         elif dtype is None:  # Default.
             dtype = np.complex128
 
+        # Store grid, frequency, and electric.
+        self.grid = grid
+        self._frequency = frequency
+        self.electric = electric
+
         # Store field.
         if data is None:
-            self._field = np.zeros(grid.n_edges, dtype=dtype)
+            self._field = np.zeros(self._get_prop('n'), dtype=dtype)
         else:
             self._field = np.asarray(data, dtype=dtype)
 
-        # Store grid and frequency.
-        self.grid = grid
-        self._frequency = frequency
-
     def __repr__(self):
         """Simple representation."""
-        return (f"{self.__class__.__name__}: {self.grid.shape_cells[0]} x "
-                f"{self.grid.shape_cells[1]} x {self.grid.shape_cells[2]}; "
-                f"{self.field.size:,}")
+        return (f"{self.__class__.__name__}: "
+                f"{['magnetic', 'electric'][self.electric]}; "
+                f"{self.grid.shape_cells[0]} x {self.grid.shape_cells[1]} x "
+                f"{self.grid.shape_cells[2]}; {self.field.size:,}")
 
     def __eq__(self, field):
         """Compare two fields."""
         equal = self.__class__.__name__ == field.__class__.__name__
         equal *= self.grid == field.grid
         equal *= self._frequency == field._frequency
-        equal *= np.allclose(self._field, field._field, atol=0, rtol=1e-10)
+        equal *= self.electric == field.electric
+        if equal:
+            equal *= np.allclose(self._field, field._field, atol=0, rtol=1e-10)
         return bool(equal)
 
     def copy(self):
@@ -143,6 +154,7 @@ class Field:
             'grid': meshes.TensorMesh(self.grid.h, self.grid.origin).to_dict(),
             'data': self._field,
             'frequency': self._frequency,
+            'electric': self.electric,
         }
         if copy:
             return deepcopy(out)
@@ -157,9 +169,9 @@ class Field:
         ----------
         inp : dict
             Dictionary as obtained from :func:`emg3d.fields.Field.to_dict`. The
-            dictionary needs the keys ``field``, ``frequency``, and ``grid``;
-            ``grid`` itself is also a dict which needs the keys ``hx``, ``hy``,
-            ``hz``, and ``origin``.
+            dictionary needs the keys ``field``, ``frequency``, ``grid``, and
+            ``electric``; ``grid`` itself is also a dict which needs the keys
+            ``hx``, ``hy``, ``hz``, and ``origin``.
 
         Returns
         -------
@@ -183,38 +195,63 @@ class Field:
 
     @property
     def fx(self):
-        """Field in x direction; shape: (cell_centers_x, nodes_y, nodes_z)."""
-        ix = self.grid.n_edges_x
-        shape = self.grid.shape_edges_x
-        return utils.EMArray(self._field[:ix]).reshape(shape, order='F')
+        """Field in x direction.
+
+        Shape:
+
+        - electric: (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)
+        - magnetic: (grid.nodes_x, grid.cell_centers_y, grid.cell_centers_z)
+
+        """
+        i1 = self._get_prop('n', 'x')
+        shape = self._get_prop('shape', 'x')
+        return utils.EMArray(self._field[:i1]).reshape(shape, order='F')
 
     @fx.setter
     def fx(self, fx):
         """Update field in x-direction."""
-        self._field[:self.grid.n_edges_x] = fx.ravel('F')
+        i1 = self._get_prop('n', 'x')
+        self._field[:i1] = fx.ravel('F')
 
     @property
     def fy(self):
-        """Field in y direction; shape: (nodes_x, cell_centers_y, nodes_z)."""
-        i0, i1 = self.grid.n_edges_x, self.grid.n_edges_z
-        shape = self.grid.shape_edges_y
+        """Field in y direction.
+
+        Shape:
+
+        - electric: (grid.nodes_x, grid.cell_centers_y, grid.nodes_z)
+        - magnetic: (grid.cell_centers_x, grid.nodes_y, grid.cell_centers_z)
+
+        """
+        i0, i1 = self._get_prop('n', 'x'), self._get_prop('n', 'z')
+        shape = self._get_prop('shape', 'y')
         return utils.EMArray(self._field[i0:-i1]).reshape(shape, order='F')
 
     @fy.setter
     def fy(self, fy):
         """Update field in y-direction."""
-        self._field[self.grid.n_edges_x:-self.grid.n_edges_z] = fy.ravel('F')
+        i0, i1 = self._get_prop('n', 'x'), self._get_prop('n', 'z')
+        self._field[i0:-i1] = fy.ravel('F')
 
     @property
     def fz(self):
-        """Field in z direction; shape: (nodes_x, nodes_y, cell_centers_z)."""
-        i0, shape = self.grid.n_edges_z, self.grid.shape_edges_z
+        """Field in z direction.
+
+        Shape:
+
+        - electric: (grid.nodes_x, grid.nodes_y, grid.cell_centers_z)
+        - magnetic: (grid.cell_centers_x, grid.cell_centers_y, grid.nodes_z)
+
+        """
+        i0 = self._get_prop('n', 'z')
+        shape = self._get_prop('shape', 'z')
         return utils.EMArray(self._field[-i0:].reshape(shape, order='F'))
 
     @fz.setter
     def fz(self, fz):
         """Update electric field in z-direction."""
-        self._field[-self.grid.n_edges_z:] = fz.ravel('F')
+        i0 = self._get_prop('n', 'z')
+        self._field[-i0:] = fz.ravel('F')
 
     @property
     def frequency(self):
@@ -249,6 +286,13 @@ class Field:
                 self._sval = None
 
         return self._sval
+
+    def _get_prop(self, pre=None, post=None):
+        """Returns `edges` or `faces` property depending on `electric`."""
+        name = '' if pre is None else pre + '_'
+        name += 'edges' if self.electric else 'faces'
+        name += '' if post is None else '_' + post
+        return getattr(self.grid, name)
 
     # INTERPOLATION
     def interpolate_to_grid(self, grid, **interpolate_opts):
@@ -524,10 +568,8 @@ def get_magnetic_field(model, efield):
 
         \nabla \times \mathbf{E} = \rm{i}\omega\mu\mathbf{H} .
 
-    Note that the magnetic field is defined on the faces of the grid, or on the
-    edges of the so-called dual grid. The grid of the returned magnetic field
-    is the dual grid and has therefore one cell less in each direction (cell
-    centers become cell edges).
+    Note that the magnetic field is defined on the faces of the grid, unlike
+    the electric field which is defined on the edges.
 
 
     Parameters
@@ -546,17 +588,8 @@ def get_magnetic_field(model, efield):
 
     """
 
-    # Create magnetic grid - cell centers become nodes.
-    grid = meshes.TensorMesh(
-            [np.diff(efield.grid.cell_centers_x),
-             np.diff(efield.grid.cell_centers_y),
-             np.diff(efield.grid.cell_centers_z)],
-            (efield.grid.cell_centers_x[0],
-             efield.grid.cell_centers_y[0],
-             efield.grid.cell_centers_z[0]))
-
     # Initiate magnetic field with zeros.
-    hfield = Field(grid, frequency=efield._frequency)
+    hfield = Field(efield.grid, frequency=efield._frequency, electric=False)
 
     # Get smu (i omega mu_r mu_0).
     if model.mu_r is None:
@@ -566,8 +599,8 @@ def get_magnetic_field(model, efield):
 
     # Compute magnetic field.
     _edge_curl_factor(
-            hfield.fx, hfield.fy, hfield.fz,
-            efield.fx, efield.fy, efield.fz,
+            hfield.fx[1:-1, :, :], hfield.fy[:, 1:-1, :],
+            hfield.fz[:, :, 1:-1], efield.fx, efield.fy, efield.fz,
             efield.grid.h[0], efield.grid.h[1], efield.grid.h[2], smu)
 
     return hfield

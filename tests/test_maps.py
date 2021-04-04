@@ -419,7 +419,8 @@ def test_points_from_grids():
     xi_array = np.arange(18).reshape(-1, 3)
 
     v_prop = np.ones(grid.shape_cells)
-    v_field = np.ones(grid.shape_edges_x)
+    v_field_e = np.ones(grid.shape_edges_x)
+    v_field_f = np.ones(grid.shape_faces_x)
 
     # linear  - values = prop  - xi = grid
     out = maps._points_from_grids(grid, v_prop, grid2, 'linear')
@@ -429,11 +430,17 @@ def test_points_from_grids():
     assert out[2] == (3, 2, 2)
 
     # nearest - values = field - xi = grid
-    out = maps._points_from_grids(grid, v_field, grid2, 'nearest')
+    out = maps._points_from_grids(grid, v_field_e, grid2, 'nearest')
     assert isinstance(out[1], np.ndarray)
     assert_allclose(out[0][1], [0., 1., 2., 3., 5., 9., 17.])
     assert_allclose(out[1][1, :], [4., 1., 0.])
     assert out[2] == (3, 3, 3)
+    # nearest - values = field - xi = grid
+    out = maps._points_from_grids(grid, v_field_f, grid2, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][1], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][1, :], [2., 1.5, 2.])
+    assert out[2] == (4, 2, 2)
 
     # cubic   - values = prop  - xi = tuple
     out = maps._points_from_grids(grid, v_prop, xi_tuple, 'cubic')
@@ -443,7 +450,7 @@ def test_points_from_grids():
     assert out[2] == (5, )
 
     # linear  - values = field - xi = tuple
-    out = maps._points_from_grids(grid, v_field, xi_tuple, 'linear')
+    out = maps._points_from_grids(grid, v_field_e, xi_tuple, 'linear')
     assert isinstance(out[1], np.ndarray)
     assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
     assert_allclose(out[1][-1, :], [1., 9., 1.])
@@ -457,7 +464,7 @@ def test_points_from_grids():
     assert out[2] == (6, )
 
     # cubic   - values = field - xi = ndarray
-    out = maps._points_from_grids(grid, v_field, xi_array, 'cubic')
+    out = maps._points_from_grids(grid, v_field_e, xi_array, 'cubic')
     assert isinstance(out[1], np.ndarray)
     assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
     assert_allclose(out[1], xi_array)
@@ -465,7 +472,7 @@ def test_points_from_grids():
 
     # cubic   - values = 1Darr - xi = grid  - FAILS
     with pytest.raises(ValueError, match='must be a 3D ndarray'):
-        maps._points_from_grids(grid, v_field.ravel(), grid2, 'cubic')
+        maps._points_from_grids(grid, v_field_e.ravel(), grid2, 'cubic')
 
     # volume  - values = prop  - xi = grid
     out = maps._points_from_grids(grid, v_prop, grid2, 'volume')
@@ -476,7 +483,7 @@ def test_points_from_grids():
 
     # volume  - values = field - xi = grid  - FAILS
     with pytest.raises(ValueError, match='only implemented for cell-centered'):
-        maps._points_from_grids(grid, v_field, grid2, 'volume')
+        maps._points_from_grids(grid, v_field_e, grid2, 'volume')
 
     # volume  - values = prop  - xi = tuple - FAILS
     with pytest.raises(ValueError, match='only implemented for TensorMesh'):
@@ -486,7 +493,7 @@ def test_points_from_grids():
     shape = (3, 2, 4, 5)
     coords = np.arange(np.prod(shape)).reshape(shape, order='F')
     xi_tuple2 = (1, coords, 10)
-    out = maps._points_from_grids(grid, v_field, xi_tuple2, 'nearest')
+    out = maps._points_from_grids(grid, v_field_e, xi_tuple2, 'nearest')
     assert isinstance(out[1], np.ndarray)
     assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
     assert_allclose(out[1][-1, :], [1., 119, 10])

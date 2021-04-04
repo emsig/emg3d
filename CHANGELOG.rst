@@ -12,17 +12,7 @@ latest: towards v1.0
 Most important changes for end users
 ''''''''''''''''''''''''''''''''''''
 
-- New solver routine ``solve_source()``, which takes a model, a source, and
-  a frequency (in contrast to ``solve()`` which takes a model and a source
-  field).
-- It is recommended to create sources (Tx*) and use those to either create
-  source fields or directly use ``solve_source``.
-- Renamed functions:
-
-  - ``get_h_field`` to ``get_magnetic_field``
-
-- Many functions do not take a grid instance any longer: ``solve``,
-  ``get_magnetic_field``, ...
+TODO
 
 
 Various:
@@ -40,6 +30,11 @@ TODO: What is stable (most), what is still *experimental* (``utils.Fourier``,
 
 Detailed changes
 ''''''''''''''''
+
+**Top namespace**
+
+- ``get_receiver`` is not in the top namespace any longer. It is advised to
+  use directly the field method: ``field.get_receiver``.
 
 **Electrodes**
 
