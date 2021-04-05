@@ -507,8 +507,52 @@ class TxElectricWire(Source, Wire):
 
 
 # RECEIVERS
+class Receiver(Wire):
+    """A receiver can be positioned absolutely or relative to source..
+
+    .. note::
+
+        Use any of the Rx* classes to create receivers, not this class.
+
+
+    Parameters
+    ----------
+    relative : bool
+        If False, the coordinates are absolute coordinates. If True, the
+        coordinates define the offset from the source center.
+
+        Note that ``relative=True`` makes only sense in combination with
+        sources, such as is the case in a :class:`emg3d.surveys.Survey`.
+
+    """
+
+    # Add relative to attributes which have to be serialized.
+    _serialize = {'relative'} | Wire._serialize
+
+    def __init__(self, relative, **kwargs):
+        """Initiate a receiver."""
+
+        # Store relative, add a repr-addition.
+        self._relative = relative
+        self._repr_add = f"{['absolute', 'relative'][self.relative]}"
+
+        super().__init__(**kwargs)
+
+    @property
+    def relative(self):
+        """True if coordinates are relative to source, False if absolute."""
+        return self._relative
+
+    def points_abs(self, source):
+        """Returns points as absolute positions."""
+        if self.relative:
+            return source.center + self.points
+        else:
+            return self.points
+
+
 @utils.known_class
-class RxElectricPoint(Point):
+class RxElectricPoint(Receiver, Point):
     """Electric point receiver (point sampling the field).
 
 
@@ -517,11 +561,23 @@ class RxElectricPoint(Point):
     coordinates : array_like
         Point defined as (x, y, z, azimuth, elevation)
 
+    relative : bool, default: False
+        If False, the coordinates are absolute coordinates. If True, the
+        coordinates define the offset from the source center.
+
+        Note that ``relative=True`` makes only sense in combination with
+        sources, such as is the case in a :class:`emg3d.surveys.Survey`.
+
     """
+
+    def __init__(self, coordinates, relative=False):
+        """Initiate an electric point receiver."""
+
+        super().__init__(coordinates=coordinates, relative=relative)
 
 
 @utils.known_class
-class RxMagneticPoint(Point):
+class RxMagneticPoint(Receiver, Point):
     """Magnetic point receiver (point sampling the field).
 
 
@@ -530,7 +586,19 @@ class RxMagneticPoint(Point):
     coordinates : array_like
         Point defined as (x, y, z, azimuth, elevation)
 
+    relative : bool, default: False
+        If False, the coordinates are absolute coordinates. If True, the
+        coordinates define the offset from the source center.
+
+        Note that ``relative=True`` makes only sense in combination with
+        sources, such as is the case in a :class:`emg3d.surveys.Survey`.
+
     """
+
+    def __init__(self, coordinates, relative=False):
+        """Initiate a magnetic point receiver."""
+
+        super().__init__(coordinates=coordinates, relative=relative)
 
 
 # CONVERSIONS

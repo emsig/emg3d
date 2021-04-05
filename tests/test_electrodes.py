@@ -244,16 +244,45 @@ def test_tx_electric_wire():
     assert_allclose(s7a.center, 0)
 
 
+def test_receiver():
+    rcoo = [1000, -200, 0]
+    scoo = [50, 50, 50, 0, 0]
+
+    ra = electrodes.Receiver(False, coordinates=rcoo)
+    rr = electrodes.Receiver(True, coordinates=rcoo)
+    s1 = electrodes.TxElectricDipole(coordinates=scoo)
+
+    assert ra.relative is False
+    assert rr.relative is True
+
+    assert_allclose(ra.points_abs(s1), ra.points)
+    assert_allclose(rr.points_abs(s1), [[1050, -150, 50]])
+
+
 def test_rx_electric_point():
-    r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15))
+    r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15), True)
     assert r1a.xtype == 'electric'
+    assert r1a.relative is True
     r1b = electrodes.RxElectricPoint.from_dict(r1a.to_dict())
     assert r1a == r1b
 
+    r2a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15))
+    assert r2a.xtype == 'electric'
+    assert r2a.relative is False
+    r2b = electrodes.RxElectricPoint.from_dict(r2a.to_dict())
+    assert r2a == r2b
+
 
 def test_rx_magnetic_point():
-    r2a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
+    r1a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
+    assert r1a.xtype == 'magnetic'
+    assert r1a.relative is False
+    r1b = electrodes.RxMagneticPoint.from_dict(r1a.to_dict())
+    assert r1a == r1b
+
+    r2a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90), True)
     assert r2a.xtype == 'magnetic'
+    assert r2a.relative is True
     r2b = electrodes.RxMagneticPoint.from_dict(r2a.to_dict())
     assert r2a == r2b
 
