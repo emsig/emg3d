@@ -651,7 +651,7 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     for nx in np.unique(cell_numbers):
 
         # Loop over possible alphas for domain.
-        for sa in np.arange(1.0, stretching[0]+0.005, 0.01):
+        for sa in np.linspace(1.0, stretching[0], 100):
 
             if vector is None:
 
@@ -706,7 +706,7 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             hxo = hx
 
             # Loop over possible alphas for buffer.
-            for ca in np.arange(sa, stretching[1]+0.005, 0.01):
+            for ca in np.linspace(sa, stretching[1], 100):
 
                 # Get current stretched grid cell sizes.
                 thxl = hx[0]*ca**np.arange(1, nx_remain+1)   # Left of survey.

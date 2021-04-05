@@ -300,10 +300,10 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 616 / 1125 / 7958" in out
         assert "Survey dom. DS [m] : -2000 - -1000" in out
         assert "Comp. dom. DC  [m] : -9071 - 49000" in out
-        assert "Final extent   [m] : -10310 - 52091" in out
-        assert "Cell widths    [m] : 205 / 205 / 12083" in out
+        assert "Final extent   [m] : -10223 - 50988" in out
+        assert "Cell widths    [m] : 205 / 205 / 11769" in out
         assert "Number of cells    : 32 (7 / 25 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.290" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.288" in out
 
         # All set.
         meshes.origin_and_widths(
@@ -330,10 +330,10 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 620 / 1125 / 50" in out
         assert "Survey dom. DS [m] : -2000 - -1000" in out
         assert "Comp. dom. DC  [m] : -10950 - 5300" in out
-        assert "Final extent   [m] : -13945 - 5425" in out
-        assert "Cell widths    [m] : 100 / 100 / 3191" in out
+        assert "Final extent   [m] : -13850 - 5386" in out
+        assert "Cell widths    [m] : 100 / 100 / 3158" in out
         assert "Number of cells    : 40 (20 / 20 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.370" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.369" in out
 
         # High frequencies.
         _, _, out = meshes.origin_and_widths(
@@ -347,10 +347,10 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 0.113 / 0.050 / 0.356" in out
         assert "Survey dom. DS [m] : -1.000 - 1.000" in out
         assert "Comp. dom. DC  [m] : -1.316 - 3.236" in out
-        assert "Final extent   [m] : -1.331 - 3.376" in out
-        assert "Cell widths    [m] : 0.038 / 0.038 / 0.252" in out
+        assert "Final extent   [m] : -1.327 - 3.262" in out
+        assert "Cell widths    [m] : 0.038 / 0.038 / 0.234" in out
         assert "Number of cells    : 80 (54 / 26 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.100" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.096" in out
 
 
 def test_good_mg_cell_nr(capsys):

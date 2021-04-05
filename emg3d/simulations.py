@@ -30,13 +30,6 @@ from copy import deepcopy
 import numpy as np
 import scipy.linalg as sl
 
-try:
-    from tqdm.contrib.concurrent import process_map
-except ImportError:
-    # If you have tqdm installed, but don't want to use it, simply do
-    # `emg3d.simulation.process_map = emg3d.utils._process_map`.
-    from emg3d.utils import _process_map as process_map
-
 from emg3d import (fields, io, solver, surveys, maps, models, meshes, optimize,
                    utils)
 
@@ -832,7 +825,7 @@ class Simulation:
             _ = self.get_sfield(src, freq)
 
         # Initiate futures-dict to store output.
-        out = process_map(
+        out = utils._process_map(
                 self._get_efield,
                 srcfreq,
                 max_workers=self.max_workers,
@@ -1121,7 +1114,7 @@ class Simulation:
         """Compute bfields asynchronously for all sources and frequencies."""
 
         # Initiate futures-dict to store output.
-        out = process_map(
+        out = utils._process_map(
                 self._get_bfields,
                 self._srcfreq,
                 max_workers=self.max_workers,
