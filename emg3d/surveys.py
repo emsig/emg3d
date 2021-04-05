@@ -33,40 +33,24 @@ __all__ = ['Survey', ]
 
 @utils.known_class
 class Survey:
-    """Create a survey with sources, receivers, and data.
+    """Create a survey containing sources, receivers, and data.
 
-    A survey contains all data with the corresponding information about
-    sources, receivers, and frequencies. The data is a 3D-array of shape
-    (nsrc, nrec, nfreq).
+    A survey contains the acquisition information such as source types,
+    positions, and frequencies and receiver types and positions. A survey
+    contains also any acquired or synthetic data and their expected relative
+    error and noise floor.
 
-    Underlying the survey-class is an xarray, which is basically a regular
-    ndarray with axis labels and more. The module `xarray` is a soft
-    dependency, and has to be installed manually to use the `Survey`
-    functionality.
-
-    The data is stored in an ndarray of the form `nsrc`x`nrec`x`nfreq` in the
-    following way::
-
-                             f1
-            Rx1 Rx2  .  RxR /   f2
-           ┌───┬───┬───┬───┐   /   .
-       Tx1 │   │   │   │   │──┐   /   fF
-           ├───┼───┼───┼───┤  │──┐   /
-       Tx2 │   │   │   │   │──┤  │──┐
-           ├───┼───┼───┼───┤  │──┤  │
-        .  │   │   │   │   │──┤  │──┤
-           ├───┼───┼───┼───┤  │──┤  │
-       TxS │   │   │   │   │──┤  │──┤
-           └───┴───┴───┴───┘  │──┤  │
-              └───┴───┴───┴───┘  │──┤
-                 └───┴───┴───┴───┘  │
-                    └───┴───┴───┴───┘
+    The data is stored in an 3D ndarray of dimension ``nsrc x nrec x nfreq``.
+    Underlying the survey-class is an :class:`xarray.Dataset`, where each
+    individual data set (e.g., acquired data or synthetic data) is stored as a
+    :class:`xarray.DataArray`. The module xarray is a soft dependency of emg3d,
+    and has to be installed manually to use the survey functionality.
 
     Receivers have a switch ``relative``, which is False by default and means
-    that the coordinates are absolute values. If the switch is set to True, the
-    coordinates are relative to the source. As such, the above layout can also
-    be used for a moving source at positions Tx1, Tx2, ..., where the receivers
-    Rx1, Rx2, ... have a constant offset from the source.
+    that the coordinates are absolute values (grid-based acquisition). If the
+    switch is set to True, the coordinates are relative to the source. This can
+    be used to model streamer-based acquisitions such as marine streamers or
+    airborne surveys. The two acquisition types can also be mixed in a survey.
 
 
     Parameters
@@ -128,11 +112,19 @@ class Survey:
     def __init__(self, sources, receivers, frequencies, data=None, **kwargs):
         """Initiate a new Survey instance."""
 
-        # Initiate sources, receivers, and frequencies.
-        self._sources = _dipole_info_to_dict(sources, 'source')
-        self._receivers = _dipole_info_to_dict(receivers, 'receiver')
-        out = _frequency_info_to_dict(frequencies)
-        self._frequencies, self._freq_dkeys, self._freq_array = out
+        # Store sources and receivers (run through txrx_lists_to_dict).
+        self._sources = electrodes.txrx_lists_to_dict(sources)
+        self._receivers = electrodes.txrx_lists_to_dict(receivers)
+
+        # Check and store frequencies
+        if isinstance(frequencies, dict):
+            self._frequencies = frequencies
+        else:
+            freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
+            if freqs.size != np.unique(freqs).size:
+                raise ValueError(f"Contains non-unique frequencies: {freqs}.")
+            self._frequencies = {f"f-{i+1:0{len(str(freqs.size))}d}": f
+                                 for i, f in enumerate(freqs)}
 
         # Initialize xarray dataset.
         self._initiate_dataset(data)
@@ -260,9 +252,14 @@ class Survey:
             # Optional parameters.
             opt = ['noise_floor', 'relative_error', 'name', 'info', 'date']
 
+            sources = {k: getattr(electrodes, v['__class__']).from_dict(v)
+                       for k, v in inp['sources'].items()}
+            receivers = {k: getattr(electrodes, v['__class__']).from_dict(v)
+                         for k, v in inp['receivers'].items()}
+
             # Initiate survey.
-            out = cls(sources=inp['sources'],
-                      receivers=inp['receivers'],
+            out = cls(sources=sources,
+                      receivers=receivers,
                       frequencies=inp['frequencies'],
                       data=inp['data'],
                       **{k: inp[k] if k in inp.keys() else None for k in opt})
@@ -450,17 +447,37 @@ class Survey:
         """Frequency dict containing all frequencies."""
         return self._frequencies
 
-    @property
-    def freq_array(self):
-        """Return frequencies as tuple."""
-        return tuple(self._freq_array)
+    def _freq_key_or_value(self, frequency, returns='key'):
+        """Returns `returns` of `frequency`, provided as its key or its value.
 
-    def _freq_key(self, frequency):
-        """Return key of `frequency`, where frequency is str (key) or float."""
+        Returns ``key`` or ``value`` of provided ``frequency``, where the
+        provided frequency itself can be its ``key`` or ``value``.
+
+        """
+
+        # Input is the name (key) of the frequency.
         if isinstance(frequency, str):
-            return frequency
+            # Key is wanted.
+            if returns == 'key':
+                return frequency
+
+            # Value is wanted.
+            else:
+                return self.frequencies[frequency]
+
+        # Input is the actual value of the frequency.
         else:
-            return self._freq_dkeys[frequency]
+            # Key is wanted.
+            if returns == 'key':
+                if not hasattr(self, '_freq_value_key'):
+                    self._freq_value_key = {
+                        float(v): k for k, v in self.frequencies.items()
+                    }
+                return self._freq_value_key[frequency]
+
+            # Value is wanted.
+            else:
+                return frequency
 
     @property
     def standard_deviation(self):
@@ -636,90 +653,3 @@ class Survey:
                 relative_error = 'data._relative_error'
 
         self._data.attrs['relative_error'] = relative_error
-
-
-def _dipole_info_to_dict(inp, name):
-    """Create dict with provided source/receiver information."""
-
-    # Create dict depending if `inp` is tuple or dict.
-    if isinstance(inp, tuple):  # Tuple with coordinates
-
-        # See if last tuple element is boolean, hence el/mag-flag.
-        if isinstance(inp[-1], (list, tuple, np.ndarray)):
-            provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
-        else:
-            provided_elmag = isinstance(inp[-1], (bool, np.bool_))
-
-        # Get max dimension.
-        nd = max([np.array(n, ndmin=1).size for n in inp])
-
-        # Expand coordinates.
-        coo = np.array([nd*[val, ] if np.array(val).size == 1 else
-                        val for val in inp], dtype=np.float64)
-
-        # Extract el/mag flag or set to ones (electric) if not provided.
-        if provided_elmag:
-            elmag = coo[-1, :]
-            coo = coo[:-1, :]
-        else:
-            elmag = np.ones(nd)
-
-        # Create dipole names (number-strings).
-        prefix = 'Tx' if name == 'source' else 'Rx'
-        dnd = len(str(nd-1))  # Max number of digits.
-        names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
-
-        # Create Dipole-dict.
-        if name == 'source':
-            TxRx = [electrodes.TxMagneticDipole, electrodes.TxElectricDipole]
-        else:
-            TxRx = [electrodes.RxMagneticPoint, electrodes.RxElectricPoint]
-        out = {names[i]: TxRx[int(elmag[i])](coo[:, i]) for i in range(nd)}
-
-    elif isinstance(inp, dict):
-        if isinstance(inp[list(inp)[0]], dict):  # Dict of de-ser. Dipoles.
-            out = {k: getattr(electrodes, v['__class__']).from_dict(v)
-                   for k, v in inp.items()}
-        else:  # Assumed dict of dipoles.
-            out = inp
-
-    else:
-        raise TypeError(
-            f"Input format of <{name}s> not recognized: {type(inp)}."
-        )
-
-    return out
-
-
-def _frequency_info_to_dict(frequencies, naming="f"):
-    """Create dicts with provided frequency information.
-
-    For easier access three items are stored:
-    - dict {name: freq}: default and used for xarray;
-    - dict {freq: name}: reverse for flexibility to use the float;
-    - array (frequencies): the frequencies as an array.
-
-    """
-
-    if isinstance(frequencies, dict):
-        name_freq = frequencies
-        freq_name = {float(v): k for k, v in frequencies.items()}
-        freqs = np.array([float(v) for v in frequencies.values()])
-    else:
-        freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
-
-        if freqs.size != np.unique(freqs).size:
-            raise ValueError(f"Contains non-unique frequencies: {freqs}.")
-
-        if naming:
-            dnd = len(str(freqs.size-1))  # Max number of digits.
-            name_freq, freq_name = {}, {}
-            for i, x in enumerate(freqs):
-                name = f"{naming}{i:0{dnd}d}"
-                name_freq[name] = float(x)
-                freq_name[float(x)] = name
-        else:
-            name_freq = {str(x): float(x) for i, x in enumerate(freqs)}
-            freq_name = {float(x): str(x) for i, x in enumerate(freqs)}
-
-    return name_freq, freq_name, freqs

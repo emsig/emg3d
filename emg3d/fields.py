@@ -433,6 +433,31 @@ def get_source_field(grid, source, frequency, **kwargs):
     sfield : Field
         Source field, a :class:`emg3d.fields.Field` instance.
 
+
+    Examples
+    --------
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create a simple grid, 8 cells of length 100 m in each
+          ...: # direction, centered around the origin.
+          ...: hx = np.ones(8)*100
+          ...: grid = emg3d.TensorMesh([hx, hx, hx], origin=(-400, -400, -400))
+          ...: grid  # For QC
+
+       In [3]: # Create an electric dipole source from
+          ...: # x1=y1=z1=0 to x2=100, y2=z2=0; strength=100 A.
+          ...: source = emg3d.TxElectricDipole(
+          ...:             [[0, 0, 0], [100, 0, 0]], strength=100)
+          ...: source  # For QC
+
+       In [4]: # Get the corresponding source field for f=0.5 Hz.
+          ...: sfield = emg3d.get_source_field(grid, source, frequency=0.5)
+          ...: sfield  # For QC
+
     """
 
     # Convert tuples, lists, and ndarrays to Source instances.

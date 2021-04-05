@@ -47,6 +47,22 @@ class BaseMesh:
     origin : array_like
         Origin (x, y, z).
 
+
+    Examples
+    --------
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create a simple grid, 8 cells of length 100 m in each
+          ...: # direction, centered around the origin.
+          ...: hx = np.ones(8)*100
+          ...: grid = emg3d.meshes.BaseMesh(
+          ...:            [hx, hx, hx], origin=(-400, -400, -400))
+          ...: grid  # QC grid
+
     """
 
     def __init__(self, h, origin, **kwargs):

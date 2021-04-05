@@ -521,7 +521,7 @@ class Simulation:
     # GET FUNCTIONS
     def get_grid(self, source, frequency):
         """Return computational grid of the given source and frequency."""
-        freq = self.survey._freq_key(frequency)
+        freq = self.survey._freq_key_or_value(frequency)
 
         # Return grid if it exists already.
         if self._dict_grid[source][freq] is not None:
@@ -592,7 +592,7 @@ class Simulation:
 
     def get_model(self, source, frequency):
         """Return model on the grid of the given source and frequency."""
-        freq = self.survey._freq_key(frequency)
+        freq = self.survey._freq_key_or_value(frequency)
 
         # Return model if it exists already.
         if self._dict_model[source][freq] is not None:
@@ -654,7 +654,7 @@ class Simulation:
 
     def get_efield(self, source, frequency, **kwargs):
         """Return electric field for given source and frequency."""
-        freq = self.survey._freq_key(frequency)
+        freq = self.survey._freq_key_or_value(frequency)
 
         # Get call_from_compute and ensure no kwargs are left.
         call_from_compute = kwargs.pop('call_from_compute', False)
@@ -672,7 +672,7 @@ class Simulation:
                 'sfield': fields.get_source_field(
                     self.get_grid(source, freq),
                     self.survey.sources[source],
-                    self.survey.frequencies[frequency]),
+                    self.survey.frequencies[freq]),
             }
 
             # Compute electric field.
@@ -702,7 +702,7 @@ class Simulation:
 
     def get_hfield(self, source, frequency, **kwargs):
         """Return magnetic field for given source and frequency."""
-        freq = self.survey._freq_key(frequency)
+        freq = self.survey._freq_key_or_value(frequency)
 
         # If magnetic field not computed yet compute it.
         if self._dict_hfield[source][freq] is None:
@@ -720,7 +720,7 @@ class Simulation:
 
     def _store_responses(self, source, frequency):
         """Return electric and magnetic fields at receiver locations."""
-        freq = self.survey._freq_key(frequency)
+        freq = self.survey._freq_key_or_value(frequency)
 
         # Get receiver coordinates.
         rec_coords = self.survey.rec_coords
@@ -752,7 +752,7 @@ class Simulation:
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
-        freq = self.survey._freq_key(frequency)
+        freq = self.survey._freq_key_or_value(frequency)
         return self._dict_efield_info[source][freq]
 
     # ASYNCHRONOUS COMPUTATION
@@ -1002,7 +1002,7 @@ class Simulation:
         if self.gridding == 'frequency':
 
             # Loop over frequencies.
-            for freq in self.survey._freq_array:
+            for freq in self.survey.frequencies.values():
                 out += f"= Source: all; Frequency: {freq} Hz =\n"
                 out += get_grid_info(self._srcfreq[0][0], freq)
 
@@ -1114,7 +1114,7 @@ class Simulation:
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
 
-        freq = self.survey.frequencies[frequency]
+        freq = self.survey._freq_key_or_value(frequency, 'value')
         grid = self.get_grid(source, frequency)
 
         # Initiate empty field
@@ -1347,7 +1347,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)
 
     # Frequency defaults to average frequency (log10).
-    frequency = 10**np.mean(np.log10(survey._freq_array))
+    frequency = 10**np.mean(np.log10([v for v in survey.frequencies.values()]))
     gopts['frequency'] = gridding_opts.pop('frequency', frequency)
 
     # Center defaults to center of all sources.

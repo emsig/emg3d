@@ -28,6 +28,7 @@ class TestWire:
 
         assert e1 == e1
         assert e1 != e2
+        assert e1._prefix == 'Wi'
         assert_allclose(e1.points, e1.coordinates)
         assert e1.xtype == 'electric'
         assert_allclose(e2.center, p2)
@@ -78,6 +79,7 @@ def test_point():
     assert_allclose(e1.center, p1[:3])
     assert e1.azimuth == p1[3]
     assert e1.elevation == p1[4]
+    assert e1._prefix == 'Po'
 
     r1 = e1.__repr__()
     assert 'Point' in r1
@@ -103,6 +105,7 @@ class TestDipole:
         assert_allclose([p1[0], p1[1], p1[2]-0.5], e1.points[0, :])
         assert e1.azimuth == 0
         assert e1.elevation == 90
+        assert e1._prefix == 'Di'
 
         e2 = electrodes.Dipole(p1, np.pi)
         assert e2.length == np.pi
@@ -183,6 +186,7 @@ def test_source():
 
     s1 = electrodes.Source(strength, coordinates=p1)
     assert s1.strength == strength
+    assert s1._prefix == 'So'
 
     grid = emg3d.TensorMesh([[1, 1], [1, 1], [1, 1]], (0, 0, 0))
     sfield = emg3d.fields.get_source_field(grid, s1, freq)
@@ -193,6 +197,7 @@ def test_tx_electric_dipole():
     s1a = electrodes.TxElectricDipole(
             (0, 0, 0, 45, 45), strength=np.pi, length=4)
     assert s1a.xtype == 'electric'
+    assert s1a._prefix == 'TxED'
     s1b = electrodes.TxElectricDipole.from_dict(s1a.to_dict())
     assert s1a == s1b
     s2a = electrodes.TxElectricDipole(
@@ -210,11 +215,16 @@ def test_tx_electric_dipole():
     assert_allclose(s1b.length, s2b.length)
     assert_allclose(s1b.length, s3b.length)
 
+    rep = s3b.__repr__()
+    assert "3.1 A" in rep
+    assert "m; e2={1.0" in rep
+
 
 def test_tx_magnetic_dipole():
     s4a = electrodes.TxMagneticDipole(
             (0, 0, 0, 45, 45), strength=np.pi, length=4)
     assert s4a.xtype == 'magnetic'
+    assert s4a._prefix == 'TxMD'
     s4b = electrodes.TxMagneticDipole.from_dict(s4a.to_dict())
     assert s4a == s4b
     s5a = electrodes.TxMagneticDipole(
@@ -232,16 +242,25 @@ def test_tx_magnetic_dipole():
     assert_allclose(s4b.length*2, s5b.length)
     assert_allclose(s4b.length*2, s6b.length)
 
+    rep = s6b.__repr__()
+    assert "3.1 A" in rep
+    assert "m; e2={-0.7" in rep
+
 
 def test_tx_electric_wire():
     n = np.sqrt(2)/2
     coo = np.array([[0, -n, 0], [n, 0, 0], [0, n, 0],
                     [-n, 0, n], [0, 0, -n]])
     s7a = electrodes.TxElectricWire(coo, np.pi)
+    assert s7a._prefix == 'TxEW'
     assert s7a.xtype == 'electric'
     s7b = electrodes.TxElectricWire.from_dict(s7a.to_dict())
     assert s7a == s7b
     assert_allclose(s7a.center, 0)
+
+    rep = s7b.__repr__()
+    assert "3.1 A" in rep
+    assert "n=4; l=4.8" in rep
 
 
 def test_receiver():
@@ -253,6 +272,7 @@ def test_receiver():
     s1 = electrodes.TxElectricDipole(coordinates=scoo)
 
     assert ra.relative is False
+    assert ra._prefix == 'Re'
     assert rr.relative is True
 
     assert_allclose(ra.points_abs(s1), ra.points)
@@ -262,6 +282,7 @@ def test_receiver():
 def test_rx_electric_point():
     r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15), True)
     assert r1a.xtype == 'electric'
+    assert r1a._prefix == 'RxEP'
     assert r1a.relative is True
     r1b = electrodes.RxElectricPoint.from_dict(r1a.to_dict())
     assert r1a == r1b
@@ -272,10 +293,17 @@ def test_rx_electric_point():
     r2b = electrodes.RxElectricPoint.from_dict(r2a.to_dict())
     assert r2a == r2b
 
+    rep = r2b.__repr__()
+    assert "absolute" in rep
+    assert "θ=368.0°, φ=15.0" in rep
+    rep = r1a.__repr__()
+    assert "relative" in rep
+
 
 def test_rx_magnetic_point():
     r1a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
     assert r1a.xtype == 'magnetic'
+    assert r1a._prefix == 'RxMP'
     assert r1a.relative is False
     r1b = electrodes.RxMagneticPoint.from_dict(r1a.to_dict())
     assert r1a == r1b
@@ -285,6 +313,47 @@ def test_rx_magnetic_point():
     assert r2a.relative is True
     r2b = electrodes.RxMagneticPoint.from_dict(r2a.to_dict())
     assert r2a == r2b
+
+    rep = r2b.__repr__()
+    assert "relative" in rep
+    assert "x=-1,200.0 m, y=56.0 m" in rep
+
+
+def test_txrx_coordinates_to_dict():
+    sources = electrodes.txrx_coordinates_to_dict(
+                    electrodes.TxElectricDipole,
+                    ([-1, 1, ], 0, 0, [-10, 10], 0), strength=[100, 1])
+    assert sources['TxED-1'].strength == 100
+    assert sources['TxED-1'].azimuth == -10
+    assert_allclose(sources['TxED-1'].center, (-1, 0, 0))
+    assert sources['TxED-2'].strength == 1
+    assert sources['TxED-2'].azimuth == 10
+    assert_allclose(sources['TxED-2'].center, (1, 0, 0))
+
+
+def test_txrx_lists_to_dict():
+    electric = [electrodes.RxElectricPoint((x, 0, 0, 0, 0))
+                for x in [1000, 1100]]
+    magnetic = electrodes.txrx_coordinates_to_dict(
+                    electrodes.RxMagneticPoint,
+                    ([950, 1050, 1150], 0, 0, 0, 90))
+    streamer = electrodes.RxElectricPoint((5, 0, 0, 0, 0), relative=True)
+
+    # If instance, it should give the instance in a dict.
+    rec1 = electrodes.txrx_lists_to_dict(streamer)
+    assert streamer == rec1['RxEP-1']
+
+    # If dict, it should yield the same.
+    rec2 = electrodes.txrx_lists_to_dict(magnetic)
+    assert magnetic['RxMP-1'] == rec2['RxMP-1']
+
+    rec3 = electrodes.txrx_lists_to_dict([[streamer, ], electric, magnetic])
+    assert rec3['RxEP-1'] == streamer
+    assert rec3['RxEP-2'] == electric[0]
+    assert rec3['RxEP-3'] == electric[1]
+    assert rec3['RxMP-4'] == magnetic['RxMP-1']
+    assert rec3['RxMP-5'] == magnetic['RxMP-2']
+    assert rec3['RxMP-6'] == magnetic['RxMP-3']
 
 
 def test_point_to_dipole():
