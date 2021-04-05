@@ -207,6 +207,13 @@ Detailed changes
     the receivers with a relative offset to the source, instead of absolute
     coordinates.
   - ``data`` can be a dict containing many data set.
+  - Only takes dicts as input for sources and receivers. For this, it has the
+    new convenience functions ``txrx_coordinates_to_dict`` and
+    ``txrx_lists_to_dict``.
+  - Automatic key names start now with 1 and have a hyphen between the prefix
+    and the number; they also contain the abbreviated electrode name. E.g.,
+    ``Tx0`` becomes ``TxED-1`` or ``TxMD-1`` or ``TxEW-1``. Similar, ``Rx9``
+    becomes ``RxEP-10`` or ``RxMp-10``, and ``f0`` becomes ``f-1``.
 
 - ``Dipole``: Replaced by the new source and receiver classes in the new module
   ``electrodes``.

@@ -319,43 +319,6 @@ def test_rx_magnetic_point():
     assert "x=-1,200.0 m, y=56.0 m" in rep
 
 
-def test_txrx_coordinates_to_dict():
-    sources = electrodes.txrx_coordinates_to_dict(
-                    electrodes.TxElectricDipole,
-                    ([-1, 1, ], 0, 0, [-10, 10], 0), strength=[100, 1])
-    assert sources['TxED-1'].strength == 100
-    assert sources['TxED-1'].azimuth == -10
-    assert_allclose(sources['TxED-1'].center, (-1, 0, 0))
-    assert sources['TxED-2'].strength == 1
-    assert sources['TxED-2'].azimuth == 10
-    assert_allclose(sources['TxED-2'].center, (1, 0, 0))
-
-
-def test_txrx_lists_to_dict():
-    electric = [electrodes.RxElectricPoint((x, 0, 0, 0, 0))
-                for x in [1000, 1100]]
-    magnetic = electrodes.txrx_coordinates_to_dict(
-                    electrodes.RxMagneticPoint,
-                    ([950, 1050, 1150], 0, 0, 0, 90))
-    streamer = electrodes.RxElectricPoint((5, 0, 0, 0, 0), relative=True)
-
-    # If instance, it should give the instance in a dict.
-    rec1 = electrodes.txrx_lists_to_dict(streamer)
-    assert streamer == rec1['RxEP-1']
-
-    # If dict, it should yield the same.
-    rec2 = electrodes.txrx_lists_to_dict(magnetic)
-    assert magnetic['RxMP-1'] == rec2['RxMP-1']
-
-    rec3 = electrodes.txrx_lists_to_dict([[streamer, ], electric, magnetic])
-    assert rec3['RxEP-1'] == streamer
-    assert rec3['RxEP-2'] == electric[0]
-    assert rec3['RxEP-3'] == electric[1]
-    assert rec3['RxMP-4'] == magnetic['RxMP-1']
-    assert rec3['RxMP-5'] == magnetic['RxMP-2']
-    assert rec3['RxMP-6'] == magnetic['RxMP-3']
-
-
 def test_point_to_dipole():
     source = (10, 100, -1000, 0, 0)
     length = 111.0

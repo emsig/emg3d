@@ -28,7 +28,7 @@ except ImportError:
 
 from emg3d import electrodes, utils, io
 
-__all__ = ['Survey', ]
+__all__ = ['Survey', 'txrx_coordinates_to_dict', 'txrx_lists_to_dict']
 
 
 @utils.known_class
@@ -113,8 +113,8 @@ class Survey:
         """Initiate a new Survey instance."""
 
         # Store sources and receivers (run through txrx_lists_to_dict).
-        self._sources = electrodes.txrx_lists_to_dict(sources)
-        self._receivers = electrodes.txrx_lists_to_dict(receivers)
+        self._sources = txrx_lists_to_dict(sources)
+        self._receivers = txrx_lists_to_dict(receivers)
 
         # Check and store frequencies
         if isinstance(frequencies, dict):
@@ -653,3 +653,151 @@ class Survey:
                 relative_error = 'data._relative_error'
 
         self._data.attrs['relative_error'] = relative_error
+
+
+def txrx_coordinates_to_dict(TxRx, coordinates, **kwargs):
+    """Create dict of TxRx instances with provided coordinates.
+
+    Source and receiver dictionaries to input into a
+    :class:`emg3d.surveys.Survey` can be created in many ways. This is a helper
+    function to create a dict from a tuple of coordinates.
+
+
+    Parameters
+    ----------
+    TxRx : {Tx*, Rx*)
+        Any of the available sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`.
+
+    coordinates : tuple
+        Tuple containing the input coordinates for the defined TxRx class.
+        Each element of the tuple must either have length ``1`` or ``n``.
+
+    **kwargs :
+        Other parameters passed through to TxRx; again, each must be of size
+        ``1`` or ``n``.
+
+
+    Returns
+    -------
+    out : dict
+        Dict where the keys consist of a TxRx-prefix followed by a number, and
+        the values contain the corresponding TxRx instances.
+
+
+    Examples
+    --------
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create 10 electric dipole sources from x=2000:2000:10,000, of
+          ...: # strength 100 A.
+          ...: offsets = np.arange(1, 6)*2000
+          ...: sources = emg3d.surveys.txrx_coordinates_to_dict(
+          ...:                 emg3d.TxElectricDipole,
+          ...:                 (offsets, 0, 0, 0, 0), strength=100)
+          ...: sources  # QC the source dict
+
+    """
+
+    # Get max dimension.
+    nd = max([np.array(n, ndmin=1).size for n in coordinates])
+
+    # Expand coordinates.
+    coo = np.array([nd*[val, ] if np.array(val).size == 1 else
+                    val for val in coordinates], dtype=np.float64)
+
+    # Expand kwargs.
+    inp = {}
+    for i in range(nd):
+        inp[i] = {}
+        for k, v in kwargs.items():
+            inp[i][k] = v if np.array(v).size == 1 else v[i]
+
+    # Return TxRx-dict.
+    return txrx_lists_to_dict([TxRx(coo[:, i], **inp[i]) for i in range(nd)])
+
+
+def txrx_lists_to_dict(txrx):
+    """Create dict from provided list of Tx/Rx instances.
+
+    Source and receiver dictionaries to input into a
+    :class:`emg3d.surveys.Survey` can be created in many ways. This is a helper
+    function to create a dict from a list of source or receiver instances, or
+    from a list of lists and dicts of source or receiver instances.
+
+
+    Parameters
+    ----------
+    txrx : {list, dict)
+        A list or dict of Tx*/Rx* instances. If it is a dict, it is returned
+        unaltered.
+
+        A list can also consist of other lists and dicts of Tx*/Rx* instances.
+
+
+    Returns
+    -------
+    out : dict
+        Dict where the keys consist of a TxRx-specific prefix followed by a
+        number, and the values contain the corresponding TxRx instances.
+
+
+    Examples
+    --------
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create two electric, fixed receivers.
+          ...: electric = [emg3d.RxElectricPoint((x, 0, 0, 0, 0))
+          ...:             for x in [1000, 1100]]
+
+       In [3]: # Create three magnetic, fixed receivers.
+          ...: magnetic = emg3d.surveys.txrx_coordinates_to_dict(
+          ...:                 emg3d.RxMagneticPoint,
+          ...:                 ([950, 1050, 1150], 0, 0, 0, 90))
+
+       In [4]: # Create a streamer receiver, flying 5 m behind the source.
+          ...: streamer = emg3d.RxElectricPoint((5, 0, 0, 0, 0), relative=True)
+
+       In [5]: # Collect all receivers.
+          ...: receivers = emg3d.surveys.txrx_lists_to_dict(
+          ...:                 [[streamer, ], electric, magnetic])
+          ...: receivers  # QC our collected receivers
+
+    """
+
+    # If input is a dict, return it unaltered.
+    if isinstance(txrx, dict):
+        return txrx
+
+    # Undocumented, but possible: A single Tx*/Rx* instance.
+    elif hasattr(txrx, '_prefix'):
+        txrx = [txrx, ]
+
+    # If it is a list of lists/dicts, collect them.
+    elif isinstance(txrx[0], (list, dict)):
+
+        # Add all lists dict to new list.
+        new_txrx = list()
+        for trx in txrx:
+            # If dict, cast it to list.
+            if isinstance(trx, dict):
+                trx = list(trx.values())
+            new_txrx += trx
+
+        # Overwrite original list with new flat list.
+        txrx = new_txrx
+
+    # else, it has to be a list of Tx/Rx instances.
+
+    # Return TxRx-dict.
+    nx = len(txrx)
+    return {f"{trx._prefix}-{i+1:0{len(str(nx))}d}": trx
+            for i, trx in enumerate(txrx)}

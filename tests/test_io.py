@@ -155,8 +155,10 @@ def test_known_classes(tmpdir):
     }
 
     if xarray:
-        survey = emg3d.Survey((-0.5, 0.5, 1000, 1000, -950, -950),
-                              (0, 1000, -950, 0, 0), frequency)
+        survey = emg3d.Survey(
+                emg3d.TxElectricDipole((-0.5, 0.5, 1000, 1000, -950, -950)),
+                emg3d.RxElectricPoint((0, 1000, -950, 0, 0)),
+                frequency)
         simulation = emg3d.Simulation(
                 survey, grid, model, gridding='same')
         out['Survey'] = survey

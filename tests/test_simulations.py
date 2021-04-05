@@ -18,8 +18,12 @@ from . import helpers
 class TestSimulation():
     if xarray is not None:
         # Create a simple survey
-        sources = (0, [1000, 3000, 5000], -950, 0, 0)
-        receivers = (np.arange(12)*500, 0, -1000, 0, 0)
+        sources = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.TxElectricDipole,
+                (0, [1000, 3000, 5000], -950, 0, 0))
+        receivers = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                (np.arange(12)*500, 0, -1000, 0, 0))
         frequencies = (1.0, 2.0)
 
         survey = emg3d.Survey(
@@ -40,56 +44,58 @@ class TestSimulation():
                 gridding='same')
 
         # Do first one single and then all together.
-        simulation.get_efield('Tx0', 'f1')
+        simulation.get_efield('TxED-1', 'f-1')
         simulation.compute(observed=True)
 
     def test_derived(self):
 
         # Check model
-        assert self.simulation.get_model('Tx1', 'f0') == self.model
+        assert self.simulation.get_model('TxED-2', 'f-1') == self.model
 
         # Check grid
-        assert self.simulation.get_grid('Tx1', 1.0) == self.grid
+        assert self.simulation.get_grid('TxED-2', 1.0) == self.grid
 
     def test_fields(self, capsys):
         # Check sfield
         sfield = emg3d.get_source_field(
-                self.grid, self.survey.sources['Tx1'].coordinates,
+                self.grid, self.survey.sources['TxED-2'].coordinates,
                 frequency=1.0, strength=1.0)
 
         # Check efield
         efield, info = emg3d.solve(
                 self.model, sfield, **self.simulation.solver_opts)
-        assert self.simulation.get_efield('Tx1', 'f0') == efield
+        assert self.simulation.get_efield('TxED-2', 'f-1') == efield
 
         # Unknown keyword
         with pytest.raises(TypeError, match='Unexpected '):
-            self.simulation.get_efield('Tx1', 1.0, unknownkeyward=True)
+            self.simulation.get_efield('TxED-2', 1.0, unknownkeyward=True)
 
         # See a single one
-        self.simulation._dict_efield['Tx1'][1.0] = None
+        self.simulation._dict_efield['TxED-2'][1.0] = None
         _, _ = capsys.readouterr()
-        self.simulation.get_efield('Tx1', 1.0)
+        self.simulation.get_efield('TxED-2', 1.0)
 
-        info = self.simulation.get_efield_info('Tx1', 1.0)
+        info = self.simulation.get_efield_info('TxED-2', 1.0)
         assert 'MAX. ITERATION REACHED, NOT CONVERGED' in info['exit_message']
 
         # Check hfield
         hfield = emg3d.get_magnetic_field(self.model, efield)
-        assert self.simulation.get_hfield('Tx1', 1.0) == hfield
-        s_hfield = self.simulation.get_hfield('Tx1', 1.0)
+        assert self.simulation.get_hfield('TxED-2', 1.0) == hfield
+        s_hfield = self.simulation.get_hfield('TxED-2', 1.0)
         assert s_hfield == hfield
         assert_allclose(
-                self.simulation._dict_efield_info['Tx1']['f0']['abs_error'],
+                self.simulation._dict_efield_info[
+                    'TxED-2']['f-1']['abs_error'],
                 info['abs_error'])
         assert_allclose(
-                self.simulation._dict_efield_info['Tx1']['f0']['rel_error'],
+                self.simulation._dict_efield_info[
+                    'TxED-2']['f-1']['rel_error'],
                 info['rel_error'])
-        exit = self.simulation._dict_efield_info['Tx1']['f0']['exit']
+        exit = self.simulation._dict_efield_info['TxED-2']['f-1']['exit']
         assert exit == info['exit'] == 1
 
     def test_responses(self):
-        rec_resp = self.simulation.get_efield('Tx1', 1.0).get_receiver(
+        rec_resp = self.simulation.get_efield('TxED-2', 1.0).get_receiver(
                 self.survey.rec_coords)
         assert_allclose(
                 self.simulation.data.synthetic[1, :, 0].data,
@@ -135,8 +141,8 @@ class TestSimulation():
         sim2 = self.simulation.copy()
         assert self.simulation.name == sim2.name
         assert self.simulation.survey.sources == sim2.survey.sources
-        assert_allclose(self.simulation.get_efield('Tx1', 1.0).field,
-                        sim2.get_efield('Tx1', 1.0).field)
+        assert_allclose(self.simulation.get_efield('TxED-2', 1.0).field,
+                        sim2.get_efield('TxED-2', 1.0).field)
 
         # Also check to_file()/from_file().
         sim_dict = self.simulation.to_dict('all')
@@ -169,9 +175,9 @@ class TestSimulation():
         # Clean and ensure it is empty
         sim3 = self.simulation.copy()
         sim3.clean('all')
-        assert sim3._dict_efield['Tx1']['f0'] is None
-        assert sim3._dict_hfield['Tx1']['f0'] is None
-        assert sim3._dict_efield_info['Tx1']['f0'] is None
+        assert sim3._dict_efield['TxED-2']['f-1'] is None
+        assert sim3._dict_hfield['TxED-2']['f-1'] is None
+        assert sim3._dict_efield_info['TxED-2']['f-1'] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             sim3.clean('nothing')
 
@@ -182,15 +188,15 @@ class TestSimulation():
         sim1 = simulations.Simulation(
                 self.survey, self.grid, self.model, gridding='dict',
                 gridding_opts=grids, name='Test2')
-        m1 = sim1.get_model('Tx1', 1.0)
-        g1 = sim1.get_grid('Tx1', 1.0)
+        m1 = sim1.get_model('TxED-2', 1.0)
+        g1 = sim1.get_grid('TxED-2', 1.0)
 
         # provide
         sim2 = simulations.Simulation(
                 self.survey, self.grid, self.model, name='Test2',
-                gridding='input', gridding_opts=grids['Tx1']['f0'])
-        m2 = sim2.get_model('Tx1', 1.0)
-        g2 = sim2.get_grid('Tx1', 1.0)
+                gridding='input', gridding_opts=grids['TxED-2']['f-1'])
+        m2 = sim2.get_model('TxED-2', 1.0)
+        g2 = sim2.get_grid('TxED-2', 1.0)
 
         assert m1 == m2
         assert g1 == g2
@@ -198,10 +204,10 @@ class TestSimulation():
         # to/from_dict
         sim1copy = sim1.copy()
         sim2copy = sim2.copy()
-        m1c = sim1copy.get_model('Tx1', 1.0)
-        g1c = sim1copy.get_grid('Tx1', 1.0)
-        m2c = sim2copy.get_model('Tx1', 1.0)
-        g2c = sim2copy.get_grid('Tx1', 1.0)
+        m1c = sim1copy.get_model('TxED-2', 1.0)
+        g1c = sim1copy.get_grid('TxED-2', 1.0)
+        m2c = sim2copy.get_model('TxED-2', 1.0)
+        g2c = sim2copy.get_grid('TxED-2', 1.0)
         assert m1 == m1c
         assert g1 == g1c
         assert m2 == m2c
@@ -249,8 +255,12 @@ class TestSimulation():
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_simulation_automatic(capsys):
     # Create a simple survey
-    sources = (0, [1000, 3000, 5000], -950, 0, 0)
-    receivers = ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0)
+    sources = emg3d.surveys.txrx_coordinates_to_dict(
+            emg3d.TxElectricDipole,
+            (0, [1000, 3000, 5000], -950, 0, 0))
+    receivers = emg3d.surveys.txrx_coordinates_to_dict(
+            emg3d.RxElectricPoint,
+            ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0))
     frequencies = (0.1, 1.0, 10.0)
 
     survey = emg3d.Survey(
@@ -281,9 +291,9 @@ def test_simulation_automatic(capsys):
     _, _ = capsys.readouterr()  # empty
     b_sim.print_grid_info()
     out, _ = capsys.readouterr()
-    assert "= Source: Tx1; Frequency: 10.0 Hz =" in out
+    assert "= Source: TxED-2; Frequency: 10.0 Hz =" in out
     assert "== GRIDDING IN X ==" in out
-    assert b_sim.get_grid('Tx0', 1.0).__repr__() in out
+    assert b_sim.get_grid('TxED-1', 1.0).__repr__() in out
 
     _, _ = capsys.readouterr()  # empty
     out = f_sim.print_grid_info(return_info=True)
@@ -291,13 +301,13 @@ def test_simulation_automatic(capsys):
     assert out2 == ""
     assert "= Source: all" in out
     assert "== GRIDDING IN X ==" in out
-    assert f_sim.get_grid('Tx2', 1.0).__repr__() in out
+    assert f_sim.get_grid('TxED-3', 1.0).__repr__() in out
 
     t_sim.print_grid_info()
     out, _ = capsys.readouterr()
     assert "; Frequency: all" in out
     assert "== GRIDDING IN X ==" in out
-    assert t_sim.get_grid('Tx1', 10.0).__repr__() in out
+    assert t_sim.get_grid('TxED-2', 10.0).__repr__() in out
 
     _, _ = capsys.readouterr()  # empty
     out = s_sim.print_grid_info(return_info=True)
@@ -305,29 +315,29 @@ def test_simulation_automatic(capsys):
     assert out2 == ""
     assert "= Source: all; Frequency: all =" in out
     assert "== GRIDDING IN X ==" in out
-    assert s_sim.get_grid('Tx2', 0.1).__repr__() in out
+    assert s_sim.get_grid('TxED-3', 0.1).__repr__() in out
 
     assert s_sim.print_grid_info(verb=-1) is None
 
     # Grids: Middle source / middle frequency should be the same in all.
-    assert f_sim.get_grid('Tx1', 1.0) == t_sim.get_grid('Tx1', 1.0)
-    assert f_sim.get_grid('Tx1', 1.0) == s_sim.get_grid('Tx1', 1.0)
-    assert f_sim.get_grid('Tx1', 1.0) == b_sim.get_grid('Tx1', 1.0)
-    assert f_sim.get_model('Tx1', 1.0) == t_sim.get_model('Tx1', 1.0)
-    assert f_sim.get_model('Tx1', 1.0) == s_sim.get_model('Tx1', 1.0)
-    assert f_sim.get_model('Tx1', 1.0) == b_sim.get_model('Tx1', 1.0)
+    assert f_sim.get_grid('TxED-2', 1.0) == t_sim.get_grid('TxED-2', 1.0)
+    assert f_sim.get_grid('TxED-2', 1.0) == s_sim.get_grid('TxED-2', 1.0)
+    assert f_sim.get_grid('TxED-2', 1.0) == b_sim.get_grid('TxED-2', 1.0)
+    assert f_sim.get_model('TxED-2', 1.0) == t_sim.get_model('TxED-2', 1.0)
+    assert f_sim.get_model('TxED-2', 1.0) == s_sim.get_model('TxED-2', 1.0)
+    assert f_sim.get_model('TxED-2', 1.0) == b_sim.get_model('TxED-2', 1.0)
 
     # Copy:
     f_sim_copy = f_sim.copy()
-    assert f_sim.get_grid('Tx1', 1.0) == f_sim_copy.get_grid('Tx1', 1.0)
+    assert f_sim.get_grid('TxED-2', 1.0) == f_sim_copy.get_grid('TxED-2', 1.0)
     assert 'expand' not in f_sim.gridding_opts.keys()
     assert 'expand' not in f_sim_copy.gridding_opts.keys()
     s_sim_copy = s_sim.copy()
-    assert s_sim.get_grid('Tx1', 1.0) == s_sim_copy.get_grid('Tx1', 1.0)
+    assert s_sim.get_grid('TxED-2', 1.0) == s_sim_copy.get_grid('TxED-2', 1.0)
     assert 'expand' not in s_sim.gridding_opts.keys()
     assert 'expand' not in s_sim_copy.gridding_opts.keys()
     t_sim_copy = t_sim.copy()
-    assert t_sim.get_grid('Tx1', 1.0) == t_sim_copy.get_grid('Tx1', 1.0)
+    assert t_sim.get_grid('TxED-2', 1.0) == t_sim_copy.get_grid('TxED-2', 1.0)
     assert 'expand' not in t_sim.gridding_opts.keys()
     assert 'expand' not in t_sim_copy.gridding_opts.keys()
 
@@ -343,9 +353,12 @@ def test_print_solver(capsys):
     model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
                         property_z=3.3, mapping='Resistivity')
 
+    sources = [emg3d.TxElectricDipole((0, 0, 0, 0, 0)), ]
+    receivers = [emg3d.RxElectricPoint((x, 0, 0, 0, 0))
+                 for x in [-10000, 10000]]
     survey = emg3d.Survey(
-        name='Test', sources=(0, 0, 0, 0, 0),
-        receivers=([-10000, 10000], 0, 0, 0, 0),
+        name='Test', sources=sources,
+        receivers=receivers,
         frequencies=1.0, noise_floor=1e-15, relative_error=0.05,
     )
 
@@ -363,13 +376,13 @@ def test_print_solver(capsys):
 
     # Errors with verb=0.
     out = simulation.print_solver_info('efield', verb=0, return_info=True)
-    assert "= Source Tx0; Frequency 1.0 Hz = MAX. ITERATION REACHED" in out
+    assert "= Source TxED-1; Frequency 1.0 Hz = MAX. ITERATION REACHED" in out
 
     # Errors with verb=1.
     _, _ = capsys.readouterr()  # empty
     simulation.print_solver_info('efield', verb=1)
     out, _ = capsys.readouterr()
-    assert "= Source Tx0; Frequency 1.0 Hz = 2.6e-02; 1; 0:00:" in out
+    assert "= Source TxED-1; Frequency 1.0 Hz = 2.6e-02; 1; 0:00:" in out
 
     # No errors; solver-verb 3.
     simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 3})
@@ -382,7 +395,7 @@ def test_print_solver(capsys):
     simulation = simulations.Simulation(verb=1, **inp, solver_opts={'verb': 0})
     simulation.compute()
     out, _ = capsys.readouterr()
-    assert "= Source Tx0; Frequency 1.0 Hz = CONVERGED" in out
+    assert "= Source TxED-1; Frequency 1.0 Hz = CONVERGED" in out
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -394,7 +407,9 @@ def test_source_strength():
     sources = {'Strength': emg3d.TxElectricDipole(srccoords),
                'NoStrength': emg3d.TxElectricDipole(
                    srccoords, strength=strength)}
-    receivers = (np.arange(12)*500, 0, -1000, 0, 0)
+    receivers = emg3d.surveys.txrx_coordinates_to_dict(
+            emg3d.RxElectricPoint,
+            (np.arange(12)*500, 0, -1000, 0, 0))
     frequencies = 1.0
     survey = emg3d.Survey(sources, receivers, frequencies, name='Test')
 
@@ -457,8 +472,12 @@ def test_expand_grid_model():
 class TestEstimateGriddingOpts():
     if xarray is not None:
         # Create a simple survey
-        sources = (0, [1000, 3000, 5000], -950, 0, 0)
-        receivers = (np.arange(11)*500, 2000, -1000, 0, 0)
+        sources = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.TxElectricDipole,
+                (0, [1000, 3000, 5000], -950, 0, 0))
+        receivers = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                (np.arange(11)*500, 2000, -1000, 0, 0))
         frequencies = (0.1, 10.0)
 
         survey = emg3d.Survey(
@@ -530,8 +549,8 @@ class TestEstimateGriddingOpts():
 
     def test_factor(self):
 
-        sources = (0, 3000, -950, 0, 0)
-        receivers = (0, 3000, -1000, 0, 0)
+        sources = [emg3d.TxElectricDipole((0, 3000, -950, 0, 0)), ]
+        receivers = [emg3d.RxElectricPoint((0, 3000, -1000, 0, 0)), ]
 
         # Adjusted x-domain.
         survey = emg3d.Survey(

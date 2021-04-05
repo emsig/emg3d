@@ -8,6 +8,7 @@ try:
 except ImportError:
     xarray = None
 
+import emg3d
 from emg3d import meshes, models, surveys, simulations, optimize
 
 
@@ -88,8 +89,11 @@ def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
 class TestOptimize():
     if xarray is not None:
         # Create a simple survey
-        sources = (0, [1000, 3000, 5000], -950, 0, 0)
-        receivers = (np.arange(12)*500, 0, -1000, 0, 0)
+        sources = [emg3d.TxElectricDipole((0, x, -950, 0, 0))
+                   for x in [1000, 3000, 5000]]
+        receivers = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                (np.arange(12)*500, 0, -1000, 0, 0))
         frequencies = (1.0, 2.0)
 
         survey = surveys.Survey(sources, receivers, frequencies)
@@ -157,8 +161,9 @@ def test_derivative(capsys):
         # Define a simple survey.
         survey = surveys.Survey(
             name='Gradient Test',
-            sources=(1650, 3200, 3200, 0, 0),
-            receivers=(4750, 3200, 3200, 0, dip, electric),
+            sources=[emg3d.TxElectricDipole((1650, 3200, 3200, 0, 0)), ],
+            receivers=[emg3d.RxElectricPoint(
+                (4750, 3200, 3200, dip, electric)), ],
             frequencies=1.0,
             noise_floor=1e-15,
             relative_error=0.05,
