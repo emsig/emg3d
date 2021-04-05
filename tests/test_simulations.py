@@ -56,7 +56,6 @@ class TestSimulation():
         sfield = emg3d.get_source_field(
                 self.grid, self.survey.sources['Tx1'].coordinates,
                 frequency=1.0, strength=1.0)
-        assert self.simulation.get_sfield('Tx1', 'f0') == sfield
 
         # Check efield
         efield, info = emg3d.solve(

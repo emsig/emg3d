@@ -31,7 +31,7 @@ import numpy as np
 import scipy.linalg as sl
 
 from emg3d import (fields, io, solver, surveys, maps, models, meshes, optimize,
-                   utils)
+                   utils, electrodes)
 
 __all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
 
@@ -128,7 +128,7 @@ class Simulation:
     solver_opts : dict, optional
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
-        `grid`, `model`, `sfield`, `efield`, `return_info`, and `log`. Default
+        `model`, `sfield`, `efield`, `return_info`, and `log`. Default
         verbosity is ``verb=2``.
 
     max_workers : int
@@ -197,7 +197,6 @@ class Simulation:
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
         self._dict_model = self._dict_initiate
-        self._dict_sfield = self._dict_initiate
         self._dict_efield = self._dict_initiate
         self._dict_hfield = self._dict_initiate
         self._dict_efield_info = self._dict_initiate
@@ -354,7 +353,7 @@ class Simulation:
                     out[name] = getattr(self, name)
 
             if what == 'all':
-                for name in ['_dict_grid', '_dict_model', '_dict_sfield']:
+                for name in ['_dict_grid', '_dict_model']:
                     if hasattr(self, name):
                         out[name] = getattr(self, name)
 
@@ -417,7 +416,7 @@ class Simulation:
                     )
 
             # Add existing derived/computed properties.
-            data = ['_dict_grid', '_dict_model', '_dict_sfield',
+            data = ['_dict_grid', '_dict_model',
                     '_dict_hfield', '_dict_efield', '_dict_efield_info',
                     '_dict_bfield', '_dict_bfield_info']
             for name in data:
@@ -653,32 +652,6 @@ class Simulation:
         # Use recursion to return model.
         return self.get_model(source, frequency)
 
-    def get_sfield(self, source, frequency):
-        """Return source field for given source and frequency."""
-        freq = self.survey._freq_key(frequency)
-
-        # Get source field if it is not stored yet.
-        if self._dict_sfield[source][freq] is None:
-
-            # Get source and source strength.
-            src = self.survey.sources[source]
-            if hasattr(src, 'strength'):
-                strength = src.strength
-            else:
-                strength = 0
-
-            sfield = fields.get_source_field(
-                    grid=self.get_grid(source, freq),
-                    source=src.coordinates,
-                    frequency=self.survey.frequencies[freq],
-                    strength=strength,
-                    electric=src.xtype == 'electric')
-
-            self._dict_sfield[source][freq] = sfield
-
-        # Return source field.
-        return self._dict_sfield[source][freq]
-
     def get_efield(self, source, frequency, **kwargs):
         """Return electric field for given source and frequency."""
         freq = self.survey._freq_key(frequency)
@@ -696,7 +669,10 @@ class Simulation:
             solver_input = {
                 **self.solver_opts,
                 'model': self.get_model(source, freq),
-                'sfield': self.get_sfield(source, freq),
+                'sfield': fields.get_source_field(
+                    self.get_grid(source, freq),
+                    self.survey.sources[source],
+                    self.survey.frequencies[frequency]),
             }
 
             # Compute electric field.
@@ -822,7 +798,6 @@ class Simulation:
         for src, freq in srcfreq:
             _ = self.get_grid(src, freq)
             _ = self.get_model(src, freq)
-            _ = self.get_sfield(src, freq)
 
         # Initiate futures-dict to store output.
         out = utils._process_map(
@@ -934,9 +909,9 @@ class Simulation:
         if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}.")
 
-        # Clean data/model/sfield-dicts.
+        # Clean data/model-dicts.
         if what in ['keepresults', 'all']:
-            for name in ['_dict_grid', '_dict_model', '_dict_sfield']:
+            for name in ['_dict_grid', '_dict_model']:
                 delattr(self, name)
                 setattr(self, name, self._dict_initiate)
 
@@ -1139,41 +1114,39 @@ class Simulation:
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
 
-        freq = self.survey._freq_key(frequency)
-        float_freq = self.survey.frequencies[freq]
-        grid = self.get_grid(source, freq)
+        freq = self.survey.frequencies[frequency]
+        grid = self.get_grid(source, frequency)
 
         # Initiate empty field
-        ResidualField = fields.Field(grid, frequency=float_freq)
+        ResidualField = fields.Field(grid, frequency=freq)
 
         # Loop over receivers, input as source.
         for name, rec in self.survey.receivers.items():
 
-            # Strength: in get_source_field the strength is multiplied with
-            # iwmu; so we undo this here.
-            residual = self.data.residual.loc[source, name, freq].data
+            # Get residual of this receiver.
+            residual = self.data.residual.loc[source, name, frequency].data
             if np.isnan(residual):
                 continue
-            strength = residual.conj()
-            strength *= self.data.weights.loc[source, name, freq].data.conj()
-            strength /= ResidualField.smu0
 
-            # Our data are from a magnetic point, but the source will be a
-            # loop, so we have to undo the factor smu0 here. (iwB vs H).
-            if rec.xtype != 'electric':
+            # Strength: in get_source_field the strength is multiplied with
+            # iwmu; so we undo this here.
+            weight = self.data.weights.loc[source, name, frequency].data.conj()
+            strength = residual.conj() * weight / ResidualField.smu0
+
+            # Create source.
+            if rec.xtype == 'magnetic':
+                # If the data is from a magnetic point we have to undo the
+                # factor smu0 here, as the source will be a loop.
                 strength /= ResidualField.smu0
+                src = electrodes.TxMagneticDipole(
+                        rec.coordinates, strength=strength)
+            else:
+                src = electrodes.TxElectricDipole(
+                        rec.coordinates, strength=strength)
 
-            # If strength is zero (very unlikely), get_source_field would
-            # return a normalized field for a unit source. However, in this
-            # case we do not want that.
-            if strength != 0:
-                ResidualField.field += fields.get_source_field(
-                    grid=grid,
-                    source=rec.coordinates,
-                    frequency=float_freq,
-                    strength=strength,
-                    electric=rec.xtype == 'electric',
-                ).field
+            # Get residual field and add it to the total field.
+            rfield = fields.get_source_field(grid, src, freq)
+            ResidualField.field += rfield.field
 
         return ResidualField
 
