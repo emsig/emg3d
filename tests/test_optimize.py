@@ -161,9 +161,8 @@ def test_derivative(capsys):
         # Define a simple survey.
         survey = surveys.Survey(
             name='Gradient Test',
-            sources=[emg3d.TxElectricDipole((1650, 3200, 3200, 0, 0)), ],
-            receivers=[emg3d.RxElectricPoint(
-                (4750, 3200, 3200, dip, electric)), ],
+            sources=emg3d.TxElectricDipole((1650, 3200, 3200, 0, 0)),
+            receivers=emg3d.RxElectricPoint((4750, 3200, 3200, dip, electric)),
             frequencies=1.0,
             noise_floor=1e-15,
             relative_error=0.05,

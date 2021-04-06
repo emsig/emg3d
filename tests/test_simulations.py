@@ -96,7 +96,7 @@ class TestSimulation():
 
     def test_responses(self):
         rec_resp = self.simulation.get_efield('TxED-2', 1.0).get_receiver(
-                self.survey.rec_coords)
+                self.survey.receivers.values())
         assert_allclose(
                 self.simulation.data.synthetic[1, :, 0].data,
                 rec_resp, atol=1e-16)
@@ -353,7 +353,7 @@ def test_print_solver(capsys):
     model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
                         property_z=3.3, mapping='Resistivity')
 
-    sources = [emg3d.TxElectricDipole((0, 0, 0, 0, 0)), ]
+    sources = emg3d.TxElectricDipole((0, 0, 0, 0, 0))
     receivers = [emg3d.RxElectricPoint((x, 0, 0, 0, 0))
                  for x in [-10000, 10000]]
     survey = emg3d.Survey(
@@ -549,8 +549,8 @@ class TestEstimateGriddingOpts():
 
     def test_factor(self):
 
-        sources = [emg3d.TxElectricDipole((0, 3000, -950, 0, 0)), ]
-        receivers = [emg3d.RxElectricPoint((0, 3000, -1000, 0, 0)), ]
+        sources = emg3d.TxElectricDipole((0, 3000, -950, 0, 0))
+        receivers = emg3d.RxElectricPoint((0, 3000, -1000, 0, 0))
 
         # Adjusted x-domain.
         survey = emg3d.Survey(

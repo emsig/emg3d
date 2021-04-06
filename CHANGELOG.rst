@@ -214,6 +214,8 @@ Detailed changes
     and the number; they also contain the abbreviated electrode name. E.g.,
     ``Tx0`` becomes ``TxED-1`` or ``TxMD-1`` or ``TxEW-1``. Similar, ``Rx9``
     becomes ``RxEP-10`` or ``RxMp-10``, and ``f0`` becomes ``f-1``.
+  - ``Survey.size`` is now the total number, ``Survey.count`` is the count of
+    the data that actually has non-NaN values.
 
 - ``Dipole``: Replaced by the new source and receiver classes in the new module
   ``electrodes``.

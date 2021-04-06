@@ -139,7 +139,7 @@ def simulation(args_dict):
             output['misfit'] = 0.0
         else:
             output['misfit'] = sim.misfit
-        output['n_observations'] = sim.survey.size
+        output['n_observations'] = sim.survey.count
 
     # Compute the gradient.
     if function == 'gradient':

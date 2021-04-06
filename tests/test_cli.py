@@ -347,7 +347,7 @@ class TestRun:
         # Create a tiny dummy survey.
         data = np.ones((1, 17, 1))
         data[0, 8:11, 0] = np.nan
-        sources = [emg3d.TxElectricDipole((4125, 4000, 4000, 0, 0)), ]
+        sources = emg3d.TxElectricDipole((4125, 4000, 4000, 0, 0))
         receivers = emg3d.surveys.txrx_coordinates_to_dict(
                 emg3d.RxElectricPoint,
                 (np.arange(17)*250+2000, 4000, 3950, 0, 0))

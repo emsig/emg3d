@@ -275,8 +275,8 @@ def test_receiver():
     assert ra._prefix == 'Re'
     assert rr.relative is True
 
-    assert_allclose(ra.points_abs(s1), ra.points)
-    assert_allclose(rr.points_abs(s1), [[1050, -150, 50]])
+    assert_allclose(ra.center_abs(s1), ra.center)
+    assert_allclose(rr.center_abs(s1), [1050, -150, 50])
 
 
 def test_rx_electric_point():

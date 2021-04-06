@@ -553,12 +553,12 @@ class Receiver(Wire):
         """True if coordinates are relative to source, False if absolute."""
         return self._relative
 
-    def points_abs(self, source):
+    def center_abs(self, source):
         """Returns points as absolute positions."""
         if self.relative:
-            return source.center + self.points
+            return source.center + self.center
         else:
-            return self.points
+            return self.center
 
 
 @utils.known_class

@@ -8,24 +8,26 @@ try:
 except ImportError:
     xarray = None
 
-from emg3d import surveys, electrodes
+import emg3d
+from emg3d import surveys
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestSurvey():
     def test_general(self):
         sources = surveys.txrx_coordinates_to_dict(
-                electrodes.TxElectricDipole,
+                emg3d.TxElectricDipole,
                 (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0))
         receivers = surveys.txrx_coordinates_to_dict(
-                electrodes.RxElectricPoint,
+                emg3d.RxElectricPoint,
                 ([1000, 2000, 3000, 4000], 2000, -1000, 0, 0))
         frequencies = (1, 0.1, 2, 3)
         srvy = surveys.Survey(sources, receivers, frequencies, name='Test')
 
         assert isinstance(srvy.sources, dict)
         assert srvy.sources['TxED-1'].center[0] == 0
-        assert srvy.size == 0
+        assert srvy.count == 0
+        assert srvy.size == 80
         assert srvy.shape == (5, 4, 4)
 
         assert 'Test' in srvy.__repr__()
@@ -37,10 +39,10 @@ class TestSurvey():
 
     def test_standard_deviation(self):
         sources = surveys.txrx_coordinates_to_dict(
-                electrodes.TxElectricDipole,
+                emg3d.TxElectricDipole,
                 (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0))
         receivers = surveys.txrx_coordinates_to_dict(
-                electrodes.RxElectricPoint,
+                emg3d.RxElectricPoint,
                 ([1000, 3000, 4000], 2000, -1000, 0, 0))
         frequencies = (1, 0.1, 2, 3)
         srvy0 = surveys.Survey(sources, receivers, frequencies,
@@ -83,8 +85,8 @@ class TestSurvey():
             srvy.relative_error = np.ones(srvy.shape)[2:6, :, :]
 
     def test_copy(self, tmpdir):
-        sources = electrodes.TxElectricDipole((0, 0, 0, 0, 0))
-        receivers = electrodes.RxElectricPoint((1000, 0, 0, 0, 0))
+        sources = emg3d.TxElectricDipole((0, 0, 0, 0, 0))
+        receivers = emg3d.RxElectricPoint((1000, 0, 0, 0, 0))
         # This also checks to_dict()/from_dict().
         srvy1 = surveys.Survey(sources, receivers, 1.0)
         # Set observed and standard deviation.
@@ -92,11 +94,6 @@ class TestSurvey():
         srvy1.standard_deviation = np.array([[[1.1]]])
         srvy2 = srvy1.copy()
         assert srvy1.sources == srvy2.sources
-
-        cpy = srvy1.to_dict()
-        del cpy['sources']
-        with pytest.raises(KeyError, match="Variable 'sources' missing"):
-            surveys.Survey.from_dict(cpy)
 
         srvy3 = surveys.Survey(sources, receivers, 1.0, [[[3+3j]]])
         srvy4 = srvy3.copy()
@@ -118,9 +115,9 @@ class TestSurvey():
         assert 'Data loaded from' in srvy7[1]
 
     def test_select(self):
-        sources = [electrodes.TxElectricDipole((x, 0, 0, 0, 0))
+        sources = [emg3d.TxElectricDipole((x, 0, 0, 0, 0))
                    for x in [0, 50, 100]]
-        receivers = [electrodes.RxElectricPoint((x, 0, 0, 0, 0))
+        receivers = [emg3d.RxElectricPoint((x, 0, 0, 0, 0))
                      for x in [1000, 1100, 1200, 1300, 1400]]
         survey = surveys.Survey(
             sources,
@@ -141,7 +138,7 @@ class TestSurvey():
 
 def test_txrx_coordinates_to_dict():
     sources = surveys.txrx_coordinates_to_dict(
-                    electrodes.TxElectricDipole,
+                    emg3d.TxElectricDipole,
                     ([-1, 1, ], 0, 0, [-10, 10], 0), strength=[100, 1])
     assert sources['TxED-1'].strength == 100
     assert sources['TxED-1'].azimuth == -10
@@ -152,12 +149,12 @@ def test_txrx_coordinates_to_dict():
 
 
 def test_txrx_lists_to_dict():
-    electric = [electrodes.RxElectricPoint((x, 0, 0, 0, 0))
+    electric = [emg3d.RxElectricPoint((x, 0, 0, 0, 0))
                 for x in [1000, 1100]]
     magnetic = surveys.txrx_coordinates_to_dict(
-                    electrodes.RxMagneticPoint,
+                    emg3d.RxMagneticPoint,
                     ([950, 1050, 1150], 0, 0, 0, 90))
-    streamer = electrodes.RxElectricPoint((5, 0, 0, 0, 0), relative=True)
+    streamer = emg3d.RxElectricPoint((5, 0, 0, 0, 0), relative=True)
 
     # If instance, it should give the instance in a dict.
     rec1 = surveys.txrx_lists_to_dict(streamer)
@@ -167,10 +164,27 @@ def test_txrx_lists_to_dict():
     rec2 = surveys.txrx_lists_to_dict(magnetic)
     assert magnetic['RxMP-1'] == rec2['RxMP-1']
 
-    rec3 = surveys.txrx_lists_to_dict([[streamer, ], electric, magnetic])
+    rec3 = surveys.txrx_lists_to_dict([streamer, electric, magnetic])
     assert rec3['RxEP-1'] == streamer
     assert rec3['RxEP-2'] == electric[0]
     assert rec3['RxEP-3'] == electric[1]
     assert rec3['RxMP-4'] == magnetic['RxMP-1']
     assert rec3['RxMP-5'] == magnetic['RxMP-2']
     assert rec3['RxMP-6'] == magnetic['RxMP-3']
+
+    rec4 = surveys.txrx_lists_to_dict((streamer, tuple(electric), magnetic))
+    assert rec3 == rec4
+
+
+def test_frequencies_to_dict():
+    f1 = {'n': 1.8, 1: True}
+    f2 = surveys.frequencies_to_dict(f1)
+    assert f1 == f2
+
+    f3 = [1.0, 2]
+    f4 = surveys.frequencies_to_dict(f3)
+    assert f4['f-1'] == 1
+    assert f4['f-2'] == 2
+
+    with pytest.raises(ValueError, match="Contains non-unique frequencies: "):
+        surveys.frequencies_to_dict([1, 2, 3, 4, 1])

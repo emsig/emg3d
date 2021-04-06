@@ -28,7 +28,8 @@ except ImportError:
 
 from emg3d import electrodes, utils, io
 
-__all__ = ['Survey', 'txrx_coordinates_to_dict', 'txrx_lists_to_dict']
+__all__ = ['Survey', 'txrx_coordinates_to_dict', 'txrx_lists_to_dict',
+           'frequencies_to_dict']
 
 
 @utils.known_class
@@ -55,30 +56,19 @@ class Survey:
 
     Parameters
     ----------
-    sources, receivers : tuple or dict
-        Sources and receivers.
+    sources, receivers : {Tx*, Rx*, list, dict)
+        Any of the available sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`, or a list or dict of
+        Tx*/Rx* instances. If it is a dict, it is returned unaltered.
 
-        - Tuples: Coordinates in one of the two following formats:
+        It can also be a list containing a combination of the above (lists,
+        dicts, and instances).
 
-          - `(x, y, z, azimuth, elevation)` [m, m, m, °, °];
-          - `(x0, x1, y0, y1, z0, z1)` [m, m, m, m, m, m].
-
-          Dimensions will be expanded (hence, if `n` dipoles, each parameter
-          must have length 1 or `n`). These dipoles will be named sequential
-          with `Tx###` and `Rx###`.
-
-          The tuple can additionally contain an additional element at the end
-          (after `elevation` or `z1`), `electric`, a boolean of length 1 or
-          `n`, that indicates if the dipoles are electric or magnetic.
-
-        - Dictionary: A dict where the values are :class:`Dipole`-instances,
-          de-serialized or not.
-
-    frequencies : ndarray or dict
+    frequencies : {array_like, dict}
         Source frequencies (Hz).
 
-        - ndarray : (or tuple, list): Frequencies will be stored in a dict with
-          keys assigned starting with 'f0', 'f1', and so on.
+        - array_like: Frequencies will be stored in a dict with keys assigned
+          starting with 'f-1', 'f-2', and so on.
 
         - dict: keys can be arbitrary names, values must be floats.
 
@@ -112,19 +102,10 @@ class Survey:
     def __init__(self, sources, receivers, frequencies, data=None, **kwargs):
         """Initiate a new Survey instance."""
 
-        # Store sources and receivers (run through txrx_lists_to_dict).
+        # Store sources, receivers, and frequencies.
         self._sources = txrx_lists_to_dict(sources)
         self._receivers = txrx_lists_to_dict(receivers)
-
-        # Check and store frequencies
-        if isinstance(frequencies, dict):
-            self._frequencies = frequencies
-        else:
-            freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
-            if freqs.size != np.unique(freqs).size:
-                raise ValueError(f"Contains non-unique frequencies: {freqs}.")
-            self._frequencies = {f"f-{i+1:0{len(str(freqs.size))}d}": f
-                                 for i, f in enumerate(freqs)}
+        self._frequencies = frequencies_to_dict(frequencies)
 
         # Initialize xarray dataset.
         self._initiate_dataset(data)
@@ -142,44 +123,8 @@ class Survey:
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
-    @utils._requires('xarray')
-    def _initiate_dataset(self, data):
-        """Initiate Dataset; wrapped in fct to check if xarray is installed."""
-
-        # Shape of DataArrays.
-        shape = (len(self._sources), len(self._receivers),
-                 len(self._frequencies))
-
-        # Initialize NaN-data if not provided.
-        if data is None:
-            data = {'observed': np.full(shape, np.nan+1j*np.nan)}
-
-        elif not isinstance(data, dict):
-            data = {'observed': np.atleast_3d(data)}
-
-        # Ensure we have 'observed' data:
-        if 'observed' not in data.keys():
-            data['observed'] = np.full(shape, np.nan+1j*np.nan)
-
-        # Create Dataset.
-        dims = ('src', 'rec', 'freq')
-        self._data = xarray.Dataset(
-            {k: xarray.DataArray(v, dims=dims) for k, v in data.items()},
-            coords={'src': list(self.sources.keys()),
-                    'rec': list(self.receivers.keys()),
-                    'freq': list(self.frequencies)},
-        )
-
-        # Add attributes.
-        self._data.src.attrs['Sources'] = "".join(
-                f"{k}: {s.__repr__()};\n" for k, s in self.sources.items())
-        self._data.rec.attrs['Receivers'] = "".join(
-                f"{k}: {d.__repr__()};\n" for k, d in self.receivers.items())
-        self._data.freq.attrs['Frequencies'] = "".join(
-                f"{k}: {f};\n" for k, f in self.frequencies.items())
-        self._data.freq.attrs['units'] = 'Hz'
-
     def __repr__(self):
+        """Simple representation."""
         name = f"  Name: {self.name}\n" if self.name else ""
         date = f"  Date: {self.date}\n" if self.date else ""
         info = f"  Info: {self.info}\n" if self.info else ""
@@ -187,6 +132,7 @@ class Survey:
                 f"{self.data.__repr__()}")
 
     def _repr_html_(self):
+        """HTML representation with fancy xarray display."""
         name = f"Name: {self.name}<br>" if self.name else ""
         date = f"Date: {self.date}<br>" if self.date else ""
         info = f"Info: {self.info}<br>" if self.info else ""
@@ -198,34 +144,32 @@ class Survey:
         return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the Survey in a dict."""
+        """Store the necessary information of the Survey in a dict.
 
-        out = {'__class__': self.__class__.__name__}
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
 
-        # Add sources.
-        out['sources'] = {k: v.to_dict() for k, v in self.sources.items()}
 
-        # Add receivers.
-        rec = {k: v.to_dict() for k, v in self.receivers.items()}
-        out['receivers'] = rec
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Survey.
 
-        # Add frequencies.
-        out['frequencies'] = self.frequencies
-
-        # Add data.
-        out['data'] = {}
-        for key in self.data.keys():
-            out['data'][key] = self.data[key].data
-
-        # Add `noise_floor` and `relative error`.
-        out['noise_floor'] = self.data.noise_floor
-        out['relative_error'] = self.data.relative_error
-
-        # Add info.
-        out['name'] = self.name
-        out['date'] = self.date
-        out['info'] = self.info
-
+        """
+        out = {
+            '__class__': self.__class__.__name__,
+            'sources': {k: v.to_dict() for k, v in self.sources.items()},
+            'receivers': {k: v.to_dict() for k, v in self.receivers.items()},
+            'frequencies': self.frequencies,
+            'data': {k: v.data for k, v in self.data.items()},
+            'noise_floor': self.data.noise_floor,
+            'relative_error': self.data.relative_error,
+            'name': self.name,
+            'date': self.date,
+            'info': self.info,
+        }
         if copy:
             return deepcopy(out)
         else:
@@ -234,40 +178,27 @@ class Survey:
     @classmethod
     @utils._requires('xarray')
     def from_dict(cls, inp):
-        """Convert dictionary into :class:`Survey` instance.
+        """Convert dictionary into :class:`emg3d.surveys.Survey` instance.
 
         Parameters
         ----------
         inp : dict
             Dictionary as obtained from :func:`Survey.to_dict`.
-            The dictionary needs the keys `sources`, `receivers` `frequencies`,
-            and `data`.
+            The dictionary needs the keys `sources`, `receivers`, and
+            `frequencies`.
 
         Returns
         -------
-        obj : :class:`Survey` instance
+        survey : Survey
+            A :class:`emg3d.surveys.Survey` instance.
 
         """
-        try:
-            # Optional parameters.
-            opt = ['noise_floor', 'relative_error', 'name', 'info', 'date']
-
-            sources = {k: getattr(electrodes, v['__class__']).from_dict(v)
-                       for k, v in inp['sources'].items()}
-            receivers = {k: getattr(electrodes, v['__class__']).from_dict(v)
-                         for k, v in inp['receivers'].items()}
-
-            # Initiate survey.
-            out = cls(sources=sources,
-                      receivers=receivers,
-                      frequencies=inp['frequencies'],
-                      data=inp['data'],
-                      **{k: inp[k] if k in inp.keys() else None for k in opt})
-
-            return out
-
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
+        inp = {k: v for k, v in inp.items() if k != '__class__'}
+        inp['sources'] = {k: getattr(electrodes, v['__class__']).from_dict(v)
+                          for k, v in inp['sources'].items()}
+        inp['receivers'] = {k: getattr(electrodes, v['__class__']).from_dict(v)
+                            for k, v in inp['receivers'].items()}
+        return cls(**inp)
 
     def to_file(self, fname, name='survey', **kwargs):
         """Store Survey to a file.
@@ -275,23 +206,14 @@ class Survey:
         Parameters
         ----------
         fname : str
-            File name inclusive ending, which defines the used data format.
-            Implemented are currently:
+            Absolute or relative file name including ending, which defines the
+            used data format. See :func:`emg3d.io.save` for the options.
 
-            - `.h5` (default): Uses `h5py` to store inputs to a hierarchical,
-              compressed binary hdf5 file. Recommended file format, but
-              requires the module `h5py`. Default format if ending is not
-              provided or not recognized.
-            - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
-              file. Default format if `h5py` is not installed.
-            - `.json`: Uses `json` to store inputs to a hierarchical, plain
-              text file.
-
-        name : str
-            Name under which the survey is stored within the file.
+        name : str, default: 'survey'
+            Name with which the survey is stored in the file.
 
         kwargs : Keyword arguments, optional
-            Passed through to :func:`io.save`.
+            Passed through to :func:`emg3d.io.save`.
 
         """
         kwargs[name] = self                # Add survey to dict.
@@ -305,14 +227,9 @@ class Survey:
         Parameters
         ----------
         fname : str
-            File name including extension. Used backend depends on the file
-            extensions:
+            Absolute or relative file name including extension.
 
-            - '.npz': numpy-binary
-            - '.h5': h5py-binary (needs `h5py`)
-            - '.json': json
-
-        name : str
+        name : str, default: 'survey'
             Name under which the survey is stored within the file.
 
         kwargs : Keyword arguments, optional
@@ -321,30 +238,77 @@ class Survey:
 
         Returns
         -------
-        survey : :class:`Survey`
-            The survey that was stored in the file.
+        survey : Survey
+            A :class:`emg3d.surveys.Survey` instance.
+
+        info : str, returned if verb<0
+            Info-string.
 
         """
         out = io.load(fname, **kwargs)
-        if 'verb' in kwargs and kwargs['verb'] < 0:
+        if kwargs.get('verb', 0) < 0:
             return out[0][name], out[1]
         else:
             return out[name]
 
+    # DATA
+    @utils._requires('xarray')
+    def _initiate_dataset(self, data):
+        """Initiate Dataset."""
+
+        # Get shape of DataArrays.
+        shape = (len(self._sources),
+                 len(self._receivers),
+                 len(self._frequencies))
+
+        # Initialize data and ensure there is 'observed'.
+        if data is None:
+            data = {'observed': np.full(shape, np.nan+1j*np.nan)}
+        elif not isinstance(data, dict):
+            data = {'observed': np.atleast_3d(data)}
+        elif 'observed' not in data.keys():
+            data['observed'] = np.full(shape, np.nan+1j*np.nan)
+
+        # Create Dataset, add all data as DataArrays.
+        dims = ('src', 'rec', 'freq')
+        self._data = xarray.Dataset(
+            {k: xarray.DataArray(v, dims=dims) for k, v in data.items()},
+            coords={'src': list(self.sources.keys()),
+                    'rec': list(self.receivers.keys()),
+                    'freq': list(self.frequencies)},
+        )
+
+        # Add attributes.
+        self._data.src.attrs['Sources'] = "".join(
+                f"{k}: {s.__repr__()};\n" for k, s in self.sources.items()
+                )[:-2]+'.'
+        self._data.rec.attrs['Receivers'] = "".join(
+                f"{k}: {d.__repr__()};\n" for k, d in self.receivers.items()
+                )[:-2]+'.'
+        self._data.freq.attrs['Frequencies'] = "".join(
+                f"{k}: {f} Hz;\n" for k, f in self.frequencies.items()
+                )[:-2]+'.'
+
+    @property
+    def data(self):
+        """Data, a :class:`xarray.Dataset` instance."""
+        return self._data
+
     def select(self, sources=None, receivers=None, frequencies=None):
-        """Return a survey with selectod sources, receivers, and frequencies.
+        """Return a Survey with selected sources, receivers, and frequencies.
 
 
         Parameters
         ----------
-        sources, receivers, frequencies : list
+        sources, receivers, frequencies : list, default: None
             Lists containing the wanted sources, receivers, and frequencies.
+            If None, all are selected.
 
 
         Returns
         -------
-        subsurvey : :class:`emg3d.surveys.Survey`
-            Survey with selected data.
+        survey : Survey
+            A :class:`emg3d.surveys.Survey` instance.
 
         """
 
@@ -372,80 +336,62 @@ class Survey:
             if isinstance(frequencies, str):
                 frequencies = [frequencies, ]
             survey['frequencies'] = {
-                    r: survey['frequencies'][r] for r in frequencies}
+                    f: survey['frequencies'][f] for f in frequencies}
             selection['freq'] = frequencies
 
         # Replace data with selected data.
         for key in survey['data'].keys():
             survey['data'][key] = self.data[key].sel(**selection)
 
-        # Return reduced survey.
+        # Return new, reduced survey.
         return Survey.from_dict(survey)
 
     @property
     def shape(self):
-        """Return nsrc x nrec x nfreq.
-
-        Note that not all source-receiver-frequency pairs do actually have
-        data. Check `size` to see how many data points there are.
-        """
+        """Shape of data (nsrc, nrec, nfreq)."""
         return self.data.observed.shape
 
     @property
     def size(self):
-        """Return actual data size (does NOT equal nsrc x nrec x nfreq)."""
+        """Size of data (nsrc x nrec x nfreq)."""
+        return int(self.data.observed.size)
+
+    @property
+    def count(self):
+        """Count of observed data."""
         return int(self.data.observed.count())
 
-    @property
-    def data(self):
-        """Data, a :class:`xarray.DataSet` instance.
-
-        Contains the :class:`xarray.DataArray` element `.observed`, but other
-        data can be added. E.g., :class:`emg3d.simulations.Simulation` adds the
-        `synthetic` array.
-        """
-        return self._data
-
+    # SOURCES, RECEIVERS, FREQUENCIES
     @property
     def sources(self):
-        """Source dict containing all source dipoles."""
+        """Source dict containing all sources."""
         return self._sources
 
     @property
     def receivers(self):
-        """Receiver dict containing all receiver dipoles."""
+        """Receiver dict containing all receivers."""
         return self._receivers
-
-    @property
-    def src_coords(self):
-        """Return source coordinates.
-
-        The returned format is `(x, y, z, azimuth, elevation)`, a tuple of 5
-        tuples.
-        """
-
-        return tuple(
-            np.array([[s.center[0], s.center[1], s.center[2], s.azimuth,
-                       s.elevation] for s in self.sources.values()]).T
-        )
-
-    @property
-    def rec_coords(self):
-        """Return receiver coordinates as `(x, y, z, azimuth, elevation)`."""
-        return tuple(
-            np.array([[r.center[0], r.center[1], r.center[2], r.azimuth,
-                       r.elevation] for r in self.receivers.values()]).T
-        )
-
-    @property
-    def rec_types(self):
-        """Return receiver flags if electric, as tuple."""
-        return tuple([r.xtype == 'electric' for r in self.receivers.values()])
 
     @property
     def frequencies(self):
         """Frequency dict containing all frequencies."""
         return self._frequencies
+
+    #  #  #  #  #  #
+
+    @property
+    def src_coords(self):
+        """Return source centers (x, y, z) as ndarray of shape (n, 3)."""
+        return np.array([s.center[:] for s in self.sources.values()])
+
+    @property
+    def rec_coords(self):
+        """Return receiver centers (x, y, z) as ndarray of shape (n, 3)."""
+        return np.array([r.center[:] for r in self.receivers.values()])
+
+    def rec_xtypes(self, xtype='electric'):
+        """Return tuple of booleans if receiver are of `xtype`."""
+        return tuple([r.xtype == xtype for r in self.receivers.values()])
 
     def _freq_key_or_value(self, frequency, returns='key'):
         """Returns `returns` of `frequency`, provided as its key or its value.
@@ -479,6 +425,7 @@ class Survey:
             else:
                 return frequency
 
+    # STANDARD DEVIATION
     @property
     def standard_deviation(self):
         r"""Return the standard deviation of the data.
@@ -732,11 +679,13 @@ def txrx_lists_to_dict(txrx):
 
     Parameters
     ----------
-    txrx : {list, dict)
-        A list or dict of Tx*/Rx* instances. If it is a dict, it is returned
-        unaltered.
+    txrx : {Tx*, Rx*, list, dict)
+        Any of the available sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`, or a list or dict of
+        Tx*/Rx* instances. If it is a dict, it is returned unaltered.
 
-        A list can also consist of other lists and dicts of Tx*/Rx* instances.
+        It can also be a list containing a combination of the above (lists,
+        dicts, and instances).
 
 
     Returns
@@ -777,27 +726,71 @@ def txrx_lists_to_dict(txrx):
     if isinstance(txrx, dict):
         return txrx
 
-    # Undocumented, but possible: A single Tx*/Rx* instance.
+    # A single Tx*/Rx* instance.
     elif hasattr(txrx, '_prefix'):
         txrx = [txrx, ]
 
-    # If it is a list of lists/dicts, collect them.
-    elif isinstance(txrx[0], (list, dict)):
+    # If it is a list and contains other lists or dicts, collect them.
+    elif any(isinstance(el, (list, tuple, dict)) for el in txrx):
 
-        # Add all lists dict to new list.
+        # Add all lists and dicts to new list.
         new_txrx = list()
         for trx in txrx:
+
+            # A single Tx*/Rx* instance.
+            if hasattr(trx, '_prefix'):
+                trx = [trx, ]
+
             # If dict, cast it to list.
-            if isinstance(trx, dict):
+            elif isinstance(trx, dict):
                 trx = list(trx.values())
+
             new_txrx += trx
 
         # Overwrite original list with new flat list.
         txrx = new_txrx
 
-    # else, it has to be a list of Tx/Rx instances.
+    # else, it has to be a list/tuple of Tx/Rx instances.
 
     # Return TxRx-dict.
     nx = len(txrx)
     return {f"{trx._prefix}-{i+1:0{len(str(nx))}d}": trx
             for i, trx in enumerate(txrx)}
+
+
+def frequencies_to_dict(frequencies):
+    """Create dict from provided frequencies.
+
+    Parameters
+    ----------
+    frequencies : {array_like, dict}
+        Source frequencies (Hz).
+
+        - array_like: Frequencies will be stored in a dict with keys assigned
+          starting with 'f-1', 'f-2', and so on.
+
+        - dict: returned unaltered.
+
+
+    Returns
+    -------
+    out : dict
+        Dict where the keys are "f-n" where n=1...N, and the values are the
+        provided frequencies.
+
+    """
+
+    if not isinstance(frequencies, dict):
+
+        # Cast.
+        freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
+
+        # Ensure frequencies are unique.
+        if freqs.size != np.unique(freqs).size:
+            raise ValueError(f"Contains non-unique frequencies: {freqs}.")
+
+        # Store in dict.
+        frequencies = {f"f-{i+1:0{len(str(freqs.size))}d}": freq
+                       for i, freq in enumerate(freqs)}
+
+    return frequencies

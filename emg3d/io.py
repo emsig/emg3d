@@ -174,8 +174,8 @@ def load(fname, **kwargs):
         :class:`emg3d.models.Model` instances are de-serialized and returned as
         instances.
 
-    info : str
-        Info-string if ``verb<0``.
+    info : str, returned if verb<0
+        Info-string.
 
     """
     # Get kwargs.

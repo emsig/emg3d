@@ -722,9 +722,8 @@ class Simulation:
         """Return electric and magnetic fields at receiver locations."""
         freq = self.survey._freq_key_or_value(frequency)
 
-        # Get receiver coordinates.
-        rec_coords = self.survey.rec_coords
-        rec_types = self.survey.rec_types
+        # Get receiver types.
+        rec_types = self.survey.rec_xtypes('electric')
 
         # Store electric receivers.
         if rec_types.count(True):
@@ -732,7 +731,8 @@ class Simulation:
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
             resp = self.get_efield(source, freq).get_receiver(
-                    receiver=tuple(np.array(rec_coords)[:, erec])
+                    receiver=[list(self.survey.receivers.values())[i]
+                              for i in erec]
             )
 
             # Store the receiver response.
@@ -744,7 +744,8 @@ class Simulation:
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = self.get_hfield(source, freq).get_receiver(
-                    receiver=tuple(np.array(rec_coords)[:, mrec])
+                    receiver=[list(self.survey.receivers.values())[i]
+                              for i in mrec]
             )
 
             # Store the receiver response.
@@ -831,7 +832,7 @@ class Simulation:
 
                 # Create noise.
                 std = self.survey.standard_deviation
-                random = np.random.randn(self.survey.size*2)
+                random = np.random.randn(self.survey.count*2)
                 noise_re = std*random[::2].reshape(self.survey.shape)
                 noise_im = std*random[1::2].reshape(self.survey.shape)
 
@@ -845,8 +846,8 @@ class Simulation:
 
             # Set near-offsets to NaN.
             offsets = sl.norm(
-                np.array(self.survey.rec_coords[:3])[:, None, :] -
-                np.array(self.survey.src_coords[:3])[:, :, None],
+                self.survey.rec_coords.T[:, None, :] -
+                self.survey.src_coords.T[:, :, None],
                 axis=0,
                 check_finite=False,
             )
@@ -1351,7 +1352,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     gopts['frequency'] = gridding_opts.pop('frequency', frequency)
 
     # Center defaults to center of all sources.
-    center = tuple([np.mean(survey.src_coords[i]) for i in range(3)])
+    center = tuple([survey.src_coords[:, i].mean() for i in range(3)])
     gopts['center'] = gridding_opts.pop('center', center)
 
     # Vector.
@@ -1450,7 +1451,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
         else:
             # Get it from survey, add 5 % on each side.
-            inp = np.r_[survey.src_coords[i], survey.rec_coords[i]]
+            inp = np.r_[survey.src_coords[:, i], survey.rec_coords[:, i]]
             dim = [min(inp), max(inp)]
             diff = np.diff(dim)[0]
             dim = [min(inp)-diff/10, max(inp)+diff/10]
