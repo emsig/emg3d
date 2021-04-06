@@ -14,75 +14,116 @@ from emg3d import surveys
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestSurvey():
-    def test_general(self):
-        sources = surveys.txrx_coordinates_to_dict(
-                emg3d.TxElectricDipole,
-                (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0))
-        receivers = surveys.txrx_coordinates_to_dict(
-                emg3d.RxElectricPoint,
-                ([1000, 2000, 3000, 4000], 2000, -1000, 0, 0))
-        frequencies = (1, 0.1, 2, 3)
-        srvy = surveys.Survey(sources, receivers, frequencies, name='Test')
+    sources = surveys.txrx_coordinates_to_dict(
+            emg3d.TxElectricDipole,
+            (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0))
+    receivers = surveys.txrx_coordinates_to_dict(
+            emg3d.RxElectricPoint,
+            ([1000, 2000, 3000, 4000], 2000, -1000, 0, 0))
+    frequencies = (1, 0.1, 2, 3)
+    shape = (len(sources), len(receivers), len(frequencies))
+
+    def test_defaults(self):
+        srvy = surveys.Survey(self.sources, self.receivers, self.frequencies)
 
         assert isinstance(srvy.sources, dict)
         assert srvy.sources['TxED-1'].center[0] == 0
         assert srvy.count == 0
         assert srvy.size == 80
-        assert srvy.shape == (5, 4, 4)
+        assert srvy.shape == self.shape
 
-        assert 'Test' in srvy.__repr__()
-        assert 'Test' in srvy._repr_html_()
         assert 'Coordinates' in srvy._repr_html_()
+        assert 'Coordinates' in srvy.__repr__()
+
+        # Check defaults
+        assert_allclose(srvy.data.observed.data,
+                        np.ones(self.shape)*(np.nan+1j*np.nan))
+        assert srvy.noise_floor is None
+        assert srvy.relative_error is None
+        assert srvy.name is None
+        assert srvy.date is None
+        assert srvy.info is None
 
         with pytest.raises(TypeError, match="Unexpected "):
-            surveys.Survey(sources, receivers, frequencies, bla='a')
+            surveys.Survey(self.sources, self.receivers, self.frequencies,
+                           bla='a')
+
+    def test_basics(self):
+        data = np.arange(np.prod(self.shape)).reshape(self.shape)
+        srvy = surveys.Survey(
+                self.sources, self.receivers, self.frequencies,
+                data={'test': data},
+                relative_error=0.05, noise_floor=1e-15,
+                name='MySurvey', info='RainyDay', date='today',
+                )
+
+        assert isinstance(srvy.sources, dict)
+        assert srvy.sources['TxED-1'].center[0] == 0
+        assert srvy.count == 0
+        assert srvy.size == 80
+        assert srvy.shape == self.shape
+
+        assert 'MySurvey' in srvy._repr_html_()
+        assert 'MySurvey' in srvy.__repr__()
+        assert 'RainyDay' in srvy._repr_html_()
+        assert 'RainyDay' in srvy.__repr__()
+        assert 'today' in srvy._repr_html_()
+        assert 'today' in srvy.__repr__()
+
+        assert_allclose(srvy.data.test.data, data)
+        assert_allclose(srvy.data.observed.data,
+                        np.ones(self.shape)*(np.nan+1j*np.nan))
+        assert srvy.noise_floor == 1e-15
+        assert srvy.relative_error == 0.05
+        assert srvy.name == 'MySurvey'
+        assert srvy.date == 'today'
+        assert srvy.info == 'RainyDay'
 
     def test_standard_deviation(self):
-        sources = surveys.txrx_coordinates_to_dict(
-                emg3d.TxElectricDipole,
-                (0, [1000, 2000, 3000, 4000, 5000], -950, 0, 0))
-        receivers = surveys.txrx_coordinates_to_dict(
-                emg3d.RxElectricPoint,
-                ([1000, 3000, 4000], 2000, -1000, 0, 0))
-        frequencies = (1, 0.1, 2, 3)
-        srvy0 = surveys.Survey(sources, receivers, frequencies,
-                               data=np.ones((5, 3, 4)))
+        srvy0 = surveys.Survey(self.sources, self.receivers, self.frequencies,
+                               data=np.ones(self.shape))
         assert srvy0.standard_deviation is None
+
+        srvy1 = surveys.Survey(self.sources, self.receivers, self.frequencies,
+                               relative_error=0.5, noise_floor=0.1,
+                               data=np.ones(self.shape))
+        std = np.sqrt(np.ones(self.shape)*0.1**2 + np.ones(self.shape)*0.5**2)
+        assert_allclose(srvy1.standard_deviation.data, std)
 
         # Test f-dependent noise-floor and source-dependent rel. error.
         nf = np.arange(1, 5)[None, None, :]*1e-15  # No noise floor for f=1.0
         re = np.arange(1, 6)[:, None, None]/100    # No rel. error for Tx1
-        srvy = surveys.Survey(sources, receivers, frequencies,
-                              relative_error=re, noise_floor=nf,
-                              data=np.ones((5, 3, 4)))
+        srvy2 = surveys.Survey(self.sources, self.receivers, self.frequencies,
+                               relative_error=re, noise_floor=nf,
+                               data=np.ones(self.shape))
 
-        assert srvy.noise_floor == 'data._noise_floor'
-        assert srvy.relative_error == 'data._relative_error'
-        assert_allclose(srvy.data._noise_floor[0, 0, :], np.squeeze(nf))
-        assert_allclose(srvy.data._relative_error[:, 0, 0], np.squeeze(re))
+        assert srvy2.noise_floor == 'data._noise_floor'
+        assert srvy2.relative_error == 'data._relative_error'
+        assert_allclose(srvy2.data._noise_floor[0, 0, :], np.squeeze(nf))
+        assert_allclose(srvy2.data._relative_error[:, 0, 0], np.squeeze(re))
         # As data are ones, we can check standard_deviation without it.
-        std = np.sqrt(np.ones(srvy.shape)*nf**2 + np.ones(srvy.shape)*re**2)
-        assert_allclose(srvy.standard_deviation.data, std)
+        std = np.sqrt(np.ones(srvy2.shape)*nf**2 + np.ones(srvy2.shape)*re**2)
+        assert_allclose(srvy2.standard_deviation.data, std)
 
         # Set the standard deviations
-        test_std = np.arange(1, srvy.size+1).reshape(srvy.shape)
-        srvy.standard_deviation = test_std
-        assert_allclose(srvy.data._noise_floor[0, 0, :], np.squeeze(nf))
-        assert_allclose(srvy.data._relative_error[:, 0, 0], np.squeeze(re))
-        assert_allclose(srvy.standard_deviation.data, test_std)
-        srvy.standard_deviation = None  # Delete again
-        assert_allclose(srvy.standard_deviation.data, std)
+        test_std = np.arange(1, srvy2.size+1).reshape(srvy2.shape)
+        srvy2.standard_deviation = test_std
+        assert_allclose(srvy2.data._noise_floor[0, 0, :], np.squeeze(nf))
+        assert_allclose(srvy2.data._relative_error[:, 0, 0], np.squeeze(re))
+        assert_allclose(srvy2.standard_deviation.data, test_std)
+        srvy2.standard_deviation = None  # Delete again
+        assert_allclose(srvy2.standard_deviation.data, std)
 
         with pytest.raises(ValueError, match='All values of `standard_dev'):
-            srvy.standard_deviation = np.zeros(srvy.shape)
+            srvy2.standard_deviation = np.zeros(srvy2.shape)
         with pytest.raises(ValueError, match='All values of `noise_floor`'):
-            srvy.noise_floor = 0.0
+            srvy2.noise_floor = 0.0
         with pytest.raises(ValueError, match='All values of `relative_error'):
-            srvy.relative_error = 0.0
+            srvy2.relative_error = 0.0
         with pytest.raises(ValueError, match='operands could not be '):
-            srvy.noise_floor = np.ones(srvy.shape)[:, :2, :]
+            srvy2.noise_floor = np.ones(srvy2.shape)[:, :2, :]
         with pytest.raises(ValueError, match='operands could not be '):
-            srvy.relative_error = np.ones(srvy.shape)[2:6, :, :]
+            srvy2.relative_error = np.ones(srvy2.shape)[2:6, :, :]
 
     def test_copy(self, tmpdir):
         sources = emg3d.TxElectricDipole((0, 0, 0, 0, 0))

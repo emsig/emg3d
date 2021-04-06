@@ -520,7 +520,7 @@ class Simulation:
     # GET FUNCTIONS
     def get_grid(self, source, frequency):
         """Return computational grid of the given source and frequency."""
-        freq = self.survey._freq_key_or_value(frequency)
+        freq = self._freq_inp2key(frequency)
 
         # Return grid if it exists already.
         if self._dict_grid[source][freq] is not None:
@@ -591,7 +591,7 @@ class Simulation:
 
     def get_model(self, source, frequency):
         """Return model on the grid of the given source and frequency."""
-        freq = self.survey._freq_key_or_value(frequency)
+        freq = self._freq_inp2key(frequency)
 
         # Return model if it exists already.
         if self._dict_model[source][freq] is not None:
@@ -653,7 +653,7 @@ class Simulation:
 
     def get_efield(self, source, frequency, **kwargs):
         """Return electric field for given source and frequency."""
-        freq = self.survey._freq_key_or_value(frequency)
+        freq = self._freq_inp2key(frequency)
 
         # Get call_from_compute and ensure no kwargs are left.
         call_from_compute = kwargs.pop('call_from_compute', False)
@@ -701,7 +701,7 @@ class Simulation:
 
     def get_hfield(self, source, frequency, **kwargs):
         """Return magnetic field for given source and frequency."""
-        freq = self.survey._freq_key_or_value(frequency)
+        freq = self._freq_inp2key(frequency)
 
         # If magnetic field not computed yet compute it.
         if self._dict_hfield[source][freq] is None:
@@ -719,7 +719,7 @@ class Simulation:
 
     def _store_responses(self, source, frequency):
         """Return electric and magnetic fields at receiver locations."""
-        freq = self.survey._freq_key_or_value(frequency)
+        freq = self._freq_inp2key(frequency)
 
         # Get receiver types.
         rec_types = tuple([r.xtype == 'electric'
@@ -753,7 +753,7 @@ class Simulation:
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
-        freq = self.survey._freq_key_or_value(frequency)
+        freq = self._freq_inp2key(frequency)
         return self._dict_efield_info[source][freq]
 
     # ASYNCHRONOUS COMPUTATION
@@ -955,6 +955,17 @@ class Simulation:
 
         return self.__srcfreq
 
+    def _freq_inp2key(self, frequency):
+        """Return key of frequency entry given its key or its value. """
+        if not isinstance(frequency, str):
+            if not hasattr(self, '_freq_value_key'):
+                self._freq_value_key = {
+                    float(v): k for k, v in self.survey.frequencies.items()
+                }
+            frequency = self._freq_value_key[frequency]
+
+        return frequency
+
     @property
     def _info_grids(self):
         """Return a string with "min {- max}" grid size."""
@@ -1113,7 +1124,7 @@ class Simulation:
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
 
-        freq = self.survey._freq_key_or_value(frequency, 'value')
+        freq = self.survey.frequencies[frequency]
         grid = self.get_grid(source, frequency)
 
         # Initiate empty field
