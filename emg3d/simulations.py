@@ -1,12 +1,9 @@
 """
-A simulation is the computation (modelling) of electromagnetic responses of a
-resistivity (conductivity) model for a given survey.
+A simulation is the computation (modelling) of the electromagnetic responses
+due to a given model and survey.
 
-In its heart, `emg3d` is a multigrid solver for 3D electromagnetic diffusion
-with triaxial electrical anisotropy. However, it contains most functionalities
-to also act as a modeller. The simulation module combines all these things
-by combining surveys with computational meshes and fields and providing
-high-level, specialised modelling routines.
+The simulation module combines the different pieces of ``emg3d`` providing
+high-level, specialised modelling routines for the end user.
 """
 # Copyright 2018-2021 The EMSiG community.
 #
@@ -29,8 +26,8 @@ from copy import deepcopy
 
 import numpy as np
 
-from emg3d import (fields, io, solver, surveys, maps, models, meshes, optimize,
-                   utils, electrodes)
+from emg3d import (electrodes, fields, io, maps, meshes, models,
+                   optimize, solver, surveys, utils)
 
 __all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
 

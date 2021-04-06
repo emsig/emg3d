@@ -5,7 +5,8 @@ import numpy as np
 from scipy.constants import mu_0
 from numpy.testing import assert_allclose
 
-from emg3d import meshes, io
+import emg3d
+from emg3d import meshes
 
 
 # Import soft dependencies.
@@ -15,7 +16,7 @@ except ImportError:
     discretize = None
 
 # Data generated with create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
+REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 def test_BaseMesh():

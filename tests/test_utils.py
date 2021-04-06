@@ -4,7 +4,8 @@ import numpy as np
 from timeit import default_timer
 from numpy.testing import assert_allclose
 
-# Soft dependencies
+from emg3d import utils
+
 try:
     import scooby
 except ImportError:
@@ -13,8 +14,6 @@ try:
     import empymod
 except ImportError:
     empymod = None
-
-from emg3d import utils
 
 
 # EMArray

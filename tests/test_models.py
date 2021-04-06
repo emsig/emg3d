@@ -2,7 +2,8 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from emg3d import fields, meshes, models
+import emg3d
+from emg3d import models
 
 from . import helpers
 
@@ -13,7 +14,7 @@ class TestModel:
         # Mainly regression tests
 
         # Create some dummy data
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
                 np.zeros(3))
 
@@ -24,7 +25,7 @@ class TestModel:
 
         _, _ = capsys.readouterr()  # Clean-up
         # Using defaults; check backwards compatibility for freq.
-        sfield = fields.Field(grid, frequency=1)
+        sfield = emg3d.Field(grid, frequency=1)
         model1 = models.Model(grid)
 
         # Check representation of Model.
@@ -141,11 +142,11 @@ class TestModel:
     def test_interpolate(self):
 
         # Create some dummy data
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.array([2, 2]), np.array([4, 4]), np.array([5, 5])],
                 np.zeros(3))
 
-        grid2 = meshes.TensorMesh(
+        grid2 = emg3d.TensorMesh(
                 [np.array([2]), np.array([4]), np.array([5])],
                 np.array([1, 2, 2.5]))
 
@@ -184,7 +185,7 @@ class TestModel:
     def test_equal_mapping(self):
 
         # Create some dummy data
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
                 np.zeros(3))
 
@@ -197,7 +198,7 @@ class TestModel:
 
     def test_negative_values(self):
         # Create some dummy data
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
                 np.zeros(3))
 
@@ -214,7 +215,7 @@ class TestModel:
         models.Model(grid, property_x=-1, mapping='LnResistivity')
 
     def test_broadcasting(self):
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.ones(4), np.ones(2), np.ones(6)], (0, 0, 0))
 
         model = models.Model(grid, 1, 1, 1, 1, 1)
@@ -241,7 +242,7 @@ class TestModel:
 
     def test_change_anisotropy(self):
         hx = [2, 2]
-        grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))
+        grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))
         model = models.Model(grid, 1)
 
         with pytest.raises(ValueError, match='initiated without `property_y`'):
@@ -260,9 +261,9 @@ class TestModel:
 class TestModelOperators:
 
     # Define two different sized meshes.
-    mesh_base = meshes.TensorMesh(
+    mesh_base = emg3d.TensorMesh(
             [np.ones(3), np.ones(4), np.ones(5)], origin=np.array([0, 0, 0]))
-    mesh_diff = meshes.TensorMesh(
+    mesh_diff = emg3d.TensorMesh(
             [np.ones(3), np.ones(4), np.ones(6)], origin=np.array([0, 0, 0]))
 
     # Define a couple of models.

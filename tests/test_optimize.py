@@ -1,15 +1,16 @@
 import pytest
 import numpy as np
-# from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose
+
+import emg3d
+from emg3d import optimize
+
 
 # Soft dependencies
 try:
     import xarray
 except ImportError:
     xarray = None
-
-import emg3d
-from emg3d import meshes, models, surveys, simulations, optimize
 
 
 def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
@@ -68,7 +69,7 @@ def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
         model_diff = model.copy()
         model_diff.property_x[ix, iy, iz] += epsilon
 
-        sim_data = simulations.Simulation(model=model_diff, **sim_inp)
+        sim_data = emg3d.Simulation(model=model_diff, **sim_inp)
         sim_data._tqdm_opts = {'disable': True}
 
         # Compute FD-gradient
@@ -86,7 +87,40 @@ def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-class TestOptimize():
+def test_misfit():
+    data = 1
+    syn = 5
+    rel_err = 0.05
+    sources = emg3d.TxElectricDipole((0, 0, 0, 0, 0))
+    receivers = emg3d.RxElectricPoint((5, 0, 0, 0, 0))
+
+    survey = emg3d.Survey(
+        sources=sources, receivers=receivers, frequencies=100,
+        data=np.zeros((1, 1, 1))+data, relative_error=0.05,
+    )
+
+    grid = emg3d.TensorMesh([np.ones(10)*2, [2, 2], [2, 2]], (-10, -2, -2))
+    model = emg3d.Model(grid, 1)
+
+    simulation = emg3d.Simulation(survey=survey, grid=grid, model=model)
+
+    field = emg3d.Field(grid, dtype=np.float64)
+    field.field += syn
+    simulation._dict_efield['TxED-1']['f-1'] = field
+    simulation.data['synthetic'] = simulation.data['observed']*0 + syn
+
+    misfit = 0.5*((syn-data)/(rel_err*data))**2
+    assert_allclose(optimize.misfit(simulation), misfit)
+
+    # Missing noise_floor / std.
+    survey = emg3d.Survey(sources, receivers, 100)
+    simulation = emg3d.Simulation(survey=survey, grid=grid, model=model)
+    with pytest.raises(ValueError, match="Either `noise_floor` or"):
+        optimize.misfit(simulation)
+
+
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+class TestGradient:
     if xarray is not None:
         # Create a simple survey
         sources = [emg3d.TxElectricDipole((0, x, -950, 0, 0))
@@ -96,18 +130,18 @@ class TestOptimize():
                 (np.arange(12)*500, 0, -1000, 0, 0))
         frequencies = (1.0, 2.0)
 
-        survey = surveys.Survey(sources, receivers, frequencies)
+        survey = emg3d.Survey(sources, receivers, frequencies)
 
         # Create a simple grid and model
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
                 np.array([-1250, -1250, -2250]))
-        model1 = models.Model(grid, 1)
-        model2 = models.Model(grid, np.arange(1, grid.n_cells+1).reshape(
+        model1 = emg3d.Model(grid, 1)
+        model2 = emg3d.Model(grid, np.arange(1, grid.n_cells+1).reshape(
             grid.shape_cells))
 
         # Create a simulation, compute all fields.
-        simulation = simulations.Simulation(
+        simulation = emg3d.Simulation(
                 survey, grid, model1, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
@@ -115,7 +149,7 @@ class TestOptimize():
 
         simulation.compute(observed=True)
 
-        simulation = simulations.Simulation(
+        simulation = emg3d.Simulation(
                 survey, grid, model2, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
@@ -125,92 +159,84 @@ class TestOptimize():
 
         # Anisotropic models.
         simulation = self.simulation.copy()
-        simulation.model = models.Model(self.grid, 1, 2, 3)
+        simulation.model = emg3d.Model(self.grid, 1, 2, 3)
         with pytest.raises(NotImplementedError, match='for isotropic models'):
             optimize.gradient(simulation)
 
         # Model with electric permittivity.
-        simulation.model = models.Model(self.grid, 1, epsilon_r=3)
+        simulation.model = emg3d.Model(self.grid, 1, epsilon_r=3)
         with pytest.raises(NotImplementedError, match='for el. permittivity'):
             optimize.gradient(simulation)
 
         # Model with magnetic permeability.
-        simulation.model = models.Model(
+        simulation.model = emg3d.Model(
                 self.grid, 1, mu_r=np.ones(self.grid.shape_cells)*np.pi)
         with pytest.raises(NotImplementedError, match='for magn. permeabili'):
             optimize.gradient(simulation)
 
-        # Missing noise_floor / std.
-        simulation.model = models.Model(
-                self.grid, np.arange(1, self.grid.n_cells+1).reshape(
-                    self.grid.shape_cells),
-                epsilon_r=None, mu_r=np.ones(self.grid.shape_cells))
-        with pytest.raises(ValueError, match="Either `noise_floor` or"):
-            optimize.misfit(simulation)
+    def test_derivative(self, capsys):
+        # Create a simple mesh.
+        hx = np.ones(64)*100
+        mesh = emg3d.TensorMesh([hx, hx, hx], origin=[0, 0, 0])
 
+        # Loop over electric and magnetic receivers.
+        for dip, electric in zip([0, 90], [True, False]):
 
-@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-def test_derivative(capsys):
-    # Create a simple mesh.
-    hx = np.ones(64)*100
-    mesh = meshes.TensorMesh([hx, hx, hx], origin=[0, 0, 0])
+            # Define a simple survey.
+            survey = emg3d.Survey(
+                name='Gradient Test',
+                sources=emg3d.TxElectricDipole((1650, 3200, 3200, 0, 0)),
+                receivers=emg3d.RxElectricPoint(
+                    (4750, 3200, 3200, dip, electric)),
+                frequencies=1.0,
+                noise_floor=1e-15,
+                relative_error=0.05,
+            )
 
-    # Loop over electric and magnetic receivers.
-    for dip, electric in zip([0, 90], [True, False]):
+            # Background Model
+            con_init = np.ones(mesh.shape_cells)
 
-        # Define a simple survey.
-        survey = surveys.Survey(
-            name='Gradient Test',
-            sources=emg3d.TxElectricDipole((1650, 3200, 3200, 0, 0)),
-            receivers=emg3d.RxElectricPoint((4750, 3200, 3200, dip, electric)),
-            frequencies=1.0,
-            noise_floor=1e-15,
-            relative_error=0.05,
-        )
+            # Target Model 1: One Block
+            con_true = np.ones(mesh.shape_cells)
+            con_true[22:32, 32:42, 20:30] = 0.001
 
-        # Background Model
-        con_init = np.ones(mesh.shape_cells)
+            model_init = emg3d.Model(mesh, con_init, mapping='Conductivity')
+            model_true = emg3d.Model(mesh, con_true, mapping='Conductivity')
 
-        # Target Model 1: One Block
-        con_true = np.ones(mesh.shape_cells)
-        con_true[22:32, 32:42, 20:30] = 0.001
+            solver_opts = {
+                'sslsolver': False,
+                'semicoarsening': False,
+                'linerelaxation': False,
+                'tol': 5e-5,  # Reduce tolerance to speed-up
+            }
+            sim_inp = {
+                'name': 'Testing',
+                'survey': survey,
+                'grid': mesh,
+                'solver_opts': solver_opts,
+                'max_workers': 1,
+                'gridding': 'same',
+                'verb': 3,
+            }
 
-        model_init = models.Model(mesh, con_init, mapping='Conductivity')
-        model_true = models.Model(mesh, con_true, mapping='Conductivity')
+            # Compute data (pre-computed and passed to Survey above)
+            sim_data = emg3d.Simulation(model=model_true, **sim_inp)
+            sim_data.compute(observed=True)
 
-        solver_opts = {
-            'sslsolver': False,
-            'semicoarsening': False,
-            'linerelaxation': False,
-            'tol': 5e-5,  # Reduce tolerance to speed-up
-        }
-        sim_inp = {
-            'name': 'Testing',
-            'survey': survey,
-            'grid': mesh,
-            'solver_opts': solver_opts,
-            'max_workers': 1,
-            'gridding': 'same',
-            'verb': 3,
-        }
+            # Compute adjoint state misfit and gradient
+            sim_data = emg3d.Simulation(model=model_init, **sim_inp)
+            data_misfit = sim_data.misfit
+            grad = sim_data.gradient
 
-        # Compute data (pre-computed and passed to Survey above)
-        sim_data = simulations.Simulation(model=model_true, **sim_inp)
-        sim_data.compute(observed=True)
+            # Note: We test a pseudo-random cell.
+            # Generally, the NRMSD will be below 0.01 %. However, in boundary
+            # regions or regions where the gradient changes from positive to
+            # negative this would fail, so we run a pseudo-random element.
+            nrmsd = random_fd_gradient(
+                    False, survey, model_init, mesh, grad, data_misfit,
+                    sim_inp)
 
-        # Compute adjoint state misfit and gradient
-        sim_data = simulations.Simulation(model=model_init, **sim_inp)
-        data_misfit = sim_data.misfit
-        grad = sim_data.gradient
-
-        # Note: We test a pseudo-random cell.
-        # Generally, the NRMSD will be below 0.01 %. However, in boundary
-        # regions or regions where the gradient changes from positive to
-        # negative this would fail, so we run a pseudo-random element.
-        nrmsd = random_fd_gradient(
-                False, survey, model_init, mesh, grad, data_misfit, sim_inp)
-
-        if electric:
-            assert nrmsd < 1.0
-        else:
-            assert nrmsd < 5.0
+            if electric:
+                assert nrmsd < 1.0
+            else:
+                assert nrmsd < 5.0

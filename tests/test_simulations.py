@@ -2,16 +2,17 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
+import emg3d
+from emg3d import simulations
+
+from . import helpers
+
+
 # Soft dependencies
 try:
     import xarray
 except ImportError:
     xarray = None
-
-import emg3d
-from emg3d import simulations
-
-from . import helpers
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

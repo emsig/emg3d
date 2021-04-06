@@ -2,7 +2,8 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from emg3d import solver, core, models, meshes, fields
+import emg3d
+from emg3d import core
 
 from . import alternatives, helpers
 
@@ -21,7 +22,7 @@ def test_amat_x(njit):
     hx = helpers.widths(8, 4, 100, 1.2)
     hy = np.ones(8)*800
     hz = np.ones(4)*500
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             h=[hx, hy, hz],
             origin=np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
@@ -31,29 +32,29 @@ def test_amat_x(njit):
     z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = models.Model(
+    model = emg3d.Model(
             grid=grid, property_x=property_x, property_y=0.8*property_x,
             property_z=2*property_x)
 
     # Create a source field
-    sfield = fields.get_source_field(grid=grid, source=src, frequency=freq)
+    sfield = emg3d.get_source_field(grid=grid, source=src, frequency=freq)
 
     # Get volume-averaged model parameters.
-    vmodel = models.VolumeModel(model, sfield)
+    vmodel = emg3d.models.VolumeModel(model, sfield)
 
     # Run two iterations to get a e-field
-    efield = solver.solve(
+    efield = emg3d.solve(
             model=model, sfield=sfield, sslsolver=False, semicoarsening=False,
             linerelaxation=False, maxit=2, verb=1)
 
     # amat_x
-    rr1 = fields.Field(grid)
+    rr1 = emg3d.Field(grid)
     amat_x(rr1.fx, rr1.fy, rr1.fz, efield.fx, efield.fy, efield.fz,
            vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
            grid.h[1], grid.h[2])
 
     # amat_x - alternative
-    rr2 = fields.Field(grid)
+    rr2 = emg3d.Field(grid)
     alternatives.alt_amat_x(
             rr2.fx, rr2.fy, rr2.fz, efield.fx, efield.fy, efield.fz,
             vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
@@ -97,7 +98,7 @@ def test_gauss_seidel(njit):
         hx = helpers.widths(0, nx, 80, 1.1)
         hy = helpers.widths(0, ny, 100, 1.3)
         hz = helpers.widths(0, nz, 200, 1.2)
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
             [hx, hy, hz], np.array([-hx.sum()/2, -hy.sum()/2, -hz.sum()/2]))
 
         # Initialize model with some resistivities.
@@ -105,25 +106,25 @@ def test_gauss_seidel(njit):
         property_y = 0.5*np.arange(grid.n_cells)+1
         property_z = 2*np.arange(grid.n_cells)+1
 
-        model = models.Model(grid, property_x, property_y, property_z)
+        model = emg3d.Model(grid, property_x, property_y, property_z)
 
         # Initialize source field.
-        sfield = fields.get_source_field(grid, src, freq)
+        sfield = emg3d.get_source_field(grid, src, freq)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(model, sfield)
+        vmodel = emg3d.models.VolumeModel(model, sfield)
 
         # Run two iterations to get some e-field.
-        efield = solver.solve(model, sfield, sslsolver=False,
-                              semicoarsening=False, linerelaxation=False,
-                              maxit=2, verb=1)
+        efield = emg3d.solve(model, sfield, sslsolver=False,
+                             semicoarsening=False, linerelaxation=False,
+                             maxit=2, verb=1)
 
         inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
                vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
 
         # Get result from `gauss_seidel`.
-        cfield = fields.Field(grid, efield.field.copy(),
-                              frequency=efield._frequency)
+        cfield = emg3d.Field(grid, efield.field.copy(),
+                             frequency=efield._frequency)
         gauss_seidel(cfield.fx, cfield.fy, cfield.fz, *inp)
 
         # Get result from `gauss_seidel_x/y/z`.
@@ -274,10 +275,10 @@ def test_restrict(njit):
     h = np.array([1, 1, 1, 1, 1, 1])
 
     # Fine grid.
-    fgrid = meshes.TensorMesh([h, h, h], origin=np.array([-3, -3, -3]))
+    fgrid = emg3d.TensorMesh([h, h, h], origin=np.array([-3, -3, -3]))
 
     # Create fine field.
-    ffield = fields.Field(fgrid)
+    ffield = emg3d.Field(fgrid)
 
     # Put in values.
     ffield.fx[:, 1:-1, 1:-1] = 1
@@ -292,17 +293,17 @@ def test_restrict(njit):
     # # CASE 0 -- regular # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([np.diff(fgrid.nodes_x[::2]),
-                               np.diff(fgrid.nodes_y[::2]),
-                               np.diff(fgrid.nodes_z[::2])],
-                              fgrid.origin)
+    cgrid = emg3d.TensorMesh([np.diff(fgrid.nodes_x[::2]),
+                              np.diff(fgrid.nodes_y[::2]),
+                              np.diff(fgrid.nodes_z[::2])],
+                             fgrid.origin)
 
     # Regular grid, so all weights (wx, wy, wz) are the same...
     w = restrict_weights(fgrid.nodes_x, fgrid.cell_centers_x, fgrid.h[0],
                          cgrid.nodes_x, cgrid.cell_centers_x, cgrid.h[0])
 
     # Create coarse field.
-    cfield = fields.Field(cgrid)
+    cfield = emg3d.Field(cgrid)
 
     # Restrict it.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -320,11 +321,11 @@ def test_restrict(njit):
     # # CASE 1 -- y & z # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([fgrid.h[0], np.diff(fgrid.nodes_y[::2]),
+    cgrid = emg3d.TensorMesh([fgrid.h[0], np.diff(fgrid.nodes_y[::2]),
                               np.diff(fgrid.nodes_z[::2])], fgrid.origin)
 
     # Create coarse field.
-    cfield = fields.Field(cgrid)
+    cfield = emg3d.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -341,11 +342,11 @@ def test_restrict(njit):
     # # CASE 2 -- x & z # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([np.diff(fgrid.nodes_x[::2]), fgrid.h[1],
+    cgrid = emg3d.TensorMesh([np.diff(fgrid.nodes_x[::2]), fgrid.h[1],
                               np.diff(fgrid.nodes_z[::2])], fgrid.origin)
 
     # Create coarse field.
-    cfield = fields.Field(cgrid)
+    cfield = emg3d.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -362,12 +363,12 @@ def test_restrict(njit):
     # # CASE 3 -- x & y # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh([np.diff(fgrid.nodes_x[::2]),
-                               np.diff(fgrid.nodes_y[::2]), fgrid.h[2]],
-                              fgrid.origin)
+    cgrid = emg3d.TensorMesh([np.diff(fgrid.nodes_x[::2]),
+                              np.diff(fgrid.nodes_y[::2]), fgrid.h[2]],
+                             fgrid.origin)
 
     # Create coarse field.
-    cfield = fields.Field(cgrid)
+    cfield = emg3d.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -384,12 +385,12 @@ def test_restrict(njit):
     # # CASE 4 -- x # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh(
+    cgrid = emg3d.TensorMesh(
             [np.diff(fgrid.nodes_x[::2]), fgrid.h[1], fgrid.h[2]],
             fgrid.origin)
 
     # Create coarse field.
-    cfield = fields.Field(cgrid)
+    cfield = emg3d.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -406,12 +407,12 @@ def test_restrict(njit):
     # # CASE 5 -- y # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh(
+    cgrid = emg3d.TensorMesh(
             [fgrid.h[0], np.diff(fgrid.nodes_y[::2]), fgrid.h[2]],
             fgrid.origin)
 
     # Create coarse field.
-    cfield = fields.Field(cgrid)
+    cfield = emg3d.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -428,12 +429,12 @@ def test_restrict(njit):
     # # CASE 6 -- z # #
 
     # Coarse grid.
-    cgrid = meshes.TensorMesh(
+    cgrid = emg3d.TensorMesh(
             [fgrid.h[0], fgrid.h[1], np.diff(fgrid.nodes_z[::2])],
             fgrid.origin)
 
     # Create coarse field.
-    cfield = fields.Field(cgrid)
+    cfield = emg3d.Field(cgrid)
 
     # Restrict field.
     restrict(cfield.fx, cfield.fy, cfield.fz, ffield.fx, ffield.fy, ffield.fz,
@@ -482,13 +483,13 @@ def test_restrict_weights(njit):
     hx = helpers.widths(2, 2, 200, 1.8)
     hy = helpers.widths(0, 8, 800, 1.2)
     hz = helpers.widths(0, 4, 400, 1.4)
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             [hx, hy, hz], np.array([-100000, 3000, 100]))
 
     # Create coarse grid thereof
     ch = [np.diff(grid.nodes_x[::2]), np.diff(grid.nodes_y[::2]),
           np.diff(grid.nodes_z[::2])]
-    cgrid = meshes.TensorMesh(ch, origin=grid.origin)
+    cgrid = emg3d.TensorMesh(ch, origin=grid.origin)
 
     # Compute the weights in a numpy-way, instead of numba-way
     wl, w0, wr = alternatives.alt_restrict_weights(

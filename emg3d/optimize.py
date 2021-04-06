@@ -1,14 +1,6 @@
 """
-
-Inversion
-=========
-
-Functionalities related to optimization (inversion), e.g., misfit function,
-gradient of the misfit function, or data- and depth-weighting.
-
-Currently it follows the implementation of [PlMu08]_, using the adjoint-state
-technique for the gradient.
-
+Functionalities related to optimization (minimization, inversion), such as the
+misfit function and its gradient.
 """
 # Copyright 2018-2021 The EMSiG community.
 #
@@ -30,11 +22,11 @@ import numpy as np
 
 from emg3d import maps, fields
 
-__all__ = ['gradient', 'misfit']
+__all__ = ['misfit', 'gradient']
 
 
 def misfit(simulation):
-    r"""Return the misfit function.
+    r"""Misfit or cost function.
 
     The data misfit or weighted least-squares functional using an :math:`l_2`
     norm is given by
@@ -42,38 +34,49 @@ def misfit(simulation):
     .. math::
         :label: misfit
 
-            \phi = \frac{1}{2} \sum_f\sum_s\sum_r
-                \left\{
+            \phi = \frac{1}{2} \sum_s\sum_r\sum_f
                 \left\lVert
                     W_{s,r,f} \left(
                        \textbf{d}_{s,r,f}^\text{pred}
                        -\textbf{d}_{s,r,f}^\text{obs}
-                    \right) \right\rVert^2
-                \right\}
-            + R \ .
+                    \right) \right\rVert^2 \, ,
 
-    Here, :math:`f, s, r` stand for frequency, source, and receiver,
+    where :math:`s, r, f` stand for source, receiver, and frequency,
     respectively; :math:`\textbf{d}^\text{obs}` are the observed electric and
     magnetic data, and :math:`\textbf{d}^\text{pred}` are the synthetic
-    electric and magnetic data. Finally, :math:`R` is a regularization term.
+    electric and magnetic data. As of now the misfit does not include any
+    regularization term.
 
     The data weight of observation :math:`d_i` is given by :math:`W_i =
     \varsigma^{-1}_i`, where :math:`\varsigma_i` is the standard deviation of
-    the observation (see :attr:`emg3d.surveys.Survey.standard_deviation`).
+    the observation, see :attr:`emg3d.surveys.Survey.standard_deviation`.
 
-    .. note::
 
-        This is an early implementation of the misfit function. Currently not
-        yet implemented are:
+    You can easily implement your own misfit function (to, e.g., include a
+    regularization term) by monkey patching the misfit function in the
+    Simulation::
 
-        - Magnetic data;
-        - Regularization term.
+        def my_misfit_function(simulation):
+            '''Returns the misfit as a float.'''
+
+            # Computing the misfit...
+
+            return misfit
+
+        # Monkey patch Simulation:
+        emg3d.simulations.Simulation.misfit = property(my_misfit_function)
+
+        # And now all the regular stuff, initiate a Simulation etc
+        simulation = emg3d.Simulation(survey, grid, model)
+        simulation.misfit
+        # => will return your misfit
+        #   (will also be used for the adjoint-state gradient).
 
 
     Parameters
     ----------
-    simulation : :class:`emg3d.simulations.Simulation`
-        The simulation.
+    simulation : Simulation
+        The simulation; a :class:`emg3d.simulations.Simulation` instance.
 
 
     Returns
@@ -82,32 +85,36 @@ def misfit(simulation):
         Value of the misfit function.
 
     """
-    std = simulation.survey.standard_deviation
-    # Raise warning if not set-up properly.
-    if std is None:
-        raise ValueError(
-            "Either `noise_floor` or `relative_error` or both must "
-            "be provided (>0) to compute the `standard_deviation`. "
-            "It can also be set directly (same shape as data). "
-            "The standard deviation is required to compute the misfit."
-        )
 
-    # Ensure all fields have been computed.
+    # Check if electric fields have already been computed.
     test_efield = sum([1 if simulation._dict_efield[src][freq] is None else 0
                        for src, freq in simulation._srcfreq])
     if test_efield:
         simulation.compute()
 
-    # Compute the residual
+    # Check if weights are stored already.
+    # (weights are currently simply 1/std^2; but might change in the future).
+    if 'weights' not in simulation.data.keys():
+
+        # Get standard deviation, raise warning if not set.
+        std = simulation.survey.standard_deviation
+        if std is None:
+            raise ValueError(
+                "Either `noise_floor` or `relative_error` or both must "
+                "be provided (>0) to compute the `standard_deviation`. "
+                "It can also be set directly (same shape as data). "
+                "The standard deviation is required to compute the misfit."
+            )
+
+        # Store weights
+        simulation.data['weights'] = std**-2
+
+    # Calculate and store residual.
     residual = simulation.data.synthetic - simulation.data.observed
     simulation.data['residual'] = residual
 
-    # Get weighted residual.
-    if 'weights' not in simulation.data.keys():
-        simulation.data['weights'] = 1/std**2
+    # Get weights, calculate misfit.
     weights = simulation.data['weights']
-
-    # Compute misfit
     misfit = np.sum(weights*(residual.conj()*residual)).real/2
 
     return misfit.data

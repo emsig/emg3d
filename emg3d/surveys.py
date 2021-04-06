@@ -1,5 +1,6 @@
 """
-A survey stores a set of sources, receivers, and the measured data.
+A survey stores a set of sources and their frequencies, receivers, and the
+measured data.
 """
 # Copyright 2018-2021 The EMSiG community.
 #

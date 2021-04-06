@@ -10,7 +10,6 @@ from emg3d import fields
 from . import alternatives, helpers
 
 
-# Import soft dependencies.
 try:
     import discretize
 except ImportError:
