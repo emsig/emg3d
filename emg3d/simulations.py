@@ -28,7 +28,6 @@ import itertools
 from copy import deepcopy
 
 import numpy as np
-import scipy.linalg as sl
 
 from emg3d import (fields, io, solver, surveys, maps, models, meshes, optimize,
                    utils, electrodes)
@@ -723,7 +722,8 @@ class Simulation:
         freq = self.survey._freq_key_or_value(frequency)
 
         # Get receiver types.
-        rec_types = self.survey.rec_xtypes('electric')
+        rec_types = tuple([r.xtype == 'electric'
+                           for r in self.survey.receivers.values()])
 
         # Store electric receivers.
         if rec_types.count(True):
@@ -845,14 +845,12 @@ class Simulation:
                 self.data['observed'].data[min_amp] = np.nan + 1j*np.nan
 
             # Set near-offsets to NaN.
-            offsets = sl.norm(
-                self.survey.rec_coords.T[:, None, :] -
-                self.survey.src_coords.T[:, :, None],
-                axis=0,
-                check_finite=False,
-            )
-            min_off = offsets < kwargs.get('min_offset', 0.0)
-            self.data['observed'].data[min_off] = np.nan + 1j*np.nan
+            min_off = kwargs.get('min_offset', 0.0)
+            nan = np.nan + 1j*np.nan
+            for ks, s in self.survey.sources.items():
+                for kr, r in self.survey.receivers.items():
+                    if np.linalg.norm(r.center_abs(s) - s.center) < min_off:
+                        self.data['observed'].loc[ks, kr, :] = nan
 
     # DATA
     @property
@@ -1352,7 +1350,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     gopts['frequency'] = gridding_opts.pop('frequency', frequency)
 
     # Center defaults to center of all sources.
-    center = tuple([survey.src_coords[:, i].mean() for i in range(3)])
+    center = np.array([s.center for s in survey.sources.values()]).mean(0)
     gopts['center'] = gridding_opts.pop('center', center)
 
     # Vector.
@@ -1451,7 +1449,10 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
 
         else:
             # Get it from survey, add 5 % on each side.
-            inp = np.r_[survey.src_coords[:, i], survey.rec_coords[:, i]]
+            inp = np.array([s.center[i] for s in survey.sources.values()])
+            for s in survey.sources.values():
+                inp = np.r_[inp, [r.center_abs(s)[i]
+                                  for r in survey.receivers.values()]]
             dim = [min(inp), max(inp)]
             diff = np.diff(dim)[0]
             dim = [min(inp)-diff/10, max(inp)+diff/10]

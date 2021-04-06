@@ -46,6 +46,8 @@ Detailed changes
 - Zero source strength does no longer mean "normalized", it means zero
   strength (hence no source).
 - New class ``TxElectricWire`` for an arbitrary electric wire.
+- Receivers have a ``relative`` flag, to mark their position as relative to the
+  source position. This makes only sense within a Survey.
 
 
 **Fields**
@@ -188,6 +190,8 @@ Detailed changes
 
   - ``name`` is new optional.
   - New optional keyword ``info``.
+  - Works now as well for surveys that contain receivers which are positioned
+    relatively to the source.
 
 
 **Surveys**
@@ -216,6 +220,8 @@ Detailed changes
     becomes ``RxEP-10`` or ``RxMp-10``, and ``f0`` becomes ``f-1``.
   - ``Survey.size`` is now the total number, ``Survey.count`` is the count of
     the data that actually has non-NaN values.
+  - Now completely functional for receivers which are positioned relatively to
+    the source.
 
 - ``Dipole``: Replaced by the new source and receiver classes in the new module
   ``electrodes``.

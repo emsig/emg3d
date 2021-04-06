@@ -377,22 +377,6 @@ class Survey:
         """Frequency dict containing all frequencies."""
         return self._frequencies
 
-    #  #  #  #  #  #
-
-    @property
-    def src_coords(self):
-        """Return source centers (x, y, z) as ndarray of shape (n, 3)."""
-        return np.array([s.center[:] for s in self.sources.values()])
-
-    @property
-    def rec_coords(self):
-        """Return receiver centers (x, y, z) as ndarray of shape (n, 3)."""
-        return np.array([r.center[:] for r in self.receivers.values()])
-
-    def rec_xtypes(self, xtype='electric'):
-        """Return tuple of booleans if receiver are of `xtype`."""
-        return tuple([r.xtype == xtype for r in self.receivers.values()])
-
     def _freq_key_or_value(self, frequency, returns='key'):
         """Returns `returns` of `frequency`, provided as its key or its value.
 
