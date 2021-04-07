@@ -472,9 +472,9 @@ def test_get_magnetic_field():
     efield = fields.Field(grid, data=new, frequency=np.pi)
     hfield_nb = fields.get_magnetic_field(model, efield)
     hfield_np = alternatives.alt_get_magnetic_field(model, efield)
-    assert_allclose(hfield_nb.fx[1:-1, :, :], hfield_np.fx)
-    assert_allclose(hfield_nb.fy[:, 1:-1, :], hfield_np.fy)
-    assert_allclose(hfield_nb.fz[:, :, 1:-1], hfield_np.fz)
+    assert_allclose(hfield_nb.fx, hfield_np.fx)
+    assert_allclose(hfield_nb.fy, hfield_np.fy)
+    assert_allclose(hfield_nb.fz, hfield_np.fz)
 
     # Test using discretize
     if discretize:
@@ -608,9 +608,9 @@ def test_edge_curl_factor(njit):
     hx = np.array([10., 10])
     hy = np.array([20., 20])
     hz = np.array([30., 30])
-    factor = 0.1*np.ones((2, 2, 2))
+    factor = 0.1*np.ones((2, 2, 2))*10*20*30
 
     edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, factor)
-    assert_allclose(mx, 0.5)  # (9/20 - 12/30) * 2 / 0.2
-    assert_allclose(my, -1)  # (6/30 - 3/10) / 0.2 * 2
-    assert_allclose(mz, 1)  # (2/10 - 2/20) / 0.2 * 2
+    assert_allclose(mx, 0.005)  # (9/20 - 12/30) * 0.1
+    assert_allclose(my, -0.01)  # (6/30 - 3/10) * 0.1
+    assert_allclose(mz, 0.01)  # (2/10 - 2/20) * 0.1

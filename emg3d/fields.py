@@ -27,7 +27,7 @@ import numpy as np
 from scipy.constants import mu_0
 
 from emg3d.core import _numba_setting
-from emg3d import maps, meshes, utils, electrodes
+from emg3d import maps, meshes, models, utils, electrodes
 
 __all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
@@ -616,17 +616,15 @@ def get_magnetic_field(model, efield):
     # Initiate magnetic field with zeros.
     hfield = Field(efield.grid, frequency=efield._frequency, electric=False)
 
-    # Get smu (i omega mu_r mu_0).
-    if model.mu_r is None:
-        smu = np.ones(efield.grid.shape_cells)*efield.smu0
-    else:
-        smu = model.mu_r*efield.smu0
+    # Get volume-averaged mu_r divided by s*mu_0.
+    vmodel = models.VolumeModel(model, efield)
+    zeta = vmodel.zeta / efield.smu0
 
     # Compute magnetic field.
     _edge_curl_factor(
             hfield.fx[1:-1, :, :], hfield.fy[:, 1:-1, :],
             hfield.fz[:, :, 1:-1], efield.fx, efield.fy, efield.fz,
-            efield.grid.h[0], efield.grid.h[1], efield.grid.h[2], smu)
+            efield.grid.h[0], efield.grid.h[1], efield.grid.h[2], zeta)
 
     return hfield
 
@@ -765,7 +763,7 @@ def _dipole_vector(grid, source, decimals=9):
 
 
 @nb.njit(**_numba_setting)
-def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, smu):
+def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, zeta):
     r"""Curl of values living on edges yielding values on faces.
 
     Used by :func:`emg3d.fields.get_magnetic_field` to compute the magnetic
@@ -787,10 +785,10 @@ def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, smu):
         Cell widths in x-, y-, and z-directions
         (:class:`emg3d.meshes.TensorMesh`).
 
-    smu : ndarray
+    zeta : ndarray
         Factor by which nabla x E will be divided. Shape of
         ``efield.grid.shape_cells``. In the case of Farady's law this is
-        i*w*mu.
+        (smu)^-1, volume-averaged.
 
     """
 
@@ -818,7 +816,18 @@ def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, smu):
                 fz = ((ey[ixp, iy, iz] - ey[ix, iy, iz])/hx[ix] -
                       (ex[ix, iyp, iz] - ex[ix, iy, iz])/hy[iy])
 
-                # Divide by smu (averaged over the two cells) and store.
-                mx[ixm, iy, iz] = 2*fx/(smu[ixm, iy, iz] + smu[ix, iy, iz])
-                my[ix, iym, iz] = 2*fy/(smu[ix, iym, iz] + smu[ix, iy, iz])
-                mz[ix, iy, izm] = 2*fz/(smu[ix, iy, izm] + smu[ix, iy, iz])
+                # Average zeta for dual-grid.
+                dx = (hx[ixm] + hx[ix])/2
+                dy = (hy[iym] + hy[iy])/2
+                dz = (hz[izm] + hz[iz])/2
+                zeta_x = (zeta[ixm, iy, iz] + zeta[ix, iy, iz])/2
+                zeta_y = (zeta[ix, iym, iz] + zeta[ix, iy, iz])/2
+                zeta_z = (zeta[ix, iy, izm] + zeta[ix, iy, iz])/2
+
+                # Divide by zeta (averaged over the two cells) and store.
+                if ix != 0:
+                    mx[ixm, iy, iz] = fx * zeta_x / (dx * hy[iy] * hz[iz])
+                if iy != 0:
+                    my[ix, iym, iz] = fy * zeta_y / (hx[ix] * dy * hz[iz])
+                if iz != 0:
+                    mz[ix, iy, izm] = fz * zeta_z / (hx[ix] * hy[iy] * dz)
