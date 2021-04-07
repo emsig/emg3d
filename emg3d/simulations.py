@@ -777,6 +777,7 @@ class Simulation:
             min_offset are set to NaN.
 
         """
+        # TODO : Check 'observed' to see which src-freq-pairs have data.
         srcfreq = self._srcfreq.copy()
 
         # We remove the ones that were already computed.

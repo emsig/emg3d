@@ -51,26 +51,27 @@ def misfit(simulation):
     \varsigma^{-1}_i`, where :math:`\varsigma_i` is the standard deviation of
     the observation, see :attr:`emg3d.surveys.Survey.standard_deviation`.
 
+    .. note::
 
-    You can easily implement your own misfit function (to, e.g., include a
-    regularization term) by monkey patching the misfit function in the
-    Simulation::
+        You can easily implement your own misfit function (to include, e.g., a
+        regularization term) by monkey patching this misfit function with your
+        own::
 
-        def my_misfit_function(simulation):
-            '''Returns the misfit as a float.'''
+            def my_misfit_function(simulation):
+                '''Returns the misfit as a float.'''
 
-            # Computing the misfit...
+                # Computing the misfit...
 
-            return misfit
+                return misfit
 
-        # Monkey patch Simulation:
-        emg3d.simulations.Simulation.misfit = property(my_misfit_function)
+            # Monkey patch optimize.misfit:
+            emg3d.optimize.misfit = my_misfit_function
 
-        # And now all the regular stuff, initiate a Simulation etc
-        simulation = emg3d.Simulation(survey, grid, model)
-        simulation.misfit
-        # => will return your misfit
-        #   (will also be used for the adjoint-state gradient).
+            # And now all the regular stuff, initiate a Simulation etc
+            simulation = emg3d.Simulation(survey, grid, model)
+            simulation.misfit
+            # => will return your misfit
+            #   (will also be used for the adjoint-state gradient).
 
 
     Parameters
@@ -123,39 +124,47 @@ def misfit(simulation):
 def gradient(simulation):
     r"""Compute the discrete gradient using the adjoint-state method.
 
-    The discrete gradient for a single source at a single frequency is given by
-    Equation (10) in [PlMu08]_,
+    The discrete adjoint-state gradient for a single source at a single
+    frequency is given by Equation (10) in [PlMu08]_,
 
     .. math::
 
         \nabla_p \phi(\textbf{p}) =
-        -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_x
-               \frac{\partial S}{\partial \textbf{p}} \textbf{E}_x
-        -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_y
-               \frac{\partial S}{\partial \textbf{p}} \textbf{E}_y
-        -\sum_{k,l,m}\mathbf{\bar{\lambda}}^E_z
-               \frac{\partial S}{\partial \textbf{p}} \textbf{E}_z \ ,
+            -&\sum_{k,l,m}\mathbf{\bar{\lambda}}_{x; k+\frac{1}{2}, l, m}
+                \frac{\partial S_{k+\frac{1}{2}, l, m}}{\partial \textbf{p}}
+                 \textbf{E}_{x; k+\frac{1}{2}, l, m}\\
+            -&\sum_{k,l,m}\mathbf{\bar{\lambda}}_{y; k, l+\frac{1}{2}, m}
+                \frac{\partial S_{k, l+\frac{1}{2}, m}}{\partial \textbf{p}}
+                 \textbf{E}_{y; k, l+\frac{1}{2}, m}\\
+            -&\sum_{k,l,m}\mathbf{\bar{\lambda}}_{z; k, l, m+\frac{1}{2}}
+                \frac{\partial S_{k, l, m+\frac{1}{2}}}{\partial \textbf{p}}
+                 \textbf{E}_{z; k, l, m+\frac{1}{2}}\, ,
 
-    where the grid notation (:math:`\{k, l, m\}` and its :math:`\{+1/2\}`
-    equivalents) have been omitted for brevity (except for the sum symbols).
+
+
+    where :math:`\textbf{E}` is the electric (forward) field and
+    :math:`\mathbf{\lambda}` is the back-propagated residual field (from
+    electric and magnetic receivers); :math:`\bar{~}` denotes conjugate.
+    The :math:`\partial S`-part takes care of the volume-averaged model
+    parameters.
 
 
     .. note::
 
-        The gradient is currently implemented only for isotropic models and not
-        for electric permittivity nor magnetic permeability.
+        The currently implemented gradient is only for isotropic models without
+        relative electric permittivity nor relative magnetic permeability.
 
 
     Parameters
     ----------
-    simulation : :class:`emg3d.simulations.Simulation`
-        The simulation.
+    simulation : Simulation
+        The simulation; a :class:`emg3d.simulations.Simulation` instance.
 
 
     Returns
     -------
     grad : ndarray
-        Adjoint-state gradient (same shape as simulation.model).
+        Adjoint-state gradient (same shape as ``simulation.model``).
 
     """
 
@@ -178,7 +187,7 @@ def gradient(simulation):
     simulation._bcompute()
 
     # Pre-allocate the gradient on the mesh.
-    grad_model = np.zeros(simulation.grid.shape_cells, order='F')
+    gradient_model = np.zeros(simulation.grid.shape_cells, order='F')
 
     # Loop over source-frequency pairs.
     for src, freq in simulation._srcfreq:
@@ -187,42 +196,42 @@ def gradient(simulation):
         # This is the actual Equation (10), with:
         #   del S / del p = iwu0 V sigma / sigma,
         # where lambda and E are already volume averaged.
-        efield = fields.Field(
-                simulation._dict_bfield[src][freq].grid,
-                -np.real(simulation._dict_bfield[src][freq].field *
-                         simulation._dict_efield[src][freq].field *
-                         simulation._dict_efield[src][freq].smu0)
-                )
+        efield = simulation._dict_efield[src][freq]
+        bfield = simulation._dict_bfield[src][freq]
+        gfield = fields.Field(
+            grid=efield.grid,
+            data=-np.real(bfield.field * efield.smu0 * efield.field),
+            dtype=float,
+        )
 
         # Pre-allocate the gradient for the computational grid.
-        shape_cells = simulation._dict_grid[src][freq].shape_cells
-        grad_x = np.zeros(shape_cells, order='F')
-        grad_y = np.zeros(shape_cells, order='F')
-        grad_z = np.zeros(shape_cells, order='F')
+        shape = gfield.grid.shape_cells
+        grad_x = np.zeros(shape, order='F')
+        grad_y = np.zeros(shape, order='F')
+        grad_z = np.zeros(shape, order='F')
 
         # Map the field to cell centers times volume.
-        cell_volumes = simulation._dict_grid[src][freq].cell_volumes.reshape(
-                shape_cells, order='F')
+        cell_volumes = gfield.grid.cell_volumes.reshape(shape, order='F')
         maps.interp_edges_to_vol_averages(
-                ex=efield.fx, ey=efield.fy, ez=efield.fz,
-                volumes=cell_volumes, ox=grad_x, oy=grad_y, oz=grad_z)
+                ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+                volumes=cell_volumes,
+                ox=grad_x, oy=grad_y, oz=grad_z)
         grad = grad_x + grad_y + grad_z
 
         # Bring the gradient back from the computation grid to the model grid.
-        tgrad = maps.interpolate(
-                    simulation._dict_grid[src][freq],
-                    -grad, simulation.grid, method='cubic')
+        this_gradient = maps.interpolate(
+                    gfield.grid, -grad, simulation.grid, method='cubic')
 
         # => Frequency-dependent depth-weighting should go here.
 
         # Add this src-freq gradient to the total gradient.
-        grad_model += tgrad
+        gradient_model += this_gradient
 
     # => Frequency-independent depth-weighting should go here.
 
     # Apply derivative-chain of property-map
-    # (in case the property is something else than conductivity).
+    # (only relevant if `mapping` is something else than conductivity).
     simulation.model.map.derivative_chain(
-            grad_model, simulation.model.property_x)
+            gradient_model, simulation.model.property_x)
 
-    return grad_model
+    return gradient_model

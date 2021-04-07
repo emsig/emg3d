@@ -32,6 +32,8 @@ def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
     pseudo = n is False
     if pseudo:
         n = 1
+
+    # 111 pseudo-selections
     ixiz = [[25, 27], [25, 28], [25, 31], [25, 32], [25, 35], [25, 36],
             [25, 37], [25, 38], [26, 27], [26, 31], [26, 32], [26, 35],
             [26, 36], [26, 37], [26, 38], [27, 27], [27, 31], [27, 32],
@@ -39,27 +41,29 @@ def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
             [28, 31], [28, 32], [28, 36], [28, 37], [28, 38], [29, 27],
             [29, 31], [29, 32], [29, 33], [29, 35], [29, 36], [29, 37],
             [29, 38], [30, 27], [30, 30], [30, 31], [30, 32], [30, 33],
-            [30, 36], [30, 37], [30, 38], [31, 27], [31, 29], [31, 30],
-            [31, 31], [31, 32], [31, 33], [31, 36], [31, 37], [31, 38],
-            [32, 27], [32, 29], [32, 31], [32, 32], [32, 36], [32, 37],
-            [32, 38], [33, 27], [33, 30], [33, 31], [33, 32], [33, 33],
-            [33, 36], [33, 37], [33, 38], [34, 27], [34, 31], [34, 32],
-            [34, 36], [34, 37], [34, 38], [35, 27], [35, 30], [35, 31],
-            [35, 32], [35, 33], [35, 36], [35, 37], [35, 38], [36, 27],
-            [36, 31], [36, 32], [36, 36], [36, 37], [36, 38], [37, 27],
-            [37, 28], [37, 31], [37, 32], [37, 36], [37, 37], [37, 38],
-            [38, 27], [38, 28], [38, 31], [38, 32], [38, 33], [38, 35],
-            [38, 36], [38, 37], [38, 38], [39, 27], [39, 28], [39, 31],
-            [39, 32], [39, 35], [39, 36], [39, 37], [39, 38], [40, 27],
-            [40, 28], [40, 29], [40, 31], [40, 32], [40, 35], [40, 36],
-            [40, 37], [40, 38]]
+            [30, 36], [30, 37], [30, 38], [31, 27], [31, 30], [31, 31],
+            [31, 32], [31, 33], [31, 36], [31, 37], [31, 38], [32, 27],
+            [32, 31], [32, 32], [32, 36], [32, 37], [32, 38], [33, 27],
+            [33, 30], [33, 31], [33, 32], [33, 33], [33, 36], [33, 37],
+            [33, 38], [34, 27], [34, 31], [34, 32], [34, 36], [34, 37],
+            [34, 38], [35, 27], [35, 30], [35, 31], [35, 32], [35, 33],
+            [35, 36], [35, 37], [35, 38], [36, 27], [36, 31], [36, 32],
+            [36, 36], [36, 37], [36, 38], [37, 27], [37, 36], [37, 37],
+            [37, 38], [38, 27], [38, 31], [38, 32], [38, 33], [38, 35],
+            [38, 36], [38, 37], [38, 38], [39, 27], [39, 28], [39, 35],
+            [39, 36], [39, 37], [39, 38], [40, 27], [40, 29], [40, 35],
+            [40, 36], [40, 37], [40, 38]]
 
     avg_nrmsd = 0.0
 
     for i in range(n):
+
+        # Pseudo-random: a random set from the list.
         if pseudo:
             ix, iz = ixiz[np.random.randint(len(ixiz))]
-            iy = 33
+            iy = 32
+
+        # Actually random, but away from the boundary.
         else:
             ix = np.random.randint(15, 50)  # btw 1500-5000 m
             iy = np.random.randint(25, 40)  # btw 2500-4000 m
@@ -76,14 +80,14 @@ def random_fd_gradient(n, survey, model, mesh, grad, data_misfit, sim_inp,
         fdgrad = float((sim_data.misfit - data_misfit)/epsilon)
 
         # Compute NRMSD
-        nrmsd = 200*abs(grad[ix, iy, iz]-fdgrad)/(
-                abs(grad[ix, iy, iz])+abs(fdgrad))
-        avg_nrmsd += nrmsd/n
+        nrmsd = 200*abs(grad[ix, iy, iz]-fdgrad)
+        nrmsd /= abs(grad[ix, iy, iz])+abs(fdgrad)
+        avg_nrmsd += nrmsd
 
         print(f"{{{ix:2d};{iy:2d};{iz:2d}}}     {grad[ix, iy, iz]:+.6e}    "
               f"{fdgrad:+.6e}    {nrmsd:9.5f}")
 
-    return avg_nrmsd
+    return avg_nrmsd/n
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -229,14 +233,22 @@ class TestGradient:
             grad = sim_data.gradient
 
             # Note: We test a pseudo-random cell.
-            # Generally, the NRMSD will be below 0.01 %. However, in boundary
+            #
+            # Generally, the NRMSD will be below 0.05 %. However, in boundary
             # regions or regions where the gradient changes from positive to
-            # negative this would fail, so we run a pseudo-random element.
+            # negative this would fail, so we run a pseudo-random element (it
+            # particularly fails in these regions as our mesh is very coarse).
+            #
+            # Other reasons for higher than expected NRMSD are (all for speed)
+            # very coarse grid, and the lowered tolerance of 5e-5. Using a
+            # finer grid, and decreasing the tolerance, would decrease the
+            # error, but the test would take much longer.
+
             nrmsd = random_fd_gradient(
                     False, survey, model_init, mesh, grad, data_misfit,
                     sim_inp)
 
             if electric:
-                assert nrmsd < 1.0
+                assert nrmsd < 0.1
             else:
-                assert nrmsd < 5.0
+                assert nrmsd < 1.0

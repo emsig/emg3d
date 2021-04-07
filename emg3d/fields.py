@@ -109,7 +109,7 @@ class Field:
 
         # Store field.
         if data is None:
-            self._field = np.zeros(self._get_prop('n'), dtype=dtype)
+            self._field = np.zeros(self._get_prop('n'), dtype=dtype, order='F')
         else:
             self._field = np.asarray(data, dtype=dtype)
 
@@ -478,7 +478,7 @@ def get_source_field(grid, source, frequency, **kwargs):
             source = electrodes.TxMagneticDipole(source, **inp)
 
     # Get total vector field by looping over segments.
-    vfield = np.zeros(grid.n_edges)
+    vfield = np.zeros(grid.n_edges, order='F')
     for p0, p1 in zip(source.points[:-1, :], source.points[1:, :]):
 
         # Add this segments' vector field to total vector field.
