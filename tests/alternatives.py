@@ -494,3 +494,64 @@ def alt_get_magnetic_field(model, efield):
 
     # Return.
     return hfield
+
+
+def fd_vs_as_gradient(ixyz, model, grad, data_misfit, sim_inp, epsilon=1e-4,
+                      verb=2):
+    """Compute FD gradient for cell ixyz and compare to AS gradient.
+
+    We use the forward finite difference approach,
+
+    Parameters
+    ----------
+    ixyz : list
+        Indices of cell to test, [ix, iy, iz].
+
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance.
+
+    grad : ndarray
+        Adjoint-state gradient for comparison.
+
+    data_misfit : float
+        Data misfit.
+
+    sim_inp : dict
+        Passed through to :class:`emg3d.simulations.Simulation`.
+
+    epsilon : float, default:1e-4
+        Difference to add to cell for finite-difference approach.
+
+    verb : int, default: 2
+        - 0: Nothing;
+        - 1: Print result;
+        - 2: Includes header line and result.
+
+    Returns
+    -------
+
+    """
+    ix, iy, iz = ixyz
+
+    # Add epsilon to given cell.
+    model_diff = model.copy()
+    model_diff.property_x[ix, iy, iz] += epsilon
+
+    # Create simulation and compute FD-gradient
+    sim_data = emg3d.Simulation(model=model_diff, **sim_inp)
+    sim_data._tqdm_opts = {'disable': True}
+    fdgrad = float((sim_data.misfit - data_misfit)/epsilon)
+
+    # Compute NRMSD
+    nrmsd = 200*abs(grad[ix, iy, iz]-fdgrad)
+    nrmsd /= abs(grad[ix, iy, iz])+abs(fdgrad)
+
+    if verb > 1:
+        print(f"   === Compare Gradients  ::  epsilon={epsilon} ===\n\n"
+              f"{{xi;iy;iz}}     Adjoint-state       Forward FD    NRMSD (%)\n"
+              f"----------------------------------------------------------")
+    if verb > 0:
+        print(f"{{{ix:2d};{iy:2d};{iz:2d}}}     {grad[ix, iy, iz]:+.6e}    "
+              f"{fdgrad:+.6e}    {nrmsd:9.5f}")
+
+    return nrmsd
