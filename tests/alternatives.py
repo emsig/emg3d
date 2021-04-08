@@ -547,8 +547,8 @@ def fd_vs_as_gradient(ixyz, model, grad, data_misfit, sim_inp, epsilon=1e-4,
     model_diff.property_x[ix, iy, iz] += epsilon
 
     # Create simulation and compute FD-gradient
-    sim_data = emg3d.Simulation(model=model_diff, **sim_inp)
-    sim_data._tqdm_opts = {'disable': True}
+    sim_data = emg3d.Simulation(
+            model=model_diff, **sim_inp, tqdm_opts={'disable': True})
     fdgrad = float((sim_data.misfit - data_misfit)/epsilon)
 
     # Compute NRMSD

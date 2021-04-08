@@ -31,7 +31,7 @@ def test_misfit():
     grid = emg3d.TensorMesh([np.ones(10)*2, [2, 2], [2, 2]], (-10, -2, -2))
     model = emg3d.Model(grid, 1)
 
-    simulation = emg3d.Simulation(survey=survey, grid=grid, model=model)
+    simulation = emg3d.Simulation(survey=survey, model=model)
 
     field = emg3d.Field(grid, dtype=np.float64)
     field.field += syn
@@ -43,7 +43,7 @@ def test_misfit():
 
     # Missing noise_floor / std.
     survey = emg3d.Survey(sources, receivers, 100)
-    simulation = emg3d.Simulation(survey=survey, grid=grid, model=model)
+    simulation = emg3d.Simulation(survey=survey, model=model)
     with pytest.raises(ValueError, match="Either `noise_floor` or"):
         optimize.misfit(simulation)
 
@@ -59,7 +59,7 @@ class TestGradient:
             frequencies=1.0,
             relative_error=0.01,
         )
-        sim_inp = {'survey': survey, 'grid': mesh, 'gridding': 'same'}
+        sim_inp = {'survey': survey, 'gridding': 'same'}
 
         # Anisotropic models.
         simulation = emg3d.Simulation(
@@ -109,7 +109,6 @@ class TestGradient:
 
         sim_inp = {
             'survey': survey,
-            'grid': mesh,
             'solver_opts': {'plain': True, 'tol': 5e-5},  # Red. tol 4 speed
             'max_workers': 1,
             'gridding': 'same',

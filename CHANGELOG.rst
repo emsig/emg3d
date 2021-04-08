@@ -192,6 +192,7 @@ Detailed changes
   - New optional keyword ``info``.
   - Works now as well for surveys that contain receivers which are positioned
     relatively to the source.
+  - No ``grid`` any longer, taken from ``model``.
 
 
 **Surveys**

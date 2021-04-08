@@ -38,7 +38,7 @@ class Simulation:
 
     A simulation can be used to compute responses for an entire survey, hence
     for an arbitrary amount of sources, receivers, and frequencies. The
-    responses can be computed in parallel over sources and frequencies. It can
+    responses are computed in parallel over sources and frequencies. It can
     also be used to compute the misfit with the data and to compute the
     gradient of the misfit function.
 
@@ -46,103 +46,102 @@ class Simulation:
     be used; see the description of the parameters ``gridding`` and
     ``gridding_opts`` for more details.
 
-    .. warning::
+    .. note::
 
         The automatic gridding does its best to generate meshes that are
         suitable for the provided model and survey. However, CSEM spans a wide
-        range of acquisition layouts, and frequencies as well as conductivities
+        range of acquisition layouts, and both frequencies and conductivities
         or resistivities span many orders of magnitude. This makes it hard to
         have a function that fits all purposes. Check the meshes with your
         expert knowledge. Also, the automatic gridding is conservative in its
-        estimate, in order to be on the save side (correct results over speed).
+        estimate, trying to be on the save side (correct results over speed).
         This means, however, that often smaller grids could be used by
-        providing the appropriate options in ``gridding_opts``.
+        providing the appropriate options in ``gridding_opts`` or directly
+        providing your own computational grids.
 
 
     Parameters
     ----------
-    survey : :class:`emg3d.surveys.Survey`
-        The survey layout, containing sources, receivers, frequencies, and
-        optionally the measured data.
+    survey : Survey
+        The survey; a :class:`emg3d.surveys.Survey` instance. The survey
+        contains sources, receivers, frequencies, and optionally data.
 
-        The survey-data will be modified in place. Provide survey.copy() if you
-        want to avoid this.
+        The survey-data will be modified in place. Provide ``survey.copy()`` if
+        you want to avoid this.
 
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The grid. See :class:`emg3d.meshes.TensorMesh`.
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance.
 
-    model : :class:`emg3d.models.Model`
-        The model. See :class:`emg3d.models.Model`.
+    max_workers : int, default: 4
+        The maximum number of processes that can be used to execute the
+        given calls.
 
-    gridding : str, optional
-        Method how the computational grids are computed. Default is 'single'.
+    gridding : str, default: 'single'
+        Method to create the computational grids.
+
         The different methods are:
 
-        - 'same': Same grid as for the input model.
-        - 'single': A single grid for all sources and frequencies.
-        - 'frequency': Frequency-dependent grids.
-        - 'source': Source-dependent grids.
-        - 'both': Frequency- and source-dependent grids.
-        - 'input': Same as 'single', but instead of automatically generate
-          the mesh it has to be provided in ``gridding_opts``.
-        - 'dict': Same as 'both', but instead of automatically generate the
-          meshes they have to be provided as a ``dict[source][frequency]``
-          in ``gridding_opts``.
+        - ``'same'``: Same grid as for the input model.
+        - ``'single'``: A single grid for all sources and frequencies.
+        - ``'frequency'``: Frequency-dependent grids.
+        - ``'source'``: Source-dependent grids.
+        - ``'both'``: Frequency- and source-dependent grids.
+        - ``'input'``: Same as ``'single'``, but the grid has to be provided in
+          ``gridding_opts`` instead of being automatically created.
+        - ``'dict'``: Same as ``'both'``, but the grids have to be provided in
+          ``gridding_opts`` in the form of ``dict[source][frequency]`` instead
+          of being automatically created.
 
         See the parameter ``gridding_opts`` for more details.
 
-    gridding_opts : dict or TensorMesh, optional
+    gridding_opts : {dict, TensorMesh}, default: {}
         Input format depends on ``gridding``:
 
-        - 'same': Nothing, ``gridding_opts`` is not permitted.
-        - 'single', 'frequency', 'source', 'both': Described below.
-        - 'input': A :class:`emg3d.meshes.TensorMesh`.
-        - 'dict': Dictionary of the format ``dict[source][frequency]``
+        - ``'same'``: Nothing, ``gridding_opts`` is not permitted.
+        - ``'single'``, ``'frequency'``, ``'source'``, ``'both'``: Described
+          below.
+        - ``'input'``: A :class:`emg3d.meshes.TensorMesh`.
+        - ``'dict'``: Dictionary of the format ``dict[source][frequency]``
           containing a :class:`emg3d.meshes.TensorMesh` for each
           source-frequency pair.
 
-        The dict in the case of 'single', 'frequency', 'source', 'both' is
-        passed to :func:`emg3d.meshes.construct_mesh`; consult the
-        corresponding documentation for more information. Parameters that are
-        not provided are estimated from the model, grid, and survey using
-        :func:`estimate_gridding_opts`, which documentation contains more
-        information too.
+        The dict in the case of ``'single'``, ``'frequency'``, ``'source'``,
+        ``'both``' is passed to :func:`emg3d.meshes.construct_mesh`; consult
+        the corresponding documentation for more information. Parameters that
+        are not provided are estimated from the provided model, grid, and
+        survey using :func:`emg3d.simulations.estimate_gridding_opts`, which
+        documentation contains more information too.
 
         There are two notably differences to the parameters described in
         :func:`emg3d.meshes.construct_mesh`:
 
         - ``vector``: besides the normal possibility it can also be a string
-          containing one or several of 'x', 'y', and 'z'. In these cases the
-          corresponding dimension of the input mesh is provided as vector.
-          See :func:`estimate_gridding_opts`.
+          containing one or several of ``'x'``, ``'y'``, and ``'z'``. In these
+          cases the corresponding dimension of the input mesh is provided as
+          vector. See :func:`emg3d.simulations.estimate_gridding_opts`.
         - ``expand``: in the format of ``[property_sea, property_air]``; if
           provided, the input model is expanded up to the seasurface with sea
           water, and an air layer is added. The actual height of the seasurface
           can be defined with the key ``seasurface``. See
-          :func:`expand_grid_model`.
+          :func:`emg3d.simulations.expand_grid_model`.
 
-    solver_opts : dict, optional
+    solver_opts : dict, default: {'verb': 2'}
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
-        `model`, `sfield`, `efield`, `return_info`, and `log`. Default
-        verbosity is ``verb=2``.
+        ``model``, ``sfield``, ``efield``, ``return_info``, and ``log``.
+        Default verbosity is ``verb=2``.
 
-    max_workers : int
-        The maximum number of processes that can be used to execute the
-        given calls. Default is 4.
+    verb : int, default: 0
+        Level of verbosity. Possible options:
 
-    verb : int; optional
-        Level of verbosity. Default is 0. These are propagated to the called
-        function if not defined above in the possible options.
-
-        - -1: Error.
-        - 0: Warning.
+        - -1: Errors.
+        - 0: Warnings.
         - 1: Info.
 
-    name : str, optional
+    name : str, default: None
         Name of the simulation.
 
-    info : str, optional
+    info : str, default: None
         Simulation info or any other info (e.g., what was the purpose of this
         simulation).
 
@@ -151,44 +150,33 @@ class Simulation:
     # Gridding descriptions (for repr's).
     _gridding_descr = {
             'same': 'Same grid as for model',
-            'single': 'A single grid for all sources and frequencies',
+            'single': 'Single grid for all sources and frequencies',
             'frequency': 'Frequency-dependent grids',
             'source': 'Source-dependent grids',
             'both': 'Frequency- and source-dependent grids',
-            'input': 'A single, provided grid all sources/frequencies',
-            'dict': 'Provided dict of frequency-/source-dependent grids',
+            'input': 'Provided grid, same for all sources/frequencies',
+            'dict': 'Provided grids, frequency-/source-dependent',
             }
 
-    def __init__(self, survey, grid, model, max_workers=4, gridding='single',
+    def __init__(self, survey, model, max_workers=4, gridding='single',
                  **kwargs):
         """Initiate a new Simulation instance."""
 
-        # Store mandatory inputs (grid and model later).
+        # Store some inputs as is, optional ones with defaults.
         self.survey = survey
         self.max_workers = max_workers
         self.gridding = gridding
-
-        # Get optional inputs with defaults.
-        gridding_opts = kwargs.pop('gridding_opts', {}).copy()
-        solver_opts = kwargs.pop('solver_opts', {})
         self.verb = kwargs.pop('verb', 0)
-
-        # Store solver options with defaults: The slowest but most robust
-        # setting is used, but user-input overwrites defaults if provided.
-        # However, verbosity is turned into a log, not real-time verbosity.
-        self.solver_opts = {
-                'verb': 2, **solver_opts, 'return_info': True, 'log': -1}
-
-        # Store original input nCz.
-        self._input_nCz = kwargs.pop('_input_nCz', grid.shape_cells[2])
-
-        # Get the optional info.
         self.name = kwargs.pop('name', None)
         self.info = kwargs.pop('info', None)
 
-        # Ensure no kwargs left.
-        if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
+        # Assemble solver_opts.
+        self.solver_opts = {
+                'verb': 2,  # Default verbosity, can be overwritten.
+                **kwargs.pop('solver_opts', {}),  # User setting.
+                'return_info': True,  # return_info=True is forced.
+                'log': -1             # log=-1 is forced.
+        }
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -199,36 +187,9 @@ class Simulation:
         self._gradient = None
         self._misfit = None
 
-        # Check gridding_opts depending on gridding and act upon.
-        if self.gridding == 'dict':
-            self._dict_grid = gridding_opts
-        elif self.gridding == 'input':
-            self._grid_single = gridding_opts
-        elif self.gridding == 'same':
-            if gridding_opts:
-                msg = "`gridding_opts` is not permitted if `gridding='same'`."
-                raise TypeError(msg)
-        else:
-
-            # Expand model by water and air if required.
-            expand = gridding_opts.pop('expand', None)
-            if expand is not None:
-                try:
-                    interface = gridding_opts['seasurface']
-                except KeyError as e:
-                    msg = ("`gridding_opts['seasurface']` is required if "
-                           "`gridding_opts['expand']` is provided.")
-                    raise KeyError(msg) from e
-                grid, model = expand_grid_model(grid, model, expand, interface)
-
-            # Get automatic gridding input.
-            # Estimate the parameters from survey and model if not provided.
-            self.gridding_opts = estimate_gridding_opts(
-                    gridding_opts, grid, model, survey, self._input_nCz)
-
-        # Store grid and model.
-        self.grid = grid
-        self.model = model
+        # Get model taking gridding_opts into account.
+        # Sets self.model and self.gridding_opts.
+        self._set_model(model, kwargs)
 
         # Initiate synthetic data with NaN's if they don't exist.
         if 'synthetic' not in self.survey.data.keys():
@@ -237,20 +198,23 @@ class Simulation:
 
         # `tqdm`-options; undocumented.
         # Can be used to, e.g., disable tqdm completely via:
-        # > simulation._tqdm_opts = {'disable': True}
-        self._tqdm_opts = {
-                'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
-                }
+        # > emg3d.Simulation(args, kwargs, tqdm_opts={'disable': True})
+        self._tqdm_opts = kwargs.pop(
+                'tqdm_opts',
+                {'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]'}
+        )
+
+        # Ensure no kwargs left.
+        if kwargs:
+            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
     def __repr__(self):
+        """Simple representation."""
         name = f" «{self.name}»" if self.name else ""
-        info = f"{self.info}\n\n" if self.info else ""
-        if self.survey.name is not None:
-            survey = f" of Survey «{self.survey.name}»"
-        else:
-            survey = ""
-        return (f"*{self.__class__.__name__}*{name}{survey}\n\n{info}"
-                f"- {self.survey.__class__.__name__}: "
+        info = f"{self.info}\n" if self.info else ""
+        survey = f" «{self.survey.name}»" if self.survey.name else ""
+        return (f":: {self.__class__.__name__}{name} ::\n{info}\n"
+                f"- {self.survey.__class__.__name__}{survey}: "
                 f"{self.survey.shape[0]} sources; "
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies\n"
@@ -259,26 +223,79 @@ class Simulation:
                 f"{self._info_grids}")
 
     def _repr_html_(self):
+        """HTML representation."""
         name = f" «{self.name}»" if self.name else ""
-        info = f"<p>{self.info}</p>" if self.info else ""
-        if self.survey.name is not None:
-            survey = f"of Survey «{self.survey.name}»"
-        else:
-            survey = ""
-        return (f"<h3>{self.__class__.__name__}{name}</h3>{survey}{info}"
-                f"<ul><li>{self.survey.__class__.__name__}: "
-                f"{self.survey.shape[0]} sources; "
-                f"{self.survey.shape[1]} receivers; "
-                f"{self.survey.shape[2]} frequencies</li>"
-                f"<li>{self.model.__repr__()}</li>"
-                f"<li>Gridding: {self._gridding_descr[self.gridding]}; "
-                f"{self._info_grids}</li>"
+        info = f"{self.info}<br>" if self.info else ""
+        survey = f" «{self.survey.name}»" if self.survey.name else ""
+        return (f"<h3>{self.__class__.__name__}{name}</h3>{info}"
+                f"<ul>"
+                f"  <li>{self.survey.__class__.__name__}{survey}:"
+                f"    {self.survey.shape[0]} sources;"
+                f"    {self.survey.shape[1]} receivers;"
+                f"    {self.survey.shape[2]} frequencies</li>"
+                f"  <li>{self.model.__repr__()}</li>"
+                f"  <li>Gridding: {self._gridding_descr[self.gridding]}; "
+                f"    {self._info_grids}</li>"
                 f"</ul>")
+
+    def clean(self, what='computed'):
+        """Clean part of the data base.
+
+        Parameters
+        ----------
+        what : str, default: 'computed'
+            What to clean. Possibilities:
+
+            - ``'computed'``:
+              Removes all computed properties: electric and magnetic fields and
+              responses at receiver locations.
+            - ``'keepresults'``:
+              Removes everything  except for the responses at receiver
+              locations.
+            - ``'all'``:
+              Removes everything (leaves it plain as initiated).
+
+        """
+
+        if what not in ['computed', 'keepresults', 'all']:
+            raise TypeError(f"Unrecognized `what`: {what}.")
+
+        # Clean grid/model-dicts.
+        if what in ['keepresults', 'all']:
+
+            # These exist always and have to be initiated.
+            for name in ['_dict_grid', '_dict_model']:
+                delattr(self, name)
+                setattr(self, name, self._dict_initiate)
+
+        # Clean field-dicts.
+        if what in ['computed', 'keepresults', 'all']:
+
+            # These exist always and have to be initiated.
+            for name in ['_dict_efield', '_dict_efield_info', '_dict_hfield']:
+                delattr(self, name)
+                setattr(self, name, self._dict_initiate)
+
+            # These only exist with gradient; don't initiate them.
+            for name in ['_dict_bfield', '_dict_bfield_info']:
+                if hasattr(self, name):
+                    delattr(self, name)
+
+        # Clean data.
+        if what in ['computed', 'all']:
+            for key in ['residual', 'weight']:
+                if key in self.data.keys():
+                    del self.data[key]
+            self.data['synthetic'] = self.data.observed.copy(
+                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
+            for name in ['_gradient', '_misfit']:
+                delattr(self, name)
+                setattr(self, name, None)
 
     def copy(self, what='computed'):
         """Return a copy of the Simulation.
 
-        See `to_file` for more information regarding `what`.
+        See ``to_file`` for more information regarding ``what``.
 
         """
         return self.from_dict(self.to_dict(what, True))
@@ -290,32 +307,28 @@ class Simulation:
 
         """
 
-        if what not in ['computed', 'results', 'all', 'plain']:
-            raise TypeError(f"Unrecognized `what`: {what}.")
-
         # If to_dict is called from to_file, it has a _what_to_file attribute.
         if hasattr(self, '_what_to_file'):
             what = self._what_to_file
             delattr(self, '_what_to_file')
 
-        # Initiate dict.
-        out = {'name': self.name, '__class__': self.__class__.__name__}
+        if what not in ['computed', 'results', 'all', 'plain']:
+            raise TypeError(f"Unrecognized `what`: {what}.")
 
-        # Add initiation parameters.
-        out['survey'] = self.survey.to_dict()
-        out['grid'] = self.grid.to_dict()
-        out['model'] = self.model.to_dict()
-        out['max_workers'] = self.max_workers
-        out['gridding'] = self.gridding
-        out['solver_opts'] = self.solver_opts
+        # Initiate dict with input parameters.
+        out = {
+            '__class__': self.__class__.__name__,
+            'survey': self.survey.to_dict(),
+            'model': self.model.to_dict(),
+            'max_workers': self.max_workers,
+            'gridding': self.gridding,
+            'solver_opts': self.solver_opts,
+            'verb': self.verb,
+            'name': self.name,
+            'info': self.info,
+        }
 
-        # Clean unwanted data if plain.
-        if what == 'plain':
-            for key in ['synthetic', 'residual', 'weights']:
-                if key in out['survey']['data'].keys():
-                    del out['survey']['data'][key]
-
-        # Put provided grids back on gridding.
+        # gridding_opts.
         if self.gridding == 'input':
             out['gridding_opts'] = self._grid_single
         elif self.gridding == 'dict':
@@ -339,8 +352,13 @@ class Simulation:
                     gopts[key]['__type__'] = this_type
 
             out['gridding_opts'] = gopts
+        out['_input_ccz'] = self._input_ccz
 
-        out['_input_nCz'] = self._input_nCz
+        # Clean unwanted data if plain.
+        if what == 'plain':
+            for key in ['synthetic', 'residual', 'weights']:
+                if key in out['survey']['data'].keys():
+                    del out['survey']['data'][key]
 
         # Store wanted dicts.
         if what in ['computed', 'all']:
@@ -366,74 +384,72 @@ class Simulation:
 
     @classmethod
     def from_dict(cls, inp):
-        """Convert dictionary into :class:`Simulation` instance.
+        """Convert dict into :class:`emg3d.simulations.Simulation` instance.
 
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Simulation.to_dict`.
+            Dictionary as obtained from
+            :func:`emg3d.simulations.Simulation.to_dict`.
 
         Returns
         -------
-        obj : :class:`Simulation` instance
+        simulation : Simulation
+            A :class:`emg3d.simulations.Simulation` instance.
 
         """
-        try:
+        inp = {k: v for k, v in inp.items() if k != '__class__'}
 
-            # gridding options, backwards compatible.
-            gridding = inp['gridding']
-            gridding_opts = inp.get('gridding_opts', {})
+        # Get all class-inputs.
+        inp_names = ['survey', 'model', 'max_workers', 'gridding',
+                     'solver_opts', 'verb', 'name', 'info']
+        cls_inp = {k: inp.pop(k) for k in inp_names}
+        cls_inp['gridding_opts'] = inp.pop('gridding_opts', {})
+        cls_inp['survey'] = surveys.Survey.from_dict(cls_inp['survey'])
+        cls_inp['model'] = models.Model.from_dict(cls_inp['model'])
+        input_ccz = inp.pop('_input_ccz', False)
+        if input_ccz:
+            cls_inp['_input_ccz'] = input_ccz
 
-            # De-serialize lists and tuples.
-            # Ideally, this should be dealt with in emg3d.io.
-            if gridding not in ['input', 'dict', 'same']:
-                props = ['domain', 'vector', 'stretching', 'min_width_limits']
-                for key in props:
-                    if key in gridding_opts.keys():
-                        if '__type__' in gridding_opts[key].keys():
-                            this_type = gridding_opts[key].pop('__type__')
-                            out = [d for d in gridding_opts[key].values()]
-                            if this_type == 'tuple':
-                                out = tuple(out)
-                            gridding_opts[key] = out
+        # De-serialize lists and tuples.
+        # Ideally, this should be dealt with in emg3d.io.
+        if cls_inp['gridding'] not in ['input', 'dict', 'same']:
+            props = ['domain', 'vector', 'stretching', 'min_width_limits']
+            gridding_opts = cls_inp['gridding_opts']
+            for key in props:
+                if key in gridding_opts.keys():
+                    if '__type__' in gridding_opts[key].keys():
+                        this_type = gridding_opts[key].pop('__type__')
+                        out = [d for d in gridding_opts[key].values()]
+                        if this_type == 'tuple':
+                            out = tuple(out)
+                        gridding_opts[key] = out
 
-            # Initiate class.
-            MeshClass = getattr(meshes, inp['grid']['__class__'])
-            out = cls(
-                    name=inp['name'],
-                    survey=surveys.Survey.from_dict(inp['survey'].copy()),
-                    grid=MeshClass.from_dict(inp['grid'].copy()),
-                    model=models.Model.from_dict(inp['model'].copy()),
-                    max_workers=inp['max_workers'],
-                    gridding=gridding,
-                    solver_opts=inp['solver_opts'],
-                    gridding_opts=gridding_opts,
-                    _input_nCz=inp.get('_input_nCz', len(inp['grid']['hz']))
-                    )
+            cls_inp['gridding_opts'] = gridding_opts
 
-            # Add existing derived/computed properties.
-            data = ['_dict_grid', '_dict_model',
-                    '_dict_hfield', '_dict_efield', '_dict_efield_info',
-                    '_dict_bfield', '_dict_bfield_info']
-            for name in data:
-                if name in inp.keys():
-                    values = inp.get(name)
+        # Instantiate the class.
+        out = cls(**cls_inp)
 
-                    # De-serialize Model, Field, and TensorMesh instances.
-                    io._dict_deserialize(values)
+        # Add existing derived/computed properties.
+        data = ['_dict_grid', '_dict_model',
+                '_dict_hfield', '_dict_efield', '_dict_efield_info',
+                '_dict_bfield', '_dict_bfield_info']
+        for name in data:
+            if name in inp.keys():
+                values = inp.pop(name)
 
-                    setattr(out, name, values)
+                # De-serialize Model, Field, and TensorMesh instances.
+                io._dict_deserialize(values)
 
-            data = ['gradient', 'misfit']
-            for name in data:
-                if name in inp.keys():
-                    setattr(out, '_'+name, inp.get(name))
+                setattr(out, name, values)
 
-            return out
+        data = ['gradient', 'misfit']
+        for name in data:
+            if name in inp.keys():
+                setattr(out, '_'+name, inp.pop(name))
 
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
+        return out
 
     def to_file(self, fname, what='computed', name='simulation', **kwargs):
         """Store Simulation to a file.
@@ -441,33 +457,24 @@ class Simulation:
         Parameters
         ----------
         fname : str
-            File name inclusive ending, which defines the used data format.
-            Implemented are currently:
+            Absolute or relative file name including ending, which defines the
+            used data format. See :func:`emg3d.io.save` for the options.
 
-            - `.h5` (default): Uses `h5py` to store inputs to a hierarchical,
-              compressed binary hdf5 file. Recommended file format, but
-              requires the module `h5py`. Default format if ending is not
-              provided or not recognized.
-            - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
-              file. Default format if `h5py` is not installed.
-            - `.json`: Uses `json` to store inputs to a hierarchical, plain
-              text file.
+        what : str, default: 'computed'
+            What to store. Possibilities:
 
-        what : str
-            What to store. Currently implemented:
-
-            - 'computed' (default):
+            - ``'computed'``:
               Stores all computed properties: electric fields and responses at
               receiver locations.
-            - 'results':
+            - '``results'``:
               Stores only the response at receiver locations.
-            - 'all':
+            - ``'all'``:
               Stores everything.
-            - 'plain':
+            - ``'plain'``:
               Only stores the plain Simulation (as initiated).
 
-        name : str
-            Name under which the survey is stored within the file.
+        name : str, default: 'simulation'
+            Name with which the simulation is stored in the file.
 
         kwargs : Keyword arguments, optional
             Passed through to :func:`emg3d.io.save`.
@@ -476,10 +483,11 @@ class Simulation:
         # Add what to self, will be removed in to_dict.
         self._what_to_file = what
 
-        kwargs[name] = self                # Add simulation to dict.
+        # Add simulation to dict.
+        kwargs[name] = self
+
         # If verb is not defined, use verbosity of simulation.
-        if 'verb' not in kwargs:
-            kwargs['verb'] = self.verb
+        kwargs['verb'] = kwargs.get('verb', self.verb)
 
         return io.save(fname, **kwargs)
 
@@ -490,23 +498,22 @@ class Simulation:
         Parameters
         ----------
         fname : str
-            File name including extension. Used backend depends on the file
-            extensions:
+            Absolute or relative file name including extension.
 
-            - '.npz': numpy-binary
-            - '.h5': h5py-binary (needs `h5py`)
-            - '.json': json
-
-        name : str
+        name : str, default: 'simulation'
             Name under which the simulation is stored within the file.
 
         kwargs : Keyword arguments, optional
-            Passed through to :func:`emg3d.io.load`.
+            Passed through to :func:`io.load`.
+
 
         Returns
         -------
-        simulation : :class:`Simulation`
-            The simulation that was stored in the file.
+        simulation : Simulation
+            A :class:`emg3d.simulations.Simulation` instance.
+
+        info : str, returned if verb<0
+            Info-string.
 
         """
         out = io.load(fname, **kwargs)
@@ -528,7 +535,7 @@ class Simulation:
         if self.gridding == 'same':  # Same grid as for provided model.
 
             # Store link to grid.
-            self._dict_grid[source][freq] = self.grid
+            self._dict_grid[source][freq] = self.model.grid
 
         elif self.gridding == 'frequency':  # Frequency-dependent grids.
 
@@ -869,7 +876,7 @@ class Simulation:
         if self._gradient is None:
             self._gradient = optimize.gradient(self)
 
-        return self._gradient[:, :, :self._input_nCz]
+        return self._gradient[:, :, :self._input_ccz]
 
     @property
     def misfit(self):
@@ -884,59 +891,87 @@ class Simulation:
 
         return self._misfit
 
+    def _get_bfields(self, inp):
+        """Return back-propagated electric field for given inp (src, freq)."""
+
+        # Input parameters.
+        solver_input = {
+            **self.solver_opts,
+            'model': self.get_model(*inp),
+            'sfield': self._get_rfield(*inp),  # Residual field.
+        }
+
+        # Compute and return back-propagated electric field.
+        return solver.solve(**solver_input)
+
+    def _bcompute(self):
+        """Compute bfields asynchronously for all sources and frequencies."""
+
+        # Initiate futures-dict to store output.
+        out = utils._process_map(
+                self._get_bfields,
+                self._srcfreq,
+                max_workers=self.max_workers,
+                **{'desc': 'Back-propagate ', **self._tqdm_opts},
+        )
+
+        # Store back-propagated electric field and info.
+        if not hasattr(self, '_dict_bfield'):
+            self._dict_bfield = self._dict_initiate
+            self._dict_bfield_info = self._dict_initiate
+
+        # Loop over src-freq combinations to extract and store.
+        for i, (src, freq) in enumerate(self._srcfreq):
+
+            # Store bfield and solver info.
+            self._dict_bfield[src][freq] = out[i][0]
+            self._dict_bfield_info[src][freq] = out[i][1]
+
+        # Print solver info.
+        self.print_solver_info('bfield', verb=self.verb)
+
+    def _get_rfield(self, source, frequency):
+        """Return residual source field for given source and frequency."""
+
+        freq = self.survey.frequencies[frequency]
+        grid = self.get_grid(source, frequency)
+
+        # Initiate empty residual source field
+        rfield = fields.Field(grid, frequency=freq)
+
+        # Loop over receivers, input as source.
+        for name, rec in self.survey.receivers.items():
+
+            # Get residual of this receiver.
+            residual = self.data.residual.loc[source, name, frequency].data
+            if np.isnan(residual):
+                continue
+
+            # Residual source strength: Weighted residual, normalized by -smu0.
+            weight = self.data.weights.loc[source, name, frequency].data
+            strength = np.conj(residual * weight / -rfield.smu0)
+
+            # Create source.
+            if rec.xtype == 'magnetic':
+                src_fct = electrodes.TxMagneticDipole
+
+                # If the data is from a magnetic point we have to undo another
+                # factor smu0 here, as the source will be a loop.
+                strength /= rfield.smu0
+
+            else:
+                src_fct = electrodes.TxElectricDipole
+
+            # Get residual field and add it to the total field.
+            rfield.field += fields.get_source_field(
+                    grid=grid,
+                    source=src_fct(rec.coordinates, strength=strength),
+                    frequency=freq,
+            ).field
+
+        return rfield
+
     # UTILS
-    def clean(self, what='computed'):
-        """Clean part of the data base.
-
-        Parameters
-        ----------
-        what : str
-            What to clean. Currently implemented:
-
-            - 'computed' (default):
-              Removes all computed properties: electric and magnetic fields and
-              responses at receiver locations.
-            - 'keepresults':
-              Removes everything  except for the responses at receiver
-              locations.
-            - 'all':
-              Removes everything (leaves it plain as initiated).
-
-        """
-
-        if what not in ['computed', 'keepresults', 'all']:
-            raise TypeError(f"Unrecognized `what`: {what}.")
-
-        # Clean data/model-dicts.
-        if what in ['keepresults', 'all']:
-            for name in ['_dict_grid', '_dict_model']:
-                delattr(self, name)
-                setattr(self, name, self._dict_initiate)
-
-        # Clean field-dicts.
-        if what in ['computed', 'keepresults', 'all']:
-
-            # These exist always and have to be initiated.
-            for name in ['_dict_efield', '_dict_efield_info', '_dict_hfield']:
-                delattr(self, name)
-                setattr(self, name, self._dict_initiate)
-
-            # These only exist with gradient; don't initiate them.
-            for name in ['_dict_bfield', '_dict_bfield_info']:
-                if hasattr(self, name):
-                    delattr(self, name)
-
-        # Clean data.
-        if what in ['computed', 'all']:
-            for key in ['residual', 'weight']:
-                if key in self.data.keys():
-                    del self.data[key]
-            self.data['synthetic'] = self.data.observed.copy(
-                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
-            for name in ['_gradient', '_misfit']:
-                delattr(self, name)
-                setattr(self, name, None)
-
     @property
     def _dict_initiate(self):
         """Return a dict of the structure `dict[source][freq]=None`."""
@@ -969,29 +1004,29 @@ class Simulation:
     def _info_grids(self):
         """Return a string with "min {- max}" grid size."""
         if self.gridding == 'same':
-            min_nC = self.grid.n_cells
-            min_vC = self.grid.shape_cells
+            min_nc = self.model.grid.n_cells
+            min_vc = self.model.grid.shape_cells
             has_minmax = False
         elif self.gridding in ['single', 'input']:
             grid = self.get_grid(self._srcfreq[0][0], self._srcfreq[0][1])
-            min_nC = grid.n_cells
-            min_vC = grid.shape_cells
+            min_nc = grid.n_cells
+            min_vc = grid.shape_cells
             has_minmax = False
         else:
-            min_nC = 1e100
-            max_nC = 0
+            min_nc = 1e100
+            max_nc = 0
             for src, freq in self._srcfreq:
                 grid = self.get_grid(src, freq)
-                if grid.n_cells > max_nC:
-                    max_nC = grid.n_cells
-                    max_vC = grid.shape_cells
-                if grid.n_cells < min_nC:
-                    min_nC = grid.n_cells
-                    min_vC = grid.shape_cells
-            has_minmax = min_nC != max_nC
-        info = f"{min_vC[0]} x {min_vC[1]} x {min_vC[2]} ({min_nC:,})"
+                if grid.n_cells > max_nc:
+                    max_nc = grid.n_cells
+                    max_vc = grid.shape_cells
+                if grid.n_cells < min_nc:
+                    min_nc = grid.n_cells
+                    min_vc = grid.shape_cells
+            has_minmax = min_nc != max_nc
+        info = f"{min_vc[0]} x {min_vc[1]} x {min_vc[2]} ({min_nc:,})"
         if has_minmax:
-            info += f" - {max_vC[0]} x {max_vC[1]} x {max_vC[2]} ({max_nC:,})"
+            info += f" - {max_vc[0]} x {max_vc[1]} x {max_vc[2]} ({max_nc:,})"
         return info
 
     def print_grid_info(self, verb=1, return_info=False):
@@ -1080,90 +1115,45 @@ class Simulation:
         elif out:
             print(out)
 
-    # BACKWARDS PROPAGATING FIELD
-    def _get_bfields(self, inp):
-        """Return back-propagated electric field for given inp (src, freq)."""
+    def _set_model(self, model, kwargs):
+        """Set model parameters."""
+        # Store original input ccz. Undocumented.
+        # This should eventually be replaced by an `active_cells` mask.
+        self._input_ccz = kwargs.pop('_input_ccz', model.grid.shape_cells[2])
+        gridding_opts = kwargs.pop('gridding_opts', {})
 
-        # Input parameters.
-        solver_input = {
-            **self.solver_opts,
-            'model': self.get_model(*inp),
-            'sfield': self._get_rfield(*inp),  # Residual field.
-        }
+        if self.gridding == 'dict':
+            self._dict_grid = gridding_opts
+        elif self.gridding == 'input':
+            self._grid_single = gridding_opts
+        elif self.gridding == 'same':
+            if gridding_opts:
+                msg = "`gridding_opts` is not permitted if `gridding='same'`."
+                raise TypeError(msg)
+        else:
+            g_opts = gridding_opts.copy()
 
-        # Compute and return back-propagated electric field.
-        return solver.solve(**solver_input)
+            # Expand model by water and air if required.
+            expand = g_opts.pop('expand', None)
+            if expand is not None:
+                try:
+                    interface = g_opts['seasurface']
+                except KeyError as e:
+                    msg = ("`g_opts['seasurface']` is required if "
+                           "`g_opts['expand']` is provided.")
+                    raise KeyError(msg) from e
+                model = expand_grid_model(model, expand, interface)
 
-    def _bcompute(self):
-        """Compute bfields asynchronously for all sources and frequencies."""
+            # Get automatic gridding input.
+            # Estimate the parameters from survey and model if not provided.
+            self.gridding_opts = estimate_gridding_opts(
+                    g_opts, model, self.survey, self._input_ccz)
 
-        # Initiate futures-dict to store output.
-        out = utils._process_map(
-                self._get_bfields,
-                self._srcfreq,
-                max_workers=self.max_workers,
-                **{'desc': 'Back-propagate ', **self._tqdm_opts},
-        )
-
-        # Store back-propagated electric field and info.
-        if not hasattr(self, '_dict_bfield'):
-            self._dict_bfield = self._dict_initiate
-            self._dict_bfield_info = self._dict_initiate
-
-        # Loop over src-freq combinations to extract and store.
-        for i, (src, freq) in enumerate(self._srcfreq):
-
-            # Store bfield and solver info.
-            self._dict_bfield[src][freq] = out[i][0]
-            self._dict_bfield_info[src][freq] = out[i][1]
-
-        # Print solver info.
-        self.print_solver_info('bfield', verb=self.verb)
-
-    def _get_rfield(self, source, frequency):
-        """Return residual source field for given source and frequency."""
-
-        freq = self.survey.frequencies[frequency]
-        grid = self.get_grid(source, frequency)
-
-        # Initiate empty residual source field
-        rfield = fields.Field(grid, frequency=freq)
-
-        # Loop over receivers, input as source.
-        for name, rec in self.survey.receivers.items():
-
-            # Get residual of this receiver.
-            residual = self.data.residual.loc[source, name, frequency].data
-            if np.isnan(residual):
-                continue
-
-            # Residual source strength: Weighted residual, normalized by -smu0.
-            weight = self.data.weights.loc[source, name, frequency].data
-            strength = np.conj(residual * weight / -rfield.smu0)
-
-            # Create source.
-            if rec.xtype == 'magnetic':
-                src_fct = electrodes.TxMagneticDipole
-
-                # If the data is from a magnetic point we have to undo another
-                # factor smu0 here, as the source will be a loop.
-                strength /= rfield.smu0
-
-            else:
-                src_fct = electrodes.TxElectricDipole
-
-            # Get residual field and add it to the total field.
-            rfield.field += fields.get_source_field(
-                    grid=grid,
-                    source=src_fct(rec.coordinates, strength=strength),
-                    frequency=freq,
-            ).field
-
-        return rfield
+        self.model = model
 
 
 # HELPER FUNCTIONS
-def expand_grid_model(grid, model, expand, interface):
+def expand_grid_model(model, expand, interface):
     """Expand model and grid according to provided parameters.
 
     Expand the grid and corresponding model in positive z-direction from the
@@ -1178,9 +1168,6 @@ def expand_grid_model(grid, model, expand, interface):
 
     Parameters
     ----------
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The grid.
-
     model : :class:`emg3d.models.Model`
         The model.
 
@@ -1201,6 +1188,7 @@ def expand_grid_model(grid, model, expand, interface):
         Expanded model.
 
     """
+    grid = model.grid
 
     def extend_property(prop, add_values, nadd):
         """Expand property `model.prop`, IF it is not None."""
@@ -1247,10 +1235,10 @@ def expand_grid_model(grid, model, expand, interface):
                 grid, property_x, property_y, property_z, mu_r,
                 epsilon_r, mapping=model.map.name)
 
-    return grid, model
+    return model
 
 
-def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
+def estimate_gridding_opts(gridding_opts, model, survey, input_ccz=None):
     """Estimate parameters for automatic gridding.
 
     Automatically determines the required gridding options from the provided
@@ -1324,17 +1312,14 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
         :func:`emg3d.meshes.construct_mesh`. See the corresponding
         documentation and the explanations above.
 
-    grid : :class:`emg3d.meshes.TensorMesh`
-        The grid.
-
     model : :class:`emg3d.models.Model`
         The model.
 
     survey : :class:`emg3d.surveys.Survey`
         The survey.
 
-    input_nCz : int, optional
-        If :func:`expand_grid_model` was used, `input_nCz` corresponds to the
+    input_ccz : int, optional
+        If :func:`expand_grid_model` was used, `input_ccz` corresponds to the
         original ``grid.shape_cells[2]``.
 
 
@@ -1346,6 +1331,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
     """
     # Initiate new gridding_opts.
     gopts = {}
+    grid = model.grid
 
     # Optional values that we only include if provided.
     for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
@@ -1372,7 +1358,7 @@ def estimate_gridding_opts(gridding_opts, grid, model, survey, input_nCz=None):
         vector = (
                 grid.nodes_x if 'x' in vector.lower() else None,
                 grid.nodes_y if 'y' in vector.lower() else None,
-                grid.nodes_z[:input_nCz] if 'z' in vector.lower() else None,
+                grid.nodes_z[:input_ccz] if 'z' in vector.lower() else None,
         )
         gopts['vector'] = vector
 

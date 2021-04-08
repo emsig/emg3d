@@ -187,7 +187,7 @@ def gradient(simulation):
     simulation._bcompute()
 
     # Pre-allocate the gradient on the mesh.
-    gradient_model = np.zeros(simulation.grid.shape_cells, order='F')
+    gradient_model = np.zeros(simulation.model.grid.shape_cells, order='F')
 
     # Loop over source-frequency pairs.
     for src, freq in simulation._srcfreq:
@@ -220,7 +220,7 @@ def gradient(simulation):
 
         # Bring the gradient back from the computation grid to the model grid.
         this_gradient = maps.interpolate(
-                    gfield.grid, -grad, simulation.grid, method='cubic')
+                    gfield.grid, -grad, simulation.model.grid, method='cubic')
 
         # => Frequency-dependent depth-weighting should go here.
 

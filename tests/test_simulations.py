@@ -28,7 +28,7 @@ class TestSimulation():
         frequencies = (1.0, 2.0)
 
         survey = emg3d.Survey(
-                sources, receivers, frequencies, name='Test',
+                sources, receivers, frequencies, name='TestSurv',
                 noise_floor=1e-15, relative_error=0.05)
 
         # Create a simple grid and model
@@ -39,7 +39,7 @@ class TestSimulation():
 
         # Create a simulation, compute all fields.
         simulation = simulations.Simulation(
-                survey, grid, model, name='Test1', max_workers=1,
+                survey, model, name='TestSim', max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
                 gridding='same')
@@ -104,34 +104,32 @@ class TestSimulation():
 
     def test_errors(self):
         with pytest.raises(TypeError, match='Unexpected '):
-            simulations.Simulation(self.survey, self.grid, self.model,
+            simulations.Simulation(self.survey, self.model,
                                    unknown=True, name='Test2')
 
         # gridding='same' with gridding_opts.
         with pytest.raises(TypeError, match="`gridding_opts` is not permitt"):
             simulations.Simulation(
-                    self.survey, self.grid, self.model, name='Test',
+                    self.survey, self.model, name='Test',
                     gridding='same', gridding_opts={'bummer': True})
 
         # expand without seasurface
         with pytest.raises(KeyError, match="is required if"):
             simulations.Simulation(
-                    self.survey, self.grid, self.model, name='Test',
+                    self.survey, self.model, name='Test',
                     gridding='single', gridding_opts={'expand': [1, 2]})
 
     def test_reprs(self):
         test = self.simulation.__repr__()
 
-        assert "*Simulation* «Test1»" in test
-        assert "of Survey «Test»" in test
-        assert "Survey: 3 sources; 12 receivers; 2 frequencies" in test
+        assert "Simulation «TestSim»" in test
+        assert "Survey «TestSurv»: 3 sources; 12 receivers; 2 frequenc" in test
         assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
         assert "Gridding: Same grid as for model" in test
 
         test = self.simulation._repr_html_()
-        assert "Simulation «Test1»" in test
-        assert "of Survey «Test»" in test
-        assert "Survey: 3 sources; 12 receivers; 2 frequencies" in test
+        assert "Simulation «TestSim»" in test
+        assert "Survey «TestSurv»:    3 sources;    12 receivers;    2" in test
         assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
         assert "Gridding: Same grid as for model" in test
 
@@ -152,11 +150,10 @@ class TestSimulation():
         assert self.simulation.survey.name == sim2.survey.name
         assert self.simulation.max_workers == sim2.max_workers
         assert self.simulation.gridding == sim2.gridding
-        assert self.simulation.grid == sim2.grid
         assert self.simulation.model == sim2.model
 
         del sim_dict['survey']
-        with pytest.raises(KeyError, match="Variable 'survey' missing"):
+        with pytest.raises(KeyError, match="'survey'"):
             simulations.Simulation.from_dict(sim_dict)
 
         # Also check to_file()/from_file().
@@ -166,7 +163,6 @@ class TestSimulation():
         assert self.simulation.survey.name == sim2.survey.name
         assert self.simulation.max_workers == sim2.max_workers
         assert self.simulation.gridding == sim2.gridding
-        assert self.simulation.grid == sim2.grid
         assert self.simulation.model == sim2.model
 
         sim9 = simulations.Simulation.from_file(tmpdir+'/test.npz', verb=-1)
@@ -187,14 +183,14 @@ class TestSimulation():
 
         # dict
         sim1 = simulations.Simulation(
-                self.survey, self.grid, self.model, gridding='dict',
+                self.survey, self.model, gridding='dict',
                 gridding_opts=grids, name='Test2')
         m1 = sim1.get_model('TxED-2', 1.0)
         g1 = sim1.get_grid('TxED-2', 1.0)
 
         # provide
         sim2 = simulations.Simulation(
-                self.survey, self.grid, self.model, name='Test2',
+                self.survey, self.model, name='Test2',
                 gridding='input', gridding_opts=grids['TxED-2']['f-1'])
         m2 = sim2.get_model('TxED-2', 1.0)
         g2 = sim2.get_grid('TxED-2', 1.0)
@@ -232,7 +228,7 @@ class TestSimulation():
                 np.array([-1250, -1250, -2250]))
 
         simulation = simulations.Simulation(
-                self.survey, self.grid, self.model, max_workers=1,
+                self.survey, self.model, max_workers=1,
                 solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                              'linerelaxation': False, 'semicoarsening': False},
                 gridding='input', gridding_opts=newgrid, name='TestX')
@@ -275,7 +271,7 @@ def test_simulation_automatic(capsys):
     model = emg3d.Model(grid, 1)
 
     # Create a simulation, compute all fields.
-    inp = {'survey': survey, 'grid': grid, 'model': model,
+    inp = {'survey': survey, 'model': model,
            'gridding_opts': {'expand': [1, 0.5], 'seasurface': 0, 'verb': 1}}
     b_sim = simulations.Simulation(name='both', gridding='both', **inp)
     f_sim = simulations.Simulation(name='freq', gridding='frequency', **inp)
@@ -363,7 +359,7 @@ def test_print_solver(capsys):
         frequencies=1.0, noise_floor=1e-15, relative_error=0.05,
     )
 
-    inp = {'name': 'Test', 'survey': survey, 'grid': grid, 'model': model,
+    inp = {'name': 'Test', 'survey': survey, 'model': model,
            'gridding': 'same'}
     sol = {'sslsolver': False, 'semicoarsening': False,
            'linerelaxation': False, 'maxit': 1}
@@ -422,7 +418,7 @@ def test_source_strength():
 
     # Create a simulation, compute all fields.
     simulation = simulations.Simulation(
-            survey, grid, model, max_workers=1, name='Test2',
+            survey, model, max_workers=1, name='Test2',
             solver_opts={'maxit': 1, 'verb': 0, 'sslsolver': False,
                          'linerelaxation': False, 'semicoarsening': False},
             gridding='same')
@@ -438,35 +434,35 @@ def test_expand_grid_model():
     model = emg3d.Model(grid, 1, np.ones(grid.shape_cells)*2, mu_r=3,
                         epsilon_r=5)
 
-    og, om = simulations.expand_grid_model(grid, model, [2, 3], 5)
+    o_model = simulations.expand_grid_model(model, [2, 3], 5)
 
     # Grid.
-    assert_allclose(grid.nodes_z, og.nodes_z[:-2])
-    assert og.nodes_z[-2] == 5
-    assert og.nodes_z[-1] == 105
+    assert_allclose(grid.nodes_z, o_model.grid.nodes_z[:-2])
+    assert o_model.grid.nodes_z[-2] == 5
+    assert o_model.grid.nodes_z[-1] == 105
 
     # Property x (from float).
-    assert_allclose(om.property_x[:, :, :-2], 1)
-    assert_allclose(om.property_x[:, :, -2], 2)
-    assert_allclose(om.property_x[:, :, -1], 3)
+    assert_allclose(o_model.property_x[:, :, :-2], 1)
+    assert_allclose(o_model.property_x[:, :, -2], 2)
+    assert_allclose(o_model.property_x[:, :, -1], 3)
 
     # Property y (from shape_cells).
-    assert_allclose(om.property_y[:, :, :-2], model.property_y)
-    assert_allclose(om.property_y[:, :, -2], 2)
-    assert_allclose(om.property_y[:, :, -1], 3)
+    assert_allclose(o_model.property_y[:, :, :-2], model.property_y)
+    assert_allclose(o_model.property_y[:, :, -2], 2)
+    assert_allclose(o_model.property_y[:, :, -1], 3)
 
     # Property z.
-    assert om.property_z is None
+    assert o_model.property_z is None
 
     # Property mu_r (from float).
-    assert_allclose(om.mu_r[:, :, :-2], 3)
-    assert_allclose(om.mu_r[:, :, -2], 1)
-    assert_allclose(om.mu_r[:, :, -1], 1)
+    assert_allclose(o_model.mu_r[:, :, :-2], 3)
+    assert_allclose(o_model.mu_r[:, :, -2], 1)
+    assert_allclose(o_model.mu_r[:, :, -1], 1)
 
     # Property epsilon_r (from float).
-    assert_allclose(om.epsilon_r[:, :, :-2], 5)
-    assert_allclose(om.epsilon_r[:, :, -2], 1)
-    assert_allclose(om.epsilon_r[:, :, -1], 1)
+    assert_allclose(o_model.epsilon_r[:, :, :-2], 5)
+    assert_allclose(o_model.epsilon_r[:, :, -2], 1)
+    assert_allclose(o_model.epsilon_r[:, :, -1], 1)
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -493,8 +489,7 @@ class TestEstimateGriddingOpts():
         model.property_y[5, 8, 3] = 100000  # Cell at source center
 
     def test_empty_dict(self):
-        gdict = simulations.estimate_gridding_opts(
-                {}, self.grid, self.model, self.survey)
+        gdict = simulations.estimate_gridding_opts({}, self.model, self.survey)
 
         assert gdict['frequency'] == 1.0
         assert gdict['mapping'].name == self.model.map.name
@@ -510,7 +505,7 @@ class TestEstimateGriddingOpts():
             'vector': 'xZ',
             }
         gdict = simulations.estimate_gridding_opts(
-                gridding_opts, self.grid, self.model, self.survey)
+                gridding_opts, self.model, self.survey)
 
         assert_allclose(
                 gdict['properties'],
@@ -523,7 +518,7 @@ class TestEstimateGriddingOpts():
     def test_vector_distance(self):
         gridding_opts = {'vector': 'Z', 'distance': [[5, 10], None, None]}
         gdict = simulations.estimate_gridding_opts(
-                gridding_opts, self.grid, self.model, self.survey)
+                gridding_opts, self.model, self.survey)
 
         assert gdict['distance'][0] == [5, 10]
         assert gdict['distance'][1] is None
@@ -542,7 +537,7 @@ class TestEstimateGriddingOpts():
             }
 
         gdict = simulations.estimate_gridding_opts(
-                gridding_opts.copy(), self.grid, self.model, self.survey)
+                gridding_opts.copy(), self.model, self.survey)
 
         # Check that all parameters passed unchanged.
         gdict2 = {k: gdict[k] for k, _ in gridding_opts.items()}
@@ -558,8 +553,7 @@ class TestEstimateGriddingOpts():
                 self.sources, receivers, self.frequencies, noise_floor=1e-15,
                 relative_error=0.05)
 
-        gdict = simulations.estimate_gridding_opts(
-                    {}, self.grid, self.model, survey)
+        gdict = simulations.estimate_gridding_opts({}, self.model, survey)
 
         assert_allclose(gdict['domain'][0], (-800, 800))
 
@@ -568,12 +562,11 @@ class TestEstimateGriddingOpts():
                 sources, self.receivers, self.frequencies, noise_floor=1e-15,
                 relative_error=0.05)
 
-        gdict = simulations.estimate_gridding_opts(
-                    {}, self.grid, self.model, survey)
+        gdict = simulations.estimate_gridding_opts({}, self.model, survey)
 
         assert_allclose(gdict['domain'][1], (1500, 3500))
 
     def test_error(self):
         with pytest.raises(TypeError, match='Unexpected gridding_opts'):
             _ = simulations.estimate_gridding_opts(
-                    {'what': True}, self.grid, self.model, self.survey)
+                    {'what': True}, self.model, self.survey)

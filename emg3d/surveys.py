@@ -126,18 +126,18 @@ class Survey:
 
     def __repr__(self):
         """Simple representation."""
-        name = f"  Name: {self.name}\n" if self.name else ""
-        date = f"  Date: {self.date}\n" if self.date else ""
-        info = f"  Info: {self.info}\n" if self.info else ""
-        return (f"{self.__class__.__name__}\n{name}{date}{info}\n"
+        name = f" «{self.name}»" if self.name else ""
+        date = f" {self.date}" if self.date else ""
+        info = f"{self.info}\n" if self.info else ""
+        return (f":: {self.__class__.__name__}{name} ::{date}\n{info}\n"
                 f"{self.data.__repr__()}")
 
     def _repr_html_(self):
         """HTML representation with fancy xarray display."""
-        name = f"Name: {self.name}<br>" if self.name else ""
-        date = f"Date: {self.date}<br>" if self.date else ""
-        info = f"Info: {self.info}<br>" if self.info else ""
-        return (f"<h4>{self.__class__.__name__}</h4><br>{name}{date}{info}"
+        name = f" «{self.name}»" if self.name else ""
+        date = f" <tt>{self.date}</tt>" if self.date else ""
+        info = f"{self.info}<br>" if self.info else ""
+        return (f"<h3>{self.__class__.__name__}{name}{date}</h3>{info}"
                 f"{self.data._repr_html_()}")
 
     def copy(self):
@@ -184,7 +184,7 @@ class Survey:
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Survey.to_dict`.
+            Dictionary as obtained from :func:`emg3d.surveys.Survey.to_dict`.
             The dictionary needs the keys `sources`, `receivers`, and
             `frequencies`.
 

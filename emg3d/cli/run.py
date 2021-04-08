@@ -87,18 +87,17 @@ def simulation(args_dict):
                                receivers=data.get('receivers', None),
                                frequencies=data.get('frequencies', None))
 
+    # Switch-off tqdm if verbosity is zero.
+    if verb < 1:
+        cfg['simulation_options']['tqdm_opts'] = {'disable': True}
+
     # Create simulation.
     sim = simulations.Simulation(
             survey=survey,
-            grid=model['mesh'],
             model=model['model'],
             verb=-1,  # Only errors.
             **cfg['simulation_options']
-            )
-
-    # Switch-off tqdm if verbosity is zero.
-    if verb < 1:
-        sim._tqdm_opts['disable'] = True
+    )
 
     # Print simulation info.
     logger.info("\n    :: SIMULATION ::")
