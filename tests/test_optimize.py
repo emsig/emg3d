@@ -137,12 +137,12 @@ class TestGradient:
 
         # We test a pseudo-random cell from the inline xz slice.
         #
-        # Generally, the NRMSD will be below 0.1 %. However, close to the
-        # boundary, in regions where the gradient is almost zero, and in
-        # regions where the gradient changes sign the NRMSD can become large.
-        # This is mainly due to numerics, our coarse mesh, and the reduced
-        # tolerance (which we reduced for speed). As such we only sample
-        # pseudo-random from 200 cells.
+        # The NRMSD is (should) be below 1 %. However, (a) close to the
+        # boundary, (b) in regions where the gradient is almost zero, and (c)
+        # in regions where the gradient changes sign the NRMSD can become
+        # large. This is mainly due to numerics, our coarse mesh, and the
+        # reduced tolerance (which we reduced for speed). As such we only
+        # sample pseudo-random from 200 cells.
         ixyz = ([20, 32, 17], [20, 32, 23], [20, 32, 24], [20, 32, 25],
                 [20, 32, 26], [20, 32, 27], [20, 32, 28], [20, 32, 29],
                 [20, 32, 30], [20, 32, 31], [20, 32, 32], [20, 32, 33],

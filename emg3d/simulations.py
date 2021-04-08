@@ -235,8 +235,9 @@ class Simulation:
             self.survey._data['synthetic'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
 
-        # `tqdm`-options; undocumented for the moment.
-        # This is likely to change with regards to verbosity and logging.
+        # `tqdm`-options; undocumented.
+        # Can be used to, e.g., disable tqdm completely via:
+        # > simulation._tqdm_opts = {'disable': True}
         self._tqdm_opts = {
                 'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]',
                 }

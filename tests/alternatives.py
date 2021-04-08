@@ -533,6 +533,15 @@ def fd_vs_as_gradient(ixyz, model, grad, data_misfit, sim_inp, epsilon=1e-4,
     """
     ix, iy, iz = ixyz
 
+    if verb > 1:
+        print(f"   === Compare Gradients  ::  epsilon={epsilon} ===\n\n"
+              f"{{xi;iy;iz}}     Adjoint-state       Forward FD    NRMSD (%)\n"
+              f"----------------------------------------------------------")
+    if verb > 0:
+        print(
+            f"{{{ix:2d};{iy:2d};{iz:2d}}}     {grad[ix, iy, iz]:+.6e}", end=''
+        )
+
     # Add epsilon to given cell.
     model_diff = model.copy()
     model_diff.property_x[ix, iy, iz] += epsilon
@@ -545,13 +554,7 @@ def fd_vs_as_gradient(ixyz, model, grad, data_misfit, sim_inp, epsilon=1e-4,
     # Compute NRMSD
     nrmsd = 200*abs(grad[ix, iy, iz]-fdgrad)
     nrmsd /= abs(grad[ix, iy, iz])+abs(fdgrad)
-
-    if verb > 1:
-        print(f"   === Compare Gradients  ::  epsilon={epsilon} ===\n\n"
-              f"{{xi;iy;iz}}     Adjoint-state       Forward FD    NRMSD (%)\n"
-              f"----------------------------------------------------------")
     if verb > 0:
-        print(f"{{{ix:2d};{iy:2d};{iz:2d}}}     {grad[ix, iy, iz]:+.6e}    "
-              f"{fdgrad:+.6e}    {nrmsd:9.5f}")
+        print(f"    {fdgrad:+.6e}    {nrmsd:9.5f}")
 
     return nrmsd
