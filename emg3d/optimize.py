@@ -196,8 +196,8 @@ def gradient(simulation):
         # This is the actual Equation (10), with:
         #   del S / del p = iwu0 V sigma / sigma,
         # where lambda and E are already volume averaged.
-        efield = simulation._dict_efield[src][freq]
-        bfield = simulation._dict_bfield[src][freq]
+        efield = simulation._dict_efield[src][freq]  # Forward electric field
+        bfield = simulation._dict_bfield[src][freq]  # Conj. backprop. field
         gfield = fields.Field(
             grid=efield.grid,
             data=-np.real(bfield.field * efield.smu0 * efield.field),

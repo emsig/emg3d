@@ -1125,8 +1125,8 @@ class Simulation:
         freq = self.survey.frequencies[frequency]
         grid = self.get_grid(source, frequency)
 
-        # Initiate empty field
-        ResidualField = fields.Field(grid, frequency=freq)
+        # Initiate empty residual source field
+        rfield = fields.Field(grid, frequency=freq)
 
         # Loop over receivers, input as source.
         for name, rec in self.survey.receivers.items():
@@ -1136,27 +1136,29 @@ class Simulation:
             if np.isnan(residual):
                 continue
 
-            # Strength: in get_source_field the strength is multiplied with
-            # iwmu; so we undo this here.
-            weight = self.data.weights.loc[source, name, frequency].data.conj()
-            strength = residual.conj() * weight / ResidualField.smu0
+            # Residual source strength: Weighted residual, normalized by -smu0.
+            weight = self.data.weights.loc[source, name, frequency].data
+            strength = np.conj(residual * weight / -rfield.smu0)
 
             # Create source.
             if rec.xtype == 'magnetic':
-                # If the data is from a magnetic point we have to undo the
+                src_fct = electrodes.TxMagneticDipole
+
+                # If the data is from a magnetic point we have to undo another
                 # factor smu0 here, as the source will be a loop.
-                strength /= ResidualField.smu0
-                src = electrodes.TxMagneticDipole(
-                        rec.coordinates, strength=strength)
+                strength /= rfield.smu0
+
             else:
-                src = electrodes.TxElectricDipole(
-                        rec.coordinates, strength=strength)
+                src_fct = electrodes.TxElectricDipole
 
             # Get residual field and add it to the total field.
-            rfield = fields.get_source_field(grid, src, freq)
-            ResidualField.field += rfield.field
+            rfield.field += fields.get_source_field(
+                    grid=grid,
+                    source=src_fct(rec.coordinates, strength=strength),
+                    frequency=freq,
+            ).field
 
-        return ResidualField
+        return rfield
 
 
 # HELPER FUNCTIONS
