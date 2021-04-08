@@ -396,7 +396,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         can be provided for direction dependent values. Note that this value
         has no influence on dimensions where a ``vector`` is provided.
 
-    min_width_pps : {tuple, float}, default: 3.0
+    min_width_pps : {array_like, float}, default: 3.0
         Passed through to :func:`cell_width` as ``pps``. A tuple of three can
         be provided for direction dependent values. Note that this value has no
         influence on dimensions where a ``vector`` is provided.
