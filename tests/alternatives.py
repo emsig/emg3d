@@ -461,12 +461,12 @@ def alt_get_magnetic_field(model, efield):
         vmodel = emg3d.models.VolumeModel(model, efield)
 
         # Plus and minus indices.
-        ixm = np.r_[0, np.arange(grid.vnC[0])]
-        ixp = np.r_[np.arange(grid.vnC[0]), grid.vnC[0]-1]
-        iym = np.r_[0, np.arange(grid.vnC[1])]
-        iyp = np.r_[np.arange(grid.vnC[1]), grid.vnC[1]-1]
-        izm = np.r_[0, np.arange(grid.vnC[2])]
-        izp = np.r_[np.arange(grid.vnC[2]), grid.vnC[2]-1]
+        ixm = np.r_[0, np.arange(grid.shape_cells[0])]
+        ixp = np.r_[np.arange(grid.shape_cells[0]), grid.shape_cells[0]-1]
+        iym = np.r_[0, np.arange(grid.shape_cells[1])]
+        iyp = np.r_[np.arange(grid.shape_cells[1]), grid.shape_cells[1]-1]
+        izm = np.r_[0, np.arange(grid.shape_cells[2])]
+        izp = np.r_[np.arange(grid.shape_cells[2]), grid.shape_cells[2]-1]
 
         # Average mu_r for dual-grid.
         zeta_x = (vmodel.zeta[ixm, :, :] + vmodel.zeta[ixp, :, :])/2.
