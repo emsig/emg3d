@@ -57,7 +57,7 @@ jobs:
 
       - name: Setup miniconda
         # [pin v2.1.1 (2021-04-01)]
-        uses: conda-incubator/setup-miniconda@        35d1405e78aa3f784fe3ce9a2eb378d5eeb62169
+        uses: conda-incubator/setup-miniconda@35d1405e78aa3f784fe3ce9a2eb378d5eeb62169
         with:
           auto-update-conda: true
           miniconda-version: "latest"
