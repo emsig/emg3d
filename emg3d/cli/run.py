@@ -32,9 +32,9 @@ from emg3d.cli import parser
 def simulation(args_dict):
     """Run `emg3d` invoked by CLI.
 
-    Run and log `emg3d` given the settings stored in the config file, overruled
-    by settings passed in `args_dict` (which correspond to command-line
-    arguments).
+    Run and log ``emg3d`` given the settings stored in the config file,
+    overruled by settings passed in ``args_dict`` (which correspond to
+    command-line arguments).
 
     Results are saved to files according to provided settings.
 
@@ -43,7 +43,7 @@ def simulation(args_dict):
     ----------
     args_dict : dict
         Arguments from terminal, see :func:`emg3d.cli.main`. Parameters passed
-        in `args_dict` overrule parameters in the `config`.
+        in ``args_dict`` overrule parameters in the ``config``.
 
     """
 
@@ -108,11 +108,7 @@ def simulation(args_dict):
     logger.debug(sim.print_grid_info(return_info=True))
 
     # Initiate output dict, add configuration.
-    # Ideally, we would add the entire configuration; however, this causes
-    # currently problems for saving h5. We therefore save only the data
-    # selection info, such that we know what data was selected.
-    # output = {'configuration': cfg}
-    output = {'configuration': {'data': cfg.get('data', {})}}
+    output = {'configuration': cfg}
 
     # Compute forward model (all calls).
     logger.info("    :: FORWARD COMPUTATION ::\n")
