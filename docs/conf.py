@@ -87,7 +87,7 @@ html_theme_options = {
 html_context = {
     "github_user": "emsig",
     "github_repo": "emg3d",
-    "github_version": "master",
+    "github_version": "main",
     "doc_path": "docs",
 }
 
