@@ -322,36 +322,13 @@ class Simulation:
             'model': self.model.to_dict(),
             'max_workers': self.max_workers,
             'gridding': self.gridding,
+            'gridding_opts': self.gridding_opts,
             'solver_opts': self.solver_opts,
             'verb': self.verb,
             'name': self.name,
             'info': self.info,
+            '_input_sc2': self._input_sc2,
         }
-
-        # gridding_opts.
-        if self.gridding == 'input':
-            out['gridding_opts'] = self._grid_single
-        elif self.gridding == 'dict':
-            out['gridding_opts'] = self._dict_grid
-        elif self.gridding != 'same':
-
-            gopts = self.gridding_opts
-
-            # Take care of map.
-            if 'mapping' in gopts.keys():
-                if not isinstance(gopts['mapping'], str):
-                    gopts['mapping'] = gopts['mapping'].name
-
-            # Take care of gridding_opts tuples for h5/npz.
-            # Ideally, this should be dealt with in emg3d.io.
-            for key in ['domain', 'vector', 'distance', 'stretching',
-                        'min_width_limits']:
-                if key in gopts.keys() and len(gopts[key]) == 3:
-                    gopts[key] = {i: v for i, v in
-                                  zip(['x', 'y', 'z'], gopts[key])}
-
-            out['gridding_opts'] = gopts
-        out['_input_sc2'] = self._input_sc2
 
         # Clean unwanted data if plain.
         if what == 'plain':
@@ -410,22 +387,6 @@ class Simulation:
         input_sc2 = inp.pop('_input_sc2', False)
         if input_sc2:
             cls_inp['_input_sc2'] = input_sc2
-
-        # Take care of gridding_opts.
-        if cls_inp['gridding'] not in ['input', 'dict', 'same']:
-            props = ['domain', 'vector', 'distance', 'stretching',
-                     'min_width_limits']
-            gridding_opts = cls_inp['gridding_opts']
-            for key in props:
-                if key in gridding_opts.keys():
-                    if isinstance(gridding_opts[key], dict):
-                        gridding_opts[key] = (
-                            gridding_opts[key]['x'],
-                            gridding_opts[key]['y'],
-                            gridding_opts[key]['z'],
-                        )
-
-            cls_inp['gridding_opts'] = gridding_opts
 
         # Instantiate the class.
         out = cls(**cls_inp)
@@ -1164,9 +1125,10 @@ class Simulation:
 
             # Get automatic gridding input.
             # Estimate the parameters from survey and model if not provided.
-            self.gridding_opts = estimate_gridding_opts(
+            gridding_opts = estimate_gridding_opts(
                     g_opts, model, self.survey, self._input_sc2)
 
+        self.gridding_opts = gridding_opts
         self.model = model
 
 
@@ -1352,14 +1314,21 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
     grid = model.grid
 
     # Optional values that we only include if provided.
-    for name in ['stretching', 'seasurface', 'cell_numbers', 'lambda_factor',
-                 'lambda_from_center', 'max_buffer', 'min_width_limits',
-                 'min_width_pps', 'verb']:
+    for name in ['seasurface', 'cell_numbers', 'lambda_factor',
+                 'lambda_from_center', 'max_buffer', 'verb']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
+    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
+        if name in gridding_opts.keys():
+            value = gridding_opts.pop(name)
+            if isinstance(value, (list, tuple)) and len(value) == 3:
+                value = {'x': value[0], 'y': value[1], 'z': value[2]}
+            gopts[name] = value
 
     # Mapping defaults to model map.
     gopts['mapping'] = gridding_opts.pop('mapping', model.map)
+    if not isinstance(gopts['mapping'], str):
+        gopts['mapping'] = gopts['mapping'].name
 
     # Frequency defaults to average frequency (log10).
     frequency = 10**np.mean(np.log10([v for v in survey.frequencies.values()]))
@@ -1378,16 +1347,20 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
                 grid.nodes_y if 'y' in vector.lower() else None,
                 grid.nodes_z[:input_sc2] if 'z' in vector.lower() else None,
         )
-        gopts['vector'] = vector
-
-    elif vector is not None:
-        # In this case vector was provided, and we include it like this.
-        gopts['vector'] = vector
+    gopts['vector'] = vector
+    if isinstance(vector, dict):
+        vector = (vector['x'], vector['y'], vector['z'])
+    elif vector is not None and len(vector) == 3:
+        gopts['vector'] = {'x': vector[0], 'y': vector[1], 'z': vector[2]}
 
     # Distance.
     distance = gridding_opts.pop('distance', None)
-    if distance is not None:
-        gopts['distance'] = distance
+    gopts['distance'] = distance
+    if isinstance(distance, dict):
+        distance = (distance['x'], distance['y'], distance['z'])
+    elif distance is not None and len(distance) == 3:
+        gopts['distance'] = {'x': distance[0], 'y': distance[1],
+                             'z': distance[2]}
 
     # Properties defaults to lowest conductivities (AFTER model expansion).
     properties = gridding_opts.pop('properties', None)
@@ -1434,6 +1407,8 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
 
     # Domain; default taken from survey.
     domain = gridding_opts.pop('domain', None)
+    if isinstance(domain, dict):
+        domain = (domain['x'], domain['y'], domain['z'])
 
     def get_dim_diff(i):
         """Return ([min, max], dim) of inp.
@@ -1492,9 +1467,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
         zdim = [zdim[0]-9*diff, zdim[1]+diff]
 
     # Collect
-    domain = (xdim, ydim, zdim)
-
-    gopts['domain'] = domain
+    gopts['domain'] = {'x': xdim, 'y': ydim, 'z': zdim}
 
     # Ensure no gridding_opts left.
     if gridding_opts:

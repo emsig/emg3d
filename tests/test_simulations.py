@@ -509,11 +509,11 @@ class TestEstimateGriddingOpts():
         gdict = simulations.estimate_gridding_opts({}, self.model, self.survey)
 
         assert gdict['frequency'] == 1.0
-        assert gdict['mapping'].name == self.model.map.name
+        assert gdict['mapping'] == self.model.map.name
         assert_allclose(gdict['center'], (0, 3000, -950))
-        assert_allclose(gdict['domain'][0], (-500, 5500))
-        assert_allclose(gdict['domain'][1], (600, 5400))
-        assert_allclose(gdict['domain'][2], (-3651, -651))
+        assert_allclose(gdict['domain']['x'], (-500, 5500))
+        assert_allclose(gdict['domain']['y'], (600, 5400))
+        assert_allclose(gdict['domain']['z'], (-3651, -651))
         assert_allclose(gdict['properties'], [100000, 10, 10, 10, 10, 10, 10])
 
     def test_mapping_vector(self):
@@ -528,9 +528,9 @@ class TestEstimateGriddingOpts():
                 gdict['properties'],
                 np.log10(1/np.array([100000, 10, 10, 10, 10, 10, 10])),
                 atol=1e-15)
-        assert_allclose(gdict['vector'][0], self.grid.nodes_x)
-        assert gdict['vector'][1] is None
-        assert_allclose(gdict['vector'][2], self.grid.nodes_z)
+        assert_allclose(gdict['vector']['x'], self.grid.nodes_x)
+        assert gdict['vector']['y'] is None
+        assert_allclose(gdict['vector']['z'], self.grid.nodes_z)
 
     def test_vector_domain_distance(self):
         gridding_opts = {
@@ -541,25 +541,44 @@ class TestEstimateGriddingOpts():
         gdict = simulations.estimate_gridding_opts(
                 gridding_opts, self.model, self.survey)
 
-        assert gdict['vector'][0] == gdict['vector'][1] is None
-        assert_allclose(gdict['vector'][2], self.model.grid.nodes_z)
+        assert gdict['vector']['x'] == gdict['vector']['y'] is None
+        assert_allclose(gdict['vector']['z'], self.model.grid.nodes_z)
 
-        assert gdict['domain'][0] is None
-        assert gdict['domain'][1] == [-1000, 1000]
-        assert gdict['domain'][2] == [self.model.grid.nodes_z[0],
-                                      self.model.grid.nodes_z[-1]]
-        assert gdict['distance'][0] == [5, 10]
-        assert gdict['distance'][1] == gdict['distance'][2] is None
+        assert gdict['domain']['x'] is None
+        assert gdict['domain']['y'] == [-1000, 1000]
+        assert gdict['domain']['z'] == [self.model.grid.nodes_z[0],
+                                        self.model.grid.nodes_z[-1]]
+        assert gdict['distance']['x'] == [5, 10]
+        assert gdict['distance']['y'] == gdict['distance']['z'] is None
+
+        # As dict
+        gridding_opts = {
+                'vector': 'Z',
+                'domain': {'x': None, 'y': [-1000, 1000], 'z': None},
+                'distance': {'x': [5, 10], 'y': None, 'z': None},
+                }
+        gdict = simulations.estimate_gridding_opts(
+                gridding_opts, self.model, self.survey)
+
+        assert gdict['vector']['x'] == gdict['vector']['y'] is None
+        assert_allclose(gdict['vector']['z'], self.model.grid.nodes_z)
+
+        assert gdict['domain']['x'] is None
+        assert gdict['domain']['y'] == [-1000, 1000]
+        assert gdict['domain']['z'] == [self.model.grid.nodes_z[0],
+                                        self.model.grid.nodes_z[-1]]
+        assert gdict['distance']['x'] == [5, 10]
+        assert gdict['distance']['y'] == gdict['distance']['z'] is None
 
     def test_pass_along(self):
         gridding_opts = {
-            'vector': (None, 1, None),
+            'vector': {'x': None, 'y': 1, 'z': None},
             'stretching': [1.2, 1.3],
             'seasurface': -500,
             'cell_numbers': [10, 20, 30],
             'lambda_factor': 0.8,
             'max_buffer': 10000,
-            'min_width_limits': [20, 40],
+            'min_width_limits': ([20, 40], [20, 40], [20, 40]),
             'min_width_pps': 4,
             'verb': -1,
             }
@@ -569,6 +588,12 @@ class TestEstimateGriddingOpts():
 
         # Check that all parameters passed unchanged.
         gdict2 = {k: gdict[k] for k, _ in gridding_opts.items()}
+        # Except the tuple, which should be a dict now
+        gridding_opts['min_width_limits'] = {
+                'x': gridding_opts['min_width_limits'][0],
+                'y': gridding_opts['min_width_limits'][1],
+                'z': gridding_opts['min_width_limits'][2]
+        }
         assert helpers.compare_dicts(gdict2, gridding_opts)
 
     def test_factor(self):
@@ -582,7 +607,7 @@ class TestEstimateGriddingOpts():
 
         gdict = simulations.estimate_gridding_opts({}, self.model, survey)
 
-        assert_allclose(gdict['domain'][0], (-800, 800))
+        assert_allclose(gdict['domain']['x'], (-800, 800))
 
         # Adjusted x-domain.
         survey = emg3d.Survey(
@@ -591,7 +616,7 @@ class TestEstimateGriddingOpts():
 
         gdict = simulations.estimate_gridding_opts({}, self.model, survey)
 
-        assert_allclose(gdict['domain'][1], (1500, 3500))
+        assert_allclose(gdict['domain']['y'], (1500, 3500))
 
     def test_error(self):
         with pytest.raises(TypeError, match='Unexpected gridding_opts'):

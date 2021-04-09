@@ -145,6 +145,16 @@ class TestConstructMesh:
         assert_allclose(m.h[1], hy)
         assert_allclose(m.h[2], hz)
 
+        # As dict
+        m = meshes.construct_mesh(
+                f, [p, p, p, p], c, d,
+                stretching={'x': [1, 1.3], 'y': [1.5, 1], 'z': [1, 1]})
+
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
+
     def test_compare_to_gow2(self):
         vz = np.arange(100)[::-1]*-20
         x0, hx = meshes.origin_and_widths(
@@ -167,6 +177,21 @@ class TestConstructMesh:
         assert_allclose(m.h[1], hy)
         assert_allclose(m.h[2], hz)
 
+        # As dict
+        m = meshes.construct_mesh(
+                frequency=0.77,
+                properties=[0.3, 1, 2, 2, 1, 2, 1e8],
+                center=(0, 0, 0),
+                domain={'x': [-1000, 1000], 'y': [-2000, 2000], 'z': None},
+                vector={'x': None, 'y': None, 'z': vz},
+                min_width_limits=[20, 40],
+                )
+
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
+
     def test_compare_to_gow3(self):
         x0, hx = meshes.origin_and_widths(
                 0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
@@ -179,6 +204,21 @@ class TestConstructMesh:
                 properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
                 center=(-423, 16, -33.3333),
                 domain=([-3333, 222], [-1234, 8956], [-100, 100]),
+                min_width_limits=20,
+                )
+
+        assert_allclose(m.origin, (x0, y0, z0), atol=1e-3)
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
+
+        # As dict.
+        m = meshes.construct_mesh(
+                frequency=0.2,
+                properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
+                center=(-423, 16, -33.3333),
+                domain={'x': [-3333, 222], 'y': [-1234, 8956],
+                        'z': [-100, 100]},
                 min_width_limits=20,
                 )
 
