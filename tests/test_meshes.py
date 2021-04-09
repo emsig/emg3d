@@ -5,7 +5,8 @@ import numpy as np
 from scipy.constants import mu_0
 from numpy.testing import assert_allclose
 
-from emg3d import meshes, io
+import emg3d
+from emg3d import meshes
 
 
 # Import soft dependencies.
@@ -15,7 +16,7 @@ except ImportError:
     discretize = None
 
 # Data generated with create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
+REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 def test_BaseMesh():
@@ -144,6 +145,16 @@ class TestConstructMesh:
         assert_allclose(m.h[1], hy)
         assert_allclose(m.h[2], hz)
 
+        # As dict
+        m = meshes.construct_mesh(
+                f, [p, p, p, p], c, d,
+                stretching={'x': [1, 1.3], 'y': [1.5, 1], 'z': [1, 1]})
+
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
+
     def test_compare_to_gow2(self):
         vz = np.arange(100)[::-1]*-20
         x0, hx = meshes.origin_and_widths(
@@ -166,6 +177,21 @@ class TestConstructMesh:
         assert_allclose(m.h[1], hy)
         assert_allclose(m.h[2], hz)
 
+        # As dict
+        m = meshes.construct_mesh(
+                frequency=0.77,
+                properties=[0.3, 1, 2, 2, 1, 2, 1e8],
+                center=(0, 0, 0),
+                domain={'x': [-1000, 1000], 'y': [-2000, 2000], 'z': None},
+                vector={'x': None, 'y': None, 'z': vz},
+                min_width_limits=[20, 40],
+                )
+
+        assert_allclose(m.origin, (x0, y0, z0))
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
+
     def test_compare_to_gow3(self):
         x0, hx = meshes.origin_and_widths(
                 0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
@@ -178,6 +204,21 @@ class TestConstructMesh:
                 properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
                 center=(-423, 16, -33.3333),
                 domain=([-3333, 222], [-1234, 8956], [-100, 100]),
+                min_width_limits=20,
+                )
+
+        assert_allclose(m.origin, (x0, y0, z0), atol=1e-3)
+        assert_allclose(m.h[0], hx)
+        assert_allclose(m.h[1], hy)
+        assert_allclose(m.h[2], hz)
+
+        # As dict.
+        m = meshes.construct_mesh(
+                frequency=0.2,
+                properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
+                center=(-423, 16, -33.3333),
+                domain={'x': [-3333, 222], 'y': [-1234, 8956],
+                        'z': [-100, 100]},
                 min_width_limits=20,
                 )
 
@@ -300,10 +341,10 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 616 / 1125 / 7958" in out
         assert "Survey dom. DS [m] : -2000 - -1000" in out
         assert "Comp. dom. DC  [m] : -9071 - 49000" in out
-        assert "Final extent   [m] : -10310 - 52091" in out
-        assert "Cell widths    [m] : 205 / 205 / 12083" in out
+        assert "Final extent   [m] : -10223 - 50988" in out
+        assert "Cell widths    [m] : 205 / 205 / 11769" in out
         assert "Number of cells    : 32 (7 / 25 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.290" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.288" in out
 
         # All set.
         meshes.origin_and_widths(
@@ -330,10 +371,10 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 620 / 1125 / 50" in out
         assert "Survey dom. DS [m] : -2000 - -1000" in out
         assert "Comp. dom. DC  [m] : -10950 - 5300" in out
-        assert "Final extent   [m] : -13945 - 5425" in out
-        assert "Cell widths    [m] : 100 / 100 / 3191" in out
+        assert "Final extent   [m] : -13850 - 5386" in out
+        assert "Cell widths    [m] : 100 / 100 / 3158" in out
         assert "Number of cells    : 40 (20 / 20 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.370" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.369" in out
 
         # High frequencies.
         _, _, out = meshes.origin_and_widths(
@@ -347,10 +388,10 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 0.113 / 0.050 / 0.356" in out
         assert "Survey dom. DS [m] : -1.000 - 1.000" in out
         assert "Comp. dom. DC  [m] : -1.316 - 3.236" in out
-        assert "Final extent   [m] : -1.331 - 3.376" in out
-        assert "Cell widths    [m] : 0.038 / 0.038 / 0.252" in out
+        assert "Final extent   [m] : -1.327 - 3.262" in out
+        assert "Cell widths    [m] : 0.038 / 0.038 / 0.234" in out
         assert "Number of cells    : 80 (54 / 26 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.100" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.096" in out
 
 
 def test_good_mg_cell_nr(capsys):

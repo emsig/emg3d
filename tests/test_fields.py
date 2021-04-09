@@ -10,7 +10,6 @@ from emg3d import fields
 from . import alternatives, helpers
 
 
-# Import soft dependencies.
 try:
     import discretize
 except ImportError:
@@ -39,10 +38,11 @@ class TestField:
         assert ee.smu0 is None
         assert ee.sval is None
         assert ee.frequency is None
+        assert ee.electric
         assert ee.field.dtype == self.field.dtype
 
         # Check representation of Field.
-        assert f"Field: {ee.grid.shape_cells[0]} x" in ee.__repr__()
+        assert f"Field: electric; {ee.grid.shape_cells[0]} x" in ee.__repr__()
 
         # Test amplitude and phase.
 
@@ -128,6 +128,25 @@ class TestField:
         ee.field = np.arange(ee.field.size) + 2j*np.arange(ee.field.size)
         resp = ee.get_receiver((4, 4, 4, 0, 0))
         assert_allclose(resp, 323.5 + 647.0j)
+
+    def test_magnetic(self):
+        ee = fields.Field(self.grid, electric=False)
+        assert not ee.electric
+        assert ee.fx.shape == self.grid.shape_faces_x
+        assert ee.fy.shape == self.grid.shape_faces_y
+        assert ee.fz.shape == self.grid.shape_faces_z
+        assert ee.smu0 is None
+        assert ee.sval is None
+        assert ee.frequency is None
+
+        # Check representation of Field.
+        assert f"Field: magnetic; {ee.grid.shape_cells[0]} x" in ee.__repr__()
+
+        # Try setting values
+        ee.field = np.arange(self.grid.n_faces)
+        ee.fx = np.ones(self.grid.shape_faces_x)
+        ee.fy = np.ones(self.grid.shape_faces_y)
+        ee.fz = np.ones(self.grid.shape_faces_z)
 
 
 class TestGetSourceField:
@@ -453,7 +472,9 @@ def test_get_magnetic_field():
     efield = fields.Field(grid, data=new, frequency=np.pi)
     hfield_nb = fields.get_magnetic_field(model, efield)
     hfield_np = alternatives.alt_get_magnetic_field(model, efield)
-    assert_allclose(hfield_nb.field, hfield_np.field)
+    assert_allclose(hfield_nb.fx, hfield_np.fx)
+    assert_allclose(hfield_nb.fy, hfield_np.fy)
+    assert_allclose(hfield_nb.fz, hfield_np.fz)
 
     # Test using discretize
     if discretize:
@@ -463,17 +484,9 @@ def test_get_magnetic_field():
         sfield = fields.get_source_field(
                 grid, (350, 550, 750, 30, 30), frequency=10)
         efield = emg3d.solve(model, sfield, plain=True, verb=0)
-        mfield = fields.get_magnetic_field(model, efield)
+        mfield = fields.get_magnetic_field(model, efield).field
         dfield = grid.edge_curl*efield.field/sfield.smu0
-        assert_allclose(
-                dfield[:80].reshape((5, 4, 4), order='F')[1:-1, :, :],
-                mfield.fx)
-        assert_allclose(
-                dfield[80:160].reshape((4, 5, 4), order='F')[:, 1:-1, :],
-                mfield.fy)
-        assert_allclose(
-                dfield[160:].reshape((4, 4, 5), order='F')[:, :, 1:-1],
-                mfield.fz)
+        assert_allclose(mfield, dfield)
 
 
 class TestDipoleVector:
@@ -595,9 +608,9 @@ def test_edge_curl_factor(njit):
     hx = np.array([10., 10])
     hy = np.array([20., 20])
     hz = np.array([30., 30])
-    factor = 0.1*np.ones((2, 2, 2))
+    factor = 0.1*np.ones((2, 2, 2))*10*20*30
 
     edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, factor)
-    assert_allclose(mx, 0.5)  # (9/20 - 12/30) * 2 / 0.2
-    assert_allclose(my, -1)  # (6/30 - 3/10) / 0.2 * 2
-    assert_allclose(mz, 1)  # (2/10 - 2/20) / 0.2 * 2
+    assert_allclose(mx, 0.005)  # (9/20 - 12/30) * 0.1
+    assert_allclose(my, -0.01)  # (6/30 - 3/10) * 0.1
+    assert_allclose(mz, 0.01)  # (2/10 - 2/20) * 0.1

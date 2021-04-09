@@ -1,7 +1,7 @@
 """
 Utility functions for the multigrid solver.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -38,6 +38,12 @@ try:
     import empymod
 except ImportError:
     empymod = None
+
+try:
+    import tqdm
+    import tqdm.contrib.concurrent
+except ImportError:
+    tqdm = None
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
@@ -704,15 +710,32 @@ class Report(ScoobyReport):
 
 # MISC
 def _process_map(fn, *iterables, max_workers, **kwargs):
-    """Imitate tqdm.contrib.concurrent.process_map without tqdm.
+    """Dispatch processes in parallel or not, using tqdm or not.
 
-    emg3d.simulation uses `process_map` from `tqdm` to run jobs asynchronously.
-    However, `tqdm` is a soft dependency. In case it is not installed we simply
-    use `concurrent.futures.ProcessPoolExecutor`, from the standard library,
-    and imitate the behaviour of process_map (basically a
-    `ProcessPoolExecutor.map`, returned as a list, and wrapped in a context
-    manager).
+    :class:``emg3d.simulations.Simulation`` uses ``process_map`` from ``tqdm``
+    to run jobs asynchronously. However, ``tqdm`` is a soft dependency. In case
+    it is not installed we use ``concurrent.futures.ProcessPoolExecutor``
+    directly, from the standard library, and imitate the behaviour of
+    process_map (basically a ``ProcessPoolExecutor.map``, returned as a list,
+    and wrapped in a context manager). If max_workers is smaller than two then
+    we we avoid parallel execution.
 
     """
-    with ProcessPoolExecutor(max_workers=max_workers) as ex:
-        return list(ex.map(fn, *iterables))
+    # Parallel
+    if max_workers > 1 and tqdm is None:
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            return list(ex.map(fn, *iterables))
+
+    # Parallel with tqdm
+    elif max_workers > 1:
+        kwargs['max_workers'] = max_workers
+        return tqdm.contrib.concurrent.process_map(fn, *iterables, **kwargs)
+
+    # Sequential
+    elif tqdm is None:
+        return list(map(fn, *iterables))
+
+    # Sequential with tqdm
+    else:
+        return list(tqdm.auto.tqdm(
+            iterable=map(fn, *iterables), total=len(iterables[0]), **kwargs))

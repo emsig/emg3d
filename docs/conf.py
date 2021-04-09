@@ -5,13 +5,13 @@ from emg3d import __version__
 
 # Load extensions
 extensions = [
-    'sphinx.ext.autodoc',
+    # 'sphinx.ext.autodoc',
     'numpydoc',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.autosummary',
+    # 'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.doctest',
+    # 'sphinx.ext.viewcode',
+    # 'sphinx.ext.doctest',
     # 'sphinx.ext.todo',
     'sphinx_automodapi.automodapi',
     'matplotlib.sphinxext.plot_directive',
@@ -55,7 +55,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emg3d'
-author = 'The emg3d Developers'
+author = 'The EMSiG community'
 copyright = f'2018-{time.strftime("%Y")}, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).
@@ -78,7 +78,8 @@ html_favicon = '_static/favicon.ico'
 html_theme_options = {
     "github_url": "https://github.com/emsig/emg3d",
     "external_links": [
-        {"name": "EMSiG", "url": "https://emsig.github.io"},
+        {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery"},
+        {"name": "EMSiG", "url": "https://emsig.xyz"},
     ],
     # "use_edit_page_button": True,
 }

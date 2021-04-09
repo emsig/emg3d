@@ -14,7 +14,7 @@ Quick overview / QC
      :target: https://github.com/emsig/emg3d/actions/workflows/linkcheck.yml
      :alt: GitHub Actions linkcheck
   .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
-     :target: https://emg3d.readthedocs.io/en/latest
+     :target: https://emg3d.emsig.xyz/en/latest
      :alt: Documentation Status
 
   Ensure CI and docs are passing.
@@ -38,7 +38,7 @@ Quick overview / QC
   Check CI coverage and code quality is good.
 
 - .. image:: https://img.shields.io/badge/benchmark-asv-blue.svg?style=flat
-     :target: https://emsig.github.io/emg3d-asv
+     :target: https://emsig.xyz/emg3d-asv
      :alt: Airspeed Velocity
 
   Check Benchmarks are run up to the latest version.

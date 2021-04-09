@@ -5,12 +5,13 @@ import scipy.interpolate as si
 from os.path import join, dirname
 from numpy.testing import assert_allclose
 
-from emg3d import solver, core, meshes, models, fields, io
+import emg3d
+from emg3d import solver
 
 from . import alternatives, helpers
 
 # Data generated with tests/create_data/regression.py
-REGRES = io.load(join(dirname(__file__), 'data', 'regression.npz'))
+REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 
 class TestSolve:
@@ -18,9 +19,9 @@ class TestSolve:
         # Regression test for homogeneous halfspace.
         dat = REGRES['res']
 
-        model = models.Model(**dat['input_model'])
+        model = emg3d.Model(**dat['input_model'])
         grid = model.grid
-        sfield = fields.get_source_field(**dat['input_source'])
+        sfield = emg3d.get_source_field(**dat['input_source'])
 
         # F-cycle
         efield = solver.solve(model=model, sfield=sfield, plain=True, verb=4)
@@ -122,14 +123,14 @@ class TestSolve:
         # Provide initial field, ensure one initial multigrid is carried out
         # without linerelaxation nor semicoarsening.
         _, _ = capsys.readouterr()  # empty
-        efield = fields.Field(grid)
+        efield = emg3d.Field(grid)
         outarray = solver.solve(model, sfield, efield=efield, maxit=2, verb=4)
         out, _ = capsys.readouterr()
         assert "after                       1 F-cycles    4 1" in out
         assert "after                       2 F-cycles    5 2" in out
 
         # Provide an initial source-field without frequency information.
-        wrong_sfield = fields.Field(grid)
+        wrong_sfield = emg3d.Field(grid)
         wrong_sfield.field = sfield.field
         with pytest.raises(ValueError, match="Source field is missing frequ"):
             solver.solve(
@@ -187,11 +188,11 @@ class TestSolve:
         # Check the QC plot if it is too long.
         # Coincidently, this one also diverges if nu_pre=0!
         # Mesh: 2-cells in y- and z-direction; 2**9 in x-direction
-        mesh = meshes.TensorMesh(
+        mesh = emg3d.TensorMesh(
                 [np.ones(2**9)/np.ones(2**9).sum(), np.ones(2), np.ones(2)],
                 origin=np.array([-0.5, -1, -1]))
         sfield = alternatives.alt_get_source_field(mesh, [0, 0, 0, 0, 0], 1)
-        model = models.Model(mesh)
+        model = emg3d.Model(mesh)
         _ = solver.solve(model, sfield, plain=True, verb=4, nu_pre=0)
         out, _ = capsys.readouterr()
         assert "(Cycle-QC restricted to first 70 steps of 72 steps.)" in out
@@ -200,8 +201,8 @@ class TestSolve:
     def test_log(self, capsys):
         dat = REGRES['res']
 
-        model = models.Model(**dat['input_model'])
-        sfield = fields.get_source_field(**dat['input_source'])
+        model = emg3d.Model(**dat['input_model'])
+        sfield = emg3d.get_source_field(**dat['input_source'])
         inp = {'model': model, 'sfield': sfield, 'plain': True, 'maxit': 1}
 
         efield, info = solver.solve(return_info=True, log=-1, verb=3, **inp)
@@ -228,9 +229,9 @@ class TestSolve:
         # Not very sophisticated; replace/extend by more detailed tests.
         dat = REGRES['lap']
 
-        model = models.Model(**dat['input_model'])
+        model = emg3d.Model(**dat['input_model'])
         grid = model.grid
-        sfield = fields.get_source_field(**dat['input_source'])
+        sfield = emg3d.get_source_field(**dat['input_source'])
 
         # F-cycle
         efield = solver.solve(model, sfield, plain=True)
@@ -246,7 +247,7 @@ class TestSolve:
         assert_allclose(dat['bicresult'].field, efield.field, atol=1e-14)
 
         # If efield is complex, assert it fails.
-        efield = fields.Field(grid, dtype=np.complex128)
+        efield = emg3d.Field(grid, dtype=np.complex128)
 
         with pytest.raises(ValueError, match='Source field and electric fiel'):
             efield = solver.solve(model, sfield, plain=True, efield=efield)
@@ -254,7 +255,7 @@ class TestSolve:
 
 def test_solve_source():
     dat = REGRES['res']
-    model = models.Model(**dat['input_model'])
+    model = emg3d.Model(**dat['input_model'])
     efield = solver.solve_source(
             model=model, source=dat['input_source']['source'],
             frequency=dat['input_source']['frequency'], plain=True)
@@ -268,11 +269,11 @@ class TestMultigrid:
     def test_basic(self, capsys):
         # This should reach every line of solver.multigrid.
         dat = REGRES['res']
-        model = models.Model(**dat['input_model'])
+        model = emg3d.Model(**dat['input_model'])
         grid = model.grid
-        sfield = fields.get_source_field(**dat['input_source'])
-        vmodel = models.VolumeModel(model, sfield)
-        efield = fields.Field(grid)  # Initiate e-field.
+        sfield = emg3d.get_source_field(**dat['input_source'])
+        vmodel = emg3d.models.VolumeModel(model, sfield)
+        efield = emg3d.Field(grid)  # Initiate e-field.
 
         # Get var-instance
         var = solver.MGParameters(
@@ -295,13 +296,13 @@ class TestKrylov:
     def test_bicgstab_error(self, capsys):
         # Load any case.
         dat = REGRES['res']
-        model = models.Model(**dat['input_model'])
+        model = emg3d.Model(**dat['input_model'])
         grid = model.grid
         model.property_x *= 100000  # Set stupid input to make bicgstab fail.
         model.property_y /= 100000  # Set stupid input to make bicgstab fail.
-        sfield = fields.get_source_field(**dat['input_source'])
-        vmodel = models.VolumeModel(model, sfield)
-        efield = fields.Field(grid)  # Initiate e-field.
+        sfield = emg3d.get_source_field(**dat['input_source'])
+        vmodel = emg3d.models.VolumeModel(model, sfield)
+        efield = emg3d.Field(grid)  # Initiate e-field.
 
         # Get var-instance
         var = solver.MGParameters(
@@ -320,11 +321,11 @@ class TestKrylov:
 
         # Load any case.
         dat = REGRES['res']
-        model = models.Model(**dat['input_model'])
+        model = emg3d.Model(**dat['input_model'])
         grid = model.grid
-        sfield = fields.get_source_field(**dat['input_source'])
-        vmodel = models.VolumeModel(model, sfield)
-        efield = fields.Field(grid)  # Initiate e-field.
+        sfield = emg3d.get_source_field(**dat['input_source'])
+        vmodel = emg3d.models.VolumeModel(model, sfield)
+        efield = emg3d.Field(grid)  # Initiate e-field.
 
         # Get var-instance
         var = solver.MGParameters(
@@ -343,11 +344,11 @@ class TestKrylov:
 
         # Load any case.
         dat = REGRES['res']
-        model = models.Model(**dat['input_model'])
+        model = emg3d.Model(**dat['input_model'])
         grid = model.grid
-        sfield = fields.get_source_field(**dat['input_source'])
-        vmodel = models.VolumeModel(model, sfield)
-        efield = fields.Field(grid)  # Initiate e-field.
+        sfield = emg3d.get_source_field(**dat['input_source'])
+        vmodel = emg3d.models.VolumeModel(model, sfield)
+        efield = emg3d.Field(grid)  # Initiate e-field.
 
         # Get var-instance
         var = solver.MGParameters(
@@ -363,7 +364,7 @@ class TestKrylov:
         assert '> CONVERGED' in out
 
         # Call krylov and ensure it fails properly.
-        efield = fields.Field(grid)  # Initiate e-field.
+        efield = emg3d.Field(grid)  # Initiate e-field.
         # Get var-instance
         var = solver.MGParameters(
                 cycle='F', sslsolver=True, semicoarsening=False,
@@ -392,7 +393,7 @@ def test_smoothing():
     for xyz in range(3):
 
         # Create a grid
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
             [widths[xyz % 3],
              widths[(xyz+1) % 3],
              widths[(xyz+2) % 3]],
@@ -406,13 +407,13 @@ def test_smoothing():
         z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
         property_x = np.outer(np.outer(x, y), z).ravel()
         freq = 0.319
-        model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
+        model = emg3d.Model(grid, property_x, 0.8*property_x, 2*property_x)
 
         # Create a source field
-        sfield = fields.get_source_field(grid=grid, source=src, frequency=freq)
+        sfield = emg3d.get_source_field(grid=grid, source=src, frequency=freq)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(model, sfield)
+        vmodel = emg3d.models.VolumeModel(model, sfield)
 
         # Run two iterations to get an e-field
         field = solver.solve(model, sfield, maxit=2)
@@ -424,26 +425,27 @@ def test_smoothing():
         func = ['', '_x', '_y', '_z']
         for lr_dir in range(8):
             # Get it directly from core
-            efield = fields.Field(grid, field.field)
+            efield = emg3d.Field(grid, field.field)
+            finp = (efield.fx, efield.fy, efield.fz)
             if lr_dir < 4:
-                getattr(core, 'gauss_seidel'+func[lr_dir])(
+                getattr(emg3d.core, 'gauss_seidel'+func[lr_dir])(
                         efield.fx, efield.fy, efield.fz, *inp)
             elif lr_dir == 4:
-                core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
-                core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+                emg3d.core.gauss_seidel_y(*finp, *inp)
+                emg3d.core.gauss_seidel_z(*finp, *inp)
             elif lr_dir == 5:
-                core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
-                core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+                emg3d.core.gauss_seidel_x(*finp, *inp)
+                emg3d.core.gauss_seidel_z(*finp, *inp)
             elif lr_dir == 6:
-                core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
-                core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
+                emg3d.core.gauss_seidel_x(*finp, *inp)
+                emg3d.core.gauss_seidel_y(*finp, *inp)
             elif lr_dir == 7:
-                core.gauss_seidel_x(efield.fx, efield.fy, efield.fz, *inp)
-                core.gauss_seidel_y(efield.fx, efield.fy, efield.fz, *inp)
-                core.gauss_seidel_z(efield.fx, efield.fy, efield.fz, *inp)
+                emg3d.core.gauss_seidel_x(*finp, *inp)
+                emg3d.core.gauss_seidel_y(*finp, *inp)
+                emg3d.core.gauss_seidel_z(*finp, *inp)
 
             # Use solver.smoothing
-            ofield = fields.Field(grid, field.field)
+            ofield = emg3d.Field(grid, field.field)
             solver.smoothing(vmodel, sfield, ofield, nu, lr_dir)
 
             # Compare
@@ -457,16 +459,16 @@ class TestRestrictionProlongation:
 
         # Simple test with restriction followed by prolongation.
         src = [150, 150, 150, 0, 45]
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
                 origin=np.zeros(3))
 
         # Create dummy model and fields, parameters don't matter.
-        model = models.Model(grid, 1, 1, 1, 1)
-        sfield = fields.get_source_field(grid, src, 1)
+        model = emg3d.Model(grid, 1, 1, 1, 1)
+        sfield = emg3d.get_source_field(grid, src, 1)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(model, sfield)
+        vmodel = emg3d.models.VolumeModel(model, sfield)
 
         rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
@@ -475,7 +477,7 @@ class TestRestrictionProlongation:
         rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
-        rr = fields.Field(grid, field)
+        rr = emg3d.Field(grid, field)
 
         # Restrict it
         cmodel, csfield, cefield = solver.restriction(
@@ -495,7 +497,7 @@ class TestRestrictionProlongation:
         assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
 
         # Add pi to the coarse e-field
-        efield = fields.Field(grid)
+        efield = emg3d.Field(grid)
         cefield.field += np.pi
 
         # Prolong it
@@ -510,16 +512,16 @@ class TestRestrictionProlongation:
 
         # Simple test with restriction followed by prolongation.
         src = [150, 150, 150, 0, 45]
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
                 origin=np.zeros(3))
 
         # Create dummy model and fields, parameters don't matter.
-        model = models.Model(grid, 1)
-        sfield = fields.get_source_field(grid, src, 1)
+        model = emg3d.Model(grid, 1)
+        sfield = emg3d.get_source_field(grid, src, 1)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(model, sfield)
+        vmodel = emg3d.models.VolumeModel(model, sfield)
 
         rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
@@ -528,7 +530,7 @@ class TestRestrictionProlongation:
         rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
-        rr = fields.Field(grid, field)
+        rr = emg3d.Field(grid, field)
 
         # Restrict it
         cmodel, csfield, cefield = solver.restriction(
@@ -553,7 +555,7 @@ class TestRestrictionProlongation:
         assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
 
         # Add pi to the coarse e-field
-        efield = fields.Field(grid)
+        efield = emg3d.Field(grid)
         cefield.field += np.pi
 
         # Prolong it
@@ -568,16 +570,16 @@ class TestRestrictionProlongation:
 
         # Simple test with restriction followed by prolongation.
         src = [150, 150, 150, 0, 45]
-        grid = meshes.TensorMesh(
+        grid = emg3d.TensorMesh(
                 [np.ones(4)*100, np.ones(4)*100, np.ones(4)*100],
                 origin=np.zeros(3))
 
         # Create dummy model and fields, parameters don't matter.
-        model = models.Model(grid, 1, 1)
-        sfield = fields.get_source_field(grid, src, 1)
+        model = emg3d.Model(grid, 1, 1)
+        sfield = emg3d.get_source_field(grid, src, 1)
 
         # Get volume-averaged model parameters.
-        vmodel = models.VolumeModel(model, sfield)
+        vmodel = emg3d.models.VolumeModel(model, sfield)
 
         rx = np.arange(sfield.fx.size, dtype=np.complex128).reshape(
                 sfield.fx.shape)
@@ -586,7 +588,7 @@ class TestRestrictionProlongation:
         rz = np.arange(sfield.fz.size, dtype=np.complex128).reshape(
                 sfield.fz.shape)
         field = np.r_[rx.ravel('F'), ry.ravel('F'), rz.ravel('F')]
-        rr = fields.Field(grid, field)
+        rr = emg3d.Field(grid, field)
 
         # Restrict it
         cmodel, csfield, cefield = solver.restriction(
@@ -610,7 +612,7 @@ class TestRestrictionProlongation:
         assert np.sum(grid.h[2]) == np.sum(cmodel.grid.h[2])
 
         # Add pi to the coarse e-field
-        efield = fields.Field(grid)
+        efield = emg3d.Field(grid)
         cefield.field += np.pi
 
         # Prolong it
@@ -627,7 +629,7 @@ def test_residual():
 
     # Create a grid
     src = [90, 1600, 25., 45, 45]
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
         [helpers.widths(4, 2, 20, 1.2), np.ones(16)*200, np.ones(2)*25],
         origin=np.zeros(3))
 
@@ -637,20 +639,20 @@ def test_residual():
     z = np.arange(1, grid.shape_cells[2]+1)[::-1]/10
     property_x = np.outer(np.outer(x, y), z).ravel()
     freq = 0.319
-    model = models.Model(grid, property_x, 0.8*property_x, 2*property_x)
+    model = emg3d.Model(grid, property_x, 0.8*property_x, 2*property_x)
 
     # Create a source field
-    sfield = fields.get_source_field(grid=grid, source=src, frequency=freq)
+    sfield = emg3d.get_source_field(grid=grid, source=src, frequency=freq)
 
     # Get volume-averaged model parameters.
-    vmodel = models.VolumeModel(model, sfield)
+    vmodel = emg3d.models.VolumeModel(model, sfield)
 
     # Run two iterations to get an e-field
     efield = solver.solve(model, sfield, maxit=2)
 
     # Use directly amat_x
     rfield = sfield.copy()
-    core.amat_x(
+    emg3d.core.amat_x(
             rfield.fx, rfield.fy, rfield.fz, efield.fx, efield.fy, efield.fz,
             vmodel.eta_x, vmodel.eta_y, vmodel.eta_z, vmodel.zeta, grid.h[0],
             grid.h[1], grid.h[2])
@@ -816,18 +818,18 @@ def test_RegularGridProlongator():
     hx = np.array([4, 1.1, 2, 3])
     hy = np.array([2, 0.1, 20, np.pi])
     hz = np.array([1, 2, 5, 1])
-    grid = meshes.TensorMesh([hx, hy, hz], origin=np.array([0, 0, 0]))
+    grid = emg3d.TensorMesh([hx, hy, hz], origin=np.array([0, 0, 0]))
 
     # Create coarse grid.
     chx = np.diff(grid.nodes_x[::2])
-    cgrid = meshes.TensorMesh([chx, chx, chx], origin=np.array([0, 0, 0]))
+    cgrid = emg3d.TensorMesh([chx, chx, chx], origin=np.array([0, 0, 0]))
 
     # Create empty fine grid fields.
-    efield1 = fields.Field(grid)
-    efield2 = fields.Field(grid)
+    efield1 = emg3d.Field(grid)
+    efield2 = emg3d.Field(grid)
 
     # Create coarse grid field with some values.
-    cefield = fields.Field(cgrid)
+    cefield = emg3d.Field(cgrid)
     cefield.fx = np.arange(cefield.fx.size)
     cefield.fx = 1j*np.arange(cefield.fx.size)/10
 
@@ -840,26 +842,26 @@ def test_RegularGridProlongator():
 
 def test_current_sc_dir():
     hx = np.ones(4)
-    grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))  # Big enough
+    grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))  # Big enough
 
     # Big enough, no change.
     for sc_dir in range(4):
         assert sc_dir == solver._current_sc_dir(sc_dir, grid)
 
     # Small in all directions => always 0
-    grid = meshes.TensorMesh([[2, 2], [2, 2], [2, 2]], (0, 0, 0))
+    grid = emg3d.TensorMesh([[2, 2], [2, 2], [2, 2]], (0, 0, 0))
     for sc_dir in range(4):
         assert 6 == solver._current_sc_dir(sc_dir, grid)
 
     # Small in y, z
-    grid = meshes.TensorMesh([hx, [2, 2], [2, 2]], (0, 0, 0))
+    grid = emg3d.TensorMesh([hx, [2, 2], [2, 2]], (0, 0, 0))
     assert 4 == solver._current_sc_dir(0, grid)
     assert 6 == solver._current_sc_dir(1, grid)
     assert 4 == solver._current_sc_dir(2, grid)
     assert 4 == solver._current_sc_dir(3, grid)
 
     # Small in x, z
-    grid = meshes.TensorMesh([[2, 2], hx, [2, 2]], (0, 0, 0))
+    grid = emg3d.TensorMesh([[2, 2], hx, [2, 2]], (0, 0, 0))
     assert 5 == solver._current_sc_dir(0, grid)
     assert 5 == solver._current_sc_dir(1, grid)
     assert 6 == solver._current_sc_dir(2, grid)
@@ -868,19 +870,19 @@ def test_current_sc_dir():
 
 def test_current_lr_dir():
     hx = np.ones(4)
-    grid = meshes.TensorMesh([hx, hx, hx], (0, 0, 0))  # Big enough
+    grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))  # Big enough
 
     # Big enough, no change.
     for lr_dir in range(8):
         assert lr_dir == solver._current_lr_dir(lr_dir, grid)
 
     # Small in all directions => always 0
-    grid = meshes.TensorMesh([[2, 2], [2, 2], [2, 2]], (0, 0, 0))
+    grid = emg3d.TensorMesh([[2, 2], [2, 2], [2, 2]], (0, 0, 0))
     for lr_dir in range(8):
         assert 0 == solver._current_lr_dir(lr_dir, grid)
 
     # Small in y, z
-    grid = meshes.TensorMesh([hx, [2, 2], [2, 2]], (0, 0, 0))
+    grid = emg3d.TensorMesh([hx, [2, 2], [2, 2]], (0, 0, 0))
     for lr_dir in [0, 1]:
         assert lr_dir == solver._current_lr_dir(lr_dir, grid)
     for lr_dir in [2, 3, 4]:
@@ -889,7 +891,7 @@ def test_current_lr_dir():
         assert 1 == solver._current_lr_dir(lr_dir, grid)
 
     # Small in z
-    grid = meshes.TensorMesh([hx, hx, [2, 2]], (0, 0, 0))
+    grid = emg3d.TensorMesh([hx, hx, [2, 2]], (0, 0, 0))
     for lr_dir in [0, 1, 2, 6]:
         assert lr_dir == solver._current_lr_dir(lr_dir, grid)
     assert 0 == solver._current_lr_dir(3, grid)
@@ -982,8 +984,8 @@ def test_get_restriction_weights():
     y = [2, 2, 2, 2]
     cy = [4, 4]
 
-    grid = meshes.TensorMesh([x, y, x], (0, 0, 0))
-    cgrid = meshes.TensorMesh([cx, cy, cx], (0, 0, 0))
+    grid = emg3d.TensorMesh([x, y, x], (0, 0, 0))
+    cgrid = emg3d.TensorMesh([cx, cy, cx], (0, 0, 0))
 
     # 1. Simple example following equation 9, [Muld06]_.
     wxl = np.array([350/250, 250/600, 400/900])
@@ -1070,7 +1072,7 @@ def test_print_gs_info(capsys):
             verb=5, cycle='F', sslsolver=False, linerelaxation=False,
             semicoarsening=False, shape_cells=(16, 8, 2))
 
-    grid = meshes.TensorMesh([[1, 1], [1, 1], [1, 1]], (0, 0, 0))
+    grid = emg3d.TensorMesh([[1, 1], [1, 1], [1, 1]], (0, 0, 0))
     solver._print_gs_info(var, 1, 2, 3, grid, 0.01, 'test')
     out, _ = capsys.readouterr()
     assert out == "      1 2 3 [  2,   2,   2]: 1.000e-02 test\n"
@@ -1095,11 +1097,11 @@ def test_print_one_liner(capsys):
     assert ":: emg3d :: 1.0e-02; 0(0); 0:00:0" in out
     assert "TEST" in out
 
-    grid = meshes.TensorMesh(
+    grid = emg3d.TensorMesh(
             [np.ones(8), np.ones(8), np.ones(8)], origin=np.array([0, 0, 0]))
-    model = models.Model(grid, property_x=1.5, property_y=1.8, property_z=3.3)
-    sfield = fields.get_source_field(grid, source=[4, 4, 4, 0, 0],
-                                     frequency=10.0)
+    model = emg3d.Model(grid, property_x=1.5, property_y=1.8, property_z=3.3)
+    sfield = emg3d.get_source_field(grid, source=[4, 4, 4, 0, 0],
+                                    frequency=10.0)
 
     # Dynamic one-liner.
     out, _ = capsys.readouterr()

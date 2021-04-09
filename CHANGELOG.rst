@@ -14,10 +14,12 @@ Most important changes for end users
 
 TODO
 
+
 Various:
 
 - Removed all deprecated features.
 - Reduced top namespace to principal functions.
+- emsig.github.io to emsig.xyz.
 
 
 Version 1 and API stability
@@ -30,6 +32,11 @@ TODO: What is stable (most), what is still *experimental* (``utils.Fourier``,
 Detailed changes
 ''''''''''''''''
 
+**Top namespace**
+
+- ``get_receiver`` is not in the top namespace any longer. It is advised to
+  use directly the field method: ``field.get_receiver``.
+
 **Electrodes**
 
 - New module containing all sources and receivers.
@@ -40,6 +47,8 @@ Detailed changes
 - Zero source strength does no longer mean "normalized", it means zero
   strength (hence no source).
 - New class ``TxElectricWire`` for an arbitrary electric wire.
+- Receivers have a ``relative`` flag, to mark their position as relative to the
+  source position. This makes only sense within a Survey.
 
 
 **Fields**
@@ -180,6 +189,11 @@ Detailed changes
 
 - ``Simulation``:
 
+  - Works now for electric and magnetic dipole sources as well as electric wire
+    sources; electric and magnetic point receivers.
+  - Works now as well for surveys that contain receivers which are positioned
+    relatively to the source.
+  - No ``grid`` any longer, taken from ``model``.
   - ``name`` is new optional.
   - New optional keyword ``info``.
 
@@ -201,6 +215,17 @@ Detailed changes
     the receivers with a relative offset to the source, instead of absolute
     coordinates.
   - ``data`` can be a dict containing many data set.
+  - Only takes dicts as input for sources and receivers. For this, it has the
+    new convenience functions ``txrx_coordinates_to_dict`` and
+    ``txrx_lists_to_dict``.
+  - Automatic key names start now with 1 and have a hyphen between the prefix
+    and the number; they also contain the abbreviated electrode name. E.g.,
+    ``Tx0`` becomes ``TxED-1`` or ``TxMD-1`` or ``TxEW-1``. Similar, ``Rx9``
+    becomes ``RxEP-10`` or ``RxMp-10``, and ``f0`` becomes ``f-1``.
+  - ``Survey.size`` is now the total number, ``Survey.count`` is the count of
+    the data that actually has non-NaN values.
+  - Now completely functional for receivers which are positioned relatively to
+    the source.
 
 - ``Dipole``: Replaced by the new source and receiver classes in the new module
   ``electrodes``.

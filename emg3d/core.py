@@ -20,7 +20,7 @@ For a developer interested in making emg3d faster this is the right place to
 start, as by far the most time is spent in these functions, particularly in
 :func:`solve`.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #

@@ -1,7 +1,7 @@
 """
 Utility functions for writing and reading data.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -174,8 +174,8 @@ def load(fname, **kwargs):
         :class:`emg3d.models.Model` instances are de-serialized and returned as
         instances.
 
-    info : str
-        Info-string if ``verb<0``.
+    info : str, returned if verb<0
+        Info-string.
 
     """
     # Get kwargs.

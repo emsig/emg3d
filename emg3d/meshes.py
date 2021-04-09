@@ -1,7 +1,7 @@
 """
 Everything related to meshes appropriate for the multigrid solver.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -47,6 +47,22 @@ class BaseMesh:
     origin : array_like
         Origin (x, y, z).
 
+
+    Examples
+    --------
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create a simple grid, 8 cells of length 100 m in each
+          ...: # direction, centered around the origin.
+          ...: hx = np.ones(8)*100
+          ...: grid = emg3d.meshes.BaseMesh(
+          ...:            [hx, hx, hx], origin=(-400, -400, -400))
+          ...: grid  # QC grid
+
     """
 
     def __init__(self, h, origin, **kwargs):
@@ -81,6 +97,15 @@ class BaseMesh:
         self.n_edges_y = np.prod(self.shape_edges_y)
         self.n_edges_z = np.prod(self.shape_edges_z)
         self.n_edges = self.n_edges_x + self.n_edges_y + self.n_edges_z
+
+        # Face related properties.
+        self.shape_faces_x = (shape_nodes[0], shape_cells[1], shape_cells[2])
+        self.shape_faces_y = (shape_cells[0], shape_nodes[1], shape_cells[2])
+        self.shape_faces_z = (shape_cells[0], shape_cells[1], shape_nodes[2])
+        self.n_faces_x = np.prod(self.shape_faces_x)
+        self.n_faces_y = np.prod(self.shape_faces_y)
+        self.n_faces_z = np.prod(self.shape_faces_z)
+        self.n_faces = self.n_faces_x + self.n_faces_y + self.n_faces_z
 
     def __repr__(self):
         """Simple representation."""
@@ -232,7 +257,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     The relation of the survey domain, computational domain, and buffer zone is
     shown in  :numref:`Figure %s <AutoGrid>` for a x-z-section; the y-direction
     behaves the same as the x-direction (the figures are only visible in the
-    web version on https://emg3d.rtfd.io).
+    web version of the API docs on https://emg3d.emsig.xyz).
 
     .. figure:: ../_static/construct_mesh.png
        :align: center
@@ -321,10 +346,11 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         which means that here is the smallest cell. Usually this is the source
         location.
 
-    domain : {tuple, list, None}, optional
+    domain : {tuple, list, dict, None}, optional
         Contains the survey-domain limits. This domain should include all
         source and receiver positions as well as any important feature of the
-        model. Format: ``([xmin, xmax], [ymin, ymax], [zmin, zmax])``.
+        model. Format: ``([xmin, xmax], [ymin, ymax], [zmin, zmax])`` or
+        ``{'x': [xmin, xmax], 'y': [ymin, ymax], 'z': [zmin, zmax]}``.
 
         It can be None, or individual lists can be None (e.g., ``(None, None,
         [zmin, zmax])``), in which case you have to provide either the
@@ -332,18 +358,22 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         exactly the domain. If only one list is provided it is applied to all
         dimensions.
 
-    distance : {tuple, list, None}, optional
+    distance : {tuple, list, dict, None}, optional
         An alternative to ``domain``: Instead of defining the domain in
         absolute values, they are defined here as distance from the center.
-        Format: ``([xl, xr], [yl, yr], [zd, zu])``. From this the domain is
-        given as ``([cx-xl, cx+xr], [cy-yl, cy+yr], [cz-zd, cz+zu])``, where
-        ``center=(cx, cy, cz)``.
+        Format:
+        ``([xl, xr], [yl, yr], [zd, zu])`` or
+        ``{'x': [xl, xr], 'y': [yl, yr], 'z': [zd, zu]}``.
+        From this the domain is given as
+        ``([cx-xl, cx+xr], [cy-yl, cy+yr], [cz-zd, cz+zu])``,
+        where ``center=(cx, cy, cz)``.
 
-    vector : {tuple, ndarray, None}, optional
+    vector : {tuple, ndarray, dict, None}, optional
         Contains vectors of mesh-edges that should be used. If provided, the
         vector *must* at least include all of the survey domain. If ``domain``
         is not provided, it is defined as the minimum/maximum of the provided
-        vector. Format: ``(xvector, yvector, zvector)``.
+        vector. Format: ``(xvector, yvector, zvector)`` or ``{'x': xvector,
+        'y': yvector, 'z': zvector}``.
 
         It can be None, or individual ndarrays can be None (e.g., ``(xvector,
         yvector, None)``), in which case you have to provide a ``domain`` or
@@ -357,24 +387,26 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         actual boundary. It has to be bigger than the lower limit of the survey
         domain.
 
-    stretching : {tuple, list}, default: [1.0, 1.5]
+    stretching : {tuple, list, dict}, default: [1.0, 1.5]
         Maximum stretching factors in the form of ``[max Ds, max Dc]``: the
         first value is the maximum stretching for the survey domain (default is
         1.0), the second value is the maximum stretching for the buffer zone
         (default is 1.5). If a list is provided the same is used for all three
         dimension. Alternatively a tuple of three lists can be provided, ``(x,
-        y, z)``. Note that the first value has no influence on dimensions where
-        a ``vector`` is provided.
+        y, z)`` or ``{'x': x, 'y': y, 'z': z}``. Note that the first value has
+        no influence on dimensions where a ``vector`` is provided.
 
-    min_width_limits : {float, list, tuple, None}, default: None
+    min_width_limits : {float, list, tuple, dict, None}, default: None
         Passed through to :func:`cell_width` as ``limits``. A tuple of three
-        can be provided for direction dependent values. Note that this value
-        has no influence on dimensions where a ``vector`` is provided.
+        or a dict with ``x;y;z`` can be provided for direction dependent
+        values. Note that this value has no influence on dimensions where a
+        ``vector`` is provided.
 
-    min_width_pps : {tuple, float}, default: 3.0
-        Passed through to :func:`cell_width` as ``pps``. A tuple of three can
-        be provided for direction dependent values. Note that this value has no
-        influence on dimensions where a ``vector`` is provided.
+    min_width_pps : {float, tuple, dict}, default: 3.0
+        Passed through to :func:`cell_width` as ``pps``. A tuple of three or a
+        dict with ``x;y;z`` can be provided for direction dependent values.
+        Note that this value has no influence on dimensions where a ``vector``
+        is provided.
 
     lambda_factor : float, default: 1.0
         The buffer is taken as one wavelength from the survey domain. This can
@@ -463,8 +495,12 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     # Add optionally direction specific args.
     for name, value in zip(['domain', 'vector', 'distance'],
                            [domain, vector, distance]):
-        if (value is not None and len(value) == 3 and not
-                isinstance(value, np.ndarray)):
+        if value is None or isinstance(value, np.ndarray):
+            kwargs[name] = value
+        elif isinstance(value, dict):
+            _put_in_dicts([xparams, yparams, zparams],
+                          (value['x'], value['y'], value['z']), name)
+        elif len(value) == 3:
             _put_in_dicts([xparams, yparams, zparams], value, name)
         else:
             kwargs[name] = value
@@ -475,6 +511,9 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         if value is not None:
             if isinstance(value, (int, float)):
                 kwargs[name] = np.array([value])
+            elif isinstance(value, dict):
+                _put_in_dicts([xparams, yparams, zparams],
+                              (value['x'], value['y'], value['z']), name)
             elif len(value) == 3:
                 _put_in_dicts([xparams, yparams, zparams], value, name)
             else:
@@ -642,7 +681,7 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     for nx in np.unique(cell_numbers):
 
         # Loop over possible alphas for domain.
-        for sa in np.arange(1.0, stretching[0]+0.005, 0.01):
+        for sa in np.linspace(1.0, stretching[0], 100):
 
             if vector is None:
 
@@ -697,7 +736,7 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             hxo = hx
 
             # Loop over possible alphas for buffer.
-            for ca in np.arange(sa, stretching[1]+0.005, 0.01):
+            for ca in np.linspace(sa, stretching[1], 100):
 
                 # Get current stretched grid cell sizes.
                 thxl = hx[0]*ca**np.arange(1, nx_remain+1)   # Left of survey.

@@ -6,11 +6,11 @@ Basic Example
 -------------
 
 Here we show a *very* basic example. To see some more realistic models have a
-look at the `gallery <https://emsig.github.io/emg3d-gallery>`_. This
-particular example is also there, with some further explanations and examples
-to show how to plot the model and the data; see `«Minimum working example»
-<https://emsig.github.io/emg3d-gallery/gallery/tutorials/minimum_example.html>`_.
-It also contains an example without using ``discretize``.
+look at the `gallery <https://emsig.xyz/emg3d-gallery>`_. This particular
+example is also there, with some further explanations and examples to show how
+to plot the model and the data; see `«Minimum working example»
+<https://emsig.xyz/emg3d-gallery/gallery/tutorials/minimum_example.html>`_. It
+also contains an example without using ``discretize``.
 
 First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
 ``numpy``:
@@ -161,6 +161,6 @@ its docstring. Here a few additional information.
   Which combination of solver is best (fastest) depends to a large extent on
   the grid stretching, but also on anisotropy and general model complexity.
   See `«Parameter tests»
-  <https://emsig.github.io/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_
+  <https://emsig.xyz/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_
   in the gallery for an example how to run some tests on your particular
   problem.

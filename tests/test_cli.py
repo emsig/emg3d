@@ -347,10 +347,14 @@ class TestRun:
         # Create a tiny dummy survey.
         data = np.ones((1, 17, 1))
         data[0, 8:11, 0] = np.nan
+        sources = emg3d.TxElectricDipole((4125, 4000, 4000, 0, 0))
+        receivers = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                (np.arange(17)*250+2000, 4000, 3950, 0, 0))
         survey = emg3d.Survey(
             name='CLI Survey',
-            sources=(4125, 4000, 4000, 0, 0),
-            receivers=(np.arange(17)*250+2000, 4000, 3950, 0, 0),
+            sources=sources,
+            receivers=receivers,
             frequencies=1,
             noise_floor=1e-15,
             relative_error=0.05,
@@ -476,9 +480,9 @@ class TestRun:
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
             f.write("[data]\n")
-            f.write("sources=Tx0\n")
-            f.write("receivers=Rx04, Rx09, Rx01, Rx11, Rx05\n")
-            f.write("frequencies=f0")
+            f.write("sources=TxED-1\n")
+            f.write("receivers=RxEP-05, RxEP-10, RxEP-02, RxEP-12, RxEP-06\n")
+            f.write("frequencies=f-1")
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)

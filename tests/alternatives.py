@@ -13,7 +13,7 @@ can use them for cross-checking with the main code. Also, they might (or might
 not) be easier to understand.
 
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -436,42 +436,125 @@ def alt_get_magnetic_field(model, efield):
         The magnetic field; a :class:`emg3d.fields.Field` instance.
 
     """
+    grid = efield.grid
 
     # Carry out the curl (^ corresponds to differentiation axis):
     # H_x = (E_z^1 - E_y^2)
     e3d_hx = (np.diff(efield.fz, axis=1)/efield.grid.h[1][None, :, None] -
               np.diff(efield.fy, axis=2)/efield.grid.h[2][None, None, :])
-    e3d_hx = e3d_hx[1:-1, :, :]
+    e3d_hx[0, :, :] = e3d_hx[-1, :, :] = 0
 
     # H_y = (E_x^2 - E_z^0)
     e3d_hy = (np.diff(efield.fx, axis=2)/efield.grid.h[2][None, None, :] -
               np.diff(efield.fz, axis=0)/efield.grid.h[0][:, None, None])
-    e3d_hy = e3d_hy[:, 1:-1, :]
+    e3d_hy[:, 0, :] = e3d_hy[:, -1, :] = 0
 
     # H_z = (E_y^0 - E_x^1)
     e3d_hz = (np.diff(efield.fy, axis=0)/efield.grid.h[0][:, None, None] -
               np.diff(efield.fx, axis=1)/efield.grid.h[1][None, :, None])
-    e3d_hz = e3d_hz[:, :, 1:-1]
+    e3d_hz[:, :, 0] = e3d_hz[:, :, -1] = 0
 
     # Divide by averaged relative magnetic permeability, if not not None.
     if model.mu_r is not None:
 
-        e3d_hx /= (model.mu_r[:-1, :, :] + model.mu_r[1:, :, :])/2.
-        e3d_hy /= (model.mu_r[:, :-1, :] + model.mu_r[:, 1:, :])/2.
-        e3d_hz /= (model.mu_r[:, :, :-1] + model.mu_r[:, :, 1:])/2.
+        # Get volume-averaged values.
+        vmodel = emg3d.models.VolumeModel(model, efield)
 
-    # Create magnetic grid - cell centers become nodes.
-    grid = emg3d.meshes.TensorMesh(
-            [np.diff(efield.grid.cell_centers_x),
-             np.diff(efield.grid.cell_centers_y),
-             np.diff(efield.grid.cell_centers_z)],
-            (efield.grid.cell_centers_x[0],
-             efield.grid.cell_centers_y[0],
-             efield.grid.cell_centers_z[0]))
+        # Plus and minus indices.
+        ixm = np.r_[0, np.arange(grid.shape_cells[0])]
+        ixp = np.r_[np.arange(grid.shape_cells[0]), grid.shape_cells[0]-1]
+        iym = np.r_[0, np.arange(grid.shape_cells[1])]
+        iyp = np.r_[np.arange(grid.shape_cells[1]), grid.shape_cells[1]-1]
+        izm = np.r_[0, np.arange(grid.shape_cells[2])]
+        izp = np.r_[np.arange(grid.shape_cells[2]), grid.shape_cells[2]-1]
 
-    # Create a Field instance and divide by s*mu_0 and return.
+        # Average mu_r for dual-grid.
+        zeta_x = (vmodel.zeta[ixm, :, :] + vmodel.zeta[ixp, :, :])/2.
+        zeta_y = (vmodel.zeta[:, iym, :] + vmodel.zeta[:, iyp, :])/2.
+        zeta_z = (vmodel.zeta[:, :, izm] + vmodel.zeta[:, :, izp])/2.
+
+        hvx = grid.h[0][:, None, None]
+        hvy = grid.h[1][None, :, None]
+        hvz = grid.h[2][None, None, :]
+
+        # Define the widths of the dual grid.
+        dx = (np.r_[0., grid.h[0]] + np.r_[grid.h[0], 0.])/2.
+        dy = (np.r_[0., grid.h[1]] + np.r_[grid.h[1], 0.])/2.
+        dz = (np.r_[0., grid.h[2]] + np.r_[grid.h[2], 0.])/2.
+
+        # Multiply fields by mu_r.
+        e3d_hx *= zeta_x/(dx[:, None, None]*hvy*hvz)
+        e3d_hy *= zeta_y/(hvx*dy[None, :, None]*hvz)
+        e3d_hz *= zeta_z/(hvx*hvy*dz[None, None, :])
+
     new = np.r_[e3d_hx.ravel('F'), e3d_hy.ravel('F'), e3d_hz.ravel('F')]
-    new *= 1/efield.smu0
+    hfield = emg3d.Field(
+            efield.grid, data=new, frequency=efield._frequency, electric=False)
+    hfield.field /= efield.smu0
 
-    # Initiate and return.
-    return emg3d.Field(grid, data=new, frequency=efield._frequency)
+    # Return.
+    return hfield
+
+
+def fd_vs_as_gradient(ixyz, model, grad, data_misfit, sim_inp, epsilon=1e-4,
+                      verb=2):
+    """Compute FD gradient for cell ixyz and compare to AS gradient.
+
+    We use the forward finite difference approach,
+
+    Parameters
+    ----------
+    ixyz : list
+        Indices of cell to test, [ix, iy, iz].
+
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance.
+
+    grad : ndarray
+        Adjoint-state gradient for comparison.
+
+    data_misfit : float
+        Data misfit.
+
+    sim_inp : dict
+        Passed through to :class:`emg3d.simulations.Simulation`.
+
+    epsilon : float, default:1e-4
+        Difference to add to cell for finite-difference approach.
+
+    verb : int, default: 2
+        - 0: Nothing;
+        - 1: Print result;
+        - 2: Includes header line and result.
+
+    Returns
+    -------
+
+    """
+    ix, iy, iz = ixyz
+
+    if verb > 1:
+        print(f"   === Compare Gradients  ::  epsilon={epsilon} ===\n\n"
+              f"{{xi;iy;iz}}     Adjoint-state       Forward FD    NRMSD (%)\n"
+              f"----------------------------------------------------------")
+    if verb > 0:
+        print(
+            f"{{{ix:2d};{iy:2d};{iz:2d}}}     {grad[ix, iy, iz]:+.6e}", end=''
+        )
+
+    # Add epsilon to given cell.
+    model_diff = model.copy()
+    model_diff.property_x[ix, iy, iz] += epsilon
+
+    # Create simulation and compute FD-gradient
+    sim_data = emg3d.Simulation(
+            model=model_diff, **sim_inp, tqdm_opts={'disable': True})
+    fdgrad = float((sim_data.misfit - data_misfit)/epsilon)
+
+    # Compute NRMSD
+    nrmsd = 200*abs(grad[ix, iy, iz]-fdgrad)
+    nrmsd /= abs(grad[ix, iy, iz])+abs(fdgrad)
+    if verb > 0:
+        print(f"    {fdgrad:+.6e}    {nrmsd:9.5f}")
+
+    return nrmsd

@@ -50,11 +50,11 @@ fields. Furthermore, it can serve as a link to use `PyVista
 <https://docs.pyvista.org>`_ to create nice 3D plots even within a notebook.
 
 Projects which can be used to compare or validate the results are, e.g.,
-`empymod <https://emsig.github.io>`_ for layered models or `SimPEG
+`empymod <https://emsig.xyz>`_ for layered models or `SimPEG
 <https://simpeg.xyz>`_ for 3D models. It is also possible to create a
 geological model with `GemPy <https://www.gempy.org>`_ and, again via
 discretize, move it to emg3d to compute CSEM responses for it.
 
-Have a look at the `gallery <https://emsig.github.io/emg3d-gallery>`_ for
+Have a look at the `gallery <https://emsig.xyz/emg3d-gallery>`_ for
 many examples of how to use emg3d together with the mentioned projects and
 more!

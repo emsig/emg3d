@@ -14,7 +14,7 @@ Making a release
   - `PyPi <https://pypi.org/project/emg3d>`_ deployed;
   - `conda-forge <https://anaconda.org/conda-forge/emg3d>`_ deployed;
   - `Zenodo <https://doi.org/10.5281/zenodo.3229006>`_ minted a DOI;
-  - `emg3d.rtfd.io <https://emg3d.rtfd.io>`_ created a tagged version.
+  - `emg3d.emsig.xyz <https://emg3d.emsig.xyz>`_ created a tagged version.
 
 
 Useful things
@@ -53,15 +53,15 @@ Automatic bits
   <https://coveralls.io/github/emsig/emg3d>`_
 - Code-quality on `Codacy
   <https://app.codacy.com/manual/prisae/emg3d/dashboard>`_
-- Manual on `ReadTheDocs <https://emg3d.readthedocs.io/en/latest>`_
+- Manual on `ReadTheDocs <https://emg3d.emsig.xyz/en/latest>`_
 - DOI minting on `Zenodo <https://doi.org/10.5281/zenodo.3229006>`_
 
 Manual things
 `````````````
 
-- Benchmarks with `Airspeed Velocity <https://emsig.github.io/emg3d-asv>`_
+- Benchmarks with `Airspeed Velocity <https://emsig.xyz/emg3d-asv>`_
   (``asv``)
-- Gallery in `emg3d-gallery <https://emsig.github.io/emg3d-gallery>`_
+- Gallery in `emg3d-gallery <https://emsig.xyz/emg3d-gallery>`_
   (``sphinx-gallery``)
 
 Automatically deploys if tagged

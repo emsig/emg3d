@@ -1,7 +1,7 @@
 """
 Functions that actually call emg3d within the CLI interface.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -87,18 +87,17 @@ def simulation(args_dict):
                                receivers=data.get('receivers', None),
                                frequencies=data.get('frequencies', None))
 
+    # Switch-off tqdm if verbosity is zero.
+    if verb < 1:
+        cfg['simulation_options']['tqdm_opts'] = {'disable': True}
+
     # Create simulation.
     sim = simulations.Simulation(
             survey=survey,
-            grid=model['mesh'],
             model=model['model'],
             verb=-1,  # Only errors.
             **cfg['simulation_options']
-            )
-
-    # Switch-off tqdm if verbosity is zero.
-    if verb < 1:
-        sim._tqdm_opts['disable'] = True
+    )
 
     # Print simulation info.
     logger.info("\n    :: SIMULATION ::")
@@ -139,7 +138,7 @@ def simulation(args_dict):
             output['misfit'] = 0.0
         else:
             output['misfit'] = sim.misfit
-        output['n_observations'] = sim.survey.size
+        output['n_observations'] = sim.survey.count
 
     # Compute the gradient.
     if function == 'gradient':

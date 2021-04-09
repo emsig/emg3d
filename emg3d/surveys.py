@@ -1,7 +1,8 @@
 """
-A survey stores a set of sources, receivers, and the measured data.
+A survey stores a set of sources and their frequencies, receivers, and the
+measured data.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -28,77 +29,52 @@ except ImportError:
 
 from emg3d import electrodes, utils, io
 
-__all__ = ['Survey', ]
+__all__ = ['Survey', 'txrx_coordinates_to_dict', 'txrx_lists_to_dict',
+           'frequencies_to_dict']
 
 
 @utils.known_class
 class Survey:
-    """Create a survey with sources, receivers, and data.
+    """Create a survey containing sources, receivers, and data.
 
-    A survey contains all data with the corresponding information about
-    sources, receivers, and frequencies. The data is a 3D-array of shape
-    (nsrc, nrec, nfreq).
+    A survey contains the acquisition information such as source types,
+    positions, and frequencies and receiver types and positions. A survey
+    contains also any acquired or synthetic data and their expected relative
+    error and noise floor.
 
-    Underlying the survey-class is an xarray, which is basically a regular
-    ndarray with axis labels and more. The module `xarray` is a soft
-    dependency, and has to be installed manually to use the `Survey`
-    functionality.
-
-    The data is stored in an ndarray of the form `nsrc`x`nrec`x`nfreq` in the
-    following way::
-
-                             f1
-            Rx1 Rx2  .  RxR /   f2
-           ┌───┬───┬───┬───┐   /   .
-       Tx1 │   │   │   │   │──┐   /   fF
-           ├───┼───┼───┼───┤  │──┐   /
-       Tx2 │   │   │   │   │──┤  │──┐
-           ├───┼───┼───┼───┤  │──┤  │
-        .  │   │   │   │   │──┤  │──┤
-           ├───┼───┼───┼───┤  │──┤  │
-       TxS │   │   │   │   │──┤  │──┤
-           └───┴───┴───┴───┘  │──┤  │
-              └───┴───┴───┴───┘  │──┤
-                 └───┴───┴───┴───┘  │
-                    └───┴───┴───┴───┘
+    The data is stored in an 3D ndarray of dimension ``nsrc x nrec x nfreq``.
+    Underlying the survey-class is an :class:`xarray.Dataset`, where each
+    individual data set (e.g., acquired data or synthetic data) is stored as a
+    :class:`xarray.DataArray`. The module xarray is a soft dependency of emg3d,
+    and has to be installed manually to use the survey functionality.
 
     Receivers have a switch ``relative``, which is False by default and means
-    that the coordinates are absolute values. If the switch is set to True, the
-    coordinates are relative to the source. As such, the above layout can also
-    be used for a moving source at positions Tx1, Tx2, ..., where the receivers
-    Rx1, Rx2, ... have a constant offset from the source.
+    that the coordinates are absolute values (grid-based acquisition). If the
+    switch is set to True, the coordinates are relative to the source. This can
+    be used to model streamer-based acquisitions such as marine streamers or
+    airborne surveys. The two acquisition types can also be mixed in a survey.
 
 
     Parameters
     ----------
-    sources, receivers : tuple or dict
-        Sources and receivers.
+    sources, receivers : {Tx*, Rx*, list, dict)
+        Any of the available sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`, or a list or dict of
+        Tx*/Rx* instances. If it is a dict, it is used as is, including the
+        provided keys. In all other cases keys are assigned to the values.
 
-        - Tuples: Coordinates in one of the two following formats:
+        It can also be a list containing a combination of the above (lists,
+        dicts, and instances).
 
-          - `(x, y, z, azimuth, elevation)` [m, m, m, °, °];
-          - `(x0, x1, y0, y1, z0, z1)` [m, m, m, m, m, m].
-
-          Dimensions will be expanded (hence, if `n` dipoles, each parameter
-          must have length 1 or `n`). These dipoles will be named sequential
-          with `Tx###` and `Rx###`.
-
-          The tuple can additionally contain an additional element at the end
-          (after `elevation` or `z1`), `electric`, a boolean of length 1 or
-          `n`, that indicates if the dipoles are electric or magnetic.
-
-        - Dictionary: A dict where the values are :class:`Dipole`-instances,
-          de-serialized or not.
-
-    frequencies : ndarray or dict
+    frequencies : {array_like, dict}
         Source frequencies (Hz).
 
-        - ndarray : (or tuple, list): Frequencies will be stored in a dict with
-          keys assigned starting with 'f0', 'f1', and so on.
+        - array_like: Frequencies will be stored in a dict with keys assigned
+          starting with ``'f-1'``, ``'f-2'``, and so on.
 
-        - dict: keys can be arbitrary names, values must be floats.
+        - dict: Keys can be arbitrary names, values must be floats.
 
-    data : ndarray, optional
+    data : ndarray, default: None
         The observed data (dtype=np.complex128); must have shape (nsrc, nrec,
         nfreq). Alternatively, it can be a dict containing many datasets, in
         which one could also store, for instance, standard-deviations for each
@@ -106,20 +82,19 @@ class Survey:
 
         If None, it will be initiated with NaN's.
 
-    noise_floor, relative_error : float or ndarray, optional
-        Noise floor and relative error of the data. Default to None.
-        They can be arrays of a shape which can be broadcasted to the data
-        shape, e.g., (nsrc, 1, 1) or (1, nrec, nfreq), or have the dimension of
-        data.
+    noise_floor, relative_error : {float, ndarray}, default: None
+        Noise floor and relative error of the data. They can be arrays of a
+        shape which can be broadcasted to the data shape, e.g., (nsrc, 1, 1) or
+        (1, nrec, nfreq), or have the dimension of data.
         See :attr:`Survey.standard_deviation` for more info.
 
-    name : str, optional
+    name : str, default: None
         Name of the survey.
 
-    date : str, optional
+    date : str, default: None
         Acquisition date.
 
-    info : str, optional
+    info : str, default: None
         Survey info or any other info (e.g., what was the intent of the survey,
         what were the acquisition conditions, problems encountered).
 
@@ -128,11 +103,10 @@ class Survey:
     def __init__(self, sources, receivers, frequencies, data=None, **kwargs):
         """Initiate a new Survey instance."""
 
-        # Initiate sources, receivers, and frequencies.
-        self._sources = _dipole_info_to_dict(sources, 'source')
-        self._receivers = _dipole_info_to_dict(receivers, 'receiver')
-        out = _frequency_info_to_dict(frequencies)
-        self._frequencies, self._freq_dkeys, self._freq_array = out
+        # Store sources, receivers, and frequencies.
+        self._sources = txrx_lists_to_dict(sources)
+        self._receivers = txrx_lists_to_dict(receivers)
+        self._frequencies = frequencies_to_dict(frequencies)
 
         # Initialize xarray dataset.
         self._initiate_dataset(data)
@@ -150,55 +124,20 @@ class Survey:
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
-    @utils._requires('xarray')
-    def _initiate_dataset(self, data):
-        """Initiate Dataset; wrapped in fct to check if xarray is installed."""
-
-        # Shape of DataArrays.
-        shape = (len(self._sources), len(self._receivers),
-                 len(self._frequencies))
-
-        # Initialize NaN-data if not provided.
-        if data is None:
-            data = {'observed': np.full(shape, np.nan+1j*np.nan)}
-
-        elif not isinstance(data, dict):
-            data = {'observed': np.atleast_3d(data)}
-
-        # Ensure we have 'observed' data:
-        if 'observed' not in data.keys():
-            data['observed'] = np.full(shape, np.nan+1j*np.nan)
-
-        # Create Dataset.
-        dims = ('src', 'rec', 'freq')
-        self._data = xarray.Dataset(
-            {k: xarray.DataArray(v, dims=dims) for k, v in data.items()},
-            coords={'src': list(self.sources.keys()),
-                    'rec': list(self.receivers.keys()),
-                    'freq': list(self.frequencies)},
-        )
-
-        # Add attributes.
-        self._data.src.attrs['Sources'] = "".join(
-                f"{k}: {s.__repr__()};\n" for k, s in self.sources.items())
-        self._data.rec.attrs['Receivers'] = "".join(
-                f"{k}: {d.__repr__()};\n" for k, d in self.receivers.items())
-        self._data.freq.attrs['Frequencies'] = "".join(
-                f"{k}: {f};\n" for k, f in self.frequencies.items())
-        self._data.freq.attrs['units'] = 'Hz'
-
     def __repr__(self):
-        name = f"  Name: {self.name}\n" if self.name else ""
-        date = f"  Date: {self.date}\n" if self.date else ""
-        info = f"  Info: {self.info}\n" if self.info else ""
-        return (f"{self.__class__.__name__}\n{name}{date}{info}\n"
+        """Simple representation."""
+        name = f" «{self.name}»" if self.name else ""
+        date = f" {self.date}" if self.date else ""
+        info = f"{self.info}\n" if self.info else ""
+        return (f":: {self.__class__.__name__}{name} ::{date}\n{info}\n"
                 f"{self.data.__repr__()}")
 
     def _repr_html_(self):
-        name = f"Name: {self.name}<br>" if self.name else ""
-        date = f"Date: {self.date}<br>" if self.date else ""
-        info = f"Info: {self.info}<br>" if self.info else ""
-        return (f"<h4>{self.__class__.__name__}</h4><br>{name}{date}{info}"
+        """HTML representation with fancy xarray display."""
+        name = f" «{self.name}»" if self.name else ""
+        date = f" <tt>{self.date}</tt>" if self.date else ""
+        info = f"{self.info}<br>" if self.info else ""
+        return (f"<h3>{self.__class__.__name__}{name}{date}</h3>{info}"
                 f"{self.data._repr_html_()}")
 
     def copy(self):
@@ -206,34 +145,32 @@ class Survey:
         return self.from_dict(self.to_dict(True))
 
     def to_dict(self, copy=False):
-        """Store the necessary information of the Survey in a dict."""
+        """Store the necessary information of the Survey in a dict.
 
-        out = {'__class__': self.__class__.__name__}
+        Parameters
+        ----------
+        copy : bool, default: False
+            If True, returns a deep copy of the dict.
 
-        # Add sources.
-        out['sources'] = {k: v.to_dict() for k, v in self.sources.items()}
 
-        # Add receivers.
-        rec = {k: v.to_dict() for k, v in self.receivers.items()}
-        out['receivers'] = rec
+        Returns
+        -------
+        out : dict
+            Dictionary containing all information to re-create the Survey.
 
-        # Add frequencies.
-        out['frequencies'] = self.frequencies
-
-        # Add data.
-        out['data'] = {}
-        for key in self.data.keys():
-            out['data'][key] = self.data[key].data
-
-        # Add `noise_floor` and `relative error`.
-        out['noise_floor'] = self.data.noise_floor
-        out['relative_error'] = self.data.relative_error
-
-        # Add info.
-        out['name'] = self.name
-        out['date'] = self.date
-        out['info'] = self.info
-
+        """
+        out = {
+            '__class__': self.__class__.__name__,
+            'sources': {k: v.to_dict() for k, v in self.sources.items()},
+            'receivers': {k: v.to_dict() for k, v in self.receivers.items()},
+            'frequencies': self.frequencies,
+            'data': {k: v.data for k, v in self.data.items()},
+            'noise_floor': self.data.noise_floor,
+            'relative_error': self.data.relative_error,
+            'name': self.name,
+            'date': self.date,
+            'info': self.info,
+        }
         if copy:
             return deepcopy(out)
         else:
@@ -242,35 +179,27 @@ class Survey:
     @classmethod
     @utils._requires('xarray')
     def from_dict(cls, inp):
-        """Convert dictionary into :class:`Survey` instance.
+        """Convert dictionary into :class:`emg3d.surveys.Survey` instance.
 
         Parameters
         ----------
         inp : dict
-            Dictionary as obtained from :func:`Survey.to_dict`.
-            The dictionary needs the keys `sources`, `receivers` `frequencies`,
-            and `data`.
+            Dictionary as obtained from :func:`emg3d.surveys.Survey.to_dict`.
+            The dictionary needs the keys `sources`, `receivers`, and
+            `frequencies`.
 
         Returns
         -------
-        obj : :class:`Survey` instance
+        survey : Survey
+            A :class:`emg3d.surveys.Survey` instance.
 
         """
-        try:
-            # Optional parameters.
-            opt = ['noise_floor', 'relative_error', 'name', 'info', 'date']
-
-            # Initiate survey.
-            out = cls(sources=inp['sources'],
-                      receivers=inp['receivers'],
-                      frequencies=inp['frequencies'],
-                      data=inp['data'],
-                      **{k: inp[k] if k in inp.keys() else None for k in opt})
-
-            return out
-
-        except KeyError as e:
-            raise KeyError(f"Variable {e} missing in `inp`.") from e
+        inp = {k: v for k, v in inp.items() if k != '__class__'}
+        inp['sources'] = {k: getattr(electrodes, v['__class__']).from_dict(v)
+                          for k, v in inp['sources'].items()}
+        inp['receivers'] = {k: getattr(electrodes, v['__class__']).from_dict(v)
+                            for k, v in inp['receivers'].items()}
+        return cls(**inp)
 
     def to_file(self, fname, name='survey', **kwargs):
         """Store Survey to a file.
@@ -278,23 +207,14 @@ class Survey:
         Parameters
         ----------
         fname : str
-            File name inclusive ending, which defines the used data format.
-            Implemented are currently:
+            Absolute or relative file name including ending, which defines the
+            used data format. See :func:`emg3d.io.save` for the options.
 
-            - `.h5` (default): Uses `h5py` to store inputs to a hierarchical,
-              compressed binary hdf5 file. Recommended file format, but
-              requires the module `h5py`. Default format if ending is not
-              provided or not recognized.
-            - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
-              file. Default format if `h5py` is not installed.
-            - `.json`: Uses `json` to store inputs to a hierarchical, plain
-              text file.
-
-        name : str
-            Name under which the survey is stored within the file.
+        name : str, default: 'survey'
+            Name with which the survey is stored in the file.
 
         kwargs : Keyword arguments, optional
-            Passed through to :func:`io.save`.
+            Passed through to :func:`emg3d.io.save`.
 
         """
         kwargs[name] = self                # Add survey to dict.
@@ -308,14 +228,9 @@ class Survey:
         Parameters
         ----------
         fname : str
-            File name including extension. Used backend depends on the file
-            extensions:
+            Absolute or relative file name including extension.
 
-            - '.npz': numpy-binary
-            - '.h5': h5py-binary (needs `h5py`)
-            - '.json': json
-
-        name : str
+        name : str, default: 'survey'
             Name under which the survey is stored within the file.
 
         kwargs : Keyword arguments, optional
@@ -324,30 +239,77 @@ class Survey:
 
         Returns
         -------
-        survey : :class:`Survey`
-            The survey that was stored in the file.
+        survey : Survey
+            A :class:`emg3d.surveys.Survey` instance.
+
+        info : str, returned if verb<0
+            Info-string.
 
         """
         out = io.load(fname, **kwargs)
-        if 'verb' in kwargs and kwargs['verb'] < 0:
+        if kwargs.get('verb', 0) < 0:
             return out[0][name], out[1]
         else:
             return out[name]
 
+    # DATA
+    @utils._requires('xarray')
+    def _initiate_dataset(self, data):
+        """Initiate Dataset."""
+
+        # Get shape of DataArrays.
+        shape = (len(self._sources),
+                 len(self._receivers),
+                 len(self._frequencies))
+
+        # Initialize data and ensure there is 'observed'.
+        if data is None:
+            data = {'observed': np.full(shape, np.nan+1j*np.nan)}
+        elif not isinstance(data, dict):
+            data = {'observed': np.atleast_3d(data)}
+        elif 'observed' not in data.keys():
+            data['observed'] = np.full(shape, np.nan+1j*np.nan)
+
+        # Create Dataset, add all data as DataArrays.
+        dims = ('src', 'rec', 'freq')
+        self._data = xarray.Dataset(
+            {k: xarray.DataArray(v, dims=dims) for k, v in data.items()},
+            coords={'src': list(self.sources.keys()),
+                    'rec': list(self.receivers.keys()),
+                    'freq': list(self.frequencies)},
+        )
+
+        # Add attributes.
+        self._data.src.attrs['Sources'] = "".join(
+                f"{k}: {s.__repr__()};\n" for k, s in self.sources.items()
+                )[:-2]+'.'
+        self._data.rec.attrs['Receivers'] = "".join(
+                f"{k}: {d.__repr__()};\n" for k, d in self.receivers.items()
+                )[:-2]+'.'
+        self._data.freq.attrs['Frequencies'] = "".join(
+                f"{k}: {f} Hz;\n" for k, f in self.frequencies.items()
+                )[:-2]+'.'
+
+    @property
+    def data(self):
+        """Data, a :class:`xarray.Dataset` instance."""
+        return self._data
+
     def select(self, sources=None, receivers=None, frequencies=None):
-        """Return a survey with selectod sources, receivers, and frequencies.
+        """Return a Survey with selected sources, receivers, and frequencies.
 
 
         Parameters
         ----------
-        sources, receivers, frequencies : list
+        sources, receivers, frequencies : list, default: None
             Lists containing the wanted sources, receivers, and frequencies.
+            If None, all are selected.
 
 
         Returns
         -------
-        subsurvey : :class:`emg3d.surveys.Survey`
-            Survey with selected data.
+        survey : Survey
+            A :class:`emg3d.surveys.Survey` instance.
 
         """
 
@@ -375,130 +337,81 @@ class Survey:
             if isinstance(frequencies, str):
                 frequencies = [frequencies, ]
             survey['frequencies'] = {
-                    r: survey['frequencies'][r] for r in frequencies}
+                    f: survey['frequencies'][f] for f in frequencies}
             selection['freq'] = frequencies
 
         # Replace data with selected data.
         for key in survey['data'].keys():
             survey['data'][key] = self.data[key].sel(**selection)
 
-        # Return reduced survey.
+        # Return new, reduced survey.
         return Survey.from_dict(survey)
 
     @property
     def shape(self):
-        """Return nsrc x nrec x nfreq.
-
-        Note that not all source-receiver-frequency pairs do actually have
-        data. Check `size` to see how many data points there are.
-        """
+        """Shape of data (nsrc, nrec, nfreq)."""
         return self.data.observed.shape
 
     @property
     def size(self):
-        """Return actual data size (does NOT equal nsrc x nrec x nfreq)."""
+        """Size of data (nsrc x nrec x nfreq)."""
+        return int(self.data.observed.size)
+
+    @property
+    def count(self):
+        """Count of observed data."""
         return int(self.data.observed.count())
 
-    @property
-    def data(self):
-        """Data, a :class:`xarray.DataSet` instance.
-
-        Contains the :class:`xarray.DataArray` element `.observed`, but other
-        data can be added. E.g., :class:`emg3d.simulations.Simulation` adds the
-        `synthetic` array.
-        """
-        return self._data
-
+    # SOURCES, RECEIVERS, FREQUENCIES
     @property
     def sources(self):
-        """Source dict containing all source dipoles."""
+        """Source dict containing all sources."""
         return self._sources
 
     @property
     def receivers(self):
-        """Receiver dict containing all receiver dipoles."""
+        """Receiver dict containing all receivers."""
         return self._receivers
-
-    @property
-    def src_coords(self):
-        """Return source coordinates.
-
-        The returned format is `(x, y, z, azimuth, elevation)`, a tuple of 5
-        tuples.
-        """
-
-        return tuple(
-            np.array([[s.center[0], s.center[1], s.center[2], s.azimuth,
-                       s.elevation] for s in self.sources.values()]).T
-        )
-
-    @property
-    def rec_coords(self):
-        """Return receiver coordinates as `(x, y, z, azimuth, elevation)`."""
-        return tuple(
-            np.array([[r.center[0], r.center[1], r.center[2], r.azimuth,
-                       r.elevation] for r in self.receivers.values()]).T
-        )
-
-    @property
-    def rec_types(self):
-        """Return receiver flags if electric, as tuple."""
-        return tuple([r.xtype == 'electric' for r in self.receivers.values()])
 
     @property
     def frequencies(self):
         """Frequency dict containing all frequencies."""
         return self._frequencies
 
-    @property
-    def freq_array(self):
-        """Return frequencies as tuple."""
-        return tuple(self._freq_array)
-
-    def _freq_key(self, frequency):
-        """Return key of `frequency`, where frequency is str (key) or float."""
-        if isinstance(frequency, str):
-            return frequency
-        else:
-            return self._freq_dkeys[frequency]
-
+    # STANDARD DEVIATION
     @property
     def standard_deviation(self):
-        r"""Return the standard deviation of the data.
+        r"""Return standard deviation of the data.
 
         The standard deviation can be set by providing an array of the same
-        dimension as the data itself:
-
-        .. code-block:: python
+        dimension as the data itself::
 
             survey.standard_deviation = ndarray  # (nsrc, nrec, nfreq)
 
-        Alternatively, one can set the `noise_floor` :math:`\epsilon_\text{nf}`
-        and the `relative_error` :math:`\epsilon_\text{r}`:
+        Alternatively, one can set the ``noise_floor``
+        :math:`\epsilon_\text{n}` and the ``relative_error``
+        :math:`\epsilon_\text{r}`::
 
-        .. code-block:: python
-
-            survey.noise_floor = float or ndarray      # (> 0 or None)
-            survey.relative error = float or ndarray   # (> 0 or None)
+            survey.noise_floor = {float, ndarray}      # (> 0 or None)
+            survey.relative error = {float, ndarray}   # (> 0 or None)
 
         They must be either floats, or three-dimensional arrays of shape
-        ``([nsrc or 1], [nrec or 1], [nfreq or 1])``; dimensions of one will be
+        ``({1;nsrc}, {1;nrec}, {1;nfreq})``; dimensions of one will be
         broadcasted to the corresponding size. E.g., for a dataset of arbitrary
-        amount of sources and receivers with three frequencies you can define
-        a purely frequency-dependent relative error via
-        ``relative_error=np.array([err_f1, err_f2, err_f3])[None, None, :]``.
+        amount of sources and receivers with three frequencies you can define a
+        purely frequency-dependent relative error via::
+
+            relative_error = np.array([err_f1, err_f2, err_f3])[None, None, :]
 
         The standard deviation :math:`\varsigma_i` of observation :math:`d_i`
-        is then given in terms of the noise floor
-        :math:`\epsilon_{\text{nf};i}` and the relative error
-        :math:`\epsilon_{\text{re};i}` by
+        is then given in terms of the noise floor :math:`\epsilon_{\text{n};i}`
+        and the relative error :math:`\epsilon_{\text{r};i}` by
 
         .. math::
             :label: std
 
-            \varsigma_i = \sqrt{
-                \epsilon_{\text{nf}; i}^2 +
-                \left(\epsilon_{\text{re}; i}|d_i|\right)^2 } \, .
+            \varsigma_i = \sqrt{\epsilon_{\text{n}; i}^2 +
+                          \left(\epsilon_{\text{r}; i}|d_i|\right)^2 } \, .
 
         Note that a set standard deviation is prioritized over potentially also
         defined noise floor and relative error. To use the noise floor and the
@@ -512,11 +425,11 @@ class Survey:
         after which Equation :eq:`std` would be used again.
 
         """
-        # If `std` was set, return it, else compute it from noise_floor and
-        # relative_error.
+        # If `standard_deviation` was set, return it.
         if 'standard_deviation' in self._data.keys():
             return self.data['standard_deviation']
 
+        # Compute it if not already set.
         elif self.noise_floor is not None or self.relative_error is not None:
 
             # Initiate std (xarray of same type as the observed data)
@@ -534,32 +447,36 @@ class Survey:
             elif self.relative_error is not None:
                 std += np.abs(self.relative_error*self.data.observed)**2
 
-            # Return.
             return np.sqrt(std)
 
+        # If nothing is defined, return None
         else:
-            # If nothing is defined, return None
             return None
 
     @standard_deviation.setter
     def standard_deviation(self, standard_deviation):
         """Update standard deviation."""
-        # If None it means basically to delete it; otherwise set it.
-        if standard_deviation is None and 'standard_deviation' in self.data:
-            del self._data['standard_deviation']
-        elif standard_deviation is not None:
+
+        # Update standard_deviation.
+        if standard_deviation is not None:
+
             # Ensure all values are bigger than zero.
             if np.any(standard_deviation <= 0.0):
                 raise ValueError(
                     "All values of `standard_deviation` must be bigger "
-                    "than zero."
+                    f"than zero. Provided: {standard_deviation}."
                 )
+
             self._data['standard_deviation'] = self.data.observed.copy(
                     data=standard_deviation)
 
+        # If None: assure no standard_deviation in data.
+        elif 'standard_deviation' in self.data:
+            del self._data['standard_deviation']
+
     @property
     def noise_floor(self):
-        r"""Return the noise floor of the data.
+        r"""Return noise floor of the data.
 
         See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
 
@@ -568,38 +485,12 @@ class Survey:
 
     @noise_floor.setter
     def noise_floor(self, noise_floor):
-        """Update noise floor.
-
-        See :attr:`Survey.standard_deviation` for more info.
-        """
-        if noise_floor is not None and not isinstance(noise_floor, str):
-
-            # Cast
-            # noise_floor = np.array(noise_floor, dtype=float, ndmin=1)
-            noise_floor = np.asarray(noise_floor)
-
-            # Ensure all values are bigger than zero.
-            if np.any(noise_floor <= 0.0):
-                raise ValueError(
-                    "All values of `noise_floor` must be bigger than zero."
-                )
-
-            # Store relative error.
-            if noise_floor.size == 1:
-                # If one value it is stored as attribute.
-                noise_floor = float(noise_floor)
-            else:
-                # If more than one value it is stored as data array;
-                # broadcasting it if necessary.
-                self.data['_noise_floor'] = self.data.observed.copy(
-                        data=np.ones(self.shape)*noise_floor)
-                noise_floor = 'data._noise_floor'
-
-        self._data.attrs['noise_floor'] = noise_floor
+        """Update noise floor."""
+        self._set_nf_re('noise_floor', noise_floor)
 
     @property
     def relative_error(self):
-        r"""Return the relative error of the data.
+        r"""Return relative error of the data.
 
         See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
 
@@ -608,118 +499,226 @@ class Survey:
 
     @relative_error.setter
     def relative_error(self, relative_error):
-        """Update relative error.
+        """Update relative error."""
+        self._set_nf_re('relative_error', relative_error)
 
-        See :attr:`Survey.standard_deviation` for more info.
-        """
-        if relative_error is not None and not isinstance(relative_error, str):
+    def _set_nf_re(self, name, value):
+        """Update noise_floor or relative_error."""
+
+        if value is not None and not isinstance(value, str):
 
             # Cast
-            # relative_error = np.array(relative_error, dtype=float, ndmin=1)
-            relative_error = np.asarray(relative_error)
+            value = np.asarray(value)
 
             # Ensure all values are bigger than zero.
-            if np.any(relative_error <= 0.0):
+            if np.any(value <= 0.0):
                 raise ValueError(
-                    "All values of `relative_error` must be bigger than zero."
+                    f"All values of `{name}` must be bigger than zero. "
+                    f"Provided: {value}."
                 )
 
-            # Store relative error.
-            if relative_error.size == 1:
-                # If one value it is stored as attribute.
-                relative_error = float(relative_error)
+            # If one value it is stored as attribute.
+            if value.size == 1:
+                value = float(value)
+
+            # If more than one value it is stored as data array;
+            # broadcasting it if necessary.
             else:
-                # If more than one value it is stored as data array;
-                # broadcasting it if necessary.
-                self.data['_relative_error'] = self.data.observed.copy(
-                        data=np.ones(self.shape)*relative_error)
-                relative_error = 'data._relative_error'
+                self.data['_'+name] = self.data.observed.copy(
+                        data=np.ones(self.shape)*value)
+                value = 'data._'+name  # str-flag on attrs.
 
-        self._data.attrs['relative_error'] = relative_error
+        self._data.attrs[name] = value
 
 
-def _dipole_info_to_dict(inp, name):
-    """Create dict with provided source/receiver information."""
+def txrx_coordinates_to_dict(TxRx, coordinates, **kwargs):
+    """Create dict of TxRx instances with provided coordinates.
 
-    # Create dict depending if `inp` is tuple or dict.
-    if isinstance(inp, tuple):  # Tuple with coordinates
-
-        # See if last tuple element is boolean, hence el/mag-flag.
-        if isinstance(inp[-1], (list, tuple, np.ndarray)):
-            provided_elmag = isinstance(inp[-1][0], (bool, np.bool_))
-        else:
-            provided_elmag = isinstance(inp[-1], (bool, np.bool_))
-
-        # Get max dimension.
-        nd = max([np.array(n, ndmin=1).size for n in inp])
-
-        # Expand coordinates.
-        coo = np.array([nd*[val, ] if np.array(val).size == 1 else
-                        val for val in inp], dtype=np.float64)
-
-        # Extract el/mag flag or set to ones (electric) if not provided.
-        if provided_elmag:
-            elmag = coo[-1, :]
-            coo = coo[:-1, :]
-        else:
-            elmag = np.ones(nd)
-
-        # Create dipole names (number-strings).
-        prefix = 'Tx' if name == 'source' else 'Rx'
-        dnd = len(str(nd-1))  # Max number of digits.
-        names = [f"{prefix}{i:0{dnd}d}" for i in range(nd)]
-
-        # Create Dipole-dict.
-        if name == 'source':
-            TxRx = [electrodes.TxMagneticDipole, electrodes.TxElectricDipole]
-        else:
-            TxRx = [electrodes.RxMagneticPoint, electrodes.RxElectricPoint]
-        out = {names[i]: TxRx[int(elmag[i])](coo[:, i]) for i in range(nd)}
-
-    elif isinstance(inp, dict):
-        if isinstance(inp[list(inp)[0]], dict):  # Dict of de-ser. Dipoles.
-            out = {k: getattr(electrodes, v['__class__']).from_dict(v)
-                   for k, v in inp.items()}
-        else:  # Assumed dict of dipoles.
-            out = inp
-
-    else:
-        raise TypeError(
-            f"Input format of <{name}s> not recognized: {type(inp)}."
-        )
-
-    return out
+    Source and receiver dictionaries to input into a
+    :class:`emg3d.surveys.Survey` can be created in many ways. This is a helper
+    function to create a dict from a tuple of coordinates.
 
 
-def _frequency_info_to_dict(frequencies, naming="f"):
-    """Create dicts with provided frequency information.
+    Parameters
+    ----------
+    TxRx : {Tx*, Rx*)
+        Any of the available sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`.
 
-    For easier access three items are stored:
-    - dict {name: freq}: default and used for xarray;
-    - dict {freq: name}: reverse for flexibility to use the float;
-    - array (frequencies): the frequencies as an array.
+    coordinates : tuple
+        Tuple containing the input coordinates for the defined TxRx class.
+        Each element of the tuple must either have length ``1`` or ``n``.
+
+    **kwargs :
+        Other parameters passed through to TxRx; again, each must be of size
+        ``1`` or ``n``.
+
+
+    Returns
+    -------
+    out : dict
+        Dict where the keys consist of a TxRx-prefix followed by a number, and
+        the values contain the corresponding TxRx instances.
+
+
+    Examples
+    --------
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create 10 electric dipole sources from x=2000:2000:10,000, of
+          ...: # strength 100 A.
+          ...: offsets = np.arange(1, 6)*2000
+          ...: sources = emg3d.surveys.txrx_coordinates_to_dict(
+          ...:                 emg3d.TxElectricDipole,
+          ...:                 (offsets, 0, 0, 0, 0), strength=100)
+          ...: sources  # QC the source dict
 
     """
 
-    if isinstance(frequencies, dict):
-        name_freq = frequencies
-        freq_name = {float(v): k for k, v in frequencies.items()}
-        freqs = np.array([float(v) for v in frequencies.values()])
-    else:
+    # Get max dimension.
+    nd = max([np.array(n, ndmin=1).size for n in coordinates])
+
+    # Expand coordinates.
+    coo = np.array([nd*[val, ] if np.array(val).size == 1 else
+                    val for val in coordinates], dtype=np.float64)
+
+    # Expand kwargs.
+    inp = {}
+    for i in range(nd):
+        inp[i] = {}
+        for k, v in kwargs.items():
+            inp[i][k] = v if np.array(v).size == 1 else v[i]
+
+    # Return TxRx-dict.
+    return txrx_lists_to_dict([TxRx(coo[:, i], **inp[i]) for i in range(nd)])
+
+
+def txrx_lists_to_dict(txrx):
+    """Create dict from provided list of Tx/Rx instances.
+
+    Source and receiver dictionaries to input into a
+    :class:`emg3d.surveys.Survey` can be created in many ways. This is a helper
+    function to create a dict from a list of source or receiver instances, or
+    from a list of lists and dicts of source or receiver instances.
+
+
+    Parameters
+    ----------
+    txrx : {Tx*, Rx*, list, dict)
+        Any of the available sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`, or a list or dict of
+        Tx*/Rx* instances. If it is a dict, it is returned unaltered.
+
+        It can also be a list containing a combination of the above (lists,
+        dicts, and instances).
+
+
+    Returns
+    -------
+    out : dict
+        Dict where the keys consist of a TxRx-specific prefix followed by a
+        number, and the values contain the corresponding TxRx instances.
+
+
+    Examples
+    --------
+
+    .. ipython::
+
+       In [1]: import emg3d
+          ...: import numpy as np
+
+       In [2]: # Create two electric, fixed receivers.
+          ...: electric = [emg3d.RxElectricPoint((x, 0, 0, 0, 0))
+          ...:             for x in [1000, 1100]]
+
+       In [3]: # Create three magnetic, fixed receivers.
+          ...: magnetic = emg3d.surveys.txrx_coordinates_to_dict(
+          ...:                 emg3d.RxMagneticPoint,
+          ...:                 ([950, 1050, 1150], 0, 0, 0, 90))
+
+       In [4]: # Create a streamer receiver, flying 5 m behind the source.
+          ...: streamer = emg3d.RxElectricPoint((5, 0, 0, 0, 0), relative=True)
+
+       In [5]: # Collect all receivers.
+          ...: receivers = emg3d.surveys.txrx_lists_to_dict(
+          ...:                 [[streamer, ], electric, magnetic])
+          ...: receivers  # QC our collected receivers
+
+    """
+
+    # If input is a dict, return it unaltered.
+    if isinstance(txrx, dict):
+        return txrx
+
+    # A single Tx*/Rx* instance.
+    elif hasattr(txrx, '_prefix'):
+        txrx = [txrx, ]
+
+    # If it is a list and contains other lists or dicts, collect them.
+    elif any(isinstance(el, (list, tuple, dict)) for el in txrx):
+
+        # Add all lists and dicts to new list.
+        new_txrx = list()
+        for trx in txrx:
+
+            # A single Tx*/Rx* instance.
+            if hasattr(trx, '_prefix'):
+                trx = [trx, ]
+
+            # If dict, cast it to list.
+            elif isinstance(trx, dict):
+                trx = list(trx.values())
+
+            new_txrx += trx
+
+        # Overwrite original list with new flat list.
+        txrx = new_txrx
+
+    # else, it has to be a list/tuple of Tx/Rx instances.
+
+    # Return TxRx-dict.
+    nx = len(txrx)
+    return {f"{trx._prefix}-{i+1:0{len(str(nx))}d}": trx
+            for i, trx in enumerate(txrx)}
+
+
+def frequencies_to_dict(frequencies):
+    """Create dict from provided frequencies.
+
+    Parameters
+    ----------
+    frequencies : {array_like, dict}
+        Source frequencies (Hz).
+
+        - array_like: Frequencies will be stored in a dict with keys assigned
+          starting with ``'f-1'``, ``'f-2'``, and so on.
+
+        - dict: returned unaltered.
+
+
+    Returns
+    -------
+    out : dict
+        Frequency dict.
+
+    """
+
+    if not isinstance(frequencies, dict):
+
+        # Cast.
         freqs = np.array(frequencies, dtype=np.float64, ndmin=1)
 
+        # Ensure frequencies are unique.
         if freqs.size != np.unique(freqs).size:
             raise ValueError(f"Contains non-unique frequencies: {freqs}.")
 
-        if naming:
-            dnd = len(str(freqs.size-1))  # Max number of digits.
-            name_freq, freq_name = {}, {}
-            for i, x in enumerate(freqs):
-                name = f"{naming}{i:0{dnd}d}"
-                name_freq[name] = float(x)
-                freq_name[float(x)] = name
-        else:
-            name_freq = {str(x): float(x) for i, x in enumerate(freqs)}
-            freq_name = {float(x): str(x) for i, x in enumerate(freqs)}
+        # Store in dict.
+        frequencies = {f"f-{i+1:0{len(str(freqs.size))}d}": freq
+                       for i, freq in enumerate(freqs)}
 
-    return name_freq, freq_name, freqs
+    return frequencies
