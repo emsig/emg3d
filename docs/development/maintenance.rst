@@ -14,7 +14,7 @@ Quick overview / QC
      :target: https://github.com/emsig/emg3d/actions/workflows/linkcheck.yml
      :alt: GitHub Actions linkcheck
   .. image:: https://readthedocs.org/projects/emg3d/badge/?version=latest
-     :target: https://emg3d.readthedocs.io/en/latest
+     :target: https://emg3d.emsig.xyz/en/latest
      :alt: Documentation Status
 
   Ensure CI and docs are passing.

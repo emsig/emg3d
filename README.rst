@@ -22,10 +22,10 @@
 A multigrid solver for 3D electromagnetic diffusion in Python.
 
 - **Website:** https://emsig.xyz
-- **Documentation:** https://emg3d.readthedocs.io
+- **Documentation:** https://emg3d.emsig.xyz
 - **Source Code:** https://github.com/emsig/emg3d
 - **Bug reports:** https://github.com/emsig/emg3d/issues
-- **Contributing:** https://emg3d.readthedocs.io/en/latest/development
+- **Contributing:** https://emg3d.emsig.xyz/en/latest/development
 - **Contact:** http://slack.simpeg.xyz
 - **Zenodo:** https://doi.org/10.5281/zenodo.3229006
 
@@ -60,6 +60,6 @@ Installable with ``pip`` from PyPI and with ``conda`` through the
 and the modules ``scipy`` and ``numba``. Various other packages are recommended
 or required for some advanced functionalities (``xarray``, ``discretize``,
 ``matplotlib``, ``h5py``, ``empymod``, ``scooby``). Consult the installation
-notes in the `manual
-<https://emg3d.readthedocs.io/en/stable/user_guide/installation.html>`_ for
+notes in the
+`manual <https://emg3d.emsig.xyz/en/stable/user_guide/installation.html>`_ for
 more information regarding installation, requirements, and soft dependencies.

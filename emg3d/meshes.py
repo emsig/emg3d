@@ -257,7 +257,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     The relation of the survey domain, computational domain, and buffer zone is
     shown in  :numref:`Figure %s <AutoGrid>` for a x-z-section; the y-direction
     behaves the same as the x-direction (the figures are only visible in the
-    web version on https://emg3d.rtfd.io).
+    web version of the API docs on https://emg3d.emsig.xyz).
 
     .. figure:: ../_static/construct_mesh.png
        :align: center

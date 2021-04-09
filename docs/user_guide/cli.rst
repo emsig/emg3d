@@ -47,7 +47,7 @@ example; remove the comment signs to use them.
   # Solver options
   # --------------
   # Input parameters for the solver.
-  # See https://emg3d.readthedocs.io/en/stable/api/emg3d.solver.solve.html
+  # See https://emg3d.emsig.xyz/en/stable/api/emg3d.solver.solve.html
   # for a list of all parameters. The only parameters that cannot be provided
   # here are grid, model, sfield, efield, and return_info.
   #
@@ -63,7 +63,7 @@ example; remove the comment signs to use them.
   # ----------------
   # Input parameters for the automatic gridding.
   # See the description of `gridding_opts` and link therein in
-  # https://emg3d.readthedocs.io/en/stable/api/emg3d.simulations.Simulation.html
+  # https://emg3d.emsig.xyz/en/stable/api/emg3d.simulations.Simulation.html
   # for more details.
   #
   # List of lists: lists are comma-separated values, lists are separated by
