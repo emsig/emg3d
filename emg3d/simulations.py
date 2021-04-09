@@ -3,7 +3,7 @@ A simulation is the computation (modelling) of the electromagnetic responses
 due to a given model and survey.
 
 The simulation module combines the different pieces of ``emg3d`` providing
-high-level, specialised modelling routines for the end user.
+a high-level, specialised modelling tool for the end user.
 """
 # Copyright 2018-2021 The EMSiG community.
 #

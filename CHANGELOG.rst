@@ -189,11 +189,13 @@ Detailed changes
 
 - ``Simulation``:
 
-  - ``name`` is new optional.
-  - New optional keyword ``info``.
+  - Works now for electric and magnetic dipole sources as well as electric wire
+    sources; electric and magnetic point receivers.
   - Works now as well for surveys that contain receivers which are positioned
     relatively to the source.
   - No ``grid`` any longer, taken from ``model``.
+  - ``name`` is new optional.
+  - New optional keyword ``info``.
 
 
 **Surveys**
