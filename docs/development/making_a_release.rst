@@ -59,9 +59,9 @@ Automatic bits
 Manual things
 `````````````
 
-- Benchmarks with `Airspeed Velocity <https://emsig.github.io/emg3d-asv>`_
+- Benchmarks with `Airspeed Velocity <https://emsig.xyz/emg3d-asv>`_
   (``asv``)
-- Gallery in `emg3d-gallery <https://emsig.github.io/emg3d-gallery>`_
+- Gallery in `emg3d-gallery <https://emsig.xyz/emg3d-gallery>`_
   (``sphinx-gallery``)
 
 Automatically deploys if tagged

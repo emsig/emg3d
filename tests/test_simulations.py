@@ -22,9 +22,13 @@ class TestSimulation():
         sources = emg3d.surveys.txrx_coordinates_to_dict(
                 emg3d.TxElectricDipole,
                 (0, [1000, 3000, 5000], -950, 0, 0))
-        receivers = emg3d.surveys.txrx_coordinates_to_dict(
+        e_rec = emg3d.surveys.txrx_coordinates_to_dict(
                 emg3d.RxElectricPoint,
-                (np.arange(12)*500, 0, -1000, 0, 0))
+                (np.arange(6)*1000, 0, -1000, 0, 0))
+        m_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxMagneticPoint,
+                (np.arange(6)*1000, 0, -1000, 90, 0))
+        receivers = emg3d.surveys.txrx_lists_to_dict([e_rec, m_rec])
         frequencies = (1.0, 2.0)
 
         survey = emg3d.Survey(
@@ -46,7 +50,7 @@ class TestSimulation():
 
         # Do first one single and then all together.
         simulation.get_efield('TxED-1', 'f-1')
-        simulation.compute(observed=True)
+        simulation.compute(observed=True, min_offset=1100)
 
     def test_derived(self):
 
@@ -96,11 +100,24 @@ class TestSimulation():
         assert exit == info['exit'] == 1
 
     def test_responses(self):
-        rec_resp = self.simulation.get_efield('TxED-2', 1.0).get_receiver(
+
+        # Check min_offset were switched-off
+        assert_allclose(self.simulation.data.observed[0, 0, 0].data, np.nan)
+        assert_allclose(self.simulation.data.observed[0, 6, 0].data, np.nan)
+
+        # Get efield responses
+        e_resp = self.simulation.get_efield('TxED-2', 1.0).get_receiver(
                 self.survey.receivers.values())
         assert_allclose(
-                self.simulation.data.synthetic[1, :, 0].data,
-                rec_resp, atol=1e-16)
+                self.simulation.data.synthetic[1, :6, 0].data,
+                e_resp[:6], atol=1e-16)
+
+        # Get hfield responses
+        m_resp = self.simulation.get_hfield('TxED-2', 1.0).get_receiver(
+                self.survey.receivers.values())
+        assert_allclose(
+                self.simulation.data.synthetic[1, 6:, 0].data,
+                m_resp[6:], atol=1e-16)
 
     def test_errors(self):
         with pytest.raises(TypeError, match='Unexpected '):
@@ -515,13 +532,24 @@ class TestEstimateGriddingOpts():
         assert gdict['vector'][1] is None
         assert_allclose(gdict['vector'][2], self.grid.nodes_z)
 
-    def test_vector_distance(self):
-        gridding_opts = {'vector': 'Z', 'distance': [[5, 10], None, None]}
+    def test_vector_domain_distance(self):
+        gridding_opts = {
+                'vector': 'Z',
+                'domain': (None, [-1000, 1000], None),
+                'distance': [[5, 10], None, None],
+                }
         gdict = simulations.estimate_gridding_opts(
                 gridding_opts, self.model, self.survey)
 
+        assert gdict['vector'][0] == gdict['vector'][1] is None
+        assert_allclose(gdict['vector'][2], self.model.grid.nodes_z)
+
+        assert gdict['domain'][0] is None
+        assert gdict['domain'][1] == [-1000, 1000]
+        assert gdict['domain'][2] == [self.model.grid.nodes_z[0],
+                                      self.model.grid.nodes_z[-1]]
         assert gdict['distance'][0] == [5, 10]
-        assert gdict['distance'][1] is None
+        assert gdict['distance'][1] == gdict['distance'][2] is None
 
     def test_pass_along(self):
         gridding_opts = {
@@ -544,7 +572,6 @@ class TestEstimateGriddingOpts():
         assert helpers.compare_dicts(gdict2, gridding_opts)
 
     def test_factor(self):
-
         sources = emg3d.TxElectricDipole((0, 3000, -950, 0, 0))
         receivers = emg3d.RxElectricPoint((0, 3000, -1000, 0, 0))
 

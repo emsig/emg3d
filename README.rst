@@ -1,5 +1,5 @@
 .. image:: https://raw.githubusercontent.com/emsig/emg3d-logo/master/logo-emg3d-transp-web250px.png
-   :target: https://emsig.github.io
+   :target: https://emsig.xyz
    :alt: emg3d logo
 
 |
@@ -21,7 +21,7 @@
 
 A multigrid solver for 3D electromagnetic diffusion in Python.
 
-- **Website:** https://emsig.github.io
+- **Website:** https://emsig.xyz
 - **Documentation:** https://emg3d.readthedocs.io
 - **Source Code:** https://github.com/emsig/emg3d
 - **Bug reports:** https://github.com/emsig/emg3d/issues

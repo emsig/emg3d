@@ -1407,11 +1407,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
             data = np.array([])
             for p in ['x', 'y', 'z']:
                 prop = getattr(model, 'property_'+p)
-                if prop is None:
-                    continue
-                elif prop.ndim == 1:
-                    data = np.r_[data, model.map.backward(prop)]
-                else:
+                if prop is not None:
                     prop = model.map.backward(prop[ix, iy, iz])
                     data = np.r_[data, np.min(prop)]
 
@@ -1502,7 +1498,6 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
 
     # Ensure no gridding_opts left.
     if gridding_opts:
-        print(gridding_opts)
         raise TypeError(
             f"Unexpected gridding_opts: {list(gridding_opts.keys())}."
         )

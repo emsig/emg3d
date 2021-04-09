@@ -38,7 +38,7 @@ Quick overview / QC
   Check CI coverage and code quality is good.
 
 - .. image:: https://img.shields.io/badge/benchmark-asv-blue.svg?style=flat
-     :target: https://emsig.github.io/emg3d-asv
+     :target: https://emsig.xyz/emg3d-asv
      :alt: Airspeed Velocity
 
   Check Benchmarks are run up to the latest version.

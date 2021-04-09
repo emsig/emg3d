@@ -18,4 +18,4 @@ There is also a benchmark suite using *airspeed velocity*, located in the
 `emsig/emg3d-asv <https://github.com/emsig/emg3d-asv>`_-repository. The results
 of my machine can be found in the `emsig/emg3d-bench
 <https://github.com/emsig/emg3d-bench>`_, its rendered version at
-`emsig.github.io/emg3d-asv <https://emsig.github.io/emg3d-asv>`_.
+`emsig.xyz/emg3d-asv <https://emsig.xyz/emg3d-asv>`_.

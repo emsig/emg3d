@@ -19,6 +19,7 @@ Various:
 
 - Removed all deprecated features.
 - Reduced top namespace to principal functions.
+- emsig.github.io to emsig.xyz.
 
 
 Version 1 and API stability

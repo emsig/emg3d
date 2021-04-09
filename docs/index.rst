@@ -7,7 +7,7 @@ emg3d Documentation
 :Release: |version|
 :Date: |today|
 :Source: `github.com/emsig/emg3d <https://github.com/emsig/emg3d>`_
-:EMSiG: `emsig.github.io <https://emsig.github.io>`_
+:EMSiG: `emsig.xyz <https://emsig.xyz>`_
 
 ----
 
@@ -19,7 +19,7 @@ emg3d Documentation
    development/index
 
 -  :ref:`user_guide`
--  `Gallery <https://emsig.github.io/emg3d-gallery>`_
+-  `Gallery <https://emsig.xyz/emg3d-gallery>`_
 -  :ref:`api_refs`
 -  :ref:`development`
 
