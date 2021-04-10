@@ -11,6 +11,7 @@ try:
     import h5py
 except ImportError:
     h5py = False
+
 try:
     import xarray
 except ImportError:
@@ -98,10 +99,8 @@ class TestSaveLoad:
                             out_h5['Grid'].cell_volumes)
 
         else:
-            with pytest.raises(ImportError):
+            with pytest.warns(UserWarning, match='feature of emg3d requires'):
                 io.save(tmpdir+'/test.h5', grid=self.grid)
-            with pytest.raises(ImportError):
-                io.load(str(tmpdir+'/test-h5.h5'))
 
     def test_json(self, tmpdir):
         io.save(tmpdir+'/test.json', **self.data)
@@ -237,12 +236,19 @@ def test_hdf5_dump_load(tmpdir):
 
     orig = {'d1': d1, 'd2': d2, 'd3': d3, 'ddict': {'d4': d4}, 'd5': d5}
 
-    io._hdf5_dump(fname=str(tmpdir) + 'test.h5', data=orig, compression='gzip')
+    if h5py:
+        io._hdf5_dump(fname=str(tmpdir) + 'test.h5',
+                      data=orig, compression='gzip')
 
-    out = io._hdf5_load(fname=str(tmpdir) + 'test.h5')
+        out = io._hdf5_load(fname=str(tmpdir) + 'test.h5')
 
-    assert_allclose(out['d1'], d1)
-    assert out['d2'] == 3
-    assert out['d3']
-    assert out['ddict']['d4'] == 'test'
-    assert out['d5'] == ['1', '2', '3']
+        assert_allclose(out['d1'], d1)
+        assert out['d2'] == 3
+        assert out['d3']
+        assert out['ddict']['d4'] == 'test'
+        assert out['d5'] == ['1', '2', '3']
+
+    else:
+        with pytest.warns(UserWarning, match='This feature of emg3d requires'):
+            io._hdf5_dump(fname=str(tmpdir) + 'test.h5',
+                          data=orig, compression='gzip')
