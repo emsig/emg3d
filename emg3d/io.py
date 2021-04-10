@@ -27,8 +27,7 @@ import numpy as np
 try:
     import h5py
 except ImportError:
-    h5py = ("'.h5'-files require `h5py`. Install it via\n"
-            "`pip install h5py` or `conda install -c conda-forge h5py`.")
+    h5py = None
 
 from emg3d import meshes, utils
 
@@ -36,46 +35,44 @@ __all__ = ['save', 'load']
 
 
 def save(fname, **kwargs):
-    """Save surveys, meshes, models, fields, and more to disk.
+    """Save simulations, surveys, meshes, models, fields, and more to disk.
 
     Serialize and save data to disk in different formats (see parameter
-    description of `fname` for the supported file formats).
+    description of ``fname`` for the supported file formats).
 
     Any other (non-emg3d) object can be added too, as long as it knows how to
     serialize itself.
 
-    The serialized instances will be de-serialized if loaded with :func:`load`.
+    The serialized instances will be de-serialized if loaded with
+    :func:`emg3d.io.load`.
 
 
     Parameters
     ----------
     fname : str
-        File name inclusive ending, which defines the used data format.
-        Implemented are currently:
+        File name with absolute or relative path including suffix, which
+        defines the used data format. Implemented are currently:
 
-        - `.h5`: Uses `h5py` to store inputs to a hierarchical, compressed
-          binary hdf5 file. Recommended file format, but requires the module
-          `h5py`.
-        - `.npz`: Uses `numpy` to store inputs to a flat, compressed binary
+        - ``.h5``: Uses h5py to store inputs to a hierarchical, compressed
+          binary HDF5 file. Recommended file format, but requires the module
+          ``h5py``.
+        - ``.npz``: Uses numpy to store inputs to a flat, compressed binary
           file.
-        - `.json`: Uses `json` to store inputs to a hierarchical, plain text
+        - ``.json``: Uses json to store inputs to a hierarchical, plain text
           file.
 
-    compression : int or str, optional
-        Passed through to h5py, default is 'gzip'.
+    compression : {int, str}, default: 'gzip'
+        Passed through to h5py.
 
-    json_indent : int or None
-        Passed through to json, default is 2.
+    json_indent : {int, None}, default: 2
+        Passed through to json.
 
-    verb : int
-        If 1 (default) verbose, if 0 silent; if -1 it returns the info as
-        string instead of printing it.
+    verb : int, default: 1
+        Verbose if 1, if 0 silent; if -1 it returns the info as string instead
+        of printing it.
 
-    kwargs : Keyword arguments, optional
-        Data to save using its key as name. The classes listed in
-        `emg3d.utils._KNOWN_CLASSES` will be properly serialized: and
-        de-serialized again if loaded with :func:`load`. These instances are
-        collected in their own group if h5py is used.
+    kwargs : optional
+        Data to save using its key as name.
 
         Note that the provided data cannot contain the before described
         parameters as keys.
@@ -83,8 +80,8 @@ def save(fname, **kwargs):
 
     Returns
     -------
-    info : str
-        Info-string if ``verb<0``.
+    info : str, returned if verb<0
+        Info-string.
 
     """
     # Get and remove optional kwargs.
@@ -92,52 +89,36 @@ def save(fname, **kwargs):
     json_indent = kwargs.pop('json_indent', 2)
     verb = kwargs.pop('verb', 1)
 
-    # Get absolute path.
-    full_path = os.path.abspath(fname)
-
     # Add meta-data to kwargs
     kwargs['_date'] = datetime.today().isoformat()
     kwargs['_version'] = f"emg3d v{utils.__version__}"
-    kwargs['_format'] = "0.13.0"  # File format; version of emg3d when changed.
+    kwargs['_format'] = "1.0"  # File format; version of emg3d when changed.
 
-    # Get hierarchical dictionary with serialized and
-    # sorted TensorMesh, Field, and Model instances.
+    # Get hierarchical dictionary with serialized and sorted KNOWN_CLASSES.
     data = _dict_serialize(kwargs)
 
-    # Save data depending on the extension.
-    if full_path.endswith('.npz'):
+    # Ensure fname is absolute.
+    fname = os.path.abspath(fname)
 
-        # Convert hierarchical dict to a flat dict.
-        data = _dict_flatten(data)
+    # Save NumPy.
+    if fname.endswith('.npz'):
+        np.savez_compressed(fname, **_dict_flatten(data))
 
-        # Store flattened data.
-        np.savez_compressed(full_path, **data)
+    # Save HDF5
+    elif fname.endswith('.h5'):
+        _hdf5_dump(fname, data=data, compression=compression)
 
-    elif full_path.endswith('.h5'):
+    # Save JSON
+    elif fname.endswith('.json'):
+        with open(fname, "w") as f:
+            json.dump(_dict_dearray_decomp(data), f, indent=json_indent)
 
-        # Check if h5py is installed.
-        if isinstance(h5py, str):
-            raise ImportError(h5py)
-
-        # Store data.
-        with h5py.File(full_path, "w") as h5file:
-            _hdf5_add_to(data, h5file, compression)
-
-    elif full_path.endswith('.json'):
-
-        # Move arrays to lists and decompose complex data.
-        data = _dict_dearray_decomp(data)
-
-        # Store hierarchical data.
-        with open(full_path, "w") as f:
-            json.dump(data, f, indent=json_indent)
-
+    # Unknown, throw error
     else:
-        ext = full_path.split('.')[-1]
-        raise ValueError(f"Unknown extension '.{ext}'.")
+        raise ValueError(f"Unknown extension '.{fname.split('.')[-1]}'.")
 
     # Print file info.
-    info = (f"Data saved to «{full_path}»\n[{kwargs['_version']} "
+    info = (f"Data saved to «{fname}»\n[{kwargs['_version']} "
             f"(format {kwargs['_format']}) on {kwargs['_date']}].")
     if verb > 0:
         print(info)
@@ -146,33 +127,30 @@ def save(fname, **kwargs):
 
 
 def load(fname, **kwargs):
-    """Load meshes, models, fields, and other data from disk.
+    """Load simulations, surveys, meshes, models, fields, and more from disk.
 
-    Load and de-serialize classes listed in `emg3d.utils._KNOWN_CLASSES`
-    and add arbitrary other data that were saved with :func:`save`.
+    Load data and de-serialize known instances.
 
 
     Parameters
     ----------
     fname : str
-        File name including extension. Possibilities:
+        File name with absolute or relative path including suffix, which
+        defines the used data format. Implemented are currently:
 
-        - '.npz': numpy-binary
-        - '.h5': h5py-binary (needs `h5py`)
-        - '.json': json
+        - ``'.npz'``: NumPy-binary;
+        - ``'.h5'``: HDF5-binary (requires ``h5py``);
+        - ``'.json'``: JSON plain text file.
 
-    verb : int
-        If 1 (default) verbose, if 0 silent; if -1 it returns the info as
-        string instead of printing it.
+    verb : int, default: 1
+        Verbose if 1, if 0 silent; if -1 it returns the info as string instead
+        of printing it.
 
 
     Returns
     -------
     out : dict
-        A dictionary containing the data stored in fname;
-        :class:`emg3d.meshes.TensorMesh`, :class:`emg3d.fields.Field`, and
-        :class:`emg3d.models.Model` instances are de-serialized and returned as
-        instances.
+        A dictionary containing the data stored in ``fname``;
 
     info : str, returned if verb<0
         Info-string.
@@ -186,46 +164,35 @@ def load(fname, **kwargs):
     if kwargs:
         raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
-    # Get absolute path.
-    full_path = os.path.abspath(fname)
+    # Ensure fname is absolute.
+    fname = os.path.abspath(fname)
 
-    # Load data depending on the file extension.
-    if full_path.endswith('.npz'):
-
-        # Load .npz into a flat dict.
-        with np.load(full_path, allow_pickle=allow_pickle) as dat:
+    # Load NumPy.
+    if fname.endswith('.npz'):
+        with np.load(fname, allow_pickle=allow_pickle) as dat:
             data = {key: dat[key] for key in dat.files}
+            data = _dict_unflatten(data)  # Un-flatten
 
-        # Un-flatten data.
-        data = _dict_unflatten(data)
+    # Load HDF5
+    elif fname.endswith('.h5'):
+        data = _hdf5_load(fname)
 
-    elif full_path.endswith('.h5'):
-
-        # Check if h5py is installed.
-        if isinstance(h5py, str):
-            raise ImportError(h5py)
-
-        # Load data.
-        with h5py.File(full_path, 'r') as h5file:
-            data = _hdf5_get_from(h5file)
-
-    elif full_path.endswith('.json'):
-
-        with open(full_path, 'r') as f:
+    # Load JSON
+    elif fname.endswith('.json'):
+        with open(fname, 'r') as f:
             data = json.load(f)
+            data = _dict_array_comp(data)  # compose arrays / complex data
 
-        # Move lists back to arrays and compose complex data.
-        data = _dict_array_comp(data)
-
+    # Unknown, throw error
     else:
-        ext = full_path.split('.')[-1]
-        raise ValueError(f"Unknown extension '.{ext}'.")
+        raise ValueError(f"Unknown extension '.{fname.split('.')[-1]}'.")
 
     # De-serialize data.
+    _nonetype_to_none(data)
     _dict_deserialize(data)
 
     # Check if file was (supposedly) created by emg3d.
-    info = f"Data loaded from «{full_path}»"
+    info = f"Data loaded from «{fname}»"
     try:
         version = data['_version']
         date = data['_date']
@@ -241,12 +208,12 @@ def load(fname, **kwargs):
         print(info)
 
     if verb < 0:
-        return data, info
-    else:
-        return data
+        data = (data, info)
+
+    return data
 
 
-def _dict_serialize(inp, out=None):
+def _dict_serialize(inp):
     """Serialize emg3d-classes and other objects in inp-dict.
 
     Returns a serialized dictionary <out> of <inp>, where all members of
@@ -261,16 +228,13 @@ def _dict_serialize(inp, out=None):
     1. Key names are converted to strings.
     2. None values are converted to 'NoneType'.
     3. TensorMesh instances from discretize will be stored as if they would be
-       simpler emg3d-meshes.
+       simpler emg3d.TensorMesh instances.
 
 
     Parameters
     ----------
     inp : dict
         Input dictionary to serialize.
-
-    out : dict
-        Output dictionary; created if not provided.
 
 
     Returns
@@ -280,56 +244,43 @@ def _dict_serialize(inp, out=None):
 
     """
 
-    # Initiate output dictionary if not provided.
-    if out is None:
-        output = True
-        out = {}
-    else:
-        output = False
+    # Initiate output dictionary.
+    out = {}
 
     # Loop over items.
     for key, value in inp.items():
 
-        # Limitation 1: Cast keys to string
-        if not isinstance(key, str):
-            key = str(key)
-
-        # Take care of the following instances
-        # (if we are in the root-directory they get their own category):
+        # Serialize known classes.
         if isinstance(value, tuple(utils._KNOWN_CLASSES.values())):
 
             # Workaround for discretize.TensorMesh (store as emg3d.TensorMesh)
             if hasattr(value, 'face_areas'):
                 value = meshes.TensorMesh(value.h, value.origin)
 
+            # Serialize.
             value = value.to_dict()
 
-        # Initiate if necessary.
-        if key not in out.keys():
-            out[key] = {}
-
-        # If value is a dict use recursion, else store.
+        # If value is a dict we use recursion
         if isinstance(value, dict):
-            _dict_serialize(value, out[key])
-        else:
-            # Limitation 2: None
-            if value is None:
-                out[key] = 'NoneType'
-            else:
-                out[key] = value
+            value = _dict_serialize(value)
 
-    # Return if it wasn't provided.
-    if output:
-        return out
+        # Limitation 1: None -> 'NoneType'
+        elif value is None:
+            value = 'NoneType'
+
+        # Store value
+        # Limitation 2: Cast keys -> str(key)
+        out[str(key)] = value
+
+    return out
 
 
-def _dict_deserialize(inp, first_call=True):
+def _dict_deserialize(inp):
     """De-serialize emg3d-classes and other objects in inp-dict.
 
     De-serializes in-place dictionary <inp>, where all members of
     `emg3d.utils._KNOWN_CLASSES` are de-serialized with their respective
-    `from_dict()` methods. It also converts back `'NoneType'`-strings to
-    `None`, and `np.bool_` to `bool`.
+    `from_dict()` methods.
 
 
     Parameters
@@ -339,14 +290,10 @@ def _dict_deserialize(inp, first_call=True):
 
     """
 
-    # Recursively replace `'NoneType'` by `None` and `np.bool_` by `bool`.
-    if first_call:
-        _nonetype_to_none(inp)
-
     # Loop over items.
     for key, value in inp.items():
 
-        # If it is a dict, deserialize if KNOWN_CLASS or recursion.
+        # If it is a dict, de-serialize if known class or recursion.
         if isinstance(value, dict):
 
             # If it has a __class__-key, de-serialize.
@@ -366,7 +313,7 @@ def _dict_deserialize(inp, first_call=True):
                     warnings.warn(msg, UserWarning)
 
             # In no __class__-key or de-serialization fails, use recursion.
-            _dict_deserialize(value, False)
+            _dict_deserialize(value)
 
 
 def _nonetype_to_none(inp):
@@ -374,9 +321,9 @@ def _nonetype_to_none(inp):
 
     Changes:
 
-    - Replace `NoneType'` by `None`.
-    - `np.bool_` are cast back to `bool` (because `bool` is converted to
-      `np.bool_` for some file formats).
+    - Replaces ``'NoneType'`` by ``None``.
+    - Casts back ``np.bool_`` to ``bool`` (because ``bool`` is converted to
+      ``np.bool_`` for some file formats).
 
     """
     for k, v in inp.items():
@@ -404,7 +351,7 @@ def _dict_flatten(data):
 
     Returns
     -------
-    fdata : dict
+    out : dict
         Flattened dict.
 
     """
@@ -433,7 +380,7 @@ def _dict_unflatten(data):
 
     Returns
     -------
-    udata : dict
+    out : dict
         Un-flattened dict.
 
     """
@@ -453,7 +400,7 @@ def _dict_unflatten(data):
         # Loop over key-parts.
         for part in parts[:-1]:
 
-            # If subkey does not exist yet, initiate subdict.
+            # If sub-key does not exist yet, initiate sub-dict.
             if part not in tmp:
                 tmp[part] = {}
 
@@ -461,7 +408,7 @@ def _dict_unflatten(data):
             tmp = tmp[part]
 
         # Convert numpy strings to str.
-        if '<U' in str(np.asarray(value).dtype):
+        if isinstance(value, np.ndarray) and value.dtype.type == np.str_:
             value = str(value)
 
         # Store actual value of this key.
@@ -477,19 +424,19 @@ def _dict_dearray_decomp(data):
     Parameters
     ----------
     data : dict
-        Input dict to decompose.
+        Input dict to de-compose and de-array.
 
 
     Returns
     -------
-    ddata : dict
+    out : dict
         As input, but arrays are moved to lists, and complex number to real
         numbers like [real, imag].
 
     """
 
     # Output dict.
-    ddata = {}
+    out = {}
 
     # Loop over keys.
     for key, value in data.items():
@@ -498,20 +445,20 @@ def _dict_dearray_decomp(data):
         if isinstance(value, dict):
             value = _dict_dearray_decomp(value)
 
-        # Test if complex.
+        # Decompose complex values.
         if np.iscomplexobj(value):
             key += '__complex'
             value = np.stack([np.asarray(value).real, np.asarray(value).imag])
 
-        # Convert to lists if no arrays wanted.
+        # Convert arrays to lists.
         if isinstance(value, np.ndarray):
             key += '__array-'+value.dtype.name
             value = value.tolist()
 
         # Store this key-value-pair.
-        ddata[key] = value
+        out[key] = value
 
-    return ddata
+    return out
 
 
 def _dict_array_comp(data):
@@ -526,14 +473,14 @@ def _dict_array_comp(data):
 
     Returns
     -------
-    ddata : dict
+    out : dict
         As input, but lists are again arrays and complex data are complex
         again.
 
     """
 
     # Output dict.
-    ddata = {}
+    out = {}
 
     # Loop over keys.
     for key, value in data.items():
@@ -555,50 +502,58 @@ def _dict_array_comp(data):
             key = key.replace('__complex', '')
 
         # Store this key-value-pair.
-        ddata[key] = value
+        out[key] = value
 
-    return ddata
+    return out
 
 
-def _hdf5_add_to(data, h5file, compression):
-    """Adds dictionary entries recursively to h5.
+@utils._requires('h5py')
+def _hdf5_dump(fname, data, compression):
+    """Adds dictionary entries recursively to hdf5 file fname.
 
 
     Parameters
     ----------
+    fname : str
+        Absolute path/name of a HDF5-file, ending in .h5.
+        (In recursion it is an HDF5-file handle).
+
     data : dict
         Dictionary containing the data.
 
-    h5file : file
-        Opened by h5py.
-
-    compression : str or int
+    compression : {str, int}
         Passed through to h5py.
 
     """
 
-    # Loop over items.
-    for key, value in data.items():
+    if isinstance(fname, str):
+        with h5py.File(fname, "w") as h5file:
+            _hdf5_dump(h5file, data, compression)
 
-        # Use recursion if value is a dict, creating a new group.
-        if isinstance(value, dict):
-            _hdf5_add_to(value, h5file.create_group(key), compression)
+    else:
+        # Loop over items.
+        for key, value in data.items():
 
-        elif np.ndim(value) > 0:  # Use compression where possible...
-            h5file.create_dataset(key, data=value, compression=compression)
+            # Use recursion if value is a dict, creating a new group.
+            if isinstance(value, dict):
+                _hdf5_dump(fname.create_group(key), value, compression)
 
-        else:                    # else store without compression.
-            h5file.create_dataset(key, data=value)
+            elif np.ndim(value) > 0:  # Use compression where possible...
+                fname.create_dataset(key, data=value, compression=compression)
+
+            else:                    # else store without compression.
+                fname.create_dataset(key, data=value)
 
 
-def _hdf5_get_from(h5file):
-    """Return data from h5file in a dictionary.
+@utils._requires('h5py')
+def _hdf5_load(fname):
+    """Return data from fname in a dict.
 
 
     Parameters
     ----------
-    h5file : file
-        Opened by h5py.
+    fname : file
+        Absolute path/name of a HDF5-file, ending in .h5.
 
 
     Returns
@@ -607,25 +562,35 @@ def _hdf5_get_from(h5file):
         Dictionary containing the data.
 
     """
-    # Initiate dictionary.
-    data = {}
 
-    # Loop over items.
-    for key, value in h5file.items():
+    if isinstance(fname, str):
+        with h5py.File(fname, "r") as h5file:
+            data = _hdf5_load(h5file)
+        return data
 
-        # If it is a dataset add value to key, else use recursion to dig in.
-        if isinstance(value, h5py._hl.dataset.Dataset):
-            data[key] = value[()]
+    else:
 
-            # h5py>=3.0 changed strings to byte strings.
-            if isinstance(data[key], bytes):
-                data[key] = data[key].decode("utf-8")
-            elif (isinstance(data[key], np.ndarray) and
-                  data[key].dtype == 'object'):
-                if isinstance(data[key][0], bytes):
-                    data[key] = [x.decode("utf-8") for x in data[key]]
+        # Initiate dictionary.
+        data = {}
 
-        elif isinstance(value, h5py._hl.group.Group):
-            data[key] = _hdf5_get_from(value)
+        # Loop over items.
+        for key, value in fname.items():
 
-    return data
+            # If it is a dataset add value to key, else use recursion.
+            if isinstance(value, h5py._hl.dataset.Dataset):
+                value = value[()]
+
+                # h5py>=3.0 changed strings to byte strings.
+                if isinstance(value, bytes):
+                    data[key] = value.decode("utf-8")
+                elif (isinstance(value, np.ndarray) and
+                      value.dtype == 'object' and
+                      isinstance(value[0], bytes)):
+                    data[key] = [x.decode("utf-8") for x in value]
+                else:
+                    data[key] = value
+
+            elif isinstance(value, h5py._hl.group.Group):
+                data[key] = _hdf5_load(value)
+
+        return data
