@@ -11,9 +11,87 @@ try:
 except ImportError:
     scooby = None
 
+try:
+    import tqdm
+except ImportError:
+    tqdm = None
 
-# EMArray
-def test_emarray():
+
+def test_known_class():
+    @utils._known_class
+    class Dummy:
+        pass
+
+    assert utils._KNOWN_CLASSES['Dummy'] == Dummy
+
+
+def test_requires(capsys):
+
+    @utils._requires('nowidea', 'whatever')
+    def dummy():
+        pass
+
+    with pytest.warns(UserWarning, match='This feature of emg3d requires'):
+        a = dummy()
+    out1, _ = capsys.readouterr()
+    assert a is None
+    assert "* WARNING :: This feature of emg3d requires" in out1
+
+
+def dummy(inp):
+    """Dummy fct to test process_map."""
+    return inp
+
+
+def test_process_map():
+
+    # Parallel
+    out = utils._process_map(dummy, [1, 2], max_workers=4, disable=True)
+    assert out == [1, 2]
+
+    # Sequential
+    out = utils._process_map(dummy, [1, 2], max_workers=1, disable=True)
+    assert out == [1, 2]
+
+    # If tqdm is installed, run now without.
+    if tqdm is not None:
+        utils.tqdm = None
+
+        # Parallel
+        out = utils._process_map(dummy, [1, 2], max_workers=4, disable=True)
+        assert out == [1, 2]
+
+        # Sequential
+        out = utils._process_map(dummy, [1, 2], max_workers=1, disable=True)
+        assert out == [1, 2]
+
+    utils.tqdm = tqdm
+
+
+@pytest.mark.skipif(scooby is None, reason="scooby not installed.")
+def test_Report(capsys):
+    out, _ = capsys.readouterr()  # Empty capsys
+
+    # Reporting is now done by the external package scooby.
+    # We just ensure the shown packages do not change (core and optional).
+    if scooby:
+        out1 = utils.Report()
+        out2 = scooby.Report(
+                core=['numpy', 'scipy', 'numba', 'emg3d'],
+                optional=['empymod', 'xarray', 'discretize', 'h5py',
+                          'matplotlib', 'tqdm', 'IPython'],
+                ncol=4)
+
+        # Ensure they're the same; exclude time to avoid errors.
+        assert out1.__repr__()[115:] == out2.__repr__()[115:]
+
+    else:  # soft dependency
+        _ = utils.Report()
+        out, _ = capsys.readouterr()  # Empty capsys
+        assert 'WARNING :: `emg3d.Report` requires `scooby`' in out
+
+
+def test_EMArray():
     out = utils.EMArray(3)
     assert out.amp() == 3
     assert out.pha() == 0
@@ -37,10 +115,9 @@ def test_emarray():
     assert_allclose(out.imag, [1, 1, -1])
 
 
-# FUNCTIONS RELATED TO TIMING
-def test_Time():
+def test_Timer():
     t0 = default_timer()  # Create almost at the same time a
-    time = utils.Time()   # t0-stamp and a Time-instance.
+    time = utils.Timer()   # t0-stamp and a Timer-instance.
 
     # Ensure they are the same.
     assert_allclose(t0, time.t0, atol=1e-3)
@@ -53,29 +130,5 @@ def test_Time():
     out = time.runtime
     assert "0:00:00" == str(out)
 
-    # Check representation of Time.
+    # Check representation of Timer.
     assert 'Runtime : 0:00:0' in time.__repr__()
-
-
-# OTHER
-@pytest.mark.skipif(scooby is None, reason="scooby not installed.")
-def test_report(capsys):
-    out, _ = capsys.readouterr()  # Empty capsys
-
-    # Reporting is now done by the external package scooby.
-    # We just ensure the shown packages do not change (core and optional).
-    if scooby:
-        out1 = utils.Report()
-        out2 = scooby.Report(
-                core=['numpy', 'scipy', 'numba', 'emg3d'],
-                optional=['empymod', 'xarray', 'discretize', 'h5py',
-                          'matplotlib', 'tqdm', 'IPython'],
-                ncol=4)
-
-        # Ensure they're the same; exclude time to avoid errors.
-        assert out1.__repr__()[115:] == out2.__repr__()[115:]
-
-    else:  # soft dependency
-        _ = utils.Report()
-        out, _ = capsys.readouterr()  # Empty capsys
-        assert 'WARNING :: `emg3d.Report` requires `scooby`' in out

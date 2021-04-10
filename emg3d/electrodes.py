@@ -428,7 +428,7 @@ class Source(Wire):
         return fields.get_source_field(grid, self, frequency)
 
 
-@utils.known_class
+@utils._known_class
 class TxElectricDipole(Source, Dipole):
     """Electric dipole source, two electrodes connected by a wire.
 
@@ -459,7 +459,7 @@ class TxElectricDipole(Source, Dipole):
                 coordinates=coordinates, strength=strength, length=length)
 
 
-@utils.known_class
+@utils._known_class
 class TxMagneticDipole(Source, Dipole):
     """Magnetic dipole source using a square loop perpendicular to the dipole.
 
@@ -494,7 +494,7 @@ class TxMagneticDipole(Source, Dipole):
                 coordinates=coordinates, strength=strength, length=length)
 
 
-@utils.known_class
+@utils._known_class
 class TxElectricWire(Source, Wire):
     """Electric wire source consisting of a series of dipoles.
 
@@ -561,7 +561,7 @@ class Receiver(Wire):
             return self.center
 
 
-@utils.known_class
+@utils._known_class
 class RxElectricPoint(Receiver, Point):
     """Electric point receiver (point sampling the field).
 
@@ -586,7 +586,7 @@ class RxElectricPoint(Receiver, Point):
         super().__init__(coordinates=coordinates, relative=relative)
 
 
-@utils.known_class
+@utils._known_class
 class RxMagneticPoint(Receiver, Point):
     """Magnetic point receiver (point sampling the field).
 

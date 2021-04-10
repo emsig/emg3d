@@ -122,7 +122,7 @@ class BaseMesh:
         return self._cell_volumes
 
 
-@utils.known_class
+@utils._known_class
 class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
     """A slightly modified version of :class:`discretize.TensorMesh`.
 

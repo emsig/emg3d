@@ -73,7 +73,7 @@ def save(fname, **kwargs):
 
     kwargs : Keyword arguments, optional
         Data to save using its key as name. The classes listed in
-        `emg3d.utils.KNOWN_CLASSES` will be properly serialized: and
+        `emg3d.utils._KNOWN_CLASSES` will be properly serialized: and
         de-serialized again if loaded with :func:`load`. These instances are
         collected in their own group if h5py is used.
 
@@ -148,7 +148,7 @@ def save(fname, **kwargs):
 def load(fname, **kwargs):
     """Load meshes, models, fields, and other data from disk.
 
-    Load and de-serialize classes listed in `emg3d.utils.KNOWN_CLASSES`
+    Load and de-serialize classes listed in `emg3d.utils._KNOWN_CLASSES`
     and add arbitrary other data that were saved with :func:`save`.
 
 
@@ -250,7 +250,7 @@ def _dict_serialize(inp, out=None):
     """Serialize emg3d-classes and other objects in inp-dict.
 
     Returns a serialized dictionary <out> of <inp>, where all members of
-    `emg3d.utils.KNOWN_CLASSES` are serialized with their respective
+    `emg3d.utils._KNOWN_CLASSES` are serialized with their respective
     `to_dict()` methods.
 
     Any other (non-emg3d) object can be added too, as long as it knows how to
@@ -296,7 +296,7 @@ def _dict_serialize(inp, out=None):
 
         # Take care of the following instances
         # (if we are in the root-directory they get their own category):
-        if isinstance(value, tuple(utils.KNOWN_CLASSES.values())):
+        if isinstance(value, tuple(utils._KNOWN_CLASSES.values())):
 
             # Workaround for discretize.TensorMesh (store as emg3d.TensorMesh)
             if hasattr(value, 'face_areas'):
@@ -327,7 +327,7 @@ def _dict_deserialize(inp, first_call=True):
     """De-serialize emg3d-classes and other objects in inp-dict.
 
     De-serializes in-place dictionary <inp>, where all members of
-    `emg3d.utils.KNOWN_CLASSES` are de-serialized with their respective
+    `emg3d.utils._KNOWN_CLASSES` are de-serialized with their respective
     `from_dict()` methods. It also converts back `'NoneType'`-strings to
     `None`, and `np.bool_` to `bool`.
 
@@ -354,7 +354,7 @@ def _dict_deserialize(inp, first_call=True):
 
                 # De-serialize, overwriting all the existing entries.
                 try:
-                    inst = utils.KNOWN_CLASSES[value['__class__']]
+                    inst = utils._KNOWN_CLASSES[value['__class__']]
                     inp[key] = inst.from_dict(value)
                     continue
 

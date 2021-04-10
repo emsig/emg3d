@@ -48,7 +48,7 @@ def simulation(args_dict):
     """
 
     # Start timer.
-    runtime = utils.Time()
+    runtime = utils.Timer()
 
     # Parse configuration file.
     cfg, term = parser.parse_config_file(args_dict)

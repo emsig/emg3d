@@ -1110,18 +1110,18 @@ class MGParameters:
         """Set and check some of the parameters."""
 
         # Levels and iterations.
-        self.level_all = list()   # To keep track of the levels for QC-figure.
-        self.first_cycle = True   # Flag if in first cycle for QC-figure.
-        self.it = 0               # To store multigrid cycle count.
-        self.ssl_it = 0           # To store solver iteration count.
-        self.l2 = 1.0             # To store current error.
-        self.l2_refe = 1.0        # To store reference error.
-        self._max_level()         # Max coarsening levels.
+        self.level_all = list()    # To keep track of the levels for QC-figure.
+        self.first_cycle = True    # Flag if in first cycle for QC-figure.
+        self.it = 0                # To store multigrid cycle count.
+        self.ssl_it = 0            # To store solver iteration count.
+        self.l2 = 1.0              # To store current error.
+        self.l2_refe = 1.0         # To store reference error.
+        self._max_level()          # Max coarsening levels.
 
         # Initiate logging strings, timer, errors, and return flag.
-        self.exit_message = ''    # For convergence status.
-        self.log_message = ''     # For returning info.
-        self.time = utils.Time()  # Time.
+        self.exit_message = ''     # For convergence status.
+        self.log_message = ''      # For returning info.
+        self.time = utils.Timer()  # Timer.
         self.runtime_at_cycle = np.array([0.])  # Store runtime per cycle.
         self.error_at_cycle = np.array([0.])    # Store error per cycle.
         self.do_return = True     # Whether or not to return the efield.

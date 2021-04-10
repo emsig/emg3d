@@ -66,6 +66,12 @@ class Fourier:
       with cubic spline interpolation (on a log-scale) using
       :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
 
+    .. note::
+
+        The package ``empymod`` has to be installed in order to use
+        ``Fourier``:
+        ``pip install empymod`` or ``conda install -c conda-forge empymod``.
+
 
     Parameters
     ----------

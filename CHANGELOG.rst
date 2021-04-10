@@ -244,6 +244,11 @@ Move ``Fourier`` from ``emg3d.utils`` to its own module ``emg3d.time``.
   - ``freq_interpolate_i`` to ``ifreq_interpolate``;
 
 
+**Utils**
+
+Renamed ``Time`` to ``Timer``.
+
+
 0.x-Series
 """"""""""
 

@@ -32,7 +32,7 @@ from emg3d import (electrodes, fields, io, maps, meshes, models,
 __all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
 
 
-@utils.known_class
+@utils._known_class
 class Simulation:
     """Create a simulation for a given survey on a given model.
 
@@ -58,6 +58,12 @@ class Simulation:
         This means, however, that often smaller grids could be used by
         providing the appropriate options in ``gridding_opts`` or directly
         providing your own computational grids.
+
+    .. note::
+
+        The package ``xarray`` has to be installed in order to use
+        ``Simulation``:
+        ``pip install xarray`` or ``conda install -c conda-forge xarray``.
 
 
     Parameters

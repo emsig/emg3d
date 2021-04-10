@@ -20,7 +20,7 @@ Utility functions for the multigrid solver.
 import copy
 import warnings
 import importlib
-from timeit import default_timer
+from time import perf_counter
 from datetime import datetime, timedelta
 from concurrent.futures import ProcessPoolExecutor
 
@@ -30,7 +30,7 @@ try:
     from scooby import Report as ScoobyReport
 except ImportError:
     class ScoobyReport:
-        pass
+        """Dummy placeholder."""
 
 try:
     import tqdm
@@ -51,20 +51,19 @@ except ImportError:
     # properly!
     __version__ = 'unknown-'+datetime.today().strftime('%Y%m%d')
 
-__all__ = ['Time', 'Report', 'EMArray']
+__all__ = ['Report', 'EMArray', 'Timer']
 
 
-# List of known classes for (de-)serialization
-KNOWN_CLASSES = {}
+# PRIVATE UTILS
+_KNOWN_CLASSES = {}  # List of known classes for (de-)serialization
 
 
-def known_class(func):
+def _known_class(func):
     """Decorator to register class as known for I/O."""
-    KNOWN_CLASSES[func.__name__] = func
+    _KNOWN_CLASSES[func.__name__] = func
     return func
 
 
-# SOFT DEPENDENCIES CHECK
 def _requires(*args, **kwargs):
     """Decorator to wrap functions with extra dependencies.
 
@@ -78,7 +77,7 @@ def _requires(*args, **kwargs):
     args : list
         Strings containing the modules to import.
 
-    verbose : bool
+    requires_verbose : bool
         If True (default) print a warning message on import failure.
 
 
@@ -87,6 +86,7 @@ def _requires(*args, **kwargs):
     out : func
         Original function if all modules are importable, otherwise returns a
         function that passes.
+
     """
     def simport(modname):
         """Safely import a module without raising an error."""
@@ -95,21 +95,21 @@ def _requires(*args, **kwargs):
         except ImportError:
             return False, None
 
-    v = kwargs.pop('verbose', True)
-    wanted = copy.deepcopy(args)
-
     def inner(function):
         available = [simport(arg)[0] for arg in args]
         if all(available):
             return function
         else:
+            verbose = kwargs.pop('requires_verbose', True)
+            wanted = copy.deepcopy(args)
+
             def passer(*args, **kwargs):
-                if v:
+                if verbose:
                     missing = [arg for i, arg in enumerate(wanted)
                                if not available[i]]
                     # Print is always shown and simpler, warn for the CLI logs.
-                    msg = ("This feature of `emg3d` requires the following,"
-                           f" missing soft dependencies: {missing}.")
+                    msg = ("This feature of emg3d requires the missing "
+                           f"soft dependencies {missing}.")
                     print(f"* WARNING :: {msg}")
                     warnings.warn(msg, UserWarning)
             return passer
@@ -117,29 +117,127 @@ def _requires(*args, **kwargs):
     return inner
 
 
-# EMArray
-class EMArray(np.ndarray):
-    r"""Create an EM-ndarray: add *amplitude* <amp> and *phase* <pha> methods.
+def _process_map(fn, *iterables, max_workers, **kwargs):
+    """Dispatch processes in parallel or not, using tqdm or not.
+
+    :class:`emg3d.simulations.Simulation` uses the function
+    ``tqdm.contrib.concurrent.process_map`` to run jobs asynchronously.
+    However, ``tqdm`` is a soft dependency. In case it is not installed we use
+    the class ``concurrent.futures.ProcessPoolExecutor`` directly, from the
+    standard library, and imitate the behaviour of process_map (basically a
+    ``ProcessPoolExecutor.map``, returned as a list, and wrapped in a context
+    manager). If max_workers is smaller than two then we we avoid parallel
+    execution.
+
+    """
+    # Parallel
+    if max_workers > 1 and tqdm is None:
+        with ProcessPoolExecutor(max_workers=max_workers) as ex:
+            return list(ex.map(fn, *iterables))
+
+    # Parallel with tqdm
+    elif max_workers > 1:
+        return tqdm.contrib.concurrent.process_map(
+                fn, *iterables, max_workers=max_workers, **kwargs)
+
+    # Sequential
+    elif tqdm is None:
+        return list(map(fn, *iterables))
+
+    # Sequential with tqdm
+    else:
+        return list(tqdm.auto.tqdm(
+            iterable=map(fn, *iterables), total=len(iterables[0]), **kwargs))
+
+
+# PUBLIC UTILS
+@_requires('scooby')
+class Report(ScoobyReport):
+    r"""Print date, time, and version information.
+
+    Use ``scooby`` to print date, time, and package version information in any
+    environment (Jupyter notebook, IPython console, Python console, QT
+    console), either as html-table (notebook) or as plain text (anywhere).
+
+    Always shown are the OS, number of CPU(s), ``numpy``, ``scipy``, ``emg3d``,
+    ``numba``, ``sys.version``, and time/date.
+
+    Additionally shown are, if they can be imported, ``IPython``,
+    ``matplotlib``, and all soft dependencies of ``emg3d``. It also shows MKL
+    information, if available.
+
+    All modules provided in ``add_pckg`` are also shown.
+
+    .. note::
+
+        The package ``scooby`` has to be installed in order to use ``Report``:
+        ``pip install scooby`` or ``conda install -c conda-forge scooby``.
+
 
     Parameters
     ----------
-    data : array
-        Data to which to add `.amp` and `.pha` attributes.
+    add_pckg : {package, str}, default: None
+        Package or list of packages to add to output information (must be
+        imported beforehand or provided as string).
+
+    ncol : int, default: 3
+        Number of package-columns in html table (no effect in text-version).
+
+    text_width : int, default: 80
+        The text width for non-HTML display modes
+
+    sort : bool, default: False
+        Sort the packages when the report is shown
+
+    """
+
+    def __init__(self, add_pckg=None, ncol=3, text_width=80, sort=False):
+        """Initiate a scooby.Report instance."""
+
+        # Mandatory packages.
+        core = ['numpy', 'scipy', 'numba', 'emg3d']
+
+        # Optional packages.
+        optional = ['empymod', 'xarray', 'discretize', 'h5py', 'matplotlib',
+                    'tqdm', 'IPython']
+
+        super().__init__(additional=add_pckg, core=core, optional=optional,
+                         ncol=ncol, text_width=text_width, sort=sort)
+
+
+class EMArray(np.ndarray):
+    r"""An EM-ndarray adds the methods `amp` (amplitude) and `pha` (phase).
+
+    Parameters
+    ----------
+    data : ndarray
+        Data to which to add ``.amp`` and ``.pha`` attributes.
 
 
     Examples
     --------
-    >>> import numpy as np
-    >>> from empymod.utils import EMArray
-    >>> emvalues = EMArray(np.array([1+1j, 1-4j, -1+2j]))
-    >>> print(f"Amplitude         : {emvalues.amp()}")
-    Amplitude         : [1.41421356 4.12310563 2.23606798]
-    >>> print(f"Phase (rad)       : {emvalues.pha()}")
-    Phase (rad)       : [ 0.78539816 -1.32581766 -4.24874137]
-    >>> print(f"Phase (deg)       : {emvalues.pha(deg=True)}")
-    Phase (deg)       : [  45.          -75.96375653 -243.43494882]
-    >>> print(f"Phase (deg; lead) : {emvalues.pha(deg=True, lag=False)}")
-    Phase (deg; lead) : [-45.          75.96375653 243.43494882]
+
+    .. ipython::
+
+       In [1]: import numpy as np
+          ...: from empymod.utils import EMArray
+          ...: emvalues = EMArray(np.array([1+1j, 1-4j, -1+2j]))
+
+       # Amplitudes
+       In [2]: emvalues.amp()
+       Out[2]: EMArray([1.41421356, 4.12310563, 2.23606798])
+
+       # Phase in radians
+       In [3]: emvalues.pha()
+       Out[3]: EMArray([ 0.78539816, -1.32581766, -4.24874137])
+
+       # Phase in degrees
+       In [4]: emvalues.pha(deg=True)
+       Out[4]: EMArray([  45.        ,  -75.96375653, -243.43494882])
+
+       # Phase in degrees, lead defined
+       In [5]: emvalues.pha(deg=True, lag=False)
+       Out[5]: EMArray([-45.        ,  75.96375653, 243.43494882])
 
     """
 
@@ -156,17 +254,14 @@ class EMArray(np.ndarray):
 
         Parameters
         ----------
-        deg : bool
-            If True the returned phase is in degrees, else in radians.
-            Default is False (radians).
+        deg : bool, default: False
+            The returned phase is in degrees if True, else in radians.
 
-        unwrap : bool
-            If True the returned phase is unwrapped.
-            Default is True (unwrapped).
+        unwrap : bool, default: True
+            The returned phase is unwrapped if True.
 
-        lag : bool
-            If True the returned phase is lag, else lead defined.
-            Default is True (lag defined).
+        lag : bool, default: True
+            The returned phase is lag defined if True, else lead defined.
 
         """
         # Get phase, lead or lag defined.
@@ -188,13 +283,12 @@ class EMArray(np.ndarray):
         return pha
 
 
-# TIMING AND REPORTING
-class Time:
+class Timer:
     """Class for timing (now; runtime)."""
 
     def __init__(self):
-        """Initialize time zero (t0) with current time stamp."""
-        self._t0 = default_timer()
+        """Initiate timer with a performance counter."""
+        self._t0 = perf_counter()
 
     def __repr__(self):
         """Simple representation."""
@@ -207,112 +301,15 @@ class Time:
 
     @property
     def now(self):
-        """Return string of current time."""
+        """Return current time as hh:mm:ss string."""
         return datetime.now().strftime("%H:%M:%S")
 
     @property
     def runtime(self):
-        """Return string of runtime since time zero."""
+        """Return elapsed time as hh:mm:ss string."""
         return str(timedelta(seconds=np.round(self.elapsed)))
 
     @property
     def elapsed(self):
-        """Return runtime in seconds since time zero."""
-        return default_timer() - self._t0
-
-
-@_requires('scooby')
-class Report(ScoobyReport):
-    r"""Print date, time, and version information.
-
-    Use `scooby` to print date, time, and package version information in any
-    environment (Jupyter notebook, IPython console, Python console, QT
-    console), either as html-table (notebook) or as plain text (anywhere).
-
-    Always shown are the OS, number of CPU(s), `numpy`, `scipy`, `emg3d`,
-    `numba`, `sys.version`, and time/date.
-
-    Additionally shown are, if they can be imported, `IPython` and
-    `matplotlib`. It also shows MKL information, if available.
-
-    All modules provided in `add_pckg` are also shown.
-
-    .. note::
-
-        The package `scooby` has to be installed in order to use `Report`:
-        ``pip install scooby``.
-
-
-    Parameters
-    ----------
-    add_pckg : packages, optional
-        Package or list of packages to add to output information (must be
-        imported beforehand).
-
-    ncol : int, optional
-        Number of package-columns in html table (no effect in text-version);
-        Defaults to 3.
-
-    text_width : int, optional
-        The text width for non-HTML display modes
-
-    sort : bool, optional
-        Sort the packages when the report is shown
-
-
-    Examples
-    --------
-    >>> import pytest
-    >>> import dateutil
-    >>> from emg3d import Report
-    >>> Report()                            # Default values
-    >>> Report(pytest)                      # Provide additional package
-    >>> Report([pytest, dateutil], ncol=5)  # Set nr of columns
-
-    """
-
-    def __init__(self, add_pckg=None, ncol=3, text_width=80, sort=False):
-        """Initiate a scooby.Report instance."""
-
-        # Mandatory packages.
-        core = ['numpy', 'scipy', 'numba', 'emg3d']
-
-        # Optional packages.
-        optional = ['empymod', 'xarray', 'discretize', 'h5py', 'matplotlib',
-                    'tqdm', 'IPython']
-
-        super().__init__(additional=add_pckg, core=core, optional=optional,
-                         ncol=ncol, text_width=text_width, sort=sort)
-
-
-# MISC
-def _process_map(fn, *iterables, max_workers, **kwargs):
-    """Dispatch processes in parallel or not, using tqdm or not.
-
-    :class:``emg3d.simulations.Simulation`` uses ``process_map`` from ``tqdm``
-    to run jobs asynchronously. However, ``tqdm`` is a soft dependency. In case
-    it is not installed we use ``concurrent.futures.ProcessPoolExecutor``
-    directly, from the standard library, and imitate the behaviour of
-    process_map (basically a ``ProcessPoolExecutor.map``, returned as a list,
-    and wrapped in a context manager). If max_workers is smaller than two then
-    we we avoid parallel execution.
-
-    """
-    # Parallel
-    if max_workers > 1 and tqdm is None:
-        with ProcessPoolExecutor(max_workers=max_workers) as ex:
-            return list(ex.map(fn, *iterables))
-
-    # Parallel with tqdm
-    elif max_workers > 1:
-        kwargs['max_workers'] = max_workers
-        return tqdm.contrib.concurrent.process_map(fn, *iterables, **kwargs)
-
-    # Sequential
-    elif tqdm is None:
-        return list(map(fn, *iterables))
-
-    # Sequential with tqdm
-    else:
-        return list(tqdm.auto.tqdm(
-            iterable=map(fn, *iterables), total=len(iterables[0]), **kwargs))
+        """Return elapsed time in seconds."""
+        return perf_counter() - self._t0
