@@ -212,7 +212,7 @@ def test_dict_flatten_unflatten():
 
 
 def test_dict_dearray_decomp_array_comp():
-    d1 = np.arange(2*3*4).reshape((2, 3, 4))
+    d1 = np.arange(2*3*4, dtype=np.int64).reshape((2, 3, 4))
     d2 = np.arange(10) + 1j*np.arange(10)[::-1]
     orig = {'d1': d1, 'd3': {'d2': d2}}
 
