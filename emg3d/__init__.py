@@ -24,4 +24,5 @@ from emg3d.models import Model
 from emg3d.simulations import Simulation
 from emg3d.solver import solve, solve_source
 from emg3d.surveys import Survey
-from emg3d.utils import Report, Fourier, __version__
+from emg3d.time import Fourier
+from emg3d.utils import Report, __version__

@@ -66,6 +66,10 @@ References
    multigrid solver for 3D electromagnetic diffusion: Journal of Open Source
    Software, 4(39), 1463;
    DOI: `10.21105/joss.01463 <https://doi.org/10.21105/joss.01463>`_.
+.. [WeMS21] Werthmüller, D., W. A. Mulder, and E. C. Slob, 2021, Fast Fourier
+   transformation of electromagnetic data for computationally expensive
+   kernels: Submitted to Geophysical Journal International;
+   `github.com/emsig/article-TDEM <https://github.com/emsig/article-TDEM>`_.
 .. [Wess91] Wesseling, P., 1991, An introduction to multigrid methods: John
    Wiley & Sons. Pure and Applied Mathematics; ISBN: 0-471-93083-0.
 .. [WiMS10] Wirianto, M., W. A. Mulder, and E. C. Slob, 2010, A feasibility
