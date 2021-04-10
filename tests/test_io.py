@@ -1,179 +1,254 @@
 import pytest
 import numpy as np
+from copy import deepcopy
 from numpy.testing import assert_allclose
 
 import emg3d
 from emg3d import io
-
-from . import helpers
 
 # Soft dependencies
 try:
     import h5py
 except ImportError:
     h5py = False
+
 try:
     import xarray
 except ImportError:
     xarray = None
 
 
-def test_save_and_load(tmpdir, capsys):
-
-    # Create some dummy data
-    grid = emg3d.meshes.TensorMesh(
-            [np.array([2, 2]), np.array([3, 4]), np.array([0.5, 2])],
-            np.zeros(3))
-
-    # TODO Add conditional discretize test, if installed
-    # grid2 = discretize.TensorMesh()
-
-    # Some field.
-    field = emg3d.Field(grid)
-    ne = grid.n_edges_x + grid.n_edges_y + grid.n_edges_z
-    field.field = np.arange(ne)+1j*np.ones(ne)
-
-    # Some model.
-    property_x = helpers.dummy_field(*grid.shape_cells, False)
-    property_y = property_x/2.0
-    property_z = property_x*1.4
-    mu_r = property_x*1.11
-    model = emg3d.Model(grid, property_x, property_y, property_z, mu_r=mu_r)
-
-    # Save it.
-    io.save(tmpdir+'/test.npz', emg3d=grid, model=model,  # discretize=grid2,
-            a=None, b=True, field=field, what={'f': field.fx, 12: 12})
-    outstr, _ = capsys.readouterr()
-    assert 'Data saved to «' in outstr
-    assert emg3d.__version__ in outstr
-
-    # Save it with other verbosity.
-    _, _ = capsys.readouterr()
-    io.save(tmpdir+'/testverb.npz', a=None, b=True, verb=0)
-    outstr, _ = capsys.readouterr()
-    assert outstr == ""
-    out = io.save(tmpdir+'/testverb.npz', a=None, b=True, verb=-1)
-    assert 'Data saved to «' in out
-
-    # Load it.
-    out_npz = io.load(str(tmpdir+'/test.npz'), allow_pickle=True)
-    outstr, _ = capsys.readouterr()
-    assert 'Data loaded from «' in outstr
-    assert 'test.npz' in outstr
-    assert emg3d.__version__ in outstr
-
-    assert out_npz['model'] == model
-    assert_allclose(field.fx, out_npz['field'].fx)
-    assert_allclose(grid.cell_volumes, out_npz['emg3d'].cell_volumes)
-    # assert_allclose(grid.cell_volumes, out_npz['discretize'].cell_volumes)
-    assert_allclose(out_npz['what']['f'], field.fx)
-    assert out_npz['b'] is True
-
-    # Load it with other verbosity.
-    _, _ = capsys.readouterr()
-    out = io.load(tmpdir+'/testverb.npz', verb=0)
-    outstr, _ = capsys.readouterr()
-    assert outstr == ""
-    out, out_str = io.load(tmpdir+'/testverb.npz', verb=-1)
-    assert 'Data loaded from «' in out_str
-
-    # Check message from loading another file
-    data = io._dict_serialize({'meshes': grid})
-    fdata = io._dict_flatten(data)
-    del fdata['meshes>hx']
-
-    np.savez_compressed(tmpdir+'/test2.npz', **fdata)
-    with pytest.warns(UserWarning, match="Could not de-serialize"):
-        _ = io.load(str(tmpdir+'/test2.npz'), allow_pickle=True)
-        outstr, _ = capsys.readouterr()
-        assert "[version/format/date unknown; not created by emg3d]." in outstr
-
-    # Unknown keyword.
-    with pytest.raises(TypeError, match="Unexpected "):
-        io.load('ttt.npz', stupidkeyword='a')
-
-    # Unknown extension.
-    with pytest.raises(ValueError, match="Unknown extension '.abc'"):
-        io.save(tmpdir+'/testwrongextension.abc', something=1)
-    with pytest.raises(ValueError, match="Unknown extension '.abc'"):
-        io.load(tmpdir+'/testwrongextension.abc')
-
-    # Test h5py.
-    if h5py:
-        io.save(tmpdir+'/test.h5', emg3d=grid,  # discretize=grid2,
-                a=1.0, b=1+1j, c=True,
-                d=['1', '2', '3'],
-                model=model, field=field, what={'f': field.fx})
-        out_h5 = io.load(str(tmpdir+'/test.h5'))
-        assert out_h5['model'] == model
-        assert out_h5['a'] == 1.0
-        assert out_h5['b'] == 1+1j
-        assert out_h5['c'] is True
-        assert out_h5['d'] == ['1', '2', '3']
-        assert_allclose(field.fx, out_h5['field'].fx)
-        assert_allclose(grid.cell_volumes, out_h5['emg3d'].cell_volumes)
-        # assert_allclose(grid.cell_volumes, out_h5['discretize'].cell_volumes)
-        assert_allclose(out_h5['what']['f'], field.fx)
-
-        # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO
-        # assert helpers.compare_dicts(out_h5, out_npz) is True
-    else:
-        with pytest.raises(ImportError):
-            io.save(tmpdir+'/test.h5', grid=grid)
-        with pytest.raises(ImportError):
-            io.load(str(tmpdir+'/test-h5.h5'))
-
-    # Test json.
-    io.save(tmpdir+'/test.json', emg3d=grid,  # discretize=grid2,
-            a=1.0, b=1+1j, model=model, field=field, what={'f': field.fx})
-    out_json = io.load(str(tmpdir+'/test.json'))
-    assert out_json['model'] == model
-    assert out_json['a'] == 1.0
-    assert out_json['b'] == 1+1j
-    assert_allclose(field.fx, out_json['field'].fx)
-    assert_allclose(grid.cell_volumes, out_json['emg3d'].cell_volumes)
-    # assert_allclose(grid.cell_volumes, out_json['discretize'].cell_volumes)
-    assert_allclose(out_json['what']['f'], field.fx)
-
-    # Currently npz/h5/json DO NOT work the same (tuples, lists,...) TODO
-    # assert helpers.compare_dicts(out_json, out_npz) is True
-
-
-def test_known_classes(tmpdir):
+class TestSaveLoad:
 
     frequency = 1.0
     grid = emg3d.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
     field = emg3d.Field(grid)
     model = emg3d.Model(grid, 1)
-    pointdip = emg3d.TxElectricDipole((0, 1000, -950, 0, 0))
 
-    out = {
-        'TensorMesh': grid,
+    tx_e_d = emg3d.TxElectricDipole((0, 1000, 0, 0, -900, -950))
+    tx_m_d = emg3d.TxMagneticDipole([[0, 0, -900], [1000, 0, -950]])
+    tx_e_w = emg3d.TxElectricWire(([[0, 0, 0], [1, 1, 1], [1, 0, 1]]))
+    rx_e_p = emg3d.RxElectricPoint((0, 1000, -950, 0, 20))
+    rx_m_p = emg3d.RxMagneticPoint((0, 1000, -950, 20, 0))
+
+    a = np.arange(10.)
+    b = 1+5j
+
+    data = {
+        'Grid': grid,
         'Model': model,
         'Field': field,
-        'Dipole': pointdip,
+        'a': a,
+        'b': b,
     }
 
     if xarray:
         survey = emg3d.Survey(
-                emg3d.TxElectricDipole((-0.5, 0.5, 1000, 1000, -950, -950)),
-                emg3d.RxElectricPoint((0, 1000, -950, 0, 0)),
-                frequency)
+            emg3d.surveys.txrx_lists_to_dict([tx_e_d, tx_m_d, tx_e_w]),
+            emg3d.surveys.txrx_lists_to_dict([rx_e_p, rx_m_p]),
+            frequency
+        )
         simulation = emg3d.Simulation(survey, model, gridding='same')
-        out['Survey'] = survey
-        out['Simulation'] = simulation
+        data['Survey'] = survey
+        data['Simulation'] = simulation
 
-    # Simple primitive test to see if it can (de)serialize all known classes.
-    def test_it(ext):
-        io.save(tmpdir+'/test.'+ext, **out)
-        inp = io.load(tmpdir+'/test.'+ext)
-        del inp['_date']
-        del inp['_version']
-        del inp['_format']
-        assert out.keys() == inp.keys()
+    def test_npz(self, tmpdir, capsys):
+        io.save(tmpdir+'/test.npz', **self.data)
+        outstr, _ = capsys.readouterr()
+        assert 'Data saved to «' in outstr
+        assert emg3d.__version__ in outstr
 
-    # Run through all format.
-    test_it('npz')
-    test_it('json')
+        # Save it with other verbosity.
+        _, _ = capsys.readouterr()
+        io.save(tmpdir+'/test.npz', **self.data, verb=0)
+        outstr, _ = capsys.readouterr()
+        assert outstr == ""
+        out = io.save(tmpdir+'/test.npz', **self.data, verb=-1)
+        assert 'Data saved to «' in out
+
+        # Load it.
+        out_npz = io.load(str(tmpdir+'/test.npz'), allow_pickle=True)
+        outstr, _ = capsys.readouterr()
+        assert 'Data loaded from «' in outstr
+        assert 'test.npz' in outstr
+        assert emg3d.__version__ in outstr
+
+        assert out_npz['Model'] == self.model
+        assert_allclose(out_npz['a'], self.a)
+        assert out_npz['b'] == self.b
+        assert_allclose(self.field.fx, out_npz['Field'].fx)
+        assert_allclose(self.grid.cell_volumes, out_npz['Grid'].cell_volumes)
+
+        # Load it with other verbosity.
+        _, _ = capsys.readouterr()
+        out = io.load(tmpdir+'/test.npz', verb=0)
+        outstr, _ = capsys.readouterr()
+        assert outstr == ""
+        out, out_str = io.load(tmpdir+'/test.npz', verb=-1)
+        assert 'Data loaded from «' in out_str
+
+    def test_h5(self, tmpdir):
+        if h5py:
+            io.save(tmpdir+'/test.h5', **self.data)
+            out_h5 = io.load(str(tmpdir+'/test.h5'))
+            assert out_h5['Model'] == self.model
+            assert_allclose(out_h5['a'], self.a)
+            assert out_h5['b'] == self.b
+            assert_allclose(self.field.fx, out_h5['Field'].fx)
+            assert_allclose(self.grid.cell_volumes,
+                            out_h5['Grid'].cell_volumes)
+
+        else:
+            with pytest.warns(UserWarning, match='feature of emg3d requires'):
+                io.save(tmpdir+'/test.h5', grid=self.grid)
+
+    def test_json(self, tmpdir):
+        io.save(tmpdir+'/test.json', **self.data)
+        out_json = io.load(str(tmpdir+'/test.json'))
+        assert out_json['Model'] == self.model
+        assert_allclose(out_json['a'], self.a)
+        assert out_json['b'] == self.b
+        assert_allclose(self.field.fx, out_json['Field'].fx)
+        assert_allclose(self.grid.cell_volumes, out_json['Grid'].cell_volumes)
+
+    def test_warnings(self, tmpdir, capsys):
+        # Check message from loading another file
+        data = io._dict_serialize({'meshes': self.grid})
+        fdata = io._dict_flatten(data)
+        np.savez_compressed(tmpdir+'/test2.npz', **fdata)
+        _ = io.load(str(tmpdir+'/test2.npz'), allow_pickle=True)
+        outstr, _ = capsys.readouterr()
+        assert "[version/format/date unknown; not created by emg" in outstr
+
+        # Unknown keyword.
+        with pytest.raises(TypeError, match="Unexpected "):
+            io.load('ttt.npz', stupidkeyword='a')
+
+        # Unknown extension.
+        with pytest.raises(ValueError, match="Unknown extension '.abc'"):
+            io.save(tmpdir+'/testwrongextension.abc', something=1)
+        with pytest.raises(ValueError, match="Unknown extension '.abc'"):
+            io.load(tmpdir+'/testwrongextension.abc')
+
+
+def test_dict_serialize_deserialize():
+    frequency = 1.0
+    grid = emg3d.TensorMesh([[2, 2], [3, 4], [0.5, 2]], (0, 0, 0))
+    field = emg3d.Field(grid)
+    model = emg3d.Model(grid, 1)
+
+    tx_e_d = emg3d.TxElectricDipole((0, 1000, 0, 0, -900, -950))
+    tx_m_d = emg3d.TxMagneticDipole([[0, 0, -900], [1000, 0, -950]])
+    tx_e_w = emg3d.TxElectricWire(([[0, 0, 0], [1, 1, 1], [1, 0, 1]]))
+    rx_e_p = emg3d.RxElectricPoint((0, 1000, -950, 0, 20))
+    rx_m_p = emg3d.RxMagneticPoint((0, 1000, -950, 20, 0))
+
+    data = {
+        'Grid': grid,
+        'Model': model,
+        'Field': field,
+    }
+
+    if xarray:
+        survey = emg3d.Survey(
+            emg3d.surveys.txrx_lists_to_dict([tx_e_d, tx_m_d, tx_e_w]),
+            emg3d.surveys.txrx_lists_to_dict([rx_e_p, rx_m_p]),
+            frequency
+        )
+        simulation = emg3d.Simulation(survey, model, gridding='same')
+        data['Survey'] = survey
+        data['Simulation'] = simulation
+
+    # Get everything into a serialized dict.
+    out = io._dict_serialize(data)
+
+    # Get everything back.
+    io._nonetype_to_none(out)
+    keep = deepcopy(out)
+    io._dict_deserialize(out)
+
+    assert data.keys() == out.keys()
+    assert out['Field'] == field
+    assert out['Grid'] == grid
+    assert out['Model'] == model
+    if xarray:
+        assert out['Survey'].sources == survey.sources
+        assert (out['Simulation'].survey.receivers ==
+                simulation.survey.receivers)
+
+    del keep['Grid']['hx']
+    with pytest.warns(UserWarning, match="Could not de-serialize"):
+        io._dict_deserialize(keep)
+
+
+def test_nonetype_to_none():
+    orig = {'1': 'NoneType', '2': np.bool_(1),
+            '3': np.array([True, ]),
+            '4': {'5': 'NoneType', '6': np.array(False)}}
+
+    io._nonetype_to_none(orig)
+
+    assert orig['1'] is None
+    assert orig['2'] is True
+    assert orig['3'] is True
+    assert orig['4']['5'] is None
+    assert orig['4']['6'] is False
+
+
+def test_dict_flatten_unflatten():
+    orig = {'one': 1, 'two': {'three': {'four': 4}},
+            'np-string': np.array('test')}  # np-strings are created by npz/h5
+    flat = io._dict_flatten(orig)
+
+    assert flat['one'] == 1
+    assert flat['two>three>four'] == 4
+    assert flat['np-string'].dtype.type == np.str_
+
+    data = io._dict_unflatten(flat)
+    assert data['one'] == 1
+    assert data['two']['three']['four'] == 4
+    assert isinstance(data['np-string'], str)  # A string!
+    assert data['np-string'] == 'test'
+
+
+def test_dict_dearray_decomp_array_comp():
+    d1 = np.arange(2*3*4, dtype=np.int64).reshape((2, 3, 4))
+    d2 = np.arange(10) + 1j*np.arange(10)[::-1]
+    orig = {'d1': d1, 'd3': {'d2': d2}}
+
+    deac = io._dict_dearray_decomp(orig)
+
+    assert isinstance(deac['d1__array-int64'], list)
+    assert isinstance(deac['d3']['d2__complex__array-float64'], list)
+
+    data = io._dict_array_comp(deac)
+
+    assert_allclose(d1, data['d1'])
+    assert_allclose(d2, data['d3']['d2'])
+
+
+def test_hdf5_dump_load(tmpdir):
+    d1 = np.arange(10)
+    d2 = 3
+    d3 = True
+    d4 = 'test'
+    d5 = ['1', '2', '3']
+
+    orig = {'d1': d1, 'd2': d2, 'd3': d3, 'ddict': {'d4': d4}, 'd5': d5}
+
     if h5py:
-        test_it('h5')
+        io._hdf5_dump(fname=str(tmpdir) + 'test.h5',
+                      data=orig, compression='gzip')
+
+        out = io._hdf5_load(fname=str(tmpdir) + 'test.h5')
+
+        assert_allclose(out['d1'], d1)
+        assert out['d2'] == 3
+        assert out['d3']
+        assert out['ddict']['d4'] == 'test'
+        assert out['d5'] == ['1', '2', '3']
+
+    else:
+        with pytest.warns(UserWarning, match='This feature of emg3d requires'):
+            io._hdf5_dump(fname=str(tmpdir) + 'test.h5',
+                          data=orig, compression='gzip')

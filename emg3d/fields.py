@@ -32,7 +32,7 @@ from emg3d import maps, meshes, models, utils, electrodes
 __all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
 
-@utils.known_class
+@utils._known_class
 class Field:
     r"""A Field contains the x-, y-, and z- directed electromagnetic fields.
 
@@ -109,9 +109,10 @@ class Field:
 
         # Store field.
         if data is None:
-            self._field = np.zeros(self._get_prop('n'), dtype=dtype, order='F')
+            field = np.zeros(self._get_prop('n'), dtype=dtype, order='F')
         else:
-            self._field = np.asarray(data, dtype=dtype)
+            field = np.asarray(data, dtype=dtype)
+        self._field = utils.EMArray(field)
 
     def __repr__(self):
         """Simple representation."""
@@ -205,7 +206,7 @@ class Field:
         """
         i1 = self._get_prop('n', 'x')
         shape = self._get_prop('shape', 'x')
-        return utils.EMArray(self._field[:i1]).reshape(shape, order='F')
+        return self._field[:i1].reshape(shape, order='F')
 
     @fx.setter
     def fx(self, fx):
@@ -225,7 +226,7 @@ class Field:
         """
         i0, i1 = self._get_prop('n', 'x'), self._get_prop('n', 'z')
         shape = self._get_prop('shape', 'y')
-        return utils.EMArray(self._field[i0:-i1]).reshape(shape, order='F')
+        return self._field[i0:-i1].reshape(shape, order='F')
 
     @fy.setter
     def fy(self, fy):
@@ -245,7 +246,7 @@ class Field:
         """
         i0 = self._get_prop('n', 'z')
         shape = self._get_prop('shape', 'z')
-        return utils.EMArray(self._field[-i0:].reshape(shape, order='F'))
+        return self._field[-i0:].reshape(shape, order='F')
 
     @fz.setter
     def fz(self, fz):

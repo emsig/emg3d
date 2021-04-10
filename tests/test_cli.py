@@ -31,17 +31,17 @@ class disable_numba(ContextDecorator):
 
 @disable_numba()
 @pytest.mark.script_launch_mode('subprocess')
-def test_basic(script_runner):
+def test_main(script_runner):
 
     # Test the installed version runs by -h.
     ret = script_runner.run('emg3d', '-h')
     assert ret.success
-    assert "emg3d is a multigrid solver for 3D EM diffusion" in ret.stdout
+    assert "Multigrid solver for 3D electromagnetic diffusion." in ret.stdout
 
     # Test the info printed if called without anything.
     ret = script_runner.run('emg3d')
     assert ret.success
-    assert "emg3d is a multigrid solver for 3D EM diffusion" in ret.stdout
+    assert "Multigrid solver for 3D electromagnetic diffusion." in ret.stdout
     assert "emg3d v" in ret.stdout
 
     # Test emg3d/__main__.py by calling the folder emg3d.
@@ -308,9 +308,13 @@ class TestParser:
         assert check['lambda_from_center']
         assert check['mapping'] == 'LnResistivity'
         assert check['vector'] == 'yz'
-        assert check['domain'] == ([-2000.0, 2000.0], None, [-4000.0, 1.111])
+        assert check['domain']['x'] == [-2000.0, 2000.0]
+        assert check['domain']['y'] is None
+        assert check['domain']['z'] == [-4000.0, 1.111]
         assert check['stretching'] == [1.1, 2.0]
-        assert check['min_width_limits'] == ([20, 40], [30, 60], None)
+        assert check['min_width_limits']['x'] == [20, 40]
+        assert check['min_width_limits']['y'] == [30, 60]
+        assert check['min_width_limits']['z'] is None
         assert check['properties'] == [0.3, 1, 2, 3, 4, 5, 6]
         assert check['center'] == [0, 0, -500]
         assert check['cell_number'] == [20, 40, 80, 100]

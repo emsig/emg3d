@@ -26,8 +26,8 @@ API reference
    simulations
    solver
    surveys
+   time
    utils
-   cli
 
 Direct links to the main user-facing functions and classes:
 

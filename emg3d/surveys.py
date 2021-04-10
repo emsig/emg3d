@@ -33,7 +33,7 @@ __all__ = ['Survey', 'txrx_coordinates_to_dict', 'txrx_lists_to_dict',
            'frequencies_to_dict']
 
 
-@utils.known_class
+@utils._known_class
 class Survey:
     """Create a survey containing sources, receivers, and data.
 
@@ -53,6 +53,11 @@ class Survey:
     switch is set to True, the coordinates are relative to the source. This can
     be used to model streamer-based acquisitions such as marine streamers or
     airborne surveys. The two acquisition types can also be mixed in a survey.
+
+    .. note::
+
+        The package ``xarray`` has to be installed in order to use ``Survey``:
+        ``pip install xarray`` or ``conda install -c conda-forge xarray``.
 
 
     Parameters

@@ -20,6 +20,7 @@ Various:
 - Removed all deprecated features.
 - Reduced top namespace to principal functions.
 - emsig.github.io to emsig.xyz.
+- Changed from ``master`` to ``main``.
 
 
 Version 1 and API stability
@@ -229,6 +230,24 @@ Detailed changes
 
 - ``Dipole``: Replaced by the new source and receiver classes in the new module
   ``electrodes``.
+
+**Time**
+
+Move ``Fourier`` from ``emg3d.utils`` to its own module ``emg3d.time``.
+
+- Renamed parameters:
+
+  - ``freq_req`` to ``freq_required``;
+  - ``freq_calc`` to ``freq_compute``;
+  - ``freq_calc_i`` to ``ifreq_compute``;
+  - ``freq_inp`` to ``input_freq``;
+  - ``freq_extrapolate_i`` to ``ifreq_extrapolate``;
+  - ``freq_interpolate_i`` to ``ifreq_interpolate``;
+
+
+**Utils**
+
+Renamed ``Time`` to ``Timer``.
 
 
 0.x-Series

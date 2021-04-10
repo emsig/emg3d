@@ -43,7 +43,7 @@ def parse_config_file(args_dict):
     configfile = os.path.abspath(config)
     cfg = configparser.ConfigParser(inline_comment_prefixes='#')
 
-    # Check if configfile is actually a file.
+    # Check if config-file is actually a file.
     if os.path.isfile(configfile):
 
         # If it is, read it.
@@ -283,7 +283,7 @@ def parse_config_file(args_dict):
                 if len(out) == 1:
                     out = out[0]
                 else:
-                    out = tuple(out)
+                    out = {'x': out[0], 'y': out[1], 'z': out[2]}
                 grid[key] = out
 
         # Check for strings.
