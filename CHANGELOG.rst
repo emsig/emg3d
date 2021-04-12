@@ -29,6 +29,8 @@ Version 1 and API stability
 TODO: What is stable (most), what is still *experimental* (``time.Fourier``,
 ``optimize``).
 
+Change data: https://gist.github.com/prisae/8345c3798e35f1c73efef617ac495538
+
 
 Detailed changes
 ''''''''''''''''
