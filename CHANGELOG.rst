@@ -26,7 +26,7 @@ Various:
 Version 1 and API stability
 '''''''''''''''''''''''''''
 
-TODO: What is stable (most), what is still *experimental* (``utils.Fourier``,
+TODO: What is stable (most), what is still *experimental* (``time.Fourier``,
 ``optimize``).
 
 
@@ -205,7 +205,7 @@ Detailed changes
 
   - ``frequencies`` is new a dict just like ``sources`` and ``receivers``.
   - ``sources`` and ``receivers`` must be tuples or dicts; lists are no longer
-    permitted. TODO: This will probably reduce to dicts only.
+    permitted.
   - Has no attribute ``observed`` any longer; access it just like any other
     data through ``Survey.data.observed``.
   - ``name`` is new optional.

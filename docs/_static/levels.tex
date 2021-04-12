@@ -1,0 +1,114 @@
+\documentclass[dvipsnames, tikz, border=5pt, 12pt]{standalone}
+\usetikzlibrary{arrows.meta,shapes, positioning, fit, backgrounds}
+
+% To create the figures (must have pdf2svg installed):
+% > pdf2svg levels.pdf levels%d.svg all
+
+\begin{document}
+
+\pgfdeclarelayer{background}
+\pgfdeclarelayer{bg}
+\pgfsetlayers{background, bg, main}
+
+\tikzstyle{class} = [draw, thin, fill=SeaGreen]
+\tikzstyle{array} = [draw, thin, fill=Turquoise]
+\tikzstyle{xuser} = [ellipse, draw, thin, fill=Orange]
+\tikzstyle{fuser} = [ellipse, draw, thin, fill=OrangeRed, font=\large\bfseries]
+\tikzstyle{arrow} = [draw=Blue, thick, arrows={-Stealth[length=8pt, sep=5pt]}]
+\tikzstyle{box} = [draw=Blue, fill=Blue!5, thick, dotted]
+\tikzstyle{title} = [above=1em, font=\Large\bfseries]
+\tikzstyle{bgframe} = [framed, background rectangle/.style={draw=black, thick, top color=white, rounded corners}]
+
+\begin{tikzpicture}[bgframe]
+
+  \node [fuser] (simulation) {Simulation};
+  \node (o1) [below=of simulation] {Responses at receivers};
+  \node at (o1) [below=.65em] {Misfit};
+  \node at (o1) [below=2em] {Gradient of misfit function};
+
+  \node [xuser] (model) [above left =of simulation] {Model};
+  \node [class] (grid) [above=of model] {Grid};
+  \node [array] (properties) [above left=of model] {properties};
+
+  \draw [arrow]
+    (grid) edge (model)
+    (properties) edge (model);
+
+  \node [xuser] (survey) [above right=of simulation] {Survey};
+  \node [class] (tx) [above left=of survey] {Tx*};
+  \node [class] (rx) [above=of survey]  {Rx*};
+  \node [array] (frequencies) [above right=of survey] {frequencies};
+  \node [array] (data) [right=of survey] {data};
+
+  \draw [arrow]
+    (tx) edge (survey)
+    (rx) edge (survey)
+    (frequencies) edge (survey)
+    (data) edge (survey);
+
+  \begin{pgfonlayer}{bg}
+    \node[box,fit=(properties) (model) (grid)] () {};
+    \node[box,fit=(tx) (rx) (frequencies) (data) (survey)] () {};
+  \end{pgfonlayer}{bg}
+
+  \draw [arrow]
+    (simulation) edge (o1)
+    (survey) edge (simulation)
+    (model) edge (simulation);
+
+    \node[title] at (current bounding box.north) {Simulation Level};
+\end{tikzpicture}
+
+
+\begin{tikzpicture}[bgframe]
+
+  \node [fuser] (solver) {\texttt{x =} solve(\texttt{A, b})};
+  \node (o1) [below=of solver] {Electric field (\texttt{x})};
+
+  \node [xuser] (model) [above left =of solver] {Model (\texttt{A})};
+  \node [class] (grid) at (solver) [above=3cm] {Grid};
+  \node [array] (properties) [above=of model] {properties};
+
+  \draw [arrow]
+    (grid) edge (model)
+    (properties) edge (model);
+
+  \node [xuser] (field) [above right=of solver] {Field (\texttt{b})};
+  \node [class] (tx) [above=of field] {Tx*};
+  \node [array] (frequencies) [above right=of field] {frequencies};
+
+  \draw [arrow]
+    (grid) edge (field)
+    (tx) edge (field)
+    (frequencies) edge (field);
+
+  \begin{pgfonlayer}{bg}
+    \node[box,fit=(properties) (model)] () {};
+    \node[box,fit=(tx) (frequencies) (field)] () {};
+  \end{pgfonlayer}{bg}
+
+  \draw [arrow]
+    (solver) edge (o1)
+    (field) edge (solver)
+    (model) edge (solver);
+
+    \node[title] at (current bounding box.north) {Solver Level (\texttt{Ax=b})};
+\end{tikzpicture}
+
+
+\begin{tikzpicture}[bgframe]
+
+  \node [fuser] (solver) {\texttt{> emg3d config.cfg}};
+  \node [array] (model) at (solver) [above left=2cm] {Model-file};
+  \node [array] (survey) at (solver) [above right=2cm] {Survey-file};
+  \node [array] (out) [below=of solver] {Output-file};
+
+  \draw [arrow]
+    (solver) edge (out)
+    (survey) edge (solver)
+    (model) edge (solver);
+
+    \node[title] at (current bounding box.north) {CLI Level};
+\end{tikzpicture}
+
+\end{document}
