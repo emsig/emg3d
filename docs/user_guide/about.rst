@@ -95,6 +95,20 @@ The solver level is the core of emg3d: It solves Maxwell's equations for the
 provided subsurface model and the provided source field using the multigrid
 method, returning the resulting electric field.
 
+The function :func:`emg3d.solver.solve_source` simplifies the solver scheme. It
+takes a model, a source, and a frequency, avoiding the need to generate the
+source field manually, as shown in :numref:`Figure %s <solver-source-level>`.
+
+.. figure:: ../_static/levels4.svg
+   :align: center
+   :alt: Solver-source level usage
+   :name: solver-source-level
+
+   Simplified solver-level workflow: The **solve_source** function requires a
+   **Model**, a **Source**, and a **frequency**. It generates the source field
+   internally, and returns ``x``, the electric field, corresponding to the
+   provided input.
+
 *Note:* This requires only ``emg3d`` (``discretize`` is recommended).
 
 

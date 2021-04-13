@@ -22,11 +22,11 @@
 \begin{tikzpicture}[bgframe]
 
   \node [fuser] (simulation) {Simulation};
-  \node (o1) [below=of simulation] {Responses at receivers};
-  \node at (o1) [below=.65em] {Misfit};
+  \node (o1) [right=of simulation] {Responses at receivers};
+  \node at (o1) [below=.6em] {Misfit};
   \node at (o1) [below=2em] {Gradient of misfit function};
 
-  \node [xuser] (model) [above left =of simulation] {Model};
+  \node [xuser] (model) at (simulation) [above left =1.5 and 1cm] {Model};
   \node [class] (grid) [above=of model] {Grid};
   \node [array] (properties) [above left=of model] {properties};
 
@@ -34,7 +34,7 @@
     (grid) edge (model)
     (properties) edge (model);
 
-  \node [xuser] (survey) [above right=of simulation] {Survey};
+  \node [xuser] (survey) at (simulation) [above right =1.5 and 2.5cm] {Survey};
   \node [class] (tx) [above left=of survey] {Tx*};
   \node [class] (rx) [above=of survey]  {Rx*};
   \node [array] (frequencies) [above right=of survey] {frequencies};
@@ -63,28 +63,28 @@
 \begin{tikzpicture}[bgframe]
 
   \node [fuser] (solver) {\texttt{x =} solve(\texttt{A, b})};
-  \node (o1) [below=of solver] {Electric field (\texttt{x})};
+  \node (o1) [right=of solver] {Electric field (\texttt{x})};
 
-  \node [xuser] (model) [above left =of solver] {Model (\texttt{A})};
-  \node [class] (grid) at (solver) [above=3cm] {Grid};
+  \node [xuser] (model) at (solver) [above left=1.5 and 1cm] {Model (\texttt{A})};
+  \node [class] (grid) at (solver) [above left=3 and -1.1cm] {Grid};
   \node [array] (properties) [above=of model] {properties};
 
   \draw [arrow]
     (grid) edge (model)
     (properties) edge (model);
 
-  \node [xuser] (field) [above right=of solver] {Field (\texttt{b})};
+  \node [xuser] (field) at (solver) [above right=1.5 and 2.0cm] {Field (\texttt{b})};
   \node [class] (tx) [above=of field] {Tx*};
-  \node [array] (frequencies) [above right=of field] {frequencies};
+  \node [array] (frequency) [above right=of field] {frequency};
 
   \draw [arrow]
     (grid) edge (field)
     (tx) edge (field)
-    (frequencies) edge (field);
+    (frequency) edge (field);
 
   \begin{pgfonlayer}{bg}
     \node[box,fit=(properties) (model)] () {};
-    \node[box,fit=(tx) (frequencies) (field)] () {};
+    \node[box,fit=(tx) (frequency) (field)] () {};
   \end{pgfonlayer}{bg}
 
   \draw [arrow]
@@ -109,6 +109,36 @@
     (model) edge (solver);
 
     \node[title] at (current bounding box.north) {CLI Level};
+\end{tikzpicture}
+
+
+\begin{tikzpicture}[bgframe]
+
+  \node [fuser] (solver) {solve\_source};
+  \node (o1) [right=of solver] {Electric field};
+
+  \node [xuser] (model) at (solver) [above left=1.5 and 0cm] {Model};
+  \node [class] (grid) at (model) [above left=1.3 and 1cm] {Grid};
+  \node [array] (properties) at (model) [above right=1.3 and 0cm] {properties};
+
+  \draw [arrow]
+    (grid) edge (model)
+    (properties) edge (model);
+
+  \node [array] (frequency) at (solver) [above right=1.5 and 3cm] {frequency};
+  \node [class] (tx) at (solver) [above right=2.5 and 2cm] {Tx*};
+
+  \begin{pgfonlayer}{bg}
+    \node[box,fit=(properties) (model) (grid)] () {};
+  \end{pgfonlayer}{bg}
+
+  \draw [arrow]
+    (solver) edge (o1)
+    (tx) edge (solver)
+    (frequency) edge (solver)
+    (model) edge (solver);
+
+    \node[title] at (current bounding box.north) {Solver Level (Source)};
 \end{tikzpicture}
 
 \end{document}
