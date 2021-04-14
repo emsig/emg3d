@@ -276,7 +276,10 @@ def test_receiver():
     assert rr.relative is True
 
     assert_allclose(ra.center_abs(s1), ra.center)
+    assert_allclose(ra.coordinates_abs(s1), ra.center)
+
     assert_allclose(rr.center_abs(s1), [1050, -150, 50])
+    assert_allclose(rr.coordinates_abs(s1), [1050, -150, 50])
 
 
 def test_rx_electric_point():
@@ -286,6 +289,10 @@ def test_rx_electric_point():
     assert r1a.relative is True
     r1b = electrodes.RxElectricPoint.from_dict(r1a.to_dict())
     assert r1a == r1b
+
+    s1 = electrodes.TxElectricDipole((10000, 500, 50, 10, 60))
+    assert_allclose(r1a.center_abs(s1), (11200, 444, 73.214))
+    assert_allclose(r1a.coordinates_abs(s1), (11200, 444, 73.214, 368, 15))
 
     r2a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15))
     assert r2a.xtype == 'electric'

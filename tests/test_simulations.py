@@ -417,6 +417,55 @@ class TestSimulation():
         out, _ = capsys.readouterr()
         assert "= Source TxED-1; Frequency 1.0 Hz = CONVERGED" in out
 
+    def test_rel_abs_rec(self):
+        # Sources
+        sources = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.TxElectricDipole, ([0, 100, 200], 0, 0, 0, 0))
+
+        # Abs and rel Receivers
+        a_e_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint, (1000+np.arange(3)*100, 0, -100, 0, 0))
+        r_e_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint, (1000, 0, -100, 0, 0), relative=True)
+        a_h_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxMagneticPoint, (1000+np.arange(3)*100, 0, -100, 0, 0))
+        r_h_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxMagneticPoint, (1000, 0, -100, 0, 0), relative=True)
+        receivers = emg3d.surveys.txrx_lists_to_dict(
+                [a_e_rec, r_e_rec, a_h_rec, r_h_rec])
+
+        # Frequencies
+        frequencies = (1.0)
+
+        survey = emg3d.Survey(
+                sources, receivers, frequencies, name='TestSurv',
+                noise_floor=1e-15, relative_error=0.05)
+
+        # Create a simple grid and model
+        grid = emg3d.TensorMesh(
+                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
+                np.array([-1250, -1250, -2250]))
+        model = emg3d.Model(grid, 1)
+
+        # Create a simulation, compute all fields.
+        simulation = simulations.Simulation(
+                survey, model, name='TestSim', max_workers=1,
+                solver_opts={'maxit': 1, 'verb': 0, 'plain': True},
+                gridding='same')
+
+        simulation.compute()
+
+        # Relative receivers must be same as corresponding absolute receivers
+        assert_allclose(
+            [simulation.data.synthetic[i, i, 0].data for i in range(3)],
+            simulation.data.synthetic[:, 3, 0].data
+        )
+
+        assert_allclose(
+            [simulation.data.synthetic[i, i+4, 0].data for i in range(3)],
+            simulation.data.synthetic[:, 7, 0].data
+        )
+
 
 def test_expand_grid_model():
     grid = emg3d.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))

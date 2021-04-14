@@ -560,6 +560,13 @@ class Receiver(Wire):
         else:
             return self.center
 
+    def coordinates_abs(self, source):
+        """Returns coordinates as absolute positions."""
+        if not hasattr(self, 'azimuth'):
+            return self.center_abs(source)
+        else:
+            return (*self.center_abs(source), self.azimuth, self.elevation)
+
 
 @utils._known_class
 class RxElectricPoint(Receiver, Point):

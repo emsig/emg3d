@@ -714,14 +714,24 @@ class Simulation:
         rec_types = tuple([r.xtype == 'electric'
                            for r in self.survey.receivers.values()])
 
+        # Get absolute coordinates as fct of source.
+        # (Only relevant in case of "relative" receivers.)
+        rl = list(self.survey.receivers.values())
+
+        def rec_coord_tuple(rec_list):
+            """Return abs. coordinates for as a fct of source."""
+            return tuple(np.array(
+                [rl[i].coordinates_abs(self.survey.sources[source])
+                 for i in rec_list]
+            ).T)
+
         # Store electric receivers.
         if rec_types.count(True):
 
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
             resp = self.get_efield(source, freq).get_receiver(
-                    receiver=[list(self.survey.receivers.values())[i]
-                              for i in erec]
+                    receiver=rec_coord_tuple(erec)
             )
 
             # Store the receiver response.
@@ -733,8 +743,7 @@ class Simulation:
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = self.get_hfield(source, freq).get_receiver(
-                    receiver=[list(self.survey.receivers.values())[i]
-                              for i in mrec]
+                    receiver=rec_coord_tuple(mrec)
             )
 
             # Store the receiver response.
@@ -930,10 +939,14 @@ class Simulation:
             else:
                 src_fct = electrodes.TxElectricDipole
 
+            # Get absolute coordinates as fct of source.
+            # (Only relevant in case of "relative" receivers.)
+            coords = rec.coordinates_abs(self.survey.sources[source])
+
             # Get residual field and add it to the total field.
             rfield.field += fields.get_source_field(
                     grid=grid,
-                    source=src_fct(rec.coordinates, strength=strength),
+                    source=src_fct(coords, strength=strength),
                     frequency=freq,
             ).field
 
