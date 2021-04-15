@@ -36,3 +36,4 @@ Direct links to the main user-facing functions and classes:
 - Survey: :class:`emg3d.surveys.Survey`
 - Simulation: :class:`emg3d.simulations.Simulation`
 - Solver: :func:`emg3d.solver.solve`
+- All sources and receivers are in :mod:`emg3d.electrodes`

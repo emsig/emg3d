@@ -1,10 +1,12 @@
+.. _about:
+
 About
 =====
 
-The code ``emg3d`` ([WeMS19]_) is a three-dimensional modeller for
+The code ``emg3d`` [WeMS19]_ is a three-dimensional modeller for
 electromagnetic (EM) diffusion as used, for instance, in controlled-source EM
-(CSEM) surveys frequently applied in the search for, amongst other,
-groundwater, geothermal sources, hydrocarbons, and minerals.
+(CSEM) surveys frequently applied in the search for resources such as
+groundwater, geothermal energy, hydrocarbons, and minerals.
 
 The core of the code is primarily based on [Muld06]_, [Muld07]_, and [Muld08]_.
 You can read more about the background of the code in the chapter
@@ -21,7 +23,7 @@ What is emg3d? (Features)
 -------------------------
 
 - A community driven, open-source 3D CSEM modelling tool.
-- It can handle **entire surveys** with **many sources, receivers, and
+- Can handle **entire surveys** with **many sources, receivers, and
   frequencies**, computing the solution in **parallel**.
 - Can model electric and magnetic dipoles and arbitrarily shaped electric
   wires.
@@ -39,7 +41,7 @@ What is emg3d? (Features)
   **Laplace domain**. Includes routines to compute the 3D EM field in the
   **time domain**.
 - **Command-line interface (CLI)**, through which emg3d can be used as forward
-  modelling kernel in inversion routines.
+  modelling kernel in inversion routines written in any language.
 
 
 What is it _not_?
@@ -49,98 +51,44 @@ What is it _not_?
 - Some knowledge of EM fields is definitely helpful, as GIGO applies («garbage
   in, garbage out»). For example, placing your receivers very close to the
   computational boundary *will* result in bad or wrong responses.
+- It is not a model builder; there are other tools that can be used to generate
+  complex geological models, e.g., `GemPy <https://www.gempy.org>`_.
 
 
-Usages
-------
+Related ecosystem
+-----------------
+
+To create advanced meshes it is recommended to use `discretize
+<https://discretize.simpeg.xyz>`_ from the `SimPEG <https://simpeg.xyz>`_
+framework. It also comes with some neat plotting functionalities to plot model
+parameters and resulting fields. Furthermore, it can serve as a link to use
+`PyVista <https://docs.pyvista.org>`_ to create nice 3D plots even within a
+notebook.
+
+`EMSiG <https://emsig.xyz>`_ with its codes `empymod
+<https://empymod.emsig.xyz>`_ and `emg3d <https://emsig.emsig.xyz>`_ is part
+of a bigger, fast growing, open-source **EM & Potential Geo-Exploration Python
+Ecosystem**:
+
+----
+
+.. raw:: html
+
+   <a href=https://pygimli.org><img src="https://www.pygimli.org/_static/gimli_logo.svg" style="max-height: 2cm;"></a>
+
+   <a href=https://simpeg.xyz><img src="https://raw.github.com/simpeg/simpeg/master/docs/images/simpeg-logo.png" style="max-height: 2.5cm;"></a>
+
+   <a href=http://petgem.bsc.es><img src="http://petgem.bsc.es/_static/figures/petgem_logo.png" style="max-height: 3cm;"></a>
+
+   <a href=https://gitlab.com/Rochlitz.R/custEM><img src="https://custem.readthedocs.io/en/latest/_static/custEMlogo.png" style="max-height: 1.5cm;"></a>
+
+   <a href=https://docs.pyvista.org><img src="https://raw.githubusercontent.com/pyvista/pyvista/master/docs/_static/pyvista_logo_sm.png" style="max-height: 2.5cm;"></a>
+
+   <a href=https://www.gempy.org><img src="https://raw.githubusercontent.com/cgre-aachen/gempy/master/docs/logos/gempy1.png" style="max-height: 2.5cm;"></a>
+
+   <a href=https://www.fatiando.org><img src="https://raw.githubusercontent.com/fatiando/logo/master/fatiando-logo-background.png" style="max-height: 3cm;"></a>
 
 
-Simulations / High-level usage
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----
 
-.. figure:: ../_static/levels1.svg
-   :align: center
-   :alt: High-level usage
-   :name: high-level
-
-   Workflow for the high-level usage: A **Simulation** needs a **Model** and a
-   **Survey**. A survey contains all acquisition parameters such as sources,
-   receivers, frequencies, and data, if available. A model contains the
-   subsurface properties such as conductivities or resistivities, and the grid
-   information.
-
-Simulate responses for electric and magnetic receivers due to electric and
-magnetic sources, in parallel. If data is provided it can also compute the
-misfit and the gradient of the misfit function. It includes automatic, source
-and frequency dependent gridding.
-
-*Note:* In addition to ``emg3d`` this requires the soft dependency ``xarray``
-(``tqdm`` and ``discretize`` are recommended).
-
-
-Solver-level usage
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. figure:: ../_static/levels2.svg
-   :align: center
-   :alt: Solver-level usage
-   :name: solver-level
-
-   Workflow for the solver-level usage: The **solve** function requires a
-   **Model** ``A`` and a Source-**Field** ``b``. It then solves ``Ax=b`` and
-   returns ``x``, the electric field, corresponding to the provided subsurface
-   model and source field.
-
-The solver level is the core of emg3d: It solves Maxwell's equations for the
-provided subsurface model and the provided source field using the multigrid
-method, returning the resulting electric field.
-
-The function :func:`emg3d.solver.solve_source` simplifies the solver scheme. It
-takes a model, a source, and a frequency, avoiding the need to generate the
-source field manually, as shown in :numref:`Figure %s <solver-source-level>`.
-
-.. figure:: ../_static/levels4.svg
-   :align: center
-   :alt: Solver-source level usage
-   :name: solver-source-level
-
-   Simplified solver-level workflow: The **solve_source** function requires a
-   **Model**, a **Source**, and a **frequency**. It generates the source field
-   internally, and returns ``x``, the electric field, corresponding to the
-   provided input.
-
-*Note:* This requires only ``emg3d`` (``discretize`` is recommended).
-
-
-Command-line interface (CLI-level)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. figure:: ../_static/levels3.svg
-   :align: center
-   :alt: CLI-level usage
-   :name: cli-level
-
-   CLI-level usage: file-driven command-line usage of the high-level
-   (Simulation) functionality of emg3d.
-
-The command-line interface is a terminal utility for the high-level
-(Simulation) usage of emg3d. The model and the survey have to be provided as
-files (HDF5, npz, or json), various settings can be defined in the config file,
-and the output will be written to the output file.
-
-*Note:* In addition to ``emg3d`` this requires the soft dependency ``xarray``
-(``tqdm`` and ``discretize`` are recommended), and ``h5py`` if the provided
-files are in the HDF5 format.
-
-
-Time-domain modelling
-~~~~~~~~~~~~~~~~~~~~~
-
-Time-domain modelling with emg3d is possible, but it is not implemented in the
-high-level class ``Simulation``. It has to be carried out by using
-:class:`emg3d.time.Fourier`, together with the Solver-level usage mentioned
-above. Have a look at the repo https://github.com/emsig/article-TDEM.
-
-
-*Note:* In addition to ``emg3d`` this requires the soft dependency ``empymod``
-(``discretize`` is recommended).
+.

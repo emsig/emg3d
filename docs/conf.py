@@ -12,7 +12,7 @@ extensions = [
     'sphinx.ext.mathjax',
     # 'sphinx.ext.viewcode',
     # 'sphinx.ext.doctest',
-    # 'sphinx.ext.todo',
+    'sphinx.ext.todo',
     'sphinx_automodapi.automodapi',
     'matplotlib.sphinxext.plot_directive',
     'IPython.sphinxext.ipython_console_highlighting',
@@ -78,7 +78,7 @@ html_favicon = '_static/favicon.ico'
 html_theme_options = {
     "github_url": "https://github.com/emsig/emg3d",
     "external_links": [
-        {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery"},
+        {"name": "Gallery", "url": "https://dev1.emsig.xyz/gallery"},
         {"name": "EMSiG", "url": "https://emsig.xyz"},
     ],
     # "use_edit_page_button": True,

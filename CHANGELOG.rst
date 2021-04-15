@@ -147,6 +147,8 @@ Detailed changes
     cannot be added afterwards. However, it can be initiated with dummy values
     and adjusted later.
 
+  - Renamed ``interpolate2grid`` to ``interpolate_to_grid``.
+
 
 **Solver**
 
@@ -250,6 +252,11 @@ Move ``Fourier`` from ``emg3d.utils`` to its own module ``emg3d.time``.
 **Utils**
 
 Renamed ``Time`` to ``Timer``.
+
+**CLI**
+
+Because frequencies are now dicts as well in a Survey they have to be named
+by their key instead of their value when selecting data in the parameter file.
 
 
 0.x-Series
