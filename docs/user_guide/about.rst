@@ -66,7 +66,7 @@ parameters and resulting fields. Furthermore, it can serve as a link to use
 notebook.
 
 `EMSiG <https://emsig.xyz>`_ with its codes `empymod
-<https://empymod.emsig.xyz>`_ and `emg3d <https://emsig.emsig.xyz>`_ is part
+<https://empymod.emsig.xyz>`_ and `emg3d <https://emg3d.emsig.xyz>`_ is part
 of a bigger, fast growing, open-source **EM & Potential Geo-Exploration Python
 Ecosystem**:
 
