@@ -30,5 +30,5 @@ A multigrid solver for 3D electromagnetic diffusion in Python.
 - **Zenodo:** https://doi.org/10.5281/zenodo.3229006
 
 
-Consult the `documentation <https://emg3d.emsig.xyz>`_ for installation
-instructions, which is generally the best way to get started using emg3d.
+Available through ``conda`` and ``pip``; consult the `documentation
+<https://emg3d.emsig.xyz>`_ for detailed installation instructions.

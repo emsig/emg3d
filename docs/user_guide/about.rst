@@ -84,7 +84,7 @@ Ecosystem**:
 
    <a href=https://docs.pyvista.org><img src="https://raw.githubusercontent.com/pyvista/pyvista/master/docs/_static/pyvista_logo_sm.png" style="max-height: 2.5cm;"></a>
 
-   <a href=https://www.gempy.org><img src="https://raw.githubusercontent.com/cgre-aachen/gempy/master/docs/logos/gempy1.png" style="max-height: 2.5cm;"></a>
+   <a href=https://www.gempy.org><img src="https://raw.githubusercontent.com/cgre-aachen/gempy/master/docs/source/_static/logos/gempy.png" style="max-height: 2.5cm;"></a>
 
    <a href=https://www.fatiando.org><img src="https://raw.githubusercontent.com/fatiando/logo/master/fatiando-logo-background.png" style="max-height: 3cm;"></a>
 

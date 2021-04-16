@@ -78,7 +78,7 @@ html_favicon = '_static/favicon.ico'
 html_theme_options = {
     "github_url": "https://github.com/emsig/emg3d",
     "external_links": [
-        {"name": "Gallery", "url": "https://dev1.emsig.xyz/gallery"},
+        {"name": "Gallery", "url": "https://dev1.emsig.xyz/gallery/gallery"},
         {"name": "EMSiG", "url": "https://emsig.xyz"},
     ],
     # "use_edit_page_button": True,
