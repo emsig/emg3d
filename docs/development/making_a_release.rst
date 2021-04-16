@@ -1,6 +1,10 @@
 Making a release
 ================
 
+.. todo::
+
+    Rework this for version 1.
+
 1. Update ``CHANGELOG.rst``.
 
 2. Push it to GitHub, create a release tagging it.

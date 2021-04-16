@@ -70,9 +70,9 @@ notebook.
 of a bigger, fast growing, open-source **EM & Potential Geo-Exploration Python
 Ecosystem**:
 
-----
-
 .. raw:: html
+
+   <p>
 
    <a href=https://pygimli.org><img src="https://www.pygimli.org/_static/gimli_logo.svg" style="max-height: 2cm;"></a>
 
@@ -88,7 +88,5 @@ Ecosystem**:
 
    <a href=https://www.fatiando.org><img src="https://raw.githubusercontent.com/fatiando/logo/master/fatiando-logo-background.png" style="max-height: 3cm;"></a>
 
+   </p>
 
-----
-
-.

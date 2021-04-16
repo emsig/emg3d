@@ -6,7 +6,15 @@ Getting started
 .. todo::
 
    The basic example needs complete rework. Include all source and receiver
-   types. Include saving and loading data.
+   types. Include saving and loading data:
+
+   - :class:`emg3d.electrodes.TxElectricDipole`;
+     :class:`emg3d.electrodes.TxMagneticDipole`;
+     :class:`emg3d.electrodes.TxElectricWire`;
+   - :class:`emg3d.electrodes.RxElectricPoint`;
+     :class:`emg3d.electrodes.RxElectricPoint`;
+   - :func:`emg3d.io.save`;
+     :func:`emg3d.io.load`.
 
 
 Basic Example

@@ -45,7 +45,7 @@ intersphinx_mapping = {
 description = 'A multigrid solver for 3D electromagnetic diffusion.'
 
 # The templates path.
-templates_path = ['_templates']
+# templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 source_suffix = '.rst'

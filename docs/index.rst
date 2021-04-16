@@ -23,6 +23,4 @@ emg3d Documentation
 -  :ref:`api_refs`
 -  :ref:`development`
 
-----
 
-.

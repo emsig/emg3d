@@ -30,36 +30,6 @@ A multigrid solver for 3D electromagnetic diffusion in Python.
 - **Zenodo:** https://doi.org/10.5281/zenodo.3229006
 
 
-Features
-========
-
-- **Iterative, matrix-free multigrid solver**, scaling linearly (CPU & RAM)
-  with the number of unknowns, O(N).
-- Uses **regular, stretched grids**.
-- Handles **triaxial electrical anisotropy**, isotropic electric permittivity,
-  and isotropic magnetic permeability.
-- Written **purely in Python** using the NumPy/SciPy-stack, where the most time-
-  and memory-consuming parts are sped up through jitted **Numba**-functions;
-  works **cross-platform** on Linux, Mac, and Windows.
-- Can solve in the complex-valued **frequency domain** or the real-valued
-  **Laplace domain**. Includes routines to compute the 3D EM field in the
-  **time domain**.
-- **Command-line interface (CLI)**, through which emg3d can be used as forward
-  modelling kernel in inversion routines.
-- Computes the **gradient of the misfit function** using the adjoint-state
-  method.
-- Can handle **entire surveys** with **many sources, receivers, and
-  frequencies**, computing the solution in **parallel**.
-
-
-Installation
-------------
-
-Installable with ``pip`` from PyPI and with ``conda`` through the
-``conda-forge`` channel. Minimum requirements are Python version 3.7 or higher
-and the modules ``scipy`` and ``numba``. Various other packages are recommended
-or required for some advanced functionalities (``xarray``, ``discretize``,
-``matplotlib``, ``h5py``, ``empymod``, ``scooby``). Consult the installation
-notes in the
-`manual <https://emg3d.emsig.xyz/en/stable/user_guide/installation.html>`_ for
-more information regarding installation, requirements, and soft dependencies.
+Consult the `manual
+<https://emg3d.emsig.xyz/en/stable/user_guide/installation.html>`_ for
+installation instructions.

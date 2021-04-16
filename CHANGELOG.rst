@@ -6,8 +6,11 @@ Changelog
 """"""""""
 
 
-latest: towards v1.0
---------------------
+Towards v1.0.0
+--------------
+
+- 2021-04-16: v1.0.0rc1
+
 
 Most important changes for end users
 ''''''''''''''''''''''''''''''''''''
@@ -15,43 +18,42 @@ Most important changes for end users
 TODO
 
 
+- **API**: With version 1.0 the API becomes stable and you can expect that your
+  code will work fine for the duration of ``emg3d v1.x``.
+- **emg3d.{save;load}**: ``Model``, ``Field``, ``Survey``, and ``Simulation``
+  instances saved with an older version of emg3d will not be able to
+  de-serialize with version 1.0. You have to update those files, see this gist:
+  https://gist.github.com/prisae/8345c3798e35f1c73efef617ac495538
+
 Various:
 
 - Removed all deprecated features.
-- Reduced top namespace to principal functions.
-- emsig.github.io to emsig.xyz.
-- Changed from ``master`` to ``main``.
+- Reduced top namespace to principal functions; ``get_receiver`` is not in the
+  top namespace any longer. It is advised to use directly the field method:
+  ``field.get_receiver``.
+- Moved emsig.github.io to emsig.xyz and emsig.readthedocs.io to
+  emg3d.emsig.xyz.
+- Changed principal repo branch from ``master`` to ``main``.
 
 
-Version 1 and API stability
-'''''''''''''''''''''''''''
-
-TODO: What is stable (most), what is still *experimental* (``time.Fourier``,
-``optimize``).
-
-Change data: https://gist.github.com/prisae/8345c3798e35f1c73efef617ac495538
-
-
-Detailed changes
-''''''''''''''''
-
-**Top namespace**
-
-- ``get_receiver`` is not in the top namespace any longer. It is advised to
-  use directly the field method: ``field.get_receiver``.
+Detailed changes by module
+''''''''''''''''''''''''''
 
 **Electrodes**
 
-- New module containing all sources and receivers.
+- New module containing all sources and receivers. Currently implemented are
+  ``TxElectricDipole``, ``TxMagneticDipole``, ``TxElectricWire``,
+  ``RxElectricPoint``, and ``RxMagneticPoint``.
+- New class ``TxElectricWire`` for an arbitrary electric wire.
+- Receivers can be defined in absolute coordinates, or in coordinates relative
+  to source position if they move with the source. Latter makes only sense
+  within a Survey/Simulation.
 - ``dip`` is new called ``elevation`` to make it clear that it is the angle
   positive upwards (anticlockwise from the horizontal plane).
 - Bugfix of the loop area for a magnetic dipole (the area was previously wrong 
-  except for dipole length of 1).
+  except for dipoles of length of 1).
 - Zero source strength does no longer mean "normalized", it means zero
   strength (hence no source).
-- New class ``TxElectricWire`` for an arbitrary electric wire.
-- Receivers have a ``relative`` flag, to mark their position as relative to the
-  source position. This makes only sense within a Survey.
 
 
 **Fields**
@@ -62,12 +64,12 @@ Detailed changes
     disadvantages. E.g., operations on ``Field`` are not possible any longer
     and have to be carried out on ``Field.field``. However, it should be easier
     to maintain and expand in the future.
-  - Knows now its ``grid``. As a consequence, all functions that required the
-    ``grid`` and the ``field`` require now only the ``field``; e.g.,
-    ``emg3d.fields.get_receiver``.
+  - Knows new its ``grid``. As a consequence, all functions that required
+    previously the ``grid`` and the ``field`` require new only the ``field``;
+    e.g., ``emg3d.fields.get_receiver``.
   - Has no property ``ensure_pec`` any longer, it is ensured directly in
     ``solver.prolongation``.
-  - Has now the methods ``interpolate_to_grid`` and ``get_receiver``.
+  - Has new the methods ``interpolate_to_grid`` and ``get_receiver``.
 
 - Renamed parameters in all functions:
 
@@ -126,17 +128,17 @@ Detailed changes
 - ``meshes.BaseMesh``:
 
   - Reduced to the attributes ``origin``, ``h``, ``shape_{cells;nodes}``,
-    ``n_cells``, ``n_edges_{x;y;z}``, ``nodes_{x;y;z}``,
-    ``cell_centers_{x;y;y}``, ``shape_edges_{x;y;z}``, and ``cell_volumes``.
-    These are the only required attributes for ``emg3d``.
+    ``n_{cells;edges;faces}``, ``n_{edges;faces}_{x;y;z}``,
+    ``{nodes;cell_centers}_{x;y;z}``, ``shape_{edges;faces}_{x;y;z}``, and
+    ``cell_volumes``. These are the only required attributes for ``emg3d``.
 
 
 **Models**
 
 - ``models.Model``:
 
-  - Knows now its ``grid``. As a consequence, all the functions that used to
-    require the ``grid`` and the ``model`` require now only the ``model``;
+  - Knows new its ``grid``. As a consequence, all the functions that used to
+    require the ``grid`` and the ``model`` require new only the ``model``;
     e.g., ``emg3d.solver.solve`` or ``emg3d.fields.get_h_field``.
 
   - If ``property_y`` or ``property_z`` are not set they return now ``None``,
@@ -148,6 +150,19 @@ Detailed changes
     and adjusted later.
 
   - Renamed ``interpolate2grid`` to ``interpolate_to_grid``.
+
+
+**Simulations**
+
+- ``Simulation``:
+
+  - Works new for electric and magnetic dipole sources as well as electric wire
+    sources; electric and magnetic point receivers.
+  - Works now as well for surveys that contain receivers which are positioned
+    relatively to the source.
+  - No ``grid`` any longer, taken from ``model``.
+  - ``name`` is new optional.
+  - New optional keyword ``info``.
 
 
 **Solver**
@@ -167,8 +182,8 @@ Detailed changes
     ``semicoarsening=False``, and ``linerelaxation=False``, unless these
     parameters were set to anything different than ``True``.
 
-  - Some verbosity levels changed (for consistency reasons throughout module).
-    The new levels are [old level in brackets]:
+  - Some verbosity levels changed (for consistency reasons throughout emg3d).
+    The new levels are [old levels in brackets]:
 
     - -1: Nothing [0]
     - 0: Warnings [1]
@@ -182,25 +197,12 @@ Detailed changes
 
 - ``solver.solve_source``: New function, a shortcut for ``solver.solve``. It
   takes a ``source`` and a ``frequency`` instead of a ``sfield``, gets the
-  ``sfield`` from it, and forwards everything to ``solver.solve``.
+  ``sfield`` internally, and forwards everything to ``solver.solve``.
 
 - ``solver.RegularGridProlongator``:
 
   - Changed signature from ``x, y, cxy`` to ``cx, cy, x, y``; it now
     incorporates the function ``_get_prolongation_coordinates``.
-
-
-**Simulations**
-
-- ``Simulation``:
-
-  - Works now for electric and magnetic dipole sources as well as electric wire
-    sources; electric and magnetic point receivers.
-  - Works now as well for surveys that contain receivers which are positioned
-    relatively to the source.
-  - No ``grid`` any longer, taken from ``model``.
-  - ``name`` is new optional.
-  - New optional keyword ``info``.
 
 
 **Surveys**
@@ -209,9 +211,12 @@ Detailed changes
 
   - ``frequencies`` is new a dict just like ``sources`` and ``receivers``.
   - ``sources`` and ``receivers`` must be tuples or dicts; lists are no longer
-    permitted.
+    permitted. For this, the module ``surveys``  has new convenience functions
+    ``txrx_coordinates_to_dict`` and ``txrx_lists_to_dict``.
   - Has no attribute ``observed`` any longer; access it just like any other
     data through ``Survey.data.observed``.
+  - Has no attributes ``rec_coords``, ``src_coords``, and ``rec_types`` any
+    longer.
   - ``name`` is new optional.
   - New optional keywords ``date`` and ``info``.
   - ``noise_floor`` and ``relative_error`` are new stored as data array if they
@@ -220,9 +225,6 @@ Detailed changes
     the receivers with a relative offset to the source, instead of absolute
     coordinates.
   - ``data`` can be a dict containing many data set.
-  - Only takes dicts as input for sources and receivers. For this, it has the
-    new convenience functions ``txrx_coordinates_to_dict`` and
-    ``txrx_lists_to_dict``.
   - Automatic key names start now with 1 and have a hyphen between the prefix
     and the number; they also contain the abbreviated electrode name. E.g.,
     ``Tx0`` becomes ``TxED-1`` or ``TxMD-1`` or ``TxEW-1``. Similar, ``Rx9``
@@ -232,12 +234,15 @@ Detailed changes
   - Now completely functional for receivers which are positioned relatively to
     the source.
 
+- New functions ``txrx_coordinates_to_dict`` and ``txrx_lists_to_dict`` to
+  collocate many sources or receivers into dicts.
+
 - ``Dipole``: Replaced by the new source and receiver classes in the new module
   ``electrodes``.
 
 **Time**
 
-Move ``Fourier`` from ``emg3d.utils`` to its own module ``emg3d.time``.
+- Moved ``Fourier`` from ``emg3d.utils`` to its own module ``emg3d.time``.
 
 - Renamed parameters:
 
@@ -251,12 +256,15 @@ Move ``Fourier`` from ``emg3d.utils`` to its own module ``emg3d.time``.
 
 **Utils**
 
-Renamed ``Time`` to ``Timer``.
+- Renamed ``Time`` to ``Timer``.
+- Moved ``Fourier`` to its own module ``emg3d.time.Fourier``.
+
 
 **CLI**
 
-Because frequencies are now dicts as well in a Survey they have to be named
-by their key instead of their value when selecting data in the parameter file.
+- Because frequencies are now dicts as well in a Survey they have to be named
+  by their key instead of their value when selecting data in the parameter
+  file.
 
 
 0.x-Series
