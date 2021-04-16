@@ -1,6 +1,10 @@
 CLI interface
 =============
 
+.. todo::
+
+    The CLI section needs rework.
+
 Command-line interface for certain specific tasks, such as forward modelling
 and gradient computation of the misfit function. The command is ``emg3d``,
 consult the inbuilt help to get started:
@@ -94,6 +98,6 @@ example; remove the comment signs to use them.
   # Select which sources, receivers, and frequencies of the survey are used. By
   # default all data is used. These are comma-separated lists.
   [data]
-  # sources = Tx02, Tx08, Tx14
-  # receivers = Rx01, Rx10
-  # frequencies = 0.5, 0.75
+  # sources = TxED-02, TxMD-08, TxEW-14
+  # receivers = RxEP-01, RxMP-10
+  # frequencies = f-1, f-3

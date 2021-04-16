@@ -1,5 +1,20 @@
+.. _usage:
+
 Getting started
 ===============
+
+.. todo::
+
+   The basic example needs complete rework. Include all source and receiver
+   types. Include saving and loading data:
+
+   - :class:`emg3d.electrodes.TxElectricDipole`;
+     :class:`emg3d.electrodes.TxMagneticDipole`;
+     :class:`emg3d.electrodes.TxElectricWire`;
+   - :class:`emg3d.electrodes.RxElectricPoint`;
+     :class:`emg3d.electrodes.RxElectricPoint`;
+   - :func:`emg3d.io.save`;
+     :func:`emg3d.io.load`.
 
 
 Basic Example
@@ -109,58 +124,97 @@ input grid had 49,152 cells, and the coarsest grid had 12 cells.
        ...:                 pcolor_opts={'norm': LogNorm()});
 
 
-Coordinate System
------------------
 
-The coordinate system is shown in :numref:`Figure %s <coordinate_system>`. It
-is a right-handed system (RHS) with x pointing East, y pointing North, and z
-pointing upwards. The azimuth is defined as the anticlockwise rotation from
-Easting towards Northing, and elevation is defined as the anticlockwise
-rotation from the horizontal plane up.
+Usages
+------
 
-.. figure:: ../_static/coordinate_system.svg
+
+Simulations / High-level usage
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. figure:: ../_static/levels1.svg
    :align: center
-   :alt: Coordinate System
-   :name: coordinate_system
+   :alt: High-level usage
+   :name: high-level
 
-   Coordinate system used in emg3d: RHS with positive z upwards.
+   Workflow for the high-level usage: A **Simulation** needs a **Model** and a
+   **Survey**. A survey contains all acquisition parameters such as sources,
+   receivers, frequencies, and data, if available. A model contains the
+   subsurface properties such as conductivities or resistivities, and the grid
+   information.
+
+Simulate responses for electric and magnetic receivers due to electric and
+magnetic sources, in parallel. If data is provided it can also compute the
+misfit and the gradient of the misfit function. It includes automatic, source
+and frequency dependent gridding.
+
+*Note:* In addition to ``emg3d`` this requires the soft dependency ``xarray``
+(``tqdm`` and ``discretize`` are recommended).
 
 
-Tips and Tricks
----------------
+Solver-level usage
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The function :func:`emg3d.solver.solve` is the main entry point, and it takes
-care whether multigrid is used as a solver or as a preconditioner (or not at
-all), while the actual multigrid solver is :func:`emg3d.solver.multigrid`. Most
-input parameters for :func:`emg3d.solver.solve` are sufficiently described in
-its docstring. Here a few additional information.
+.. figure:: ../_static/levels2.svg
+   :align: center
+   :alt: Solver-level usage
+   :name: solver-level
 
-- You can input any three-dimensional tensor mesh into `emg3d`. However, the
-  implemented multigrid technique works with the existing nodes, meaning there
-  are no new nodes created as coarsening is done by combining adjacent
-  cells. The more times the grid dimension can be divided by two the better it
-  is suited for MG. Ideally, the number should be dividable by two a few times
-  and the dimension of the coarsest grid should be a low prime number
-  :math:`p`, for which good sizes can then be computed with :math:`p 2^n`. Good
-  grid sizes (in each direction) up to 1024 are
+   Workflow for the solver-level usage: The **solve** function requires a
+   **Model** ``A`` and a Source-**Field** ``b``. It then solves ``Ax=b`` and
+   returns ``x``, the electric field, corresponding to the provided subsurface
+   model and source field.
 
-  - :math:`2·2^{3, 4, ..., 9}`: 16,  32,  64, 128, 256, 512, 1024,
-  - :math:`3·2^{3, 4, ..., 8}`: 24,  48,  96, 192, 384, 768,
-  - :math:`5·2^{3, 4, ..., 7}`: 40,  80, 160, 320, 640,
-  - :math:`7·2^{3, 4, ..., 7}`: 56, 112, 224, 448, 896,
+The solver level is the core of emg3d: It solves Maxwell's equations for the
+provided subsurface model and the provided source field using the multigrid
+method, returning the resulting electric field.
 
-  and preference decreases from top to bottom row (stick to the first two or
-  three rows if possible). Good grid sizes in sequential order, excluding p=7:
-  16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320, 384, 512, 640, 768,
-  1024. You can get this list via :func:`emg3d.meshes.good_mg_cell_nr()`.
+The function :func:`emg3d.solver.solve_source` simplifies the solver scheme. It
+takes a model, a source, and a frequency, avoiding the need to generate the
+source field manually, as shown in :numref:`Figure %s <solver-source-level>`.
 
-- The multigrid method can be used as a solver or as a preconditioner, for
-  instance for BiCGSTAB. Using multigrid as a preconditioner for BiCGSTAB
-  together with semicoarsening and line relaxation is the most stable version,
-  but expensive, and therefore only recommended on highly stretched grids.
-  Which combination of solver is best (fastest) depends to a large extent on
-  the grid stretching, but also on anisotropy and general model complexity.
-  See `«Parameter tests»
-  <https://emsig.xyz/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_
-  in the gallery for an example how to run some tests on your particular
-  problem.
+.. figure:: ../_static/levels4.svg
+   :align: center
+   :alt: Solver-source level usage
+   :name: solver-source-level
+
+   Simplified solver-level workflow: The **solve_source** function requires a
+   **Model**, a **Source**, and a **frequency**. It generates the source field
+   internally, and returns ``x``, the electric field, corresponding to the
+   provided input.
+
+*Note:* This requires only ``emg3d`` (``discretize`` is recommended).
+
+
+Command-line interface (CLI-level)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. figure:: ../_static/levels3.svg
+   :align: center
+   :alt: CLI-level usage
+   :name: cli-level
+
+   CLI-level usage: file-driven command-line usage of the high-level
+   (Simulation) functionality of emg3d.
+
+The command-line interface is a terminal utility for the high-level
+(Simulation) usage of emg3d. The model and the survey have to be provided as
+files (HDF5, npz, or json), various settings can be defined in the config file,
+and the output will be written to the output file.
+
+*Note:* In addition to ``emg3d`` this requires the soft dependency ``xarray``
+(``tqdm`` and ``discretize`` are recommended), and ``h5py`` if the provided
+files are in the HDF5 format.
+
+
+Time-domain modelling
+~~~~~~~~~~~~~~~~~~~~~
+
+Time-domain modelling with emg3d is possible, but it is not implemented in the
+high-level class ``Simulation``. It has to be carried out by using
+:class:`emg3d.time.Fourier`, together with the Solver-level usage mentioned
+above. Have a look at the repo https://github.com/emsig/article-TDEM.
+
+
+*Note:* In addition to ``emg3d`` this requires the soft dependency ``empymod``
+(``discretize`` is recommended).

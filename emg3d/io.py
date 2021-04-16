@@ -305,7 +305,7 @@ def _dict_deserialize(inp):
                     inp[key] = inst.from_dict(value)
                     continue
 
-                except (NotImplementedError, AttributeError, KeyError) as e:
+                except (AttributeError, KeyError, TypeError) as e:
                     # Gracefully fail.
                     # Print is always shown and simpler, warn for the CLI logs.
                     msg = f"Could not de-serialize <{key}>: {e}"

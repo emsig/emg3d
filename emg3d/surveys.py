@@ -378,6 +378,37 @@ class Survey:
         """Receiver dict containing all receivers."""
         return self._receivers
 
+    def source_coordinates(self):
+        """Return source center coordinates as ndarray [x, y, z]."""
+        return np.array([s.center for s in self.sources.values()]).T
+
+    def receiver_coordinates(self, source=None):
+        """Return receiver center coordinates as ndarray [x, y, z].
+
+        For relative receivers, all positions are listed one after the other
+        for each source position. Alternatively, a source-name (string) can be
+        provided, in which case only the position for this source is added.
+        """
+        coords = []
+
+        # Loop over receivers.
+        for v in self.receivers.values():
+
+            # If relative, loop over sources and add all positions.
+            if v.relative and source is None:
+                for s in self.sources.values():
+                    coords.append(v.center_abs(s))
+
+            # If relative with a provided source, add this position.
+            elif v.relative:
+                coords.append(v.center_abs(self.sources[source]))
+
+            # If absolute, add.
+            else:
+                coords.append(v.center)
+
+        return np.array(coords).T
+
     @property
     def frequencies(self):
         """Frequency dict containing all frequencies."""

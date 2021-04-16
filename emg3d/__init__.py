@@ -15,8 +15,10 @@
 # the License.
 
 # Import most important functions and classes
-from emg3d.electrodes import (TxElectricDipole, TxMagneticDipole,
-                              TxElectricWire, RxElectricPoint, RxMagneticPoint)
+from emg3d.electrodes import (
+        TxElectricDipole, TxMagneticDipole, TxElectricWire,
+        RxElectricPoint, RxMagneticPoint,
+)
 from emg3d.fields import Field, get_source_field, get_magnetic_field
 from emg3d.io import save, load
 from emg3d.meshes import TensorMesh, construct_mesh

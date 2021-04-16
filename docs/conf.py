@@ -12,7 +12,7 @@ extensions = [
     'sphinx.ext.mathjax',
     # 'sphinx.ext.viewcode',
     # 'sphinx.ext.doctest',
-    # 'sphinx.ext.todo',
+    'sphinx.ext.todo',
     'sphinx_automodapi.automodapi',
     'matplotlib.sphinxext.plot_directive',
     'IPython.sphinxext.ipython_console_highlighting',
@@ -45,7 +45,7 @@ intersphinx_mapping = {
 description = 'A multigrid solver for 3D electromagnetic diffusion.'
 
 # The templates path.
-templates_path = ['_templates']
+# templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 source_suffix = '.rst'
@@ -78,7 +78,7 @@ html_favicon = '_static/favicon.ico'
 html_theme_options = {
     "github_url": "https://github.com/emsig/emg3d",
     "external_links": [
-        {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery"},
+        {"name": "Gallery", "url": "https://dev1.emsig.xyz/gallery/gallery"},
         {"name": "EMSiG", "url": "https://emsig.xyz"},
     ],
     # "use_edit_page_button": True,

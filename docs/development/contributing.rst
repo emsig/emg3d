@@ -1,6 +1,10 @@
 Contributing
 ============
 
+.. todo::
+
+    Rework this for version 1.
+
 New contributions, bug reports, or any kind of feedback is always welcomed!
 Have a look at the `Roadmap-project
 <https://github.com/emsig/emg3d/projects/1>`_ to get an idea of things that
@@ -17,7 +21,7 @@ and install it in your python distribution via:
 
 .. code-block:: console
 
-   python setup.py install
+   make install
 
 Please make sure your code follows the pep8-guidelines by using, for instance,
 the python module ``flake8``, and also that your code is covered with

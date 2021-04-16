@@ -177,6 +177,28 @@ class TestSurvey():
         t2 = survey.select(frequencies=[], receivers='RxEP-1')
         assert t2.shape == (3, 1, 0)
 
+    def test_src_rec_coordinates(self):
+        survey = surveys.Survey(
+            sources=[
+                emg3d.TxElectricDipole((0, 0, 0, 0, 0)),
+                emg3d.TxElectricDipole((100, 200, 300, 400, 500, 600))
+            ],
+            receivers=[
+                emg3d.RxElectricPoint((1000, 0, 2000, 0, 0)),
+                emg3d.RxElectricPoint((1000, 0, 2000, 0, 0), relative=True)
+            ],
+            frequencies=1,
+        )
+
+        assert_allclose(survey.source_coordinates(),
+                        [[0, 150], [0, 350], [0, 550]])
+
+        assert_allclose(survey.receiver_coordinates(),
+                        [[1000, 1000, 1150], [0, 0, 350], [2000, 2000, 2550]])
+
+        assert_allclose(survey.receiver_coordinates('TxED-2'),
+                        [[1000, 1150], [0, 350], [2000, 2550]])
+
 
 def test_txrx_coordinates_to_dict():
     sources = surveys.txrx_coordinates_to_dict(

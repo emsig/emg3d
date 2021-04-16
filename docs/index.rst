@@ -23,8 +23,4 @@ emg3d Documentation
 -  :ref:`api_refs`
 -  :ref:`development`
 
-----
-
-.. image:: https://raw.githubusercontent.com/emsig/emg3d-logo/master/logo-emg3d-transp-web250px.png
-   :alt: emg3d logo
 
