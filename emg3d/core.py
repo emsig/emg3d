@@ -1,8 +1,26 @@
 """
-The core functionalities, the most computationally demanding parts, of the
-:mod:`emg3d.solver` as just-in-time (jit) compiled functions using ``numba``.
+The **core** contains the number-crunching functionalities of
+:func:`emg3d.solver.solve`, the computationally most demanding parts. These
+functions are implemented as just-in-time (jit) compiled functions using the
+:func:`numba.jit`-decorator of `numba <https://numba.pydata.org>`_.
+
+    «*Numba translates Python functions to optimized machine code at runtime
+    using the industry-standard LLVM compiler library. Numba-compiled numerical
+    algorithms in Python can approach the speeds of C or FORTRAN.*» (from the
+    numba website.)
+
+These functions are not meant to be called directly, particularly not from an
+end-user; they are called from functions in :func:`emg3d.solver.solve`.
+
+For an end-user it can still be insightful to look at the documentation and
+code of these functions if you are interested in understanding how the
+multigrid solver works, the theory and its implementation.
+
+For a developer interested in making emg3d faster this is the right place to
+start, as by far the most time is spent in these functions, particularly in
+:func:`solve`.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -28,7 +46,7 @@ _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 # LinearOperator to compute A x
 @nb.njit(**_numba_setting)
 def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
-    r"""Residual without or with source term.
+    r"""Residual with or without source term.
 
     Compute the residual as given in [Muld06]_ in middle of the right column
     on page 636, but without the source term:
@@ -40,45 +58,45 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
                        \mathbf{E} \right) .
 
     The computation is carried out in a matrix-free manner; on said page 636
-    (or in the :doc:`../theory` of the manual) are the various steps laid out
-    to discretise the different parts, for instance involved curls. This can
-    also be understood as the left-hand-side of :math:`A x = b`, as given in
-    Equation 2 in [Muld06]_ (here without the cell volumes V),
+    (or in the :doc:`../user_guide/theory` of the manual) are the various steps
+    laid out to discretize the different parts such as the involved curls. This
+    can also be understood as the left-hand-side of :math:`A x = b`, as given
+    in Equation 2 in [Muld06]_ (here without the cell volumes :math:`V`),
 
     .. math::
 
-        \mathrm{i}\omega\mu_0 \tilde{\sigma} \mathrm{E}
-        - \nabla \times \zeta^{-1} \nabla \times \mathrm{E}
-        = - \mathrm{i} \omega \mu_0 \mathrm{J_s} .
+        \mathrm{i}\omega\mu_0 \tilde{\sigma} \mathbf{E}
+        - \nabla \times \mu_\mathrm{r}^{-1} \nabla \times \mathbf{E}
+        = - \mathrm{i} \omega \mu_0 \mathbf{J_\mathrm{s}} .
 
-    It can therefore be used as `matvec` to create a `LinearOperator`, which
-    can be passed to a solver.
+    It can therefore be used as a ``matvec`` to create a ``LinearOperator``,
+    which can be passed to a solver.
 
-    It is assumed that ex, ey, and ez have PEC boundaries; otherwise the output
-    will not have PEC boundaries.
+    It is assumed that the PEC boundary condition is applied to the electric
+    field :math:`\mathbf{E}` (``ex``, ``ey``, and ``ez``).
 
-    The residuals are subtracted in-place from `rx`, `ry`, and `rz`. That means
-    that if `rx`, `ry`, and `rz` contain the source field, they will contain
-    the total residual afterwards; if they are empty fields, they will contain
-    the negative partial residual afterwards.
+    The residuals are subtracted in-place from ``rx``, ``ry``, and ``rz``. That
+    means that if ``rx``, ``ry``, and ``rz`` contain the source field, they
+    will contain the total residual afterwards; if they are empty fields, they
+    will contain the negative partial residuals afterwards.
 
 
     Parameters
     ----------
     rx, ry, rz : ndarray
         Source field or pre-allocated zero residual field in x-, y-, and
-        z-directions.
+        z-directions (:class:`emg3d.fields.Field`).
 
     ex, ey, ez : ndarray
-        Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+        Electric fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
     eta_x, eta_y, eta_z, zeta : ndarray
-        VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.models.VolumeModel`.
+        Volume-averaged model parameters (:class:`emg3d.models.VolumeModel`).
 
     hx, hy, hz : ndarray
-        Cell widths in x-, y-, and z-directions.
+        Cell widths in x-, y-, and z-directions
+        (:class:`emg3d.meshes.TensorMesh`).
 
     """
 
@@ -87,11 +105,12 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
     ny = len(hy)
     nz = len(hz)
 
-    # Loop over dimensions; x-fastest, then y, z.
     # NOTE about `i?m = max(0, i?-1)`:
     # In the cases when -1 is set to 0, these indices are only used in
     # parameters which are not actually used in these cases, see the note
     # towards the end. Resetting -1 to 0 is simply to avoid index errors.
+
+    # Loop over dimensions; x-fastest, then y, z
     for iz in range(nz):
         izm = max(0, iz-1)
         izp = iz+1
@@ -177,7 +196,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
                 rz[ix, iy, iz] -= 0.5*rrz - 0.25*stz*ez[ix, iy, iz]
 
 
-# Gauss-Seidel method
+# Smoother (Gauss-Seidel method)
 @nb.njit(**_numba_setting)
 def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                  nu):
@@ -192,7 +211,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
         L_*^{-1} \left(\mathbf{b} - U \mathbf{x}^{(k)} \right) \ ,
 
     where :math:`L_*` is the lower triangular component, and :math:`U` the
-    strictly upper triangular component, :math:`A = L_* + U`:
+    strictly upper triangular component, :math:`A = L_* + U`, with
 
     .. math::
 
@@ -209,49 +228,49 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                  0   &   0    & \cdots &   0
             \end{array} \right] \ .
 
-    On the coarsest grid it acts as direct solver, whereas on the fine grid it
-    acts as a smoother with only few iterations, defined by :math:`\nu` (`nu`).
-    Odd numbers of `nu` use forward ordering, even numbers use backwards
-    ordering. ``nu=2`` is therefore one symmetric Gauss-Seidel iteration, one
-    forward ordered iteration followed by one backward ordered iteration.
+    On the coarsest grid it acts as a direct solver, whereas on the fine grid
+    it acts as a smoother with only few iterations, defined by :math:`\nu`
+    (``nu``). Odd numbers of ``nu`` use forward ordering, even numbers use
+    backwards ordering; ``nu=2`` is therefore one symmetric Gauss-Seidel
+    iteration, one forward ordered iteration followed by one backward ordered
+    iteration.
 
-    From [Muld06]_: The method proposed by [ArFW00]_ is chosen as a smoother.
+    From [Muld06]_: «The method proposed by [ArFW00]_ is chosen as a smoother.
     It selects one node of the grid and simultaneously solves for the six
     degrees of freedom on the six edges attached to the node. If node
     :math:`(x_k, y_l, z_m)` is selected, the six equations,
-    :math:`r_{x;k\pm1/2,l,m} = 0`, :math:`r_{y;k,l\pm1/2,m} = 0` and
+    :math:`r_{x;k\pm1/2,l,m} = 0`, :math:`r_{y;k,l\pm1/2,m} = 0`, and
     :math:`r_{z;k,l,m\pm1/2} = 0`, are solved for :math:`e_{x;k\pm1/2,l,m}`,
-    :math:`e_{y;k,l\pm1/2,m}` and :math:`e_{z;k,l,m\pm1/2}`. Here, this
+    :math:`e_{y;k,l\pm1/2,m}`, and :math:`e_{z;k,l,m\pm1/2}`. Here, this
     smoother is applied in a symmetric Gauss-Seidel fashion, following the
     lexicographical ordering of the nodes :math:`(x_k, y_l, z_m)`, with fastest
     index :math:`k=1, \dots, N_x-1`, intermediate index :math:`l=1, \dots,
-    N_y-1`, and slowest index :math:`m=1, \ldots, N_z-1`.
+    N_y-1`, and slowest index :math:`m=1, \ldots, N_z-1`.»
 
     To actually solve the system of six equations a non-standard Cholesky
-    factorisation is used, :func:`solve`.
+    factorisation is used implemented in :func:`solve`. Tangential components
+    at the boundaries are assumed to be zero (PEC boundaries).
 
-    Tangential components at the boundaries are assumed to be zero (PEC
-    boundaries).
-
-    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
+    The result is stored in the provided electric field components ``ex``,
+    ``ey``, and ``ez``.
 
 
     Parameters
     ----------
     ex, ey, ez : ndarray
-        Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+        Electric fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    sx, sy, sz :
-        Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+    sx, sy, sz : ndarray
+        Source fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    eta_x, eta_y, eta_z, zeta :
-        VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.models.VolumeModel`.
+    eta_x, eta_y, eta_z, zeta : ndarray
+        Volume-averaged model parameters (:class:`emg3d.models.VolumeModel`).
 
     hx, hy, hz : ndarray
-        Cell widths in x-, y-, and z-directions.
+        Cell widths in x-, y-, and z-directions
+        (:class:`emg3d.meshes.TensorMesh`).
 
     nu : int
         Number of Gauss-Seidel iterations.
@@ -271,7 +290,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
     # Direction-switch for Gauss-Seidel
     iback = 0
 
-    # Pre-allocating A for the six edges attached to one node; will be
+    # Pre-allocating `A` for the six edges attached to one node; it will be
     # overwritten at each iteration
     amat = np.zeros(36, dtype=ex.dtype)
 
@@ -368,7 +387,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                         amat[6*k] = -st[k]
 
                     # Complete diagonals
-                    # A is symmetric and curl curl part is real-valued
+                    # A is symmetric and curl-curl part is real-valued
                     amat[0] += mzyRxm/hy[iy] + mzyLxm/hy[iym]   # 0,0| 0
                     amat[0] += myzRxm/hz[iz] + myzLxm/hz[izm]
                     amat[6] += mzyRxp/hy[iy] + mzyLxp/hy[iym]   # 1,1| 6
@@ -462,10 +481,10 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                     rhs[5] += mxyLzp*(ez[ix, iym, iz]/hy[iym] +
                                       ey[ix, iym, izp]/hz[iz])
 
-                    # Solve linear system A x = b.
+                    # Solve linear system A x = b
                     solve(amat, rhs)
 
-                    # Update efield (here we could apply damping weights).
+                    # Update e-field (here we could apply damping weights)
                     ex[ixm, iy, iz] = rhs[0]
                     ex[ix, iy, iz] = rhs[1]
                     ey[ix, iym, iz] = rhs[2]
@@ -480,7 +499,8 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     r"""Gauss-Seidel method with line relaxation in x-direction.
 
     This is the equivalent to :func:`gauss_seidel`, but with line relaxation in
-    the x-direction. See :func:`gauss_seidel` for more details.
+    the x-direction. See :func:`gauss_seidel` for more details on the smoother
+    itself.
 
     The resulting system A x = b to solve consists of n unknowns (x-vector),
     and the corresponding matrix A is a banded matrix with the main diagonal
@@ -508,30 +528,30 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     The values are computed in rows of 5 lines, with the indicated middle and
     left matrices as indicated in the above scheme. These blocks are filled
     into the main matrix A and vector b, and subsequently solved with a
-    non-standard Cholesky factorisation, :func:`solve`.
-
-    Tangential components at the boundaries are assumed to be 0 (PEC
+    non-standard Cholesky factorisation implemented in :func:`solve`.
+    Tangential components at the boundaries are assumed to be zero (PEC
     boundaries).
 
-    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
+    The result is stored in the provided electric field components ``ex``,
+    ``ey``, and ``ez``.
 
 
     Parameters
     ----------
     ex, ey, ez : ndarray
-        Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+        Electric fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    sx, sy, sz :
-        Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+    sx, sy, sz : ndarray
+        Source fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    eta_x, eta_y, eta_z, zeta :
-        VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.models.VolumeModel`.
+    eta_x, eta_y, eta_z, zeta : ndarray
+        Volume-averaged model parameters (:class:`emg3d.models.VolumeModel`).
 
     hx, hy, hz : ndarray
-        Cell widths in x-, y-, and z-directions.
+        Cell widths in x-, y-, and z-directions
+        (:class:`emg3d.meshes.TensorMesh`).
 
     nu : int
         Number of Gauss-Seidel iterations.
@@ -738,10 +758,10 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                     # Copy to big system
                     blocks_to_amat(amat, bvec, middle, left, rhs, ixm, nCx)
 
-                # Solve linear system A x = b.
+                # Solve linear system A x = b
                 solve(amat, bvec)
 
-                # Update efield (here we could apply damping weights).
+                # Update efield (here we could apply damping weights)
                 for ix in range(1, nCx+1):
                     ixm = ix-1
 
@@ -759,7 +779,8 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     r"""Gauss-Seidel method with line relaxation in y-direction.
 
     This is the equivalent to :func:`gauss_seidel`, but with line relaxation in
-    the y-direction. See :func:`gauss_seidel` for more details.
+    the y-direction. See :func:`gauss_seidel` for more details on the smoother
+    itself.
 
     The resulting system A x = b to solve consists of n unknowns (x-vector),
     and the corresponding matrix A is a banded matrix with the main diagonal
@@ -787,35 +808,35 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     The values are computed in rows of 5 lines, with the indicated middle and
     left matrices as indicated in the above scheme. These blocks are filled
     into the main matrix A and vector b, and subsequently solved with a
-    non-standard Cholesky factorisation, :func:`solve`.
+    non-standard Cholesky factorisation implemented in :func:`solve`.
+    Tangential components at the boundaries are assumed to be zero (PEC
+    boundaries).
 
     Note: The smoothing with linerelaxation in y-direction is carried out in
     reversed lexicographical order, in order to improve speed (memory access).
     All other smoothers (:func:`gauss_seidel`, :func:`gauss_seidel_x`, and
     :func:`gauss_seidel_z`) use lexicographical order.
 
-    Tangential components at the boundaries are assumed to be 0 (PEC
-    boundaries).
-
-    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
+    The result is stored in the provided electric field components ``ex``,
+    ``ey``, and ``ez``.
 
 
     Parameters
     ----------
     ex, ey, ez : ndarray
-        Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+        Electric fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    sx, sy, sz :
-        Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+    sx, sy, sz : ndarray
+        Source fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    eta_x, eta_y, eta_z, zeta :
-        VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.models.VolumeModel`.
+    eta_x, eta_y, eta_z, zeta : ndarray
+        Volume-averaged model parameters (:class:`emg3d.models.VolumeModel`).
 
     hx, hy, hz : ndarray
-        Cell widths in x-, y-, and z-directions.
+        Cell widths in x-, y-, and z-directions
+        (:class:`emg3d.meshes.TensorMesh`).
 
     nu : int
         Number of Gauss-Seidel iterations.
@@ -1022,10 +1043,10 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                     # Copy to big system
                     blocks_to_amat(amat, bvec, middle, left, rhs, iym, nCy)
 
-                # Solve linear system A x = b.
+                # Solve linear system A x = b
                 solve(amat, bvec)
 
-                # Update efield (here we could apply damping weights).
+                # Update efield (here we could apply damping weights)
                 for iy in range(1, nCy+1):
                     iym = iy-1
 
@@ -1043,7 +1064,8 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     r"""Gauss-Seidel method with line relaxation in z-direction.
 
     This is the equivalent to :func:`gauss_seidel`, but with line relaxation in
-    the z-direction. See :func:`gauss_seidel` for more details.
+    the z-direction. See :func:`gauss_seidel` for more details on the smoother
+    itself.
 
     The resulting system A x = b to solve consists of n unknowns (x-vector),
     and the corresponding matrix A is a banded matrix with the main diagonal
@@ -1071,30 +1093,30 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     The values are computed in rows of 5 lines, with the indicated middle and
     left matrices as indicated in the above scheme. These blocks are filled
     into the main matrix A and vector b, and subsequently solved with a
-    non-standard Cholesky factorisation, :func:`solve`.
-
-    Tangential components at the boundaries are assumed to be 0 (PEC
+    non-standard Cholesky factorisation implemented in :func:`solve`.
+    Tangential components at the boundaries are assumed to be zero (PEC
     boundaries).
 
-    The result is stored in the provided electric fields `ex`, `ey`, and `ez`.
+    The result is stored in the provided electric field components ``ex``,
+    ``ey``, and ``ez``.
 
 
     Parameters
     ----------
     ex, ey, ez : ndarray
-        Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+        Electric fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    sx, sy, sz :
-        Source fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+    sx, sy, sz : ndarray
+        Source fields in x-, y-, and z-directions
+        (:class:`emg3d.fields.Field`).
 
-    eta_x, eta_y, eta_z, zeta :
-        VolumeModel parameters (multiplied by volumes) as obtained from
-        :func:`emg3d.models.VolumeModel`.
+    eta_x, eta_y, eta_z, zeta : ndarray
+        Volume-averaged model parameters (:class:`emg3d.models.VolumeModel`).
 
     hx, hy, hz : ndarray
-        Cell widths in x-, y-, and z-directions.
+        Cell widths in x-, y-, and z-directions
+        (:class:`emg3d.meshes.TensorMesh`).
 
     nu : int
         Number of Gauss-Seidel iterations.
@@ -1301,10 +1323,10 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                     # Copy to big system
                     blocks_to_amat(amat, bvec, middle, left, rhs, izm, nCz)
 
-                # Solve linear system A x = b.
+                # Solve linear system A x = b
                 solve(amat, bvec)
 
-                # Update efield (here we could apply damping weights).
+                # Update efield (here we could apply damping weights)
                 for iz in range(1, nCz+1):
                     izm = iz-1
 
@@ -1320,13 +1342,13 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
 def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
     r"""Insert middle, left, and rhs into main arrays amat and bvec.
 
-    The banded matrix amat contains the main diagonal and the first five lower
-    off-diagonals. They are stored one column after the other, in a 6*n
+    The banded matrix ``amat`` contains the main diagonal and the first five
+    lower off-diagonals. They are stored one column after the other, in a 6*n
     ndarray.
 
     .. highlight:: none
 
-    The complete main matrix `amat` and the `middle` and `left` blocks
+    The complete main matrix ``amat`` and the ``middle`` and ``left`` blocks
     are given by::
 
        .-0
@@ -1342,10 +1364,11 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
        . 1*1, - 4*1, | 1*4, X 4*4, \ 4*4 upper or lower
 
 
-    Both, `middle` and `left`, are 5x5 matrices. The corresponding
-    right-hand-side `rhs` is filled into `bvec`. The matrices `left` and
-    `middle` provided in a single call are horizontally aligned (not
-    vertically). The sorting of amat (banded matrix) and bvec are given by::
+    Both, ``middle`` and ``left``, are 5x5 matrices. The corresponding
+    right-hand-side ``rhs`` is filled into ``bvec``. The matrices ``left`` and
+    ``middle`` provided in a single call are horizontally aligned (not
+    vertically). The sorting of ``amat`` (banded matrix) and ``bvec`` is given
+    by::
 
         amat (66,)             example: n = 11                   bvec (11,)
         --------------                                                 --
@@ -1394,10 +1417,10 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
         Corresponding right-hand-side of length 5.
 
     im : int
-        Current minus-index of direction of line relaxation, {ixm, iym, izm}.
+        Current minus-index of direction of line relaxation, ``i{x;y;z}m``.
 
     nC : int
-        Total number of cells in direction of line relaxation, {nCx, nCy, nCz}.
+        Total number of cells in direction of line relaxation, ``nC{x;y;z}``.
 
     """
     # Define two often used indices
@@ -1444,25 +1467,26 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
         amat[6*fam] = middle[0]
 
 
+# Actual solver (the core of the core)
 @nb.njit(**_numba_setting)
 def solve(amat, bvec):
     r"""Solve A x = b using a non-standard Cholesky factorisation.
 
     Solve the system A x = b using a non-standard Cholesky factorisation
     without pivoting for a symmetric, complex matrix A tailored to the problem
-    of the multigrid solver. The matrix A (amat) is an array of length 6*n,
+    of the multigrid solver. The matrix A (``amat``) is an array of length 6*n,
     containing the main diagonal and the first five lower off-diagonals
     (ordered so that the first element of the main diagonal is followed by the
     first elements of the off diagonals, then the second elements and so on).
-    The vector bvec has length b.
+    The vector ``bvec`` has length b.
 
-    The solution is placed in b (bvec), and A (amat) is replaced by its
+    The solution is placed in b (``bvec``), and A (``amat``) is replaced by its
     decomposition.
 
     1. Non-standard Cholesky factorisation.
 
-        From [Muld07]_: We use a non-standard Cholesky factorisation. The
-        standard factorisation factors a hermitian matrix A into L L^H, where L
+        From [Muld07]_: «We use a non-standard Cholesky factorisation. The
+        standard factorisation factors a Hermitian matrix A into L L^H, where L
         is a lower triangular matrix and L^H its complex conjugate transpose.
         In our case, the discretisation is based on the Finite Integration
         Technique ([Weil77]_) and provides a matrix A that is complex-valued
@@ -1473,7 +1497,7 @@ def solve(amat, bvec):
         L^T. Because of the symmetry, only the main diagonal and five lower
         diagonal elements of B need to be computed. The Cholesky factorisation
         replaces this matrix by L, containing six diagonals, after which the
-        line relaxation can be carried out by simple back-substitution.
+        line relaxation can be carried out by simple back-substitution.»
 
         :math:`A = L D L^T` factorisation without pivoting:
 
@@ -1604,8 +1628,8 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     fine grid. The weights :math:`w` are obtained from
     :func:`restrict_weights`.
 
-    The restrictions of `rx`, `ry`, and `rz` are stored directly in `crx`,
-    `cry`, and `crz`.
+    The restrictions of ``rx``, ``ry``, and ``rz`` are stored directly in
+    ``crx``, ``cry``, and ``crz``.
 
     Parameters
     ----------
@@ -1615,9 +1639,9 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     rx, ry, rz : ndarray
         Fine grid {x,y,z}-directed residual.
 
-    wx, wy, wz: tuple
-        Tuples containing the weights (wl, w0, wr) as returned from
-        :func:`restrict_weights` for the x-, y-, and z-directions.
+    wx, wy, wz: (ndarray, ndarray, ndarray)
+        Tuples containing the weights (``wl``, ``w0``, ``wr``) as returned from
+        :func:`restrict_weights` for the {x,y,z}-directions.
 
     sc_dir : int
         Direction of semicoarsening; 0 for no semicoarsening.
@@ -1968,7 +1992,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
 
 
 @nb.njit(**_numba_setting)
-def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
+def restrict_weights(nodes, cell_centers, h, cnodes, ccell_centers, ch):
     r"""Restriction weights for the coarse-grid correction operator.
 
     Corresponds to Equation 9 in [Muld06]_. A generalized version of that
@@ -1982,10 +2006,10 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     where :math:`d` are the dual grid cell widths, :math:`v` is one of
     :math:`\{x, y, z\}`, and :math:`Q, q` the corresponding entries of
-    :math:`\{K, L, M\}, \{k, l, m\}`. The superscripts :math:`h, 2h` indicate
-    quantities defined on the coarse grid and on the fine grid, respectively.
-    The indices :math:`\{K, L, M\}` on the coarse grid correspond to
-    :math:`\{k, l, m\} = 2\{K, L, M\}` on the fine grid.
+    :math:`\{K, L, M\}, \{k, l, m\}`, respectively. The superscripts :math:`h,
+    2h` indicate quantities defined on the coarse grid and on the fine grid,
+    respectively. The indices :math:`\{K, L, M\}` on the coarse grid correspond
+    to :math:`\{k, l, m\} = 2\{K, L, M\}` on the fine grid.
 
     For the dual volume cell widths at the boundaries the scheme of [MoSu94]_
     is applied, where :math:`d_0^x = h_{1/2}^x/2` at :math:`k = 0`,
@@ -1997,14 +2021,15 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     Parameters
     ----------
-    vectorN, cvectorN : ndarray
-        Cell edges of the fine (vectorN) and coarse (cvectorN) grids.
+    nodes, cnodes : ndarray
+        Cell edges of the fine (``nodes``) and coarse (``cnodes``) grids.
 
-    vectorCC, cvectorCC : ndarray
-        Cell centers of the fine (vectorCC) and coarse (cvectorCC) grids.
+    cell_centers, ccell_centers : ndarray
+        Cell centers of the fine (``cell_centers``) and coarse
+        (``ccell_centers``) grids.
 
     h, ch : ndarray
-        Cell widths of the fine (h) and coarse (ch) grids.
+        Cell widths of the fine (``h``) and coarse (``ch``) grids.
 
     Returns
     -------
@@ -2014,7 +2039,7 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     """
     # Get length of weights
-    n = len(cvectorN)
+    n = len(cnodes)
 
     # Dual grid cell widths
     d = np.empty(n+1)
@@ -2025,17 +2050,17 @@ def restrict_weights(vectorN, vectorCC, h, cvectorN, cvectorCC, ch):
 
     # Left weight
     wl = 1/d[:-1]
-    wl[0] *= (vectorN[0]-h[0]/2) - (cvectorN[0]-ch[0]/2)
+    wl[0] *= (nodes[0]-h[0]/2) - (cnodes[0]-ch[0]/2)
     for i in range(1, n):
-        wl[i] *= vectorCC[2*i-1]-cvectorCC[i-1]
+        wl[i] *= cell_centers[2*i-1]-ccell_centers[i-1]
 
     # Central weight
     w0 = np.ones(n)
 
     # Right weight
     wr = 1/d[1:]
-    wr[-1] *= (cvectorN[-1]+ch[-1]/2) - (vectorN[-1]+h[-1]/2)
+    wr[-1] *= (cnodes[-1]+ch[-1]/2) - (nodes[-1]+h[-1]/2)
     for i in range(n-1):
-        wr[i] *= cvectorCC[i]-vectorCC[2*i]
+        wr[i] *= ccell_centers[i]-cell_centers[2*i]
 
     return wl, w0, wr

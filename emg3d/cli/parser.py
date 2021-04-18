@@ -1,7 +1,7 @@
 """
 Parser for the configuration file of the command-line interface.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -43,7 +43,7 @@ def parse_config_file(args_dict):
     configfile = os.path.abspath(config)
     cfg = configparser.ConfigParser(inline_comment_prefixes='#')
 
-    # Check if configfile is actually a file.
+    # Check if config-file is actually a file.
     if os.path.isfile(configfile):
 
         # If it is, read it.
@@ -81,8 +81,9 @@ def parse_config_file(args_dict):
 
     # Ensure no keys are left.
     if args_dict:
-        raise TypeError(f"Unexpected parameter in **args_dict: "
-                        f"{list(args_dict.keys())}")
+        raise TypeError(
+            f"Unexpected parameter in **args_dict: {list(args_dict.keys())}."
+        )
 
     # Enforce some limits.
     term['verbosity'] = int(min(max(term['verbosity'], -1), 2))  # [-1, 2]
@@ -140,8 +141,9 @@ def parse_config_file(args_dict):
 
     # Ensure no keys are left.
     if all_files:
-        raise TypeError(f"Unexpected parameter in [files]: "
-                        f"{list(all_files.keys())}")
+        raise TypeError(
+            f"Unexpected parameter in [files]: {list(all_files.keys())}."
+        )
 
     # # Simulation parameters  # #
 
@@ -183,8 +185,9 @@ def parse_config_file(args_dict):
 
     # Ensure no keys are left.
     if all_sim:
-        raise TypeError(f"Unexpected parameter in [simulation]: "
-                        f"{list(all_sim.keys())}")
+        raise TypeError(
+            f"Unexpected parameter in [simulation]: {list(all_sim.keys())}."
+        )
 
     # # Solver parameters  # #
 
@@ -224,8 +227,10 @@ def parse_config_file(args_dict):
 
         # Ensure no keys are left.
         if all_solver:
-            raise TypeError(f"Unexpected parameter in [solver_opts]: "
-                            f"{list(all_solver.keys())}")
+            raise TypeError(
+                f"Unexpected parameter in [solver_opts]: "
+                f"{list(all_solver.keys())}."
+            )
 
         # Add to simulation dict if not empty.
         if solver:
@@ -241,15 +246,13 @@ def parse_config_file(args_dict):
         for key in ['sources', 'receivers', 'frequencies']:
             value = all_data.pop(key, False)
             if value:
-                if key == 'frequencies':
-                    data[key] = [float(v) for v in value.split(',')]
-                else:
-                    data[key] = [v.strip() for v in value.split(',')]
+                data[key] = [v.strip() for v in value.split(',')]
 
         # Ensure no keys are left.
         if all_data:
-            raise TypeError(f"Unexpected parameter in [data]: "
-                            f"{list(all_data.keys())}")
+            raise TypeError(
+                f"Unexpected parameter in [data]: {list(all_data.keys())}."
+            )
 
     # # Gridding # #
 
@@ -280,7 +283,7 @@ def parse_config_file(args_dict):
                 if len(out) == 1:
                     out = out[0]
                 else:
-                    out = tuple(out)
+                    out = {'x': out[0], 'y': out[1], 'z': out[2]}
                 grid[key] = out
 
         # Check for strings.
@@ -309,8 +312,10 @@ def parse_config_file(args_dict):
 
         # Ensure no keys are left.
         if all_grid:
-            raise TypeError(f"Unexpected parameter in [gridding_opts]: "
-                            f"{list(all_grid.keys())}")
+            raise TypeError(
+                f"Unexpected parameter in [gridding_opts]: "
+                f"{list(all_grid.keys())}"
+            )
 
         # Add to simulation dict if not empty.
         if grid:

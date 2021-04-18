@@ -1,8 +1,11 @@
 """
-Interpolation routines mapping grids to grids, grids to fields, and fields to
-grids.
+Mapping routines to map to and from linear conductivities (what is used
+internally) to other representations such as resistivities or logarithms
+thereof.
+
+Interpolation routines mapping values between different grids.
 """
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -20,273 +23,50 @@ grids.
 
 import numba as nb
 import numpy as np
-from scipy import interpolate, ndimage
+from scipy.ndimage import map_coordinates
+from scipy.interpolate import RegularGridInterpolator, interpnd, interp1d
 
-__all__ = ['grid2grid', 'interp3d', 'MapConductivity', 'MapLgConductivity',
+from emg3d.core import _numba_setting
+
+__all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
-           'MapLnResistivity', 'edges2cellaverages']
-
-# Numba-settings
-_numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
+           'MapLnResistivity', 'interpolate', 'interp_spline_3d',
+           'interp_volume_average', 'interp_edges_to_vol_averages']
 
 
-# INTERPOLATIONS
-def grid2grid(grid, values, new_grid, method='linear', extrapolate=True,
-              log=False):
-    """Interpolate `values` located on `grid` to `new_grid`.
+class BaseMap:
+    """Maps variable `x` to computational variable `σ` (conductivity).
 
-    **Note 1:**
-    The default method is 'linear', because it works with fields and model
-    parameters. However, recommended are 'volume' for model parameters and
-    'cubic' for fields.
+    Subclass this BaseMap to create new maps. A map class must start with
+    ``Map`` followed by a name, e.g., ``MapProperty``.
 
-    **Note 2:**
-    For model parameters with `method='volume'` the result is quite different
-    if you provide resistivity, conductivity, or the logarithm of any of the
-    two. The recommended way is to provide the logarithm of resistivity or
-    conductivity, in which case the output of one is indeed the inverse of the
-    output of the other.
+    To be able to load custom maps using ``emg3d.io.load`` define the map
+    before you load the files, and register the map by putting the decorator
+    ``emg3d.maps.register_map``. This will enable the I/O to properly
+    instantiate your custom maps.
 
+    .. code-block:: python
 
-    Parameters
-    ----------
-    grid, new_grid : TensorMesh
-        Input and output model grids;
-        :class:`TensorMesh` instances.
+        @emg3d.maps.register_map
+        class MapProperty(emg3d.maps.BaseMap):
+            '''Description'''
+            def __init__(self):
+                super().__init__('property')
 
-    values : ndarray
-        Model parameters; :class:`emg3d.fields.Field` instance, or a particular
-        field (e.g. field.fx). For fields the method cannot be 'volume'.
+            def forward(self, conductivity):
+                return # Mapping from your property to conductivity.
 
-    method : {<'linear'>, 'volume', 'cubic'}, optional
-        The method of interpolation to perform. The volume averaging method
-        ensures that the total sum of the property stays constant.
+            def backward(self, mapped):
+                return # Mapping from conductivity to your property.
 
-        Volume averaging is only implemented for model parameters, not for
-        fields. The method 'cubic' requires at least three points in any
-        direction, otherwise it will fall back to 'linear'.
-
-        Default is 'linear', because it works with fields and model parameters.
-        However, recommended are 'volume' for model parameters and 'cubic' for
-        fields.
-
-    extrapolate : bool
-        If True, points on `new_grid` which are outside of `grid` are filled by
-        the nearest value (if ``method='cubic'``) or by extrapolation (if
-        ``method='linear'``). If False, points outside are set to zero.
-
-        For ``method='volume'`` it always uses the nearest value for points
-        outside of `grid`.
-
-        Default is True.
-
-    log : bool
-        If True, the interpolation is carried out on a log10-scale; hence the
-        same as ``10**grid2grid(grid, np.log10(values), ...)``.
-        Default is False.
-
-
-    Returns
-    -------
-    new_values : ndarray
-        Values corresponding to `new_grid`.
-
-
-    See Also
-    --------
-    get_receiver : Interpolation of model parameters or fields to (x, y, z).
+            def derivative_chain(self, gradient, mapped):
+                gradient *= # Chain rule of your backward mapping.
 
     """
-
-    # If values is a Field instance, call it recursively for each field.
-    if hasattr(values, 'field') and values.field.ndim == 1:
-        fx = grid2grid(grid, np.asarray(values.fx), new_grid, method,
-                       extrapolate, log)
-        fy = grid2grid(grid, np.asarray(values.fy), new_grid, method,
-                       extrapolate, log)
-        fz = grid2grid(grid, np.asarray(values.fz), new_grid, method,
-                       extrapolate, log)
-
-        # Return a field instance.
-        return values.__class__(fx, fy, fz)
-
-    # If values is a particular field, ensure method is not 'volume'.
-    if not np.all(grid.vnC == values.shape) and method == 'volume':
-        raise ValueError("``method='volume'`` not implemented for fields.")
-
-    if method == 'volume':
-        points = (grid.nodes_x, grid.nodes_y, grid.nodes_z)
-        new_points = (new_grid.nodes_x, new_grid.nodes_y, new_grid.nodes_z)
-        new_values = np.zeros(new_grid.vnC, dtype=values.dtype)
-        vol = new_grid.cell_volumes.reshape(new_grid.vnC, order='F')
-
-        # Get values from `volume_average`.
-        if log:
-            volume_average(*points, np.log10(values), *new_points,
-                           new_values, vol)
-        else:
-            volume_average(*points, values, *new_points, new_values, vol)
-
-    else:
-        # Get the vectors corresponding to input data.
-        points = tuple()
-        new_points = tuple()
-        shape = tuple()
-        for i, coord in enumerate(['x', 'y', 'z']):
-            if values.shape[i] == getattr(grid, 'shape_nodes')[i]:
-                pts = getattr(grid, 'nodes_'+coord)
-                new_pts = getattr(new_grid, 'nodes_'+coord)
-            else:
-                pts = getattr(grid, 'cell_centers_'+coord)
-                new_pts = getattr(new_grid, 'cell_centers_'+coord)
-
-            # Add to points.
-            points += (pts, )
-            new_points += (new_pts, )
-            shape += (len(new_pts), )
-
-        # Format the output points.
-        xx, yy, zz = np.broadcast_arrays(
-                new_points[0][:, None, None],
-                new_points[1][:, None],
-                new_points[2])
-        new_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
-        new_points = new_points.reshape(-1, 3, order='F')
-
-        # Get values from `interp3d`.
-        if extrapolate:
-            fill_value = None
-            mode = 'nearest'
-        else:
-            fill_value = 0.0
-            mode = 'constant'
-
-        if log:
-            new_values = interp3d(points, np.log10(values), new_points,
-                                  method, fill_value, mode)
-        else:
-            new_values = interp3d(points, values, new_points, method,
-                                  fill_value, mode)
-
-        new_values = new_values.reshape(shape, order='F')
-
-    if log:
-        return 10**new_values
-    else:
-        return new_values
-
-
-def interp3d(points, values, new_points, method, fill_value, mode, cval=0.0):
-    """Interpolate values in 3D either linearly or with a cubic spline.
-
-    Return `values` corresponding to a regular 3D grid defined by `points` on
-    `new_points`.
-
-    This is a modified version of :func:`scipy.interpolate.interpn`, using
-    :class:`scipy.interpolate.RegularGridInterpolator` if ``method='linear'``
-    and a custom-wrapped version of :func:`scipy.ndimage.map_coordinates` if
-    ``method='cubic'``. If speed is important then choose 'linear', as it can
-    be significantly faster.
-
-
-    Parameters
-    ----------
-    points : tuple of ndarray of float, with shapes ((nx, ), (ny, ) (nz, ))
-        The points defining the regular grid in three dimensions.
-
-    values : array_like, shape (nx, ny, nz)
-        The data on the regular grid in three dimensions.
-
-    new_points : tuple (rec_x, rec_y, rec_z)
-        Coordinates (x, y, z) of new points.
-
-    method : {'cubic', 'linear'}, optional
-        The method of interpolation to perform, 'linear' or 'cubic'. Default is
-        'cubic' (forced to 'linear' if there are less than 3 points in any
-        direction).
-
-    fill_value : float or None
-        Passed to :class:`scipy.interpolate.RegularGridInterpolator` if
-        ``method='linear'``: The value to use for points outside of the
-        interpolation domain. If None, values outside the domain are
-        extrapolated.
-
-    mode : {'constant', 'nearest', 'mirror', 'reflect', 'wrap'}
-        Passed to :func:`scipy.ndimage.map_coordinates` if ``method='cubic'``:
-        Determines how the input array is extended beyond its boundaries.
-
-    cval : float or np.nan
-        Passed to :func:`scipy.ndimage.map_coordinates` if ``method='cubic'``:
-        it is the value to fill past edges of input if ``mode='constant'``.
-        Default is 0.0
-
-    Returns
-    -------
-    new_values : ndarray
-        Values corresponding to `new_points`.
-
-    """
-
-    # We need at least 3 points in each direction for cubic spline. This should
-    # never be an issue for a realistic 3D model.
-    for pts in points:
-        if len(pts) < 4:
-            method = 'linear'
-
-    # Interpolation.
-    if method == "linear":
-        ifn = interpolate.RegularGridInterpolator(
-                points=points, values=values, method="linear",
-                bounds_error=False, fill_value=fill_value)
-
-        new_values = ifn(xi=new_points)
-
-    else:
-
-        # Replicate the same expansion of xi as used in
-        # RegularGridInterpolator, so the input xi can be quite flexible.
-        xi = interpolate.interpnd._ndim_coords_from_arrays(new_points, ndim=3)
-        xi_shape = xi.shape
-        xi = xi.reshape(-1, 3)
-
-        # map_coordinates uses the indices of the input data (values in this
-        # case) as coordinates. We have therefore to transform our desired
-        # output coordinates to this artificial coordinate system too.
-        coords = np.empty(xi.T.shape)
-        for i in range(3):
-            coords[i] = interpolate.interp1d(
-                    points[i], np.arange(len(points[i])), kind='cubic',
-                    bounds_error=False, fill_value='extrapolate',)(xi[:, i])
-
-        # map_coordinates only works for real data; split it up if complex.
-        params3d = {'order': 3, 'mode': mode, 'cval': cval}
-        if 'complex' in values.dtype.name:
-            real = ndimage.map_coordinates(values.real, coords, **params3d)
-            imag = ndimage.map_coordinates(values.imag, coords, **params3d)
-            result = real + 1j*imag
-        else:
-            result = ndimage.map_coordinates(values, coords, **params3d)
-
-        new_values = result.reshape(xi_shape[:-1])
-
-    return new_values
-
-
-# MAPS
-MAPLIST = {}
-
-
-def register_map(func):
-    MAPLIST[func.__name__] = func
-    return func
-
-
-class _Map:
-    """Maps variable `x` to computational variable `σ` (conductivity)."""
 
     def __init__(self, description):
         """Initiate the map."""
-        self.name = self.__class__.__name__[3:]
+        self.name = self.__class__.__name__[3:]  # Class name without `Map`
         self.description = description
 
     def __repr__(self):
@@ -306,18 +86,8 @@ class _Map:
         """Chain rule to map gradient from conductivity to mapping space."""
         raise NotImplementedError("Derivative chain not implemented.")
 
-    def to_dict(self):
-        """Store the map name in a dict for serialization."""
-        return {'name': self.name, '__class__': '_Map'}
 
-    @classmethod
-    def from_dict(cls, inp):
-        """Get :class:`_Map` instance from name in dict."""
-        return MAPLIST['Map'+inp['name']]()
-
-
-@register_map
-class MapConductivity(_Map):
+class MapConductivity(BaseMap):
     """Maps `σ` to computational variable `σ` (conductivity).
 
     - forward: x = σ
@@ -338,8 +108,7 @@ class MapConductivity(_Map):
         pass
 
 
-@register_map
-class MapLgConductivity(_Map):
+class MapLgConductivity(BaseMap):
     """Maps `log_10(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(σ)
@@ -360,8 +129,7 @@ class MapLgConductivity(_Map):
         gradient *= self.backward(mapped)*np.log(10)
 
 
-@register_map
-class MapLnConductivity(_Map):
+class MapLnConductivity(BaseMap):
     """Maps `log_e(σ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(σ)
@@ -382,8 +150,7 @@ class MapLnConductivity(_Map):
         gradient *= self.backward(mapped)
 
 
-@register_map
-class MapResistivity(_Map):
+class MapResistivity(BaseMap):
     """Maps `ρ` to computational variable `σ` (conductivity).
 
     - forward: x = ρ = σ^-1
@@ -404,8 +171,7 @@ class MapResistivity(_Map):
         gradient *= -self.backward(mapped)**2
 
 
-@register_map
-class MapLgResistivity(_Map):
+class MapLgResistivity(BaseMap):
     """Maps `log_10(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_10(ρ) = log_10(σ^-1)
@@ -426,8 +192,7 @@ class MapLgResistivity(_Map):
         gradient *= -self.backward(mapped)*np.log(10)
 
 
-@register_map
-class MapLnResistivity(_Map):
+class MapLnResistivity(BaseMap):
     """Maps `log_e(ρ)` to computational variable `σ` (conductivity).
 
     - forward: x = log_e(ρ) = log_e(σ^-1)
@@ -448,44 +213,381 @@ class MapLnResistivity(_Map):
         gradient *= -self.backward(mapped)
 
 
-# VOLUME AVERAGING
-@nb.njit(**_numba_setting)
-def volume_average(edges_x, edges_y, edges_z, values,
-                   new_edges_x, new_edges_y, new_edges_z, new_values, new_vol):
-    """Interpolation using the volume averaging technique.
-
-    The result is added to new_values.
-
-    The original implementation (see ``emg3d v0.7.1``) followed [PlDM07]_. Joe
-    Capriot took that algorithm and made it much faster for implementation in
-    `discretize`. The current implementation is a simplified Numba-version of
-    his Cython version (the `discretize` version works for 1D, 2D, and 3D
-    meshes and can also return a sparse matrix representing the operation).
+# INTERPOLATIONS
+def interpolate(grid, values, xi, method='linear', extrapolate=True,
+                log=False, **kwargs):
+    """Interpolate values from one grid to another grid or to points.
 
 
     Parameters
     ----------
-    edges_[x, y, z] : ndarray
-        The edges in x-, y-, and z-directions for the original grid.
+    grid : TensorMesh
+        Input grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     values : ndarray
-        Values corresponding to `grid`.
+        A model property such as ``Model.property_x``, or a field such as
+        ``Field.fx`` (``ndim=3``; the dimension in each direction must either
+        correspond to the number of nodes or cell centers in the corresponding
+        direction).
 
-    new_edges_[x, y, z] : ndarray
-        The edges in x-, y-, and z-directions for the new grid.
+    xi : {TensorMesh, tuple, ndarray}
+        Output coordinates; possibilities:
+
+        - A grid (:class:`emg3d.meshes.TensorMesh`): interpolation from one
+          grid to another.
+        - A tuple (array_like, array_like, array_like) containing x-, y-, and
+          z-coordinates. The length of each can be either one or the number of
+          coordinates, the size-one elements will be expanded internally to the
+          length of the coordinates. E.g., ``(x, [y0, y1, y2], z)`` will be
+          expanded to ``([x, x, x], [y0, y1, y2], [z, z, z])``.
+        - Arbitrary point coordinates as ``ndarray`` of shape ``(..., 3)``,
+          e.g., ``array([[x0, y0, z0], ..., [xN, yN, zN]))``.
+
+    method : {'nearest', 'linear', 'volume', 'cubic'}, default: 'linear'
+        The method of interpolation to perform.
+
+        - ``'nearest', 'linear'``: Fastest methods; work for model properties
+          and fields living on edges or faces. Carried out with
+          :class:`scipy.interpolate.RegularGridInterpolator`.
+
+        - ``'cubic'``: Cubic spline interpolation using
+          :func:`emg3d.maps.interp_spline_3d`.
+
+        - ``'volume'``: Volume average interpolation using
+          :func:`emg3d.maps.interp_volume_average`.
+
+          Volume average interpolation ensures that the total sum of the
+          interpolated quantity stays constant. The result can be quite
+          different if you provide resistivity, conductivity, or the logarithm
+          of any of the two. The recommended way is to use ``log=True``, in
+          which case the output is the same for conductivities and
+          resistivities.
+
+          This method is only implemented for quantities living on cell
+          centers, not on edges/faces (hence not for fields); and only for
+          grids as input to ``xi``.
+
+    extrapolate : bool, default: True
+        This parameter controls the default parameters provided to the
+        interpolation routines.
+
+        - ``'nearest', 'linear'``: If True, values outside of the domain are
+          extrapolated (``bounds_error=False, fill_value=None``); if False,
+          values outside are set to 0.0 (``bounds_error=False,
+          fill_value=0.0``)
+
+        - ``'cubic'``: If True, values outside of the domain are extrapolated
+          using nearest interpolation (``mode='nearest'``); if False, values
+          outside are set to 0.0 (``mode='constant', cval=0.0``).
+
+        - ``'volume'``: Always uses nearest interpolation for points outside of
+          the provided grid, independent of the choice of ``extrapolate``.
+
+    log : bool, default: False
+        If True, the interpolation is carried out on a log10-scale; this
+        corresponds to ``10**interpolate(grid, np.log10(values), ...)``.
+
+    kwargs : dict, optional
+        Will be forwarded to the corresponding interpolation algorithm, if they
+        accept additional keywords. This can be used, e.g., to change the
+        behaviour outlined in the parameter ``extrapolate``.
+
+
+    Returns
+    -------
+    values_x : ndarray
+        Values corresponding to the new grid.
+
+    """
+
+    # Take log10 if set.
+    if log:
+        values = np.log10(values)
+
+    # Get points in the right shape.
+    points, new_points, shape = _points_from_grids(grid, values, xi, method)
+
+    # Carry out the actual interpolation.
+    if method == 'volume':
+
+        # Pre-allocate output.
+        values_x = np.zeros(shape, order='F', dtype=values.dtype)
+
+        interp_volume_average(
+                nodes_x=points[0], nodes_y=points[1], nodes_z=points[2],
+                values=values, new_nodes_x=new_points[0],
+                new_nodes_y=new_points[1], new_nodes_z=new_points[2],
+                new_values=values_x,
+                new_vol=xi.cell_volumes.reshape(shape, order='F'))
+
+    elif method == 'cubic':
+
+        opts = {
+            'mode': 'nearest' if extrapolate else 'constant',
+            **({} if kwargs is None else kwargs),
+        }
+
+        values_x = interp_spline_3d(
+                points=points, values=values, xi=new_points, **opts)
+
+    else:  # 'nearest'/'linear' (will raise ValueError if unknown method).
+
+        opts = {
+            'bounds_error': False,
+            'fill_value': None if extrapolate else 0.0,
+            **({} if kwargs is None else kwargs),
+        }
+
+        values_x = RegularGridInterpolator(
+                points=points, values=values, method=method,
+                **opts)(xi=new_points)
+
+    # Return to linear if log10 was applied.
+    if log:
+        values_x = 10**values_x
+
+    # Reshape and return.
+    return values_x.reshape(shape, order='F')
+
+
+def _points_from_grids(grid, values, xi, method):
+    """Return `points` and `new_points` from original grid and new grid/points.
+
+    Returns ``points``, ``new_points``, and ``shape`` to use with
+    :func:`emg3d.maps.interp_volume_average`,
+    :func:`emg3d.maps.interp_spline_3d`, and
+    :class:`scipy.interpolate.RegularGridInterpolator`.
+
+
+    For the input parameters, see :func:`emg3d.maps.interpolate`.
+
+    Returns
+    -------
+    points : (ndarray, ndarray, ndarray)
+        Tuple containing the x-, y-, and z-coordinates of the input values.
+
+    new_points : {(ndarray, ndarray, ndarray); ndarray}
+        Depends on the ``method``:
+
+        - If ``method='volume'``: (ndarray, ndarray, ndarray)
+
+          Tuple containing the x-, y-, and z-coordinates of the output values.
+
+        - Else: ndarray
+
+          Coordinates in an ndarray of shape (..., 3):
+          ``array([[x1, y1, z1], ..., [xn, yn, zn]])``.
+
+    shape : tuple
+        Final shape of the output values.
+
+    """
+
+    # Specific checks for method='volume'.
+    if method == 'volume':
+        msg = "``method='volume'`` is only implemented for "
+
+        # 'xi' must be a TensorMesh.
+        if not hasattr(xi, 'nodes_x'):
+            msg += "TensorMesh instances as input for ``xi``."
+            raise ValueError(msg)
+
+        # Shape of the values must correspond to shape of cells.
+        if grid.shape_cells != values.shape:
+            msg += "cell-centered properties; required shape = "
+            raise ValueError(msg + f"{grid.shape_cells}.")
+
+    # General dimensionality check.
+    else:
+        electric = [grid.shape_edges_x, grid.shape_faces_y, grid.shape_edges_z]
+        magnetic = [grid.shape_faces_x, grid.shape_edges_y, grid.shape_faces_z]
+        centered = [grid.shape_cells, ]
+        if values.shape not in np.r_[electric, magnetic, centered]:
+            msg = ("``values`` must be a 3D ndarray living on cell centers, "
+                   "edges, or faces of the ``grid``.")
+            raise ValueError(msg)
+
+    # Get electric flag (living on edges vs living on faces).
+    electric = values.shape not in [grid.shape_faces_x, grid.shape_edges_y,
+                                    grid.shape_faces_z]
+
+    # Check if 'xi' is a TensorMesh.
+    xi_is_grid = hasattr(xi, 'nodes_x')
+
+    # # Get points from input # #
+
+    # 1. Get required tuples from input grids.
+    points = tuple()
+    if xi_is_grid:
+        new_points = tuple()
+        shape = tuple()
+
+    # Loop over dimensions to get the vectors corresponding to input data.
+    for i, coord in enumerate(['x', 'y', 'z']):
+
+        # Cell nodes.
+        comp_shape = [grid.shape_cells[i], grid.shape_nodes[i]][electric]
+        if method == 'volume' or values.shape[i] == comp_shape:
+            prop = ['cell_centers_', 'nodes_'][electric]
+            pts = getattr(grid, prop + coord)
+            if xi_is_grid:
+                new_pts = getattr(xi, prop + coord)
+
+        # Cell centers.
+        else:
+            prop = ['nodes_', 'cell_centers_'][electric]
+            pts = getattr(grid, prop + coord)
+            if xi_is_grid:
+                new_pts = getattr(xi, prop + coord)
+
+        # Add to points.
+        points += (pts, )
+        if xi_is_grid:
+            new_points += (new_pts, )
+            shape += (len(new_pts), )
+
+    # After this step the points/new_points are:
+    # points: (x-points, y-points, z-points)
+    # new_points: (new-x-points, new-y-points, new-z-points)  # if xi_is_grid
+
+    # 'volume' takes new_points as tuples. However, the other methods take an
+    # (..., 3) ndarray of the coordinates.
+    if method != 'volume':
+
+        # # Convert points to correct format # #
+        if xi_is_grid:
+            xx, yy, zz = np.broadcast_arrays(
+                    new_points[0][:, None, None],
+                    new_points[1][:, None],
+                    new_points[2])
+            new_points = np.r_[xx.ravel('F'), yy.ravel('F'), zz.ravel('F')]
+            new_points = new_points.reshape(-1, 3, order='F')
+
+        else:
+            # Replicate the same expansion of xi as used in
+            # RegularGridInterpolator, so the input xi can be quite flexible.
+            new_points = interpnd._ndim_coords_from_arrays(
+                    xi, ndim=3)
+            shape = new_points.shape[:-1]
+            new_points = new_points.reshape(-1, 3, order='F')
+
+        # After this step the new_points are:
+        # new_points: array([[x1, y1, z1], ..., [xn, yn, zn]])
+
+    else:
+        shape = xi.shape_cells
+
+    return points, new_points, shape
+
+
+def interp_spline_3d(points, values, xi, **kwargs):
+    """Interpolate values in 3D with a cubic spline.
+
+    This functionality is best accessed through :func:`emg3d.maps.interpolate`
+    by setting ``method='cubic'``.
+
+    3D cubic spline interpolation is achieved by mapping the ``points`` to
+    regular indices and interpolate with cubic splines
+    (:class:`scipy.interpolate.interp1d`) the ``xi`` to this artificial
+    coordinate system. The ``values`` can then be interpolated from ``points``
+    to ``xi`` on this transformed coordinate system using cubic spline
+    interpolation through :func:`scipy.ndimage.map_coordinates`.
+
+
+    Parameters
+    ----------
+    points : (ndarray, ndarray, ndarray)
+        The points defining the regular grid in (x, y, z) direction.
+
+    values : ndarray
+        The data on the regular grid in three dimensions (nx, ny, nz).
+
+    xi : ndarray
+        Coordinates (x, y, z) of new points, shape ``(..., 3)``.
+
+    kwargs : dict, optional
+        Passed through to :func:`scipy.ndimage.map_coordinates`.
+        Potentially valuable keywords to pass are
+
+        - ``order``: which has to be in the range of 0-5, default: 3;
+        - ``mode``: default is ``'constant'``, options include ``'nearest'``;
+        - ``cval``: the value to fill past edges if ``mode='constant'``,
+          default is 0.0.
+
+
+    Returns
+    -------
+    values_x : ndarray
+        Values corresponding to ``xi``.
+
+    """
+
+    # `map_coordinates` uses the indices of the input data (our values) as
+    # coordinates. We have therefore to transform our desired output
+    # coordinates to this artificial coordinate system too.
+    coords = np.empty(xi.T.shape)
+    for i in range(3):
+        coords[i] = interp1d(points[i], np.arange(len(points[i])),
+                             kind='cubic', bounds_error=False,
+                             fill_value='extrapolate')(xi[:, i])
+
+    # `map_coordinates` only works for real data; split it up if complex.
+    # Note: SciPy 1.6 (12/2020) introduced complex-valued
+    #       ndimage.map_coordinates; replace eventually.
+    values_x = map_coordinates(values.real, coords, **kwargs)
+    if 'complex' in values.dtype.name:
+        imag = map_coordinates(values.imag, coords, **kwargs)
+        values_x = values_x + 1j*imag
+
+    return values_x
+
+
+@nb.njit(**_numba_setting)
+def interp_volume_average(
+        nodes_x, nodes_y, nodes_z, values, new_nodes_x, new_nodes_y,
+        new_nodes_z, new_values, new_vol):
+    """Interpolate properties from `grid` to `new_grid` using volume averages.
+
+    This functionality is best accessed through :func:`emg3d.maps.interpolate`
+    by setting ``method='volume'``.
+
+    Interpolation using the volume averaging technique. The original
+    implementation (see ``emg3d v0.7.1``) followed [PlDM07]_. Joseph Capriotti
+    took that algorithm and made it much faster for implementation in
+    *discretize*. The current implementation is a translation of that from
+    Cython to Numba, heavily simplified for the 3D use case in *emg3d*.
+
+    The result is added to ``new_values``.
+
+
+    Parameters
+    ----------
+    nodes_{x;y;z} : ndarray
+        The nodes in x-, y-, and z-directions for the original grid,
+        ``grid.nodes_{x;y;z}``, from a :func:`emg3d.meshes.TensorMesh`
+        instance.
+
+    values : ndarray
+        Values corresponding to original grid (of shape ``grid.shape_cells``).
+
+    new_nodes_{x;y;z} : ndarray
+        The nodes in x-, y-, and z-directions for the new grids,
+        ``new_grid.nodes_{x;y;z}``, from a :func:`emg3d.meshes.TensorMesh`
+        instance.
 
     new_values : ndarray
-        Array where values corresponding to `new_grid` will be added.
+        Array where values corresponding to the new grid will be added (of
+        shape ``new_grid.shape_cells``).
 
     new_vol : ndarray
-        The volumes of the `new_grid`-cells.
+        The cell volumes of the new grid (``new_grid.cell_volumes``).
 
     """
 
     # Get the weights and indices for each direction.
-    wx, ix_in, ix_out = _volume_average_weights(edges_x, new_edges_x)
-    wy, iy_in, iy_out = _volume_average_weights(edges_y, new_edges_y)
-    wz, iz_in, iz_out = _volume_average_weights(edges_z, new_edges_z)
+    wx, ix_in, ix_out = _volume_average_weights(nodes_x, new_nodes_x)
+    wy, iy_in, iy_out = _volume_average_weights(nodes_y, new_nodes_y)
+    wz, iz_in, iz_out = _volume_average_weights(nodes_z, new_nodes_z)
 
     # Loop over the elements and sum up the contributions.
     for iz, w_z in enumerate(wz):
@@ -505,97 +607,74 @@ def volume_average(edges_x, edges_y, edges_z, values,
 
 
 @nb.njit(**_numba_setting)
-def _volume_average_weights(x1, x2):
-    """Returaveragethe weights for the volume averaging technique.
+def _volume_average_weights(x_i, x_o):
+    """Return weights for volume averaging technique.
 
 
     Parameters
     ----------
-    x1, x2 : ndarray
-        The edges in x-, y-, or z-directions for the original (x1) and the new
-        (x2) grids.
+    x_i, x_o : ndarray
+        The nodes in x-, y-, or z-directions for the input (x_i) and output
+        (x_o) grids.
 
 
     Returns
     -------
     hs : ndarray
-        Weights for the mapping of x1 to x2.
+        Weights for the mapping of x_i to x_o.
 
-    ix1, ix2 : ndarray
-        Indices to map x1 to x2.
+    ix_i, ix_o : ndarray
+        Indices to map x_i to x_o.
 
     """
-    # Fill xs with uniques and truncate.
-    # Corresponds to np.unique(np.concatenate([x1, x2])).
-    n1, n2 = len(x1), len(x2)
-    xs = np.empty(n1 + n2)  # Pre-allocate array containing all edges.
-    i1, i2, i = 0, 0, 0
-    while i1 < n1 or i2 < n2:
-        if i1 < n1 and i2 < n2:
-            if x1[i1] < x2[i2]:
-                xs[i] = x1[i1]
-                i1 += 1
-            elif x1[i1] > x2[i2]:
-                xs[i] = x2[i2]
-                i2 += 1
-            else:
-                xs[i] = x1[i1]
-                i1 += 1
-                i2 += 1
-        elif i1 < n1 and i2 == n2:
-            xs[i] = x1[i1]
-            i1 += 1
-        elif i2 < n2 and i1 == n1:
-            xs[i] = x2[i2]
-            i2 += 1
-        i += 1
+    # Get unique nodes.
+    xs = np.unique(np.concatenate((x_i, x_o)))
+    n1, n2, nh = len(x_i), len(x_o), len(xs)-1
 
     # Get weights and indices for the two arrays.
-    # - hs corresponds to np.diff(xs) where x1 and x2 overlap; zero outside.
-    # - x1[ix1] can be mapped to x2[ix2] with the corresponding weight.
-    nh = i-1
-    hs = np.empty(nh)                   # Pre-allocate weights.
-    ix1 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x1.
-    ix2 = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x2.
+    # - wx corresponds to np.diff(xs) where x_i and x_o overlap; zero outside.
+    # - x_i[ix_i] can be mapped to x_o[ix_o] with the corresponding weight.
+    wx = np.empty(nh)                   # Pre-allocate weights.
+    ix_i = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x_i.
+    ix_o = np.zeros(nh, dtype=np.int32)  # Pre-allocate indices for x_o.
     center = 0.0
     i1, i2, i, ii = 0, 0, 0, 0
     for i in range(nh):
         center = 0.5*(xs[i]+xs[i+1])
-        if x2[0] <= center and center <= x2[n2-1]:
-            hs[ii] = xs[i+1]-xs[i]
-            while i1 < n1-1 and center >= x1[i1]:
+        if x_o[0] <= center and center <= x_o[n2-1]:
+            wx[ii] = xs[i+1]-xs[i]
+            while i1 < n1-1 and center >= x_i[i1]:
                 i1 += 1
-            while i2 < n2-1 and center >= x2[i2]:
+            while i2 < n2-1 and center >= x_o[i2]:
                 i2 += 1
-            ix1[ii] = min(max(i1-1, 0), n1-1)
-            ix2[ii] = min(max(i2-1, 0), n2-1)
+            ix_i[ii] = min(max(i1-1, 0), n1-1)
+            ix_o[ii] = min(max(i2-1, 0), n2-1)
             ii += 1
 
-    return hs[:ii], ix1[:ii], ix2[:ii]
+    return wx[:ii], ix_i[:ii], ix_o[:ii]
 
 
-# EDGES => CENTERS
 @nb.njit(**_numba_setting)
-def edges2cellaverages(ex, ey, ez, vol, out_x, out_y, out_z):
+def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
     r"""Interpolate fields defined on edges to volume-averaged cell values.
-
 
     Parameters
     ----------
     ex, ey, ez : ndarray
-        Electric fields in x-, y-, and z-directions, as obtained from
-        :class:`emg3d.fields.Field`.
+        Electric fields in x-, y-, and z-directions from a
+        :func:`emg3d.fields.Field` instance (``field.f{x;y;z}``).
 
-    vol : ndarray
-        Volumes of the grid, as obtained from :class:`emg3d.meshes.TensorMesh`.
+    volumes : ndarray
+        Cell volumes of the corresponding grid (``field.grid.cell_volumes``).
 
-    out_x, out_y, out_z : ndarray
-        Arrays where the results are placed (per direction).
+    ox, oy, oz : ndarray
+        Output arrays where the results are placed (of shape
+        ``field.grid.shape_cells``).
 
     """
 
     # Get dimensions
-    nx, ny, nz = vol.shape
+    nx, ny, nz = volumes.shape
 
     # Loop over dimensions.
     for iz in range(nz+1):
@@ -612,19 +691,19 @@ def edges2cellaverages(ex, ey, ez, vol, out_x, out_y, out_z):
 
                 # Multiply field by volume/4.
                 if ix < nx:
-                    out_x[ix, iym, izm] += vol[ix, iym, izm]*ex[ix, iy, iz]/4
-                    out_x[ix, iyp, izm] += vol[ix, iyp, izm]*ex[ix, iy, iz]/4
-                    out_x[ix, iym, izp] += vol[ix, iym, izp]*ex[ix, iy, iz]/4
-                    out_x[ix, iyp, izp] += vol[ix, iyp, izp]*ex[ix, iy, iz]/4
+                    ox[ix, iym, izm] += volumes[ix, iym, izm]*ex[ix, iy, iz]/4
+                    ox[ix, iyp, izm] += volumes[ix, iyp, izm]*ex[ix, iy, iz]/4
+                    ox[ix, iym, izp] += volumes[ix, iym, izp]*ex[ix, iy, iz]/4
+                    ox[ix, iyp, izp] += volumes[ix, iyp, izp]*ex[ix, iy, iz]/4
 
                 if iy < ny:
-                    out_y[ixm, iy, izm] += vol[ixm, iy, izm]*ey[ix, iy, iz]/4
-                    out_y[ixp, iy, izm] += vol[ixp, iy, izm]*ey[ix, iy, iz]/4
-                    out_y[ixm, iy, izp] += vol[ixm, iy, izp]*ey[ix, iy, iz]/4
-                    out_y[ixp, iy, izp] += vol[ixp, iy, izp]*ey[ix, iy, iz]/4
+                    oy[ixm, iy, izm] += volumes[ixm, iy, izm]*ey[ix, iy, iz]/4
+                    oy[ixp, iy, izm] += volumes[ixp, iy, izm]*ey[ix, iy, iz]/4
+                    oy[ixm, iy, izp] += volumes[ixm, iy, izp]*ey[ix, iy, iz]/4
+                    oy[ixp, iy, izp] += volumes[ixp, iy, izp]*ey[ix, iy, iz]/4
 
                 if iz < nz:
-                    out_z[ixm, iym, iz] += vol[ixm, iym, iz]*ez[ix, iy, iz]/4
-                    out_z[ixp, iym, iz] += vol[ixp, iym, iz]*ez[ix, iy, iz]/4
-                    out_z[ixm, iyp, iz] += vol[ixm, iyp, iz]*ez[ix, iy, iz]/4
-                    out_z[ixp, iyp, iz] += vol[ixp, iyp, iz]*ez[ix, iy, iz]/4
+                    oz[ixm, iym, iz] += volumes[ixm, iym, iz]*ez[ix, iy, iz]/4
+                    oz[ixp, iym, iz] += volumes[ixp, iym, iz]*ez[ix, iy, iz]/4
+                    oz[ixm, iyp, iz] += volumes[ixm, iyp, iz]*ez[ix, iy, iz]/4
+                    oz[ixp, iyp, iz] += volumes[ixp, iyp, iz]*ez[ix, iy, iz]/4

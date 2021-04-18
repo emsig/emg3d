@@ -1,9 +1,4 @@
-"""
-Functions related to the command-line interface (CLI) of `emg3d`.
-
-Consult the :doc:`cli` section in the documentation for more information.
-"""
-# Copyright 2018-2021 The emg3d Developers.
+# Copyright 2018-2021 The EMSiG community.
 #
 # This file is part of emg3d.
 #
@@ -19,4 +14,4 @@ Consult the :doc:`cli` section in the documentation for more information.
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from emg3d.cli.main import main  # noqa
+from emg3d.cli.main import main

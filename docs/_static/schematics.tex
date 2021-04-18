@@ -1,12 +1,14 @@
 \documentclass[tikz, border=5pt, 12pt]{standalone}
-\usetikzlibrary{positioning}
+\usetikzlibrary{positioning, backgrounds}
 
-% To create the figures (must have pdf2svg):
-% > for i in {1..4}; do pdf2svg schematics.pdf schematics$i.svg $i; done
+% To create the figures (must have pdf2svg installed):
+% > pdf2svg schematics.pdf schematics%d.svg all
 
 \begin{document}
 
-\begin{tikzpicture}
+\tikzstyle{bgframe} = [framed,background rectangle/.style={draw=white, top color=white, rounded corners}]
+
+\begin{tikzpicture}[bgframe]
     % 2x2 Coarsest grid
     \node at (-5, -0.5) {$2\times2$};
     \begin{scope}[
@@ -54,7 +56,7 @@
 
 \end{tikzpicture}
 
-\begin{tikzpicture}
+\begin{tikzpicture}[bgframe]
 
     % Nth smoothing step
     \node at (-5, -0.5) {$N$};
@@ -137,7 +139,7 @@
 
 \end{tikzpicture}
 
-\begin{tikzpicture}
+\begin{tikzpicture}[bgframe]
 
     % Nth smoothing step
     \node at (-5, 2) {$3$};
@@ -202,7 +204,7 @@
 
 \end{tikzpicture}
 
-\begin{tikzpicture}
+\begin{tikzpicture}[bgframe]
 
     % 16x2 Coarsest grid
     \node at (-5, -0.5) {$16\times2$};

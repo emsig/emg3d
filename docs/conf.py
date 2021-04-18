@@ -5,22 +5,28 @@ from emg3d import __version__
 
 # Load extensions
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.todo',
-    'sphinx.ext.intersphinx',
+    # 'sphinx.ext.autodoc',
     'numpydoc',
+    'sphinx.ext.intersphinx',
+    # 'sphinx.ext.autosummary',
+    'sphinx.ext.mathjax',
+    # 'sphinx.ext.viewcode',
+    # 'sphinx.ext.doctest',
+    'sphinx.ext.todo',
     'sphinx_automodapi.automodapi',
+    'matplotlib.sphinxext.plot_directive',
+    'IPython.sphinxext.ipython_console_highlighting',
+    'IPython.sphinxext.ipython_directive',
 ]
 autosummary_generate = True
 add_module_names = True
+add_function_parentheses = False
 
 # Numpydoc settings
 numpydoc_show_class_members = False
 numfig = True
-numfig_format = {'figure': 'Figure %s:'}
+# Make numpydoc to generate plots for example sections
+numpydoc_use_plots = True
 
 # Todo settings
 todo_include_todos = True
@@ -32,13 +38,14 @@ intersphinx_mapping = {
     "discretize": ("https://discretize.simpeg.xyz/en/master", None),
     "empymod": ("https://empymod.readthedocs.io/en/stable", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
+    "numba": ("https://numba.readthedocs.io/en/stable", None),
 }
 
 # ==== 2. General Settings ====
 description = 'A multigrid solver for 3D electromagnetic diffusion.'
 
 # The templates path.
-templates_path = ['_templates']
+# templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 source_suffix = '.rst'
@@ -48,8 +55,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emg3d'
-copyright = u'2018-{}, The emg3d Developers.'.format(time.strftime("%Y"))
-author = 'The emg3d Developers'
+author = 'The EMSiG community'
+copyright = f'2018-{time.strftime("%Y")}, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).
 version = __version__
@@ -63,40 +70,30 @@ exclude_patterns = ['_build', '../tests']
 pygments_style = 'friendly'
 
 # ==== 3. HTML settings ====
-html_theme = 'sphinx_rtd_theme'
-html_theme_options = {
-    'logo_only': True,
-    'display_version': True,
-    'prev_next_buttons_location': 'both',
-}
+html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
 html_logo = '_static/logo-emg3d-cut.svg'
 html_favicon = '_static/favicon.ico'
-html_sidebars = {
-    '**': [
-        'about.html',
-        'navigation.html',
-        'searchbox.html',
-    ]
+
+html_theme_options = {
+    "github_url": "https://github.com/emsig/emg3d",
+    "external_links": [
+        {"name": "Gallery", "url": "https://dev1.emsig.xyz/gallery/gallery"},
+        {"name": "EMSiG", "url": "https://emsig.xyz"},
+    ],
+    # "use_edit_page_button": True,
 }
 
 html_context = {
-    'menu_links_name': 'Links',
-    'menu_links': [
-        ('<i class="fa fa-link fa-fw"></i> Website',
-         'https://emsig.github.io'),
-        ('<i class="fa fa-github fa-fw"></i> Source Code',
-         'https://github.com/emsig/emg3d'),
-    ],
+    "github_user": "emsig",
+    "github_repo": "emg3d",
+    "github_version": "main",
+    "doc_path": "docs",
 }
 
-htmlhelp_basename = 'emg3ddoc'
-
-
-# -- CSS fixes --
-def setup(app):
-    app.add_css_file("style.css")
-
+html_use_modindex = True
+html_file_suffix = '.html'
+htmlhelp_basename = 'emg3d'
 
 # ==== 4. linkcheck ====
 
