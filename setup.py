@@ -9,8 +9,9 @@ if not sys.version_info[:2] >= (3, 7):
              f"Current version: {sys.version_info[0]}.{sys.version_info[1]}.")
 
 # Get README and remove badges.
-readme = open("README.rst").read()
-readme = re.sub(r"\|.*\|", "", readme, flags=re.DOTALL)
+with open("README.rst", "r", encoding="utf-8") as f:
+    readme = f.read()
+    readme = re.sub(r"\|.*\|", "", readme, flags=re.DOTALL)
 
 setup(
     name="emg3d",
