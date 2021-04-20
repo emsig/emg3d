@@ -820,7 +820,7 @@ class Simulation:
 
             self.data['observed'] = self.data['synthetic'].copy()
 
-            # Add noise noise_floor and/or relative_error given.
+            # Add noise if noise_floor and/or relative_error given.
             if self.survey.standard_deviation is not None:
 
                 # Create noise.
@@ -833,8 +833,12 @@ class Simulation:
                 self.data['observed'].data += noise_re + 1j*noise_im
 
             # Set data below the noise floor to NaN.
-            if self.data.noise_floor is not None:
-                min_amp = abs(self.data.synthetic.data) < self.data.noise_floor
+            if self.survey.noise_floor is not None:
+                if self.survey.noise_floor == 'data._noise_floor':
+                    nf = self.survey.data._noise_floor.data
+                else:
+                    nf = self.survey.noise_floor
+                min_amp = abs(self.data.synthetic.data) < nf
                 self.data['observed'].data[min_amp] = np.nan + 1j*np.nan
 
             # Set near-offsets to NaN.
