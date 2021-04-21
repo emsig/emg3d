@@ -98,8 +98,8 @@ class TestSurvey():
                                relative_error=re, noise_floor=nf,
                                data=np.ones(self.shape))
 
-        assert srvy2.noise_floor == 'data._noise_floor'
-        assert srvy2.relative_error == 'data._relative_error'
+        assert_allclose(srvy2.noise_floor, np.ones(srvy2.shape)*nf)
+        assert_allclose(srvy2.relative_error, np.ones(srvy2.shape)*re)
         assert_allclose(srvy2.data._noise_floor[0, 0, :], np.squeeze(nf))
         assert_allclose(srvy2.data._relative_error[:, 0, 0], np.squeeze(re))
         # As data are ones, we can check standard_deviation without it.
