@@ -472,15 +472,11 @@ class Survey:
             std = self.data.observed.copy(data=np.zeros(self.shape))
 
             # Add noise floor if given.
-            if self.noise_floor == 'data._noise_floor':
-                std += self.data._noise_floor**2
-            elif self.noise_floor is not None:
+            if self.noise_floor is not None:
                 std += self.noise_floor**2
 
             # Add relative error if given.
-            if self.relative_error == 'data._relative_error':
-                std += np.abs(self.data._relative_error*self.data.observed)**2
-            elif self.relative_error is not None:
+            if self.relative_error is not None:
                 std += np.abs(self.relative_error*self.data.observed)**2
 
             return np.sqrt(std)
@@ -517,7 +513,10 @@ class Survey:
         See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
 
         """
-        return self.data.noise_floor
+        if isinstance(self.data.noise_floor, str):
+            return self.data._noise_floor.data
+        else:
+            return self.data.noise_floor
 
     @noise_floor.setter
     def noise_floor(self, noise_floor):
@@ -531,7 +530,10 @@ class Survey:
         See :attr:`emg3d.surveys.Survey.standard_deviation` for more info.
 
         """
-        return self.data.relative_error
+        if isinstance(self.data.relative_error, str):
+            return self.data._relative_error.data
+        else:
+            return self.data.relative_error
 
     @relative_error.setter
     def relative_error(self, relative_error):
