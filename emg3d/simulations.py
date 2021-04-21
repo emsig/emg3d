@@ -834,11 +834,8 @@ class Simulation:
 
             # Set data below the noise floor to NaN.
             if self.survey.noise_floor is not None:
-                if self.survey.noise_floor == 'data._noise_floor':
-                    nf = self.survey.data._noise_floor.data
-                else:
-                    nf = self.survey.noise_floor
-                min_amp = abs(self.data.synthetic.data) < nf
+                noise_floor = self.survey.noise_floor
+                min_amp = abs(self.data.synthetic.data) < noise_floor
                 self.data['observed'].data[min_amp] = np.nan + 1j*np.nan
 
             # Set near-offsets to NaN.
