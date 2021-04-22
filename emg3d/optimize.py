@@ -120,8 +120,7 @@ def misfit(simulation):
 
     return misfit.data
 
-
-def gradient(simulation):
+def gradient(simulation, vec=None):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete adjoint-state gradient for a single source at a single
@@ -181,8 +180,12 @@ def gradient(simulation):
             raise NotImplementedError(f"Gradient not implemented for {n}.")
 
     # Ensure misfit has been computed (and therefore the electric fields).
-    _ = simulation.misfit
-
+    if vec is None:
+        _ = simulation.misfit
+    else:
+        # vec is an xarray 
+        simulation.data['residual'] = vec
+  
     # Compute back-propagating electric fields.
     simulation._bcompute()
 
