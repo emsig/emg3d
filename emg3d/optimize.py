@@ -21,6 +21,7 @@ misfit function and its gradient.
 import numpy as np
 
 from emg3d import maps, fields
+from emg3d.solver import solve
 
 __all__ = ['misfit', 'gradient']
 
@@ -238,3 +239,65 @@ def gradient(simulation, vec=None):
             gradient_model, simulation.model.property_x)
 
     return gradient_model
+
+def jvec(simulation, vec=None): 
+    # Assume simulation.compute() is done.
+    jacobian_vec = simulation.data.synthetic.copy()
+    # Jvec = PA^-1 * G * vec
+    for src, freq in simulation._srcfreq:
+        # Step1: Get e-field
+        efield = simulation._dict_efield[src][freq]  # Forward electric field
+
+        # Step2: compute G * vec = gvec
+        gvec = efield.grid.getEdgeInnerProductDeriv(np.ones(efield.grid.n_cells))(efield.field) * vec
+        # Extension to sig_x, sig_y, sig_z is trivial 
+        # gvec = mesh.getEdgeInnerProductDeriv(np.ones(mesh.n_cells)*3)(efield.field) * vec
+        
+        gvec_field = fields.Field(
+            grid=efield.grid,
+            data=-efield.smu0*gvec,
+            dtype=float,
+            frequency=efield.frequency
+        )
+        # Step3: P A^-1 G vec
+        efield_jvec = solve(simulation.model, gvec_field, verb=-1)
+
+        # Get receiver types.
+        rec_types = tuple([r.xtype == 'electric'
+                           for r in simulation.survey.receivers.values()])
+
+        # Get absolute coordinates as fct of source.
+        # (Only relevant in case of "relative" receivers.)
+        rl = list(simulation.survey.receivers.values())
+
+        def rec_coord_tuple(rec_list):
+            """Return abs. coordinates for as a fct of source."""
+            return tuple(np.array(
+                [rl[i].coordinates_abs(simulation.survey.sources[src])
+                 for i in rec_list]
+            ).T)
+
+        # Store electric receivers.
+        if rec_types.count(True):
+
+            # Extract data at receivers.
+            erec = np.nonzero(rec_types)[0]
+            resp = efield_jvec.get_receiver(
+                    receiver=rec_coord_tuple(erec)
+            )
+
+            # Store the receiver response.
+            jacobian_vec.loc[src, :, freq][erec] = resp
+
+        # Store magnetic receivers.
+        if rec_types.count(False):
+
+            # Extract data at receivers.
+            mrec = np.nonzero(np.logical_not(rec_types))[0]
+            resp = simulation.get_hfield(src, freq).get_receiver(
+                    receiver=rec_coord_tuple(mrec)
+            )
+
+            # Store the receiver response.
+            jacobian_vec.loc[src, :, freq][mrec] = resp
+    return jacobian_vec.values.flatten()
