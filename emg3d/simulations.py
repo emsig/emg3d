@@ -966,14 +966,14 @@ class Simulation:
             'sfield': self._get_gvec_field(*inp),
         }
 
-        # Compute and return back-propagated electric field.
+        # Compute and return A^-1 * G * vec
         efield_jvec = solver.solve(**solver_input)[0]
         # Get receiver types.
         src, freq = inp
         rec_types = tuple([r.xtype == 'electric'
                             for r in self.survey.receivers.values()])
-        # Get absolute coordinates as fct of source.
-        # (Only relevant in case of "relative" receivers.)
+        
+        # Compute P A^-1 * G * vec
         rl = list(self.survey.receivers.values())
         def rec_coord_tuple(rec_list):
             """Return abs. coordinates for as a fct of source."""
