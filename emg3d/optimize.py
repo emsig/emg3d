@@ -20,7 +20,7 @@ misfit function and its gradient.
 
 import numpy as np
 
-from emg3d import maps, fields
+from emg3d import maps, fields, utils
 from emg3d.solver import solve
 
 __all__ = ['misfit', 'gradient']
@@ -184,8 +184,10 @@ def gradient(simulation, vec=None):
     if vec is None:
         _ = simulation.misfit
     else:
-        # vec is an xarray 
-        simulation.data['residual'] = vec
+        # vec is a numpy array 
+        vec_xr = simulation.data.observed.copy()
+        vec_xr.values = vec.reshape(vec_xr.shape)
+        simulation.data['residual'] = vec_xr
   
     # Compute back-propagating electric fields.
     simulation._bcompute()
@@ -231,6 +233,8 @@ def gradient(simulation, vec=None):
         # Add this src-freq gradient to the total gradient.
         gradient_model += this_gradient
 
+    if vec is not None:
+        return gradient_model.ravel(order='F')
     # => Frequency-independent depth-weighting should go here.
 
     # Apply derivative-chain of property-map
@@ -240,7 +244,7 @@ def gradient(simulation, vec=None):
 
     return gradient_model
 
-def jvec(simulation, vec=None): 
+def jvec_serial(simulation, vec=None): 
     # Assume simulation.compute() is done.
     jacobian_vec = simulation.data.synthetic.copy()
     # Jvec = PA^-1 * G * vec
@@ -300,4 +304,43 @@ def jvec(simulation, vec=None):
 
             # Store the receiver response.
             jacobian_vec.loc[src, :, freq][mrec] = resp
-    return jacobian_vec.values.flatten()
+    return jacobian_vec.values.ravel()
+
+def jvec(simulation, vec=None):
+    # Jvec = PA^-1 * G * vec
+    srcfreq = simulation._srcfreq.copy()  # Iterable of all src-freq pairs
+    simulation._vec = vec
+    # Initiate futures-dict to store output.
+    out = utils._process_map(
+            simulation._jvec,    # fct to call
+            srcfreq,  # iterables
+            max_workers=simulation.max_workers,  # nr of procs
+            **{'desc': 'Compute jvec', **simulation._tqdm_opts},
+    )
+    # Loop over src-freq combinations to extract and store.
+
+    rec_types = tuple(
+        [r.xtype == 'electric' for r in simulation.survey.receivers.values()]
+    )
+
+    jacobian_vec = simulation.data.synthetic.copy()
+    
+    for i, (src, freq) in enumerate(srcfreq):
+        # Store efield and solver info.
+        # Store electric receivers.
+        if rec_types.count(True):
+
+            # Extract data at receivers.
+            erec = np.nonzero(rec_types)[0]
+            # Store the receiver response.
+            jacobian_vec.loc[src, :, freq][erec] = out[i] 
+
+        # Store magnetic receivers.
+        if rec_types.count(False):
+
+            # Extract data at receivers.
+            mrec = np.nonzero(np.logical_not(rec_types))[0]
+            # Store the receiver response.
+            jacobian_vec.loc[src, :, freq][mrec] = out[i]         
+
+    return jacobian_vec.values.ravel()

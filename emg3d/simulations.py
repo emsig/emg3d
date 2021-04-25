@@ -192,6 +192,7 @@ class Simulation:
         self._dict_efield_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
+        self._vec = None
 
         # Get model taking gridding_opts into account.
         # Sets self.model and self.gridding_opts.
@@ -945,6 +946,8 @@ class Simulation:
             coords = rec.coordinates_abs(self.survey.sources[source])
 
             # Get residual field and add it to the total field.
+            # There seems a bit of problem here. 
+            # This should be an adjoint operation
             rfield.field += fields.get_source_field(
                     grid=grid,
                     source=src_fct(coords, strength=strength),
@@ -952,6 +955,67 @@ class Simulation:
             ).field
 
         return rfield
+
+    def _jvec(self, inp):
+        """Return back-propagated electric field for given inp (src, freq)."""
+
+        # Input parameters.
+        solver_input = {
+            **self.solver_opts,
+            'model': self.get_model(*inp),
+            'sfield': self._get_gvec_field(*inp),
+        }
+
+        # Compute and return back-propagated electric field.
+        efield_jvec = solver.solve(**solver_input)[0]
+        # Get receiver types.
+        src, freq = inp
+        rec_types = tuple([r.xtype == 'electric'
+                            for r in self.survey.receivers.values()])
+        # Get absolute coordinates as fct of source.
+        # (Only relevant in case of "relative" receivers.)
+        rl = list(self.survey.receivers.values())
+        def rec_coord_tuple(rec_list):
+            """Return abs. coordinates for as a fct of source."""
+            return tuple(np.array(
+                [rl[i].coordinates_abs(self.survey.sources[src])
+                    for i in rec_list]
+            ).T)
+        # Store electric receivers.
+        if rec_types.count(True):
+            # Extract data at receivers.
+            erec = np.nonzero(rec_types)[0]
+            resp = efield_jvec.get_receiver(
+                    receiver=rec_coord_tuple(erec)
+            )
+            # Store the receiver response.
+        # Store magnetic receivers.
+        if rec_types.count(False):
+            # Extract data at receivers.
+            mrec = np.nonzero(np.logical_not(rec_types))[0]
+            resp = self.get_hfield(src, freq).get_receiver(
+                    receiver=rec_coord_tuple(mrec)
+            )
+            # Store the receiver response.
+        return resp
+
+    def _get_gvec_field(self, source, frequency):
+        
+        # Forward electric field
+        efield = self._dict_efield[source][frequency]
+
+        # Step2: compute G * vec = gvec
+        gvec = efield.grid.getEdgeInnerProductDeriv(np.ones(efield.grid.n_cells))(efield.field) * self._vec
+        # Extension to sig_x, sig_y, sig_z is trivial 
+        # gvec = mesh.getEdgeInnerProductDeriv(np.ones(mesh.n_cells)*3)(efield.field) * vec
+        
+        gvec_field = fields.Field(
+            grid=efield.grid,
+            data=-efield.smu0*gvec,
+            dtype=float,
+            frequency=efield.frequency
+        )
+        return gvec_field
 
     # UTILS
     @property
