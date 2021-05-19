@@ -58,7 +58,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
                        \mathbf{E} \right) .
 
     The computation is carried out in a matrix-free manner; on said page 636
-    (or in the :doc:`../user_guide/theory` of the manual) are the various steps
+    (or in the :doc:`../manual/theory` of the manual) are the various steps
     laid out to discretize the different parts such as the involved curls. This
     can also be understood as the left-hand-side of :math:`A x = b`, as given
     in Equation 2 in [Muld06]_ (here without the cell volumes :math:`V`),
