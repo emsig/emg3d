@@ -1237,13 +1237,13 @@ class MGParameters:
         # Check if number on coarsest grid is bigger than 7.
         # Ignore if clevel was provided and also reached (user wants it).
         check_inp = zip(clevel, [sx, sy, sz])
-        low_prime = any([cl < inp_clevel and sl > 7 for cl, sl in check_inp])
+        max_low = any([cl < inp_clevel and sl > 7 for cl, sl in check_inp])
 
         # Check if it can be at least 3 (or inp_clevel) times coarsened.
         min_div = any(clevel < min(inp_clevel, 3))
 
         # Raise warning if necessary.
-        if low_prime or min_div:
+        if max_low or min_div:
             msg = "  :: Grid not optimal for MG solver ::"
             self._repr_clevel['message'] = msg
         else:

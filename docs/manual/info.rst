@@ -39,7 +39,7 @@ its docstring. Here a few additional information.
   are no new nodes created as coarsening is done by combining adjacent
   cells. The more times the grid dimension can be divided by two the better it
   is suited for MG. Ideally, the number should be dividable by two a few times
-  and the dimension of the coarsest grid should be a low prime number
+  and the dimension of the coarsest grid should be 2 or a small, odd number
   :math:`p`, for which good sizes can then be computed with :math:`p 2^n`. Good
   grid sizes (in each direction) up to 1024 are
 

@@ -395,13 +395,13 @@ class TestOriginAndWidths:
 
 
 def test_good_mg_cell_nr(capsys):
-    numbers = meshes.good_mg_cell_nr(max_nr=128, max_prime=5, min_div=3)
+    numbers = meshes.good_mg_cell_nr(max_nr=128, max_lowest=5, min_div=3)
     assert_allclose([16, 24, 32, 40, 48, 64, 80, 96, 128], numbers)
 
-    with pytest.raises(ValueError, match='Highest prime is 25, '):
-        numbers = meshes.good_mg_cell_nr(max_nr=128, max_prime=25, min_div=3)
+    with pytest.raises(ValueError, match='Maximum lowest is 25, '):
+        numbers = meshes.good_mg_cell_nr(max_nr=128, max_lowest=25, min_div=3)
 
-    numbers = meshes.good_mg_cell_nr(max_nr=50, max_prime=3, min_div=5)
+    numbers = meshes.good_mg_cell_nr(max_nr=50, max_lowest=3, min_div=5)
     assert len(numbers) == 0
 
 

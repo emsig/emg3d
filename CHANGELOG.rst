@@ -153,6 +153,9 @@ Detailed changes by module
 
 - ``meshes.skin_depth`` takes new ``mu_r`` instead of ``mu``.
 
+- ``good_mg_cell_nr``: ``max_prime`` is new ``max_lowest``, as it could also
+  be, e.g., 9, which is not a prime.
+
 
 **Models**
 

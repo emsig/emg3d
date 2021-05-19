@@ -744,16 +744,16 @@ class TestMGParameters:
                'linerelaxation': False, 'verb': 0}
         txt = ":: Grid not optimal for MG solver ::"
 
-        # One large prime => warning.
+        # One large lowest => warning.
         var = solver.MGParameters(shape_cells=(11*2**3, 2**5, 2**4), **inp)
         assert txt in var.__repr__()
 
-        # Large primes, but clevel smaller => no warning.
+        # Large lowest, but clevel smaller => no warning.
         var = solver.MGParameters(
                 shape_cells=(11*2**5, 11*2**4, 11*2**5), clevel=4, **inp)
         assert txt not in var.__repr__()
 
-        # Large primes, clevel bigger => warning.
+        # Large lowest, clevel bigger => warning.
         var = solver.MGParameters(
                 shape_cells=(11*2**5, 11*2**4, 11*2**5), clevel=5, **inp)
         assert txt in var.__repr__()
