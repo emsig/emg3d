@@ -35,7 +35,7 @@ todo_include_todos = True
 intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
-    "discretize": ("https://discretize.simpeg.xyz/en/master", None),
+    "discretize": ("https://discretize.simpeg.xyz/en/main", None),
     "empymod": ("https://empymod.readthedocs.io/en/stable", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
     "numba": ("https://numba.readthedocs.io/en/stable", None),
