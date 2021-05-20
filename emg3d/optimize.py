@@ -244,7 +244,9 @@ def gradient(simulation, vec=None):
 
     return gradient_model
 
-def jvec_serial(simulation, vec=None): 
+def jvec_serial(simulation, vec=None, method='linear'): 
+    """@SEOGI: method can be 'linear' or 'cubic'"""
+
     # Assume simulation.compute() is done.
     jacobian_vec = simulation.data.synthetic.copy()
     # Jvec = PA^-1 * G * vec
@@ -287,7 +289,8 @@ def jvec_serial(simulation, vec=None):
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
             resp = efield_jvec.get_receiver(
-                    receiver=rec_coord_tuple(erec)
+                    receiver=rec_coord_tuple(erec),
+                    method=method,
             )
 
             # Store the receiver response.
@@ -299,7 +302,8 @@ def jvec_serial(simulation, vec=None):
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = simulation.get_hfield(src, freq).get_receiver(
-                    receiver=rec_coord_tuple(mrec)
+                    receiver=rec_coord_tuple(mrec),
+                    method=method,
             )
 
             # Store the receiver response.

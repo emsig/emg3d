@@ -335,7 +335,7 @@ class Field:
         # Assemble and return new field.
         return Field(grid, field, frequency=self._frequency)
 
-    def get_receiver(self, receiver):
+    def get_receiver(self, receiver, method='cubic'):
         """Return the field (response) at receiver coordinates.
 
         Note that in order to avoid boundary effects from the PEC boundary the
@@ -366,7 +366,7 @@ class Field:
             Responses at receiver.
 
         """
-        return get_receiver(self, receiver)
+        return get_receiver(self, receiver, method)
 
 
 def get_source_field(grid, source, frequency, **kwargs):
@@ -497,7 +497,7 @@ def get_source_field(grid, source, frequency, **kwargs):
     return sfield
 
 
-def get_receiver(field, receiver):
+def get_receiver(field, receiver, method='cubic'):
     """Return the field (response) at receiver coordinates.
 
     Note that in order to avoid boundary effects from the PEC boundary the
@@ -567,7 +567,7 @@ def get_receiver(field, receiver):
     factors = electrodes.rotation(*coordinates[3:])
 
     # Add the required responses.
-    opts = {'method': 'cubic', 'extrapolate': False, 'log': False, 'mode':
+    opts = {'method': method, 'extrapolate': False, 'log': False, 'mode':
             'constant', 'cval': np.nan}
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
