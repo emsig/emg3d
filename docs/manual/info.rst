@@ -77,13 +77,10 @@ been tried and what still could be tried in order to improve the current code.
 Runtime
 ```````
 
-The `gallery <https://emsig.xyz/emg3d-gallery>`_ contains a script to
-do some testing with regards to runtime, see the `Tools Section
-<https://emsig.xyz/emg3d-gallery/gallery/index.html#tools>`_. An
-example output of that script is shown in :numref:`Figure %s <runtime>`.
+An example of a runtime test is shown in :numref:`Figure %s <runtime>`.
 
-.. figure:: ../_static/runtime.svg
-   :width: 80 %
+.. figure:: ../_static/CPU.png
+   :scale: 80 %
    :align: center
    :alt: Runtime
    :name: runtime
@@ -156,22 +153,18 @@ fields (source field, electric field, and residual field) and the model
 parameters (resistivity, eta, mu). For a big model, they some up; e.g., almost
 3 GB for an isotropic model with 256x256x256 cells.
 
-The `gallery <https://emsig.xyz/emg3d-gallery>`_ contains a script to
-do some testing with regards to the RAM usage, see the `Tools Section
-<https://emsig.xyz/emg3d-gallery/gallery/index.html#tools>`_. An
-example output of that script is shown in :numref:`Figure %s <ramusage>`.
+An example of a memory test is shown in :numref:`Figure %s <ramusage>`.
 
-.. figure:: ../_static/RAM-Usage.svg
-   :width: 80 %
+.. figure:: ../_static/RAM.png
+   :scale: 80 %
    :align: center
    :alt: RAM Usage
    :name: ramusage
 
    RAM usage, showing the optimal behaviour of multigrid methods. "Data RAM" is
    the memory required by the fields (source field, electric field, residual
-   field) and by the model parameters (resistivity; and eta, mu). "MG Base" is
-   for solving one Gauss-Seidel iteration on the original grid. "MG full RAM"
-   is for solving one multigrid F-Cycle.
+   field) and by the model parameters (resistivity; and eta, mu). "MG RAM" is
+   for solving one multigrid F-Cycle.
 
 
 The theory of multigrid says that in an ideal scenario, multigrid requires
@@ -190,3 +183,83 @@ number of cells twice the memory is required (from a certain size onwards).
 
 **Attempts at improving memory usage should focus on the difference between the
 red line (actual usage) and the dashed black line (1.14 x base usage).**
+
+Scripts
+```````
+
+To test CPU and RAM on your machine, you can use and adjust the following
+script. The old notebooks which were used to generate the above figures can be
+found at
+
+- RAM: `4a_RAM-requirements.ipynb
+  <https://github.com/emsig/emg3d-examples/blob/master/4a_RAM-requirements.ipynb>`_,
+- CPU: `4b_Runtime.ipynb
+  <https://github.com/emsig/emg3d-examples/blob/master/4b_Runtime.ipynb>`_.
+
+.. ipython::
+  :verbatim:
+
+  In [1]: import emg3d
+     ...: import numpy as np
+     ...: import matplotlib.pyplot as plt
+     ...: from memory_profiler import memory_usage
+
+  In [2]: def compute(nx):
+     ...:     """Simple computation routine.
+     ...:
+     ...:     This is the actual model it runs. Adjust this to your needs.
+     ...:
+     ...:     - Model size is nx * nx * nx, centered around the origin.
+     ...:     - Source is at the origin, x-directed.
+     ...:     - Frequency is 1 Hz.
+     ...:     - Homogenous space of 1 Ohm.m.
+     ...:
+     ...:     """
+     ...:
+     ...:     # Grid
+     ...:     hx = np.ones(nx)*50
+     ...:     x0 = -nx//2*50
+     ...:     grid = emg3d.TensorMesh([hx, hx, hx], x0=(x0, x0, x0))
+     ...:
+     ...:     # Model and source field
+     ...:     model = emg3d.Model(grid, property_x=1.0)
+     ...:     sfield = emg3d.get_source_field(
+     ...:             grid, source=[0, 0, 0, 0, 0], frequency=1.0)
+     ...:
+     ...:     # Compute the field
+     ...:     _, inf = emg3d.solve(
+     ...:             model, sfield, verb=0, plain=True, return_info=True)
+     ...:
+     ...:     return inf['time']
+
+  In [3]: # Loop over model sizes (adjust to your needs).
+     ...: nsizes = np.array([32, 48, 64, 96, 128, 192, 256,
+     ...:                    384, 512, 768, 1024])
+     ...: memory = np.zeros(nsizes.shape)
+     ...: runtime = np.zeros(nsizes.shape)
+     ...:
+     ...: # Loop over nx
+     ...: for i, nx in enumerate(nsizes):
+     ...:     print(f"  => {nx}^3 = {nx**3:12,d} cells")
+     ...:     mem, time = memory_usage((compute, (nx, ), {}), retval=True)
+     ...:     memory[i] = max(mem)
+     ...:     runtime[i] = time
+     ...:
+
+  In [4]: # Plot CPU
+     ...: plt.figure()
+     ...: plt.title('Runtime')
+     ...: plt.loglog(nsizes**3/1e6, runtime, '.-')
+     ...: plt.xlabel('Number of cells (in millions)')
+     ...: plt.ylabel('CPU (s)')
+     ...: plt.axis('equal')
+     ...: plt.show()
+
+  In [5]: # Plot RAM
+     ...: plt.figure()
+     ...: plt.title('Memory')
+     ...: plt.loglog(nsizes**3/1e6, memory/1e3, '-', zorder=10)
+     ...: plt.xlabel('Number of cells (in millions)')
+     ...: plt.ylabel('RAM (GB)')
+     ...: plt.axis('equal')
+     ...: plt.show()
