@@ -307,7 +307,7 @@ class Field:
 
         interpolate_opts : dict
             Passed through to :func:`emg3d.maps.interpolate`. Defaults are
-            ``method='cubic'``, ``log=True``, and ``extrapolate=False``.
+            ``method='cubic'``, ``log=False``, and ``extrapolate=False``.
 
 
         Returns
@@ -321,7 +321,7 @@ class Field:
         g2g_inp = {
             'method': 'cubic',
             'extrapolate': False,
-            'log': True,
+            'log': False,
             **({} if interpolate_opts is None else interpolate_opts),
             'grid': self.grid,
             'xi': grid,

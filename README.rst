@@ -26,7 +26,7 @@ A multigrid solver for 3D electromagnetic diffusion in Python.
 - **Source Code:** https://github.com/emsig/emg3d
 - **Bug reports:** https://github.com/emsig/emg3d/issues
 - **Contributing:** https://emg3d.emsig.xyz/en/latest/dev
-- **Contact:** http://slack.simpeg.xyz
+- **Contact:** see https://emsig.xyz
 - **Zenodo:** https://doi.org/10.5281/zenodo.3229006
 
 
