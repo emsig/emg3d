@@ -72,7 +72,7 @@ pygments_style = 'friendly'
 # ==== 3. HTML settings ====
 html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
-html_logo = '_static/logo-emg3d-cut.svg'
+html_logo = '_static/emg3d-logo.svg'
 html_favicon = '_static/favicon.ico'
 
 html_theme_options = {
