@@ -1156,7 +1156,7 @@ class MGParameters:
             f"   Coarsest grid  : {self._repr_clevel['shape_cells'][0]:3} x"
             f" {self._repr_clevel['shape_cells'][1]:3} x"
             f" {self._repr_clevel['shape_cells'][2]:3}  "
-            f"   => {self._repr_clevel['nC']:,} cells\n"
+            f"   => {self._repr_clevel['n_cells']:,} cells\n"
             #
             f"   Coarsest level : {self._repr_clevel['clevel'][0]:3} ;"
             f" {self._repr_clevel['clevel'][1]:3}"
@@ -1190,8 +1190,7 @@ class MGParameters:
     def _max_level(self):
         r"""Sets dimension-dependent level variable ``clevel``.
 
-        Requires at least two cells in each direction (for ``nCx``, ``nCy``,
-        and ``nCz``).
+        Requires at least two cells in each direction.
 
         """
         # Store input clevel for checks.
@@ -1225,7 +1224,7 @@ class MGParameters:
         sx = int(self.shape_cells[0]/2**clevel[0])
         sy = int(self.shape_cells[1]/2**clevel[1])
         sz = int(self.shape_cells[2]/2**clevel[2])
-        self._repr_clevel = {'nC': sx*sy*sz, 'shape_cells': (sx, sy, sz),
+        self._repr_clevel = {'n_cells': sx*sy*sz, 'shape_cells': (sx, sy, sz),
                              'clevel': clevel}
 
         # Check some grid characteristics. Good values up to 1024 are:
@@ -1238,13 +1237,13 @@ class MGParameters:
         # Check if number on coarsest grid is bigger than 7.
         # Ignore if clevel was provided and also reached (user wants it).
         check_inp = zip(clevel, [sx, sy, sz])
-        low_prime = any([cl < inp_clevel and sl > 7 for cl, sl in check_inp])
+        max_low = any([cl < inp_clevel and sl > 7 for cl, sl in check_inp])
 
         # Check if it can be at least 3 (or inp_clevel) times coarsened.
         min_div = any(clevel < min(inp_clevel, 3))
 
         # Raise warning if necessary.
-        if low_prime or min_div:
+        if max_low or min_div:
             msg = "  :: Grid not optimal for MG solver ::"
             self._repr_clevel['message'] = msg
         else:

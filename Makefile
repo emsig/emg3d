@@ -27,7 +27,7 @@ doc:
 	cd docs && make html && cd ..
 
 doc-clean:
-	cd docs && rm -rf api/ && rm -rf _build/ && make html && cd ..
+	cd docs && rm -rf api/emg3d* && rm -rf _build/ && make html && cd ..
 
 linkcheck:
 	cd docs && make html -b linkcheck && cd ..
@@ -36,4 +36,4 @@ clean:
 	rm -rf build/ dist/ .eggs/ emg3d.egg-info/ emg3d/version.py  # build
 	rm -rf */__pycache__/ */*/__pycache__/      # python cache
 	rm -rf .coverage htmlcov/ .pytest_cache/    # tests and coverage
-	rm -rf docs/api/ docs/_build/ docs/savefig/ # docs
+	rm -rf docs/api/emg3d* docs/_build/ docs/savefig/ # docs

@@ -58,7 +58,7 @@ def amat_x(rx, ry, rz, ex, ey, ez, eta_x, eta_y, eta_z, zeta, hx, hy, hz):
                        \mathbf{E} \right) .
 
     The computation is carried out in a matrix-free manner; on said page 636
-    (or in the :doc:`../user_guide/theory` of the manual) are the various steps
+    (or in the :doc:`../manual/theory` of the manual) are the various steps
     laid out to discretize the different parts such as the involved curls. This
     can also be understood as the left-hand-side of :math:`A x = b`, as given
     in Equation 2 in [Muld06]_ (here without the cell volumes :math:`V`),
@@ -278,9 +278,9 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
     """
 
     # Get dimensions
-    nCx = len(hx)
-    nCy = len(hy)
-    nCz = len(hz)
+    nx = len(hx)
+    ny = len(hy)
+    nz = len(hz)
 
     # Get half of the inverse widths
     kx = 0.5/hx
@@ -301,11 +301,11 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
         iback = 1-iback
 
         # Loop over cells, keeping boundaries fixed; x-fastest, then y, z.
-        for izh in range(1, nCz):
+        for izh in range(1, nz):
 
             # Back-forth-switch
             if iback:
-                iz = nCz-izh
+                iz = nz-izh
             else:
                 iz = izh
 
@@ -313,11 +313,11 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
             izm = iz-1
             izp = iz+1
 
-            for iyh in range(1, nCy):
+            for iyh in range(1, ny):
 
                 # Back-forth-switch
                 if iback:
-                    iy = nCy-iyh
+                    iy = ny-iyh
                 else:
                     iy = iyh
 
@@ -325,11 +325,11 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                 iym = iy-1
                 iyp = iy+1
 
-                for ixh in range(1, nCx):
+                for ixh in range(1, nx):
 
                     # Back-forth-switch
                     if iback:
-                        ix = nCx-ixh
+                        ix = nx-ixh
                     else:
                         ix = ixh
 
@@ -521,7 +521,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     The matrix A is complex and symmetric (A = A^T), and therefore only the
     main diagonal and the lower five off-diagonals are required.
 
-    - The right-hand-side b has length 5*nCx-4 (nCx even).
+    - The right-hand-side b has length 5*nx-4 (nx even).
     - The matrix A has length of b and 1+2*5 diagonals; we use for it an array
       of length 6*len(b).
 
@@ -559,9 +559,9 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     """
 
     # Get dimensions
-    nCx = len(hx)
-    nCy = len(hy)
-    nCz = len(hz)
+    nx = len(hx)
+    ny = len(hy)
+    nz = len(hz)
 
     # Get half of the inverse widths
     kx = 0.5/hx
@@ -578,7 +578,7 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete x-loop.
-    nr = 5*nCx-4  # Number of unknowns
+    nr = 5*nx-4  # Number of unknowns
     bvec = np.zeros(nr, dtype=ex.dtype)
     amat = np.zeros(6*nr, dtype=ex.dtype)
 
@@ -589,11 +589,11 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
         iback = 1-iback
 
         # Loop over cells, keeping boundaries fixed; x-fastest, then y, z.
-        for izh in range(1, nCz):
+        for izh in range(1, nz):
 
             # Back-forth-switch
             if iback:
-                iz = nCz-izh
+                iz = nz-izh
             else:
                 iz = izh
 
@@ -601,11 +601,11 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
             izm = iz-1
             izp = iz+1
 
-            for iyh in range(1, nCy):
+            for iyh in range(1, ny):
 
                 # Back-forth-switch
                 if iback:
-                    iy = nCy-iyh
+                    iy = ny-iyh
                 else:
                     iy = iyh
 
@@ -619,10 +619,10 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 bvec[:] = 0.
                 amat[:] = 0.
 
-                for ixh in range(1, nCx+1):
+                for ixh in range(1, nx+1):
 
                     # Index and minus index
-                    ix = min(ixh, nCx-1)
+                    ix = min(ixh, nx-1)
                     ixm = ixh-1
 
                     # Averaging of 1/mu_r: mzyRxm etc.
@@ -756,17 +756,17 @@ def gauss_seidel_x(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                     rhs[4] += mxyLzp*ez[ix, iym, iz]/hy[iym]
 
                     # Copy to big system
-                    blocks_to_amat(amat, bvec, middle, left, rhs, ixm, nCx)
+                    blocks_to_amat(amat, bvec, middle, left, rhs, ixm, nx)
 
                 # Solve linear system A x = b
                 solve(amat, bvec)
 
                 # Update efield (here we could apply damping weights)
-                for ix in range(1, nCx+1):
+                for ix in range(1, nx+1):
                     ixm = ix-1
 
                     ex[ixm, iy, iz] = bvec[5*ixm]
-                    if ixm < nCx-1:
+                    if ixm < nx-1:
                         ey[ix, iym, iz] = bvec[1+5*ixm]
                         ey[ix, iy, iz] = bvec[2+5*ixm]
                         ez[ix, iy, izm] = bvec[3+5*ixm]
@@ -801,7 +801,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     The matrix A is complex and symmetric (A = A^T), and therefore only the
     main diagonal and the lower five off-diagonals are required.
 
-    - The right-hand-side b has length 5*nCy-4 (nCy even).
+    - The right-hand-side b has length 5*ny-4 (ny even).
     - The matrix A has length of b and 1+2*5 diagonals; we use for it an array
       of length 6*len(b).
 
@@ -844,9 +844,9 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     """
 
     # Get dimensions
-    nCx = len(hx)
-    nCy = len(hy)
-    nCz = len(hz)
+    nx = len(hx)
+    ny = len(hy)
+    nz = len(hz)
 
     # Get half of the inverse widths
     kx = 0.5/hx
@@ -863,7 +863,7 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete y-loop.
-    nr = 5*nCy-4  # Number of unknowns
+    nr = 5*ny-4  # Number of unknowns
     bvec = np.zeros(nr, dtype=ex.dtype)
     amat = np.zeros(6*nr, dtype=ex.dtype)
 
@@ -874,11 +874,11 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
         iback = 1-iback
 
         # Loop over cells, keeping boundaries fixed; y-fastest, then z, x.
-        for izh in range(1, nCz):
+        for izh in range(1, nz):
 
             # Back-forth-switch
             if iback:
-                iz = nCz-izh
+                iz = nz-izh
             else:
                 iz = izh
 
@@ -886,11 +886,11 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
             izm = iz-1
             izp = iz+1
 
-            for ixh in range(1, nCx):
+            for ixh in range(1, nx):
 
                 # Back-forth-switch
                 if iback:
-                    ix = nCx-ixh
+                    ix = nx-ixh
                 else:
                     ix = ixh
 
@@ -904,10 +904,10 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 bvec[:] = 0.
                 amat[:] = 0.
 
-                for iyh in range(1, nCy+1):
+                for iyh in range(1, ny+1):
 
                     # Index and minus index
-                    iy = min(iyh, nCy-1)
+                    iy = min(iyh, ny-1)
                     iym = iyh-1
 
                     # Averaging of 1/mu_r: mzyRxm etc.
@@ -1041,17 +1041,17 @@ def gauss_seidel_y(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                     rhs[4] += myxLzp*ez[ixm, iy, iz]/hx[ixm]
 
                     # Copy to big system
-                    blocks_to_amat(amat, bvec, middle, left, rhs, iym, nCy)
+                    blocks_to_amat(amat, bvec, middle, left, rhs, iym, ny)
 
                 # Solve linear system A x = b
                 solve(amat, bvec)
 
                 # Update efield (here we could apply damping weights)
-                for iy in range(1, nCy+1):
+                for iy in range(1, ny+1):
                     iym = iy-1
 
                     ey[ix, iym, iz] = bvec[5*iym]
-                    if iym < nCy-1:
+                    if iym < ny-1:
                         ex[ixm, iy, iz] = bvec[1+5*iym]
                         ex[ix, iy, iz] = bvec[2+5*iym]
                         ez[ix, iy, izm] = bvec[3+5*iym]
@@ -1086,7 +1086,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     The matrix A is complex and symmetric (A = A^T), and therefore only the
     main diagonal and the lower five off-diagonals are required.
 
-    - The right-hand-side b has length 5*nCz-4 (nCz even).
+    - The right-hand-side b has length 5*nz-4 (nz even).
     - The matrix A has length of b and 1+2*5 diagonals; we use for it an array
       of length 6*len(b).
 
@@ -1124,9 +1124,9 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
     """
 
     # Get dimensions
-    nCx = len(hx)
-    nCy = len(hy)
-    nCz = len(hz)
+    nx = len(hx)
+    ny = len(hy)
+    nz = len(hz)
 
     # Get half of the inverse widths
     kx = 0.5/hx
@@ -1143,7 +1143,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
 
     # Pre-allocating full RHS (bvec) and full matrix A (amat). Will be
     # overwritten after each complete z-loop.
-    nr = 5*nCz-4  # Number of unknowns
+    nr = 5*nz-4  # Number of unknowns
     bvec = np.zeros(nr, dtype=ex.dtype)
     amat = np.zeros(6*nr, dtype=ex.dtype)
 
@@ -1154,11 +1154,11 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
         iback = 1-iback
 
         # Loop over cells, keeping boundaries fixed; z-fastest, then x, y.
-        for iyh in range(1, nCy):
+        for iyh in range(1, ny):
 
             # Back-forth-switch
             if iback:
-                iy = nCy-iyh
+                iy = ny-iyh
             else:
                 iy = iyh
 
@@ -1166,11 +1166,11 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
             iym = iy-1
             iyp = iy+1
 
-            for ixh in range(1, nCx):
+            for ixh in range(1, nx):
 
                 # Back-forth-switch
                 if iback:
-                    ix = nCx-ixh
+                    ix = nx-ixh
                 else:
                     ix = ixh
 
@@ -1184,10 +1184,10 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                 bvec[:] = 0.
                 amat[:] = 0.
 
-                for izh in range(1, nCz+1):
+                for izh in range(1, nz+1):
 
                     # Index and minus index
-                    iz = min(izh, nCz-1)
+                    iz = min(izh, nz-1)
                     izm = izh-1
 
                     # Averaging of 1/mu_r: mzyRxm etc.
@@ -1321,17 +1321,17 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
                     rhs[4] += mzxLyp*ey[ixm, iy, iz]/hx[ixm]
 
                     # Copy to big system
-                    blocks_to_amat(amat, bvec, middle, left, rhs, izm, nCz)
+                    blocks_to_amat(amat, bvec, middle, left, rhs, izm, nz)
 
                 # Solve linear system A x = b
                 solve(amat, bvec)
 
                 # Update efield (here we could apply damping weights)
-                for iz in range(1, nCz+1):
+                for iz in range(1, nz+1):
                     izm = iz-1
 
                     ez[ix, iy, izm] = bvec[5*izm]
-                    if izm < nCz-1:
+                    if izm < nz-1:
                         ex[ixm, iy, iz] = bvec[1+5*izm]
                         ex[ix, iy, iz] = bvec[2+5*izm]
                         ey[ix, iym, iz] = bvec[3+5*izm]
@@ -1339,7 +1339,7 @@ def gauss_seidel_z(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy,
 
 
 @nb.njit(**_numba_setting)
-def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
+def blocks_to_amat(amat, bvec, middle, left, rhs, im, nc):
     r"""Insert middle, left, and rhs into main arrays amat and bvec.
 
     The banded matrix ``amat`` contains the main diagonal and the first five
@@ -1419,8 +1419,8 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
     im : int
         Current minus-index of direction of line relaxation, ``i{x;y;z}m``.
 
-    nC : int
-        Total number of cells in direction of line relaxation, ``nC{x;y;z}``.
+    nc : int
+        Total number of cells in direction of line relaxation, ``n{x;y;z}``.
 
     """
     # Define two often used indices
@@ -1438,7 +1438,7 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
             for m in range(k+1):
                 amat[k+5*m] = middle[k+5*m]
 
-    elif im <= nC-2 and nC > 2:  # Normal case; full middle and left
+    elif im <= nc-2 and nc > 2:  # Normal case; full middle and left
 
         # RHS
         for k in range(5):
@@ -1454,7 +1454,7 @@ def blocks_to_amat(amat, bvec, middle, left, rhs, im, nC):
             for m in range(k+1):
                 amat[k+fam+5*(m+fam)] = middle[k+5*m]
 
-    elif im == nC-1:             # The last point
+    elif im == nc-1:             # The last point
 
         # RHS
         bvec[fam] = rhs[0]
@@ -1648,10 +1648,10 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
 
     """
     # Number of coarse grid edges.
-    cnNx, cnNy, cnNz = cry.shape[0], crx.shape[1], crx.shape[2]
+    cnx, cny, cnz = cry.shape[0], crx.shape[1], crx.shape[2]
 
     # Number of fine grid edges.
-    nNx, nNy, nNz = ry.shape[0], rx.shape[1], rx.shape[2]
+    nx, ny, nz = ry.shape[0], rx.shape[1], rx.shape[2]
 
     # Get weights
     wxl, wx0, wxr = wx
@@ -1661,25 +1661,25 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     if sc_dir == 0:  # Standard
 
         # Loop over coarse z-edges.
-        for ciz in range(cnNz):
+        for ciz in range(cnz):
             iz = 2*ciz
             izm = max(0, iz-1)
-            izp = min(nNz-1, iz+1)
+            izp = min(nz-1, iz+1)
 
             # Loop over coarse y-edges.
-            for ciy in range(cnNy):
+            for ciy in range(cny):
                 iy = 2*ciy
                 iym = max(0, iy-1)
-                iyp = min(nNy-1, iy+1)
+                iyp = min(ny-1, iy+1)
 
                 # Loop over coarse x-edges.
-                for cix in range(cnNx):
+                for cix in range(cnx):
                     ix = 2*cix
                     ixm = max(0, ix-1)
-                    ixp = min(nNx-1, ix+1)
+                    ixp = min(nx-1, ix+1)
 
                     # Sum the terms for x-field.
-                    if cix < cnNx-1:
+                    if cix < cnx-1:
                         crx[cix, ciy, ciz] = wy0[ciy]*(
                             wz0[ciz]*(rx[ix, iy, iz] + rx[ixp, iy, iz]) +
                             wzl[ciz]*(rx[ix, iy, izm] + rx[ixp, iy, izm]) +
@@ -1699,7 +1699,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the terms for y-field.
-                    if ciy < cnNy-1:
+                    if ciy < cny-1:
                         cry[cix, ciy, ciz] = wx0[cix]*(
                             wz0[ciz]*(ry[ix, iy, iz] + ry[ix, iyp, iz]) +
                             wzl[ciz]*(ry[ix, iy, izm] + ry[ix, iyp, izm]) +
@@ -1719,7 +1719,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the terms for z-field.
-                    if ciz < cnNz-1:
+                    if ciz < cnz-1:
                         crz[cix, ciy, ciz] = wx0[cix]*(
                             wy0[ciy]*(rz[ix, iy, iz] + rz[ix, iy, izp]) +
                             wyl[ciy]*(rz[ix, iym, iz] + rz[ix, iym, izp]) +
@@ -1741,22 +1741,22 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 1:  # Restrict in y- and z-directions
 
         # Loop over coarse z-edges.
-        for ciz in range(cnNz):
+        for ciz in range(cnz):
             iz = 2*ciz
             izm = max(0, iz-1)
-            izp = min(nNz-1, iz+1)
+            izp = min(nz-1, iz+1)
 
             # Loop over coarse y-edges.
-            for ciy in range(cnNy):
+            for ciy in range(cny):
                 iy = 2*ciy
                 iym = max(0, iy-1)
-                iyp = min(nNy-1, iy+1)
+                iyp = min(ny-1, iy+1)
 
                 # Loop over coarse x-edges.
-                for cix in range(cnNx):
+                for cix in range(cnx):
 
                     # Sum the terms for x-field.
-                    if cix < cnNx-1:
+                    if cix < cnx-1:
                         crx[cix, ciy, ciz] = wy0[ciy]*(
                                 wz0[ciz]*rx[cix, iy, iz] +
                                 wzl[ciz]*rx[cix, iy, izm] +
@@ -1776,7 +1776,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the terms for y-field.
-                    if ciy < cnNy-1:
+                    if ciy < cny-1:
                         cry[cix, ciy, ciz] = (
                             wz0[ciz]*(ry[cix, iy, iz] + ry[cix, iyp, iz]) +
                             wzl[ciz]*(ry[cix, iy, izm] + ry[cix, iyp, izm]) +
@@ -1784,7 +1784,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the terms for z-field.
-                    if ciz < cnNz-1:
+                    if ciz < cnz-1:
                         crz[cix, ciy, ciz] = (
                             wy0[ciy]*(rz[cix, iy, iz] + rz[cix, iy, izp]) +
                             wyl[ciy]*(rz[cix, iym, iz] + rz[cix, iym, izp]) +
@@ -1794,22 +1794,22 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 2:  # Restrict in x- and z-directions
 
         # Loop over coarse z-edges.
-        for ciz in range(cnNz):
+        for ciz in range(cnz):
             iz = 2*ciz
             izm = max(0, iz-1)
-            izp = min(nNz-1, iz+1)
+            izp = min(nz-1, iz+1)
 
             # Loop over coarse y-edges.
-            for ciy in range(cnNy):
+            for ciy in range(cny):
 
                 # Loop over coarse x-edges.
-                for cix in range(cnNx):
+                for cix in range(cnx):
                     ix = 2*cix
                     ixm = max(0, ix-1)
-                    ixp = min(nNx-1, ix+1)
+                    ixp = min(nx-1, ix+1)
 
                     # Sum the terms for x-field.
-                    if cix < cnNx-1:
+                    if cix < cnx-1:
                         crx[cix, ciy, ciz] = (
                             wz0[ciz]*(rx[ix, ciy, iz] + rx[ixp, ciy, iz]) +
                             wzl[ciz]*(rx[ix, ciy, izm] + rx[ixp, ciy, izm]) +
@@ -1817,7 +1817,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the terms for y-field.
-                    if ciy < cnNy-1:
+                    if ciy < cny-1:
                         cry[cix, ciy, ciz] = wx0[cix]*(
                                 wz0[ciz]*ry[ix, ciy, iz] +
                                 wzl[ciz]*ry[ix, ciy, izm] +
@@ -1837,7 +1837,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the terms for z-field.
-                    if ciz < cnNz-1:
+                    if ciz < cnz-1:
                         crz[cix, ciy, ciz] = (
                             wx0[cix]*(rz[ix, ciy, iz] + rz[ix, ciy, izp]) +
                             wxl[cix]*(rz[ixm, ciy, iz] + rz[ixm, ciy, izp]) +
@@ -1847,22 +1847,22 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 3:  # Restrict in x- and y-directions
 
         # Loop over coarse z-edges.
-        for ciz in range(cnNz):
+        for ciz in range(cnz):
 
             # Loop over coarse y-edges.
-            for ciy in range(cnNy):
+            for ciy in range(cny):
                 iy = 2*ciy
                 iym = max(0, iy-1)
-                iyp = min(nNy-1, iy+1)
+                iyp = min(ny-1, iy+1)
 
                 # Loop over coarse x-edges.
-                for cix in range(cnNx):
+                for cix in range(cnx):
                     ix = 2*cix
                     ixm = max(0, ix-1)
-                    ixp = min(nNx-1, ix+1)
+                    ixp = min(nx-1, ix+1)
 
                     # Sum the term for x-field.
-                    if cix < cnNx-1:
+                    if cix < cnx-1:
                         crx[cix, ciy, ciz] = (
                             wy0[ciy]*(rx[ix, iy, ciz] + rx[ixp, iy, ciz]) +
                             wyl[ciy]*(rx[ix, iym, ciz] + rx[ixp, iym, ciz]) +
@@ -1870,7 +1870,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the term for y-field.
-                    if ciy < cnNy-1:
+                    if ciy < cny-1:
                         cry[cix, ciy, ciz] = (
                             wx0[cix]*(ry[ix, iy, ciz] + ry[ix, iyp, ciz]) +
                             wxl[cix]*(ry[ixm, iy, ciz] + ry[ixm, iyp, ciz]) +
@@ -1878,7 +1878,7 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
                         )
 
                     # Sum the terms for z-field.
-                    if ciz < cnNz-1:
+                    if ciz < cnz-1:
                         crz[cix, ciy, ciz] = wx0[cix]*(
                                 wy0[ciy]*rz[ix, iy, ciz] +
                                 wyl[ciy]*rz[ix, iym, ciz] +
@@ -1900,30 +1900,30 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 4:  # Restrict in x-direction
 
         # Loop over coarse z-edges.
-        for ciz in range(cnNz):
+        for ciz in range(cnz):
 
             # Loop over coarse y-edges.
-            for ciy in range(cnNy):
+            for ciy in range(cny):
 
                 # Loop over coarse x-edges.
-                for cix in range(cnNx):
+                for cix in range(cnx):
                     ix = 2*cix
                     ixm = max(0, ix-1)
-                    ixp = min(nNx-1, ix+1)
+                    ixp = min(nx-1, ix+1)
 
                     # Sum the terms for x-field.
-                    if cix < cnNx-1:
+                    if cix < cnx-1:
                         crx[cix, ciy, ciz] = rx[ix, ciy, ciz]
                         crx[cix, ciy, ciz] += rx[ixp, ciy, ciz]
 
                     # Sum the terms for y-field.
-                    if ciy < cnNy-1:
+                    if ciy < cny-1:
                         cry[cix, ciy, ciz] = wx0[cix]*ry[ix, ciy, ciz]
                         cry[cix, ciy, ciz] += wxl[cix]*ry[ixm, ciy, ciz]
                         cry[cix, ciy, ciz] += wxr[cix]*ry[ixp, ciy, ciz]
 
                     # Sum the terms for z-field.
-                    if ciz < cnNz-1:
+                    if ciz < cnz-1:
                         crz[cix, ciy, ciz] = wx0[cix]*rz[ix, ciy, ciz]
                         crz[cix, ciy, ciz] += wxl[cix]*rz[ixm, ciy, ciz]
                         crz[cix, ciy, ciz] += wxr[cix]*rz[ixp, ciy, ciz]
@@ -1931,30 +1931,30 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 5:  # Restrict in y-direction
 
         # Loop over coarse z-edges.
-        for ciz in range(cnNz):
+        for ciz in range(cnz):
 
             # Loop over coarse y-edges.
-            for ciy in range(cnNy):
+            for ciy in range(cny):
                 iy = 2*ciy
                 iym = max(0, iy-1)
-                iyp = min(nNy-1, iy+1)
+                iyp = min(ny-1, iy+1)
 
                 # Loop over coarse x-edges.
-                for cix in range(cnNx):
+                for cix in range(cnx):
 
                     # Sum the terms for x-field.
-                    if cix < cnNx-1:
+                    if cix < cnx-1:
                         crx[cix, ciy, ciz] = wy0[ciy]*rx[cix, iy, ciz]
                         crx[cix, ciy, ciz] += wyl[ciy]*rx[cix, iym, ciz]
                         crx[cix, ciy, ciz] += wyr[ciy]*rx[cix, iyp, ciz]
 
                     # Sum the terms for y-field.
-                    if ciy < cnNy-1:
+                    if ciy < cny-1:
                         cry[cix, ciy, ciz] = ry[cix, iy, ciz]
                         cry[cix, ciy, ciz] += ry[cix, iyp, ciz]
 
                     # Sum the terms for z-field.
-                    if ciz < cnNz-1:
+                    if ciz < cnz-1:
                         crz[cix, ciy, ciz] = wy0[ciy]*rz[cix, iy, ciz]
                         crz[cix, ciy, ciz] += wyl[ciy]*rz[cix, iym, ciz]
                         crz[cix, ciy, ciz] += wyr[ciy]*rz[cix, iyp, ciz]
@@ -1962,31 +1962,31 @@ def restrict(crx, cry, crz, rx, ry, rz, wx, wy, wz, sc_dir):
     elif sc_dir == 6:  # Restrict in z-direction
 
         # Loop over coarse z-edges.
-        for ciz in range(cnNz):
+        for ciz in range(cnz):
             iz = 2*ciz
             izm = max(0, iz-1)
-            izp = min(nNz-1, iz+1)
+            izp = min(nz-1, iz+1)
 
             # Loop over coarse y-edges.
-            for ciy in range(cnNy):
+            for ciy in range(cny):
 
                 # Loop over coarse x-edges.
-                for cix in range(cnNx):
+                for cix in range(cnx):
 
                     # Sum the terms for x-field.
-                    if cix < cnNx-1:
+                    if cix < cnx-1:
                         crx[cix, ciy, ciz] = wz0[ciz]*rx[cix, ciy, iz]
                         crx[cix, ciy, ciz] += wzl[ciz]*rx[cix, ciy, izm]
                         crx[cix, ciy, ciz] += wzr[ciz]*rx[cix, ciy, izp]
 
                     # Sum the terms for y-field.
-                    if ciy < cnNy-1:
+                    if ciy < cny-1:
                         cry[cix, ciy, ciz] = wz0[ciz]*ry[cix, ciy, iz]
                         cry[cix, ciy, ciz] += wzl[ciz]*ry[cix, ciy, izm]
                         cry[cix, ciy, ciz] += wzr[ciz]*ry[cix, ciy, izp]
 
                     # Sum the terms for z-field.
-                    if ciz < cnNz-1:
+                    if ciz < cnz-1:
                         crz[cix, ciy, ciz] = rz[cix, ciy, iz]
                         crz[cix, ciy, ciz] += rz[cix, ciy, izp]
 

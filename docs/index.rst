@@ -14,13 +14,13 @@ emg3d Documentation
 .. toctree::
    :hidden:
 
-   user_guide/index
-   api_reference/index
-   development/index
+   manual/index
+   api/index
+   dev/index
 
--  :ref:`user_guide`
+-  :ref:`manual`
 -  `Gallery <https://emsig.xyz/emg3d-gallery>`_
--  :ref:`api_refs`
+-  :ref:`api`
 -  :ref:`development`
 
 

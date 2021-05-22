@@ -10,7 +10,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     # 'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
-    # 'sphinx.ext.viewcode',
+    'sphinx.ext.viewcode',
     # 'sphinx.ext.doctest',
     'sphinx.ext.todo',
     'sphinx_automodapi.automodapi',
@@ -35,7 +35,7 @@ todo_include_todos = True
 intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
-    "discretize": ("https://discretize.simpeg.xyz/en/master", None),
+    "discretize": ("https://discretize.simpeg.xyz/en/main", None),
     "empymod": ("https://empymod.readthedocs.io/en/stable", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
     "numba": ("https://numba.readthedocs.io/en/stable", None),
@@ -72,7 +72,7 @@ pygments_style = 'friendly'
 # ==== 3. HTML settings ====
 html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
-html_logo = '_static/logo-emg3d-cut.svg'
+html_logo = '_static/emg3d-logo.svg'
 html_favicon = '_static/favicon.ico'
 
 html_theme_options = {
