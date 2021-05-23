@@ -2,128 +2,175 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
+import emg3d
+from emg3d import maps
+
 from . import alternatives
-from emg3d import fields, maps, meshes, models
 
 # Import soft dependencies.
 try:
     import discretize
-    # Backwards compatibility; remove latest for version 1.0.0.
-    dv = discretize.__version__.split('.')
-    if int(dv[0]) == 0 and int(dv[1]) < 6:
-        discretize = None
 except ImportError:
     discretize = None
 
 
-def test_grid2grid_volume():
-    # == X == Simple 1D model
-    grid_in = meshes.TensorMesh(
-            [np.ones(5)*10, np.array([1, ]), np.array([1, ])],
-            origin=np.array([0, 0, 0]))
-    grid_out = meshes.TensorMesh(
-            [np.array([10, 25, 10, 5, 2]), np.array([1, ]), np.array([1, ])],
-            origin=np.array([-5, 0, 0]))
-    values_in = np.array([1., 5., 3, 7, 2])[:, None, None]
-    values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
+# MAPS
+class TestMaps:
+    mesh = emg3d.TensorMesh([[1, 1], [1, 1], [1]], (0, 0, 0))
 
-    # Result 2nd cell: (5*1+10*5+10*3)/25=3.4
-    assert_allclose(values_out[:, 0, 0], np.array([1, 3.4, 7, 2, 2]))
+    values = np.array([0.01, 10, 3, 4])
 
-    # Check log:
-    vlogparam = maps.grid2grid(
-            grid_in, values_in, grid_out, 'volume', log=True)
-    vlinloginp = maps.grid2grid(
-            grid_in, np.log10(values_in), grid_out, 'volume')
-    assert_allclose(vlogparam, 10**vlinloginp)
+    def test_new(self):
 
-    # == Y ==  Reverse it
-    grid_out = meshes.TensorMesh(
-            [np.array([1, ]), np.ones(5)*10, np.array([1, ])],
-            origin=np.array([0, 0, 0]))
-    grid_in = meshes.TensorMesh(
-            [np.array([1, ]), np.array([10, 25, 10, 5, 2]), np.array([1, ])],
-            origin=np.array([0, -5, 0]))
-    values_in = np.array([1, 3.4, 7, 2, 2])[None, :, None]
-    values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
+        class MapNew(maps.BaseMap):
+            def __init__(self):
+                super().__init__(description='my new map')
 
-    # Result 1st cell: (5*1+5*3.4)/10=2.2
-    assert_allclose(values_out[0, :, 0], np.array([2.2, 3.4, 3.4, 7, 2]))
+        testmap = MapNew()
 
-    # == Z == Another 1D test
-    grid_in = meshes.TensorMesh(
-            [np.array([1, ]), np.array([1, ]), np.ones(9)*10],
-            origin=np.array([0, 0, 0]))
-    grid_out = meshes.TensorMesh(
-            [np.array([1, ]), np.array([1, ]), np.array([20, 41, 9, 30])],
-            origin=np.array([0, 0, 0]))
-    values_in = np.arange(1., 10)[None, None, :]
-    values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
+        assert "MapNew: my new map" in testmap.__repr__()
 
-    assert_allclose(values_out[0, 0, :], np.array([1.5, 187/41, 7, 260/30]))
+        with pytest.raises(NotImplementedError, match='Forward map not imple'):
+            testmap.forward(1)
 
-    # == 3D ==
-    grid_in = meshes.TensorMesh(
-            [np.array([1, 1, 1]), np.array([10, 10, 10, 10, 10]),
-             np.array([10, 2, 10])], origin=np.array([0, 0, 0]))
-    grid_out = meshes.TensorMesh(
-            [np.array([1, 2, ]), np.array([10, 25, 10, 5, 2]),
-             np.array([4, 4, 4])], origin=np.array([0, -5, 6]))
-    create = np.array([[1, 2., 1]])
-    create = np.array([create, 2*create, create])
-    values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
+        with pytest.raises(NotImplementedError, match='Backward map not impl'):
+            testmap.backward(1)
 
-    values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
+        with pytest.raises(NotImplementedError, match='Derivative chain not '):
+            testmap.derivative_chain(1, 1)
 
-    check = np.array([[1, 1.5, 1], [1.5, 2.25, 1.5]])[:, None, :]
-    check = check*np.array([1, 3.4, 7, 2, 2])[None, :, None]
+    def test_conductivity(self):
+        model = emg3d.Model(self.mesh, self.values, mapping='Conductivity')
 
-    assert_allclose(values_out, check)
+        # Forward
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, self.values)
 
-    # == If the extent is the same, volume*values must remain constant. ==
-    grid_in = meshes.TensorMesh(
-            [np.array([1, 1, 1]), np.array([10, 10, 10, 10, 10]),
-             np.array([10, 2, 10])], origin=np.array([0, 0, 0]))
-    grid_out = meshes.TensorMesh(
-            [np.array([1, 2, ]), np.array([5, 25, 10, 5, 5]),
-             np.array([9, 4, 9])], origin=np.array([0, 0, 0]))
-    create = np.array([[1, 2., 1]])
-    create = np.array([create, 2*create, create])
-    values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
-    vol_in = np.outer(np.outer(
-        grid_in.h[0], grid_in.h[1]).ravel('F'), grid_in.h[2])
-    vol_in = vol_in.ravel('F').reshape(grid_in.vnC, order='F')
+        # Backward
+        backward = model.map.backward(forward)
+        assert_allclose(backward, self.values)
 
-    values_out = maps.grid2grid(grid_in, values_in, grid_out, 'volume')
-    vol_out = np.outer(np.outer(grid_out.h[0], grid_out.h[1]).ravel('F'),
-                       grid_out.h[2])
-    vol_out = vol_out.ravel('F').reshape(grid_out.vnC, order='F')
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(derivative, derivative)
 
-    assert_allclose(np.sum(values_out*vol_out), np.sum(values_in*vol_in))
+    def test_lgconductivity(self):
+        model = emg3d.Model(self.mesh, np.log10(self.values),
+                            mapping='LgConductivity')
+
+        # Forward
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log10(self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        assert_allclose(backward, self.values)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, derivative*10**model.property_x*np.log(10))
+
+    def test_lnconductivity(self):
+        model = emg3d.Model(self.mesh, np.log(self.values),
+                            mapping='LnConductivity')
+
+        # Forward
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log(self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        assert_allclose(backward, self.values)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, derivative*np.exp(model.property_x))
+
+    def test_resistivity(self):
+        model = emg3d.Model(self.mesh, 1/self.values, mapping='Resistivity')
+
+        # Forward
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, 1/self.values)
+
+        # Backward
+        backward = model.map.backward(forward)
+        assert_allclose(backward, self.values)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, -derivative*(1/model.property_x)**2)
+
+    def test_lgresistivity(self):
+        model = emg3d.Model(self.mesh, np.log10(1/self.values),
+                            mapping='LgResistivity')
+
+        # Forward
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log10(1/self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        assert_allclose(backward, self.values)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, -derivative*10**-model.property_x*np.log(10))
+
+    def test_lnresistivity(self):
+        model = emg3d.Model(self.mesh, np.log(self.values),
+                            mapping='LnResistivity')
+
+        # Forward
+        forward = model.map.forward(self.values)
+        assert_allclose(forward, np.log(1/self.values))
+
+        # Backward
+        backward = model.map.backward(forward)
+        assert_allclose(backward, self.values)
+
+        # Derivative
+        gradient = 2*np.ones(model.property_x.shape)
+        derivative = gradient.copy()
+        model.map.derivative_chain(gradient, model.property_x)
+        assert_allclose(gradient, -derivative*np.exp(-model.property_x))
 
 
-class TestGrid2grid():
+# INTERPOLATIONS
+class TestInterpolate:
+    # emg3d.interpolate is only a dispatcher function, calling other
+    # interpolation routines; there are lots of small dummy tests here, but in
+    # the end it is not up to emg3d.interpolate to check the accuracy of the
+    # actual interpolation; the only relevance is to check if it calls the
+    # right function.
 
     def test_linear(self):
-        igrid = meshes.TensorMesh(
+        igrid = emg3d.TensorMesh(
                 [np.array([1, 1]), np.array([1, 1, 1]), np.array([1, 1, 1])],
                 [0, -1, -1])
-        ogrid = meshes.TensorMesh(
+        ogrid = emg3d.TensorMesh(
                 [np.array([1]), np.array([1]), np.array([1])],
                 [0.5, 0, 0])
-        values = np.r_[9*[1.0, ], 9*[2.0, ]].reshape(igrid.vnC)
-
-        # Provide wrong dimension:
-        with pytest.raises(ValueError, match='There are 2 points and 1 valu'):
-            maps.grid2grid(igrid, values[1:, :, :], ogrid)
+        values = np.r_[9*[1.0, ], 9*[2.0, ]].reshape(igrid.shape_cells)
 
         # Simple, linear example.
-        out = maps.grid2grid(igrid, values, ogrid, 'linear')
+        out = maps.interpolate(
+                grid=igrid, values=values, xi=ogrid, method='linear')
         assert_allclose(out[0, 0, 0], 1.5)
 
         # Provide ogrid.gridCC.
         ogrid._gridCC = np.array([[0.5, 0.5, 0.5]])
-        out2 = maps.grid2grid(igrid, values, ogrid, 'linear')
+        out2 = maps.interpolate(igrid, values, ogrid, 'linear')
         assert_allclose(out2[0, 0, 0], 1.5)
 
     def test_linear_cubic(self):
@@ -131,113 +178,389 @@ class TestGrid2grid():
         # determined, very smoothly changing example.
 
         # Fine grid.
-        fgrid = meshes.TensorMesh(
+        fgrid = emg3d.TensorMesh(
             [np.ones(2**6)*10, np.ones(2**5)*100, np.ones(2**4)*1000],
             origin=np.array([-320., -1600, -8000]))
 
         # Smoothly changing model for fine grid.
-        cmodel = np.arange(1, fgrid.nC+1).reshape(fgrid.vnC, order='F')
+        cmodel = np.arange(1, fgrid.n_cells+1).reshape(
+                fgrid.shape_cells, order='F')
 
         # Coarser grid.
-        cgrid = meshes.TensorMesh(
+        cgrid = emg3d.TensorMesh(
             [np.ones(2**5)*15, np.ones(2**4)*150, np.ones(2**3)*1500],
             origin=np.array([-240., -1200, -6000]))
 
         # Interpolate linearly and cubic spline.
-        lin_model = maps.grid2grid(fgrid, cmodel, cgrid, 'linear')
-        cub_model = maps.grid2grid(fgrid, cmodel, cgrid, 'cubic')
+        lin_model = maps.interpolate(fgrid, cmodel, cgrid, 'linear')
+        cub_model = maps.interpolate(fgrid, cmodel, cgrid, 'cubic')
 
         # Compare
         assert np.max(np.abs((lin_model-cub_model)/lin_model*100)) < 1.0
 
     def test_nearest(self):
         # Assert it is 'nearest' or extrapolate if points are outside.
-        tgrid = meshes.TensorMesh(
+        tgrid = emg3d.TensorMesh(
                 [np.array([1, 1, 1, 1]), np.array([1, 1, 1, 1]),
                  np.array([1, 1, 1, 1])], origin=np.array([0., 0, 0]))
-        tmodel = np.ones(tgrid.nC).reshape(tgrid.vnC, order='F')
+        tmodel = np.ones(tgrid.n_cells).reshape(tgrid.shape_cells, order='F')
         tmodel[:, 0, :] = 2
-        t2grid = meshes.TensorMesh(
+        t2grid = emg3d.TensorMesh(
                 [np.array([1]), np.array([1]), np.array([1])],
                 origin=np.array([2, -1, 2]))
 
         # Nearest with cubic.
-        out = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic')
+        out = maps.interpolate(tgrid, tmodel, t2grid, 'cubic')
         assert_allclose(out, 2.)
 
         # Same, but with log.
-        vlog = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic', log=True)
-        vlin = maps.grid2grid(tgrid, np.log10(tmodel), t2grid, 'cubic')
+        vlog = maps.interpolate(tgrid, tmodel, t2grid, 'cubic', log=True)
+        vlin = maps.interpolate(tgrid, np.log10(tmodel), t2grid, 'cubic')
         assert_allclose(vlog, 10**vlin)
 
         # Extrapolate with linear.
-        out = maps.grid2grid(tgrid, tmodel, t2grid, 'linear')
+        out = maps.interpolate(tgrid, tmodel, t2grid, 'linear')
         assert_allclose(out, 3.)
 
         # Same, but with log.
-        vlog = maps.grid2grid(tgrid, tmodel, t2grid, 'linear', log=True)
-        vlin = maps.grid2grid(tgrid, np.log10(tmodel), t2grid, 'linear')
+        vlog = maps.interpolate(tgrid, tmodel, t2grid, 'linear', log=True)
+        vlin = maps.interpolate(tgrid, np.log10(tmodel), t2grid, 'linear')
         assert_allclose(vlog, 10**vlin)
 
         # Assert it is 0 if points are outside.
-        out = maps.grid2grid(tgrid, tmodel, t2grid, 'cubic', False)
+        out = maps.interpolate(tgrid, tmodel, t2grid, 'cubic', False)
         assert_allclose(out, 0.)
-        out = maps.grid2grid(tgrid, tmodel, t2grid, 'linear', False)
+        out = maps.interpolate(tgrid, tmodel, t2grid, 'linear', False)
         assert_allclose(out, 0.)
 
-    def test_field(self):
-        # Provide a Field instance
-        grid = meshes.TensorMesh(
-                [np.array([1, 2]), np.array([1, 2]), np.array([1, 2])],
-                [0, 0, 0])
-        cgrid = meshes.TensorMesh(
-                [np.array([1.5, 1]), np.array([1.5]), np.array([1.5])],
-                [0, 0, 0])
-        field = fields.Field(grid)
+    def test_volume(self):
+        # == X == Simple 1D model
+        grid_in = emg3d.TensorMesh(
+                [np.ones(5)*10, np.array([1, ]), np.array([1, ])],
+                origin=np.array([0, 0, 0]))
+        grid_out = emg3d.TensorMesh(
+                [[10, 25, 10, 5, 2], [1, ], [1, ]], origin=(-5, 0, 0))
+        values_in = np.array([1., 5., 3, 7, 2])[:, None, None]
+        values_out = maps.interpolate(grid_in, values_in, grid_out, 'volume')
 
-        # Simple linear interpolation test.
-        field.fx = np.arange(1, field.fx.size+1)
-        field.fy = np.arange(1, field.fy.size+1)
-        field.fz = np.arange(1, field.fz.size+1)
+        # Result 2nd cell: (5*1+10*5+10*3)/25=3.4
+        assert_allclose(values_out[:, 0, 0], np.array([1, 3.4, 7, 2, 2]))
 
-        new_field = maps.grid2grid(grid, field, cgrid, method='linear')
-        fx = maps.grid2grid(grid, field.fx, cgrid, method='linear')
-        fy = maps.grid2grid(grid, field.fy, cgrid, method='linear')
-        fz = maps.grid2grid(grid, field.fz, cgrid, method='linear')
-        assert_allclose(fx, new_field.fx)
-        assert_allclose(fy, new_field.fy)
-        assert_allclose(fz, new_field.fz)
+        # Check log:
+        vlogparam = maps.interpolate(
+                grid_in, values_in, grid_out, 'volume', log=True)
+        vlinloginp = maps.interpolate(
+                grid_in, np.log10(values_in), grid_out, 'volume')
+        assert_allclose(vlogparam, 10**vlinloginp)
 
-        new_field = maps.grid2grid(grid, field, cgrid, method='cubic')
-        fx = maps.grid2grid(grid, field.fx, cgrid, method='cubic')
-        fy = maps.grid2grid(grid, field.fy, cgrid, method='cubic')
-        fz = maps.grid2grid(grid, field.fz, cgrid, method='cubic')
-        assert_allclose(fx, new_field.fx)
-        assert_allclose(fy, new_field.fy)
-        assert_allclose(fz, new_field.fz)
+        # == Y ==  Reverse it
+        grid_out = emg3d.TensorMesh(
+                [np.array([1, ]), np.ones(5)*10, np.array([1, ])],
+                origin=np.array([0, 0, 0]))
+        grid_in = emg3d.TensorMesh(
+                [[1, ], [10, 25, 10, 5, 2], [1, ]], origin=[0, -5, 0])
+        values_in = np.array([1, 3.4, 7, 2, 2])[None, :, None]
+        values_out = maps.interpolate(grid_in, values_in, grid_out, 'volume')
 
-        # Ensure Field fails with 'volume'.
-        with pytest.raises(ValueError, match="``method='volume'`` not impl"):
-            maps.grid2grid(grid, field, cgrid, method='volume')
+        # Result 1st cell: (5*1+5*3.4)/10=2.2
+        assert_allclose(values_out[0, :, 0], np.array([2.2, 3.4, 3.4, 7, 2]))
+
+        # == Z == Another 1D test
+        grid_in = emg3d.TensorMesh(
+                [np.array([1, ]), np.array([1, ]), np.ones(9)*10],
+                origin=np.array([0, 0, 0]))
+        grid_out = emg3d.TensorMesh(
+                [np.array([1, ]), np.array([1, ]), np.array([20, 41, 9, 30])],
+                origin=np.array([0, 0, 0]))
+        values_in = np.arange(1., 10)[None, None, :]
+        values_out = maps.interpolate(grid_in, values_in, grid_out, 'volume')
+
+        assert_allclose(values_out[0, 0, :],
+                        np.array([1.5, 187/41, 7, 260/30]))
+
+        # == 3D ==
+        grid_in = emg3d.TensorMesh(
+                [[1, 1, 1], [10, 10, 10, 10, 10], [10, 2, 10]],
+                origin=(0, 0, 0))
+        grid_out = emg3d.TensorMesh(
+                [[1, 2, ], [10, 25, 10, 5, 2], [4, 4, 4]], origin=[0, -5, 6])
+        create = np.array([[1, 2., 1]])
+        create = np.array([create, 2*create, create])
+        values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
+
+        values_out = maps.interpolate(grid_in, values_in, grid_out, 'volume')
+
+        check = np.array([[1, 1.5, 1], [1.5, 2.25, 1.5]])[:, None, :]
+        check = check*np.array([1, 3.4, 7, 2, 2])[None, :, None]
+
+        assert_allclose(values_out, check)
+
+        # == If the extent is the same, volume*values must remain constant. ==
+        grid_in = emg3d.TensorMesh(
+                [np.array([1, 1, 1]), np.array([10, 10, 10, 10, 10]),
+                 np.array([10, 2, 10])], origin=np.array([0, 0, 0]))
+        grid_out = emg3d.TensorMesh(
+                [np.array([1, 2, ]), np.array([5, 25, 10, 5, 5]),
+                 np.array([9, 4, 9])], origin=np.array([0, 0, 0]))
+        create = np.array([[1, 2., 1]])
+        create = np.array([create, 2*create, create])
+        values_in = create*np.array([1., 5., 3, 7, 2])[None, :, None]
+        vol_in = np.outer(np.outer(
+            grid_in.h[0], grid_in.h[1]).ravel('F'), grid_in.h[2])
+        vol_in = vol_in.ravel('F').reshape(grid_in.shape_cells, order='F')
+
+        values_out = maps.interpolate(grid_in, values_in, grid_out, 'volume')
+        vol_out = np.outer(np.outer(grid_out.h[0], grid_out.h[1]).ravel('F'),
+                           grid_out.h[2])
+        vol_out = vol_out.ravel('F').reshape(grid_out.shape_cells, order='F')
+
+        assert_allclose(np.sum(values_out*vol_out), np.sum(values_in*vol_in))
+
+    def test_all_run(self):
+        hx = [1, 1, 1, 2, 4, 8]
+        grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))
+        grid2 = emg3d.TensorMesh([[2, 4, 5], [1, 1], [4, 5]], (0, 1, 0))
+        field = emg3d.Field(grid)
+        field.fx = np.arange(1, field.fx.size+1).reshape(
+                field.fx.shape, order='F')
+        model = emg3d.Model(grid, 1, 2, 3)
+
+        model.property_x[1, :, :] = 2
+        model.property_x[2, :, :] = 3
+        model.property_x[3, :, :] = 4
+        model.property_x[4, :, :] = np.arange(1, 37).reshape((6, 6), order='F')
+        model.property_x[5, :, :] = 200
+
+        xi = (1, [8, 7, 6, 8, 9], [1])
+
+        # == NEAREST ==
+        # property - grid
+        _ = maps.interpolate(grid, model.property_x, grid2, method='nearest')
+        # field - grid
+        _ = maps.interpolate(grid, field.fx, grid2, method='nearest')
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='nearest')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='nearest')
+
+        # == LINEAR ==
+        # property - grid
+        _ = maps.interpolate(grid, model.property_x, grid2, method='linear')
+        # field - grid
+        _ = maps.interpolate(grid, field.fx, grid2, method='linear')
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='linear')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='linear')
+
+        # == CUBIC ==
+        # property - grid
+        _ = maps.interpolate(grid, model.property_x, grid2, method='cubic')
+        # field - grid
+        _ = maps.interpolate(grid, field.fx, grid2, method='cubic')
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='cubic')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='cubic')
+
+        # == VOLUME ==
+        # property - grid
+        _ = maps.interpolate(grid, model.property_x, grid2, method='volume')
+        # field - grid
+        with pytest.raises(ValueError, match="for cell-centered properties"):
+            maps.interpolate(grid, field.fx, grid2, method='volume')
+        # property - points
+        with pytest.raises(ValueError, match="only implemented for TensorM"):
+            maps.interpolate(grid, model.property_x, xi, method='volume')
+        # field - points
+        with pytest.raises(ValueError, match="only implemented for TensorM"):
+            maps.interpolate(grid, field.fx, xi, method='volume')
+
+    def test_2d_arrays(self):
+        hx = [1, 1, 1, 2, 4, 8]
+        grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))
+        field = emg3d.Field(grid)
+        field.fx = np.arange(1, field.fx.size+1).reshape(
+                field.fx.shape, order='F')
+        model = emg3d.Model(grid, 1, 2, 3)
+
+        model.property_x[1, :, :] = 2
+        model.property_x[2, :, :] = 3
+        model.property_x[3, :, :] = 4
+        model.property_x[4, :, :] = np.arange(1, 37).reshape((6, 6), order='F')
+        model.property_x[5, :, :] = 200
+
+        xi = (np.ones((3, 2)), 5, np.ones((3, 2)))
+
+        # == NEAREST ==
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='nearest')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='nearest')
+
+        # == LINEAR ==
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='linear')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='linear')
+
+        # == CUBIC ==
+        # property - points
+        _ = maps.interpolate(grid, model.property_x, xi, method='cubic')
+        # field - points
+        _ = maps.interpolate(grid, field.fx, xi, method='cubic')
+
+
+def test_points_from_grids():
+    hx = [1, 1, 1, 2, 4, 8]
+    grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))
+    grid2 = emg3d.TensorMesh([[2, 4, 5], [1, 1], [4, 5]], (0, 1, 0))
+
+    xi_tuple = (1, [8, 7, 6, 8, 9], [1])
+    xi_array = np.arange(18).reshape(-1, 3)
+
+    v_prop = np.ones(grid.shape_cells)
+    v_field_e = np.ones(grid.shape_edges_x)
+    v_field_f = np.ones(grid.shape_faces_x)
+
+    # linear  - values = prop  - xi = grid
+    out = maps._points_from_grids(grid, v_prop, grid2, 'linear')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][0, :], [1., 1.5, 2])
+    assert out[2] == (3, 2, 2)
+
+    # nearest - values = field - xi = grid
+    out = maps._points_from_grids(grid, v_field_e, grid2, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][1], [0., 1., 2., 3., 5., 9., 17.])
+    assert_allclose(out[1][1, :], [4., 1., 0.])
+    assert out[2] == (3, 3, 3)
+    # nearest - values = field - xi = grid
+    out = maps._points_from_grids(grid, v_field_f, grid2, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][1], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][1, :], [2., 1.5, 2.])
+    assert out[2] == (4, 2, 2)
+
+    # cubic   - values = prop  - xi = tuple
+    out = maps._points_from_grids(grid, v_prop, xi_tuple, 'cubic')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][2], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][2, :], [1., 6., 1.])
+    assert out[2] == (5, )
+
+    # linear  - values = field - xi = tuple
+    out = maps._points_from_grids(grid, v_field_e, xi_tuple, 'linear')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][-1, :], [1., 9., 1.])
+    assert out[2] == (5, )
+
+    # nearest - values = prop  - xi = ndarray
+    out = maps._points_from_grids(grid, v_prop, xi_array, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1], xi_array)
+    assert out[2] == (6, )
+
+    # cubic   - values = field - xi = ndarray
+    out = maps._points_from_grids(grid, v_field_e, xi_array, 'cubic')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1], xi_array)
+    assert out[2] == (6, )
+
+    # cubic   - values = 1Darr - xi = grid  - FAILS
+    with pytest.raises(ValueError, match='must be a 3D ndarray'):
+        maps._points_from_grids(grid, v_field_e.ravel(), grid2, 'cubic')
+
+    # volume  - values = prop  - xi = grid
+    out = maps._points_from_grids(grid, v_prop, grid2, 'volume')
+    assert isinstance(out[1], tuple)
+    assert_allclose(out[0][0], [0., 1, 2, 3, 5, 9, 17])
+    assert_allclose(out[1][0], [0., 2, 6, 11])
+    assert out[2] == (3, 2, 2)
+
+    # volume  - values = field - xi = grid  - FAILS
+    with pytest.raises(ValueError, match='only implemented for cell-centered'):
+        maps._points_from_grids(grid, v_field_e, grid2, 'volume')
+
+    # volume  - values = prop  - xi = tuple - FAILS
+    with pytest.raises(ValueError, match='only implemented for TensorMesh'):
+        maps._points_from_grids(grid, v_prop, xi_tuple, 'volume')
+
+    # tuple can contain any dimension; it will work (undocumented).
+    shape = (3, 2, 4, 5)
+    coords = np.arange(np.prod(shape)).reshape(shape, order='F')
+    xi_tuple2 = (1, coords, 10)
+    out = maps._points_from_grids(grid, v_field_e, xi_tuple2, 'nearest')
+    assert isinstance(out[1], np.ndarray)
+    assert_allclose(out[0][0], [0.5, 1.5, 2.5, 4., 7., 13.])
+    assert_allclose(out[1][-1, :], [1., 119, 10])
+    assert out[2] == shape
+
+
+def test_interp_spline_3d():
+    x = np.array([1., 2, 4, 5])
+    pts = (x, x, x)
+
+    p1 = np.array([[3, 1, 3], [3, 3, 3], [3, 4, 3]])
+    v1 = np.ones((4, 4, 4), order='F')
+    v1[1, :, :] = 4.0
+    v1[2, :, :] = 16.0
+    v1[3, :, :] = 25.0
+
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=0)
+    assert_allclose(out, 16)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=1)
+    assert_allclose(out, 10)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=2)
+    assert_allclose(out, 9.4)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1)
+    assert_allclose(out, 9.25)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=4)
+    assert_allclose(out, 9.117647)
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, order=5)
+    assert_allclose(out, 9.0625)
+
+    p2 = np.array([[1, 3, 3], [3, 3, 3], [4, 3, 3]])
+    v2 = np.rollaxis(v1, 1)
+    out = maps.interp_spline_3d(points=pts, values=v2, xi=p2)
+    assert_allclose(out, 9.25)
+
+    p3 = np.array([[3, 3, 1], [3, 3, 3], [3, 3, 4]])
+    v3 = np.rollaxis(v2, 1)
+    v3 = v3 + 1j*v3
+    out = maps.interp_spline_3d(points=pts, values=v3, xi=p3)
+    assert_allclose(out, 9.25 + 9.25j)
+
+    p1 = np.array([[3, 100, 3]])
+    v1 = np.ones((4, 4, 4), order='F')
+    v1[1, :, :] = 4.0
+    v1[2, :, :] = 16.0
+    v1[3, :, :] = 25.0
+    out = maps.interp_spline_3d(points=pts, values=v1, xi=p1, cval=999)
+    assert_allclose(out, 999)
 
 
 @pytest.mark.parametrize("njit", [True, False])
-def test_volume_average(njit):
+def test_interp_volume_average(njit):
     if njit:
-        volume_average = maps.volume_average
+        interp_volume_average = maps.interp_volume_average
     else:
-        volume_average = maps.volume_average.py_func
+        interp_volume_average = maps.interp_volume_average.py_func
 
     # Comparison to alt_version.
-    grid_in = meshes.TensorMesh(
+    grid_in = emg3d.TensorMesh(
             [np.ones(30), np.ones(20)*5, np.ones(10)*10],
             origin=np.array([0, 0, 0]))
-    grid_out = meshes.TensorMesh(
+    grid_out = emg3d.TensorMesh(
             [np.arange(7)+1, np.arange(13)+1, np.arange(13)+1],
             origin=np.array([0.5, 3.33, 5]))
 
-    values = np.arange(grid_in.nC, dtype=np.float_).reshape(
-            grid_in.vnC, order='F')
+    values = np.arange(grid_in.n_cells, dtype=np.float64).reshape(
+            grid_in.shape_cells, order='F')
 
     points = (grid_in.nodes_x, grid_in.nodes_y, grid_in.nodes_z)
     new_points = (grid_out.nodes_x, grid_out.nodes_y, grid_out.nodes_z)
@@ -245,14 +568,14 @@ def test_volume_average(njit):
     # Compute volume.
     vol = np.outer(np.outer(
         grid_out.h[0], grid_out.h[1]).ravel('F'), grid_out.h[2])
-    vol = vol.ravel('F').reshape(grid_out.vnC, order='F')
+    vol = vol.ravel('F').reshape(grid_out.shape_cells, order='F')
 
     # New solution.
-    new_values = np.zeros(grid_out.vnC, dtype=values.dtype)
-    volume_average(*points, values, *new_points, new_values, vol)
+    new_values = np.zeros(grid_out.shape_cells, dtype=values.dtype)
+    interp_volume_average(*points, values, *new_points, new_values, vol)
 
     # Old solution.
-    new_values_alt = np.zeros(grid_out.vnC, dtype=values.dtype)
+    new_values_alt = np.zeros(grid_out.shape_cells, dtype=values.dtype)
     alternatives.alt_volume_average(
             *points, values, *new_points, new_values_alt)
 
@@ -266,10 +589,10 @@ def test_volume_average_weights(njit):
     else:
         volume_avg_weights = maps._volume_average_weights.py_func
 
-    grid_in = meshes.TensorMesh(
+    grid_in = emg3d.TensorMesh(
             [np.ones(11), np.ones(10)*2, np.ones(3)*10],
             origin=np.array([0, 0, 0]))
-    grid_out = meshes.TensorMesh(
+    grid_out = emg3d.TensorMesh(
             [np.arange(4)+1, np.arange(5)+1, np.arange(6)+1],
             origin=np.array([0.5, 3.33, 5]))
 
@@ -290,157 +613,19 @@ def test_volume_average_weights(njit):
     assert_allclose(iz_in, [0, 0, 0, 1, 1, 1, 2])
     assert_allclose(iz_out, [0, 1, 2, 2, 3, 4, 5])
 
-    w, inp, out = volume_avg_weights(np.array([0., 5, 7, 10]),
-                                     np.array([-1., 1, 4, 6, 7, 11]))
+    w, inp, out = volume_avg_weights(x_i=np.array([0., 5, 7, 10]),
+                                     x_o=np.array([-1., 1, 4, 6, 7, 11]))
     assert_allclose(w, [1, 1, 3, 1, 1, 1, 3, 1])
     assert_allclose(inp, [0, 0, 0, 0, 1, 1, 2, 2])
     assert_allclose(out, [0, 0, 1, 2, 2, 3, 4, 4])
 
 
-class TestMaps:
-    mesh = meshes.TensorMesh(
-            [np.array([1, 1]), np.array([1, 1]), np.array([1])],
-            np.array([0, 0, 0]))
-
-    values = np.array([0.01, 10, 3, 4])
-
-    def test_basic(self):
-        class MyMap(maps._Map):
-            def __init__(self):
-                super().__init__('my awesome map')
-
-        testmap = MyMap()
-
-        assert "MyMap: my awesome map" in testmap.__repr__()
-
-        with pytest.raises(NotImplementedError, match='Forward map not imple'):
-            testmap.forward(1)
-
-        with pytest.raises(NotImplementedError, match='Backward map not impl'):
-            testmap.backward(1)
-
-        with pytest.raises(NotImplementedError, match='Derivative chain not '):
-            testmap.derivative_chain(1, 1)
-
-    def test_conductivity(self):
-        model = models.Model(self.mesh, self.values, mapping='Conductivity')
-
-        # Forward
-        forward = model.map.forward(self.values)
-        assert_allclose(forward, self.values)
-
-        # Backward
-        backward = model.map.backward(forward)
-        assert_allclose(backward, self.values)
-
-        # Derivative
-        gradient = 2*np.ones(model.property_x.shape)
-        derivative = gradient.copy()
-        model.map.derivative_chain(gradient, model.property_x)
-        assert_allclose(derivative, derivative)
-
-    def test_lgconductivity(self):
-        model = models.Model(self.mesh, np.log10(self.values),
-                             mapping='LgConductivity')
-
-        # Forward
-        forward = model.map.forward(self.values)
-        assert_allclose(forward, np.log10(self.values))
-
-        # Backward
-        backward = model.map.backward(forward)
-        assert_allclose(backward, self.values)
-
-        # Derivative
-        gradient = 2*np.ones(model.property_x.shape)
-        derivative = gradient.copy()
-        model.map.derivative_chain(gradient, model.property_x)
-        assert_allclose(gradient, derivative*10**model.property_x*np.log(10))
-
-    def test_lnconductivity(self):
-        model = models.Model(self.mesh, np.log(self.values),
-                             mapping='LnConductivity')
-
-        # Forward
-        forward = model.map.forward(self.values)
-        assert_allclose(forward, np.log(self.values))
-
-        # Backward
-        backward = model.map.backward(forward)
-        assert_allclose(backward, self.values)
-
-        # Derivative
-        gradient = 2*np.ones(model.property_x.shape)
-        derivative = gradient.copy()
-        model.map.derivative_chain(gradient, model.property_x)
-        assert_allclose(gradient, derivative*np.exp(model.property_x))
-
-    def test_resistivity(self):
-        model = models.Model(self.mesh, 1/self.values, mapping='Resistivity')
-
-        # Forward
-        forward = model.map.forward(self.values)
-        assert_allclose(forward, 1/self.values)
-
-        # Backward
-        backward = model.map.backward(forward)
-        assert_allclose(backward, self.values)
-
-        # Derivative
-        gradient = 2*np.ones(model.property_x.shape)
-        derivative = gradient.copy()
-        model.map.derivative_chain(gradient, model.property_x)
-        assert_allclose(gradient, -derivative*(1/model.property_x)**2)
-
-    def test_lgresistivity(self):
-        model = models.Model(self.mesh, np.log10(1/self.values),
-                             mapping='LgResistivity')
-
-        # Forward
-        forward = model.map.forward(self.values)
-        assert_allclose(forward, np.log10(1/self.values))
-
-        # Backward
-        backward = model.map.backward(forward)
-        assert_allclose(backward, self.values)
-
-        # Derivative
-        gradient = 2*np.ones(model.property_x.shape)
-        derivative = gradient.copy()
-        model.map.derivative_chain(gradient, model.property_x)
-        assert_allclose(gradient, -derivative*10**-model.property_x*np.log(10))
-
-    def test_lnresistivity(self):
-        model = models.Model(self.mesh, np.log(self.values),
-                             mapping='LnResistivity')
-
-        # Forward
-        forward = model.map.forward(self.values)
-        assert_allclose(forward, np.log(1/self.values))
-
-        # Backward
-        backward = model.map.backward(forward)
-        assert_allclose(backward, self.values)
-
-        # Derivative
-        gradient = 2*np.ones(model.property_x.shape)
-        derivative = gradient.copy()
-        model.map.derivative_chain(gradient, model.property_x)
-        assert_allclose(gradient, -derivative*np.exp(-model.property_x))
-
-    def test_to_from_dict(self):
-        m = maps.MapLgResistivity()
-        d = m.to_dict()
-        n = maps.MapLgResistivity.from_dict(d)
-        assert m.name == n.name
-
-
 @pytest.mark.parametrize("njit", [True, False])
-def test_edges2cellaverages(njit):
+def test_interp_edges_to_vol_averages(njit):
     if njit:
-        edges2cellaverages = maps.edges2cellaverages
+        edges_to_vol_averages = maps.interp_edges_to_vol_averages
     else:
-        edges2cellaverages = maps.edges2cellaverages.py_func
+        edges_to_vol_averages = maps.interp_edges_to_vol_averages.py_func
 
     # To test it, we create a mesh 2x2x2 cells,
     # where all hx/hy/hz have distinct lengths.
@@ -448,8 +633,8 @@ def test_edges2cellaverages(njit):
     y0, y1 = 4, 5
     z0, z1 = 6, 7
 
-    grid = meshes.TensorMesh([[x0, x1], [y0, y1], [z0, z1]], [0, 0, 0])
-    field = fields.Field(grid)
+    grid = emg3d.TensorMesh([[x0, x1], [y0, y1], [z0, z1]], [0, 0, 0])
+    field = emg3d.Field(grid)
 
     # Only three edges have a value, one in each direction.
     fx = 1.23+9.87j
@@ -460,14 +645,16 @@ def test_edges2cellaverages(njit):
     field.fz[1, 1, 0] = fz
 
     # Initiate gradient.
-    grad_x = np.zeros(grid.vnC, order='F', dtype=complex)
-    grad_y = np.zeros(grid.vnC, order='F', dtype=complex)
-    grad_z = np.zeros(grid.vnC, order='F', dtype=complex)
+    grad_x = np.zeros(grid.shape_cells, order='F', dtype=complex)
+    grad_y = np.zeros(grid.shape_cells, order='F', dtype=complex)
+    grad_z = np.zeros(grid.shape_cells, order='F', dtype=complex)
+
+    cell_volumes = grid.cell_volumes.reshape(grid.shape_cells, order='F')
 
     # Call function.
-    vol = grid.cell_volumes.reshape(grid.vnC, order='F')
-    edges2cellaverages(field.fx, field.fy, field.fz,
-                       vol, grad_x, grad_y, grad_z)
+    edges_to_vol_averages(ex=field.fx, ey=field.fy, ez=field.fz,
+                          volumes=cell_volumes,
+                          ox=grad_x, oy=grad_y, oz=grad_z)
     grad = grad_x + grad_y + grad_z
 
     # Check all eight cells explicitly by
@@ -498,17 +685,20 @@ def test_edges2cellaverages(njit):
 
     if discretize is not None:
         def volume_disc(grid, field):
-            out = grid.aveE2CC*field*grid.cell_volumes
-            return out.reshape(grid.vnC, order='F')
+            out = grid.average_edge_to_cell*field.field*grid.cell_volumes
+            return out.reshape(grid.shape_cells, order='F')
 
         assert_allclose(grad, 3*volume_disc(grid, field))
 
     if discretize is not None:
 
-        out_x = grid.aveEx2CC*field.fx.ravel('F')*grid.cell_volumes
-        out_y = grid.aveEy2CC*field.fy.ravel('F')*grid.cell_volumes
-        out_z = grid.aveEz2CC*field.fz.ravel('F')*grid.cell_volumes
+        out_x = grid.average_edge_x_to_cell*field.fx.ravel('F')
+        out_x *= grid.cell_volumes
+        out_y = grid.average_edge_y_to_cell*field.fy.ravel('F')
+        out_y *= grid.cell_volumes
+        out_z = grid.average_edge_z_to_cell*field.fz.ravel('F')
+        out_z *= grid.cell_volumes
 
-        assert_allclose(grad_x, out_x.reshape(grid.vnC, order='F'))
-        assert_allclose(grad_y, out_y.reshape(grid.vnC, order='F'))
-        assert_allclose(grad_z, out_z.reshape(grid.vnC, order='F'))
+        assert_allclose(grad_x, out_x.reshape(grid.shape_cells, order='F'))
+        assert_allclose(grad_y, out_y.reshape(grid.shape_cells, order='F'))
+        assert_allclose(grad_z, out_z.reshape(grid.shape_cells, order='F'))

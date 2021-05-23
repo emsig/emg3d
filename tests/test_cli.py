@@ -1,6 +1,7 @@
 import os
 import pytest
 import numpy as np
+from os.path import join, sep
 from numpy.testing import assert_allclose
 from contextlib import suppress, ContextDecorator
 
@@ -12,16 +13,6 @@ try:
     import xarray
 except ImportError:
     xarray = None
-
-msg = ""
-try:
-    import discretize
-    # Backwards compatibility; remove latest for version 1.0.0.
-    dv = discretize.__version__.split('.')
-    if int(dv[0]) == 0 and int(dv[1]) < 6:
-        msg = "`emg3d>=v0.15.0` ONLY works with `discretize>=v0.6.0`;"
-except ImportError:
-    pass
 
 
 class disable_numba(ContextDecorator):
@@ -40,22 +31,17 @@ class disable_numba(ContextDecorator):
 
 @disable_numba()
 @pytest.mark.script_launch_mode('subprocess')
-def test_basic(script_runner):
+def test_main(script_runner):
 
     # Test the installed version runs by -h.
     ret = script_runner.run('emg3d', '-h')
     assert ret.success
-    assert "emg3d is a multigrid solver for 3D EM diffusion" in ret.stdout
-
-    if msg:
-        assert msg in ret.stderr
-    else:
-        assert ret.stderr == ""
+    assert "Multigrid solver for 3D electromagnetic diffusion." in ret.stdout
 
     # Test the info printed if called without anything.
     ret = script_runner.run('emg3d')
     assert ret.success
-    assert "emg3d is a multigrid solver for 3D EM diffusion" in ret.stdout
+    assert "Multigrid solver for 3D electromagnetic diffusion." in ret.stdout
     assert "emg3d v" in ret.stdout
 
     # Test emg3d/__main__.py by calling the folder emg3d.
@@ -67,18 +53,20 @@ def test_basic(script_runner):
     assert emg3d.utils.Report().__repr__()[115:475] in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - I.
-    ret = script_runner.run('python', 'emg3d/cli/main.py', '--version')
+    ret = script_runner.run(
+            'python', join('emg3d', 'cli', 'main.py'), '--version')
     assert ret.success
     assert "emg3d v" in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - II.
-    ret = script_runner.run('python', 'emg3d/cli/main.py', '--report')
+    ret = script_runner.run(
+            'python', join('emg3d', 'cli', 'main.py'), '--report')
     assert ret.success
     # Exclude time to avoid errors.
     assert emg3d.utils.Report().__repr__()[115:475] in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - III.
-    ret = script_runner.run('python', 'emg3d/cli/main.py', '-d')
+    ret = script_runner.run('python', join('emg3d', 'cli', 'main.py'), '-d')
     assert not ret.success
     assert "* ERROR   :: Config file not found: " in ret.stderr
 
@@ -116,10 +104,10 @@ class TestParser:
 
         # Check some default values.
         assert term['function'] == 'forward'
-        assert cfg['files']['survey'] == tmpdir+'/survey.h5'
-        assert cfg['files']['model'] == tmpdir+'/model.h5'
-        assert cfg['files']['output'] == tmpdir+'/emg3d_out.h5'
-        assert cfg['files']['log'] == tmpdir+'/emg3d_out.log'
+        assert cfg['files']['survey'] == join(tmpdir, 'survey.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'model.h5')
+        assert cfg['files']['output'] == join(tmpdir, 'emg3d_out.h5')
+        assert cfg['files']['log'] == join(tmpdir, 'emg3d_out.log')
 
         # Provide file names
         args_dict = self.args_dict.copy()
@@ -128,9 +116,9 @@ class TestParser:
         args_dict['output'] = 'out.npz'
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['files']['survey'] == tmpdir+'/test.h5'
-        assert cfg['files']['model'] == tmpdir+'/unkno.h5'
-        assert cfg['files']['output'] == tmpdir+'/out.npz'
+        assert cfg['files']['survey'] == join(tmpdir, 'test.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'unkno.h5')
+        assert cfg['files']['output'] == join(tmpdir, 'out.npz')
 
         # .-trick.
         args_dict = self.args_dict.copy()
@@ -142,7 +130,7 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = 'bla'
         _, term = cli.parser.parse_config_file(args_dict)
-        assert '/bla' in term['config_file']
+        assert sep + 'bla' in term['config_file']
 
     def test_term_various(self, tmpdir):
 
@@ -160,10 +148,10 @@ class TestParser:
         assert term['dry_run'] is True
         assert term['function'] == 'gradient'
         assert cfg['simulation_options']['max_workers'] == 1
-        assert cfg['files']['survey'] == tmpdir+'/testit.h5'
-        assert cfg['files']['model'] == tmpdir+'/model.json'
-        assert cfg['files']['output'] == tmpdir+'/output.npz'
-        assert cfg['files']['log'] == tmpdir+'/output.log'
+        assert cfg['files']['survey'] == join(tmpdir, 'testit.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'model.json')
+        assert cfg['files']['output'] == join(tmpdir, 'output.npz')
+        assert cfg['files']['log'] == join(tmpdir, 'output.log')
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             args_dict = self.args_dict.copy()
@@ -185,10 +173,10 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['files']['survey'] == tmpdir+'/testit.json'
-        assert cfg['files']['model'] == tmpdir+'/thismodel.h5'
-        assert cfg['files']['output'] == tmpdir+'/results.npz'
-        assert cfg['files']['log'] == tmpdir+'/results.log'
+        assert cfg['files']['survey'] == join(tmpdir, 'testit.json')
+        assert cfg['files']['model'] == join(tmpdir, 'thismodel.h5')
+        assert cfg['files']['output'] == join(tmpdir, 'results.npz')
+        assert cfg['files']['log'] == join(tmpdir, 'results.log')
         assert cfg['files']['store_simulation'] is False
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
@@ -263,7 +251,7 @@ class TestParser:
             f.write("[data]\n")
             f.write("sources=Tx11\n")
             f.write("receivers=Rx1, Rx2\n")
-            f.write("frequencies=1")
+            f.write("frequencies=f0")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -271,7 +259,7 @@ class TestParser:
         test = cfg['data']
         assert test['sources'] == ['Tx11']
         assert test['receivers'] == ['Rx1', 'Rx2']
-        assert test['frequencies'] == [1.0]
+        assert test['frequencies'] == ['f0']
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             # Write a config file.
@@ -320,9 +308,13 @@ class TestParser:
         assert check['lambda_from_center']
         assert check['mapping'] == 'LnResistivity'
         assert check['vector'] == 'yz'
-        assert check['domain'] == ([-2000.0, 2000.0], None, [-4000.0, 1.111])
+        assert check['domain']['x'] == [-2000.0, 2000.0]
+        assert check['domain']['y'] is None
+        assert check['domain']['z'] == [-4000.0, 1.111]
         assert check['stretching'] == [1.1, 2.0]
-        assert check['min_width_limits'] == ([20, 40], [30, 60], None)
+        assert check['min_width_limits']['x'] == [20, 40]
+        assert check['min_width_limits']['y'] == [30, 60]
+        assert check['min_width_limits']['z'] is None
         assert check['properties'] == [0.3, 1, 2, 3, 4, 5, 6]
         assert check['center'] == [0, 0, -500]
         assert check['cell_number'] == [20, 40, 80, 100]
@@ -359,10 +351,14 @@ class TestRun:
         # Create a tiny dummy survey.
         data = np.ones((1, 17, 1))
         data[0, 8:11, 0] = np.nan
+        sources = emg3d.TxElectricDipole((4125, 4000, 4000, 0, 0))
+        receivers = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                (np.arange(17)*250+2000, 4000, 3950, 0, 0))
         survey = emg3d.Survey(
             name='CLI Survey',
-            sources=(4125, 4000, 4000, 0, 0),
-            receivers=(np.arange(17)*250+2000, 4000, 3950, 0, 0),
+            sources=sources,
+            receivers=receivers,
             frequencies=1,
             noise_floor=1e-15,
             relative_error=0.05,
@@ -420,12 +416,12 @@ class TestRun:
         # Missing output directory.
         args_dict = self.args_dict.copy()
         args_dict['path'] = tmpdir
-        args_dict['output'] = 'phantom/output/dir.npz'
+        args_dict['output'] = join('phantom', 'output', 'dir.npz')
         with pytest.raises(SystemExit) as e:
             cli.run.simulation(args_dict)
         assert e.type == SystemExit
         assert "* ERROR   :: Output directory does not exist: " in e.value.code
-        assert "phantom/output" in e.value.code
+        assert join("phantom", "output") in e.value.code
 
     def test_run(self, tmpdir, capsys):
 
@@ -488,9 +484,9 @@ class TestRun:
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
             f.write("[data]\n")
-            f.write("sources=Tx0\n")
-            f.write("receivers=Rx04, Rx09, Rx01, Rx11, Rx05\n")
-            f.write("frequencies=1")
+            f.write("sources=TxED-1\n")
+            f.write("receivers=RxEP-05, RxEP-10, RxEP-02, RxEP-12, RxEP-06\n")
+            f.write("frequencies=f-1")
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)

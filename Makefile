@@ -18,17 +18,16 @@ dev-install:
 	pip install -r requirements-dev.txt && pip install -e .
 
 pytest:
-	rm -rf .coverage htmlcov/ .pytest_cache/    # clean up
-	pytest --cov=emg3d --flake8 && coverage html
+	rm -rf .coverage htmlcov/ .pytest_cache/ && pytest --cov=emg3d --flake8 && coverage html
 
 flake8:
-	flake8 docs/conf.py setup.py emg3d/ tests/
+	flake8 docs/ setup.py emg3d/ tests/
 
 doc:
 	cd docs && make html && cd ..
 
 doc-clean:
-	cd docs && rm -rf api/ && rm -rf _build/ && make html && cd ..
+	cd docs && rm -rf api/emg3d* && rm -rf _build/ && make html && cd ..
 
 linkcheck:
 	cd docs && make html -b linkcheck && cd ..
@@ -37,4 +36,4 @@ clean:
 	rm -rf build/ dist/ .eggs/ emg3d.egg-info/ emg3d/version.py  # build
 	rm -rf */__pycache__/ */*/__pycache__/      # python cache
 	rm -rf .coverage htmlcov/ .pytest_cache/    # tests and coverage
-	rm -rf docs/api/ docs/_build/               # docs
+	rm -rf docs/api/emg3d* docs/_build/ docs/savefig/ # docs
