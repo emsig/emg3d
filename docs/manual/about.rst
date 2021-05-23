@@ -65,7 +65,7 @@ parameters and resulting fields. Furthermore, it can serve as a link to use
 `PyVista <https://docs.pyvista.org>`_ to create nice 3D plots even within a
 notebook.
 
-`EMSiG <https://emsig.xyz>`_ with its codes `empymod
+`emsig <https://emsig.xyz>`_ with its codes `empymod
 <https://empymod.emsig.xyz>`_ and `emg3d <https://emg3d.emsig.xyz>`_ is part
 of a bigger, fast growing, open-source **EM & Potential Geo-Exploration Python
 Ecosystem**:

@@ -2,7 +2,7 @@
 Functionalities related to optimization (minimization, inversion), such as the
 misfit function and its gradient.
 """
-# Copyright 2018-2021 The EMSiG community.
+# Copyright 2018-2021 The emsig community.
 #
 # This file is part of emg3d.
 #

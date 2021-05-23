@@ -55,7 +55,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emg3d'
-author = 'The EMSiG community'
+author = 'The emsig community'
 copyright = f'2018-{time.strftime("%Y")}, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).
@@ -78,8 +78,8 @@ html_favicon = '_static/favicon.ico'
 html_theme_options = {
     "github_url": "https://github.com/emsig/emg3d",
     "external_links": [
-        {"name": "Gallery", "url": "https://dev1.emsig.xyz/gallery/gallery"},
-        {"name": "EMSiG", "url": "https://emsig.xyz"},
+        {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery/gallery"},
+        {"name": "emsig", "url": "https://emsig.xyz"},
     ],
     # "use_edit_page_button": True,
 }

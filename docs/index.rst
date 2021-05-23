@@ -7,7 +7,6 @@ emg3d Documentation
 :Release: |version|
 :Date: |today|
 :Source: `github.com/emsig/emg3d <https://github.com/emsig/emg3d>`_
-:EMSiG: `emsig.xyz <https://emsig.xyz>`_
 
 ----
 
