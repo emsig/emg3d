@@ -2,6 +2,7 @@
 -r requirements.txt
 
 # SOFT DEPENDENCIES
+tqdm
 h5py
 scooby
 xarray
