@@ -4,18 +4,19 @@ About
 =====
 
 The code ``emg3d`` [WeMS19]_ is a three-dimensional modeller for
-electromagnetic (EM) diffusion as used, for instance, in controlled-source EM
-(CSEM) surveys frequently applied in the search for resources such as
-groundwater, geothermal energy, hydrocarbons, and minerals.
+electromagnetic (EM) diffusion as used for instance in geophysical
+controlled-source EM (CSEM) surveys. This includes use cases in the search for
+resources such as groundwater, geothermal energy, hydrocarbons, and minerals,
+or civil engineering and environmental applications.
 
 The core of the code is primarily based on [Muld06]_, [Muld07]_, and [Muld08]_.
-You can read more about the background of the code in the chapter
-:doc:`credits`. An introduction to the underlying theory of multigrid methods
-is given in the chapter :doc:`theory`, and further literature is provided in
-the :doc:`references`. The code is currently restricted to regular, stretched
-grids. As a matrix-free multigrid solver it scales linearly with the number of
-cells for both CPU and RAM. This makes it possible to use emg3d for models with
-several millions of cells on a regular laptop.
+You can read more about the background of the code in the :doc:`credits`. An
+introduction to the underlying theory of multigrid methods is given in the
+:doc:`theory`, and further literature is provided in the :doc:`references`. The
+code is currently restricted to regular, stretched grids. As a matrix-free
+multigrid solver it scales linearly with the number of cells for both CPU and
+RAM. This makes it possible to use emg3d for models with several millions of
+cells on a regular laptop.
 
 
 
@@ -48,11 +49,12 @@ What is it _not_?
 -----------------
 
 - The code is meant to be used in Python or in a terminal. There is **no** GUI.
-- Some knowledge of EM fields is definitely helpful, as GIGO applies («garbage
-  in, garbage out»). For example, placing your receivers very close to the
-  computational boundary *will* result in bad or wrong responses.
+- Some knowledge of EM fields in particular and numerical modelling in general
+  is definitely helpful, as GIGO applies («garbage in, garbage out»). For
+  example, placing your receivers very close to the computational boundary
+  *will* result in bad or wrong responses.
 - It is not a model builder; there are other tools that can be used to generate
-  complex geological models, e.g., `GemPy <https://www.gempy.org>`_.
+  complex geological models, for instance `GemPy <https://www.gempy.org>`_.
 
 
 Related ecosystem
@@ -65,28 +67,9 @@ parameters and resulting fields. Furthermore, it can serve as a link to use
 `PyVista <https://docs.pyvista.org>`_ to create nice 3D plots even within a
 notebook.
 
-`emsig <https://emsig.xyz>`_ with its codes `empymod
-<https://empymod.emsig.xyz>`_ and `emg3d <https://emg3d.emsig.xyz>`_ is part
-of a bigger, fast growing, open-source **EM & Potential Geo-Exploration Python
-Ecosystem**:
+There are some first successful attempts of using emsig as a forward modeller
+in both `SimPEG <https://simpeg.xyz>`_ and `pyGIMLi <https://pygimli.org>`_
+inversions. Get in touch if you are interested in these developments.
 
-.. raw:: html
-
-   <p>
-
-   <a href=https://pygimli.org><img src="https://www.pygimli.org/_static/gimli_logo.svg" style="max-height: 2cm;"></a>
-
-   <a href=https://simpeg.xyz><img src="https://raw.github.com/simpeg/simpeg/master/docs/images/simpeg-logo.png" style="max-height: 2.5cm;"></a>
-
-   <a href=http://petgem.bsc.es><img src="http://petgem.bsc.es/_static/figures/petgem_logo.png" style="max-height: 3cm;"></a>
-
-   <a href=https://gitlab.com/Rochlitz.R/custEM><img src="https://custem.readthedocs.io/en/latest/_static/custEMlogo.png" style="max-height: 1.5cm;"></a>
-
-   <a href=https://docs.pyvista.org><img src="https://raw.githubusercontent.com/pyvista/pyvista/master/docs/_static/pyvista_logo_sm.png" style="max-height: 2.5cm;"></a>
-
-   <a href=https://www.gempy.org><img src="https://raw.githubusercontent.com/cgre-aachen/gempy/master/docs/source/_static/logos/gempy.png" style="max-height: 2.5cm;"></a>
-
-   <a href=https://www.fatiando.org><img src="https://raw.githubusercontent.com/fatiando/logo/master/fatiando-logo-background.png" style="max-height: 3cm;"></a>
-
-   </p>
-
+See also the note about the `EM & Potential Geo-Exploration Python Ecosystem
+<https://emsig.xyz/#related-ecosystem>`_ on `emsig.xyz <https://emsig.xyz>`_.

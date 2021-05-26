@@ -40,7 +40,7 @@ emg3d Documentation
 
     ---
 
-    :fa:`images,fa-4x`
+    :fa:`picture-o,fa-4x`
 
     Gallery
     ^^^^^^^

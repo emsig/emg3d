@@ -5,6 +5,8 @@ Contributing
 
     Rework this for version 1.
 
+    dev reqs, all the tools, etc
+
 New contributions, bug reports, or any kind of feedback is always welcomed!
 Have a look at the `Roadmap-project
 <https://github.com/emsig/emg3d/projects/1>`_ to get an idea of things that

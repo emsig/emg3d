@@ -3,131 +3,252 @@
 Getting started
 ===============
 
-.. todo::
+There are different usages of ``emg3d``. As an end user you might be interested
+in the :ref:`high-level-usage`: define your survey and your model, and
+simulate electromagnetic data for them. As a developer you might be interested
+in the :ref:`solver-level-usage` or :ref:`cli-level-usage`, to implement emg3d
+for instance as a forward modelling kernel in you inversion code. And then
+there is also :ref:`time-level-usage`.
 
-   The basic example needs complete rework. Include all source and receiver
-   types. Include saving and loading data:
 
-   - :class:`emg3d.electrodes.TxElectricDipole`;
-     :class:`emg3d.electrodes.TxMagneticDipole`;
-     :class:`emg3d.electrodes.TxElectricWire`;
-   - :class:`emg3d.electrodes.RxElectricPoint`;
-     :class:`emg3d.electrodes.RxElectricPoint`;
-   - :func:`emg3d.io.save`;
-     :func:`emg3d.io.load`.
+Here we show first an introductory example of the :ref:`high-level-usage`.
+Further down you find an overview and more detailed explanation of the
+different :ref:`usages`.
 
 
 Basic Example
 -------------
 
-Here we show a *very* basic example. To see some more realistic models have a
-look at the `gallery <https://emsig.xyz/emg3d-gallery>`_. This particular
-example is also there, with some further explanations and examples to show how
-to plot the model and the data; see `«Minimum working example»
-<https://emsig.xyz/emg3d-gallery/gallery/tutorials/minimum_example.html>`_. It
-also contains an example without using ``discretize``.
-
-First, we load ``emg3d`` and ``discretize`` (to create a mesh), along with
-``numpy``:
+The following is a *very* basic example. To see some more realistic models have
+a look at the `gallery <https://emsig.xyz/emg3d-gallery>`_. First, we load
+``emg3d``, ``numpy``, and ``matplotlib``. Note that this example requires that
+you have installed ``discretize`` and ``xarray`` as well.
 
 .. ipython::
 
   In [1]: import emg3d
      ...: import numpy as np
-     ...: from matplotlib.colors import LogNorm
+     ...: import matplotlib as mpl
 
-First, we define the mesh (see :class:`discretize.TensorMesh` for more info).
-In reality, this task requires some careful considerations. E.g., to avoid edge
-effects, the mesh should be large enough in order for the fields to dissipate,
-yet fine enough around source and receiver to accurately model them. This grid
-is too small, but serves as a minimal example.
+One of the elementary ingredients for modelling is a model, in our case a
+resistivity or conductivity model. emg3d is *not* a model builder. We just
+construct here a very simple dummy model. You can see more realistic models in
+the `models section
+<https://emsig.xyz/emg3d-gallery/gallery/models/index.html>`_ of the gallery.
 
-.. ipython::
+Grid
+~~~~
 
-  In [2]: grid = emg3d.TensorMesh(
-     ...:         h=[[(25, 10, -1.04), (25, 28), (25, 10, 1.04)],
-     ...:            [(50, 8, -1.03), (50, 16), (50, 8, 1.03)],
-     ...:            [(30, 8, -1.05), (30, 16), (30, 8, 1.05)]],
-     ...:         origin='CCC')
-     ...: grid
-  Out[2]:
-     ...:   TensorMesh: 49,152 cells
-     ...:
-     ...:                       MESH EXTENT             CELL WIDTH      FACTOR
-     ...:   dir    nC        min           max         min       max      max
-     ...:   ---   ---  ---------------------------  ------------------  ------
-     ...:    x     48       -662.16        662.16     25.00     37.01    1.04
-     ...:    y     32       -857.96        857.96     50.00     63.34    1.03
-     ...:    z     32       -540.80        540.80     30.00     44.32    1.05
-
-Next we define a very simple fullspace model with
-:math:`\rho_x=1.5\,\Omega\,\text{m}`, :math:`\rho_y=1.8\,\Omega\,\text{m}`, and
-:math:`\rho_z=3.3\,\Omega\,\text{m}`. The source is an x-directed dipole at the
-origin, with a 10 Hz signal of 1 A.
+We first build a simple four-quadrant grid, centred around the origin.
 
 .. ipython::
 
-  In [3]: model = emg3d.Model(grid, property_x=1.5, property_y=1.8,
-     ...:                     property_z=3.3, mapping='Resistivity')
-     ...: model
-  Out[3]:    Model [resistivity]; triaxial; 48 x 32 x 32 (49,152)
+  In [1]: hx = np.ones(2)*5000
+     ...: grid = emg3d.TensorMesh(
+     ...:         [[5000, 5000], [10000], [5000, 5000]], origin='CCC')
+     ...: grid  # QC
+  Out[1]:
+     ...:
+     ...:  TensorMesh: 4 cells
+     ...:
+     ...:                      MESH EXTENT             CELL WIDTH      FACTOR
+     ...:  dir    nC        min           max         min       max      max
+     ...:  ---   ---  ---------------------------  ------------------  ------
+     ...:   x      2     -5,000.00      5,000.00  5,000.00  5,000.00    1.00
+     ...:   y      1     -5,000.00      5,000.00 10,000.00 10,000.00    1.00
+     ...:   z      2     -5,000.00      5,000.00  5,000.00  5,000.00    1.00
 
-  In [4]: sfield = emg3d.get_source_field(grid=grid, source=[0, 0, 0, 0, 0], frequency=10)
+Model
+~~~~~
 
-Now we can compute the electric field with ``emg3d``:
+We use the constructed grid to create a simple resistivity model:
 
 .. ipython::
 
-  In [5]: efield = emg3d.solve(model=model, sfield=sfield, verb=4)
-  Out[5]:
-     ...: :: emg3d START :: 13:56:59 :: v0.17.1.dev18+gf20d741.d20210309
-     ...:
-     ...:    MG-cycle       : 'F'                 sslsolver : False
-     ...:    semicoarsening : False [0]           tol       : 1e-06
-     ...:    linerelaxation : False [0]           maxit     : 50
-     ...:    nu_{i,1,c,2}   : 0, 2, 1, 2          verb      : 4
-     ...:    Original grid  :  48 x  32 x  32     => 49,152 cells
-     ...:    Coarsest grid  :   3 x   2 x   2     => 12 cells
-     ...:    Coarsest level :   4 ;   4 ;   4   
-     ...:
-     ...:    [hh:mm:ss]  rel. error                  [abs. error, last/prev]   l s
-     ...:
-     ...:        h_
-     ...:       2h_ \                  /
-     ...:       4h_  \          /\    / 
-     ...:       8h_   \    /\  /  \  /  
-     ...:      16h_    \/\/  \/    \/   
-     ...:
-     ...:    [13:56:59]   2.623e-02  after   1 F-cycles   [1.464e-06, 0.026]   0 0
-     ...:    [13:57:00]   2.253e-03  after   2 F-cycles   [1.258e-07, 0.086]   0 0
-     ...:    [13:57:00]   3.051e-04  after   3 F-cycles   [1.704e-08, 0.135]   0 0
-     ...:    [13:57:00]   5.500e-05  after   4 F-cycles   [3.071e-09, 0.180]   0 0
-     ...:    [13:57:01]   1.170e-05  after   5 F-cycles   [6.531e-10, 0.213]   0 0
-     ...:    [13:57:01]   2.745e-06  after   6 F-cycles   [1.532e-10, 0.235]   0 0
-     ...:    [13:57:01]   6.873e-07  after   7 F-cycles   [3.837e-11, 0.250]   0 0
-     ...:
-     ...:    > CONVERGED
-     ...:    > MG cycles        : 7
-     ...:    > Final rel. error : 6.873e-07
-     ...:
-     ...: :: emg3d END   :: 13:57:01 :: runtime = 0:00:02
+  In [1]: model = emg3d.Model(
+     ...:     grid=grid,
+     ...:     property_x=[1, 10, 0.3, 0.3],
+     ...:     mapping='Resistivity'
+     ...: )
+     ...: model  # QC
+  Out[1]: Model: resistivity; isotropic; 2 x 2 x 2 (4)
 
+We defined an isotropic model in terms of resistivities, but through the
+``mapping`` parameter one can also define a model in terms of conductivities or
+the logarithms thereof.
 
-So the computation required seven multigrid F-cycles and took just a bit more
-than 2 seconds. It was able to coarsen in each dimension four times, where the
-input grid had 49,152 cells, and the coarsest grid had 12 cells.
+Quick check how the model looks like:
 
 .. ipython::
 
-  @savefig basic_example.png width=4in
-  In [6]: grid.plot_slice(efield.field, normal='Y', v_type='Ex', view='abs',
-     ...:                 pcolor_opts={'norm': LogNorm()});
+  @savefig basic_model.png width=4in
+  In [1]: fig, ax = plt.subplots()
+     ...: cf = ax.pcolormesh(
+     ...:     grid.cell_centers_x/1e3,
+     ...:     grid.cell_centers_z/1e3,
+     ...:     model.property_x[:, 0, :].T,
+     ...:     shading='nearest',
+     ...:     norm=mpl.colors.LogNorm(),
+     ...: )
+     ...: fig.colorbar(cf)
+     ...: ax.set_title(r'Depth slice ($\Omega$ m)');
+     ...: ax.set_xlabel('Easting (km)');
+     ...: ax.set_ylabel('Depth (km)');
+
+
+So we have an upper halfspace of 0.3 Ohm.m, a lower-left quadrant of 1 Ohm.m,
+and a lower-right quadrant of 10 Ohm.m.
+
+Survey
+~~~~~~
+
+Now that we have a model we need to define our survey. Currently there are
+three source types implemented,
+
+- :class:`emg3d.electrodes.TxElectricDipole`;
+- :class:`emg3d.electrodes.TxMagneticDipole`;
+- :class:`emg3d.electrodes.TxElectricWire`;
+
+and two receiver types,
+
+- :class:`emg3d.electrodes.RxElectricPoint`;
+- :class:`emg3d.electrodes.RxElectricPoint`.
+
+We are going to define a simple survey with an electric dipole source and a
+line of electric point receivers.
+
+.. ipython::
+
+  In [1]: source = emg3d.TxElectricDipole(
+     ...:     coordinates=(-3000, 0, 0, 0, 0)  # x, y, z, azimuth, elevation
+     ...: )
+     ...:
+     ...: offsets = np.linspace(-2000, 3000, 21)
+     ...: receivers = emg3d.surveys.txrx_coordinates_to_dict(
+     ...:     emg3d.RxElectricPoint,
+     ...:     coordinates=(offsets, 0, 0, 0, 0),  # x, y, z, azimuth, elevation
+     ...: )
+     ...:
+     ...: survey = emg3d.Survey(
+     ...:     sources=source,
+     ...:     receivers=receivers,
+     ...:     frequencies=1.0,       # Hz
+     ...: )
+     ...:
+     ...: survey  # QC
+
+
+Simulation
+~~~~~~~~~~
+
+Now that we have a model and a survey we can define our simulation:
+
+.. ipython::
+
+  In [1]: sim = emg3d.Simulation(
+     ...:     survey=survey,
+     ...:     model=model,
+     ...: )
+     ...:
+     ...: sim  # QC
+
+From the output we see that we defined a survey with one source, 21 receivers,
+and one frequency. We see that we have a model, defined as resistivity, which
+consists of four cells. And we see that the simulation created a computational
+grid of 96x48x64 cells.
+
+A simulation takes many input parameters, and you should really read the API
+reference of :class:`emg3d.simulations.Simulation`. Particularly important are
+the gridding parameters, and as such it is highly recommended to also read
+:func:`emg3d.meshes.construct_mesh`. The simulation will try its best to create
+suitable computational grids. However, these are not necessarily the best ones,
+and the user has to pay attention to the grid creation. Also, the default grids
+will most likely be quite big, to be on the safe side. Providing suitable user
+inputs can significantly reduce the grid sizes and therefore computational
+time!
+
+So lets check in more detail the computational grid it created:
+
+.. ipython::
+
+  In [1]: comp_model = sim.get_model(source='TxED-1', frequency=1.0)
+     ...: comp_model.grid
+  Out[1]:
+     ...:
+     ...:  TensorMesh: 294,912 cells
+     ...:
+     ...:                      MESH EXTENT             CELL WIDTH      FACTOR
+     ...:  dir    nC        min           max         min       max      max
+     ...:  ---   ---  ---------------------------  ------------------  ------
+     ...:   x     96     -6,939.37     13,615.81     91.89  3,045.59    1.42
+     ...:   y     48    -11,286.30     11,286.30     91.89  3,045.59    1.42
+     ...:   z     64    -13,651.53      2,245.90     91.89  1,866.31    1.21
+
+We can see that the grid extends further in the directions where there are
+higher resistivities. For instance, in positive z we have 0.3 Ohm.m, so the
+grid does only extend roughly to +2.2 km. In positive x and z as well as in
+positive and negative y we have 10 Ohm.m, so the grid goes to over 10 km.
+
+Computing the fields is now a simple command,
+
+.. ipython::
+
+  In [1]: sim.compute()
+
+Results
+~~~~~~~
+
+Let's plot the electric field at receiver locations (the responses):
+
+.. ipython::
+
+  @savefig basic_receivers.png width=4in
+  In [1]: responses = sim.data.synthetic.data.squeeze()
+     ...: fig, ax = plt.subplots()
+     ...: ax.semilogy(offsets/1e3, abs(responses.real), 'C0o-', label='|Real|')
+     ...: ax.semilogy(offsets/1e3, abs(responses.imag), 'C1o-', label='|Imag|')
+     ...: ax.legend()
+     ...: ax.set_title('Electric field at receivers')
+     ...: ax.set_xlabel('Easting (km)')
+     ...: ax.set_ylabel('E-field (V/m)')
+
+We can also get the entire electric field in a similar way as we got the
+computational model, and plot it for QC:
+
+.. ipython::
+
+  @savefig basic_efield.png width=4in
+  In [1]: efield = sim.get_efield(source='TxED-1', frequency=1.0)
+     ...:
+     ...: fig, ax = plt.subplots()
+     ...: cf = ax.pcolormesh(
+     ...:     efield.grid.cell_centers_x/1e3,
+     ...:     efield.grid.nodes_z/1e3,
+     ...:     abs(efield.fx[:, 24, :].T),
+     ...:     shading='gouraud',
+     ...:     norm=mpl.colors.LogNorm(vmin=1e-16, vmax=1e-8),
+     ...: )
+     ...: fig.colorbar(cf)
+     ...: ax.set_xlim([-3.5, 4])
+     ...: ax.set_ylim([-3, 1])
+     ...: ax.set_title(r'|$E_x$| Field (V/m)');
+     ...: ax.set_xlabel('Easting (km)');
+     ...: ax.set_ylabel('Depth (km)');
+
+
+This is frankly a *very* fast rundown, and many things are only scratched at
+the surface or not explained at all. However, you should find much more
+information and explanation in the rest of the manual, and many examples in the
+gallery.
 
 
 
-Usages
-------
+.. _usages:
 
+Usage levels
+------------
+
+.. _high-level-usage:
 
 Simulations / High-level usage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -152,8 +273,10 @@ and frequency dependent gridding.
 (``tqdm`` and ``discretize`` are recommended).
 
 
+.. _solver-level-usage:
+
 Solver-level usage
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 .. figure:: ../_static/levels2.svg
    :align: center
@@ -186,6 +309,8 @@ source field manually, as shown in :numref:`Figure %s <solver-source-level>`.
 *Note:* This requires only ``emg3d`` (``discretize`` is recommended).
 
 
+.. _cli-level-usage:
+
 Command-line interface (CLI-level)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -200,12 +325,14 @@ Command-line interface (CLI-level)
 The command-line interface is a terminal utility for the high-level
 (Simulation) usage of emg3d. The model and the survey have to be provided as
 files (HDF5, npz, or json), various settings can be defined in the config file,
-and the output will be written to the output file.
+and the output will be written to the output file (see also
+:ref:`io-persistence`).
 
 *Note:* In addition to ``emg3d`` this requires the soft dependency ``xarray``
 (``tqdm`` and ``discretize`` are recommended), and ``h5py`` if the provided
 files are in the HDF5 format.
 
+.. _time-level-usage:
 
 Time-domain modelling
 ~~~~~~~~~~~~~~~~~~~~~

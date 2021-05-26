@@ -5,6 +5,10 @@ Tests and Benchmarks
 
     Rework this for version 1.
 
+.. todo::
+
+    Add solve example/benchmark
+
 The modeller comes with a test suite using ``pytest``. If you want to run the
 tests, just install ``pytest`` and run it within the ``emg3d``-top-directory.
 

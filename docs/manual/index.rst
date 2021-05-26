@@ -10,13 +10,13 @@ User Guide
 ----
 
 .. toctree::
-   :maxdepth: 2
-   :hidden:
+   :maxdepth: 1
 
    about
    installation
    usage
    info
+   io
    cli
    mgwhat
    theory
@@ -25,10 +25,3 @@ User Guide
    references
    changelog
    license
-
--  :ref:`about`
--  :ref:`installation`
--  :ref:`usage`
--  :ref:`credits`
--  :ref:`citation`
--  :ref:`license`
