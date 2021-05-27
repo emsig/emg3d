@@ -1,5 +1,3 @@
-.. _usage:
-
 Getting started
 ===============
 
@@ -33,8 +31,8 @@ you have installed ``discretize`` and ``xarray`` as well.
 One of the elementary ingredients for modelling is a model, in our case a
 resistivity or conductivity model. emg3d is *not* a model builder. We just
 construct here a very simple dummy model. You can see more realistic models in
-the `models section
-<https://emsig.xyz/emg3d-gallery/gallery/models/index.html>`_ of the gallery.
+the `models section <https://emsig.xyz/emg3d-gallery/gallery/models>`_ of the
+gallery.
 
 Grid
 ~~~~

@@ -23,6 +23,7 @@ sphinx_automodapi
 ipykernel
 
 # FOR TESTING
+asv
 pytest
 coveralls
 pytest-cov

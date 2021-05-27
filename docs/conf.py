@@ -99,7 +99,7 @@ htmlhelp_basename = 'emg3d'
 html_css_files = [
     "style.css",
     "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/" +
-    "4.7.0/css/font-awesome.min.css"
+    "5.15.3/css/font-awesome.min.css"
 ]
 
 # ==== 4. linkcheck ====

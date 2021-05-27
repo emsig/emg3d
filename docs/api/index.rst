@@ -12,7 +12,7 @@ API reference
 .. module:: emg3d
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
 
    core
@@ -29,11 +29,34 @@ API reference
    time
    utils
 
-Direct links to the main user-facing functions and classes:
 
-- Grid: :class:`emg3d.meshes.TensorMesh`
-- Model: :class:`emg3d.models.Model`
-- Survey: :class:`emg3d.surveys.Survey`
-- Simulation: :class:`emg3d.simulations.Simulation`
-- Solver: :func:`emg3d.solver.solve`
-- All sources and receivers are in :mod:`emg3d.electrodes`
+.. panels::
+    :container: container-lg pb-1
+    :column: col-lg-12 p-2
+
+    Grid: :class:`emg3d.meshes.TensorMesh`
+
+    ---
+    :column: col-lg-12 p-2
+
+    Model: :class:`emg3d.models.Model`
+
+    ---
+    :column: col-lg-12 p-2
+
+    Survey: :class:`emg3d.surveys.Survey`
+
+    ---
+    :column: col-lg-12 p-2
+
+    Simulation: :class:`emg3d.simulations.Simulation`
+
+    ---
+    :column: col-lg-12 p-2
+
+    Solver: :func:`emg3d.solver.solve`
+
+    ---
+    :column: col-lg-12 p-2
+
+    All sources and receivers are in :mod:`emg3d.electrodes`

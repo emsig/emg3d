@@ -40,7 +40,7 @@ emg3d Documentation
 
     ---
 
-    :fa:`picture-o,fa-4x`
+    :fa:`images,fa-4x`
 
     Gallery
     ^^^^^^^
@@ -92,28 +92,39 @@ emg3d Documentation
             :text: To the development guide
             :classes: btn-block btn-info stretched-link
 
-|
-|
-|
+    ---
+    :column: col-lg-12 p-2
 
-.. dropdown:: About the name and logo of **emg3d**
+    :fa:`comments,fa-4x`
 
-    The name **emg3d** is a portmanteau of *electromagnetic* (em),
-    *multigrid* (mg), and *three-dimensional* (3D): emg3d is a
-    three-dimensional multigrid solver for electromagnetic diffusion.
+    Contact
+    ^^^^^^^
 
-    The symbol stands for the full ('F') multigrid cycling scheme through the
-    different grid sizes. This is given, for a maximum of three coarsening
-    steps, by::
+    .. link-button:: https://emsig.xyz/#contributing-contact
+            :type: url
+            :text: Go to «Contributing & Contact» @ emsig.xyz
+            :classes: btn-block btn-info stretched-link
+    ---
+    :column: col-lg-12 p-2
 
-        h_
-       2h_ \          /
-       4h_  \    /\  /
-       8h_   \/\/  \/
+    .. dropdown:: About the name and logo of **emg3d**
+
+        The name **emg3d** is a portmanteau of *electromagnetic* (em),
+        *multigrid* (mg), and *three-dimensional* (3D): emg3d is a
+        three-dimensional multigrid solver for electromagnetic diffusion.
+
+        The symbol stands for the full ('F') multigrid cycling scheme through
+        the different grid sizes. This is given, for a maximum of three
+        coarsening steps, by::
+
+            h_
+           2h_ \          /
+           4h_  \    /\  /
+           8h_   \/\/  \/
 
 
-    See, for example, the theory section around :numref:`Figure %s
-    <Muld06_Fig5>`.
+        See, for example, the theory section around :numref:`Figure %s
+        <Muld06_Fig5>`.
 
-    .. image:: ./_static/emg3d-logo.svg
+        .. image:: ./_static/emg3d-logo.svg
 
