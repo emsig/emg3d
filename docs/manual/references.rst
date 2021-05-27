@@ -40,9 +40,9 @@ References
    diffusion with multigrid: Computing and Visualization in Science, 11,
    29--138; DOI: `10.1007/s00791-007-0064-y
    <https://doi.org/10.1007/s00791-007-0064-y>`_.
-.. [Muld11] Mulder, W. A., 2011, *in* Numerical Methods, Multigrid: Springer
-   Netherlands, 895--900; DOI `10.1007/978-90-481-8702-7_153
-   <https://doi.org/10.1007/978-90-481-8702-7_153>`_.
+.. [Muld20] Mulder, W. A., 2020, *in* Numerical Methods, Multigrid: Springer
+   International Publishing, 1--6; DOI `10.1007/978-3-030-10475-7_153-1
+   <https://doi.org/10.1007/978-3-030-10475-7_153-1>`_.
 .. [MuWS08] Mulder, W. A., M. Wirianto, and E. C. Slob, 2008, Time-domain
    modeling of electromagnetic diffusion with a frequency-domain code:
    Geophysics, 73, F1--F8; DOI: `10.1190/1.2799093

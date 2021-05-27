@@ -1,7 +1,7 @@
 """
 Parser for the configuration file of the command-line interface.
 """
-# Copyright 2018-2021 The EMSiG community.
+# Copyright 2018-2021 The emsig community.
 #
 # This file is part of emg3d.
 #
@@ -121,7 +121,7 @@ def parse_config_file(args_dict):
         # Get absolute paths.
         ffile = Path(os.path.join(path, fname))
 
-        # Ensure there is a file ending, if not, fall back to h5p
+        # Ensure there is a file ending, if not, fall back to h5.
         if ffile.suffix not in ['.h5', '.json', '.npz']:
             ffile = ffile.with_suffix('.h5')
 

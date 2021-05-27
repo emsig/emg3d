@@ -1,5 +1,3 @@
-.. _installation:
-
 Installation
 ============
 
@@ -20,14 +18,17 @@ and ``numba``. Various other packages are recommended or required for some
 advanced functionalities, namely:
 
 - ``xarray``: For the :class:`emg3d.surveys.Survey` and
-  :class:`emg3d.simulations.Simulation` classes (many sources and receivers at
-  once).
+  :class:`emg3d.simulations.Simulation` classes (model many sources and
+  frequencies at once).
 - ``discretize``: For advanced meshing tools (fancy mesh-representations and
   plotting utilities).
 - ``matplotlib``: To use the plotting utilities within ``discretize``.
 - ``h5py``: Save and load data in the HDF5 format.
-- ``empymod``: Time-domain modelling (:class:`emg3d.utils.Fourier`).
+- ``empymod``: Time-domain modelling (:class:`emg3d.time.Fourier`).
 - ``scooby``: For the version and system report (:class:`emg3d.utils.Report`).
+- ``tqdm``: For nice progress bars when computing many sources and frequencies.
+
+All soft dependencies are also available both on ``conda-forge`` and ``pip``.
 
 If you are new to Python we recommend using a Python distribution, which will
 ensure that all dependencies are met, specifically properly compiled versions

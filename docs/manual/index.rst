@@ -17,6 +17,7 @@ User Guide
    installation
    usage
    info
+   io
    cli
    mgwhat
    theory
@@ -26,9 +27,58 @@ User Guide
    changelog
    license
 
--  :ref:`about`
--  :ref:`installation`
--  :ref:`usage`
--  :ref:`credits`
--  :ref:`citation`
--  :ref:`license`
+.. panels::
+    :container: container-lg pb-3 text-center
+    :column: col-lg-4 col-md-4 col-sm-6 col-xs-12 p-2
+
+    :fa:`info,fa-4x`
+
+    .. link-button:: about
+        :type: ref
+        :text: About
+        :classes: btn-link stretched-link font-weight-bold
+
+    ---
+
+    :fa:`laptop,fa-4x`
+
+    .. link-button:: installation
+        :type: ref
+        :text: Installation
+        :classes: btn-link stretched-link font-weight-bold
+
+    ---
+
+    :fa:`play,fa-4x`
+
+    .. link-button:: usage
+        :type: ref
+        :text: Getting started
+        :classes: btn-link stretched-link font-weight-bold
+
+    ---
+
+    :fa:`lightbulb,fa-4x`
+
+    .. link-button:: info-tips-tricks
+        :type: ref
+        :text: Info, tips & tricks
+        :classes: btn-link stretched-link font-weight-bold
+
+    ---
+
+    :fa:`question,fa-4x`
+
+    .. link-button:: mgwhat
+        :type: ref
+        :text: Multi-what?
+        :classes: btn-link stretched-link font-weight-bold
+
+    ---
+
+    :fa:`pencil,fa-4x`
+
+    .. link-button:: citation
+        :type: ref
+        :text: Citation
+        :classes: btn-link stretched-link font-weight-bold

@@ -1,28 +1,28 @@
+.. _dev-contributing:
+
 Contributing
 ============
 
-.. todo::
+emg3d is a community code, and contributions of any kind are welcomed: From
+typos in the documentation to additional examples, reporting or fixing bugs in
+the code, all the way to new suggestion or implementing new features.
 
-    Rework this for version 1.
+Good places to get started is to browse the existing issues, check out the
+roadmap, or have a look at any open PR:
 
-New contributions, bug reports, or any kind of feedback is always welcomed!
-Have a look at the `Roadmap-project
-<https://github.com/emsig/emg3d/projects/1>`_ to get an idea of things that
-could be implemented. The GitHub `issues
-<https://github.com/emsig/emg3d/issues>`_ and
-`PR's <https://github.com/emsig/emg3d/pulls>`_ are also a good starting
-point. The best way for interaction is at https://github.com/emsig or by
-joining the `Slack channel <http://slack.simpeg.xyz>`_ «em-x-d» of SimPEG. If
-you prefer to get in touch outside of GitHub/Slack use the contact form on
-https://werthmuller.org.
+- `Issues <https://github.com/emsig/emg3d/issues>`_;
+- `Roadmap-project <https://github.com/emsig/emg3d/projects/1>`_;
+- `PR's <https://github.com/emsig/emg3d/pulls>`_.
 
-To install emg3d from source, you can download the latest version from GitHub
-and install it in your python distribution via:
+There are various different ways to get in touch, see
+`emsig.xyz#contributing-contact <https://emsig.xyz/#contributing-contact>`_.
 
-.. code-block:: console
+If you think about making changes to the code and contribute code have a look
+at :doc:`tests`
 
-   make install
 
-Please make sure your code follows the pep8-guidelines by using, for instance,
-the python module ``flake8``, and also that your code is covered with
-appropriate tests. Just get in touch if you have any doubts.
+.. note::
+
+    The community is tiny so far, so there are no former protocols (such as
+    CoC) in place (yet). Please get in touch if you think it is about time to
+    implement those.

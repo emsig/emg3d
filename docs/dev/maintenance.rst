@@ -1,12 +1,14 @@
 Maintenance
 ===========
 
-.. todo::
-
-    Rework this for version 1.
+Status reports and other tools to have the checks all in one place, for quick
+QC.
 
 Quick overview / QC
 -------------------
+
+All possible badges of the CI chain. Definitely check this before making a
+release.
 
 - .. image:: https://github.com/emsig/emg3d/actions/workflows/linux.yml/badge.svg
      :target: https://github.com/emsig/emg3d/actions/workflows/linux.yml
@@ -57,10 +59,12 @@ Quick overview / QC
 Info from ReadTheDocs
 ---------------------
 
+To check the environment in which the documentation was built.
+
 .. ipython::
 
     In [1]: import emg3d
        ...: emg3d.Report(
        ...:     ['sphinx', 'numpydoc', 'ipykernel', 'sphinx_numfig',
-       ...:      'sphinx_automodapi', 'pydata_sphinx_theme']
+       ...:      'sphinx_panels', 'sphinx_automodapi', 'pydata_sphinx_theme']
        ...: )

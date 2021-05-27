@@ -7,6 +7,7 @@ from emg3d import __version__
 extensions = [
     # 'sphinx.ext.autodoc',
     'numpydoc',
+    'sphinx_panels',
     'sphinx.ext.intersphinx',
     # 'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
@@ -18,6 +19,7 @@ extensions = [
     'IPython.sphinxext.ipython_console_highlighting',
     'IPython.sphinxext.ipython_directive',
 ]
+panels_add_bootstrap_css = False
 autosummary_generate = True
 add_module_names = True
 add_function_parentheses = False
@@ -55,7 +57,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emg3d'
-author = 'The EMSiG community'
+author = 'The emsig community'
 copyright = f'2018-{time.strftime("%Y")}, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).
@@ -78,8 +80,8 @@ html_favicon = '_static/favicon.ico'
 html_theme_options = {
     "github_url": "https://github.com/emsig/emg3d",
     "external_links": [
-        {"name": "Gallery", "url": "https://dev1.emsig.xyz/gallery/gallery"},
-        {"name": "EMSiG", "url": "https://emsig.xyz"},
+        {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery/gallery"},
+        {"name": "emsig", "url": "https://emsig.xyz"},
     ],
     # "use_edit_page_button": True,
 }
@@ -94,6 +96,11 @@ html_context = {
 html_use_modindex = True
 html_file_suffix = '.html'
 htmlhelp_basename = 'emg3d'
+html_css_files = [
+    "style.css",
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/" +
+    "css/font-awesome.min.css"
+]
 
 # ==== 4. linkcheck ====
 

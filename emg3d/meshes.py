@@ -1,7 +1,7 @@
 """
 Everything related to meshes appropriate for the multigrid solver.
 """
-# Copyright 2018-2021 The EMSiG community.
+# Copyright 2018-2021 The emsig community.
 #
 # This file is part of emg3d.
 #
@@ -681,7 +681,8 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     for nx in np.unique(cell_numbers):
 
         # Loop over possible alphas for domain.
-        for sa in np.linspace(1.0, stretching[0], 100):
+        nsa = max(1, min(100, int((stretching[0] - 1) / 0.001)))
+        for sa in np.linspace(1.0, stretching[0], nsa):
 
             if vector is None:
 
@@ -736,7 +737,8 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             hxo = hx
 
             # Loop over possible alphas for buffer.
-            for ca in np.linspace(sa, stretching[1], 100):
+            nca = max(1, min(100, int((stretching[1] - sa) / 0.001)))
+            for ca in np.linspace(sa, stretching[1], nca):
 
                 # Get current stretched grid cell sizes.
                 thxl = hx[0]*ca**np.arange(1, nx_remain+1)   # Left of survey.
