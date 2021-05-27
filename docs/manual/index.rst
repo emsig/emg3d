@@ -40,7 +40,7 @@ User Guide
 
     ---
 
-    :fa:`fas fa-laptop-code,fa-4x`
+    :fa:`laptop,fa-4x`
 
     .. link-button:: installation
         :type: ref
@@ -49,7 +49,7 @@ User Guide
 
     ---
 
-    :fa:`fas fa-running,fa-4x`
+    :fa:`play,fa-4x`
 
     .. link-button:: usage
         :type: ref
@@ -76,7 +76,7 @@ User Guide
 
     ---
 
-    :fa:`fas fa-scroll,fa-4x`
+    :fa:`pencil,fa-4x`
 
     .. link-button:: citation
         :type: ref

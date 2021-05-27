@@ -39,7 +39,7 @@ Development
 
     ---
 
-    :fa:`fas fa-tools,fa-4x`
+    :fa:`cogs,fa-4x`
 
     .. link-button:: maintenance
         :type: ref
