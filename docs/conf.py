@@ -96,11 +96,7 @@ html_context = {
 html_use_modindex = True
 html_file_suffix = '.html'
 htmlhelp_basename = 'emg3d'
-html_css_files = [
-    "style.css",
-    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/" +
-    "5.15.3/css/font-awesome.min.css"
-]
+html_css_files = ["style.css",]
 
 # ==== 4. linkcheck ====
 
