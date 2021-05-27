@@ -30,7 +30,7 @@ Development
 
     ---
 
-    :fa:`stopwatch,fa-4x`
+    :fa:`fas fa-hourglass-half,fa-4x`
 
     .. link-button:: tests
         :type: ref
@@ -39,7 +39,7 @@ Development
 
     ---
 
-    :fa:`tools,fa-4x`
+    :fa:`fas fa-tools,fa-4x`
 
     .. link-button:: maintenance
         :type: ref

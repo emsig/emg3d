@@ -66,6 +66,5 @@ To check the environment in which the documentation was built.
     In [1]: import emg3d
        ...: emg3d.Report(
        ...:     ['sphinx', 'numpydoc', 'ipykernel', 'sphinx_numfig',
-       ...:      'sphinx_automodapi', 'pydata_sphinx_theme', 'scooby',
-       ...:      'setuptools_scm', 'sphinx_panels']
+       ...:      'sphinx_panels', 'sphinx_automodapi', 'pydata_sphinx_theme']
        ...: )
