@@ -2,11 +2,11 @@ name: gallery
 
 # NOT ACTIVE CURRENTLY
 on:
-  #pull_request:
-  #push:
-  #  branches:
-  #    - main
-  #    - gallery
+  pull_request:
+  push:
+    branches:
+      - main
+      - gallery
   release:
     types:
       - published
