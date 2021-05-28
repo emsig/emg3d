@@ -16,6 +16,19 @@ dependencies:
   - sphinx-gallery
   - numpydoc
   - pooch
+  - sphinx_panels
   - pydata-sphinx-theme
+  - sphinx_numfig
+  - sphinx_automodapi
   - mkl-service
   - tqdm
+  - pip:
+    - setuptools_scm
+    - ipykernel
+    - memory_profiler
+    - asv
+    - pytest
+    - coveralls
+    - pytest-cov
+    - pytest-flake8
+    - pytest-console-scripts
