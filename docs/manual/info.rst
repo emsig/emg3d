@@ -68,9 +68,9 @@ default setting. However, it is also the **most expensive** setting, and often
 you can obtain faster results by adjusting the combination of solver,
 semicoarsening, and line relaxation. Which combination is best (fastest)
 depends to a large extent on the grid stretching, but also on anisotropy and
-general model complexity. See `«Parameter tests»
-<https://emsig.xyz/emg3d-gallery/gallery/tutorials/parameter_tests.html>`_ in
-the gallery for an example how to run some tests on your particular problem.
+general model complexity. See
+:ref:`sphx_glr_gallery_tutorials_parameter_tests.py` in the gallery for an
+example how to run some tests on your particular problem.
 
 
 CPU & RAM

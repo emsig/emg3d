@@ -31,3 +31,8 @@
   margin: 0 1rem 0 0;
   color: #ef413d;
 }
+
+/* Hide figure numbers in gallery overview */
+.sphx-glr-thumbcontainer .caption-number {
+  visibility: hidden;
+}

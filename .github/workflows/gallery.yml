@@ -1,0 +1,82 @@
+name: gallery
+
+# NOT ACTIVE CURRENTLY
+on:
+  #pull_request:
+  #push:
+  #  branches:
+  #    - main
+  #    - gallery
+  release:
+    types:
+      - published
+
+# Use bash by default in all jobs
+defaults:
+  run:
+    # Using "-l {0}" is necessary for conda environments to be activated
+    # But this breaks on MacOS if using actions/setup-python:
+    # https://github.com/actions/setup-python/issues/132
+    shell: bash
+
+jobs:
+  gallery:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Cancel any previous run of the test job; [pin v0.8.0 (2021-02-13)]
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@3d86a7cc43670094ac248017207be0295edbc31d
+        with:
+          access_token: ${{ github.token }}
+
+      # Checks-out your repository under $GITHUB_WORKSPACE
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          # Need to fetch more than the last commit so that setuptools_scm can
+          # create the correct version string. If the number of commits since
+          # the last release is greater than this, the version still be wrong.
+          # Increase if necessary.
+          fetch-depth: 100
+          # The GitHub token is preserved by default but this job doesn't need
+          # to be able to push to GitHub.
+          persist-credentials: false
+
+      # Need the tags so that setuptools_scm can form a valid version number
+      - name: Fetch git tags
+        run: git fetch origin 'refs/tags/*:refs/tags/*'
+
+      - name: Setup miniconda
+        # [pin v2.1.1 (2021-04-01)]
+        uses: conda-incubator/setup-miniconda@35d1405e78aa3f784fe3ce9a2eb378d5eeb62169
+        with:
+          auto-update-conda: false
+          python-version: 3.9
+          environment-file: environment.yml
+          activate-environment: emg3d-gallery
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          use-mamba: true
+
+      - name: Create docs
+        shell: bash -l {0}
+        run: |
+          conda config --show-sources
+          conda config --show
+          mamba install pip
+          mamba info -a
+          mamba list
+          pip install emg3d==1.0.0rc2
+          emg3d --report
+          cd docs
+          make html
+
+      - name: Artifact Upload
+        # if: success() # # # # # # # #
+        uses: actions/upload-artifact@v2
+        with:
+          name: emg3d-gallery-${{ github.sha }}
+          path: docs/_build/html/

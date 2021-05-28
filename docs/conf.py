@@ -1,5 +1,7 @@
 import time
+import warnings
 from emg3d import __version__
+from sphinx_gallery.sorting import ExampleTitleSortKey
 
 # ==== 1. Extensions  ====
 
@@ -18,6 +20,7 @@ extensions = [
     'matplotlib.sphinxext.plot_directive',
     'IPython.sphinxext.ipython_console_highlighting',
     'IPython.sphinxext.ipython_directive',
+    'sphinx_gallery.gen_gallery',
 ]
 panels_add_bootstrap_css = False
 autosummary_generate = True
@@ -33,12 +36,44 @@ numpydoc_use_plots = True
 # Todo settings
 todo_include_todos = True
 
+# Sphinx gallery configuration
+sphinx_gallery_conf = {
+    'examples_dirs': [
+        '../examples/tutorials',
+        '../examples/comparisons',
+        '../examples/models',
+    ],
+    'gallery_dirs': [
+        'gallery/tutorials',
+        'gallery/comparisons',
+        'gallery/models',
+    ],
+    'capture_repr': ('_repr_html_', '__repr__'),
+    # Patter to search for example files
+    "filename_pattern": r"\.py",
+    # Sort gallery example by file name instead of number of lines (default)
+    "within_subsection_order": ExampleTitleSortKey,
+    # Remove the settings (e.g., sphinx_gallery_thumbnail_number)
+    'remove_config_comments': True,
+    # Show memory
+    'show_memory': True,
+    # Custom first notebook cell
+    'first_notebook_cell': '%matplotlib notebook',
+    'image_scrapers': ('matplotlib', ),
+}
+
+# https://github.com/sphinx-gallery/sphinx-gallery/pull/521/files
+# Remove matplotlib agg warnings from generated doc when using plt.show
+warnings.filterwarnings("ignore", category=UserWarning,
+                        message='Matplotlib is currently using agg, which is a'
+                                ' non-GUI backend, so cannot show the figure.')
+
 # Intersphinx configuration
 intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
     "discretize": ("https://discretize.simpeg.xyz/en/main", None),
-    "empymod": ("https://empymod.readthedocs.io/en/stable", None),
+    "empymod": ("https://empymod.emsig.xyz/en/stable", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
     "numba": ("https://numba.readthedocs.io/en/stable", None),
 }
@@ -80,7 +115,6 @@ html_favicon = '_static/favicon.ico'
 html_theme_options = {
     "github_url": "https://github.com/emsig/emg3d",
     "external_links": [
-        {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery/gallery"},
         {"name": "emsig", "url": "https://emsig.xyz"},
     ],
     # "use_edit_page_button": True,
@@ -108,4 +142,5 @@ html_css_files = [
 linkcheck_ignore = [
     'https://doi.org/10.1111/j.1365-246X.2010.04544.x',
     'https://doi.org/10.1088/0266-5611/24/3/034012',
+    'https://doi.org/10.1093/gji/ggab171',
 ]

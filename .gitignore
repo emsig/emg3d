@@ -5,6 +5,8 @@ __pycache__/
 docs/_build/
 docs/api/emg3d*
 docs/savefig/
+docs/gallery/*/
+examples/download/
 
 # Pytest and coverage related
 htmlcov

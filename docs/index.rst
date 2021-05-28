@@ -14,6 +14,7 @@ emg3d Documentation
    :hidden:
 
    manual/index
+   gallery/index
    api/index
    dev/index
 
@@ -51,8 +52,8 @@ emg3d Documentation
 
     +++
 
-    .. link-button:: https://emsig.xyz/emg3d-gallery
-            :type: url
+    .. link-button:: emg3d_gallery
+            :type: ref
             :text: To the gallery
             :classes: btn-block btn-info stretched-link
 

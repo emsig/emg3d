@@ -35,6 +35,4 @@ jobs:
 
       - name: Check links
         shell: bash -l {0}
-        run: |
-          cd docs
-          make html -b linkcheck
+        run: make linkcheck-noplot

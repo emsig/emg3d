@@ -12,10 +12,13 @@ matplotlib
 
 # SETUP RELATED
 setuptools_scm
+mkl-service
 
 # FOR DOCUMENTATION
+pooch
 sphinx > 3
 numpydoc >= 0.9
+sphinx_gallery
 sphinx_panels
 sphinx_numfig
 pydata_sphinx_theme

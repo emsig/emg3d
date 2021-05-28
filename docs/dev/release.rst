@@ -49,8 +49,6 @@ Manual
 
 - Benchmarks with `Airspeed Velocity <https://emsig.xyz/emg3d-asv>`_
   (``asv``)
-- Gallery in `emg3d-gallery <https://emsig.xyz/emg3d-gallery>`_
-  (``sphinx-gallery``)
 
 
 Useful things

@@ -1,6 +1,7 @@
 prune docs
 prune tests
 prune .github
+prune examples
 exclude MANIFEST.in
 exclude CHANGELOG.rst
 exclude Makefile
