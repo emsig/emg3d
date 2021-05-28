@@ -6,12 +6,17 @@ Changelog
 """"""""""
 
 
-Towards v1.0.0
---------------
+v1.0.0: Stable API
+------------------
 
-- 2021-05-28: v1.0.0rc3
+**2021-05-29**
+
+Here it is, three months of hard labour lead to v1.0.0!
 
 There are _many_ changes, and they are listed below for each module.
+
+*Your existing code will break, and I apologize for it. Please do not hesitate
+to get in touch if you have troubles updating your code.*
 
 **API**: With version 1.0 the API becomes stable and you can expect that your
 code will work fine for the duration of ``emg3d v1.x``.
@@ -59,7 +64,6 @@ Detailed changes by module
   strength (hence no source).
 - Besides the sources and receivers it contains utilities how to move
   electrodes in the coordinate system (e.g., ``rotation``).
-
 
 
 **Fields**
