@@ -14,8 +14,9 @@ default configuration filename is ``emg3d.cfg``, but another name can be
 provided as first positional argument to ``emg3d``. Note that arguments
 provided in the command line overwrite the settings in the configuration file.
 
-For an example see
-https://emsig.xyz/emg3d-gallery/gallery/tutorials/cli.html>`_ in the gallery.
+For an example see the
+`CLI example <https://emsig.xyz/emg3d-gallery/gallery/tutorials/cli.html>`_ in
+ the gallery.
 
 
 Format of the config file

@@ -51,7 +51,7 @@ emg3d Documentation
 
     +++
 
-    .. link-button:: https://emsig.xyz/emg3d-gallery
+    .. link-button:: https://emsig.xyz/emg3d-gallery/gallery
             :type: url
             :text: To the gallery
             :classes: btn-block btn-info stretched-link
