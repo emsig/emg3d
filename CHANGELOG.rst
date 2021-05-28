@@ -9,7 +9,7 @@ Changelog
 v1.0.0: Stable API
 ------------------
 
-**2021-05-29**
+**2021-05-28**
 
 Here it is, three months of hard labour lead to v1.0.0!
 
