@@ -1,0 +1,21 @@
+name: emg3d-gallery
+
+channels:
+  - conda-forge
+
+dependencies:
+  - "libblas=*=*mkl"
+  - empymod
+  - emg3d
+  - xarray
+  - discretize
+  - h5py
+  - matplotlib
+  - scooby
+  - sphinx
+  - sphinx-gallery
+  - numpydoc
+  - pooch
+  - pydata-sphinx-theme
+  - mkl-service
+  - tqdm
