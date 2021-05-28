@@ -90,7 +90,7 @@ bash("emg3d --help")
 #
 # Let's write a simple example file.
 with open(f"{data_path}emg3d.cfg", "w") as f:
-    f.write(f"""[files]
+    f.write("""[files]
 survey = GemPy-II-survey-A.h5
 model = GemPy-II.h5
 output = emg3d_out.json

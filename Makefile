@@ -25,7 +25,7 @@ pytest:
 	rm -rf .coverage htmlcov/ .pytest_cache/ && pytest --cov=emg3d --flake8 && coverage html
 
 flake8:
-	flake8 docs/ setup.py emg3d/ tests/ examples/
+	flake8 docs/ setup.py emg3d/ tests/ examples/[tcm]*
 
 html:
 	cd docs && make html
