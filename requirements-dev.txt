@@ -24,6 +24,7 @@ sphinx_numfig
 pydata_sphinx_theme
 sphinx_automodapi
 ipykernel
+memory_profiler
 
 # FOR TESTING
 asv
