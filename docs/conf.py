@@ -38,7 +38,7 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
     "discretize": ("https://discretize.simpeg.xyz/en/main", None),
-    "empymod": ("https://empymod.readthedocs.io/en/stable", None),
+    "empymod": ("https://empymod.emsig.xyz/en/stable", None),
     "xarray": ("https://xarray.pydata.org/en/stable", None),
     "numba": ("https://numba.readthedocs.io/en/stable", None),
 }
@@ -108,4 +108,5 @@ html_css_files = [
 linkcheck_ignore = [
     'https://doi.org/10.1111/j.1365-246X.2010.04544.x',
     'https://doi.org/10.1088/0266-5611/24/3/034012',
+    'https://doi.org/10.1093/gji/ggab171',
 ]

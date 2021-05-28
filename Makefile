@@ -1,14 +1,15 @@
 help:
 	@echo "Commands:"
 	@echo ""
-	@echo "  install      install in editable mode"
-	@echo "  dev-install  install in editable mode with dev requirements"
-	@echo "  pytest       run the test suite and report coverage"
-	@echo "  flake8       style check with flake8"
-	@echo "  doc          build docs (update existing)"
-	@echo "  doc-clean    build docs (new, removing any existing)"
-	@echo "  linkcheck    check all links in docs"
-	@echo "  clean        clean up all generated files"
+	@echo "  install        install in editable mode"
+	@echo "  dev-install    install in editable mode with dev requirements"
+	@echo "  pytest         run the test suite and report coverage"
+	@echo "  flake8         style check with flake8"
+	@echo "  html           build docs (update existing)"
+	@echo "  html-clean     build docs (new, removing any existing)"
+	@echo "  preview        renders docs in Browser"
+	@echo "  linkcheck      check all links in docs"
+	@echo "  clean          clean up all generated files"
 	@echo ""
 
 install:
@@ -23,14 +24,17 @@ pytest:
 flake8:
 	flake8 docs/ setup.py emg3d/ tests/
 
-doc:
-	cd docs && make html && cd ..
+html:
+	cd docs && make html
 
-doc-clean:
-	cd docs && rm -rf api/emg3d* && rm -rf _build/ && make html && cd ..
+html-clean:
+	cd docs && rm -rf api/emg3d* && rm -rf _build/ && make html
+
+preview:
+	xdg-open docs/_build/html/index.html
 
 linkcheck:
-	cd docs && make html -b linkcheck && cd ..
+	cd docs && make linkcheck
 
 clean:
 	rm -rf build/ dist/ .eggs/ emg3d.egg-info/ emg3d/version.py  # build

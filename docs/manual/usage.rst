@@ -18,9 +18,9 @@ Basic Example
 -------------
 
 The following is a *very* basic example. To see some more realistic models have
-a look at the `gallery <https://emsig.xyz/emg3d-gallery>`_. First, we load
-``emg3d``, ``numpy``, and ``matplotlib``. Note that this example requires that
-you have installed ``discretize`` and ``xarray`` as well.
+a look at the `gallery <https://emsig.xyz/emg3d-gallery/gallery>`_. First, we
+load ``emg3d``, ``numpy``, and ``matplotlib``. Note that this example requires
+that you have installed ``discretize`` and ``xarray`` as well.
 
 .. ipython::
 

@@ -9,7 +9,7 @@ Changelog
 Towards v1.0.0
 --------------
 
-- 2021-04-16: v1.0.0rc1
+- 2021-05-28: v1.0.0rc3
 
 There are _many_ changes, and they are listed below for each module.
 
