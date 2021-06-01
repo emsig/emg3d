@@ -567,8 +567,10 @@ def get_receiver(field, receiver, method='cubic'):
     factors = electrodes.rotation(*coordinates[3:])
 
     # Add the required responses.
-    opts = {'method': method, 'extrapolate': False, 'log': False, 'mode':
-            'constant', 'cval': np.nan}
+    # TODO opts here is temporary work-around for dev-solver TODO
+    opts = {'method': method, 'extrapolate': False, 'log': False}
+    if method == 'cubic':
+        opts['cval'] = np.nan
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interpolate(grid, ff, xi, **opts)

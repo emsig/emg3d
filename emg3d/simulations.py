@@ -176,6 +176,10 @@ class Simulation:
         self.name = kwargs.pop('name', None)
         self.info = kwargs.pop('info', None)
 
+        # TODO dev-solver temporary solution
+        self.receiver_interpolation = kwargs.pop(
+                'receiver_interpolation', 'cubic')
+
         # Assemble solver_opts.
         self.solver_opts = {
                 'verb': 2,  # Default verbosity, can be overwritten.
@@ -732,7 +736,8 @@ class Simulation:
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
             resp = self.get_efield(source, freq).get_receiver(
-                    receiver=rec_coord_tuple(erec)
+                    receiver=rec_coord_tuple(erec),
+                    method=self.receiver_interpolation,
             )
 
             # Store the receiver response.
@@ -744,7 +749,8 @@ class Simulation:
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = self.get_hfield(source, freq).get_receiver(
-                    receiver=rec_coord_tuple(mrec)
+                    receiver=rec_coord_tuple(mrec),
+                    method=self.receiver_interpolation,
             )
 
             # Store the receiver response.
@@ -986,7 +992,8 @@ class Simulation:
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
             resp = efield_jvec.get_receiver(
-                    receiver=rec_coord_tuple(erec)
+                    receiver=rec_coord_tuple(erec),
+                    method=self.receiver_interpolation,
             )
             # Store the receiver response.
         # Store magnetic receivers.
@@ -994,7 +1001,8 @@ class Simulation:
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = self.get_hfield(src, freq).get_receiver(
-                    receiver=rec_coord_tuple(mrec)
+                    receiver=rec_coord_tuple(mrec),
+                    method=self.receiver_interpolation,
             )
             # Store the receiver response.
         return resp
