@@ -3,7 +3,7 @@ Everything that is related to fields: storing the electric field, obtaining the
 magnetic field, generating the source field; obtaining the fields at receiver
 locations.
 """
-# Copyright 2018-2021 The EMSiG community.
+# Copyright 2018-2021 The emsig community.
 #
 # This file is part of emg3d.
 #
@@ -307,7 +307,7 @@ class Field:
 
         interpolate_opts : dict
             Passed through to :func:`emg3d.maps.interpolate`. Defaults are
-            ``method='cubic'``, ``log=True``, and ``extrapolate=False``.
+            ``method='cubic'``, ``log=False``, and ``extrapolate=False``.
 
 
         Returns
@@ -321,7 +321,7 @@ class Field:
         g2g_inp = {
             'method': 'cubic',
             'extrapolate': False,
-            'log': True,
+            'log': False,
             **({} if interpolate_opts is None else interpolate_opts),
             'grid': self.grid,
             'xi': grid,

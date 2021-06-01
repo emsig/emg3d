@@ -5,12 +5,12 @@ Background Theory
 
 The following provides an introduction to the theoretical foundation of the
 solver `emg3d`. More specific theory is covered in the docstrings of many
-functions, have a look at the :doc:`../api_reference/core`-section or follow
-the links to the corresponding functions here within the theory. If you just
-want to use the solver, but do not care much about the internal functionality,
-then the function :func:`emg3d.solver.solve` is the only function you will ever
-need. It is the main entry point, and it takes care whether multigrid is used
-as a solver or as a preconditioner (or not at all), while the actual multigrid
+functions, have a look at the :doc:`../api/core`-section or follow the links to
+the corresponding functions here within the theory. If you just want to use the
+solver, but do not care much about the internal functionality, then the
+function :func:`emg3d.solver.solve` is the only function you will ever need. It
+is the main entry point, and it takes care whether multigrid is used as a
+solver or as a preconditioner (or not at all), while the actual multigrid
 solver is :func:`emg3d.solver.multigrid`.
 
 .. note::

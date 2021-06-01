@@ -5,8 +5,8 @@ If you have never heard of the multigrid method before you might ask yourself
 "*multi-what?*" The following is an intent to describe the multigrid method
 without the maths; just some keywords and some figures. **It is a heavily
 simplified intro, using a 2D grid for simplicity.** Have a look at the
-:doc:`theory`-section for more details. A good, four-page intro with some maths
-is given by [Muld11]_. More in-depth information can be found, e.g., in
+:doc:`theory`-section for more details. A good, six-page intro with some maths
+is given by [Muld20]_. More in-depth information can be found, e.g., in
 [BrHM00]_, [Hack85]_, and [Wess91]_.
 
 The multigrid method ([Fedo64]_)
@@ -27,7 +27,7 @@ To solve the system, it solves for all fields adjacent to one node, moves then
 to the next node, and so on until it reaches the last node, see :numref:`Figure
 %s <smoother>`, where the red lines indicate the fields which are solved
 simultaneously per step (the fields on the boundaries are never computed, as
-they are assumed to be 0).
+they are assumed to be zero).
 
 .. figure:: ../_static/schematics2.svg
    :width: 60 %
@@ -60,7 +60,7 @@ has two advantages:
 - Coarser grid size transforms lower frequency error to higher frequency error,
   relatively to cell size, which means faster convergence.
 
-The implemented multigrid method simply joins two adjacent cells to get from
+The implemented multigrid method simply joins two adjacent cells to go from
 finer to coarser grids, see :numref:`Figure %s <fine2coarse>` for an example
 coarsening starting with a 16 cells by 16 cells grid.
 

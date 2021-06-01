@@ -2,6 +2,7 @@
 -r requirements.txt
 
 # SOFT DEPENDENCIES
+tqdm
 h5py
 scooby
 xarray
@@ -15,12 +16,14 @@ setuptools_scm
 # FOR DOCUMENTATION
 sphinx > 3
 numpydoc >= 0.9
+sphinx_panels
 sphinx_numfig
 pydata_sphinx_theme
 sphinx_automodapi
 ipykernel
 
 # FOR TESTING
+asv
 pytest
 coveralls
 pytest-cov

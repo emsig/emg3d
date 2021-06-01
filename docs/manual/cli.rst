@@ -1,31 +1,31 @@
 CLI interface
 =============
 
-.. todo::
-
-    The CLI section needs rework.
-
-Command-line interface for certain specific tasks, such as forward modelling
-and gradient computation of the misfit function. The command is ``emg3d``,
-consult the inbuilt help to get started:
+The command-line interface can be used for certain specific tasks, such as
+forward modelling and the computation of the gradient. The command is
+``emg3d``, consult the inbuilt help in your terminal to get started:
 
 .. code-block:: console
 
    emg3d --help
 
 The CLI is driven by command-line parameters and a configuration file. The
-default configuration file is ``emg3d.cfg``, but another name can be provided
-as first positional argument to ``emg3d``. Note that arguments provided in the
-command line overwrite the settings in the configuration file.
+default configuration filename is ``emg3d.cfg``, but another name can be
+provided as first positional argument to ``emg3d``. Note that arguments
+provided in the command line overwrite the settings in the configuration file.
+
+For an example see the
+`CLI example <https://emsig.xyz/emg3d-gallery/gallery/tutorials/cli.html>`_ in
+ the gallery.
 
 
 Format of the config file
 -------------------------
 
-The shown values are the defaults. All values are commented out in this
-example; remove the comment signs to use them.
+The shown values are examples. All values are commented out in this example;
+remove the comment signs to use them.
 
-::
+``emg3d.cfg``::
 
   # Files
   # -----
@@ -45,8 +45,9 @@ example; remove the comment signs to use them.
   # for `compute()`.
   [simulation]
   # max_workers = 4    # Also via `-n` or `--nproc`.
-  # gridding = single  # One grid for all sources and frequencies.
+  # gridding = single
   # min_offset = 0.0   # Only relevant if `observed=True` (r<r_min set to NaN).
+  # name = MyTestSimulation
 
   # Solver options
   # --------------
@@ -58,10 +59,18 @@ example; remove the comment signs to use them.
   # Note that currently sslsolver, semicoarsening, and linerelaxation only
   # accept True/False through the CLI.
   [solver_opts]
-  # sslsolver = True
-  # semicoarsening = True
-  # linerelaxation = True
-  # verb = 0
+  # sslsolver =            # bool
+  # semicoarsening =       # bool
+  # linerelaxation =       # bool
+  # cycl =                 # string
+  # tol =                  # float
+  # verb =                 # int
+  # maxit =                # int
+  # nu_init =              # int
+  # nu_pre =               # int
+  # nu_coarse =            # int
+  # nu_post =              # int
+  # clevel =               # int
 
   # Gridding options
   # ----------------
@@ -91,7 +100,6 @@ example; remove the comment signs to use them.
   # lambda_factor =       # float, e.g.: 1.0
   # verb =                # int, e.g.: 0
   # lambda_from_center =  # bool, e.g.: False
-
 
   # Data
   # ----

@@ -2,7 +2,7 @@
 A survey stores a set of sources and their frequencies, receivers, and the
 measured data.
 """
-# Copyright 2018-2021 The EMSiG community.
+# Copyright 2018-2021 The emsig community.
 #
 # This file is part of emg3d.
 #

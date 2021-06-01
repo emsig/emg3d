@@ -1,7 +1,7 @@
 """
 Everything related to meshes appropriate for the multigrid solver.
 """
-# Copyright 2018-2021 The EMSiG community.
+# Copyright 2018-2021 The emsig community.
 #
 # This file is part of emg3d.
 #
@@ -681,7 +681,8 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     for nx in np.unique(cell_numbers):
 
         # Loop over possible alphas for domain.
-        for sa in np.linspace(1.0, stretching[0], 100):
+        nsa = max(1, min(100, int((stretching[0] - 1) / 0.001)))
+        for sa in np.linspace(1.0, stretching[0], nsa):
 
             if vector is None:
 
@@ -736,7 +737,8 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             hxo = hx
 
             # Loop over possible alphas for buffer.
-            for ca in np.linspace(sa, stretching[1], 100):
+            nca = max(1, min(100, int((stretching[1] - sa) / 0.001)))
+            for ca in np.linspace(sa, stretching[1], nca):
 
                 # Get current stretched grid cell sizes.
                 thxl = hx[0]*ca**np.arange(1, nx_remain+1)   # Left of survey.
@@ -830,11 +832,11 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         return x0, hx
 
 
-def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
-    r"""Return 'good' cell numbers for the multigrid method.
+def good_mg_cell_nr(max_nr=1024, max_lowest=5, min_div=3):
+    r"""Return "good" cell numbers for the multigrid method.
 
-    'Good' cell numbers are numbers which can be divided by two as many times
-    as possible. At the end there should be a low prime number.
+    "Good" cell numbers are numbers which can be divided by two as many times
+    as possible. At the end there should be 2 or a small odd number.
 
     The function adds all numbers
 
@@ -847,7 +849,7 @@ def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
         n &= {n_\text{min}, n_\text{min}+1, ..., \infty} \ ,
 
     where :math:`M, p_\text{max}, n_\text{min}` correspond to ``max_nr``,
-    ``max_prime``, and ``min_div``, respectively.
+    ``max_lowest``, and ``min_div``, respectively.
 
 
     Parameters
@@ -855,9 +857,10 @@ def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
     max_nr : int, default: 1024
         Maximum number of cells.
 
-    max_prime : int, default: 5
-        Highest permitted prime number p for p*2^n. {2, 3, 5, 7} are good upper
-        limits in order to avoid too big lowest grids in the multigrid method.
+    max_lowest : int, default: 5
+        Maximum permitted lowest number p for p*2^n. {2, 3, 5, 7} are good
+        upper limits in order to avoid too big lowest grids in the multigrid
+        method.
 
     min_div : int, default: 3
         Minimum times the number can be divided by two.
@@ -869,21 +872,21 @@ def good_mg_cell_nr(max_nr=1024, max_prime=5, min_div=3):
         Array containing all possible cell numbers from lowest to highest.
 
     """
-    # Primes till 20.
-    primes = np.array([2, 3, 5, 7, 11, 13, 17, 19], dtype=np.int64)
+    # 2 + odd numbers till 20.
+    lowest = np.array([2, 3, 5, 7, 9, 11, 13, 15, 17, 19], dtype=np.int64)
 
     # Sanity check; 19 is already ridiculously high.
-    if max_prime > primes[-1]:
+    if max_lowest > lowest[-1]:
         raise ValueError(
-            f"Highest prime is {max_prime}, please use a value < 20."
+            f"Maximum lowest is {max_lowest}, please use a value < 20."
         )
 
-    # Restrict to max_prime.
-    primes = primes[primes <= max_prime]
+    # Restrict to max_lowest.
+    lowest = lowest[lowest <= max_lowest]
 
     # Get possible values.
-    # Currently restricted to prime*2**30 (for prime=2 => 1,073,741,824 cells).
-    numbers = primes[:, None]*2**np.arange(min_div, 30)
+    # Currently restr. to lowest*2**29 (for lowest=2 => 1,073,741,824 cells).
+    numbers = lowest[:, None]*2**np.arange(min_div, 30)
 
     # Get unique values.
     numbers = np.unique(numbers)
