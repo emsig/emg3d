@@ -210,28 +210,27 @@ def gradient(simulation, vec=None):
             dtype=float,
         )
 
-        # Pre-allocate the gradient for the computational grid.
-        shape = gfield.grid.shape_cells
+        # Bring the gradient back from the computation grid to the model grid.
+        gradient = gfield.interpolate_to_grid(simulation.model.grid)
+
+        # Pre-allocate the gradient for this src-freq.
+        shape = gradient.grid.shape_cells
         grad_x = np.zeros(shape, order='F')
         grad_y = np.zeros(shape, order='F')
         grad_z = np.zeros(shape, order='F')
 
         # Map the field to cell centers times volume.
-        cell_volumes = gfield.grid.cell_volumes.reshape(shape, order='F')
+        cell_volumes = gradient.grid.cell_volumes.reshape(shape, order='F')
         maps.interp_edges_to_vol_averages(
-                ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+                ex=gradient.fx, ey=gradient.fy, ez=gradient.fz,
                 volumes=cell_volumes,
                 ox=grad_x, oy=grad_y, oz=grad_z)
         grad = grad_x + grad_y + grad_z
 
-        # Bring the gradient back from the computation grid to the model grid.
-        this_gradient = maps.interpolate(
-                    gfield.grid, -grad, simulation.model.grid, method='cubic')
-
         # => Frequency-dependent depth-weighting should go here.
 
         # Add this src-freq gradient to the total gradient.
-        gradient_model += this_gradient
+        gradient_model -= grad
 
     if vec is not None:
         return gradient_model.ravel(order='F')
