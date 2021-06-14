@@ -121,6 +121,7 @@ def misfit(simulation):
 
     return misfit.data
 
+
 def gradient(simulation, vec=None):
     r"""Compute the discrete gradient using the adjoint-state method.
 
@@ -184,11 +185,11 @@ def gradient(simulation, vec=None):
     if vec is None:
         _ = simulation.misfit
     else:
-        # vec is a numpy array 
+        # vec is a numpy array
         vec_xr = simulation.data.observed.copy()
         vec_xr.values = vec.reshape(vec_xr.shape)
         simulation.data['residual'] = vec_xr
-  
+
     # Compute back-propagating electric fields.
     simulation._bcompute()
 
@@ -243,7 +244,8 @@ def gradient(simulation, vec=None):
 
     return gradient_model
 
-def jvec_serial(simulation, vec=None): 
+
+def jvec_serial(simulation, vec=None):
     """@SEOGI: method can be 'linear' or 'cubic'"""
 
     # Assume simulation.compute() is done.
@@ -254,10 +256,12 @@ def jvec_serial(simulation, vec=None):
         efield = simulation._dict_efield[src][freq]  # Forward electric field
 
         # Step2: compute G * vec = gvec
-        gvec = efield.grid.getEdgeInnerProductDeriv(np.ones(efield.grid.n_cells))(efield.field) * vec
-        # Extension to sig_x, sig_y, sig_z is trivial 
-        # gvec = mesh.getEdgeInnerProductDeriv(np.ones(mesh.n_cells)*3)(efield.field) * vec
-        
+        gvec = efield.grid.getEdgeInnerProductDeriv(
+                np.ones(efield.grid.n_cells))(efield.field) * vec
+        # Extension to sig_x, sig_y, sig_z is trivial
+        # gvec = mesh.getEdgeInnerProductDeriv(
+        #         np.ones(mesh.n_cells)*3)(efield.field) * vec
+
         gvec_field = fields.Field(
             grid=efield.grid,
             data=-efield.smu0*gvec,
@@ -309,6 +313,7 @@ def jvec_serial(simulation, vec=None):
             jacobian_vec.loc[src, :, freq][mrec] = resp
     return jacobian_vec.values.ravel()
 
+
 def jvec(simulation, vec=None):
     # Jvec = PA^-1 * G * vec
     srcfreq = simulation._srcfreq.copy()  # Iterable of all src-freq pairs
@@ -327,7 +332,7 @@ def jvec(simulation, vec=None):
     )
 
     jacobian_vec = simulation.data.synthetic.copy()
-    
+
     for i, (src, freq) in enumerate(srcfreq):
         # Store efield and solver info.
         # Store electric receivers.
@@ -336,7 +341,7 @@ def jvec(simulation, vec=None):
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
             # Store the receiver response.
-            jacobian_vec.loc[src, :, freq][erec] = out[i] 
+            jacobian_vec.loc[src, :, freq][erec] = out[i]
 
         # Store magnetic receivers.
         if rec_types.count(False):
@@ -344,6 +349,6 @@ def jvec(simulation, vec=None):
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             # Store the receiver response.
-            jacobian_vec.loc[src, :, freq][mrec] = out[i]         
+            jacobian_vec.loc[src, :, freq][mrec] = out[i]
 
     return jacobian_vec.values.ravel()

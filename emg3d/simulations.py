@@ -952,7 +952,7 @@ class Simulation:
             coords = rec.coordinates_abs(self.survey.sources[source])
 
             # Get residual field and add it to the total field.
-            # There seems a bit of problem here. 
+            # There seems a bit of problem here.
             # This should be an adjoint operation
             rfield.field += fields.get_source_field(
                     grid=grid,
@@ -977,16 +977,18 @@ class Simulation:
         # Get receiver types.
         src, freq = inp
         rec_types = tuple([r.xtype == 'electric'
-                            for r in self.survey.receivers.values()])
-        
+                           for r in self.survey.receivers.values()])
+
         # Compute P A^-1 * G * vec
         rl = list(self.survey.receivers.values())
+
         def rec_coord_tuple(rec_list):
             """Return abs. coordinates for as a fct of source."""
             return tuple(np.array(
                 [rl[i].coordinates_abs(self.survey.sources[src])
-                    for i in rec_list]
+                 for i in rec_list]
             ).T)
+
         # Store electric receivers.
         if rec_types.count(True):
             # Extract data at receivers.
@@ -1008,15 +1010,17 @@ class Simulation:
         return resp
 
     def _get_gvec_field(self, source, frequency):
-        
+
         # Forward electric field
         efield = self._dict_efield[source][frequency]
 
         # Step2: compute G * vec = gvec
-        gvec = efield.grid.getEdgeInnerProductDeriv(np.ones(efield.grid.n_cells))(efield.field) * self._vec
-        # Extension to sig_x, sig_y, sig_z is trivial 
-        # gvec = mesh.getEdgeInnerProductDeriv(np.ones(mesh.n_cells)*3)(efield.field) * vec
-        
+        gvec = efield.grid.getEdgeInnerProductDeriv(
+                np.ones(efield.grid.n_cells))(efield.field) * self._vec
+        # Extension to sig_x, sig_y, sig_z is trivial
+        # gvec = mesh.getEdgeInnerProductDeriv(
+        #         np.ones(mesh.n_cells)*3)(efield.field) * vec
+
         gvec_field = fields.Field(
             grid=efield.grid,
             data=-efield.smu0*gvec,

@@ -437,7 +437,6 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         return info_dict
 
 
-
 def solve_source(model, source, frequency, **kwargs):
     """Return electric field for a given source and frequency.
 
