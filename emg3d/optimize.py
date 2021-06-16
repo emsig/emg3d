@@ -122,7 +122,7 @@ def misfit(simulation):
     return misfit.data
 
 
-def gradient(simulation, vec=None):
+def gradient(simulation, vector=None):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete adjoint-state gradient for a single source at a single
@@ -161,6 +161,12 @@ def gradient(simulation, vec=None):
     simulation : Simulation
         The simulation; a :class:`emg3d.simulations.Simulation` instance.
 
+    vector : ndarray, default: None
+        A vector of shape ``simulation.survey.shape`` (nsrc, nrec, nfreq). The
+        gradient is by default computed by back-propagating the residual of the
+        modelled responses and the data. If a vector is provided, the residual
+        is replaced by this vector.
+
 
     Returns
     -------
@@ -182,13 +188,11 @@ def gradient(simulation, vec=None):
             raise NotImplementedError(f"Gradient not implemented for {n}.")
 
     # Ensure misfit has been computed (and therefore the electric fields).
-    if vec is None:
-        _ = simulation.misfit
-    else:
-        # vec is a numpy array
-        vec_xr = simulation.data.observed.copy()
-        vec_xr.values = vec.reshape(vec_xr.shape)
-        simulation.data['residual'] = vec_xr
+    _ = simulation.misfit
+
+    # Replace residual by vector if provided
+    if vector is not None:
+        simulation.data['residual'][...] = vector
 
     # Compute back-propagating electric fields.
     simulation._bcompute()
@@ -233,8 +237,6 @@ def gradient(simulation, vec=None):
         # Add this src-freq gradient to the total gradient.
         gradient_model -= grad
 
-    if vec is not None:
-        return gradient_model.ravel(order='F')
     # => Frequency-independent depth-weighting should go here.
 
     # Apply derivative-chain of property-map

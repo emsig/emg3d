@@ -21,6 +21,7 @@ a high-level, specialised modelling tool for the end user.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 import itertools
 from copy import deepcopy
 
@@ -218,6 +219,10 @@ class Simulation:
         # Ensure no kwargs left.
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
+
+        # TODO TODO
+        if gridding == 'same':
+            self._check_grid
 
     def __repr__(self):
         """Simple representation."""
@@ -1226,6 +1231,33 @@ class Simulation:
 
         self.gridding_opts = gridding_opts
         self.model = model
+
+    # TODO TODO TODO
+    @property
+    def _check_grid(self):
+    # TODO TODO TODO
+        # Throw a warning if mesh is not good for multigrid
+
+        # Extreme values.
+        good = meshes.good_mg_cell_nr(max_nr=50000, max_lowest=5, min_div=0)
+
+        # Ensure meshes are TensorMesh.
+        if not self.model.grid.__class__.__name__ == 'TensorMesh':
+            raise TypeError("Grid must be a TensorMesh.")
+
+        # Ensure it is a 3D grid.
+        if self.model.grid.dim != 3:
+            raise TypeError('Grid must be 3D grid.')
+
+        # Check mesh dimensions, warn if not optimal.
+        if any(n_cells not in good for n_cells in self.model.grid.shape_cells):
+            msg = (
+                f"Warning: grid dimension {(self.model.grid.shape_cells)} "
+                "is not optimal for MG solver. Good numbers are:\n"
+                f"{meshes.good_mg_cell_nr(max_nr=5000)}"
+            )
+            print(f"* WARNING :: {msg}")
+            warnings.warn(msg, UserWarning)
 
 
 # HELPER FUNCTIONS
