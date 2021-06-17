@@ -264,6 +264,9 @@ def jvec_serial(simulation, vec=None):
         # gvec = mesh.getEdgeInnerProductDeriv(
         #         np.ones(mesh.n_cells)*3)(efield.field) * vec
 
+        # NOTE: I think grid.getEdgeInnerProductDeriv corresponds to
+        #       emg3d.maps.interp_edges_to_vol_averages
+
         gvec_field = fields.Field(
             grid=efield.grid,
             data=-efield.smu0*gvec,
