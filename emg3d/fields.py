@@ -479,11 +479,90 @@ def get_source_field(grid, source, frequency, **kwargs):
             source = electrodes.TxMagneticDipole(source, **inp)
 
     # Get total vector field by looping over segments.
-    vfield = np.zeros(grid.n_edges, order='F')
-    for p0, p1 in zip(source.points[:-1, :], source.points[1:, :]):
+    if len(source.coordinates) == 5 and source.length == 1.0:
 
-        # Add this segments' vector field to total vector field.
-        vfield += _dipole_vector(grid, source=np.r_[[p0, p1]]).field
+        # Cast some parameters.
+        coo = np.asarray(source.coordinates, dtype=np.float64)
+        strength = np.asarray(source.strength)
+
+        # Ensure source is within grid.
+        ii = [0, 0, 1, 1, 2, 2]
+        source_in = np.any(coo[ii[0]] >= grid.nodes_x[0])
+        source_in *= np.any(coo[ii[1]] <= grid.nodes_x[-1])
+        source_in *= np.any(coo[ii[2]] >= grid.nodes_y[0])
+        source_in *= np.any(coo[ii[3]] <= grid.nodes_y[-1])
+        source_in *= np.any(coo[ii[4]] >= grid.nodes_z[0])
+        source_in *= np.any(coo[ii[5]] <= grid.nodes_z[-1])
+
+        if not source_in:
+            raise ValueError(f"Provided source outside grid: {coo}.")
+
+        # Point dipole: convert azimuth/dip to weights.
+        h = np.cos(np.deg2rad(coo[4]))
+        dys = np.sin(np.deg2rad(coo[3]))*h
+        dxs = np.cos(np.deg2rad(coo[3]))*h
+        dzs = np.sin(np.deg2rad(coo[4]))
+        srcdir = np.array([dxs, dys, dzs])
+        coo = coo[:3]
+
+        def point_source(xx, yy, zz, coo, s):
+            """Set point dipole source."""
+            nx, ny, nz = s.shape
+
+            # Get indices of cells in which source resides.
+            ix = max(0, np.where(coo[0] < np.r_[xx, np.infty])[0][0]-1)
+            iy = max(0, np.where(coo[1] < np.r_[yy, np.infty])[0][0]-1)
+            iz = max(0, np.where(coo[2] < np.r_[zz, np.infty])[0][0]-1)
+
+            def get_index_and_strength(ic, nc, csrc, cc):
+                """Return index and field strength in c-direction."""
+                if ic == nc-1:
+                    ic1 = ic
+                    rc = 1.0
+                    ec = 1.0
+                else:
+                    ic1 = ic+1
+                    rc = (csrc-cc[ic])/(cc[ic1]-cc[ic])
+                    ec = 1.0-rc
+                return rc, ec, ic1
+
+            rx, ex, ix1 = get_index_and_strength(ix, nx, coo[0], xx)
+            ry, ey, iy1 = get_index_and_strength(iy, ny, coo[1], yy)
+            rz, ez, iz1 = get_index_and_strength(iz, nz, coo[2], zz)
+
+            s[ix, iy, iz] = ex*ey*ez
+            s[ix1, iy, iz] = rx*ey*ez
+            s[ix, iy1, iz] = ex*ry*ez
+            s[ix1, iy1, iz] = rx*ry*ez
+            s[ix, iy, iz1] = ex*ey*rz
+            s[ix1, iy, iz1] = rx*ey*rz
+            s[ix, iy1, iz1] = ex*ry*rz
+            s[ix1, iy1, iz1] = rx*ry*rz
+
+        # Initiate zero source field.
+        tfield = Field(grid, frequency=frequency)
+
+        # Return source-field depending.
+        vec1 = (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)
+        vec2 = (grid.nodes_x, grid.cell_centers_y, grid.nodes_z)
+        vec3 = (grid.nodes_x, grid.nodes_y, grid.cell_centers_z)
+        point_source(*vec1, coo, tfield.fx)
+        point_source(*vec2, coo, tfield.fy)
+        point_source(*vec3, coo, tfield.fz)
+
+        # Multiply by moment*s*mu in per direction.
+        tfield.fx *= srcdir[0]
+        tfield.fy *= srcdir[1]
+        tfield.fz *= srcdir[2]
+
+        vfield = tfield.field
+
+    else:
+        vfield = np.zeros(grid.n_edges, order='F')
+        for p0, p1 in zip(source.points[:-1, :], source.points[1:, :]):
+
+            # Add this segments' vector field to total vector field.
+            vfield += _dipole_vector(grid, source=np.r_[[p0, p1]]).field
 
     # Initiate field with the total vector field.
     sfield = Field(grid, data=vfield, frequency=frequency)
