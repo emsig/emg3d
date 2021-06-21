@@ -479,8 +479,9 @@ def get_source_field(grid, source, frequency, **kwargs):
             source = electrodes.TxMagneticDipole(source, **inp)
 
     # Get total vector field by looping over segments.
-    if len(source.coordinates) == 5 and source.length == 1.0:
-
+    # TODO TODO TODO _does not work for magnetic sources TODO TODO TODO
+    if (len(source.coordinates) == 5 and source.length == 1.0 and
+            'Electric' in source.__class__.__name__):
         # Cast some parameters.
         coo = np.asarray(source.coordinates, dtype=np.float64)
         strength = np.asarray(source.strength)
