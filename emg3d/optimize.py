@@ -316,7 +316,7 @@ def jvec_serial(simulation, vec=None):
 
             # Store the receiver response.
             jacobian_vec.loc[src, :, freq][mrec] = resp
-    return jacobian_vec.values.ravel()
+    return jacobian_vec.data
 
 
 def jvec(simulation, vec=None):
@@ -356,4 +356,4 @@ def jvec(simulation, vec=None):
             # Store the receiver response.
             jacobian_vec.loc[src, :, freq][mrec] = out[i]
 
-    return jacobian_vec.values.ravel()
+    return jacobian_vec.data
