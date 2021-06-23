@@ -957,8 +957,6 @@ class Simulation:
             coords = rec.coordinates_abs(self.survey.sources[source])
 
             # Get residual field and add it to the total field.
-            # There seems a bit of problem here.
-            # This should be an adjoint operation
             rfield.field += fields.get_source_field(
                     grid=grid,
                     source=src_fct(coords, strength=strength),
