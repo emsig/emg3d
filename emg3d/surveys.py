@@ -493,7 +493,7 @@ class Survey:
         if standard_deviation is not None:
 
             # Ensure all values are bigger than zero.
-            if np.any(standard_deviation < 0.0):
+            if np.any(standard_deviation <= 0.0):
                 raise ValueError(
                     "All values of `standard_deviation` must be bigger "
                     f"than zero. Provided: {standard_deviation}."
@@ -549,7 +549,7 @@ class Survey:
             value = np.asarray(value)
 
             # Ensure all values are bigger than zero.
-            if np.any(value < 0.0):
+            if np.any(value <= 0.0):
                 raise ValueError(
                     f"All values of `{name}` must be bigger than zero. "
                     f"Provided: {value}."
