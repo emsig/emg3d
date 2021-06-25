@@ -68,7 +68,7 @@ Many of the tests are set up in the Makefile (only tested on Linux):
 
   .. code-block:: console
 
-     make doc
+     make html
 
 - Or to list all the possibilities, simply run:
 
