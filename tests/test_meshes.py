@@ -445,11 +445,11 @@ def test_check_mesh(capsys):
 
     # Wrong dimension.
     if discretize is None:
-        grid = meshes.BaseMesh(h=[2, 2, 2], origin=(0, 0, 0))
+        grid = meshes.TensorMesh(h=[2, 2, 2], origin=(0, 0, 0))
         grid.origin = (0, 0)
     else:
         grid = meshes.TensorMesh(h=[2, 2], origin=(0, 0))
-    with pytest.raises(TypeError, match="Mesh must be 3D mesh."):
+    with pytest.raises(TypeError, match="Mesh must be a 3D mesh."):
         meshes.check_mesh(grid)
 
     # Bad cell number.

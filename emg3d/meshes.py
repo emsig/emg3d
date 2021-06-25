@@ -1045,7 +1045,7 @@ def check_mesh(mesh):
 
     # Ensure it is a 3D mesh.
     if len(mesh.origin) != 3:
-        raise TypeError('Mesh must be 3D mesh.')
+        raise TypeError('Mesh must be a 3D mesh.')
 
     # Check mesh dimensions, warn if not optimal.
     if any(n_cells not in good for n_cells in mesh.shape_cells):
