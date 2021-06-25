@@ -9,6 +9,26 @@ Changelog
 latest
 ------
 
+**Fields**
+
+- ``get_receiver`` has a new keyword ``method``, which can be ``'cubic'`` or
+  ``'linear'``; default is the former, which is the same behaviour us before.
+  However, if you want to compute the gradient, you should set it to
+  ``'linear'`` in your Simulation parameters. Otherwise the adjoint-state
+  gradient will not exactly be the adjoint state. Note: This will change once
+  the adjoint of a cubic interpolation is implemented as source function.
+
+
+**Simulations**
+
+- New keyword ``receiver_interpolation``, which corresponds to the ``method``
+  in ``get_receiver`` (see above). Cubic is more precise. However, if you are
+  interested in the gradient, you need to choose 'linear' at the moment, as
+  there are only linearly interpolated source functions. To be the proper
+  adjoint for the gradient the receiver has to be interpolated linearly too.
+  (This will change in the future.)
+
+
 **Optimize**
 
 - ``gradient``:

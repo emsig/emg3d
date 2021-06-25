@@ -424,6 +424,10 @@ class TestGetReceiver:
         e3d_inst = fields.get_receiver(efield, rec_inst[0])
         assert_allclose(e3d_inst, e3d[0])
 
+        # Ensure cubic and linear are different; and that 'cubic' is default.
+        e3d_inst2 = fields.get_receiver(efield, rec_inst[0], method='linear')
+        assert abs(e3d_inst) != abs(e3d_inst2)
+
         # Ensure responses outside and in the last cell are set to NaN.
         h = np.ones(4)*100
         grid = emg3d.TensorMesh([h, h, h], (-200, -200, -200))
@@ -433,6 +437,11 @@ class TestGetReceiver:
         out = emg3d.solve(model=model, sfield=sfield, plain=True, verb=0)
         off = np.arange(11)*50-250
         resp = out.get_receiver((off, off, off, 0, 0))
+        assert_allclose(np.isfinite(resp),
+                        np.r_[3*[False, ], 5*[True, ], 3*[False, ]])
+
+        # Also if linearly interpolated
+        resp = out.get_receiver((off, off, off, 0, 0), method='linear')
         assert_allclose(np.isfinite(resp),
                         np.r_[3*[False, ], 5*[True, ], 3*[False, ]])
 
