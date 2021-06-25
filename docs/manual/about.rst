@@ -66,7 +66,7 @@ parameters and resulting fields. Furthermore, it can serve as a link to use
 notebook.
 
 There are some first successful attempts of using emsig as a forward modeller
-in both `SimPEG <https://simpeg.xyz>`_ and `pyGIMLi <https://pygimli.org>`_
+in both `SimPEG <https://simpeg.xyz>`_ and `pyGIMLi <https://www.pygimli.org>`_
 inversions. Get in touch if you are interested in these developments.
 
 See also the note about the `EM & Potential Geo-Exploration Python Ecosystem
