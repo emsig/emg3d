@@ -6,6 +6,24 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+**Optimize**
+
+- ``gradient``:
+
+  - Changed order when going from computational grid to inversion grid.
+    Changing the grids at the field stage (cubic interpolation) seems to be
+    better than changing at the cell-averaged stage:
+
+    New: field_comp -> field_inv -> cells_inv
+    Old: field_comp -> cells_comp -> cells_inv
+
+
+- Various small fixes to docs etc.
+
+
 v1.0.0: Stable API
 ------------------
 
