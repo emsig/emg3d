@@ -151,6 +151,14 @@ class Simulation:
         Simulation info or any other info (e.g., what was the purpose of this
         simulation).
 
+    receiver_interpolation : str, default: 'cubic':
+        Interpolation method to obtain the response at receiver location;
+        'cubic' or 'linear'. Cubic is more precise. However, if you are
+        interested in the gradient, you need to choose 'linear' at the moment,
+        as there are only linearly interpolated source functions. To be the
+        proper adjoint for the gradient the receiver has to be interpolated
+        linearly too. (This will change in the future.)
+
     """
 
     # Gridding descriptions (for repr's).
@@ -175,6 +183,8 @@ class Simulation:
         self.verb = kwargs.pop('verb', 0)
         self.name = kwargs.pop('name', None)
         self.info = kwargs.pop('info', None)
+        self.receiver_interpolation = kwargs.pop(   # Remove once we have
+                'receiver_interpolation', 'cubic')  # cubic source fct.
 
         # Assemble solver_opts.
         self.solver_opts = {
@@ -731,7 +741,8 @@ class Simulation:
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
             resp = self.get_efield(source, freq).get_receiver(
-                    receiver=rec_coord_tuple(erec)
+                    receiver=rec_coord_tuple(erec),
+                    method=self.receiver_interpolation,
             )
 
             # Store the receiver response.
@@ -743,7 +754,8 @@ class Simulation:
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = self.get_hfield(source, freq).get_receiver(
-                    receiver=rec_coord_tuple(mrec)
+                    receiver=rec_coord_tuple(mrec),
+                    method=self.receiver_interpolation,
             )
 
             # Store the receiver response.

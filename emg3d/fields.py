@@ -335,7 +335,7 @@ class Field:
         # Assemble and return new field.
         return Field(grid, field, frequency=self._frequency)
 
-    def get_receiver(self, receiver):
+    def get_receiver(self, receiver, method='cubic'):
         """Return the field (response) at receiver coordinates.
 
         Note that in order to avoid boundary effects from the PEC boundary the
@@ -359,6 +359,10 @@ class Field:
             effect here, it just takes the coordinates from the receiver
             instances.
 
+        method : str, default: 'cubic'
+            Interpolation method to obtain the response at receiver location;
+            'cubic' or 'linear'.
+
 
         Returns
         -------
@@ -366,7 +370,7 @@ class Field:
             Responses at receiver.
 
         """
-        return get_receiver(self, receiver)
+        return get_receiver(self, receiver, method)
 
 
 def get_source_field(grid, source, frequency, **kwargs):
@@ -497,7 +501,7 @@ def get_source_field(grid, source, frequency, **kwargs):
     return sfield
 
 
-def get_receiver(field, receiver):
+def get_receiver(field, receiver, method='cubic'):
     """Return the field (response) at receiver coordinates.
 
     Note that in order to avoid boundary effects from the PEC boundary the
@@ -522,6 +526,10 @@ def get_receiver(field, receiver):
 
         Note that the actual receiver type of the ``Rx*`` instances has no
         effect here, it just takes the coordinates from the receiver instances.
+
+    method : str, default: 'cubic'
+        Interpolation method to obtain the response at receiver location;
+        'cubic' or 'linear'.
 
 
     Returns
@@ -567,8 +575,12 @@ def get_receiver(field, receiver):
     factors = electrodes.rotation(*coordinates[3:])
 
     # Add the required responses.
-    opts = {'method': 'cubic', 'extrapolate': False, 'log': False, 'mode':
-            'constant', 'cval': np.nan}
+    opts = {'method': method, 'extrapolate': False, 'log': False}
+    # Set receivers outside of grid to NaN (they should be FAR from boundary).
+    if method == 'linear':
+        opts['fill_value'] = np.nan
+    else:
+        opts['cval'] = np.nan
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
             resp += factors[i]*maps.interpolate(grid, ff, xi, **opts)
