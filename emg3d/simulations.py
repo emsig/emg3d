@@ -187,10 +187,6 @@ class Simulation:
         self.receiver_interpolation = kwargs.pop(   # Remove once we have
                 'receiver_interpolation', 'cubic')  # cubic source fct.
 
-        # TODO dev-solver temporary solution
-        self.receiver_interpolation = kwargs.pop(
-                'receiver_interpolation', 'cubic')
-
         # Assemble solver_opts.
         self.solver_opts = {
                 'verb': 2,  # Default verbosity, can be overwritten.
