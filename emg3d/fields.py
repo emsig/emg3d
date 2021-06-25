@@ -94,7 +94,7 @@ class Field:
             else:
                 raise ValueError(
                     "`frequency` must be f>0 (frequency domain) or f<0 "
-                    "(Laplace domain). Provided: {frequency} Hz."
+                    f"(Laplace domain). Provided: {frequency} Hz."
                 )
         elif data is not None:  # Data is second priority.
             dtype = data.dtype
