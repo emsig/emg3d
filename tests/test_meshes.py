@@ -433,3 +433,35 @@ def test_cell_width():
 
     t3 = meshes.cell_width(503.0, limits=[100, 120])
     assert t3 == 120
+
+
+def test_check_mesh(capsys):
+
+    # Bad class name.
+    grid = meshes.BaseMesh(h=[2, 2, 2], origin=(0, 0, 0))
+    grid.__class__.__name__ = 'Test'
+    with pytest.raises(TypeError, match="Mesh must be a TensorMesh."):
+        meshes.check_mesh(grid)
+
+    # Wrong dimension.
+    if discretize is None:
+        grid = meshes.TensorMesh(h=[2, 2, 2], origin=(0, 0, 0))
+        grid.origin = (0, 0)
+    else:
+        grid = meshes.TensorMesh(h=[2, 2], origin=(0, 0))
+    with pytest.raises(TypeError, match="Mesh must be a 3D mesh."):
+        meshes.check_mesh(grid)
+
+    # Bad cell number.
+    grid = meshes.TensorMesh(h=[[2, ], [2, ], [2, 2]], origin=(0, 0, 0))
+    with pytest.warns(UserWarning, match='ptimal for MG solver. Good numbers'):
+        meshes.check_mesh(grid)
+    out, _ = capsys.readouterr()
+    assert "* WARNING :: Mesh dimension" in out
+
+    # A good one, nothing should happen.
+    hx = np.ones(16)*20
+    grid = meshes.TensorMesh(h=[hx, hx, hx], origin=(0, 0, 0))
+    meshes.check_mesh(grid)
+    out, _ = capsys.readouterr()
+    assert out == ""

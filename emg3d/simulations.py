@@ -101,6 +101,11 @@ class Simulation:
 
         See the parameter ``gridding_opts`` for more details.
 
+        If ``gridding`` is ``'same'`` or ``'input'``, the input grid is checked
+        if it is a sensible grid for emg3d; if not, it throws a warning. In the
+        other cases the grids are created by emg3d itself, they will be fine.
+        (If ``'dict'`` we assume the user knows how to provide good grids.)
+
     gridding_opts : {dict, TensorMesh}, default: {}
         Input format depends on ``gridding``:
 
@@ -226,9 +231,11 @@ class Simulation:
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
-        # TODO TODO
+        # Check the grid if one was explicitly provided.
         if gridding == 'same':
-            self._check_grid
+            meshes.check_mesh(self.model.grid)
+        elif gridding == 'input':
+            meshes.check_mesh(self._grid_single)
 
     def __repr__(self):
         """Simple representation."""
@@ -1243,33 +1250,6 @@ class Simulation:
 
         self.gridding_opts = gridding_opts
         self.model = model
-
-    # TODO TODO TODO
-    @property
-    def _check_grid(self):
-    # TODO TODO TODO
-        # Throw a warning if mesh is not good for multigrid
-
-        # Extreme values.
-        good = meshes.good_mg_cell_nr(max_nr=50000, max_lowest=5, min_div=0)
-
-        # Ensure meshes are TensorMesh.
-        if not self.model.grid.__class__.__name__ == 'TensorMesh':
-            raise TypeError("Grid must be a TensorMesh.")
-
-        # Ensure it is a 3D grid.
-        if self.model.grid.dim != 3:
-            raise TypeError('Grid must be 3D grid.')
-
-        # Check mesh dimensions, warn if not optimal.
-        if any(n_cells not in good for n_cells in self.model.grid.shape_cells):
-            msg = (
-                f"Warning: grid dimension {(self.model.grid.shape_cells)} "
-                "is not optimal for MG solver. Good numbers are:\n"
-                f"{meshes.good_mg_cell_nr(max_nr=5000)}"
-            )
-            print(f"* WARNING :: {msg}")
-            warnings.warn(msg, UserWarning)
 
 
 # HELPER FUNCTIONS
