@@ -17,6 +17,7 @@ Everything related to meshes appropriate for the multigrid solver.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -30,7 +31,8 @@ except ImportError:
     discretize = None
 
 __all__ = ['TensorMesh', 'BaseMesh', 'construct_mesh', 'origin_and_widths',
-           'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width']
+           'good_mg_cell_nr', 'skin_depth', 'wavelength', 'cell_width',
+           'check_mesh']
 
 
 class BaseMesh:
@@ -1022,3 +1024,34 @@ def cell_width(skin_depth, pps=3, limits=None):
             cell_width = np.clip(cell_width, *limits)  # Restrict.
 
     return cell_width
+
+
+def check_mesh(mesh):
+    """Check provided mesh and throw a warning if it is not good for multigrid.
+
+    Parameters
+    ----------
+    mesh : TensorMesh
+        A :class:`emg3d.meshes.TensorMesh` instance.
+
+    """
+
+    # Extreme values.
+    good = good_mg_cell_nr(max_nr=50000, max_lowest=5, min_div=0)
+
+    # Ensure mesh is a TensorMesh.
+    if not mesh.__class__.__name__ == 'TensorMesh':
+        raise TypeError("Mesh must be a TensorMesh.")
+
+    # Ensure it is a 3D mesh.
+    if len(mesh.origin) != 3:
+        raise TypeError('Mesh must be 3D mesh.')
+
+    # Check mesh dimensions, warn if not optimal.
+    if any(n_cells not in good for n_cells in mesh.shape_cells):
+        msg = (
+            f"Mesh dimension {(mesh.shape_cells)} is not optimal for MG "
+            f"solver. Good numbers are:\n{good_mg_cell_nr(max_nr=5000)}"
+        )
+        print(f"* WARNING :: {msg}")
+        warnings.warn(msg, UserWarning)

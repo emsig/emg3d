@@ -28,6 +28,14 @@ latest
   adjoint for the gradient the receiver has to be interpolated linearly too.
   (This will change in the future.)
 
+- If ``gridding`` is ``'same'`` or ``'input'``, it new checks if the provided
+  grid is a sensible grid for emg3d; if not, it throws a warning.
+
+
+**Meshes**
+
+- New function ``check_grid`` to verify if a given grid is good for emg3d.
+
 
 **Optimize**
 
