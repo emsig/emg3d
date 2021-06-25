@@ -152,6 +152,14 @@ class Simulation:
         Simulation info or any other info (e.g., what was the purpose of this
         simulation).
 
+    receiver_interpolation : str, default: 'cubic':
+        Interpolation method to obtain the response at receiver location;
+        'cubic' or 'linear'. Cubic is more precise. However, if you are
+        interested in the gradient, you need to choose 'linear' at the moment,
+        as there are only linearly interpolated source functions. To be the
+        proper adjoint for the gradient the receiver has to be interpolated
+        linearly too. (This will change in the future.)
+
     """
 
     # Gridding descriptions (for repr's).
@@ -176,6 +184,8 @@ class Simulation:
         self.verb = kwargs.pop('verb', 0)
         self.name = kwargs.pop('name', None)
         self.info = kwargs.pop('info', None)
+        self.receiver_interpolation = kwargs.pop(   # Remove once we have
+                'receiver_interpolation', 'cubic')  # cubic source fct.
 
         # TODO dev-solver temporary solution
         self.receiver_interpolation = kwargs.pop(

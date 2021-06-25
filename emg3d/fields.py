@@ -359,6 +359,10 @@ class Field:
             effect here, it just takes the coordinates from the receiver
             instances.
 
+        method : str, default: 'cubic'
+            Interpolation method to obtain the response at receiver location;
+            'cubic' or 'linear'.
+
 
         Returns
         -------
@@ -603,6 +607,10 @@ def get_receiver(field, receiver, method='cubic'):
         Note that the actual receiver type of the ``Rx*`` instances has no
         effect here, it just takes the coordinates from the receiver instances.
 
+    method : str, default: 'cubic'
+        Interpolation method to obtain the response at receiver location;
+        'cubic' or 'linear'.
+
 
     Returns
     -------
@@ -647,9 +655,11 @@ def get_receiver(field, receiver, method='cubic'):
     factors = electrodes.rotation(*coordinates[3:])
 
     # Add the required responses.
-    # TODO opts here is temporary work-around for dev-solver TODO
     opts = {'method': method, 'extrapolate': False, 'log': False}
-    if method == 'cubic':
+    # Set receivers outside of grid to NaN (they should be FAR from boundary).
+    if method == 'linear':
+        opts['fill_value'] = np.nan
+    else:
         opts['cval'] = np.nan
     for i, ff in enumerate((field.fx, field.fy, field.fz)):
         if np.any(abs(factors[i]) > 1e-10):
