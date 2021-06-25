@@ -229,6 +229,16 @@ class TestSimulation():
         assert m2 == m2c
         assert g2 == g2c
 
+    def test_grid_provided(self):
+        # Check bad grid
+        hx = np.ones(17)*20
+        grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))
+        print(80*'*')
+        print(hx)
+        with pytest.warns(UserWarning, match='optimal for MG solver. Good n'):
+            simulations.Simulation(self.survey, self.model, gridding='input',
+                                   gridding_opts=grid)
+
     def test_synthetic(self):
         sim = self.simulation.copy()
 

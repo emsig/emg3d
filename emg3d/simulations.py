@@ -100,6 +100,11 @@ class Simulation:
 
         See the parameter ``gridding_opts`` for more details.
 
+        If ``gridding`` is ``'same'`` or ``'input'``, the input grid is checked
+        if it is a sensible grid for emg3d; if not, it throws a warning. In the
+        other cases the grids are created by emg3d itself, they will be fine.
+        (If ``'dict'`` we assume the user knows how to provide good grids.)
+
     gridding_opts : {dict, TensorMesh}, default: {}
         Input format depends on ``gridding``:
 
@@ -223,6 +228,12 @@ class Simulation:
         # Ensure no kwargs left.
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
+
+        # Check the grid if one was explicitly provided.
+        if gridding == 'same':
+            meshes.check_mesh(self.model.grid)
+        elif gridding == 'input':
+            meshes.check_mesh(self._grid_single)
 
     def __repr__(self):
         """Simple representation."""
