@@ -443,7 +443,7 @@ class TxElectricPoint(Source, Point):
 
     """
 
-    def __init__(self, coordinates, strength=1.0, length=1.0):
+    def __init__(self, coordinates, strength=1.0):
         """Initiate an electric dipole source."""
 
         super().__init__(coordinates=coordinates, strength=strength)

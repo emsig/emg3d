@@ -46,9 +46,9 @@ latest
 
 **Optimize**
 
-This release contains various improvements to the adjoint-state gradient. There
-are still some remaining issues, particularly with respect to magnetic
-receivers.
+This release contains various improvements to the adjoint-state gradient.
+Electric receivers work fine, but there are still some remaining issues with
+respect to magnetic receivers.
 
 - ``gradient``:
 
