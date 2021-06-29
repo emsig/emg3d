@@ -148,6 +148,13 @@ def gradient(simulation):
     The :math:`\partial S`-part takes care of the volume-averaged model
     parameters.
 
+    .. warning::
+
+        To obtain the proper adjoint-state gradient you have to choose linear
+        interpolation for the receiver responses:
+        ``emg3d.Simulation(..., receiver_interpolation='linear')``.
+        The reason is that the point-source is the adjoint of a tri-linear
+        interpolation, so the residual should come from a linear interpolation.
 
     .. note::
 

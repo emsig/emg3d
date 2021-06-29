@@ -156,9 +156,11 @@ class TestGetSourceField:
         grid = emg3d.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
         freq = 1.2458
 
-        sfield = fields.get_source_field(grid, src, freq, strength=1+1j)
+        vfield = fields.get_source_field(grid, src, None)
         sfield = fields.get_source_field(grid, src, freq, strength=1)
         iomegamu = 2j*np.pi*freq*constants.mu_0
+
+        assert_allclose(vfield.field, sfield.field/-iomegamu)
 
         # Check number of edges
         assert 4 == sfield.fx[sfield.fx != 0].size
@@ -170,9 +172,9 @@ class TestGetSourceField:
         y = np.sin(np.deg2rad(src[3]))*h
         x = np.cos(np.deg2rad(src[3]))*h
         z = np.sin(np.deg2rad(src[4]))
-        assert_allclose(np.sum(sfield.fx/x/iomegamu).real, -1)
-        assert_allclose(np.sum(sfield.fy/y/iomegamu).real, -1)
-        assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
+        assert_allclose(np.sum(vfield.fx/x), 1)
+        assert_allclose(np.sum(vfield.fy/y), 1)
+        assert_allclose(np.sum(vfield.fz/z), 1)
         assert sfield._frequency == freq
         assert sfield.frequency == freq
         assert_allclose(sfield.smu0, iomegamu)
