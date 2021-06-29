@@ -680,27 +680,18 @@ def _point_vector(grid, coordinates):
     if not source_in:
         raise ValueError(f"Provided source outside grid: {coordinates}.")
 
-    # Point dipole: convert azimuth/dip to weights.
-    h = np.cos(np.deg2rad(coordinates[4]))
-    dys = np.sin(np.deg2rad(coordinates[3]))*h
-    dxs = np.cos(np.deg2rad(coordinates[3]))*h
-    dzs = np.sin(np.deg2rad(coordinates[4]))
-    srcdir = np.array([dxs, dys, dzs])
-    coordinates = coordinates[:3]
-
-    def point_source(xx, yy, zz, coordinates, s):
+    def point_source(xx, yy, zz, coo, s):
         """Set point dipole source."""
         nx, ny, nz = s.shape
 
         # Get indices of cells in which source resides.
-        ix = max(0, np.where(coordinates[0] < np.r_[xx, np.infty])[0][0]-1)
-        iy = max(0, np.where(coordinates[1] < np.r_[yy, np.infty])[0][0]-1)
-        iz = max(0, np.where(coordinates[2] < np.r_[zz, np.infty])[0][0]-1)
+        ix = max(0, np.where(coo[0] < np.r_[xx, np.infty])[0][0]-1)
+        iy = max(0, np.where(coo[1] < np.r_[yy, np.infty])[0][0]-1)
+        iz = max(0, np.where(coo[2] < np.r_[zz, np.infty])[0][0]-1)
 
         def get_index_and_strength(ic, nc, csrc, cc):
             """Return index and field strength in c-direction."""
             if ic == nc-1:
-                print('BOOM')
                 ic1 = ic
                 rc = 1.0
                 ec = 1.0
@@ -710,9 +701,9 @@ def _point_vector(grid, coordinates):
                 ec = 1.0-rc
             return rc, ec, ic1
 
-        rx, ex, ix1 = get_index_and_strength(ix, nx, coordinates[0], xx)
-        ry, ey, iy1 = get_index_and_strength(iy, ny, coordinates[1], yy)
-        rz, ez, iz1 = get_index_and_strength(iz, nz, coordinates[2], zz)
+        rx, ex, ix1 = get_index_and_strength(ix, nx, coo[0], xx)
+        ry, ey, iy1 = get_index_and_strength(iy, ny, coo[1], yy)
+        rz, ez, iz1 = get_index_and_strength(iz, nz, coo[2], zz)
 
         s[ix, iy, iz] = ex*ey*ez
         s[ix1, iy, iz] = rx*ey*ez
@@ -730,11 +721,12 @@ def _point_vector(grid, coordinates):
     vec1 = (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)
     vec2 = (grid.nodes_x, grid.cell_centers_y, grid.nodes_z)
     vec3 = (grid.nodes_x, grid.nodes_y, grid.cell_centers_z)
-    point_source(*vec1, coordinates, vfield.fx)
-    point_source(*vec2, coordinates, vfield.fy)
-    point_source(*vec3, coordinates, vfield.fz)
+    point_source(*vec1, coordinates[:3], vfield.fx)
+    point_source(*vec2, coordinates[:3], vfield.fy)
+    point_source(*vec3, coordinates[:3], vfield.fz)
 
     # Multiply by fraction in each direction.
+    srcdir = electrodes.rotation(*coordinates[3:])
     vfield.fx *= srcdir[0]
     vfield.fy *= srcdir[1]
     vfield.fz *= srcdir[2]
