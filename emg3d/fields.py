@@ -668,16 +668,16 @@ def _point_vector(grid, coordinates):
 
     """
 
-    # Ensure source is within grid.
-    ii = [0, 0, 1, 1, 2, 2]
-    source_in = np.any(coordinates[ii[0]] >= grid.nodes_x[0])
-    source_in *= np.any(coordinates[ii[1]] <= grid.nodes_x[-1])
-    source_in *= np.any(coordinates[ii[2]] >= grid.nodes_y[0])
-    source_in *= np.any(coordinates[ii[3]] <= grid.nodes_y[-1])
-    source_in *= np.any(coordinates[ii[4]] >= grid.nodes_z[0])
-    source_in *= np.any(coordinates[ii[5]] <= grid.nodes_z[-1])
-
-    if not source_in:
+    # Ensure source is within nodes.
+    outside = (
+        coordinates[0] < grid.nodes_x[0] or
+        coordinates[0] > grid.nodes_x[-1] or
+        coordinates[1] < grid.nodes_y[0] or
+        coordinates[1] > grid.nodes_y[-1] or
+        coordinates[2] < grid.nodes_z[0] or
+        coordinates[2] > grid.nodes_z[-1]
+    )
+    if outside:
         raise ValueError(f"Provided source outside grid: {coordinates}.")
 
     def point_source(xx, yy, zz, coo, s):
