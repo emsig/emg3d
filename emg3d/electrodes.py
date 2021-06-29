@@ -429,6 +429,27 @@ class Source(Wire):
 
 
 @utils._known_class
+class TxElectricPoint(Source, Point):
+    """Electric point source.
+
+
+    Parameters
+    ----------
+    coordinates : array_like
+        Point coordinates in the format (x, y, z, azimuth, elevation).
+
+    strength : float, default: 1.0
+        Source strength (A).
+
+    """
+
+    def __init__(self, coordinates, strength=1.0):
+        """Initiate an electric dipole source."""
+
+        super().__init__(coordinates=coordinates, strength=strength)
+
+
+@utils._known_class
 class TxElectricDipole(Source, Dipole):
     """Electric dipole source, two electrodes connected by a wire.
 

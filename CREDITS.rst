@@ -17,8 +17,9 @@ through discussions and help on Slack at
 thanks to both communities. Special thanks to
 `@jokva <https://github.com/jokva>`_ (general),
 `@banesullivan <https://github.com/banesullivan>`_ (visualization),
-`@joferkington <https://github.com/joferkington>`_ (interpolation), and
-`@jcapriot <https://github.com/jcapriot>`_ (volume averaging).
+`@joferkington <https://github.com/joferkington>`_ (interpolation),
+`@jcapriot <https://github.com/jcapriot>`_ (volume averaging), and
+`@sgkang <https://github.com/sgkang>`_ (inversion).
 
 
 Historical credits

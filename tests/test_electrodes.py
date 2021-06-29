@@ -193,6 +193,22 @@ def test_source():
     assert s1.get_field(grid, freq) == sfield
 
 
+def test_tx_electric_point():
+    coo = (0, 0, 0, 45, 45)
+    s1a = electrodes.TxElectricPoint(coo, strength=np.pi)
+    assert s1a.xtype == 'electric'
+    assert s1a._prefix == 'TxEP'
+    s1b = electrodes.TxElectricPoint.from_dict(s1a.to_dict())
+    assert s1a == s1b
+    assert_allclose(s1b.coordinates, coo)
+    assert_allclose(s1b.points, np.atleast_2d(coo[:3]))
+    assert_allclose(s1b.strength, np.pi)
+
+    rep = s1a.__repr__()
+    assert "3.1 A" in rep
+    assert "=0.0 m, θ=45.0°" in rep
+
+
 def test_tx_electric_dipole():
     s1a = electrodes.TxElectricDipole(
             (0, 0, 0, 45, 45), strength=np.pi, length=4)

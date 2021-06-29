@@ -156,9 +156,11 @@ class TestGetSourceField:
         grid = emg3d.TensorMesh([h*200, h*400, h*800], (-450, -850, -1650))
         freq = 1.2458
 
-        sfield = fields.get_source_field(grid, src, freq, strength=1+1j)
+        vfield = fields.get_source_field(grid, src, None)
         sfield = fields.get_source_field(grid, src, freq, strength=1)
         iomegamu = 2j*np.pi*freq*constants.mu_0
+
+        assert_allclose(vfield.field, sfield.field/-iomegamu)
 
         # Check number of edges
         assert 4 == sfield.fx[sfield.fx != 0].size
@@ -170,9 +172,9 @@ class TestGetSourceField:
         y = np.sin(np.deg2rad(src[3]))*h
         x = np.cos(np.deg2rad(src[3]))*h
         z = np.sin(np.deg2rad(src[4]))
-        assert_allclose(np.sum(sfield.fx/x/iomegamu).real, -1)
-        assert_allclose(np.sum(sfield.fy/y/iomegamu).real, -1)
-        assert_allclose(np.sum(sfield.fz/z/iomegamu).real, -1)
+        assert_allclose(np.sum(vfield.fx/x), 1)
+        assert_allclose(np.sum(vfield.fy/y), 1)
+        assert_allclose(np.sum(vfield.fz/z), 1)
         assert sfield._frequency == freq
         assert sfield.frequency == freq
         assert_allclose(sfield.smu0, iomegamu)
@@ -496,6 +498,53 @@ def test_get_magnetic_field():
         mfield = fields.get_magnetic_field(model, efield).field
         dfield = grid.edge_curl*efield.field/sfield.smu0
         assert_allclose(mfield, dfield)
+
+
+class TestPointVector:
+    def test_basics_xdir_on_x(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+
+        # x-directed source in the middle
+        vfield = fields._point_vector(grid, (0, 0, 0, 0, 0))
+
+        # x: exact in the middle on the two edges
+        assert_allclose(vfield.fx[1:-1, 2:-2, 2:-2].ravel(), [0.5, 0.5])
+        # y: as exact "on" x-grid, falls to the right
+        assert_allclose(vfield.fy[1:-1, 2:-1, 2:-2].ravel(), 0)
+        # z: as exact "on" x-grid, falls to top
+        assert_allclose(vfield.fz[1:-1, 2:-2, 2:-1].ravel(), 0)
+
+    def test_basics_diag(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+
+        # Diagonal source in the middle
+        vfield = fields._point_vector(grid, (0, 0, 0, 45, 45))
+
+        # x: exact in the middle on the two edges
+        assert_allclose(vfield.fx[1:-1, 2:-2, 2:-2].ravel(), [0.25, 0.25])
+
+        # compare lower-left-front with upper-right-back
+        assert_allclose(vfield.fx[1:-2, 1:-2, 1:-2].ravel(),
+                        vfield.fx[2:-1, 2:-1, 2:-1].ravel()[::-1])
+
+        # Source is symmetric horizontally, compare all fields are the same
+        assert_allclose(vfield.fx[1:-2, 1:-2, 1:-2].ravel(),
+                        vfield.fy[1:-2, 1:-2, 1:-2].ravel())
+
+        assert_allclose(vfield.fx[2:-1, 2:-1, 2:-1].ravel(),
+                        vfield.fy[2:-1, 2:-1, 2:-1].ravel())
+
+        # The corner case
+        vfield1 = fields._point_vector(grid, (2, 2, 0, 0, 0))
+        assert_allclose(vfield1.fx[3:, 3:, 2:-2].ravel(), [0.5, 0.5])
+
+    def test_warnings(self):
+        h = np.ones(4)
+        grid = emg3d.TensorMesh([h, h, h], (0, 0, 0))
+        with pytest.raises(ValueError, match='Provided source outside grid'):
+            fields._point_vector(grid, (5, 2, 2, 20, 10))
 
 
 class TestDipoleVector:

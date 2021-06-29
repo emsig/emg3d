@@ -954,6 +954,8 @@ class Simulation:
 
             # Create source.
             if rec.xtype == 'magnetic':
+
+                # TODO: The adjoint test for magnetic receivers does not pass.
                 src_fct = electrodes.TxMagneticDipole
 
                 # If the data is from a magnetic point we have to undo another
@@ -961,7 +963,7 @@ class Simulation:
                 strength /= rfield.smu0
 
             else:
-                src_fct = electrodes.TxElectricDipole
+                src_fct = electrodes.TxElectricPoint
 
             # Get absolute coordinates as fct of source.
             # (Only relevant in case of "relative" receivers.)

@@ -53,6 +53,15 @@ and preference decreases from top to bottom row. In sequential order: 16, 24,
 can obtain the good cell number via :func:`emg3d.meshes.good_mg_cell_nr()`.
 
 
+Source resolution
+-----------------
+
+Take into consideration that emg3d works with volume-averaged cell properties,
+and that the fields are defined on edges. This means that the minimum size of a
+general source is at least as big as the cell surrounding it. In other words,
+the cell size around your source defines your source resolution.
+
+
 Solver or Preconditioner
 -------------------------
 
