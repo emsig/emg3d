@@ -156,6 +156,9 @@ def gradient(simulation):
         The reason is that the point-source is the adjoint of a tri-linear
         interpolation, so the residual should come from a linear interpolation.
 
+        Also, the adjoint test for magnetic receivers does not yet pass.
+        Electric receivers are good to go.
+
     .. note::
 
         The currently implemented gradient is only for isotropic models without

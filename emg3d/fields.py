@@ -382,9 +382,11 @@ def get_source_field(grid, source, frequency, **kwargs):
 
         -\mathrm{i} \omega \mu_0 \mathbf{J}_\mathrm{s} \, .
 
-    The adjoint of the trilinear interpolation is used to distribute the points
-    to the grid edges, which corresponds to the discretization of a Dirac
-    ([PlDM07]_).
+
+    - In the case of dipoles and wires, the source is distributed onto the
+      cells as fraction of the source length.
+    - In the case of points, the adjoint of the trilinear interpolation is used
+      to distribute it to the grid edges.
 
 
     Parameters
@@ -486,15 +488,14 @@ def get_source_field(grid, source, frequency, **kwargs):
         else:
             source = electrodes.TxMagneticDipole(source, **inp)
 
-    # Get total vector field by looping over segments.
-    vfield = np.zeros(grid.n_edges, order='F')
-    for p0, p1 in zip(source.points[:-1, :], source.points[1:, :]):
-
-        # Add this segments' vector field to total vector field.
-        vfield += _dipole_vector(grid, source=np.r_[[p0, p1]]).field
+    # Get vector field
+    if isinstance(source, electrodes.TxElectricPoint):
+        vfield = _point_vector(grid, source.coordinates)
+    else:
+        vfield = _dipole_vector(grid, source.points)
 
     # Initiate field with the total vector field.
-    sfield = Field(grid, data=vfield, frequency=frequency)
+    sfield = Field(grid, data=vfield.field, frequency=frequency)
 
     # Multiply by source strength
     sfield.field *= source.strength
@@ -647,8 +648,8 @@ def get_magnetic_field(model, efield):
     return hfield
 
 
-def _dipole_vector(grid, source, decimals=9):
-    """Get unit dipole source vector using the adjoint interpolation method.
+def _point_vector(grid, coordinates):
+    """Get point source using the adjoint of the trilinear interpolation.
 
 
     Parameters
@@ -656,10 +657,103 @@ def _dipole_vector(grid, source, decimals=9):
     grid : TensorMesh
         The grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    source : ndarray
-        Source coordinates of shape (2, 3): [[x1, y1, z1], [x2, y2, z2]] (m).
-        Source field, a :class:`emg3d.fields.Field` instance; created if not
-        provided.
+    coordinates : array_like
+        Source coordinates in the format (x, y, z, azimuth, elevation).
+
+
+    Returns
+    -------
+    vfield : Field
+        Source field, a :class:`emg3d.fields.Field` instance.
+
+    """
+
+    # Ensure source is within grid.
+    ii = [0, 0, 1, 1, 2, 2]
+    source_in = np.any(coordinates[ii[0]] >= grid.nodes_x[0])
+    source_in *= np.any(coordinates[ii[1]] <= grid.nodes_x[-1])
+    source_in *= np.any(coordinates[ii[2]] >= grid.nodes_y[0])
+    source_in *= np.any(coordinates[ii[3]] <= grid.nodes_y[-1])
+    source_in *= np.any(coordinates[ii[4]] >= grid.nodes_z[0])
+    source_in *= np.any(coordinates[ii[5]] <= grid.nodes_z[-1])
+
+    if not source_in:
+        raise ValueError(f"Provided source outside grid: {coordinates}.")
+
+    # Point dipole: convert azimuth/dip to weights.
+    h = np.cos(np.deg2rad(coordinates[4]))
+    dys = np.sin(np.deg2rad(coordinates[3]))*h
+    dxs = np.cos(np.deg2rad(coordinates[3]))*h
+    dzs = np.sin(np.deg2rad(coordinates[4]))
+    srcdir = np.array([dxs, dys, dzs])
+    coordinates = coordinates[:3]
+
+    def point_source(xx, yy, zz, coordinates, s):
+        """Set point dipole source."""
+        nx, ny, nz = s.shape
+
+        # Get indices of cells in which source resides.
+        ix = max(0, np.where(coordinates[0] < np.r_[xx, np.infty])[0][0]-1)
+        iy = max(0, np.where(coordinates[1] < np.r_[yy, np.infty])[0][0]-1)
+        iz = max(0, np.where(coordinates[2] < np.r_[zz, np.infty])[0][0]-1)
+
+        def get_index_and_strength(ic, nc, csrc, cc):
+            """Return index and field strength in c-direction."""
+            if ic == nc-1:
+                print('BOOM')
+                ic1 = ic
+                rc = 1.0
+                ec = 1.0
+            else:
+                ic1 = ic+1
+                rc = (csrc-cc[ic])/(cc[ic1]-cc[ic])
+                ec = 1.0-rc
+            return rc, ec, ic1
+
+        rx, ex, ix1 = get_index_and_strength(ix, nx, coordinates[0], xx)
+        ry, ey, iy1 = get_index_and_strength(iy, ny, coordinates[1], yy)
+        rz, ez, iz1 = get_index_and_strength(iz, nz, coordinates[2], zz)
+
+        s[ix, iy, iz] = ex*ey*ez
+        s[ix1, iy, iz] = rx*ey*ez
+        s[ix, iy1, iz] = ex*ry*ez
+        s[ix1, iy1, iz] = rx*ry*ez
+        s[ix, iy, iz1] = ex*ey*rz
+        s[ix1, iy, iz1] = rx*ey*rz
+        s[ix, iy1, iz1] = ex*ry*rz
+        s[ix1, iy1, iz1] = rx*ry*rz
+
+    # Initiate zero source field.
+    vfield = Field(grid, dtype=float)
+
+    # Return source-field depending.
+    vec1 = (grid.cell_centers_x, grid.nodes_y, grid.nodes_z)
+    vec2 = (grid.nodes_x, grid.cell_centers_y, grid.nodes_z)
+    vec3 = (grid.nodes_x, grid.nodes_y, grid.cell_centers_z)
+    point_source(*vec1, coordinates, vfield.fx)
+    point_source(*vec2, coordinates, vfield.fy)
+    point_source(*vec3, coordinates, vfield.fz)
+
+    # Multiply by fraction in each direction.
+    vfield.fx *= srcdir[0]
+    vfield.fy *= srcdir[1]
+    vfield.fz *= srcdir[2]
+
+    return vfield
+
+
+def _dipole_vector(grid, points, decimals=9):
+    """Get n-segment dipole source by distributing them to the relevant cells.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+    points : ndarray
+        Source coordinates of shape (2, N):
+        [[x1, y1, z1], ..., [xN, yN, zN]] (m).
 
     decimals : int, default: 9
         Grid nodes and source coordinates are rounded to given number of
@@ -672,45 +766,57 @@ def _dipole_vector(grid, source, decimals=9):
         Source field, a :class:`emg3d.fields.Field` instance.
 
     """
+
     vfield = Field(grid, dtype=float)
+
+    # Recursively loop through segments.
+    if points.shape[0] != 2:
+
+        # Add each segments' vector field to total vector field.
+        for p0, p1 in zip(points[:-1, :], points[1:, :]):
+            vfield.field += _dipole_vector(
+                          grid, points=np.r_[[p0, p1]], decimals=decimals
+                      ).field
+
+        return vfield
 
     # Round nodes and source coordinates (to avoid floating point issues etc).
     nodes_x = np.round(grid.nodes_x, decimals)
     nodes_y = np.round(grid.nodes_y, decimals)
     nodes_z = np.round(grid.nodes_z, decimals)
-    source = np.round(np.asarray(source, dtype=float), decimals)
+    points = np.round(np.asarray(points, dtype=float), decimals)
 
     # Ensure source is within nodes.
     outside = (
-        min(source[:, 0]) < nodes_x[0] or max(source[:, 0]) > nodes_x[-1] or
-        min(source[:, 1]) < nodes_y[0] or max(source[:, 1]) > nodes_y[-1] or
-        min(source[:, 2]) < nodes_z[0] or max(source[:, 2]) > nodes_z[-1]
+        min(points[:, 0]) < nodes_x[0] or max(points[:, 0]) > nodes_x[-1] or
+        min(points[:, 1]) < nodes_y[0] or max(points[:, 1]) > nodes_y[-1] or
+        min(points[:, 2]) < nodes_z[0] or max(points[:, 2]) > nodes_z[-1]
     )
     if outside:
-        raise ValueError(f"Provided source outside grid: {source}.")
+        raise ValueError(f"Provided source outside grid: {points}.")
 
     # Dipole lengths in x-, y-, and z-directions, and overall.
-    dxdydz = source[1, :] - source[0, :]
+    dxdydz = points[1, :] - points[0, :]
     length = np.linalg.norm(dxdydz)
 
     # Ensure finite length dipole is not a point dipole.
     if length < 1e-15:
-        raise ValueError(f"Provided finite dipole has no length: {source}.")
+        raise ValueError(f"Provided finite dipole has no length: {points}.")
 
     # Inverse source lengths.
     id_xyz = dxdydz.copy()
     id_xyz[id_xyz != 0] = 1/id_xyz[id_xyz != 0]
 
     # Cell fractions.
-    a1 = (nodes_x - source[0, 0]) * id_xyz[0]
-    a2 = (nodes_y - source[0, 1]) * id_xyz[1]
-    a3 = (nodes_z - source[0, 2]) * id_xyz[2]
+    a1 = (nodes_x - points[0, 0]) * id_xyz[0]
+    a2 = (nodes_y - points[0, 1]) * id_xyz[1]
+    a3 = (nodes_z - points[0, 2]) * id_xyz[2]
 
-    # Get range of indices of cells in which source resides.
+    # Get range of indices of cells in which points resides.
     def min_max_ind(vector, i):
-        """Return [min, max]-index of cells in which source resides."""
-        vmin = min(source[:, i])
-        vmax = max(source[:, i])
+        """Return [min, max]-index of cells in which points resides."""
+        vmin = min(points[:, i])
+        vmax = max(points[:, i])
         return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
                 max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
 
@@ -731,8 +837,8 @@ def _dipole_vector(grid, source, decimals=9):
                 ar = min(1, aa[:, 1].min())  # elements.
 
                 # Characteristics of this cell.
-                xmin = source[0, :] + al*dxdydz
-                xmax = source[0, :] + ar*dxdydz
+                xmin = points[0, :] + al*dxdydz
+                xmax = points[0, :] + ar*dxdydz
                 x_c = (xmin + xmax) / 2.0
                 x_len = np.linalg.norm(xmax - xmin) / length
 

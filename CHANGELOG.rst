@@ -22,6 +22,11 @@ latest
   frequency-independent, source vector.
 
 
+**Electrodes**
+
+- Re-introduced the point source as ``TxElectricPoint``.
+
+
 **Simulations**
 
 - New keyword ``receiver_interpolation``, which corresponds to the ``method``
