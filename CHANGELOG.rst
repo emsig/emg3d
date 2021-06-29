@@ -18,6 +18,14 @@ latest
   gradient will not exactly be the adjoint state. Note: This will change once
   the adjoint of a cubic interpolation is implemented as source function.
 
+- ``get_source_field``: If ``frequency=None``, it returns new the real-valued,
+  frequency-independent, source vector.
+
+
+**Electrodes**
+
+- Re-introduced the point source as ``TxElectricPoint``.
+
 
 **Simulations**
 
@@ -26,7 +34,6 @@ latest
   interested in the gradient, you need to choose 'linear' at the moment, as
   there are only linearly interpolated source functions. To be the proper
   adjoint for the gradient the receiver has to be interpolated linearly too.
-  (This will change in the future.)
 
 - If ``gridding`` is ``'same'`` or ``'input'``, it new checks if the provided
   grid is a sensible grid for emg3d; if not, it throws a warning.
@@ -38,6 +45,10 @@ latest
 
 
 **Optimize**
+
+This release contains various improvements to the adjoint-state gradient.
+Electric receivers work fine, but there are still some remaining issues with
+respect to magnetic receivers.
 
 - ``gradient``:
 
