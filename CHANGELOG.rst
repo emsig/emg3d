@@ -61,10 +61,10 @@ The changes in more detail:
       New: field_comp -> field_inv -> cells_inv
       Old: field_comp -> cells_comp -> cells_inv
 
-- ``cli``: By default it uses new linear receiver interpolation if the
-  ``gradient`` is wanted, otherwise it uses cubic interpolation (as before).
-  The new keyword ``receiver_interpolation`` of the simulation can be set in
-  the parameter file, which overwrites the described default behaviour.
+- ``cli``: Uses now by default linear receiver interpolation if the
+  ``gradient`` is wanted (new), otherwise it uses cubic interpolation (as
+  before). The new keyword ``receiver_interpolation`` of the simulation can be
+  set in the parameter file, which overwrites the described default behaviour.
 
 
 v1.0.0: Stable API
