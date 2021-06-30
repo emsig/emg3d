@@ -9,7 +9,7 @@ Changelog
 v1.1.0: Adjoint-fix for electric receivers
 ------------------------------------------
 
-**2021-05-28**
+**2021-06-30**
 
 This release contains, besides the usual small bugfixes, typos, and small
 improvements, an important fix for ``optimize.gradient``. Keep in mind that
@@ -30,7 +30,7 @@ The changes in more detail:
     However, if you want to compute the gradient, you should set it to
     ``'linear'`` in your Simulation parameters. Otherwise the adjoint-state
     gradient will not exactly be the adjoint state.
-  - ``get_source_field`` returns new the real-valued, frequency-independent,
+  - ``get_source_field`` returns new the real-valued, frequency-independent
     source vector if ``frequency=None``.
   - ``get_source_field`` uses the adjoint of trilinear interpolation for point
     sources (new). For dipoles and wires it the source is distributed onto the
