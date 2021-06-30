@@ -1049,7 +1049,6 @@ class Simulation:
         gvec_field = fields.Field(
             grid=efield.grid,
             data=-efield.smu0*gvec,
-            dtype=float,
             frequency=efield.frequency
         )
         return gvec_field
