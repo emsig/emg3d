@@ -413,9 +413,9 @@ def get_source_field(grid, source, frequency, **kwargs):
           :math:`s = \mathrm{i}\omega = 2\mathrm{i}\pi f` (complex);
         - ``frequency < 0``: Laplace domain, hence
           :math:`s = f` (real).
-        - ``frequency == None``: Returns the real-valued,
-          frequency-independent, source vector. This basically excludes the
-          multiplication by :math:`-\mathrm{i}\omega\mu_0`.
+        - ``frequency == None``: Returns the real-valued, frequency-independent
+          source vector. This basically excludes the multiplication by
+          :math:`-\mathrm{i}\omega\mu_0`.
 
     strength : {float, complex}, default: 1.0
         Source strength (A), put through to
