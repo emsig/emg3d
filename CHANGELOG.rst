@@ -11,13 +11,14 @@ v1.1.0: Adjoint-fix for electric receivers
 
 **2021-05-28**
 
-Besides various small fixes and typos this release contains a few improvements
-an important fix for ``optimize.gradient``. Keep in mind that while the forward
-modelling is regarded as stable, the optimize-module is still work in progress.
+This release contains, besides the usual small bugfixes, typos, and small
+improvements, an important fix for ``optimize.gradient``. Keep in mind that
+while the forward modelling is regarded as stable, the ``optimize`` module is
+still work in progress.
 
 The fixes with regard to ``optimize.gradient`` ensure that the gradient is
 indeed using the proper adjoint to back-propagate the field. This is currently
-_only_ given for electric receivers, not yet for magnetic receivers. These
+*only* given for electric receivers, not yet for magnetic receivers. These
 improvement happened mainly thanks to the help of Seogi (@sgkang).
 
 The changes in more detail:
@@ -29,10 +30,8 @@ The changes in more detail:
     However, if you want to compute the gradient, you should set it to
     ``'linear'`` in your Simulation parameters. Otherwise the adjoint-state
     gradient will not exactly be the adjoint state.
-
   - ``get_source_field`` returns new the real-valued, frequency-independent,
     source vector if ``frequency=None``.
-
   - ``get_source_field`` uses the adjoint of trilinear interpolation for point
     sources (new). For dipoles and wires it the source is distributed onto the
     cells as fraction of the source length (as before).
@@ -47,7 +46,6 @@ The changes in more detail:
     moment, as the point source is the adjoint of linear interpolation. To be
     the proper adjoint for the gradient the receiver has to be interpolated
     linearly too.
-
   - If ``gridding`` is ``'same'`` or ``'input'``, it checks now if the provided
     grid is a sensible grid for emg3d; if not, it throws a warning.
 
@@ -56,7 +54,7 @@ The changes in more detail:
 
 - ``optimize.gradient``: Changed order when going from computational grid to
   inversion grid. Changing the grids at the field stage (cubic interpolation)
-  seems to be better than changing at the cell-averaged stage:
+  seems to be better than changing at the cell-averaged stage::
 
       New: field_comp -> field_inv -> cells_inv
       Old: field_comp -> cells_comp -> cells_inv
