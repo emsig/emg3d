@@ -162,7 +162,7 @@ class Simulation:
         interested in the gradient, you need to choose 'linear' at the moment,
         as there are only linearly interpolated source functions. To be the
         proper adjoint for the gradient the receiver has to be interpolated
-        linearly too. (This will change in the future.)
+        linearly too.
 
     """
 
@@ -188,8 +188,8 @@ class Simulation:
         self.verb = kwargs.pop('verb', 0)
         self.name = kwargs.pop('name', None)
         self.info = kwargs.pop('info', None)
-        self.receiver_interpolation = kwargs.pop(   # Remove once we have
-                'receiver_interpolation', 'cubic')  # cubic source fct.
+        self.receiver_interpolation = kwargs.pop(
+                'receiver_interpolation', 'cubic')
 
         # Assemble solver_opts.
         self.solver_opts = {

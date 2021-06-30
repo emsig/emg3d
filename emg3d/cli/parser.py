@@ -183,6 +183,14 @@ def parse_config_file(args_dict):
         _ = all_sim.pop(key)
         simulation[key] = cfg.getfloat('simulation', key)
 
+    key = 'receiver_interpolation'
+    if cfg.has_option('simulation', key):
+        _ = all_sim.pop(key)
+        simulation[key] = cfg.get('simulation', key)
+    elif term['function'] == 'gradient':
+        # Default is 'cubic' - gradient needs 'linear'
+        simulation[key] = 'linear'
+
     # Ensure no keys are left.
     if all_sim:
         raise TypeError(

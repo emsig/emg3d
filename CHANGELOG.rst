@@ -6,61 +6,63 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.1.0: Adjoint-fix for electric receivers
+------------------------------------------
 
-**Fields**
+**2021-06-30**
 
-- ``get_receiver`` has a new keyword ``method``, which can be ``'cubic'`` or
-  ``'linear'``; default is the former, which is the same behaviour us before.
-  However, if you want to compute the gradient, you should set it to
-  ``'linear'`` in your Simulation parameters. Otherwise the adjoint-state
-  gradient will not exactly be the adjoint state. Note: This will change once
-  the adjoint of a cubic interpolation is implemented as source function.
+This release contains, besides the usual small bugfixes, typos, and small
+improvements, an important fix for ``optimize.gradient``. Keep in mind that
+while the forward modelling is regarded as stable, the ``optimize`` module is
+still work in progress.
 
-- ``get_source_field``: If ``frequency=None``, it returns new the real-valued,
-  frequency-independent, source vector.
+The fixes with regard to ``optimize.gradient`` ensure that the gradient is
+indeed using the proper adjoint to back-propagate the field. This is currently
+*only* given for electric receivers, not yet for magnetic receivers. These
+improvement happened mainly thanks to the help of Seogi (@sgkang).
 
+The changes in more detail:
 
-**Electrodes**
+- ``fields``:
 
-- Re-introduced the point source as ``TxElectricPoint``.
+  - ``get_receiver`` has a new keyword ``method``, which can be ``'cubic'`` or
+    ``'linear'``; default is the former, which is the same behaviour as before.
+    However, if you want to compute the gradient, you should set it to
+    ``'linear'`` in your Simulation parameters. Otherwise the adjoint-state
+    gradient will not exactly be the adjoint state.
+  - ``get_source_field`` returns new the real-valued, frequency-independent
+    source vector if ``frequency=None``.
+  - ``get_source_field`` uses the adjoint of trilinear interpolation for point
+    sources (new). For dipoles and wires it the source is distributed onto the
+    cells as fraction of the source length (as before).
 
+- ``electrodes``: Re-introduced the point source as ``TxElectricPoint``.
 
-**Simulations**
+- ``simulations.Simulation``:
 
-- New keyword ``receiver_interpolation``, which corresponds to the ``method``
-  in ``get_receiver`` (see above). Cubic is more precise. However, if you are
-  interested in the gradient, you need to choose 'linear' at the moment, as
-  there are only linearly interpolated source functions. To be the proper
-  adjoint for the gradient the receiver has to be interpolated linearly too.
+  - New keyword ``receiver_interpolation``, which corresponds to the ``method``
+    in ``get_receiver`` (see above). Cubic is more precise. However, if you are
+    interested in the gradient, you need to choose linear interpolation at the
+    moment, as the point source is the adjoint of linear interpolation. To be
+    the proper adjoint for the gradient the receiver has to be interpolated
+    linearly too.
+  - If ``gridding`` is ``'same'`` or ``'input'``, it checks now if the provided
+    grid is a sensible grid for emg3d; if not, it throws a warning.
 
-- If ``gridding`` is ``'same'`` or ``'input'``, it new checks if the provided
-  grid is a sensible grid for emg3d; if not, it throws a warning.
+- ``meshes``: New function ``check_grid`` to verify if a given grid is good for
+  emg3d.
 
+- ``optimize.gradient``: Changed order when going from computational grid to
+  inversion grid. Changing the grids at the field stage (cubic interpolation)
+  seems to be better than changing at the cell-averaged stage::
 
-**Meshes**
+      New: field_comp -> field_inv -> cells_inv
+      Old: field_comp -> cells_comp -> cells_inv
 
-- New function ``check_grid`` to verify if a given grid is good for emg3d.
-
-
-**Optimize**
-
-This release contains various improvements to the adjoint-state gradient.
-Electric receivers work fine, but there are still some remaining issues with
-respect to magnetic receivers.
-
-- ``gradient``:
-
-  - Changed order when going from computational grid to inversion grid.
-    Changing the grids at the field stage (cubic interpolation) seems to be
-    better than changing at the cell-averaged stage:
-
-    New: field_comp -> field_inv -> cells_inv
-    Old: field_comp -> cells_comp -> cells_inv
-
-
-- Various small fixes to docs etc.
+- ``cli``: Uses now by default linear receiver interpolation if the
+  ``gradient`` is wanted (new), otherwise it uses cubic interpolation (as
+  before). The new keyword ``receiver_interpolation`` of the simulation can be
+  set in the parameter file, which overwrites the described default behaviour.
 
 
 v1.0.0: Stable API
@@ -1097,7 +1099,7 @@ were removed, however.
   - ``utils.get_cell_numbers`` to get good values of number of cells for given
     primes.
 
-- Speed-up ``njitted.volume_average`` significantly thanks to @jcapriot.
+- Speed-up ``njitted.volume_average`` significantly thanks to Joe (@jcapriot).
 - Bugfixes and other minor things:
 
   - Abort if l2-norm is NaN (only works for MG).
