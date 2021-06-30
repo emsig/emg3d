@@ -204,10 +204,13 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['simulation_options']['max_workers'] == 5
-        assert cfg['simulation_options']['gridding'] == 'fancything'
-        assert cfg['simulation_options']['name'] == "PyTest simulation"
-        assert cfg['simulation_options']['min_offset'] == 1320.0
+        sim_opts = cfg['simulation_options']
+        assert sim_opts['max_workers'] == 5
+        assert sim_opts['gridding'] == 'fancything'
+        assert sim_opts['name'] == "PyTest simulation"
+        assert sim_opts['min_offset'] == 1320.0
+        with pytest.raises(KeyError, match="receiver_interpolation"):
+            assert sim_opts['receiver_interpolation'] == 'linear'
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             with open(config, 'a') as f:
@@ -215,6 +218,26 @@ class TestParser:
             args_dict = self.args_dict.copy()
             args_dict['config'] = config
             _ = cli.parser.parse_config_file(args_dict)
+
+        # Ensure it sets interpolation to linear for gradient
+        args_dict = self.args_dict.copy()
+        args_dict['gradient'] = True
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        sim_opts = cfg['simulation_options']
+        assert sim_opts['receiver_interpolation'] == 'linear'
+
+        # Ensure config file overrides that
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[simulation]\n")
+            f.write("receiver_interpolation=cubic")
+
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = config
+        args_dict['gradient'] = True
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        sim_opts = cfg['simulation_options']
+        assert sim_opts['receiver_interpolation'] == 'cubic'
 
     def test_solver(self, tmpdir):
 
