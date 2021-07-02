@@ -84,7 +84,7 @@ class TestParser:
             'survey': None,
             'model': None,
             'output': None,
-            'store': None,
+            'save': None,
             'load': None,
             'verbosity': 0,
             'dry_run': False,
@@ -170,7 +170,7 @@ class TestParser:
             f.write("survey=testit.json\n")
             f.write("model=thismodel\n")
             f.write("output=results.npz\n")
-            f.write("store=test")
+            f.write("save=test")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -179,7 +179,7 @@ class TestParser:
         assert cfg['files']['model'] == join(tmpdir, 'thismodel.h5')
         assert cfg['files']['output'] == join(tmpdir, 'results.npz')
         assert cfg['files']['log'] == join(tmpdir, 'results.log')
-        assert cfg['files']['store'] == join(tmpdir, 'test.h5')
+        assert cfg['files']['save'] == join(tmpdir, 'test.h5')
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             # Write a config file.
@@ -368,7 +368,7 @@ class TestRun:
             'survey': 'survey.npz',
             'model': 'model.npz',
             'output': 'output.npz',
-            'store': None,
+            'save': None,
             'load': None,
             'verbosity': 0,
             'dry_run': True,
@@ -456,7 +456,7 @@ class TestRun:
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
             f.write("[files]\n")
-            f.write("store=mysim.npz\n")
+            f.write("save=mysim.npz\n")
             f.write("[solver_opts]\n")
             f.write("sslsolver=False\n")
             f.write("semicoarsening=False\n")

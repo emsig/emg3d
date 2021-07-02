@@ -107,10 +107,10 @@ def main(args=None):
 
     # arg: Output base name; relative to path
     parser.add_argument(
-        "--store",
+        "--save",
         type=str,
         default=None,
-        help="file-name to store simulation; not used by default"
+        help="file-name to save simulation; not used by default"
     )
 
     # arg: Output base name; relative to path

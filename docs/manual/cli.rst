@@ -31,11 +31,19 @@ remove the comment signs to use them.
   # If the files are provided without ending the suffix `.h5` will be appended.
   # The log has the same name as `output`, but with the suffix `.log`.
   [files]
-  # path = .                   # Path (absolute or relative) to the data
-  # survey = survey.h5         # Also via `--survey`
-  # model = model.h5           # Also via `--model`
-  # output = emg3d_out.h5      # Also via `--output`
-  # store_simulation = False   # Stores entire simulation in output if True
+  # path = .               # Path (absolute or relative) to the data
+  # survey = survey.h5     # Also via `--survey`
+  # model = model.h5       # Also via `--model`
+  # output = emg3d_out.h5  # Also via `--output`
+  #
+  # # You can save the entire simulation with the `save` argument.
+  # save = my_sim.h5       # Also via `--save`
+  #
+  # # You can load an existing simulation with the `load` argument.
+  # # Note that if you provide a simulation it will ignore
+  # # - The survey and model under [files]
+  # # - Sections [simulation], [solver_opts], [gridding_opts], and [data]
+  # load = my_sim.h5       # Also via `--load`
 
   # Simulation parameters
   # ---------------------

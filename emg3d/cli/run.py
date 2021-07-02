@@ -165,8 +165,8 @@ def simulation(args_dict):
 
     # Store output to disk.
     logger.info("    :: SAVE RESULTS ::\n")
-    if cfg['files']['store']:
-        oinfo = sim.to_file(cfg['files']['store'], verb=-1)
+    if cfg['files']['save']:
+        oinfo = sim.to_file(cfg['files']['save'], verb=-1)
         logger.info(oinfo.split('\n')[0])
         logger.debug(oinfo.split('\n')[1])
     oinfo = io.save(cfg['files']['output'], **output, verb=-1)
@@ -198,8 +198,8 @@ def check_files(cfg, term):
     dname = os.path.split(cfg['files']['log'])[0]
     if not os.path.isdir(dname):
         error += f"* ERROR   :: Output directory does not exist: {dname}\n"
-    if cfg['files']['store']:
-        dname = os.path.split(cfg['files']['store'])[0]
+    if cfg['files']['save']:
+        dname = os.path.split(cfg['files']['save'])[0]
         if not os.path.isdir(dname):
             error += f"* ERROR   :: Output directory does not exist: {dname}\n"
 

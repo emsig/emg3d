@@ -76,7 +76,7 @@ def parse_config_file(args_dict):
         term['function'] = 'forward'
 
     # Get file names.
-    for key in ['path', 'survey', 'model', 'output', 'store', 'load']:
+    for key in ['path', 'survey', 'model', 'output', 'save', 'load']:
         term[key] = args_dict.pop(key)
 
     # Ensure no keys are left.
@@ -106,7 +106,7 @@ def parse_config_file(args_dict):
     path = os.path.abspath(path)
 
     # Initiate files dict with defaults.
-    files = {'store': False, 'load': False,
+    files = {'save': False, 'load': False,
              'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
     for key, value in files.items():
 
