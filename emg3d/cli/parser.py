@@ -136,6 +136,7 @@ def parse_config_file(args_dict):
         # Store in dict.
         files[key] = str(ffile)
 
+    # If a simulation is provided, the model and survey are not used.
     if files['load']:
         files['model'] = False
         files['survey'] = False
