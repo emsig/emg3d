@@ -105,6 +105,22 @@ def main(args=None):
         help="output files base name; default is 'emg3d_out'"
     )
 
+    # arg: Output base name; relative to path
+    parser.add_argument(
+        "--store",
+        type=str,
+        default=None,
+        help="file-name to store simulation; not used by default"
+    )
+
+    # arg: Output base name; relative to path
+    parser.add_argument(
+        "--load",
+        type=str,
+        default=None,
+        help="file-name to load simulation; not used by default"
+    )
+
     # arg: Verbosity.
     group3 = parser.add_mutually_exclusive_group()
     group3.add_argument(

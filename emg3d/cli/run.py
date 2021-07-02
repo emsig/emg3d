@@ -71,12 +71,15 @@ def simulation(args_dict):
 
     min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
 
-    if cfg['files']['load_simulation']:
+    if cfg['files']['load']:
 
         # Load input.
         logger.info("\n    :: LOAD SIMULATION ::\n")
 
-        sim = simulations.Simulation.from_file(cfg['files']['load_simulation'])
+        sim, sinfo = simulations.Simulation.from_file(
+                cfg['files']['load'], verb=-1)
+        logger.info(sinfo.split('\n')[0])
+        logger.debug(sinfo.split('\n')[1])
 
     else:
 
@@ -162,8 +165,8 @@ def simulation(args_dict):
 
     # Store output to disk.
     logger.info("    :: SAVE RESULTS ::\n")
-    if cfg['files']['store_simulation']:
-        oinfo = sim.to_file(cfg['files']['store_simulation'], verb=-1)
+    if cfg['files']['store']:
+        oinfo = sim.to_file(cfg['files']['store'], verb=-1)
         logger.info(oinfo.split('\n')[0])
         logger.debug(oinfo.split('\n')[1])
     oinfo = io.save(cfg['files']['output'], **output, verb=-1)
@@ -185,8 +188,7 @@ def check_files(cfg, term):
         error += f"* ERROR   :: Config file not found: {fname}\n"
 
     # Check Survey and Model.
-    files = {'Survey': 'survey', 'Model': 'model',
-             'Simulation': 'load_simulation'}
+    files = {'Survey': 'survey', 'Model': 'model', 'Simulation': 'load'}
     for key, value in files.items():
         ffile = cfg['files'][value]
         if ffile and not os.path.isfile(ffile):
@@ -196,8 +198,8 @@ def check_files(cfg, term):
     dname = os.path.split(cfg['files']['log'])[0]
     if not os.path.isdir(dname):
         error += f"* ERROR   :: Output directory does not exist: {dname}\n"
-    if cfg['files']['store_simulation']:
-        dname = os.path.split(cfg['files']['store_simulation'])[0]
+    if cfg['files']['store']:
+        dname = os.path.split(cfg['files']['store'])[0]
         if not os.path.isdir(dname):
             error += f"* ERROR   :: Output directory does not exist: {dname}\n"
 

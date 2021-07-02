@@ -76,7 +76,7 @@ def parse_config_file(args_dict):
         term['function'] = 'forward'
 
     # Get file names.
-    for key in ['path', 'survey', 'model', 'output']:
+    for key in ['path', 'survey', 'model', 'output', 'store', 'load']:
         term[key] = args_dict.pop(key)
 
     # Ensure no keys are left.
@@ -106,16 +106,14 @@ def parse_config_file(args_dict):
     path = os.path.abspath(path)
 
     # Initiate files dict with defaults.
-    files = {'survey': 'survey', 'model': 'model', 'output': 'emg3d_out',
-             'store_simulation': False, 'load_simulation': False}
+    files = {'store': False, 'load': False,
+             'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
     for key, value in files.items():
-        fname = None
 
         config_or_default = all_files.pop(key, value)
 
         # Get terminal input.
-        if key in ['survey', 'model', 'output']:
-            fname = term.pop(key)
+        fname = term.pop(key)
 
         # If there was no terminal input, get config-file; else, default.
         if fname is None:
@@ -137,6 +135,10 @@ def parse_config_file(args_dict):
 
         # Store in dict.
         files[key] = str(ffile)
+
+    if files['load']:
+        files['model'] = False
+        files['survey'] = False
 
     # Add log file.
     files['log'] = logfile
