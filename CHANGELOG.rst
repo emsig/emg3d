@@ -6,6 +6,18 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+- CLI:
+
+  - New parameters ``save`` and ``load`` to save and load an entire simulation.
+    In the parameter file, they are under ``[files]``; on the command line,
+    they are available as ``--save`` and ``--load``; they are followed by the
+    filename including its path and suffix. (In turn, the parameter
+    ``store_simulation`` was removed.)
+
+
 v1.1.0: Adjoint-fix for electric receivers
 ------------------------------------------
 
