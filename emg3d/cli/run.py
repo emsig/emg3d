@@ -69,35 +69,45 @@ def simulation(args_dict):
     logger.debug("\n    :: CONFIGURATION ::\n")
     logger.debug(f"{term['config_file']}\n{paramdump}")
 
-    # Load input.
-    logger.info("\n    :: LOAD SURVEY AND MODEL ::\n")
-    sdata, sinfo = io.load(cfg['files']['survey'], verb=-1)
-    survey = sdata['survey']
-    logger.info(sinfo.split('\n')[0])
-    logger.debug(sinfo.split('\n')[1])
-    model, minfo = io.load(cfg['files']['model'], verb=-1)
-    logger.info(minfo.split('\n')[0])
-    logger.debug(minfo.split('\n')[1])
     min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
 
-    # Select data.
-    data = cfg['data']
-    if data:
-        survey = survey.select(sources=data.get('sources', None),
-                               receivers=data.get('receivers', None),
-                               frequencies=data.get('frequencies', None))
+    if cfg['files']['load_simulation']:
 
-    # Switch-off tqdm if verbosity is zero.
-    if verb < 1:
-        cfg['simulation_options']['tqdm_opts'] = {'disable': True}
+        # Load input.
+        logger.info("\n    :: LOAD SIMULATION ::\n")
 
-    # Create simulation.
-    sim = simulations.Simulation(
-            survey=survey,
-            model=model['model'],
-            verb=-1,  # Only errors.
-            **cfg['simulation_options']
-    )
+        sim = simulations.Simulation.from_file(cfg['files']['load_simulation'])
+
+    else:
+
+        # Load input.
+        logger.info("\n    :: LOAD SURVEY AND MODEL ::\n")
+        sdata, sinfo = io.load(cfg['files']['survey'], verb=-1)
+        survey = sdata['survey']
+        logger.info(sinfo.split('\n')[0])
+        logger.debug(sinfo.split('\n')[1])
+        model, minfo = io.load(cfg['files']['model'], verb=-1)
+        logger.info(minfo.split('\n')[0])
+        logger.debug(minfo.split('\n')[1])
+
+        # Select data.
+        data = cfg['data']
+        if data:
+            survey = survey.select(sources=data.get('sources', None),
+                                   receivers=data.get('receivers', None),
+                                   frequencies=data.get('frequencies', None))
+
+        # Switch-off tqdm if verbosity is zero.
+        if verb < 1:
+            cfg['simulation_options']['tqdm_opts'] = {'disable': True}
+
+        # Create simulation.
+        sim = simulations.Simulation(
+                survey=survey,
+                model=model['model'],
+                verb=-1,  # Only errors.
+                **cfg['simulation_options']
+        )
 
     # Print simulation info.
     logger.info("\n    :: SIMULATION ::")
@@ -141,7 +151,7 @@ def simulation(args_dict):
         logger.info("\n    :: BACKWARD COMPUTATION ::\n")
 
         if dry_run:
-            output['gradient'] = np.zeros(model['mesh'].shape_cells)
+            output['gradient'] = np.zeros(sim.model.grid.shape_cells)
         else:
             output['gradient'] = sim.gradient
 
@@ -153,7 +163,9 @@ def simulation(args_dict):
     # Store output to disk.
     logger.info("    :: SAVE RESULTS ::\n")
     if cfg['files']['store_simulation']:
-        output['simulation'] = sim
+        oinfo = sim.to_file(cfg['files']['store_simulation'], verb=-1)
+        logger.info(oinfo.split('\n')[0])
+        logger.debug(oinfo.split('\n')[1])
     oinfo = io.save(cfg['files']['output'], **output, verb=-1)
     logger.info(oinfo.split('\n')[0])
     logger.debug(oinfo.split('\n')[1])
@@ -173,15 +185,21 @@ def check_files(cfg, term):
         error += f"* ERROR   :: Config file not found: {fname}\n"
 
     # Check Survey and Model.
-    for name in ['Survey', 'Model']:
-        fname = cfg['files'][name.lower()]
-        if not os.path.isfile(fname):
-            error += f"* ERROR   :: {name} file not found: {fname}\n"
+    files = {'Survey': 'survey', 'Model': 'model',
+             'Simulation': 'load_simulation'}
+    for key, value in files.items():
+        ffile = cfg['files'][value]
+        if ffile and not os.path.isfile(ffile):
+            error += f"* ERROR   :: {key} file not found: {ffile}\n"
 
     # Finally check output directory.
     dname = os.path.split(cfg['files']['log'])[0]
     if not os.path.isdir(dname):
         error += f"* ERROR   :: Output directory does not exist: {dname}\n"
+    if cfg['files']['store_simulation']:
+        dname = os.path.split(cfg['files']['store_simulation'])[0]
+        if not os.path.isdir(dname):
+            error += f"* ERROR   :: Output directory does not exist: {dname}\n"
 
     # If any was not found, exit with error.
     if len(error) > 10:

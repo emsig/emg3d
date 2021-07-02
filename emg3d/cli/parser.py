@@ -106,17 +106,24 @@ def parse_config_file(args_dict):
     path = os.path.abspath(path)
 
     # Initiate files dict with defaults.
-    files = {'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
+    files = {'survey': 'survey', 'model': 'model', 'output': 'emg3d_out',
+             'store_simulation': False, 'load_simulation': False}
     for key, value in files.items():
+        fname = None
 
         config_or_default = all_files.pop(key, value)
 
         # Get terminal input.
-        fname = term.pop(key)
+        if key in ['survey', 'model', 'output']:
+            fname = term.pop(key)
 
         # If there was no terminal input, get config-file; else, default.
         if fname is None:
             fname = config_or_default
+
+        # Next file if it is not provided.
+        if not fname:
+            continue
 
         # Get absolute paths.
         ffile = Path(os.path.join(path, fname))
@@ -125,19 +132,14 @@ def parse_config_file(args_dict):
         if ffile.suffix not in ['.h5', '.json', '.npz']:
             ffile = ffile.with_suffix('.h5')
 
+        if key == 'output':
+            logfile = str(ffile.with_suffix('.log'))
+
         # Store in dict.
-        files[key] = ffile
+        files[key] = str(ffile)
 
-    # Ensure files and directory exist:
-    for key in ['survey', 'model']:
-        files[key] = str(files[key])
-    files['log'] = str(files['output'].with_suffix('.log'))
-    files['output'] = str(files['output'])
-
-    # Store options (get it with getboolean, and remove from dict).
-    files['store_simulation'] = cfg.getboolean(
-            'files', 'store_simulation', fallback=False)
-    _ = all_files.pop('store_simulation', None)
+    # Add log file.
+    files['log'] = logfile
 
     # Ensure no keys are left.
     if all_files:

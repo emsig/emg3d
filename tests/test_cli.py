@@ -168,7 +168,7 @@ class TestParser:
             f.write("survey=testit.json\n")
             f.write("model=thismodel\n")
             f.write("output=results.npz\n")
-            f.write("store_simulation=false")
+            f.write("store_simulation=test")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -177,7 +177,7 @@ class TestParser:
         assert cfg['files']['model'] == join(tmpdir, 'thismodel.h5')
         assert cfg['files']['output'] == join(tmpdir, 'results.npz')
         assert cfg['files']['log'] == join(tmpdir, 'results.log')
-        assert cfg['files']['store_simulation'] is False
+        assert cfg['files']['store_simulation'] == join(tmpdir, 'test.h5')
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             # Write a config file.
@@ -452,7 +452,7 @@ class TestRun:
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
             f.write("[files]\n")
-            f.write("store_simulation=True\n")
+            f.write("store_simulation=mysim.npz\n")
             f.write("[solver_opts]\n")
             f.write("sslsolver=False\n")
             f.write("semicoarsening=False\n")
@@ -484,7 +484,8 @@ class TestRun:
         assert_allclose(res1['data'].shape, res2['data'].shape)
         assert_allclose(res1['misfit'].shape, res2['misfit'].shape)
         assert_allclose(res1['gradient'].shape, res2['gradient'].shape)
-        assert 'simulation' in res2
+        # Assert we can load the simulation
+        emg3d.Simulation.from_file(os.path.join(tmpdir, 'mysim.npz'))
         assert res1['n_observations'] == np.isfinite(self.data).sum()
         assert res2['n_observations'] == np.isfinite(self.data).sum()
 
