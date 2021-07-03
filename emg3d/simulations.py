@@ -21,6 +21,7 @@ a high-level, specialised modelling tool for the end user.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 import itertools
 from copy import deepcopy
 
@@ -231,9 +232,9 @@ class Simulation:
 
         # Check the grid if one was explicitly provided.
         if gridding == 'same':
-            meshes.check_mesh(self.model.grid)
+            meshes.check_mesh(self.model.grid, self.verb)
         elif gridding == 'input':
-            meshes.check_mesh(self._grid_single)
+            meshes.check_mesh(self._grid_single, self.verb)
 
     def __repr__(self):
         """Simple representation."""
@@ -878,6 +879,17 @@ class Simulation:
 
         """
         if self._gradient is None:
+            if self.receiver_interpolation == 'cubic':
+                # Print is always shown and simpler, warn for the CLI logs.
+                msg = (
+                    "Receiver responses were obtained with cubic interpolation"
+                    ". This will not yield the exact gradient. Change "
+                    "`receiver_interpolation='linear'` in the call to "
+                    "Simulation()."
+                )
+                if self.verb > -1:
+                    print(f"* WARNING :: {msg}")
+                warnings.warn(msg, UserWarning)
             self._gradient = optimize.gradient(self)
         return self._gradient[:, :, :self._input_sc2]
 

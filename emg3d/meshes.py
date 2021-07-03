@@ -1026,13 +1026,16 @@ def cell_width(skin_depth, pps=3, limits=None):
     return cell_width
 
 
-def check_mesh(mesh):
+def check_mesh(mesh, verb=0):
     """Check provided mesh and throw a warning if it is not good for multigrid.
 
     Parameters
     ----------
     mesh : TensorMesh
         A :class:`emg3d.meshes.TensorMesh` instance.
+
+    verb : int, default: 0
+        Prints warning if `verb` is 0 or bigger.
 
     """
 
@@ -1049,9 +1052,11 @@ def check_mesh(mesh):
 
     # Check mesh dimensions, warn if not optimal.
     if any(n_cells not in good for n_cells in mesh.shape_cells):
+        # Print is always shown and simpler, warn for the CLI logs.
         msg = (
             f"Mesh dimension {(mesh.shape_cells)} is not optimal for MG "
             f"solver. Good numbers are:\n{good_mg_cell_nr(max_nr=5000)}"
         )
-        print(f"* WARNING :: {msg}")
+        if verb > -1:
+            print(f"* WARNING :: {msg}")
         warnings.warn(msg, UserWarning)
