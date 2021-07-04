@@ -232,9 +232,9 @@ class Simulation:
 
         # Check the grid if one was explicitly provided.
         if gridding == 'same':
-            meshes.check_mesh(self.model.grid, self.verb)
+            meshes.check_mesh(self.model.grid)
         elif gridding == 'input':
-            meshes.check_mesh(self._grid_single, self.verb)
+            meshes.check_mesh(self._grid_single)
 
     def __repr__(self):
         """Simple representation."""

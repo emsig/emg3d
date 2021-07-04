@@ -1026,16 +1026,13 @@ def cell_width(skin_depth, pps=3, limits=None):
     return cell_width
 
 
-def check_mesh(mesh, verb=0):
+def check_mesh(mesh):
     """Check provided mesh and throw a warning if it is not good for multigrid.
 
     Parameters
     ----------
     mesh : TensorMesh
         A :class:`emg3d.meshes.TensorMesh` instance.
-
-    verb : int, default: 0
-        Prints warning if `verb` is 0 or bigger.
 
     """
 
