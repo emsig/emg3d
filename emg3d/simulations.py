@@ -1501,6 +1501,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
             diff = np.diff(dim)[0]
             get_it = True
 
+        diff = np.where(diff > 1e-9, diff, 1e-9)  # Avoid division by 0 later
         return dim, diff, get_it
 
     xdim, xdiff, get_x = get_dim_diff(0)
