@@ -54,6 +54,10 @@ except ImportError:
 __all__ = ['Report', 'EMArray', 'Timer']
 
 
+# Set emg3d-warnings to always.
+warnings.filterwarnings('always', 'emg3d: ', category=UserWarning)
+
+
 # PRIVATE UTILS
 _KNOWN_CLASSES = {}  # List of known classes for (de-)serialization
 
@@ -107,10 +111,12 @@ def _requires(*args, **kwargs):
                 if verbose:
                     missing = [arg for i, arg in enumerate(wanted)
                                if not available[i]]
-                    # Print is always shown and simpler, warn for the CLI logs.
-                    msg = ("This feature of emg3d requires the missing "
-                           f"soft dependencies {missing}.")
-                    print(f"* WARNING :: {msg}")
+
+                    # Warn.
+                    msg = (
+                        "emg3d: This feature requires the missing "
+                        f"soft dependencies {missing}."
+                    )
                     warnings.warn(msg, UserWarning)
             return passer
 

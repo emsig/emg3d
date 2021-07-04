@@ -53,7 +53,7 @@ class TestFourier:
         Fourier.time = time2
         assert freq_required.size != Fourier.freq_required.size
 
-    def test_kwargs(self, capsys):
+    def test_kwargs(self):
         times = np.logspace(-1, 1)
         fmin = 0.1
         fmax = 10
@@ -61,27 +61,20 @@ class TestFourier:
         xfreq = 10
 
         # input_freq; verb=0
-        _, _ = capsys.readouterr()
         Fourier1 = time.Fourier(times, fmin, fmax, input_freq=input_freq,
                                 verb=0, ftarg={'kind': 'sin'})
-        out, _ = capsys.readouterr()
-        assert '' == out
         assert_allclose(input_freq, Fourier1.freq_compute, 0, 0)
 
         # input_freq AND every_x_freq => re-sets every_x_freq.
         with pytest.warns(UserWarning, match='Re-setting'):
             Fourier2 = time.Fourier(times, fmin, fmax, every_x_freq=xfreq,
                                     input_freq=input_freq, verb=1)
-            out, _ = capsys.readouterr()
-        assert 'Re-setting `every_x_freq=None`' in out
         assert_allclose(input_freq, Fourier2.freq_compute, 0, 0)
         assert_allclose(Fourier1.freq_compute, Fourier2.freq_compute)
 
         # Now set every_x_freq again => re-sets input_freq.
         with pytest.warns(UserWarning, match='Re-setting'):
             Fourier2.every_x_freq = xfreq
-            out, _ = capsys.readouterr()
-        assert 'Re-setting `input_freq=None`' in out
         assert_allclose(Fourier2.freq_coarse, Fourier2.freq_required[::xfreq])
         assert Fourier2.input_freq is None
         test = Fourier2.freq_required[::xfreq][
@@ -92,8 +85,6 @@ class TestFourier:
         # And back
         with pytest.warns(UserWarning, match='Re-setting'):
             Fourier2.input_freq = input_freq
-            out, _ = capsys.readouterr()
-        assert 'Re-setting `every_x_freq=None`' in out
         assert_allclose(Fourier2.freq_compute, input_freq)
         assert Fourier2.every_x_freq is None
 

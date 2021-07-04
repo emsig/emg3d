@@ -863,10 +863,8 @@ def _dipole_vector(grid, points, decimals=9):
     # Ensure unity (should not be necessary).
     for field in [vfield.fx, vfield.fy, vfield.fz]:
         sum_s = abs(field.sum())
-        if abs(sum_s-1) > 1e-6:
-            # Print is always shown and simpler, warn for the CLI logs.
-            msg = f"Normalizing Source: {sum_s:.10f}."
-            print(f"* WARNING :: {msg}")
+        if abs(sum_s-1) > 1e-6:  # Normalize and warn.
+            msg = f"emg3d: Normalizing Source: {sum_s:.10f}."
             warnings.warn(msg, UserWarning)
             field /= sum_s
 

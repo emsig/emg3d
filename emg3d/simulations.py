@@ -880,15 +880,13 @@ class Simulation:
         """
         if self._gradient is None:
             if self.receiver_interpolation == 'cubic':
-                # Print is always shown and simpler, warn for the CLI logs.
+                # Warn that cubic is not good for adjoint-state gradient.
                 msg = (
-                    "Receiver responses were obtained with cubic interpolation"
-                    ". This will not yield the exact gradient. Change "
-                    "`receiver_interpolation='linear'` in the call to "
+                    "emg3d: Receiver responses were obtained with cubic "
+                    "interpolation. This will not yield the exact gradient. "
+                    "Change `receiver_interpolation='linear'` in the call to "
                     "Simulation()."
                 )
-                if self.verb > -1:
-                    print(f"* WARNING :: {msg}")
                 warnings.warn(msg, UserWarning)
             self._gradient = optimize.gradient(self)
         return self._gradient[:, :, :self._input_sc2]

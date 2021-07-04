@@ -307,9 +307,7 @@ def _dict_deserialize(inp):
 
                 except (AttributeError, KeyError, TypeError) as e:
                     # Gracefully fail.
-                    # Print is always shown and simpler, warn for the CLI logs.
-                    msg = f"Could not de-serialize <{key}>: {e}"
-                    print(f"* WARNING :: {msg}")
+                    msg = f"emg3d: Could not de-serialize <{key}>: {e}"
                     warnings.warn(msg, UserWarning)
 
             # In no __class__-key or de-serialization fails, use recursion.
