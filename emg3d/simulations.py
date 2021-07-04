@@ -21,6 +21,7 @@ a high-level, specialised modelling tool for the end user.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 import itertools
 from copy import deepcopy
 
@@ -878,6 +879,15 @@ class Simulation:
 
         """
         if self._gradient is None:
+            if self.receiver_interpolation == 'cubic':
+                # Warn that cubic is not good for adjoint-state gradient.
+                msg = (
+                    "emg3d: Receiver responses were obtained with cubic "
+                    "interpolation. This will not yield the exact gradient. "
+                    "Change `receiver_interpolation='linear'` in the call to "
+                    "Simulation()."
+                )
+                warnings.warn(msg, UserWarning)
             self._gradient = optimize.gradient(self)
         return self._gradient[:, :, :self._input_sc2]
 
@@ -1491,6 +1501,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
             diff = np.diff(dim)[0]
             get_it = True
 
+        diff = np.where(diff > 1e-9, diff, 1e-9)  # Avoid division by 0 later
         return dim, diff, get_it
 
     xdim, xdiff, get_x = get_dim_diff(0)

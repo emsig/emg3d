@@ -99,7 +99,7 @@ class TestSaveLoad:
                             out_h5['Grid'].cell_volumes)
 
         else:
-            with pytest.warns(UserWarning, match='feature of emg3d requires'):
+            with pytest.warns(UserWarning, match='emg3d: This feature requir'):
                 io.save(tmpdir+'/test.h5', grid=self.grid)
 
     def test_json(self, tmpdir):
@@ -249,6 +249,6 @@ def test_hdf5_dump_load(tmpdir):
         assert out['d5'] == ['1', '2', '3']
 
     else:
-        with pytest.warns(UserWarning, match='This feature of emg3d requires'):
+        with pytest.warns(UserWarning, match='emg3d: This feature requires'):
             io._hdf5_dump(fname=str(tmpdir) + 'test.h5',
                           data=orig, compression='gzip')
