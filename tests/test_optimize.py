@@ -113,6 +113,7 @@ class TestGradient:
             'max_workers': 1,
             'gridding': 'same',
             'verb': 0,
+            'receiver_interpolation': 'linear',
         }
 
         # Compute data (pre-computed and passed to Survey above)

@@ -660,15 +660,15 @@ def test_edge_curl_factor(njit):
     ex = 1*np.arange(1, 19).reshape((2, 3, 3), order='F')
     ey = 2*np.arange(1, 19).reshape((3, 2, 3), order='F')
     ez = 3*np.arange(1, 19).reshape((3, 3, 2), order='F')
-    mx = np.zeros((1, 2, 2))
-    my = np.zeros((2, 1, 2))
-    mz = np.zeros((2, 2, 1))
+    mx = np.zeros((3, 2, 2))
+    my = np.zeros((2, 3, 2))
+    mz = np.zeros((2, 2, 3))
     hx = np.array([10., 10])
     hy = np.array([20., 20])
     hz = np.array([30., 30])
     factor = 0.1*np.ones((2, 2, 2))*10*20*30
 
     edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, factor)
-    assert_allclose(mx, 0.005)  # (9/20 - 12/30) * 0.1
-    assert_allclose(my, -0.01)  # (6/30 - 3/10) * 0.1
-    assert_allclose(mz, 0.01)  # (2/10 - 2/20) * 0.1
+    assert_allclose(mx[1:-1, :, :], 0.005)  # (9/20 - 12/30) * 0.1
+    assert_allclose(my[:, 1:-1, :], -0.01)  # (6/30 - 3/10) * 0.1
+    assert_allclose(mz[:, :, 1:-1], 0.01)  # (2/10 - 2/20) * 0.1
