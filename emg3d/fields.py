@@ -641,8 +641,7 @@ def get_magnetic_field(model, efield):
 
     # Compute magnetic field.
     _edge_curl_factor(
-            hfield.fx[1:-1, :, :], hfield.fy[:, 1:-1, :],
-            hfield.fz[:, :, 1:-1], efield.fx, efield.fy, efield.fz,
+            hfield.fx, hfield.fy, hfield.fz, efield.fx, efield.fy, efield.fz,
             efield.grid.h[0], efield.grid.h[1], efield.grid.h[2], zeta)
 
     return hfield
@@ -887,9 +886,8 @@ def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, zeta):
     Parameters
     ----------
     mx, my, mz : ndarray
-        Pre-allocated zero magnetic field in x-, y-, and z-directions
-        (:class:`emg3d.fields.Field`). The magnetic field grid has one cell
-        less in each direction than the electric field grid.
+        Pre-allocated zero magnetic field (defined on the faces) in x-, y-, and
+        z-directions (:class:`emg3d.fields.Field`).
 
     ex, ey, ez : ndarray
         Electric fields in x-, y-, and z-directions
@@ -930,18 +928,19 @@ def _edge_curl_factor(mx, my, mz, ex, ey, ez, hx, hy, hz, zeta):
                 fz = ((ey[ixp, iy, iz] - ey[ix, iy, iz])/hx[ix] -
                       (ex[ix, iyp, iz] - ex[ix, iy, iz])/hy[iy])
 
-                # Average zeta for dual-grid.
-                dx = (hx[ixm] + hx[ix])/2
-                dy = (hy[iym] + hy[iy])/2
-                dz = (hz[izm] + hz[iz])/2
-                zeta_x = (zeta[ixm, iy, iz] + zeta[ix, iy, iz])/2
-                zeta_y = (zeta[ix, iym, iz] + zeta[ix, iy, iz])/2
-                zeta_z = (zeta[ix, iy, izm] + zeta[ix, iy, iz])/2
+                # Average zeta for dual-grid
+                # (factor 2 in d?/zeta_? cancels out).
+                dx = hx[ixm] + hx[ix]
+                dy = hy[iym] + hy[iy]
+                dz = hz[izm] + hz[iz]
+                zeta_x = zeta[ixm, iy, iz] + zeta[ix, iy, iz]
+                zeta_y = zeta[ix, iym, iz] + zeta[ix, iy, iz]
+                zeta_z = zeta[ix, iy, izm] + zeta[ix, iy, iz]
 
                 # Divide by zeta (averaged over the two cells) and store.
                 if ix != 0:
-                    mx[ixm, iy, iz] = fx * zeta_x / (dx * hy[iy] * hz[iz])
+                    mx[ix, iy, iz] = fx * zeta_x / (dx * hy[iy] * hz[iz])
                 if iy != 0:
-                    my[ix, iym, iz] = fy * zeta_y / (hx[ix] * dy * hz[iz])
+                    my[ix, iy, iz] = fy * zeta_y / (hx[ix] * dy * hz[iz])
                 if iz != 0:
-                    mz[ix, iy, izm] = fz * zeta_z / (hx[ix] * hy[iy] * dz)
+                    mz[ix, iy, iz] = fz * zeta_z / (hx[ix] * hy[iy] * dz)

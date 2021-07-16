@@ -262,7 +262,8 @@ class TestSimulation():
                              'linerelaxation': False, 'semicoarsening': False},
                 gridding='input', gridding_opts=newgrid, name='TestX')
 
-        grad = simulation.gradient
+        with pytest.warns(UserWarning, match='Receiver responses were obtain'):
+            grad = simulation.gradient
 
         # Ensure the gradient has the shape of the model, not of the input.
         assert grad.shape == self.model.shape
