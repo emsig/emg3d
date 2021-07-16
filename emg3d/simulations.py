@@ -779,22 +779,36 @@ class Simulation:
         return self.get_efield(*inp, call_from_compute=True)
 
     def compute(self, observed=False, **kwargs):
-        """Compute efields asynchronously for all sources and frequencies.
+        r"""Compute efields asynchronously for all sources and frequencies.
 
         Parameters
         ----------
         observed : bool, default: False
-            If True, it stores the current result also as observed model. This
-            is usually done for pure forward modelling (not inversion). It will
-            as such be stored within the survey. If the survey has either
+            If True, it stores the current `synthetic` responses also as
+            `observed` responses. This is usually done for pure forward
+            modelling (not inversion). If the survey has either
             ``relative_error`` or ``noise_floor``, random Gaussian noise of
             standard deviation will be added to the ``data.observed`` (not to
             ``data.synthetic``). Also, data below the noise floor will be set
             to NaN.
 
+            .. math::
+
+                d^\text{obs} &= d^\text{syn} + \sqrt{2}\, \varsigma
+                              \exp(\text{i}\mathcal{N}) \,; \\
+                d^\text{obs}[d^\text{syn} < \epsilon_n] &= \text{NaN} \, .
+
+            See :attr:`emg3d.surveys.Survey.standard_deviation` for the
+            definition of the standard deviation. :math:`\mathcal{N}` is
+            the normal distribution (Gaussian with mean :math:`\mu`, provided
+            via parameter ``mean_noise``).
+
         min_offset : float, default: 0.0
             Data points in ``data.observed`` where the offset < min_offset are
             set to NaN.
+
+        mean_noise : float, default: 0.0
+            Mean value (location) of the normal distributed noise.
 
         """
         srcfreq = self._srcfreq.copy()
@@ -847,14 +861,16 @@ class Simulation:
             # Add noise if noise_floor and/or relative_error given.
             if self.survey.standard_deviation is not None:
 
-                # Create noise.
+                # Create noise: zero-mean, Gaussian distributed.
                 std = self.survey.standard_deviation
-                random = np.random.randn(self.survey.count*2)
-                noise_re = std*random[::2].reshape(self.survey.shape)
-                noise_im = std*random[1::2].reshape(self.survey.shape)
+                loc = kwargs.get('mean_noise', 0.0)
+                rng = np.random.default_rng()
+                gaussian = rng.normal(loc=loc, size=self.survey.count)
+                noise = np.sqrt(2)*std*np.exp(1j*gaussian).reshape(
+                            self.survey.shape)
 
                 # Add noise to observed data.
-                self.data['observed'].data += noise_re + 1j*noise_im
+                self.data['observed'].data += noise
 
             # Set data below the noise floor to NaN.
             if self.survey.noise_floor is not None:

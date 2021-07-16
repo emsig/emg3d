@@ -21,11 +21,18 @@ Changelog
 
   - Warns if the gradient is called, but ``receiver_interpolation`` is not
     ``'linear'``.
+  - Slightly changed the added noise in ``compute(observed=True)``: Before
+    random Gaussian noise was added to the real and to the imaginary part,
+    random realizations for each part. New random Gaussian noise is added as
+    complex number (argument of the exponential); hence real and imaginary
+    parts are not independent. This yields a flat amplitude spectrum with
+    random phases (white noise).
 
 - Various:
 
   - All emg3d-warnings (not solver warnings) are now set to ``'always'``, and
     corresponding print statements were removed.
+  - Simplified (unified) ``_edge_curl_factor`` (private fct).
 
 
 v1.1.0: Adjoint-fix for electric receivers
