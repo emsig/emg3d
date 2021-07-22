@@ -71,6 +71,12 @@ class Survey:
         It can also be a list containing a combination of the above (lists,
         dicts, and instances).
 
+        Receivers can be set to ``None``, if one is only interested in forward
+        modelling the entire fields. In this case, the related data object and
+        the noise floor and relative error have no meaning. Also, in
+        conjunction with a :class:`emg3d.simulations.Simulation`, the misfit
+        and the gradient will be zero.
+
     frequencies : {array_like, dict}
         Source frequencies (Hz).
 
@@ -110,7 +116,10 @@ class Survey:
 
         # Store sources, receivers, and frequencies.
         self._sources = txrx_lists_to_dict(sources)
-        self._receivers = txrx_lists_to_dict(receivers)
+        if receivers is None:
+            self._receivers = {}
+        else:
+            self._receivers = txrx_lists_to_dict(receivers)
         self._frequencies = frequencies_to_dict(frequencies)
 
         # Initialize xarray dataset.
