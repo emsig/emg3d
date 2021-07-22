@@ -40,11 +40,11 @@ jobs:
           - python-version: 3.7
             name: plain
             os: ubuntu
-            conda: "numpy<1.21"  # Temp., numba does not yet support it
+            conda: "numpy<=1.20"  # Temp., numba does not yet support it
           - python-version: 3.8
             name: plain
             os: ubuntu
-            conda: "numpy<1.21"  # Temp., numba does not yet support it
+            conda: "numpy<=1.20"  # Temp., numba does not yet support it
           - python-version: 3.8
             name: full
             os: ubuntu
@@ -52,7 +52,7 @@ jobs:
           - python-version: 3.9
             name: plain
             os: ubuntu
-            conda: "numpy<1.21"  # Temp., numba does not yet support it
+            conda: "numpy<=1.20"  # Temp., numba does not yet support it
 
     env:
       # Used to for coveralls flag
