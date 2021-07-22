@@ -74,8 +74,7 @@ jobs:
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
           conda config --show
-          # Temp. restrict numpy, numba does not yet support it
-          conda install "numpy<=1.21" pytest pytest-console-scripts pip
+          conda install numba pytest pytest-console-scripts pip
           pip install setuptools_scm pytest-flake8
           conda info -a
           conda list
