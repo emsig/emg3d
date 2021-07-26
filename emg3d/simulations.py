@@ -779,7 +779,7 @@ class Simulation:
         return self.get_efield(*inp, call_from_compute=True)
 
     def compute(self, observed=False, **kwargs):
-        r"""Compute efields asynchronously for all sources and frequencies.
+        """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
         ----------

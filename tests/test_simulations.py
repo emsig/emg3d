@@ -241,12 +241,8 @@ class TestSimulation():
 
     def test_synthetic(self):
         sim = self.simulation.copy()
-
-        # Switch off noise_floor, relative_error, min_offset => No noise.
-        sim.survey.noise_floor = None
-        sim.survey.relative_error = None
         sim._dict_efield = sim._dict_initiate  # Reset
-        sim.compute(observed=True)
+        sim.compute(observed=True, add_noise=False)
         assert_allclose(sim.data.synthetic, sim.data.observed)
         assert sim.survey.size == sim.data.observed.size
 

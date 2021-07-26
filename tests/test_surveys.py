@@ -199,6 +199,51 @@ class TestSurvey():
         assert_allclose(survey.receiver_coordinates('TxED-2'),
                         [[1000, 1150], [0, 350], [2000, 2550]])
 
+    def test_add_noise(self):
+        data = np.ones(self.shape, dtype=complex)
+        srvy = surveys.Survey(
+                self.sources, self.receivers, self.frequencies, data=data,
+                noise_floor=1e-10)  # Below data, so no effect
+        srvy.data['test'] = srvy.data.observed.copy()
+
+        srvy.add_noise(add_to='noise')  # Add to non-existing
+        srvy.add_noise(add_to='test')   # Add to non-default
+        srvy.add_noise()                # Add to default
+
+        assert_allclose(srvy.data.observed.data, data)
+        assert_allclose(srvy.data.observed.data, srvy.data.test.data)
+        assert_allclose(srvy.data.observed.data, data+srvy.data.noise.data)
+
+
+def test_random_noise():
+    std = np.ones((2, 3, 4))
+    mean_noise = 0.0
+
+    # Default is white noise
+    noise_wn = surveys.random_noise(std, mean_noise)
+    assert_allclose(std, abs(noise_wn))  # Constant amplitude!
+
+    nm = np.angle(surveys.random_noise(np.ones(100000), mean_noise=0.0)).mean()
+    assert_allclose(nm, 0.0, atol=0.01, rtol=1e-1)
+    nm = np.angle(surveys.random_noise(np.ones(100000), mean_noise=0.5)).mean()
+    assert_allclose(nm, 0.5, rtol=1e-1)
+
+    noise_gu = surveys.random_noise(std, mean_noise, 'gaussian_uncorrelated')
+    # Real and imaginary part have to be different.
+    assert not np.allclose(noise_gu.imag, noise_gu.real, 0, 1e-15)
+    nn_gu = surveys.random_noise(
+                np.ones(100000)*.01, 0.5, 'gaussian_uncorrelated')
+    assert_allclose(nn_gu.real.mean(), 0.01*0.5, rtol=1e-1)
+    assert_allclose(nn_gu.imag.mean(), 0.01*0.5, rtol=1e-1)
+
+    noise_gc = surveys.random_noise(std, mean_noise, 'gaussian_correlated')
+    # Real and imaginary part are the same.
+    assert_allclose(noise_gc.imag, noise_gc.real)
+    nn_gc = surveys.random_noise(
+                np.ones(100000)*.01, 0.5, 'gaussian_correlated')
+    assert_allclose(nn_gc.real.mean(), 0.01*0.5, rtol=1e-1)
+    assert_allclose(nn_gc.imag.mean(), 0.01*0.5, rtol=1e-1)
+
 
 def test_txrx_coordinates_to_dict():
     sources = surveys.txrx_coordinates_to_dict(
