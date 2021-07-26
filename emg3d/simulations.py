@@ -785,30 +785,12 @@ class Simulation:
         ----------
         observed : bool, default: False
             If True, it stores the current `synthetic` responses also as
-            `observed` responses. This is usually done for pure forward
-            modelling (not inversion). If the survey has either
-            ``relative_error`` or ``noise_floor``, random Gaussian noise of
-            standard deviation will be added to the ``data.observed`` (not to
-            ``data.synthetic``). Also, data below the noise floor will be set
-            to NaN.
+            `observed` responses.
 
-            .. math::
-
-                d^\text{obs} &= d^\text{syn} + \sqrt{2}\, \varsigma
-                              \exp(\text{i}\mathcal{N}) \,; \\
-                d^\text{obs}[d^\text{syn} < \epsilon_n] &= \text{NaN} \, .
-
-            See :attr:`emg3d.surveys.Survey.standard_deviation` for the
-            definition of the standard deviation. :math:`\mathcal{N}` is
-            the normal distribution (Gaussian with mean :math:`\mu`, provided
-            via parameter ``mean_noise``).
-
-        min_offset : float, default: 0.0
-            Data points in ``data.observed`` where the offset < min_offset are
-            set to NaN.
-
-        mean_noise : float, default: 0.0
-            Mean value (location) of the normal distributed noise.
+        add_noise : bool, default: True
+            Boolean if to add noise to observed data (if ``observed=True``).
+            All remaining ``kwargs`` are forwarded to
+            :meth:`emg3d.surveys.Survey.add_noise`.
 
         """
         srcfreq = self._srcfreq.copy()
@@ -856,35 +838,12 @@ class Simulation:
         # If it shall be used as observed data save a copy.
         if observed:
 
+            # Copy synthetic to observed.
             self.data['observed'] = self.data['synthetic'].copy()
 
-            # Add noise if noise_floor and/or relative_error given.
-            if self.survey.standard_deviation is not None:
-
-                # Create noise: zero-mean, Gaussian distributed.
-                std = self.survey.standard_deviation
-                loc = kwargs.get('mean_noise', 0.0)
-                rng = np.random.default_rng()
-                gaussian = rng.normal(loc=loc, size=self.survey.count)
-                noise = np.sqrt(2)*std*np.exp(1j*gaussian).reshape(
-                            self.survey.shape)
-
-                # Add noise to observed data.
-                self.data['observed'].data += noise
-
-            # Set data below the noise floor to NaN.
-            if self.survey.noise_floor is not None:
-                noise_floor = self.survey.noise_floor
-                min_amp = abs(self.data.synthetic.data) < noise_floor
-                self.data['observed'].data[min_amp] = np.nan + 1j*np.nan
-
-            # Set near-offsets to NaN.
-            min_off = kwargs.get('min_offset', 0.0)
-            nan = np.nan + 1j*np.nan
-            for ks, s in self.survey.sources.items():
-                for kr, r in self.survey.receivers.items():
-                    if np.linalg.norm(r.center_abs(s) - s.center) < min_off:
-                        self.data['observed'].loc[ks, kr, :] = nan
+            # Add noise.
+            if kwargs.get('add_noise', True):
+                self.survey.add_noise(**kwargs)
 
     # OPTIMIZATION
     @property

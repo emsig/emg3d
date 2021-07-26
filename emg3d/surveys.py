@@ -414,7 +414,7 @@ class Survey:
         """Frequency dict containing all frequencies."""
         return self._frequencies
 
-    # STANDARD DEVIATION
+    # STANDARD DEVIATION and NOISE
     @property
     def standard_deviation(self):
         r"""Return standard deviation of the data.
@@ -539,6 +539,81 @@ class Survey:
     def relative_error(self, relative_error):
         """Update relative error."""
         self._set_nf_re('relative_error', relative_error)
+
+    def add_noise(self, min_offset=0.0, min_amplitude='noise_floor',
+                  mean_noise=0.0, add_to='observed'):
+        r"""Add white noise to data.
+
+        If the standard deviation is defined (hence, at least one of
+        ``relative_error`` or ``noise_floor`` is set), white noise of standard
+        deviation will be added to ``data.observed`` (or the data specified
+        with ``add_to``). The noise has a flat amplitude spectrum with random
+        phase, given by
+
+        .. math::
+
+            d^\text{noise} = \varsigma \{ (1 + \text{i})u +
+                             \exp[\text{i}\mathcal{U}(0, 2\pi)] \} \, ,
+
+        where :math:`\mathcal{U}` is the uniform distribution, :math:`u` is the
+        mean, provided via parameter ``mean_noise``, and :math:`\varsigma` is
+        the standard deviation, see
+        :attr:`emg3d.surveys.Survey.standard_deviation`.
+
+
+        Parameters
+        ----------
+
+        min_offset : float, default: 0.0
+            Data points in ``data.observed`` where the offset < min_offset are
+            set to NaN.
+
+        min_amplitude : {float, str}, default: 'noise_floor'
+            Data points in ``data.observed`` where abs(data) < min_amplitude
+            are set to NaN. If ``'noise_floor'``, the ``noise_floor`` is used
+            as ``min_amplitude``. Set to None to include all data.
+
+        mean_noise : float, default: 0.0
+            Mean value (location) of the uniform distributed noise. The uniform
+            random phases result in factors between :math:`\pm 1`, to which the
+            mean noise is added.
+
+        add_to : str, default: observed
+            Data to which to add the noise. By default it is added to the
+            observed data. You can pre-allocate zero data to obtain the pure
+            noise.
+
+        """
+        # If a new data set is defined as output, initiate it.
+        if add_to not in self.data.keys():
+            self.data[add_to] = self.data.observed.copy(
+                    data=np.zeros(self.shape, dtype=complex))
+
+        # Add noise if noise_floor and/or relative_error given.
+        if self.standard_deviation is not None:
+
+            # Create uniform random phases between zero and 2 pi.
+            rng = np.random.default_rng()
+            random_phases = rng.uniform(0, 2*np.pi, self.count)
+            noise = np.exp(1j * random_phases).reshape(self.shape)
+
+            # Add noise to selected data with given mean and std.
+            std = self.standard_deviation
+            self.data[add_to].data += std*((1+1j)*mean_noise + noise)
+
+        # Set data below minimum amplitude to NaN.
+        if min_amplitude == 'noise_floor':
+            min_amplitude = self.noise_floor
+        if min_amplitude:
+            cut_amp = abs(self.data.synthetic.data) < min_amplitude
+            self.data[add_to].data[cut_amp] = np.nan + 1j*np.nan
+
+        # Set offsets below minimum offset to NaN.
+        if min_offset > 0.0:
+            for ks, s in self.sources.items():
+                for kr, r in self.receivers.items():
+                    if np.linalg.norm(r.center_abs(s) - s.center) < min_offset:
+                        self.data[add_to].loc[ks, kr, :] = np.nan + 1j*np.nan
 
     def _set_nf_re(self, name, value):
         """Update noise_floor or relative_error."""
