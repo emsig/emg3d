@@ -200,19 +200,40 @@ class TestSurvey():
                         [[1000, 1150], [0, 350], [2000, 2550]])
 
     def test_add_noise(self):
-        data = np.ones(self.shape, dtype=complex)
-        srvy = surveys.Survey(
-                self.sources, self.receivers, self.frequencies, data=data,
-                noise_floor=1e-10)  # Below data, so no effect
-        srvy.data['test'] = srvy.data.observed.copy()
+        offs = np.linspace(0, 10000, 21)
+        rec = surveys.txrx_coordinates_to_dict(
+                emg3d.electrodes.RxElectricPoint, (offs, 0, 0, 0, 0)
+        )
 
-        srvy.add_noise(add_to='noise')  # Add to non-existing
-        srvy.add_noise(add_to='test')   # Add to non-default
-        srvy.add_noise()                # Add to default
+        data = np.logspace(0, -20, offs.size)+1j*np.logspace(0, -20, offs.size)
 
-        assert_allclose(srvy.data.observed.data, data)
-        assert_allclose(srvy.data.observed.data, srvy.data.test.data)
-        assert_allclose(srvy.data.observed.data, data+srvy.data.noise.data)
+        survey = surveys.Survey(
+            sources=emg3d.electrodes.TxElectricDipole((0, 0, 0, 0, 0)),
+            receivers=rec,
+            frequencies=1.0,
+            data=data,
+            relative_error=0.01,
+            noise_floor=1e-15
+        )
+
+        # Defined cutting
+        survey.add_noise(min_offset=1000, min_amplitude=1e-19, add_to='test1')
+        # Ensure short offsets are NaN
+        assert np.all(np.isnan(survey.data.test1.data[:, :2, :]))
+        # Ensure low amplitudes are NaN
+        assert np.all(np.isnan(survey.data.test1.data[:, -1:, :]))
+        # Ensure no others are none
+        assert np.sum(np.isnan(survey.data.test1.data)) == 3
+
+        # No cutting
+        survey.add_noise(min_offset=0, min_amplitude=10e-50, add_to='test2')
+        assert np.sum(np.isnan(survey.data.test2.data)) == 0
+
+        # Defaults
+        survey.add_noise()
+        # Ensure low amplitudes are NaN
+        assert np.all(np.isnan(survey.data.observed.data[:, -5:, :]))
+        assert np.sum(np.isnan(survey.data.observed.data)) == 5
 
 
 def test_random_noise():

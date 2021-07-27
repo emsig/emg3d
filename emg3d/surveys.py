@@ -540,7 +540,7 @@ class Survey:
         """Update relative error."""
         self._set_nf_re('relative_error', relative_error)
 
-    def add_noise(self, min_offset=0.0, min_amplitude='noise_floor',
+    def add_noise(self, min_offset=0.0, min_amplitude='half_nf',
                   add_to='observed', **kwargs):
         """Add random noise to the data defined by ``add_to``.
 
@@ -560,10 +560,11 @@ class Survey:
             Data points in ``data.observed`` where the offset < min_offset are
             set to NaN.
 
-        min_amplitude : {float, str}, default: 'noise_floor'
+        min_amplitude : {float, str, None}, default: 'half_nf'
             Data points in ``data.observed`` where abs(data) < min_amplitude
-            are set to NaN. If ``'noise_floor'``, the ``noise_floor`` is used
-            as ``min_amplitude``. Set to ``None`` to include all data.
+            are set to NaN. If ``'half_nf'``, the ``noise_floor`` divided by
+            two is used as ``min_amplitude``. Set to ``None`` to include all
+            data.
 
         add_to : str, default: 'observed'
             Data to which to add the noise. By default it is added to the
@@ -577,15 +578,12 @@ class Survey:
             self.data[add_to] = self.data.observed.copy(
                     data=np.zeros(self.shape, dtype=complex))
 
-        # Add noise if noise_floor and/or relative_error given.
-        if self.standard_deviation is not None:
-            noise = random_noise(self.standard_deviation.data, **kwargs)
-            self.data[add_to].data += noise
-
         # Set data below minimum amplitude to NaN.
-        if min_amplitude == 'noise_floor':
+        if min_amplitude == 'half_nf':
             min_amplitude = self.noise_floor
-        if min_amplitude:
+            if min_amplitude is not None:
+                min_amplitude /= 2.0
+        if min_amplitude is not None:
             cut_amp = abs(self.data.observed.data) < min_amplitude
             self.data[add_to].data[cut_amp] = np.nan + 1j*np.nan
 
@@ -595,6 +593,11 @@ class Survey:
                 for kr, r in self.receivers.items():
                     if np.linalg.norm(r.center_abs(s) - s.center) < min_offset:
                         self.data[add_to].loc[ks, kr, :] = np.nan + 1j*np.nan
+
+        # Add noise if noise_floor and/or relative_error given.
+        if self.standard_deviation is not None:
+            noise = random_noise(self.standard_deviation.data, **kwargs)
+            self.data[add_to].data += noise
 
     def _set_nf_re(self, name, value):
         """Update noise_floor or relative_error."""
