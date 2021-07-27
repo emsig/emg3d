@@ -40,11 +40,11 @@ jobs:
           - python-version: 3.7
             name: plain
             os: ubuntu
-            conda: ""
+            conda: "numba"
           - python-version: 3.8
             name: plain
             os: ubuntu
-            conda: ""
+            conda: "numba"
           - python-version: 3.8
             name: full
             os: ubuntu
@@ -52,7 +52,7 @@ jobs:
           - python-version: 3.9
             name: plain
             os: ubuntu
-            conda: ""
+            conda: "numba"
 
     env:
       # Used to for coveralls flag
@@ -103,7 +103,7 @@ jobs:
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
           conda config --show
-          conda install ${{ matrix.case.conda }} numpy pytest pytest-cov pytest-console-scripts pip
+          conda install ${{ matrix.case.conda }} pytest pytest-cov pytest-console-scripts pip
           pip install setuptools_scm coveralls pytest-flake8
           conda info -a
           conda list

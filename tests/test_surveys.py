@@ -80,6 +80,14 @@ class TestSurvey():
         assert srvy.date == 'today'
         assert srvy.info == 'RainyDay'
 
+    def test_no_receiver(self):
+        srvy = surveys.Survey(self.sources, None, self.frequencies)
+
+        assert isinstance(srvy.sources, dict)
+        assert srvy.sources['TxED-1'].center[0] == 0
+        assert srvy.receivers == {}
+        assert srvy.shape == (self.shape[0], 0, self.shape[2])
+
     def test_standard_deviation(self):
         srvy0 = surveys.Survey(self.sources, self.receivers, self.frequencies,
                                data=np.ones(self.shape))

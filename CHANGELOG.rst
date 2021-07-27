@@ -37,6 +37,13 @@ Changelog
   - New attribute ``Survey.add_noise``, which uses under the hood above
     function.
 
+- ``surveys.Survey``:
+
+  - ``receivers`` can new be set to ``None``, if one is only interested in
+    forward modelling the entire fields. In this case, the related data object
+    and the noise floor and relative error have no meaning. Also, in
+    conjunction with a Simulation, the misfit and the gradient will be zero.
+
 - Various:
 
   - All emg3d-warnings (not solver warnings) are now set to ``'always'``, and
