@@ -784,17 +784,13 @@ class Simulation:
         Parameters
         ----------
         observed : bool, default: False
-            If True, it stores the current result also as observed model. This
-            is usually done for pure forward modelling (not inversion). It will
-            as such be stored within the survey. If the survey has either
-            ``relative_error`` or ``noise_floor``, random Gaussian noise of
-            standard deviation will be added to the ``data.observed`` (not to
-            ``data.synthetic``). Also, data below the noise floor will be set
-            to NaN.
+            If True, it stores the current `synthetic` responses also as
+            `observed` responses.
 
-        min_offset : float, default: 0.0
-            Data points in ``data.observed`` where the offset < min_offset are
-            set to NaN.
+        add_noise : bool, default: True
+            Boolean if to add noise to observed data (if ``observed=True``).
+            All remaining ``kwargs`` are forwarded to
+            :meth:`emg3d.surveys.Survey.add_noise`.
 
         """
         srcfreq = self._srcfreq.copy()
@@ -842,33 +838,12 @@ class Simulation:
         # If it shall be used as observed data save a copy.
         if observed:
 
+            # Copy synthetic to observed.
             self.data['observed'] = self.data['synthetic'].copy()
 
-            # Add noise if noise_floor and/or relative_error given.
-            if self.survey.standard_deviation is not None:
-
-                # Create noise.
-                std = self.survey.standard_deviation
-                random = np.random.randn(self.survey.count*2)
-                noise_re = std*random[::2].reshape(self.survey.shape)
-                noise_im = std*random[1::2].reshape(self.survey.shape)
-
-                # Add noise to observed data.
-                self.data['observed'].data += noise_re + 1j*noise_im
-
-            # Set data below the noise floor to NaN.
-            if self.survey.noise_floor is not None:
-                noise_floor = self.survey.noise_floor
-                min_amp = abs(self.data.synthetic.data) < noise_floor
-                self.data['observed'].data[min_amp] = np.nan + 1j*np.nan
-
-            # Set near-offsets to NaN.
-            min_off = kwargs.get('min_offset', 0.0)
-            nan = np.nan + 1j*np.nan
-            for ks, s in self.survey.sources.items():
-                for kr, r in self.survey.receivers.items():
-                    if np.linalg.norm(r.center_abs(s) - s.center) < min_off:
-                        self.data['observed'].loc[ks, kr, :] = nan
+            # Add noise.
+            if kwargs.get('add_noise', True):
+                self.survey.add_noise(**kwargs)
 
     # OPTIMIZATION
     @property

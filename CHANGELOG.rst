@@ -6,8 +6,10 @@ Changelog
 """"""""""
 
 
-*latest*
---------
+v1.2.0: White noise
+-------------------
+
+**2021-07-27**
 
 - CLI:
 
@@ -21,10 +23,25 @@ Changelog
 
   - Warns if the gradient is called, but ``receiver_interpolation`` is not
     ``'linear'``.
+  - Slightly changed the added noise in ``compute(observed=True)``: It uses new
+    the ``survey.add_noise`` attribute. There is new a flag to set if noise
+    should be added or not (``add_noise``), and if the amplitudes should be
+    chopped or not (``min_amplitude``). Also note that the added noise is new
+    white noise with constant amplitude and random phase.
 
-- ``surveys.Survey``:
+- ``surveys``:
 
-  - ``receivers`` can new be set to ``None``, if one is only interested in
+  - New function ``random_noise``, which can be used to create random noise in
+    different ways. The default noise is white noise, hence constant amplitude
+    with random phase. (This is different to before, where random Gaussian
+    noise was added separately to the real and imaginary part.) For the random
+    noise it requires new at least NumPy 1.17.0.
+
+  - New attribute ``Survey.add_noise``, which uses under the hood above
+    function.
+
+  - A ``Survey`` can new be instantiated without receivers by setting
+    ``receivers`` to ``None``. This is useful if one is only interested in
     forward modelling the entire fields. In this case, the related data object
     and the noise floor and relative error have no meaning. Also, in
     conjunction with a Simulation, the misfit and the gradient will be zero.
@@ -33,6 +50,7 @@ Changelog
 
   - All emg3d-warnings (not solver warnings) are now set to ``'always'``, and
     corresponding print statements were removed.
+  - Simplified (unified) ``_edge_curl_factor`` (private fct).
 
 
 v1.1.0: Adjoint-fix for electric receivers

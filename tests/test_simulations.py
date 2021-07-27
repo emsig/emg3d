@@ -233,20 +233,14 @@ class TestSimulation():
         # Check bad grid
         hx = np.ones(17)*20
         grid = emg3d.TensorMesh([hx, hx, hx], (0, 0, 0))
-        print(80*'*')
-        print(hx)
         with pytest.warns(UserWarning, match='optimal for MG solver. Good n'):
             simulations.Simulation(self.survey, self.model, gridding='input',
                                    gridding_opts=grid)
 
     def test_synthetic(self):
         sim = self.simulation.copy()
-
-        # Switch off noise_floor, relative_error, min_offset => No noise.
-        sim.survey.noise_floor = None
-        sim.survey.relative_error = None
         sim._dict_efield = sim._dict_initiate  # Reset
-        sim.compute(observed=True)
+        sim.compute(observed=True, add_noise=False)
         assert_allclose(sim.data.synthetic, sim.data.observed)
         assert sim.survey.size == sim.data.observed.size
 
