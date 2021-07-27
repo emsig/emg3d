@@ -6,8 +6,10 @@ Changelog
 """"""""""
 
 
-*latest*: White noise
----------------------
+v1.2.0: White noise
+-------------------
+
+**2021-07-27**
 
 - CLI:
 
@@ -38,9 +40,8 @@ Changelog
   - New attribute ``Survey.add_noise``, which uses under the hood above
     function.
 
-- ``surveys.Survey``:
-
-  - ``receivers`` can new be set to ``None``, if one is only interested in
+  - A ``Survey`` can new be instantiated without receivers by setting
+    ``receivers`` to ``None``. This is useful if one is only interested in
     forward modelling the entire fields. In this case, the related data object
     and the noise floor and relative error have no meaning. Also, in
     conjunction with a Simulation, the misfit and the gradient will be zero.
