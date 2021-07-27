@@ -32,7 +32,8 @@ Changelog
   - New function ``random_noise``, which can be used to create random noise in
     different ways. The default noise is white noise, hence constant amplitude
     with random phase. (This is different to before, where random Gaussian
-    noise was added separately to the real and imaginary part.)
+    noise was added separately to the real and imaginary part.) For the random
+    noise it requires new at least NumPy 1.17.0.
 
   - New attribute ``Survey.add_noise``, which uses under the hood above
     function.
