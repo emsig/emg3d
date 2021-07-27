@@ -11,7 +11,7 @@ funding ended, namely:
 
 - 2021-today: `Delft University of Technology <https://www.tudelft.nl>`_,
   funded through the `Delphi Consortium <https://www.delphi-consortium.com>`_
-- 2021-today: `TERRASYS Geophysics GmbH & Co. KG <https://www.terrasys.de>`_
+- 2021-today: `TERRASYS Geophysics GmbH & Co. KG <https://www.terrasysgeo.com>`_
 
 For a list of code contributors see
 https://github.com/emsig/emg3d/graphs/contributors.
