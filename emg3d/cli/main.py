@@ -44,7 +44,8 @@ def main(args=None):
         default="emg3d.cfg",
         type=str,
         help=("name of config file; default is 'emg3d.cfg'; consult "
-              "https://emg3d.emsig.xyz/en/stable/cli.html for its format")
+              "https://emg3d.emsig.xyz/en/stable/manual/cli.html for "
+              "its format")
     )
 
     # arg: Number of processors.
