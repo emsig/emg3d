@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Bug fixes:
+
+  - Track order when saving to hdf5.
+
+
 v1.2.0: White noise
 -------------------
 
