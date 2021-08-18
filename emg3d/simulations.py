@@ -596,12 +596,19 @@ class Simulation:
         grid = self.get_grid(source, self._freq_inp2key(frequency))
         return self.model.interpolate_to_grid(grid)
 
-    def get_efield(self, source, frequency, **kwargs):
+    def get_efield(self, source, frequency):
         """Return electric field for given source and frequency."""
         freq = self._freq_inp2key(frequency)
 
-        # TODO: Change: only access dict or call compute() if necessary;
-        #       computation should happen in compute.
+        # If it doesn't exist yet, compute it.
+        if self._dict_efield[source][freq] is None:
+            self.compute(source=source, frequency=freq)
+
+        return self._dict_efield[source][freq]
+
+    def _old_get_efield(self, source, frequency, **kwargs):
+        # TODO REPLACE COMPLETELY
+        freq = self._freq_inp2key(frequency)
 
         # Get call_from_compute and ensure no kwargs are left.
         call_from_compute = kwargs.pop('call_from_compute', False)
@@ -622,6 +629,7 @@ class Simulation:
                     grid,
                     self.survey.sources[source],
                     self.survey.frequencies[freq]),
+                'efield': self._dict_efield[source][freq],
             }
 
             # Compute electric field.
@@ -659,8 +667,8 @@ class Simulation:
             self._dict_hfield[source][freq] = fields.get_magnetic_field(
                     self.model.interpolate_to_grid(    # TODO CHANGE
                         self.get_grid(source, freq)),  # move to efield
-                    self.get_efield(source, freq,
-                                    call_from_hfield=True, **kwargs))
+                    self._old_get_efield(
+                        source, freq, call_from_hfield=True, **kwargs))
 
             # Store electric and magnetic responses at receiver locations.
             self._store_responses(source, frequency)
@@ -696,7 +704,7 @@ class Simulation:
 
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
-            resp = self.get_efield(source, freq).get_receiver(
+            resp = self._old_get_efield(source, freq).get_receiver(
                     receiver=rec_coord_tuple(erec),
                     method=self.receiver_interpolation,
             )
@@ -719,8 +727,8 @@ class Simulation:
 
     # ASYNCHRONOUS COMPUTATION
     def _get_efield(self, inp):
-        """Wrapper of `get_efield` for `concurrent.futures`."""
-        return self.get_efield(*inp, call_from_compute=True)
+        """Wrapper of `_old_get_efield` for `concurrent.futures`."""
+        return self._old_get_efield(*inp, call_from_compute=True)
 
     def compute(self, observed=False, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
@@ -737,9 +745,15 @@ class Simulation:
             :meth:`emg3d.surveys.Survey.add_noise`.
 
         """
-        srcfreq = self._srcfreq.copy()
 
-        # TODO only selected source / freq
+        # If the call is from `get_efield`, it will have source/frequency.
+        # This use is only internal. End users should use `get_efield()`.
+        srcfreq = [
+            (kwargs.pop('source', None), kwargs.pop('frequency', None)),
+        ]
+        if not srcfreq[0][0]:
+            # "Normal" case: all source-frequency pairs.
+            srcfreq = self._srcfreq
 
         # TODO split up, so that process_map does NOT get the simulation,
         #      ONLY model, sfield, <efield>, solver_opts.
@@ -748,19 +762,12 @@ class Simulation:
         # TODO compute() flexible enough so it works for efield/bfield/jvec
         #      FACTORIZE
 
-        # We remove the ones that were already computed.
-        remove = []
-        for src, freq in srcfreq:
-            if self._dict_efield[src][freq] is not None:
-                remove += [(src, freq)]
-        for src, freq in remove:
-            srcfreq.remove((src, freq))
-
         # Ensure grids computed.  # TODO CHANGE
         for src, freq in srcfreq:
             _ = self.get_grid(src, freq)
 
         # Initiate futures-dict to store output.
+        # TODO process_map has to be _independent_ of self. Copy; no references
         out = utils._process_map(
                 self._get_efield,
                 srcfreq,

@@ -74,10 +74,6 @@ class TestSimulation():
                 self.model, sfield, **self.simulation.solver_opts)
         assert self.simulation.get_efield('TxEW-3', 'f-1') == efield
 
-        # Unknown keyword
-        with pytest.raises(TypeError, match='Unexpected '):
-            self.simulation.get_efield('TxEW-3', 1.0, unknownkeyward=True)
-
         # See a single one
         self.simulation._dict_efield['TxEW-3'][1.0] = None
         _, _ = capsys.readouterr()
