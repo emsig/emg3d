@@ -324,6 +324,9 @@ class Model:
             A new :class:`emg3d.models.Model` instance on ``grid``.
 
         """
+        # If grids are identical, return a copy.
+        if grid == self.grid:
+            return self.copy()
 
         # Get solver options, set to defaults if not provided.
         g2g_inp = {
