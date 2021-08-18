@@ -253,7 +253,7 @@ def test_random_noise():
     assert_allclose(std, abs(noise_wn))  # Constant amplitude!
 
     nm = np.angle(surveys.random_noise(np.ones(100000), mean_noise=0.0)).mean()
-    assert_allclose(nm, 0.0, atol=0.01, rtol=1e-1)
+    assert_allclose(nm, 0.0, atol=0.02, rtol=1e-1)
     nm = np.angle(surveys.random_noise(np.ones(100000), mean_noise=0.5)).mean()
     assert_allclose(nm, 0.5, rtol=1e-1)
 

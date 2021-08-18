@@ -35,8 +35,9 @@ setup(
     },
     python_requires=">=3.7",
     install_requires=[
-        "scipy>=1.4.0",
-        "numba>=0.45.0",
+        "numpy>=1.17",
+        "scipy>=1.4",
+        "numba>=0.45",
     ],
     use_scm_version={
         "root": ".",
