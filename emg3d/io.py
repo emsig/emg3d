@@ -534,7 +534,8 @@ def _hdf5_dump(fname, data, compression):
 
             # Use recursion if value is a dict, creating a new group.
             if isinstance(value, dict):
-                _hdf5_dump(fname.create_group(key), value, compression)
+                _hdf5_dump(fname.create_group(key, track_order=True),
+                           value, compression)
 
             elif np.ndim(value) > 0:  # Use compression where possible...
                 fname.create_dataset(key, data=value, compression=compression)
