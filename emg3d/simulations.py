@@ -616,37 +616,39 @@ class Simulation:
         if kwargs:
             raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
 
-        # Compute electric field if it is not stored yet.
+        grid = self.get_grid(source, freq)
+
         if self._dict_efield[source][freq] is None:
+            provided = fields.Field(grid)
+        else:
+            provided = self._dict_efield[source][freq]
 
-            # Input parameters.
-            grid = self.get_grid(source, freq)
-            solver_input = {
-                **self.solver_opts,
-                # TODO: here OK, will happen on thread
-                'model': self.model.interpolate_to_grid(grid),
-                'sfield': fields.get_source_field(
-                    grid,
-                    self.survey.sources[source],
-                    self.survey.frequencies[freq]),
-                'efield': self._dict_efield[source][freq],
-            }
+        solver_input = {
+            **self.solver_opts,
+            # TODO: here OK, will happen on thread
+            'model': self.model.interpolate_to_grid(grid),
+            'sfield': fields.get_source_field(
+                grid,
+                self.survey.sources[source],
+                self.survey.frequencies[freq]),
+            'efield': provided,
+        }
 
-            # Compute electric field.
-            efield, info = solver.solve(**solver_input)
+        # Compute electric field.
+        info = solver.solve(**solver_input)
+        self._dict_efield[source][freq] = provided
 
-            # Store electric field and info.
-            self._dict_efield[source][freq] = efield
-            self._dict_efield_info[source][freq] = info
+        # Store electric field and info.
+        self._dict_efield_info[source][freq] = info
 
-            if not call_from_hfield:
+        if not call_from_hfield:
 
-                # Clean corresponding hfield, so it will be recomputed.
-                del self._dict_hfield[source][freq]
-                self._dict_hfield[source][freq] = None
+            # Clean corresponding hfield, so it will be recomputed.
+            del self._dict_hfield[source][freq]
+            self._dict_hfield[source][freq] = None
 
-                # Store electric and magnetic responses at receiver locations.
-                self._store_responses(source, freq)
+            # Store electric and magnetic responses at receiver locations.
+            self._store_responses(source, freq)
 
         # Return electric field.
         if call_from_compute:
@@ -704,7 +706,7 @@ class Simulation:
 
             # Extract data at receivers.
             erec = np.nonzero(rec_types)[0]
-            resp = self._old_get_efield(source, freq).get_receiver(
+            resp = self.get_efield(source, freq).get_receiver(
                     receiver=rec_coord_tuple(erec),
                     method=self.receiver_interpolation,
             )
