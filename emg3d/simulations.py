@@ -612,15 +612,7 @@ class Simulation:
 
         # If magnetic field not computed yet compute it.
         if self._dict_hfield[source][freq] is None:
-
-            efield = self.get_efield(source, freq, **kwargs)
-            self._dict_hfield[source][freq] = fields.get_magnetic_field(
-                self.model.interpolate_to_grid(self.get_grid(source, freq)),
-                efield
-            )
-
-            # Store electric and magnetic responses at receiver locations.
-            self._store_responses(source, frequency)
+            self.compute(source=source, frequency=freq, **kwargs)
 
         # Return magnetic field.
         return self._dict_hfield[source][freq]
@@ -634,8 +626,7 @@ class Simulation:
         freq = self._freq_inp2key(frequency)
 
         # Get receiver types.
-        rec_types = tuple([r.xtype == 'electric'
-                           for r in self.survey.receivers.values()])
+        erec, mrec = self.survey._irec_types
 
         # Get absolute coordinates as fct of source.
         # (Only relevant in case of "relative" receivers.)
@@ -649,10 +640,9 @@ class Simulation:
             ).T)
 
         # Store electric receivers.
-        if rec_types.count(True):
+        if erec.size:
 
             # Extract data at receivers.
-            erec = np.nonzero(rec_types)[0]
             resp = self.get_efield(source, freq).get_receiver(
                     receiver=rec_coord_tuple(erec),
                     method=self.receiver_interpolation,
@@ -662,10 +652,9 @@ class Simulation:
             self.data.synthetic.loc[source, :, freq][erec] = resp
 
         # Store magnetic receivers.
-        if rec_types.count(False):
+        if mrec.size:
 
             # Extract data at receivers.
-            mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = self.get_hfield(source, freq).get_receiver(
                     receiver=rec_coord_tuple(mrec),
                     method=self.receiver_interpolation,
@@ -675,43 +664,6 @@ class Simulation:
             self.data.synthetic.loc[source, :, freq][mrec] = resp
 
     # ASYNCHRONOUS COMPUTATION
-    def _get_efield(self, inp):
-        """Wrapper of `_old_get_efield` for `concurrent.futures`."""
-
-        source, freq = inp
-
-        # TODO:
-        # o NEED TO PROVIDE:
-        #   - src/freq dep : model; sfield; efield;
-        #   - general      : solver_opts
-        # o NO NEED:
-        #   - source, frequency
-        # THEN self._get_efield() => turns into => solver.solve_source() !
-
-        grid = self.get_grid(source, freq)
-
-        if self._dict_efield[source][freq] is None:
-            efield = fields.Field(grid)
-        else:
-            efield = self._dict_efield[source][freq]
-
-        solver_input = {
-            **self.solver_opts,
-            # TODO: here OK, will happen on thread
-            'model': self.model.interpolate_to_grid(grid),
-            'sfield': fields.get_source_field(
-                grid,
-                self.survey.sources[source],
-                self.survey.frequencies[freq]),
-            'efield': efield,
-        }
-
-        # Compute electric field.
-        info = solver.solve(**solver_input)
-
-        # Return electric field.
-        return efield, info
-
     def compute(self, observed=False, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
 
@@ -737,22 +689,23 @@ class Simulation:
             # "Normal" case: all source-frequency pairs.
             srcfreq = self._srcfreq
 
-        # TODO split up, so that process_map does NOT get the simulation,
-        #      ONLY model, sfield, <efield>, solver_opts.
-        #      => comp. model internally from model & sfiled.grid
+        # Create iterable form src/freq-list to call the process_map.
+        def collect_inputs(inp):
+            """Collect inputs."""
+            source, freq = inp
+            sfield = fields.get_source_field(
+                grid=self.get_grid(source, freq),
+                source=self.survey.sources[source],
+                frequency=self.survey.frequencies[freq],
+            )
+            efield = self._dict_efield[source][freq]
 
-        # TODO compute() flexible enough so it works for efield/bfield/jvec
-        #      FACTORIZE
-
-        # Ensure grids computed.  # TODO CHANGE
-        for src, freq in srcfreq:
-            _ = self.get_grid(src, freq)
+            return self.model, sfield, efield, self.solver_opts
 
         # Initiate futures-dict to store output.
-        # TODO process_map has to be _independent_ of self. Copy; no references
         out = utils._process_map(
-                self._get_efield,
-                srcfreq,
+                _solver,
+                list(map(collect_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
                 **{'desc': 'Compute efields', **self._tqdm_opts},
         )
@@ -764,15 +717,18 @@ class Simulation:
             self._dict_efield[src][freq] = out[i][0]
             self._dict_efield_info[src][freq] = out[i][1]
 
-            # TODO Only necessary if any magnetic receivers. Otherwise we
-            # could set hfield to None
-            hfield = fields.get_magnetic_field(
-                self.model.interpolate_to_grid(self.get_grid(src, freq)),
-                self._dict_efield[src][freq],
-            )
+            # Get magnetic field if there are any magnetic receivers.
+            _, mrec = self.survey._irec_types
+            if mrec.size:
+                hfield = fields.get_magnetic_field(
+                    self.model.interpolate_to_grid(self.get_grid(src, freq)),
+                    self._dict_efield[src][freq],
+                )
+            else:
+                hfield = None
             self._dict_hfield[src][freq] = hfield
 
-            # Store electric and magnetic responses at receiver locations.
+            # Store responses at receiver locations.
             self._store_responses(src, freq)
 
         # Print solver info.
@@ -1452,3 +1408,48 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
 
     # Return gridding_opts.
     return gopts
+
+
+def _solver(inp):
+    """Thin wrapper of `solver.solve` for a `process_map`.
+
+
+    Parameters
+    ----------
+    inp : tuple
+        (model, sfield, efield, solver_opts):
+
+        - ``model``: Corresponds to `Simulation.model`; it will be interpolated
+          to the computational grid.
+        - ``sfield``: Source field on computational grid.
+        - ``efield``: None or electric field which is used as starting field.
+        - `` solver_opts``: Dict which is provided to ``solver.solve``.
+
+
+    Returns
+    -------
+    efield : Field
+        Resulting electric field.
+
+    info : dict
+        Dictionary with solver info.
+
+    """
+
+    model, sfield, efield, solver_opts = inp
+
+    solver_input = {
+        **solver_opts,
+        'model': model.interpolate_to_grid(sfield.grid),
+        'sfield': sfield,
+        'efield': efield,
+    }
+
+    # Compute electric field.
+    if efield is None:
+        efield, info = solver.solve(**solver_input)
+    else:
+        info = solver.solve(**solver_input)
+
+    # Return electric field.
+    return efield, info

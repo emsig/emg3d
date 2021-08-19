@@ -636,6 +636,16 @@ class Survey:
 
         self._data.attrs[name] = value
 
+    @property
+    def _irec_types(self):
+        """Return receiver types if electric (True) or magnetic (False)."""
+        if getattr(self, '_ierec', None) is None:
+            rec_types = tuple(
+                [r.xtype == 'electric' for r in self.receivers.values()])
+            self._ierec = np.nonzero(rec_types)[0]
+            self._imrec = np.nonzero(np.logical_not(rec_types))[0]
+        return self._ierec, self._imrec
+
 
 def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):
     r"""Return random noise for given inputs.
