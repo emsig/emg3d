@@ -1074,13 +1074,13 @@ class Simulation:
     def print_solver_info(self, field='efield', verb=1, return_info=False):
         """Print solver info."""
 
-        # Get info dict.
-        info = getattr(self, f"_dict_{field}_info", {})
-        out = ""
-
         # If not verbose, return.
         if verb < 0:
             return
+
+        # Get info dict.
+        info = getattr(self, f"_dict_{field}_info", {})
+        out = ""
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
