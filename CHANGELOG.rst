@@ -9,13 +9,18 @@ Changelog
 latest
 ------
 
-
 - WIP: Memory improvements for parallel execution in simulations.
 
   - ``get_model`` is done on the fly, not stored in a dict any longer
     (``simulation._dict_model`` does not exist any longer).
   - All computation move to ...
   - Provided ``efields`` are now input to the solver.
+
+- Simulation:
+
+  - Adjust printing: correct simulation results for adjusted solver printing
+    levels; *default solver verbosity is new 1*; ``log`` can now be overwritten
+    in ``solver_opts`` (mainly for debugging).
 
 - Bug fixes:
 
