@@ -1087,7 +1087,7 @@ class Simulation:
             cinfo = info[src][freq]
 
             # Print if verbose or not converged.
-            if verb > 0 or cinfo['exit'] != 0:
+            if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
 
                 # Initial message.
                 if not out:

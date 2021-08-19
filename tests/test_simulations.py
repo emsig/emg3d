@@ -422,6 +422,22 @@ class TestSimulation():
         out, _ = capsys.readouterr()
         assert "= Source TxED-1; Frequency 1.0 Hz = CONVERGED" in out
 
+        # Two sources, only compute 1, assure printing works.
+        sources = [emg3d.TxElectricDipole((x, 0, 0, 0, 0)) for x in [0, 10]]
+        survey = emg3d.Survey(
+            name='Test', sources=sources,
+            receivers=receivers,
+            frequencies=1.0, noise_floor=1e-15, relative_error=0.05,
+        )
+
+        inp = {'name': 'Test', 'survey': survey, 'model': model,
+               'gridding': 'same'}
+        simulation = simulations.Simulation(**inp, solver_opts={'verb': 0})
+        _ = simulation.get_efield('TxED-2', 'f-1')
+        simulation.print_solver_info(verb=1)
+        out, _ = capsys.readouterr()
+        assert "= Source TxED-2; Frequency 1.0 Hz = CONVERGED" in out
+
     def test_rel_abs_rec(self):
         # Sources
         sources = emg3d.surveys.txrx_coordinates_to_dict(
