@@ -9,6 +9,12 @@ Changelog
 latest
 ------
 
+- Simulation:
+
+  - Adjust printing: correct simulation results for adjusted solver printing
+    levels; *default solver verbosity is new 1*; ``log`` can now be overwritten
+    in ``solver_opts`` (mainly for debugging).
+
 - Bug fixes:
 
   - Track order when saving to hdf5.
