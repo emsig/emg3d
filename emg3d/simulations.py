@@ -951,7 +951,13 @@ class Simulation:
 
             # Residual source strength: Weighted residual, normalized by -smu0.
             weight = self.data.weights.loc[source, name, frequency].data
-            strength = np.conj(residual * weight / -rfield.smu0)
+            
+            if rec.data_type == 'amp':
+                data_rec = self.data.synthetic.loc[source, name, frequency].data
+                data_rec_deriv_conj = data_rec / abs(data_rec)
+                strength = np.conj(residual * weight  * data_rec_deriv_conj / -rfield.smu0)
+            else:
+                strength = np.conj(residual * weight / -rfield.smu0)
 
             # Create source.
             if rec.xtype == 'magnetic':
@@ -969,6 +975,7 @@ class Simulation:
             # Get absolute coordinates as fct of source.
             # (Only relevant in case of "relative" receivers.)
             coords = rec.coordinates_abs(self.survey.sources[source])
+            
 
             # Get residual field and add it to the total field.
             rfield.field += fields.get_source_field(
@@ -1010,6 +1017,8 @@ class Simulation:
         out = np.zeros(self.data.synthetic.loc[src, :, freq].shape,
                        dtype=complex)
 
+        data_deriv = []
+        
         # Store electric receivers.
         if rec_types.count(True):
 
@@ -1031,7 +1040,15 @@ class Simulation:
                     method=self.receiver_interpolation,
             )
             out[mrec] = resp
-
+        
+        for name, rec in self.survey.receivers.items():
+            if rec.data_type == 'amp':
+                data_rec = self.data.synthetic.loc[src, name, freq].data
+                data_rec_deriv = data_rec.conj() / abs(data_rec)
+            else:
+                data_rec_deriv = np.ones(self.data.synthetic.loc[src, name, freq].data.size, dtype=complex)
+            data_deriv.append(data_rec_deriv) 
+        out *= np.hstack(data_deriv)
         return out
 
     def _get_gvec_field(self, source, frequency):

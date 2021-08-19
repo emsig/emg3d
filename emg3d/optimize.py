@@ -121,7 +121,7 @@ def misfit(simulation):
     return misfit.data
 
 
-def gradient(simulation):
+def gradient(simulation, data_type='complex'):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete adjoint-state gradient for a single source at a single
