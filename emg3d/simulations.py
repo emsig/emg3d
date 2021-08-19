@@ -700,7 +700,7 @@ class Simulation:
             srcfreq = self._srcfreq
 
         # Create iterable form src/freq-list to call the process_map.
-        def collect_inputs(inp):
+        def collect_efield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
             sfield = fields.get_source_field(
@@ -715,7 +715,7 @@ class Simulation:
         # Initiate futures-dict to store output.
         out = utils._process_map(
                 _solver,
-                list(map(collect_inputs, self._srcfreq)),
+                list(map(collect_efield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
                 **{'desc': 'Compute efields', **self._tqdm_opts},
         )
@@ -775,26 +775,22 @@ class Simulation:
             self._misfit = optimize.misfit(self)
         return self._misfit
 
-    def _get_bfields(self, inp):
-        """Return back-propagated electric field for given inp (src, freq)."""
-
-        # Input parameters.
-        solver_input = {
-            **self.solver_opts,
-            'model': self.model.interpolate_to_grid(self.get_grid(*inp)),
-            'sfield': self._get_rfield(*inp),  # Residual field.
-        }
-
-        # Compute and return back-propagated electric field.
-        return solver.solve(**solver_input)
-
     def _bcompute(self):
         """Compute bfields asynchronously for all sources and frequencies."""
 
+        # Create iterable form src/freq-list to call the process_map.
+        def collect_bfield_inputs(inp):
+            """Collect inputs."""
+            source, freq = inp
+            sfield = self._get_rfield(*inp)  # Residual field.
+            bfield = None  # Initial bfield not yet implemented
+
+            return self.model, sfield, bfield, self.solver_opts
+
         # Initiate futures-dict to store output.
         out = utils._process_map(
-                self._get_bfields,
-                self._srcfreq,
+                _solver,
+                list(map(collect_bfield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
                 **{'desc': 'Back-propagate ', **self._tqdm_opts},
         )
