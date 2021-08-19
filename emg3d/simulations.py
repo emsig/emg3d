@@ -953,7 +953,7 @@ class Simulation:
             weight = self.data.weights.loc[source, name, frequency].data
             
             data_complex_rec = self.data.synthetic.loc[source, name, frequency].data
-            data_complex_rec_deriv = rec.data_deriv(data_complex_rec, adjoint=True)
+            data_complex_rec_deriv = rec.data_deriv(data_complex_rec, adjoint=True)[0]
             strength = np.conj(residual * weight  * data_complex_rec_deriv / -rfield.smu0)
 
             # Create source.
@@ -972,14 +972,41 @@ class Simulation:
             # Get absolute coordinates as fct of source.
             # (Only relevant in case of "relative" receivers.)
             coords = rec.coordinates_abs(self.survey.sources[source])
-            
+                
+            if rec.xtype == 'electric':
+                # Get residual field and add it to the total field.
+                rfield.field += fields.get_source_field(
+                        grid=grid,
+                        source=src_fct(coords, strength=strength),
+                        frequency=freq,
+                ).field
 
-            # Get residual field and add it to the total field.
-            rfield.field += fields.get_source_field(
-                    grid=grid,
-                    source=src_fct(coords, strength=strength),
-                    frequency=freq,
-            ).field
+            elif rec.xtype == 'magnetic':
+                # Use of SimPEG for calculating rfield
+                C = grid.edgeCurl
+                rec_loc = rec.coordinates[:3]
+                azimuth = rec.coordinates[3]
+                elevation = rec.coordinates[4]
+                # Requires a generalization, but should be simple by combining x, y, z
+                # Aslo no need to store P every time, so would be wortwhile to store
+                # in a receiver object?
+                
+                if (azimuth == 0) & (elevation==0):
+                    location_type='Fx'
+                elif (azimuth == 90) & (elevation==0):
+                    location_type='Fy'
+                elif (azimuth == 0) & (elevation==90):
+                    location_type='Fz'
+                P = grid.get_interpolation_matrix(rec_loc, location_type=location_type)    
+                # h = -C*e / (i*omega*mu)       
+                # smu0 = i*omega*mu
+                h_deriv = ((C.T @ P.T).toarray().ravel() / rfield.smu0).conj()
+
+                rfield.field += fields.Field(
+                        grid=grid,
+                        data=np.conj(-h_deriv * residual * weight),
+                        frequency=freq,
+                ).field
 
         return rfield
 
@@ -1030,9 +1057,13 @@ class Simulation:
 
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
-            resp = self.get_hfield(source, frequency).get_receiver(
-                    receiver=rec_coord_tuple(mrec),
-                    method=self.receiver_interpolation,
+
+            resp = fields.get_magnetic_field(
+                    self.get_model(source, frequency),
+                    efield_jvec
+            ).get_receiver(
+                receiver=rec_coord_tuple(mrec),
+                method=self.receiver_interpolation,            
             )
             out[mrec] = resp
         
