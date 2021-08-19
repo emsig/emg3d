@@ -606,59 +606,6 @@ class Simulation:
 
         return self._dict_efield[source][freq]
 
-    def _old_get_efield(self, source, frequency, **kwargs):
-        # TODO REPLACE COMPLETELY
-        freq = self._freq_inp2key(frequency)
-
-        # Get call_from_compute and ensure no kwargs are left.
-        call_from_compute = kwargs.pop('call_from_compute', False)
-        call_from_hfield = kwargs.pop('call_from_hfield', False)
-        if kwargs:
-            raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
-
-        grid = self.get_grid(source, freq)
-
-        if self._dict_efield[source][freq] is None:
-            provided = fields.Field(grid)
-        else:
-            provided = self._dict_efield[source][freq]
-
-        solver_input = {
-            **self.solver_opts,
-            # TODO: here OK, will happen on thread
-            'model': self.model.interpolate_to_grid(grid),
-            'sfield': fields.get_source_field(
-                grid,
-                self.survey.sources[source],
-                self.survey.frequencies[freq]),
-            'efield': provided,
-        }
-
-        # Compute electric field.
-        info = solver.solve(**solver_input)
-        self._dict_efield[source][freq] = provided
-
-        # Store electric field and info.
-        self._dict_efield_info[source][freq] = info
-
-        if not call_from_hfield:
-
-            # Clean corresponding hfield, so it will be recomputed.
-            del self._dict_hfield[source][freq]
-            self._dict_hfield[source][freq] = None
-
-            # Store electric and magnetic responses at receiver locations.
-            self._store_responses(source, freq)
-
-        # Return electric field.
-        if call_from_compute:
-            return (self._dict_efield[source][freq],
-                    self._dict_efield_info[source][freq],
-                    self._dict_hfield[source][freq],
-                    self.data.synthetic.loc[source, :, freq].data)
-        else:
-            return self._dict_efield[source][freq]
-
     def get_hfield(self, source, frequency, **kwargs):
         """Return magnetic field for given source and frequency."""
         freq = self._freq_inp2key(frequency)
@@ -666,11 +613,11 @@ class Simulation:
         # If magnetic field not computed yet compute it.
         if self._dict_hfield[source][freq] is None:
 
+            efield = self.get_efield(source, freq, **kwargs)
             self._dict_hfield[source][freq] = fields.get_magnetic_field(
-                    self.model.interpolate_to_grid(    # TODO CHANGE
-                        self.get_grid(source, freq)),  # move to efield
-                    self._old_get_efield(
-                        source, freq, call_from_hfield=True, **kwargs))
+                self.model.interpolate_to_grid(self.get_grid(source, freq)),
+                efield
+            )
 
             # Store electric and magnetic responses at receiver locations.
             self._store_responses(source, frequency)
@@ -730,7 +677,40 @@ class Simulation:
     # ASYNCHRONOUS COMPUTATION
     def _get_efield(self, inp):
         """Wrapper of `_old_get_efield` for `concurrent.futures`."""
-        return self._old_get_efield(*inp, call_from_compute=True)
+
+        source, freq = inp
+
+        # TODO:
+        # o NEED TO PROVIDE:
+        #   - src/freq dep : model; sfield; efield;
+        #   - general      : solver_opts
+        # o NO NEED:
+        #   - source, frequency
+        # THEN self._get_efield() => turns into => solver.solve_source() !
+
+        grid = self.get_grid(source, freq)
+
+        if self._dict_efield[source][freq] is None:
+            efield = fields.Field(grid)
+        else:
+            efield = self._dict_efield[source][freq]
+
+        solver_input = {
+            **self.solver_opts,
+            # TODO: here OK, will happen on thread
+            'model': self.model.interpolate_to_grid(grid),
+            'sfield': fields.get_source_field(
+                grid,
+                self.survey.sources[source],
+                self.survey.frequencies[freq]),
+            'efield': efield,
+        }
+
+        # Compute electric field.
+        info = solver.solve(**solver_input)
+
+        # Return electric field.
+        return efield, info
 
     def compute(self, observed=False, **kwargs):
         """Compute efields asynchronously for all sources and frequencies.
@@ -783,10 +763,17 @@ class Simulation:
             # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
             self._dict_efield_info[src][freq] = out[i][1]
-            self._dict_hfield[src][freq] = out[i][2]
 
-            # Store responses at receivers.
-            self.data['synthetic'].loc[src, :, freq] = out[i][3]
+            # TODO Only necessary if any magnetic receivers. Otherwise we
+            # could set hfield to None
+            hfield = fields.get_magnetic_field(
+                self.model.interpolate_to_grid(self.get_grid(src, freq)),
+                self._dict_efield[src][freq],
+            )
+            self._dict_hfield[src][freq] = hfield
+
+            # Store electric and magnetic responses at receiver locations.
+            self._store_responses(src, freq)
 
         # Print solver info.
         self.print_solver_info('efield', verb=self.verb)
@@ -839,7 +826,6 @@ class Simulation:
         # Input parameters.
         solver_input = {
             **self.solver_opts,
-            # TODO: here OK, will happen on thread
             'model': self.model.interpolate_to_grid(self.get_grid(*inp)),
             'sfield': self._get_rfield(*inp),  # Residual field.
         }
