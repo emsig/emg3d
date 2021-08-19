@@ -952,12 +952,9 @@ class Simulation:
             # Residual source strength: Weighted residual, normalized by -smu0.
             weight = self.data.weights.loc[source, name, frequency].data
             
-            if rec.data_type == 'amp':
-                data_rec = self.data.synthetic.loc[source, name, frequency].data
-                data_rec_deriv_conj = data_rec / abs(data_rec)
-                strength = np.conj(residual * weight  * data_rec_deriv_conj / -rfield.smu0)
-            else:
-                strength = np.conj(residual * weight / -rfield.smu0)
+            data_complex_rec = self.data.synthetic.loc[source, name, frequency].data
+            data_complex_rec_deriv = rec.data_deriv(data_complex_rec, adjoint=True)
+            strength = np.conj(residual * weight  * data_complex_rec_deriv / -rfield.smu0)
 
             # Create source.
             if rec.xtype == 'magnetic':
@@ -1000,7 +997,7 @@ class Simulation:
         efield_jvec = solver.solve(**solver_input)[0]
 
         # Get receiver types.
-        src, freq = inp
+        source, frequency = inp
         rec_types = tuple([r.xtype == 'electric'
                            for r in self.survey.receivers.values()])
 
@@ -1010,14 +1007,12 @@ class Simulation:
         def rec_coord_tuple(rec_list):
             """Return abs. coordinates for as a fct of source."""
             return tuple(np.array(
-                [rl[i].coordinates_abs(self.survey.sources[src])
+                [rl[i].coordinates_abs(self.survey.sources[source])
                  for i in rec_list]
             ).T)
 
-        out = np.zeros(self.data.synthetic.loc[src, :, freq].shape,
+        out = np.zeros(self.data.synthetic.loc[source, :, frequency].shape,
                        dtype=complex)
-
-        data_deriv = []
         
         # Store electric receivers.
         if rec_types.count(True):
@@ -1035,20 +1030,19 @@ class Simulation:
 
             # Extract data at receivers.
             mrec = np.nonzero(np.logical_not(rec_types))[0]
-            resp = self.get_hfield(src, freq).get_receiver(
+            resp = self.get_hfield(source, frequency).get_receiver(
                     receiver=rec_coord_tuple(mrec),
                     method=self.receiver_interpolation,
             )
             out[mrec] = resp
         
+        # Apply a chainrule for the different data_type than complex (e.g. amp)
+        data_complex_deriv = []
         for name, rec in self.survey.receivers.items():
-            if rec.data_type == 'amp':
-                data_rec = self.data.synthetic.loc[src, name, freq].data
-                data_rec_deriv = data_rec.conj() / abs(data_rec)
-            else:
-                data_rec_deriv = np.ones(self.data.synthetic.loc[src, name, freq].data.size, dtype=complex)
-            data_deriv.append(data_rec_deriv) 
-        out *= np.hstack(data_deriv)
+            data_complex_rec = self.data.synthetic.loc[source, name, frequency].data
+            data_complex_rec_deriv = rec.data_deriv(data_complex_rec, adjoint=False)
+            data_complex_deriv.append(data_complex_rec_deriv) 
+        out *= np.hstack(data_complex_deriv)
         return out
 
     def _get_gvec_field(self, source, frequency):

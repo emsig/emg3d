@@ -580,6 +580,18 @@ class Receiver(Wire):
         """Data type"""
         return self._data_type
 
+    def data_deriv(self, data_complex, adjoint=False):     
+        if self.data_type == 'complex':
+            data_complex_deriv = np.ones(data_complex.size, dtype='complex')
+        elif self.data_type == 'amp':
+            data_complex_deriv = data_complex.conj() / abs(data_complex)            
+        else:
+            raise Exception("Not Implemented!")
+        if adjoint:
+            return data_complex_deriv.conj()
+        else:
+            return data_complex_deriv
+
     def center_abs(self, source):
         """Returns points as absolute positions."""
         if self.relative:
