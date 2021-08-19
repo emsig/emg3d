@@ -137,7 +137,7 @@ class Simulation:
           can be defined with the key ``seasurface``. See
           :func:`emg3d.simulations.expand_grid_model`.
 
-    solver_opts : dict, default: {'verb': 2'}
+    solver_opts : dict, default: {'verb': 1'}
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
         ``model``, ``sfield``, ``efield``, ``return_info``, and ``log``.
@@ -194,10 +194,10 @@ class Simulation:
 
         # Assemble solver_opts.
         self.solver_opts = {
-                'verb': 2,  # Default verbosity, can be overwritten.
+                'verb': 1,  # Default verbosity, can be overwritten.
+                'log': -1,  # Default only log, can be overwritten.
                 **kwargs.pop('solver_opts', {}),  # User setting.
                 'return_info': True,  # return_info=True is forced.
-                'log': -1             # log=-1 is forced.
         }
 
         # Initiate dictionaries and other values with None's.
@@ -1074,19 +1074,20 @@ class Simulation:
     def print_solver_info(self, field='efield', verb=1, return_info=False):
         """Print solver info."""
 
+        # If not verbose, return.
+        if verb < 0:
+            return
+
         # Get info dict.
         info = getattr(self, f"_dict_{field}_info", {})
         out = ""
-
-        if verb < 0:
-            return
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
             cinfo = info[src][freq]
 
             # Print if verbose or not converged.
-            if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
+            if verb > 0 or cinfo['exit'] != 0:
 
                 # Initial message.
                 if not out:
@@ -1099,14 +1100,14 @@ class Simulation:
                 out += f"{self.survey.frequencies[freq]} Hz ="
 
                 # Print log depending on solver and simulation verbosities.
-                if verb == 0 or self.solver_opts['verb'] not in [1, 2]:
+                if verb == 0 or self.solver_opts['verb'] != 1:
                     out += f" {cinfo['exit_message']}\n"
 
-                if verb > 0 and self.solver_opts['verb'] > 2:
-                    out += f"\n{cinfo['log']}\n"
-
-                if verb > 0 and self.solver_opts['verb'] in [1, 2]:
+                if verb == 1 and self.solver_opts['verb'] == 1:
                     out += f" {cinfo['log'][12:]}"
+
+                if verb == 1 and self.solver_opts['verb'] > 1:
+                    out += f"\n{cinfo['log']}\n"
 
         if return_info:
             return out
