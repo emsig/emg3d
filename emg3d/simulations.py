@@ -643,7 +643,7 @@ class Simulation:
         if erec.size:
 
             # Extract data at receivers.
-            resp = self.get_efield(source, freq).get_receiver(
+            resp = self._dict_efield[source][freq].get_receiver(
                     receiver=rec_coord_tuple(erec),
                     method=self.receiver_interpolation,
             )
@@ -654,8 +654,18 @@ class Simulation:
         # Store magnetic receivers.
         if mrec.size:
 
+            # Get h-field.
+            if self._dict_hfield[source][freq] is None:
+
+                hfield = fields.get_magnetic_field(
+                    self.model.interpolate_to_grid(
+                            self.get_grid(source, freq)),
+                    self._dict_efield[source][freq],
+                )
+                self._dict_hfield[source][freq] = hfield
+
             # Extract data at receivers.
-            resp = self.get_hfield(source, freq).get_receiver(
+            resp = self._dict_hfield[source][freq].get_receiver(
                     receiver=rec_coord_tuple(mrec),
                     method=self.receiver_interpolation,
             )
@@ -716,17 +726,6 @@ class Simulation:
             # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
             self._dict_efield_info[src][freq] = out[i][1]
-
-            # Get magnetic field if there are any magnetic receivers.
-            _, mrec = self.survey._irec_types
-            if mrec.size:
-                hfield = fields.get_magnetic_field(
-                    self.model.interpolate_to_grid(self.get_grid(src, freq)),
-                    self._dict_efield[src][freq],
-                )
-            else:
-                hfield = None
-            self._dict_hfield[src][freq] = hfield
 
             # Store responses at receiver locations.
             self._store_responses(src, freq)
