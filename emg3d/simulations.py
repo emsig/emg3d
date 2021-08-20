@@ -884,30 +884,8 @@ class Simulation:
         # Compute and return A^-1 * G * vec
         efield_jvec = solver.solve(**solver_input)[0]
 
-        # Get receiver types and their coordinates.
-        source, frequency = inp
-        erec, mrec = self.survey._irec_types
-        erec_coord, mrec_coord = self.survey._rec_types_coord(source)
-
-        # Initiate data array.
-        out = np.zeros(self.data.synthetic.loc[source, :, frequency].shape,
-                       dtype=complex)
-
-        # Store electric receivers.
-        if erec.size:
-            out[erec] = efield_jvec.get_receiver(
-                    receiver=erec_coord, method=self.receiver_interpolation,
-            )
-
-        # Store magnetic receivers.
-        if mrec.size:
-            out[mrec] = fields.get_magnetic_field(
-                self.get_model(source, frequency), efield_jvec
-            ).get_receiver(
-                receiver=mrec_coord, method=self.receiver_interpolation,
-            )
-
-        return out
+        # Return the responses at receivers.
+        return self._store_responses(*inp, efield_jvec)
 
     def _get_gvec_field(self, source, frequency):
 
