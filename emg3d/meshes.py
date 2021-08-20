@@ -1050,8 +1050,7 @@ def check_mesh(mesh):
     # Check mesh dimensions, warn if not optimal.
     if any(n_cells not in good for n_cells in mesh.shape_cells):
         msg = (
-            f"Mesh dimension {(mesh.shape_cells)} is not optimal for MG "
-            f"solver. Good numbers are:\n{good_mg_cell_nr(max_nr=5000)}"
+            f"emg3d: Mesh dimension {(mesh.shape_cells)} is not optimal for "
+            f"MG solver. Good numbers are:\n{good_mg_cell_nr(max_nr=5000)}"
         )
-        print(f"* WARNING :: {msg}")
         warnings.warn(msg, UserWarning)

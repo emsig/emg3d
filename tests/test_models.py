@@ -126,10 +126,12 @@ class TestModel:
 
         # Check a couple of out-of-range failures
         with pytest.raises(ValueError, match='`property_x` must be all'):
-            _ = models.Model(grid, property_x=property_x*0)
+            with np.errstate(all='ignore'):
+                _ = models.Model(grid, property_x=property_x*0)
         Model = models.Model(grid, property_x=property_x)
         with pytest.raises(ValueError, match='`property_x` must be all'):
-            Model._check_positive_finite(property_x*0, 'property_x')
+            with np.errstate(all='ignore'):
+                Model._check_positive_finite(property_x*0, 'property_x')
         with pytest.raises(ValueError, match='`property_x` must be all'):
             Model._check_positive_finite(-1.0, 'property_x')
         with pytest.raises(ValueError, match='`property_y` must be all'):

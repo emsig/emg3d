@@ -29,8 +29,8 @@ except ImportError:
 
 from emg3d import electrodes, utils, io
 
-__all__ = ['Survey', 'txrx_coordinates_to_dict', 'txrx_lists_to_dict',
-           'frequencies_to_dict']
+__all__ = ['Survey', 'random_noise', 'txrx_coordinates_to_dict',
+           'txrx_lists_to_dict', 'frequencies_to_dict']
 
 
 @utils._known_class
@@ -71,6 +71,12 @@ class Survey:
         It can also be a list containing a combination of the above (lists,
         dicts, and instances).
 
+        Receivers can be set to ``None``, if one is only interested in forward
+        modelling the entire fields. In this case, the related data object and
+        the noise floor and relative error have no meaning. Also, in
+        conjunction with a :class:`emg3d.simulations.Simulation`, the misfit
+        and the gradient will be zero.
+
     frequencies : {array_like, dict}
         Source frequencies (Hz).
 
@@ -110,7 +116,10 @@ class Survey:
 
         # Store sources, receivers, and frequencies.
         self._sources = txrx_lists_to_dict(sources)
-        self._receivers = txrx_lists_to_dict(receivers)
+        if receivers is None:
+            self._receivers = {}
+        else:
+            self._receivers = txrx_lists_to_dict(receivers)
         self._frequencies = frequencies_to_dict(frequencies)
 
         # Initialize xarray dataset.
@@ -414,7 +423,7 @@ class Survey:
         """Frequency dict containing all frequencies."""
         return self._frequencies
 
-    # STANDARD DEVIATION
+    # STANDARD DEVIATION and NOISE
     @property
     def standard_deviation(self):
         r"""Return standard deviation of the data.
@@ -540,6 +549,65 @@ class Survey:
         """Update relative error."""
         self._set_nf_re('relative_error', relative_error)
 
+    def add_noise(self, min_offset=0.0, min_amplitude='half_nf',
+                  add_to='observed', **kwargs):
+        """Add random noise to the data defined by ``add_to``.
+
+        The noise is generated with :func:`emg3d.surveys.random_noise`, consult
+        that function to see how it is actually generated (``kwargs`` are
+        passed through).
+
+        This function takes further care of removing data which is too close to
+        the source (``min_offset``) or has a too low signal
+        (``min_amplitude``).
+
+
+        Parameters
+        ----------
+
+        min_offset : float, default: 0.0
+            Data points in ``data.observed`` where the offset < min_offset are
+            set to NaN.
+
+        min_amplitude : {float, str, None}, default: 'half_nf'
+            Data points in ``data.observed`` where abs(data) < min_amplitude
+            are set to NaN. If ``'half_nf'``, the ``noise_floor`` divided by
+            two is used as ``min_amplitude``. Set to ``None`` to include all
+            data.
+
+        add_to : str, default: 'observed'
+            Data to which to add the noise. By default it is added to the
+            observed data. If a name is provided that is not an existing
+            dataset it will create a dataset of zeroes. You can use that to
+            obtain the pure noise.
+
+        """
+        # If a new data set is defined as output, initiate it.
+        if add_to not in self.data.keys():
+            self.data[add_to] = self.data.observed.copy(
+                    data=np.zeros(self.shape, dtype=complex))
+
+        # Set data below minimum amplitude to NaN.
+        if min_amplitude == 'half_nf':
+            min_amplitude = self.noise_floor
+            if min_amplitude is not None:
+                min_amplitude /= 2.0
+        if min_amplitude is not None:
+            cut_amp = abs(self.data.observed.data) < min_amplitude
+            self.data[add_to].data[cut_amp] = np.nan + 1j*np.nan
+
+        # Set offsets below minimum offset to NaN.
+        if min_offset > 0.0:
+            for ks, s in self.sources.items():
+                for kr, r in self.receivers.items():
+                    if np.linalg.norm(r.center_abs(s) - s.center) < min_offset:
+                        self.data[add_to].loc[ks, kr, :] = np.nan + 1j*np.nan
+
+        # Add noise if noise_floor and/or relative_error given.
+        if self.standard_deviation is not None:
+            noise = random_noise(self.standard_deviation.data, **kwargs)
+            self.data[add_to].data += noise
+
     def _set_nf_re(self, name, value):
         """Update noise_floor or relative_error."""
 
@@ -567,6 +635,120 @@ class Survey:
                 value = 'data._'+name  # str-flag on attrs.
 
         self._data.attrs[name] = value
+
+
+def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):
+    r"""Return random noise for given inputs.
+
+    Different methods are implemented to create random noise for
+    frequency-domain CSEM data. All methods generate random noise in the
+    following way
+
+    .. math::
+
+        d^\text{noise} =
+        \varsigma \left[(1 + \text{i})\,u + \mathcal{R} \right] \, .
+
+    where :math:`\varsigma` is the standard deviation (see
+    :attr:`emg3d.surveys.Survey.standard_deviation`), :math:`u` is the mean
+    value of the randomly distributed noise, and :math:`\mathcal{R}` are the
+    random realizations of the noise.
+
+    Currently there are three methods (``ntype``) implemented.
+
+    1. ``white_noise``
+
+       Random uniform phases with constant amplitudes. This is the default
+       implementation, and corresponds to white noise in the time-domain: a
+       flat amplitude spectrum for all frequencies, with random phases:
+
+       .. math::
+
+           \mathcal{R}_\text{wn} = \exp[\text{i}\,\mathcal{U}(0, 2\pi)] \, ,
+
+       where :math:`\mathcal{U}(0, 2\pi)` is the uniform distribution and its
+       range.
+
+    2. Random Gaussian noise.
+
+       In the following, :math:`\mathcal{N}(0, 1)` is the standard normal
+       distribution of zero mean and unit standard deviation.
+
+       a. ``gaussian_correlated``
+
+          Same realization added to real and imaginary part.
+
+          .. math::
+
+              \mathcal{R}_\text{gc} = (1+\text{i})\,\mathcal{N}(0, 1) \, .
+
+
+       b. ``gaussian_uncorrelated``
+
+          Independent realizations added to real and imaginary part.
+
+          .. math::
+
+              \mathcal{R}_\text{gu} =
+              \mathcal{N}(0, 1) + \text{i}\,\mathcal{N}(0, 1) \, .
+
+
+    There are, of course, other possibilities. One could, e.g., make the
+    non-zero mean itself random.
+
+    See the example `random_noise_f_domain.html
+    <https://empymod.emsig.xyz/en/latest/gallery/educational/random_noise_f_domain.html>`_
+    for more details about random noise in the frequency domain.
+
+
+    Parameters
+    ----------
+    standard_deviation : ndarray
+        Standard deviations of the data.
+
+    mean_noise : float, default: 0.0
+        Mean value of the random noise (as fraction of standard_deviation).
+
+    ntype : str, default: white_noise
+        What type of noise. Options:
+
+        - ``'white_noise'``:
+          random uniform phases with constant amplitude.
+
+        - ``'gaussian_correlated'``:
+          Same Gaussian random realizations added to Real and Imaginary part.
+
+        - ``'gaussian_uncorrelated'``:
+          Independent Gaussian random realizations added to Real and Imaginary
+          part.
+
+
+    Returns
+    -------
+    noise : ndarray
+        Noise, a complex-valued ndarray of the same shape as
+        standard_deviation.
+
+    """
+    shape = standard_deviation.shape
+
+    # Initiate Random Generator.
+    rng = np.random.default_rng()
+
+    # Random Gaussian noise independently for Real and Imaginary part.
+    if ntype == 'gaussian_uncorrelated':
+        noise = rng.standard_normal(shape) + 1j*rng.standard_normal(shape)
+
+    # Random Gaussian noise; same for Real and Imaginary part.
+    elif ntype == 'gaussian_correlated':
+        noise = rng.standard_normal(shape)*(1+1j)
+
+    # Random Uniform phases with constant amplitude (white noise); default.
+    else:
+        noise = np.exp(1j * rng.uniform(0, 2*np.pi, shape))
+
+    # Return noise.
+    return standard_deviation * ((1+1j)*mean_noise + noise)
 
 
 def txrx_coordinates_to_dict(TxRx, coordinates, **kwargs):

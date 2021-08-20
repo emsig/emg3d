@@ -417,7 +417,7 @@ class Fourier:
 
         # If they are both set, reset one depending on `keep_inp_freq`.
         if self._input_freq is not None and self._every_x_freq is not None:
-            msg = ("`input_freq` and `every_x_freq` are mutually "
+            msg = ("emg3d: `input_freq` and `every_x_freq` are mutually "
                    "exclusive. Re-setting ")
 
             if keep_inp_freq:  # Keep input_freq.
@@ -428,8 +428,7 @@ class Fourier:
                 msg += "`input_freq=None`."
                 self._input_freq = None
 
-            # Print is always shown and simpler, warn for the CLI logs.
-            print(f"* WARNING :: {msg}")
+            # Warn.
             warnings.warn(msg, UserWarning)
 
     # PRINTING ROUTINES

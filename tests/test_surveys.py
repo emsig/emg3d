@@ -80,6 +80,14 @@ class TestSurvey():
         assert srvy.date == 'today'
         assert srvy.info == 'RainyDay'
 
+    def test_no_receiver(self):
+        srvy = surveys.Survey(self.sources, None, self.frequencies)
+
+        assert isinstance(srvy.sources, dict)
+        assert srvy.sources['TxED-1'].center[0] == 0
+        assert srvy.receivers == {}
+        assert srvy.shape == (self.shape[0], 0, self.shape[2])
+
     def test_standard_deviation(self):
         srvy0 = surveys.Survey(self.sources, self.receivers, self.frequencies,
                                data=np.ones(self.shape))
@@ -198,6 +206,72 @@ class TestSurvey():
 
         assert_allclose(survey.receiver_coordinates('TxED-2'),
                         [[1000, 1150], [0, 350], [2000, 2550]])
+
+    def test_add_noise(self):
+        offs = np.linspace(0, 10000, 21)
+        rec = surveys.txrx_coordinates_to_dict(
+                emg3d.electrodes.RxElectricPoint, (offs, 0, 0, 0, 0)
+        )
+
+        data = np.logspace(0, -20, offs.size)+1j*np.logspace(0, -20, offs.size)
+
+        survey = surveys.Survey(
+            sources=emg3d.electrodes.TxElectricDipole((0, 0, 0, 0, 0)),
+            receivers=rec,
+            frequencies=1.0,
+            data=data,
+            relative_error=0.01,
+            noise_floor=1e-15
+        )
+
+        # Defined cutting
+        survey.add_noise(min_offset=1000, min_amplitude=1e-19, add_to='test1')
+        # Ensure short offsets are NaN
+        assert np.all(np.isnan(survey.data.test1.data[:, :2, :]))
+        # Ensure low amplitudes are NaN
+        assert np.all(np.isnan(survey.data.test1.data[:, -1:, :]))
+        # Ensure no others are none
+        assert np.sum(np.isnan(survey.data.test1.data)) == 3
+
+        # No cutting
+        survey.add_noise(min_offset=0, min_amplitude=10e-50, add_to='test2')
+        assert np.sum(np.isnan(survey.data.test2.data)) == 0
+
+        # Defaults
+        survey.add_noise()
+        # Ensure low amplitudes are NaN
+        assert np.all(np.isnan(survey.data.observed.data[:, -5:, :]))
+        assert np.sum(np.isnan(survey.data.observed.data)) == 5
+
+
+def test_random_noise():
+    std = np.ones((2, 3, 4))
+    mean_noise = 0.0
+
+    # Default is white noise
+    noise_wn = surveys.random_noise(std, mean_noise)
+    assert_allclose(std, abs(noise_wn))  # Constant amplitude!
+
+    nm = np.angle(surveys.random_noise(np.ones(100000), mean_noise=0.0)).mean()
+    assert_allclose(nm, 0.0, atol=0.02, rtol=1e-1)
+    nm = np.angle(surveys.random_noise(np.ones(100000), mean_noise=0.5)).mean()
+    assert_allclose(nm, 0.5, rtol=1e-1)
+
+    noise_gu = surveys.random_noise(std, mean_noise, 'gaussian_uncorrelated')
+    # Real and imaginary part have to be different.
+    assert not np.allclose(noise_gu.imag, noise_gu.real, 0, 1e-15)
+    nn_gu = surveys.random_noise(
+                np.ones(100000)*.01, 0.5, 'gaussian_uncorrelated')
+    assert_allclose(nn_gu.real.mean(), 0.01*0.5, rtol=1e-1)
+    assert_allclose(nn_gu.imag.mean(), 0.01*0.5, rtol=1e-1)
+
+    noise_gc = surveys.random_noise(std, mean_noise, 'gaussian_correlated')
+    # Real and imaginary part are the same.
+    assert_allclose(noise_gc.imag, noise_gc.real)
+    nn_gc = surveys.random_noise(
+                np.ones(100000)*.01, 0.5, 'gaussian_correlated')
+    assert_allclose(nn_gc.real.mean(), 0.01*0.5, rtol=1e-1)
+    assert_allclose(nn_gc.imag.mean(), 0.01*0.5, rtol=1e-1)
 
 
 def test_txrx_coordinates_to_dict():

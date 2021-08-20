@@ -44,7 +44,8 @@ def main(args=None):
         default="emg3d.cfg",
         type=str,
         help=("name of config file; default is 'emg3d.cfg'; consult "
-              "https://emg3d.emsig.xyz/en/stable/cli.html for its format")
+              "https://emg3d.emsig.xyz/en/stable/manual/cli.html for "
+              "its format")
     )
 
     # arg: Number of processors.
@@ -103,6 +104,22 @@ def main(args=None):
         type=str,
         default=None,
         help="output files base name; default is 'emg3d_out'"
+    )
+
+    # arg: Simulation file name to save; relative to path
+    parser.add_argument(
+        "--save",
+        type=str,
+        default=None,
+        help="file-name to save simulation; not used by default"
+    )
+
+    # arg: Simulation file name to load; relative to path
+    parser.add_argument(
+        "--load",
+        type=str,
+        default=None,
+        help="file-name to load simulation; not used by default"
     )
 
     # arg: Verbosity.

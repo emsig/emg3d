@@ -76,7 +76,7 @@ def parse_config_file(args_dict):
         term['function'] = 'forward'
 
     # Get file names.
-    for key in ['path', 'survey', 'model', 'output']:
+    for key in ['path', 'survey', 'model', 'output', 'save', 'load']:
         term[key] = args_dict.pop(key)
 
     # Ensure no keys are left.
@@ -106,7 +106,8 @@ def parse_config_file(args_dict):
     path = os.path.abspath(path)
 
     # Initiate files dict with defaults.
-    files = {'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
+    files = {'save': False, 'load': False,
+             'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
     for key, value in files.items():
 
         config_or_default = all_files.pop(key, value)
@@ -118,6 +119,10 @@ def parse_config_file(args_dict):
         if fname is None:
             fname = config_or_default
 
+        # Next file if it is not provided.
+        if not fname:
+            continue
+
         # Get absolute paths.
         ffile = Path(os.path.join(path, fname))
 
@@ -125,19 +130,19 @@ def parse_config_file(args_dict):
         if ffile.suffix not in ['.h5', '.json', '.npz']:
             ffile = ffile.with_suffix('.h5')
 
+        if key == 'output':
+            logfile = str(ffile.with_suffix('.log'))
+
         # Store in dict.
-        files[key] = ffile
+        files[key] = str(ffile)
 
-    # Ensure files and directory exist:
-    for key in ['survey', 'model']:
-        files[key] = str(files[key])
-    files['log'] = str(files['output'].with_suffix('.log'))
-    files['output'] = str(files['output'])
+    # If a simulation is provided, the model and survey are not used.
+    if files['load']:
+        files['model'] = False
+        files['survey'] = False
 
-    # Store options (get it with getboolean, and remove from dict).
-    files['store_simulation'] = cfg.getboolean(
-            'files', 'store_simulation', fallback=False)
-    _ = all_files.pop('store_simulation', None)
+    # Add log file.
+    files['log'] = logfile
 
     # Ensure no keys are left.
     if all_files:

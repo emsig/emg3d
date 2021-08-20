@@ -84,6 +84,8 @@ class TestParser:
             'survey': None,
             'model': None,
             'output': None,
+            'save': None,
+            'load': None,
             'verbosity': 0,
             'dry_run': False,
             }
@@ -108,8 +110,10 @@ class TestParser:
         assert cfg['files']['model'] == join(tmpdir, 'model.h5')
         assert cfg['files']['output'] == join(tmpdir, 'emg3d_out.h5')
         assert cfg['files']['log'] == join(tmpdir, 'emg3d_out.log')
+        assert cfg['files']['save'] is False
+        assert cfg['files']['load'] is False
 
-        # Provide file names
+        # Provide file names without save/load
         args_dict = self.args_dict.copy()
         args_dict['survey'] = 'test.h5'
         args_dict['model'] = 'unkno.wn'
@@ -119,6 +123,23 @@ class TestParser:
         assert cfg['files']['survey'] == join(tmpdir, 'test.h5')
         assert cfg['files']['model'] == join(tmpdir, 'unkno.h5')
         assert cfg['files']['output'] == join(tmpdir, 'out.npz')
+        assert cfg['files']['save'] is False
+        assert cfg['files']['load'] is False
+
+        # Provide file names with save/load
+        args_dict = self.args_dict.copy()
+        args_dict['survey'] = 'test.h5'  # will be removed
+        args_dict['model'] = 'unkno.wn'  # will be removed
+        args_dict['output'] = 'out.npz'
+        args_dict['save'] = 'test.npz'
+        args_dict['load'] = 'test.npz'
+        args_dict['config'] = config
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        assert cfg['files']['survey'] is False
+        assert cfg['files']['model'] is False
+        assert cfg['files']['output'] == join(tmpdir, 'out.npz')
+        assert cfg['files']['save'] == join(tmpdir, 'test.npz')
+        assert cfg['files']['load'] == join(tmpdir, 'test.npz')
 
         # .-trick.
         args_dict = self.args_dict.copy()
@@ -168,7 +189,7 @@ class TestParser:
             f.write("survey=testit.json\n")
             f.write("model=thismodel\n")
             f.write("output=results.npz\n")
-            f.write("store_simulation=false")
+            f.write("save=test")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -177,7 +198,7 @@ class TestParser:
         assert cfg['files']['model'] == join(tmpdir, 'thismodel.h5')
         assert cfg['files']['output'] == join(tmpdir, 'results.npz')
         assert cfg['files']['log'] == join(tmpdir, 'results.log')
-        assert cfg['files']['store_simulation'] is False
+        assert cfg['files']['save'] == join(tmpdir, 'test.h5')
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             # Write a config file.
@@ -189,6 +210,27 @@ class TestParser:
             args_dict = self.args_dict.copy()
             args_dict['config'] = config
             cfg, term = cli.parser.parse_config_file(args_dict)
+
+        # Write a config file with load.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[files]\n")
+            f.write(f"path={tmpdir}\n")
+            f.write("survey=testit.json\n")
+            f.write("model=thismodel\n")
+            f.write("output=results.npz\n")
+            f.write("save=test\n")
+            f.write("load=test")
+
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = config
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        assert cfg['files']['survey'] is False
+        assert cfg['files']['model'] is False
+        assert cfg['files']['output'] == join(tmpdir, 'results.npz')
+        assert cfg['files']['log'] == join(tmpdir, 'results.log')
+        assert cfg['files']['save'] == join(tmpdir, 'test.h5')
+        assert cfg['files']['load'] == join(tmpdir, 'test.h5')
 
     def test_simulation(self, tmpdir):
 
@@ -366,6 +408,8 @@ class TestRun:
             'survey': 'survey.npz',
             'model': 'model.npz',
             'output': 'output.npz',
+            'save': None,
+            'load': None,
             'verbosity': 0,
             'dry_run': True,
             }
@@ -440,11 +484,13 @@ class TestRun:
         args_dict = self.args_dict.copy()
         args_dict['path'] = tmpdir
         args_dict['output'] = join('phantom', 'output', 'dir.npz')
+        args_dict['save'] = join('phantom', 'simulation', 'save.npz')
         with pytest.raises(SystemExit) as e:
             cli.run.simulation(args_dict)
         assert e.type == SystemExit
         assert "* ERROR   :: Output directory does not exist: " in e.value.code
         assert join("phantom", "output") in e.value.code
+        assert join("phantom", "simulation") in e.value.code
 
     def test_run(self, tmpdir, capsys):
 
@@ -452,7 +498,7 @@ class TestRun:
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
             f.write("[files]\n")
-            f.write("store_simulation=True\n")
+            f.write("save=mysim.npz\n")
             f.write("[solver_opts]\n")
             f.write("sslsolver=False\n")
             f.write("semicoarsening=False\n")
@@ -484,7 +530,8 @@ class TestRun:
         assert_allclose(res1['data'].shape, res2['data'].shape)
         assert_allclose(res1['misfit'].shape, res2['misfit'].shape)
         assert_allclose(res1['gradient'].shape, res2['gradient'].shape)
-        assert 'simulation' in res2
+        # Assert we can load the simulation
+        emg3d.Simulation.from_file(os.path.join(tmpdir, 'mysim.npz'))
         assert res1['n_observations'] == np.isfinite(self.data).sum()
         assert res2['n_observations'] == np.isfinite(self.data).sum()
 
@@ -499,6 +546,21 @@ class TestRun:
         cli.run.simulation(args_dict)
         res3 = emg3d.load(os.path.join(tmpdir, 'output3.npz'))
         assert 'misfit' not in res3
+        assert 'gradient' not in res3
+
+        # Redo for misfit, loading existing simulation.
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
+        args_dict['path'] = tmpdir
+        args_dict['forward'] = False
+        args_dict['misfit'] = True
+        args_dict['gradient'] = False
+        args_dict['dry_run'] = False
+        args_dict['load'] = 'mysim.npz'
+        args_dict['output'] = 'output3.npz'
+        cli.run.simulation(args_dict)
+        res3 = emg3d.load(os.path.join(tmpdir, 'output3.npz'))
+        assert 'misfit' in res3
         assert 'gradient' not in res3
 
     def test_data(self, tmpdir, capsys):

@@ -21,6 +21,7 @@ a high-level, specialised modelling tool for the end user.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import warnings
 import itertools
 from copy import deepcopy
 
@@ -136,7 +137,7 @@ class Simulation:
           can be defined with the key ``seasurface``. See
           :func:`emg3d.simulations.expand_grid_model`.
 
-    solver_opts : dict, default: {'verb': 2'}
+    solver_opts : dict, default: {'verb': 1'}
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
         ``model``, ``sfield``, ``efield``, ``return_info``, and ``log``.
@@ -193,10 +194,10 @@ class Simulation:
 
         # Assemble solver_opts.
         self.solver_opts = {
-                'verb': 2,  # Default verbosity, can be overwritten.
+                'verb': 1,  # Default verbosity, can be overwritten.
+                'log': -1,  # Default only log, can be overwritten.
                 **kwargs.pop('solver_opts', {}),  # User setting.
                 'return_info': True,  # return_info=True is forced.
-                'log': -1             # log=-1 is forced.
         }
 
         # Initiate dictionaries and other values with None's.
@@ -784,17 +785,13 @@ class Simulation:
         Parameters
         ----------
         observed : bool, default: False
-            If True, it stores the current result also as observed model. This
-            is usually done for pure forward modelling (not inversion). It will
-            as such be stored within the survey. If the survey has either
-            ``relative_error`` or ``noise_floor``, random Gaussian noise of
-            standard deviation will be added to the ``data.observed`` (not to
-            ``data.synthetic``). Also, data below the noise floor will be set
-            to NaN.
+            If True, it stores the current `synthetic` responses also as
+            `observed` responses.
 
-        min_offset : float, default: 0.0
-            Data points in ``data.observed`` where the offset < min_offset are
-            set to NaN.
+        add_noise : bool, default: True
+            Boolean if to add noise to observed data (if ``observed=True``).
+            All remaining ``kwargs`` are forwarded to
+            :meth:`emg3d.surveys.Survey.add_noise`.
 
         """
         srcfreq = self._srcfreq.copy()
@@ -842,33 +839,12 @@ class Simulation:
         # If it shall be used as observed data save a copy.
         if observed:
 
+            # Copy synthetic to observed.
             self.data['observed'] = self.data['synthetic'].copy()
 
-            # Add noise if noise_floor and/or relative_error given.
-            if self.survey.standard_deviation is not None:
-
-                # Create noise.
-                std = self.survey.standard_deviation
-                random = np.random.randn(self.survey.count*2)
-                noise_re = std*random[::2].reshape(self.survey.shape)
-                noise_im = std*random[1::2].reshape(self.survey.shape)
-
-                # Add noise to observed data.
-                self.data['observed'].data += noise_re + 1j*noise_im
-
-            # Set data below the noise floor to NaN.
-            if self.survey.noise_floor is not None:
-                noise_floor = self.survey.noise_floor
-                min_amp = abs(self.data.synthetic.data) < noise_floor
-                self.data['observed'].data[min_amp] = np.nan + 1j*np.nan
-
-            # Set near-offsets to NaN.
-            min_off = kwargs.get('min_offset', 0.0)
-            nan = np.nan + 1j*np.nan
-            for ks, s in self.survey.sources.items():
-                for kr, r in self.survey.receivers.items():
-                    if np.linalg.norm(r.center_abs(s) - s.center) < min_off:
-                        self.data['observed'].loc[ks, kr, :] = nan
+            # Add noise.
+            if kwargs.get('add_noise', True):
+                self.survey.add_noise(**kwargs)
 
     # OPTIMIZATION
     @property
@@ -879,6 +855,15 @@ class Simulation:
 
         """
         if self._gradient is None:
+            if self.receiver_interpolation == 'cubic':
+                # Warn that cubic is not good for adjoint-state gradient.
+                msg = (
+                    "emg3d: Receiver responses were obtained with cubic "
+                    "interpolation. This will not yield the exact gradient. "
+                    "Change `receiver_interpolation='linear'` in the call to "
+                    "Simulation()."
+                )
+                warnings.warn(msg, UserWarning)
             self._gradient = optimize.gradient(self)
         return self._gradient[:, :, :self._input_sc2]
 
@@ -1196,12 +1181,13 @@ class Simulation:
     def print_solver_info(self, field='efield', verb=1, return_info=False):
         """Print solver info."""
 
+        # If not verbose, return.
+        if verb < 0:
+            return
+
         # Get info dict.
         info = getattr(self, f"_dict_{field}_info", {})
         out = ""
-
-        if verb < 0:
-            return
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
@@ -1221,14 +1207,14 @@ class Simulation:
                 out += f"{self.survey.frequencies[freq]} Hz ="
 
                 # Print log depending on solver and simulation verbosities.
-                if verb == 0 or self.solver_opts['verb'] not in [1, 2]:
+                if verb == 0 or self.solver_opts['verb'] != 1:
                     out += f" {cinfo['exit_message']}\n"
 
-                if verb > 0 and self.solver_opts['verb'] > 2:
-                    out += f"\n{cinfo['log']}\n"
-
-                if verb > 0 and self.solver_opts['verb'] in [1, 2]:
+                if verb == 1 and self.solver_opts['verb'] == 1:
                     out += f" {cinfo['log'][12:]}"
+
+                if verb == 1 and self.solver_opts['verb'] > 1:
+                    out += f"\n{cinfo['log']}\n"
 
         if return_info:
             return out
@@ -1598,6 +1584,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
             diff = np.diff(dim)[0]
             get_it = True
 
+        diff = np.where(diff > 1e-9, diff, 1e-9)  # Avoid division by 0 later
         return dim, diff, get_it
 
     xdim, xdiff, get_x = get_dim_diff(0)

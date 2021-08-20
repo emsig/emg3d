@@ -6,6 +6,67 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Simulation:
+
+  - Adjust printing: correct simulation results for adjusted solver printing
+    levels; *default solver verbosity is new 1*; ``log`` can now be overwritten
+    in ``solver_opts`` (mainly for debugging).
+
+- Bug fixes:
+
+  - Track order when saving to hdf5.
+
+
+v1.2.0: White noise
+-------------------
+
+**2021-07-27**
+
+- CLI:
+
+  - New parameters ``save`` and ``load`` to save and load an entire simulation.
+    In the parameter file, they are under ``[files]``; on the command line,
+    they are available as ``--save`` and ``--load``; they are followed by the
+    filename including its path and suffix. (In turn, the parameter
+    ``store_simulation`` was removed.)
+
+- ``simulations.Simulation``:
+
+  - Warns if the gradient is called, but ``receiver_interpolation`` is not
+    ``'linear'``.
+  - Slightly changed the added noise in ``compute(observed=True)``: It uses new
+    the ``survey.add_noise`` attribute. There is new a flag to set if noise
+    should be added or not (``add_noise``), and if the amplitudes should be
+    chopped or not (``min_amplitude``). Also note that the added noise is new
+    white noise with constant amplitude and random phase.
+
+- ``surveys``:
+
+  - New function ``random_noise``, which can be used to create random noise in
+    different ways. The default noise is white noise, hence constant amplitude
+    with random phase. (This is different to before, where random Gaussian
+    noise was added separately to the real and imaginary part.) For the random
+    noise it requires new at least NumPy 1.17.0.
+
+  - New attribute ``Survey.add_noise``, which uses under the hood above
+    function.
+
+  - A ``Survey`` can new be instantiated without receivers by setting
+    ``receivers`` to ``None``. This is useful if one is only interested in
+    forward modelling the entire fields. In this case, the related data object
+    and the noise floor and relative error have no meaning. Also, in
+    conjunction with a Simulation, the misfit and the gradient will be zero.
+
+- Various:
+
+  - All emg3d-warnings (not solver warnings) are now set to ``'always'``, and
+    corresponding print statements were removed.
+  - Simplified (unified) ``_edge_curl_factor`` (private fct).
+
+
 v1.1.0: Adjoint-fix for electric receivers
 ------------------------------------------
 

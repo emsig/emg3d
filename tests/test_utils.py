@@ -31,11 +31,10 @@ def test_requires(capsys):
     def dummy():
         pass
 
-    with pytest.warns(UserWarning, match='This feature of emg3d requires'):
+    with pytest.warns(UserWarning, match='emg3d: This feature requires'):
         a = dummy()
     out1, _ = capsys.readouterr()
     assert a is None
-    assert "* WARNING :: This feature of emg3d requires" in out1
 
 
 def dummy(inp):
@@ -68,7 +67,6 @@ def test_process_map():
     utils.tqdm = tqdm
 
 
-@pytest.mark.skipif(scooby is None, reason="scooby not installed.")
 def test_Report(capsys):
     out, _ = capsys.readouterr()  # Empty capsys
 
@@ -86,9 +84,8 @@ def test_Report(capsys):
         assert out1.__repr__()[115:] == out2.__repr__()[115:]
 
     else:  # soft dependency
-        _ = utils.Report()
-        out, _ = capsys.readouterr()  # Empty capsys
-        assert 'WARNING :: `emg3d.Report` requires `scooby`' in out
+        with pytest.warns(UserWarning, match='emg3d: This feature requires'):
+            _ = utils.Report()
 
 
 def test_EMArray():
