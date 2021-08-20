@@ -646,6 +646,31 @@ class Survey:
             self._imrec = np.nonzero(np.logical_not(rec_types))[0]
         return self._ierec, self._imrec
 
+    def _rec_types_coord(self, source):
+        """Return coordinates of _irec_types as tuples."""
+        if getattr(self, '_erec_coord', None) is None:
+
+            self._erec_coord = {}
+            self._mrec_coord = {}
+
+        if source not in self._erec_coord.keys():
+            # Get absolute coordinates as fct of source.
+            # (Only relevant in case of "relative" receivers.)
+            rl = list(self.receivers.values())
+
+            def rec_coord_tuple(rec_list):
+                """Return abs. coordinates for as a fct of source."""
+                return tuple(np.array(
+                    [rl[i].coordinates_abs(self.sources[source])
+                     for i in rec_list]
+                ).T)
+
+            ierec, imrec = self._irec_types
+            self._erec_coord[source] = rec_coord_tuple(ierec)
+            self._mrec_coord[source] = rec_coord_tuple(imrec)
+
+        return self._erec_coord[source], self._mrec_coord[source]
+
 
 def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):
     r"""Return random noise for given inputs.

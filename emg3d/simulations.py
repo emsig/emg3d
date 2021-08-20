@@ -622,57 +622,35 @@ class Simulation:
         """Return the solver information of the corresponding computation."""
         return self._dict_efield_info[source][self._freq_inp2key(frequency)]
 
-    def _store_responses(self, source, frequency):
+    def _store_responses(self, source, frequency, data):
         """Return electric and magnetic fields at receiver locations."""
-        freq = self._freq_inp2key(frequency)
 
-        # Get receiver types.
+        # Get receiver types and their coordinates.
         erec, mrec = self.survey._irec_types
-
-        # Get absolute coordinates as fct of source.
-        # (Only relevant in case of "relative" receivers.)
-        rl = list(self.survey.receivers.values())
-
-        def rec_coord_tuple(rec_list):
-            """Return abs. coordinates for as a fct of source."""
-            return tuple(np.array(
-                [rl[i].coordinates_abs(self.survey.sources[source])
-                 for i in rec_list]
-            ).T)
+        erec_coord, mrec_coord = self.survey._rec_types_coord(source)
 
         # Store electric receivers.
+        efield = self._dict_efield[source][frequency]
         if erec.size:
-
-            # Extract data at receivers.
-            resp = self._dict_efield[source][freq].get_receiver(
-                    receiver=rec_coord_tuple(erec),
-                    method=self.receiver_interpolation,
+            resp = efield.get_receiver(
+                    receiver=erec_coord, method=self.receiver_interpolation,
             )
+            data.loc[source, :, frequency][erec] = resp
 
-            # Store the receiver response.
-            self.data.synthetic.loc[source, :, freq][erec] = resp
-
-        # Store magnetic receivers.
+        # Get h-field.
         if mrec.size:
-
-            # Get h-field.
-            if self._dict_hfield[source][freq] is None:
+            if self._dict_hfield[source][frequency] is None:
 
                 hfield = fields.get_magnetic_field(
-                    self.model.interpolate_to_grid(
-                            self.get_grid(source, freq)),
-                    self._dict_efield[source][freq],
+                    self.model.interpolate_to_grid(efield.grid), efield,
                 )
-                self._dict_hfield[source][freq] = hfield
+                self._dict_hfield[source][frequency] = hfield
 
-            # Extract data at receivers.
-            resp = self._dict_hfield[source][freq].get_receiver(
-                    receiver=rec_coord_tuple(mrec),
-                    method=self.receiver_interpolation,
+            # Store magnetic receivers.
+            resp = self._dict_hfield[source][frequency].get_receiver(
+                    receiver=mrec_coord, method=self.receiver_interpolation,
             )
-
-            # Store the receiver response.
-            self.data.synthetic.loc[source, :, freq][mrec] = resp
+            data.loc[source, :, frequency][mrec] = resp
 
     # ASYNCHRONOUS COMPUTATION
     def compute(self, observed=False, **kwargs):
@@ -729,7 +707,7 @@ class Simulation:
             self._dict_efield_info[src][freq] = out[i][1]
 
             # Store responses at receiver locations.
-            self._store_responses(src, freq)
+            self._store_responses(src, freq, self.data['synthetic'])
 
         # Print solver info.
         self.print_solver_info('efield', verb=self.verb)
