@@ -783,9 +783,14 @@ class Simulation:
             """Collect inputs."""
             source, freq = inp
             sfield = self._get_rfield(*inp)  # Residual field.
-            bfield = None  # Initial bfield not yet implemented
+            bfield = self._dict_bfield[source][freq]
 
             return self.model, sfield, bfield, self.solver_opts
+
+        # Initiate back-propagated electric field and info dicts.
+        if not hasattr(self, '_dict_bfield'):
+            self._dict_bfield = self._dict_initiate
+            self._dict_bfield_info = self._dict_initiate
 
         # Initiate futures-dict to store output.
         out = utils._process_map(
@@ -794,11 +799,6 @@ class Simulation:
                 max_workers=self.max_workers,
                 **{'desc': 'Back-propagate ', **self._tqdm_opts},
         )
-
-        # Store back-propagated electric field and info.
-        if not hasattr(self, '_dict_bfield'):
-            self._dict_bfield = self._dict_initiate
-            self._dict_bfield_info = self._dict_initiate
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
