@@ -159,6 +159,8 @@ class TestModel:
         epsilon_r = property_x*3.33
 
         model1inp = models.Model(grid, property_x)
+        same = model1inp.interpolate_to_grid(model1inp.grid)
+        assert model1inp == same
 
         model1out = model1inp.interpolate_to_grid(grid2)
         assert_allclose(model1out.property_x[0],

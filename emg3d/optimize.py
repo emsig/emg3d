@@ -87,11 +87,8 @@ def misfit(simulation):
 
     """
 
-    # Check if electric fields have already been computed.
-    test_efield = sum([1 if simulation._dict_efield[src][freq] is None else 0
-                       for src, freq in simulation._srcfreq])
-    if test_efield:
-        simulation.compute()
+    # Ensure efields are computed.
+    simulation.compute()
 
     # Check if weights are stored already.
     # (weights are currently simply 1/std^2; but might change in the future).

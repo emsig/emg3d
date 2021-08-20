@@ -39,6 +39,12 @@ def test_misfit():
     simulation.data['synthetic'] = simulation.data['observed']*0 + syn
 
     misfit = 0.5*((syn-data)/(rel_err*data))**2
+
+    def dummy():
+        pass
+
+    simulation.compute = dummy  # => switch of compute()
+
     assert_allclose(optimize.misfit(simulation), misfit)
 
     # Missing noise_floor / std.

@@ -9,6 +9,13 @@ Changelog
 latest
 ------
 
+- WIP: Memory improvements for parallel execution in simulations.
+
+  - Parallel computation is now not sharing the simulation any longer.
+  - ``get_model`` is done on the fly, not stored in a dict any longer
+    (``simulation._dict_model`` does not exist any longer).
+  - Provided ``efields`` are now input to the solver.
+
 - Simulation:
 
   - Adjust printing: correct simulation results for adjusted solver printing
