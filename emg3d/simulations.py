@@ -626,20 +626,20 @@ class Simulation:
         """Return the solver information of the corresponding computation."""
         return self._dict_efield_info[source][self._freq_inp2key(frequency)]
 
-    def _store_responses(self, source, frequency, efield):
+    def _get_responses(self, source, frequency, efield):
         """Return electric and magnetic fields at receiver locations."""
 
         # Get receiver types and their coordinates.
         erec, mrec = self.survey._irec_types
         erec_coord, mrec_coord = self.survey._rec_types_coord(source)
 
-        # Initiate output
-        data = np.zeros_like(
+        # Initiate output.
+        resp = np.zeros_like(
                 self.data.synthetic.loc[source, :, frequency].data)
 
         # Store electric receivers.
         if erec.size:
-            data[erec] = efield.get_receiver(
+            resp[erec] = efield.get_receiver(
                 receiver=erec_coord, method=self.receiver_interpolation,
             )
 
@@ -650,11 +650,11 @@ class Simulation:
                 self.get_model(source, frequency), efield,
             )
 
-            data[mrec] = hfield.get_receiver(
+            resp[mrec] = hfield.get_receiver(
                 receiver=mrec_coord, method=self.receiver_interpolation,
             )
 
-        return data
+        return resp
 
     # ASYNCHRONOUS COMPUTATION
     def compute(self, observed=False, **kwargs):
@@ -711,7 +711,7 @@ class Simulation:
             self._dict_efield_info[src][freq] = out[i][1]
 
             # Store responses at receiver locations.
-            resp = self._store_responses(src, freq, out[i][0])
+            resp = self._get_responses(src, freq, out[i][0])
             self.data['synthetic'].loc[src, :, freq] = resp
 
         # Print solver info.
