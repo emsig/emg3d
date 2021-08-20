@@ -814,8 +814,16 @@ class Simulation:
 
             # Residual source strength: Weighted residual, normalized by -smu0.
             weight = self.data.weights.loc[source, name, frequency].data
-            data_complex_rec_deriv = rec.data_deriv(data_complex_rec, adjoint=True)[0]
-            strength = np.conj(residual * weight  * data_complex_rec_deriv / -rfield.smu0)
+            data_complex_rec = self.data.synthetic.loc[
+                source, name, frequency
+            ].data
+            data_complex_rec_deriv = rec.data_deriv(
+                data_complex_rec, adjoint=True
+            )[0]
+            strength = np.conj(
+                residual * weight *
+                data_complex_rec_deriv / -rfield.smu0
+            )
 
             # Create source.
             if rec.xtype == 'magnetic':
@@ -869,14 +877,6 @@ class Simulation:
                         data=np.conj(-h_deriv * residual * weight),
                         frequency=freq,
                 ).field
-       
-        # Apply a chainrule for the different data_type than complex (e.g. amp)
-        data_complex_deriv = []
-        for name, rec in self.survey.receivers.items():
-            data_complex_rec = self.data.synthetic.loc[source, name, frequency].data
-            data_complex_rec_deriv = rec.data_deriv(data_complex_rec, adjoint=False)
-            data_complex_deriv.append(data_complex_rec_deriv) 
-        out *= np.hstack(data_complex_deriv)                
 
         return rfield
 
@@ -894,7 +894,21 @@ class Simulation:
         efield_jvec = solver.solve(**solver_input)[0]
 
         # Return the responses at receivers.
-        return self._store_responses(*inp, efield_jvec)
+        resp = self._store_responses(*inp, efield_jvec)
+        # Apply a chainrule for the different data_type than complex (e.g. amp)
+        source, frequency = inp
+        data_complex_deriv = []
+        for name, rec in self.survey.receivers.items():
+            data_complex_rec = self.data.synthetic.loc[
+                source, name, frequency
+            ].data
+            data_complex_rec_deriv = rec.data_deriv(
+                data_complex_rec,
+                adjoint=False
+            )
+            data_complex_deriv.append(data_complex_rec_deriv)
+        resp *= np.hstack(data_complex_deriv)
+        return resp
 
     def _get_gvec_field(self, source, frequency):
 

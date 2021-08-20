@@ -580,11 +580,11 @@ class Receiver(Wire):
         """Data type"""
         return self._data_type
 
-    def data_deriv(self, data_complex, adjoint=False):     
+    def data_deriv(self, data_complex, adjoint=False):
         if self.data_type == 'complex':
             data_complex_deriv = np.ones(data_complex.size, dtype='complex')
         elif self.data_type == 'amp':
-            data_complex_deriv = data_complex.conj() / abs(data_complex)            
+            data_complex_deriv = data_complex.conj() / abs(data_complex)
         else:
             raise Exception("Not Implemented!")
         if adjoint:
@@ -629,7 +629,11 @@ class RxElectricPoint(Receiver, Point):
     def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate an electric point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative, data_type=data_type)
+        super().__init__(
+            coordinates=coordinates,
+            relative=relative,
+            data_type=data_type
+        )
 
 
 @utils._known_class
@@ -654,7 +658,11 @@ class RxMagneticPoint(Receiver, Point):
     def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate a magnetic point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative, data_type=data_type)
+        super().__init__(
+            coordinates=coordinates,
+            relative=relative,
+            data_type=data_type
+        )
 
 
 # ROTATIONS AND CONVERSIONS
