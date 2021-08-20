@@ -782,10 +782,10 @@ class Simulation:
         def collect_bfield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
-            sfield = self._get_rfield(*inp)  # Residual field.
+            rfield = self._get_rfield(*inp)
             bfield = self._dict_bfield[source][freq]
 
-            return self.model, sfield, bfield, self.solver_opts
+            return self.model, rfield, bfield, self.solver_opts
 
         # Initiate back-propagated electric field and info dicts.
         if not hasattr(self, '_dict_bfield'):
