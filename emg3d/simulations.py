@@ -878,28 +878,13 @@ class Simulation:
 
         return rfield
 
-    def _jvec(self, inp):
-        """Return back-propagated electric field for given inp (src, freq)."""
-
-        # Input parameters.
-        solver_input = {
-            **self.solver_opts,
-            'model': self.get_model(*inp),
-            'sfield': self._get_gvec_field(*inp),
-        }
-
-        # Compute and return A^-1 * G * vec
-        efield_jvec = solver.solve(**solver_input)[0]
-
-        # Return the responses at receivers.
-        return self._store_responses(*inp, efield_jvec)
-
     def _get_gvec_field(self, source, frequency):
 
         # Forward electric field
         efield = self._dict_efield[source][frequency]
 
-        # Step2: compute G * vec = gvec
+        # Step2: compute G * vec = gvec (using discretize)
+        # TODO implement so it is possible also without discretize.
         gvec = efield.grid.getEdgeInnerProductDeriv(
                 np.ones(efield.grid.n_cells))(efield.field) * self._vec
         # Extension to sig_x, sig_y, sig_z is trivial

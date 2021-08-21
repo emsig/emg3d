@@ -20,7 +20,7 @@ misfit function and its gradient.
 
 import numpy as np
 
-from emg3d import maps, fields, utils
+from emg3d import maps, fields, utils, solver
 
 __all__ = ['misfit', 'gradient']
 
@@ -118,7 +118,7 @@ def misfit(simulation):
     return misfit.data
 
 
-def gradient(simulation, data_type='complex'):
+def gradient(simulation):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete adjoint-state gradient for a single source at a single
@@ -249,10 +249,16 @@ def jvec(simulation, vec):
     # Store vec
     simulation._vec = vec
 
-    # Initiate futures-dict to store output.
+    # Create iterable form src/freq-list to call the process_map.
+    def collect_jfield_inputs(inp):
+        """Collect inputs."""
+        rfield = simulation._get_gvec_field(*inp)
+        return simulation.model, rfield, None, simulation.solver_opts
+
+    # Compute and return A^-1 * G * vec
     out = utils._process_map(
-            simulation._jvec,
-            simulation._srcfreq,
+            solver._solve,
+            list(map(collect_jfield_inputs, simulation._srcfreq)),
             max_workers=simulation.max_workers,
             **{'desc': 'Compute jvec', **simulation._tqdm_opts},
     )
@@ -266,6 +272,7 @@ def jvec(simulation, vec):
     for i, (src, freq) in enumerate(simulation._srcfreq):
 
         # Store responses at receivers.
-        simulation.data['jvec'].loc[src, :, freq] = out[i]
+        resp = simulation._get_responses(src, freq, out[i][0])
+        simulation.data['jvec'].loc[src, :, freq] = resp
 
     return simulation.data['jvec'].data
