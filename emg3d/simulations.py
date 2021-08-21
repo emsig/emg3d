@@ -627,20 +627,20 @@ class Simulation:
         """Return the solver information of the corresponding computation."""
         return self._dict_efield_info[source][self._freq_inp2key(frequency)]
 
-    def _store_responses(self, source, frequency, efield):
+    def _get_responses(self, source, frequency, efield):
         """Return electric and magnetic fields at receiver locations."""
 
         # Get receiver types and their coordinates.
         erec, mrec = self.survey._irec_types
         erec_coord, mrec_coord = self.survey._rec_types_coord(source)
 
-        # Initiate output
-        data = np.zeros_like(
+        # Initiate output.
+        resp = np.zeros_like(
                 self.data.synthetic.loc[source, :, frequency].data)
 
         # Store electric receivers.
         if erec.size:
-            data[erec] = efield.get_receiver(
+            resp[erec] = efield.get_receiver(
                 receiver=erec_coord, method=self.receiver_interpolation,
             )
 
@@ -651,11 +651,11 @@ class Simulation:
                 self.get_model(source, frequency), efield,
             )
 
-            data[mrec] = hfield.get_receiver(
+            resp[mrec] = hfield.get_receiver(
                 receiver=mrec_coord, method=self.receiver_interpolation,
             )
 
-        return data
+        return resp
 
     # ASYNCHRONOUS COMPUTATION
     def compute(self, observed=False, **kwargs):
@@ -687,18 +687,15 @@ class Simulation:
         def collect_efield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
-            sfield = fields.get_source_field(
-                grid=self.get_grid(source, freq),
-                source=self.survey.sources[source],
-                frequency=self.survey.frequencies[freq],
-            )
+            grid = self.get_grid(source, freq)
+            src = self.survey.sources[source]
+            frequency = self.survey.frequencies[freq]
             efield = self._dict_efield[source][freq]
-
-            return self.model, sfield, efield, self.solver_opts
+            return self.model, grid, src, frequency, efield, self.solver_opts
 
         # Initiate futures-dict to store output.
         out = utils._process_map(
-                _solver,
+                solver._solve,
                 list(map(collect_efield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
                 **{'desc': 'Compute efields', **self._tqdm_opts},
@@ -712,7 +709,7 @@ class Simulation:
             self._dict_efield_info[src][freq] = out[i][1]
 
             # Store responses at receiver locations.
-            resp = self._store_responses(src, freq, out[i][0])
+            resp = self._get_responses(src, freq, out[i][0])
             self.data['synthetic'].loc[src, :, freq] = resp
 
         # Print solver info.
@@ -769,7 +766,6 @@ class Simulation:
             source, freq = inp
             rfield = self._get_rfield(*inp)
             bfield = self._dict_bfield[source][freq]
-
             return self.model, rfield, bfield, self.solver_opts
 
         # Initiate back-propagated electric field and info dicts.
@@ -779,7 +775,7 @@ class Simulation:
 
         # Initiate futures-dict to store output.
         out = utils._process_map(
-                _solver,
+                solver._solve,
                 list(map(collect_bfield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
                 **{'desc': 'Back-propagate ', **self._tqdm_opts},
@@ -1463,48 +1459,3 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
 
     # Return gridding_opts.
     return gopts
-
-
-def _solver(inp):
-    """Thin wrapper of `solver.solve` for a `process_map`.
-
-
-    Parameters
-    ----------
-    inp : tuple
-        (model, sfield, efield, solver_opts):
-
-        - ``model``: Corresponds to `Simulation.model`; it will be interpolated
-          to the computational grid.
-        - ``sfield``: Source field on computational grid.
-        - ``efield``: None or electric field which is used as starting field.
-        - `` solver_opts``: Dict which is provided to ``solver.solve``.
-
-
-    Returns
-    -------
-    efield : Field
-        Resulting electric field.
-
-    info : dict
-        Dictionary with solver info.
-
-    """
-
-    model, sfield, efield, solver_opts = inp
-
-    solver_input = {
-        **solver_opts,
-        'model': model.interpolate_to_grid(sfield.grid),
-        'sfield': sfield,
-        'efield': efield,
-    }
-
-    # Compute electric field.
-    if efield is None:
-        efield, info = solver.solve(**solver_input)
-    else:
-        info = solver.solve(**solver_input)
-
-    # Return electric field.
-    return efield, info
