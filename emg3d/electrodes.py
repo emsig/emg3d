@@ -558,7 +558,7 @@ class Receiver(Wire):
     """
 
     # Add relative to attributes which have to be serialized.
-    _serialize = {'relative'} | Wire._serialize
+    _serialize = {'relative', 'data_type'} | Wire._serialize
 
     def __init__(self, relative, data_type='complex', **kwargs):
         """Initiate a receiver."""
@@ -566,7 +566,9 @@ class Receiver(Wire):
         # Store relative, add a repr-addition.
         self._relative = relative
         self._data_type = data_type
-        self._repr_add = f"{['absolute', 'relative'][self.relative]};"
+        self._repr_add = (
+            f"{['absolute', 'relative'][self.relative]}; {data_type};"
+        )
 
         super().__init__(**kwargs)
 
