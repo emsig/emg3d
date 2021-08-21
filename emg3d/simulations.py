@@ -207,7 +207,6 @@ class Simulation:
         self._dict_efield_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
-        self._vec = None
 
         # Get model taking gridding_opts into account.
         # Sets self.model and self.gridding_opts.
@@ -878,7 +877,38 @@ class Simulation:
 
         return rfield
 
-    def _get_gvec_field(self, source, frequency):
+    def _jvec(self, vec):
+        """Jvec = PA^-1 * G * vec."""
+
+        # Create iterable form src/freq-list to call the process_map.
+        def collect_jfield_inputs(inp, vec=vec):
+            """Collect inputs."""
+            rfield = self._get_gvec_field(*inp, vec)
+            return self.model, rfield, None, self.solver_opts
+
+        # Compute and return A^-1 * G * vec
+        out = utils._process_map(
+                solver._solve,
+                list(map(collect_jfield_inputs, self._srcfreq)),
+                max_workers=self.max_workers,
+                **{'desc': 'Compute jvec', **self._tqdm_opts},
+        )
+
+        # Store gradient field and info.
+        if 'jvec' not in self.data.keys():
+            self.data['jvec'] = self.data.observed.copy(
+                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
+
+        # Loop over src-freq combinations to extract and store.
+        for i, (src, freq) in enumerate(self._srcfreq):
+
+            # Store responses at receivers.
+            resp = self._get_responses(src, freq, out[i][0])
+            self.data['jvec'].loc[src, :, freq] = resp
+
+        return self.data['jvec'].data
+
+    def _get_gvec_field(self, source, frequency, vec):
 
         # Forward electric field
         efield = self._dict_efield[source][frequency]
@@ -886,7 +916,7 @@ class Simulation:
         # Step2: compute G * vec = gvec (using discretize)
         # TODO implement so it is possible also without discretize.
         gvec = efield.grid.getEdgeInnerProductDeriv(
-                np.ones(efield.grid.n_cells))(efield.field) * self._vec
+                np.ones(efield.grid.n_cells))(efield.field) * vec
         # Extension to sig_x, sig_y, sig_z is trivial
         # gvec = mesh.getEdgeInnerProductDeriv(
         #         np.ones(mesh.n_cells)*3)(efield.field) * vec

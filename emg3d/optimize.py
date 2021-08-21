@@ -20,7 +20,7 @@ misfit function and its gradient.
 
 import numpy as np
 
-from emg3d import maps, fields, utils, solver
+from emg3d import maps, fields
 
 __all__ = ['misfit', 'gradient']
 
@@ -241,38 +241,3 @@ def gradient(simulation):
             gradient_model, simulation.model.property_x)
 
     return gradient_model
-
-
-def jvec(simulation, vec):
-    """Jvec = PA^-1 * G * vec."""
-
-    # Store vec
-    simulation._vec = vec
-
-    # Create iterable form src/freq-list to call the process_map.
-    def collect_jfield_inputs(inp):
-        """Collect inputs."""
-        rfield = simulation._get_gvec_field(*inp)
-        return simulation.model, rfield, None, simulation.solver_opts
-
-    # Compute and return A^-1 * G * vec
-    out = utils._process_map(
-            solver._solve,
-            list(map(collect_jfield_inputs, simulation._srcfreq)),
-            max_workers=simulation.max_workers,
-            **{'desc': 'Compute jvec', **simulation._tqdm_opts},
-    )
-
-    # Store gradient field and info.
-    if 'jvec' not in simulation.data.keys():
-        simulation.data['jvec'] = simulation.data.observed.copy(
-                data=np.full(simulation.survey.shape, np.nan+1j*np.nan))
-
-    # Loop over src-freq combinations to extract and store.
-    for i, (src, freq) in enumerate(simulation._srcfreq):
-
-        # Store responses at receivers.
-        resp = simulation._get_responses(src, freq, out[i][0])
-        simulation.data['jvec'].loc[src, :, freq] = resp
-
-    return simulation.data['jvec'].data
