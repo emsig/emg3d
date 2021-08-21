@@ -15,10 +15,13 @@ latest
     levels; *default solver verbosity is new 1*; ``log`` can now be overwritten
     in ``solver_opts`` (mainly for debugging).
 
-- There is no ``optimize`` module any longer. The ``misfit`` and ``gradient``
-  are directly included in the Simulation class. (This is backwards
-  incompatible, but *optimize* was not yet declared stable; it is getting there
-  soon though.)
+
+- Non-backwards compatible changes:
+
+    - There is no ``optimize`` module any longer. The ``misfit`` and
+      ``gradient`` are directly included in the Simulation class.
+    - ``expand_grid_model`` moved from ``simulations`` to ``models``.
+    - ``estimate_gridding_options`` moved from ``simulations`` to ``meshes``.
 
 - Bug fixes:
 

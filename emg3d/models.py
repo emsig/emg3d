@@ -24,7 +24,7 @@ from scipy.constants import epsilon_0
 
 from emg3d import maps, meshes, utils
 
-__all__ = ['Model', 'VolumeModel']
+__all__ = ['Model', 'VolumeModel', 'expand_grid_model']
 
 
 # MODEL
@@ -523,3 +523,87 @@ class VolumeModel:
     def zeta(self):
         r"""Volume-averaged, isotropic zeta."""
         return self._zeta
+
+
+def expand_grid_model(model, expand, interface):
+    """Expand model and grid according to provided parameters.
+
+    Expand the grid and corresponding model in positive z-direction from the
+    edge of the grid to the interface with property ``expand[0]``, and a 100 m
+    thick layer above the interface with property ``expand[1]``.
+
+    The provided properties are taken as isotropic (as is the case in water and
+    air); ``mu_r`` and ``epsilon_r`` are expanded with ones, if necessary.
+
+    The ``interface`` is usually the sea-surface, and ``expand`` is therefore
+    ``[property_sea, property_air]``.
+
+    Parameters
+    ----------
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance.
+
+    expand : list
+        The two properties below and above the interface:
+        ``[below_interface, above_interface]``.
+
+    interface : float
+        Interface between the two properties in ``expand``.
+
+
+    Returns
+    -------
+    exp_grid : TensorMesh
+        Expanded grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+    exp_model : Model
+        The expanded model; a :class:`emg3d.models.Model` instance.
+
+    """
+    grid = model.grid
+
+    def extend_property(prop, add_values, nadd):
+        """Expand property `model.prop`, IF it is not None."""
+
+        if getattr(model, prop) is None:
+            prop_ext = None
+
+        else:
+            prop_ext = np.zeros((grid.shape_cells[0], grid.shape_cells[1],
+                                 grid.shape_cells[2]+nadd))
+            prop_ext[:, :, :-nadd] = getattr(model, prop)
+            if nadd == 2:
+                prop_ext[:, :, -2] = add_values[0]
+            prop_ext[:, :, -1] = add_values[1]
+
+        return prop_ext
+
+    # Initiate.
+    nzadd = 0
+    hz_ext = grid.h[2]
+
+    # Fill-up property_below.
+    if grid.nodes_z[-1] < interface-0.05:  # At least 5 cm.
+        hz_ext = np.r_[hz_ext, interface-grid.nodes_z[-1]]
+        nzadd += 1
+
+    # Add 100 m of property_above.
+    if grid.nodes_z[-1] <= interface+0.001:  # +1mm
+        hz_ext = np.r_[hz_ext, 100]
+        nzadd += 1
+
+    if nzadd > 0:
+        # Extend properties.
+        property_x = extend_property('property_x', expand, nzadd)
+        property_y = extend_property('property_y', expand, nzadd)
+        property_z = extend_property('property_z', expand, nzadd)
+        mu_r = extend_property('mu_r', [1, 1], nzadd)
+        epsilon_r = extend_property('epsilon_r', [1, 1], nzadd)
+
+        # Create extended grid and model.
+        grid = meshes.TensorMesh(
+                [grid.h[0], grid.h[1], hz_ext], origin=grid.origin)
+        model = Model(grid, property_x, property_y, property_z, mu_r,
+                      epsilon_r, mapping=model.map.name)
+
+    return model
