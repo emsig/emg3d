@@ -20,7 +20,7 @@ misfit function and its gradient.
 
 import numpy as np
 
-from emg3d import maps, fields, utils
+from emg3d import maps, fields
 
 __all__ = ['misfit', 'gradient']
 
@@ -118,7 +118,7 @@ def misfit(simulation):
     return misfit.data
 
 
-def gradient(simulation, data_type='complex'):
+def gradient(simulation):
     r"""Compute the discrete gradient using the adjoint-state method.
 
     The discrete adjoint-state gradient for a single source at a single
@@ -241,31 +241,3 @@ def gradient(simulation, data_type='complex'):
             gradient_model, simulation.model.property_x)
 
     return gradient_model
-
-
-def jvec(simulation, vec):
-    """Jvec = PA^-1 * G * vec."""
-
-    # Store vec
-    simulation._vec = vec
-
-    # Initiate futures-dict to store output.
-    out = utils._process_map(
-            simulation._jvec,
-            simulation._srcfreq,
-            max_workers=simulation.max_workers,
-            **{'desc': 'Compute jvec', **simulation._tqdm_opts},
-    )
-
-    # Store gradient field and info.
-    if 'jvec' not in simulation.data.keys():
-        simulation.data['jvec'] = simulation.data.observed.copy(
-                data=np.full(simulation.survey.shape, np.nan+1j*np.nan))
-
-    # Loop over src-freq combinations to extract and store.
-    for i, (src, freq) in enumerate(simulation._srcfreq):
-
-        # Store responses at receivers.
-        simulation.data['jvec'].loc[src, :, freq] = out[i]
-
-    return simulation.data['jvec'].data

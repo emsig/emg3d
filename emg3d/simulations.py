@@ -207,7 +207,6 @@ class Simulation:
         self._dict_efield_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
-        self._vec = None
 
         # Get model taking gridding_opts into account.
         # Sets self.model and self.gridding_opts.
@@ -627,20 +626,20 @@ class Simulation:
         """Return the solver information of the corresponding computation."""
         return self._dict_efield_info[source][self._freq_inp2key(frequency)]
 
-    def _store_responses(self, source, frequency, efield):
+    def _get_responses(self, source, frequency, efield):
         """Return electric and magnetic fields at receiver locations."""
 
         # Get receiver types and their coordinates.
         erec, mrec = self.survey._irec_types
         erec_coord, mrec_coord = self.survey._rec_types_coord(source)
 
-        # Initiate output
-        data = np.zeros_like(
+        # Initiate output.
+        resp = np.zeros_like(
                 self.data.synthetic.loc[source, :, frequency].data)
 
         # Store electric receivers.
         if erec.size:
-            data[erec] = efield.get_receiver(
+            resp[erec] = efield.get_receiver(
                 receiver=erec_coord, method=self.receiver_interpolation,
             )
 
@@ -651,11 +650,11 @@ class Simulation:
                 self.get_model(source, frequency), efield,
             )
 
-            data[mrec] = hfield.get_receiver(
+            resp[mrec] = hfield.get_receiver(
                 receiver=mrec_coord, method=self.receiver_interpolation,
             )
 
-        return data
+        return resp
 
     # ASYNCHRONOUS COMPUTATION
     def compute(self, observed=False, **kwargs):
@@ -687,18 +686,15 @@ class Simulation:
         def collect_efield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
-            sfield = fields.get_source_field(
-                grid=self.get_grid(source, freq),
-                source=self.survey.sources[source],
-                frequency=self.survey.frequencies[freq],
-            )
+            grid = self.get_grid(source, freq)
+            src = self.survey.sources[source]
+            frequency = self.survey.frequencies[freq]
             efield = self._dict_efield[source][freq]
-
-            return self.model, sfield, efield, self.solver_opts
+            return self.model, grid, src, frequency, efield, self.solver_opts
 
         # Initiate futures-dict to store output.
         out = utils._process_map(
-                _solver,
+                solver._solve,
                 list(map(collect_efield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
                 **{'desc': 'Compute efields', **self._tqdm_opts},
@@ -712,7 +708,7 @@ class Simulation:
             self._dict_efield_info[src][freq] = out[i][1]
 
             # Store responses at receiver locations.
-            resp = self._store_responses(src, freq, out[i][0])
+            resp = self._get_responses(src, freq, out[i][0])
             self.data['synthetic'].loc[src, :, freq] = resp
 
         # Print solver info.
@@ -769,7 +765,6 @@ class Simulation:
             source, freq = inp
             rfield = self._get_rfield(*inp)
             bfield = self._dict_bfield[source][freq]
-
             return self.model, rfield, bfield, self.solver_opts
 
         # Initiate back-propagated electric field and info dicts.
@@ -779,7 +774,7 @@ class Simulation:
 
         # Initiate futures-dict to store output.
         out = utils._process_map(
-                _solver,
+                solver._solve,
                 list(map(collect_bfield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
                 **{'desc': 'Back-propagate ', **self._tqdm_opts},
@@ -825,6 +820,16 @@ class Simulation:
                 data_complex_rec_deriv / -rfield.smu0
             )
 
+            # TODO ideally, we want here simply a single call independent of
+            # receiver type, and implement all receiver-type specific things in
+            # the electrodes module as `adjoint_source`-method to `rec`.
+            #
+            #   rfield.field += fields.get_source_field(
+            #           grid=grid,
+            #           source=rec.adjoint_source(coords, strength=strength),
+            #           frequency=freq,
+            #   ).field
+
             # Create source.
             if rec.xtype == 'magnetic':
 
@@ -851,7 +856,8 @@ class Simulation:
                 ).field
 
             elif rec.xtype == 'magnetic':
-                # Use of SimPEG for calculating rfield
+                # Use of discretize for calculating rfield
+                # TODO implement so it is possible also without discretize.
                 C = grid.edge_curl
                 rec_loc = rec.coordinates[:3]
                 azimuth = rec.coordinates[3]
@@ -880,44 +886,61 @@ class Simulation:
 
         return rfield
 
-    def _jvec(self, inp):
-        """Return back-propagated electric field for given inp (src, freq)."""
+    def _jvec(self, vec):
+        """Jvec = PA^-1 * G * vec."""
 
-        # Input parameters.
-        solver_input = {
-            **self.solver_opts,
-            'model': self.get_model(*inp),
-            'sfield': self._get_gvec_field(*inp),
-        }
+        # Create iterable form src/freq-list to call the process_map.
+        def collect_jfield_inputs(inp, vec=vec):
+            """Collect inputs."""
+            rfield = self._get_gvec_field(*inp, vec)
+            return self.model, rfield, None, self.solver_opts
 
         # Compute and return A^-1 * G * vec
-        efield_jvec = solver.solve(**solver_input)[0]
+        out = utils._process_map(
+                solver._solve,
+                list(map(collect_jfield_inputs, self._srcfreq)),
+                max_workers=self.max_workers,
+                **{'desc': 'Compute jvec', **self._tqdm_opts},
+        )
 
-        # Return the responses at receivers.
-        resp = self._store_responses(*inp, efield_jvec)
-        # Apply a chainrule for the different data_type than complex (e.g. amp)
-        source, frequency = inp
-        data_complex_deriv = []
-        for name, rec in self.survey.receivers.items():
-            data_complex_rec = self.data.synthetic.loc[
-                source, name, frequency
-            ].data
-            data_complex_rec_deriv = rec.data_deriv(
-                data_complex_rec,
-                adjoint=False
-            )
-            data_complex_deriv.append(data_complex_rec_deriv)
-        resp *= np.hstack(data_complex_deriv)
-        return resp
+        # Store gradient field and info.
+        if 'jvec' not in self.data.keys():
+            self.data['jvec'] = self.data.observed.copy(
+                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
 
-    def _get_gvec_field(self, source, frequency):
+        # Loop over src-freq combinations to extract and store.
+        for i, (src, freq) in enumerate(self._srcfreq):
+
+            # Store responses at receivers.
+            resp = self._get_responses(src, freq, out[i][0])
+
+            # Apply a chainrule for the different data_type than complex
+            # (e.g. amp)
+            data_complex_deriv = []
+            for name, rec in self.survey.receivers.items():
+                data_complex_rec = self.data.synthetic.loc[
+                    src, name, freq
+                ].data
+                data_complex_rec_deriv = rec.data_deriv(
+                    data_complex_rec,
+                    adjoint=False
+                )
+                data_complex_deriv.append(data_complex_rec_deriv)
+            resp *= np.hstack(data_complex_deriv)
+
+            self.data['jvec'].loc[src, :, freq] = resp
+
+        return self.data['jvec'].data
+
+    def _get_gvec_field(self, source, frequency, vec):
 
         # Forward electric field
         efield = self._dict_efield[source][frequency]
 
-        # Step2: compute G * vec = gvec
+        # Step2: compute G * vec = gvec (using discretize)
+        # TODO implement so it is possible also without discretize.
         gvec = efield.grid.getEdgeInnerProductDeriv(
-                np.ones(efield.grid.n_cells))(efield.field) * self._vec
+                np.ones(efield.grid.n_cells))(efield.field) * vec
         # Extension to sig_x, sig_y, sig_z is trivial
         # gvec = mesh.getEdgeInnerProductDeriv(
         #         np.ones(mesh.n_cells)*3)(efield.field) * vec
@@ -1475,48 +1498,3 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
 
     # Return gridding_opts.
     return gopts
-
-
-def _solver(inp):
-    """Thin wrapper of `solver.solve` for a `process_map`.
-
-
-    Parameters
-    ----------
-    inp : tuple
-        (model, sfield, efield, solver_opts):
-
-        - ``model``: Corresponds to `Simulation.model`; it will be interpolated
-          to the computational grid.
-        - ``sfield``: Source field on computational grid.
-        - ``efield``: None or electric field which is used as starting field.
-        - `` solver_opts``: Dict which is provided to ``solver.solve``.
-
-
-    Returns
-    -------
-    efield : Field
-        Resulting electric field.
-
-    info : dict
-        Dictionary with solver info.
-
-    """
-
-    model, sfield, efield, solver_opts = inp
-
-    solver_input = {
-        **solver_opts,
-        'model': model.interpolate_to_grid(sfield.grid),
-        'sfield': sfield,
-        'efield': efield,
-    }
-
-    # Compute electric field.
-    if efield is None:
-        efield, info = solver.solve(**solver_input)
-    else:
-        info = solver.solve(**solver_input)
-
-    # Return electric field.
-    return efield, info
