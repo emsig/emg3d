@@ -71,8 +71,11 @@ class Wire:
         # Check input.
         if equal:
             for name in self._serialize:
-                equal *= np.allclose(getattr(self, name),
-                                     getattr(electrode, name))
+                if name == 'data_type':
+                    equal *= getattr(self, name) == getattr(electrode, name)
+                else:
+                    equal *= np.allclose(getattr(self, name),
+                                         getattr(electrode, name))
 
         return bool(equal)
 
@@ -558,14 +561,17 @@ class Receiver(Wire):
     """
 
     # Add relative to attributes which have to be serialized.
-    _serialize = {'relative'} | Wire._serialize
+    _serialize = {'relative', 'data_type'} | Wire._serialize
 
-    def __init__(self, relative, **kwargs):
+    def __init__(self, relative, data_type='complex', **kwargs):
         """Initiate a receiver."""
 
         # Store relative, add a repr-addition.
         self._relative = relative
-        self._repr_add = f"{['absolute', 'relative'][self.relative]};"
+        self._data_type = data_type
+        self._repr_add = (
+            f"{['absolute', 'relative'][self.relative]}; {data_type};"
+        )
 
         super().__init__(**kwargs)
 
@@ -573,6 +579,23 @@ class Receiver(Wire):
     def relative(self):
         """True if coordinates are relative to source, False if absolute."""
         return self._relative
+
+    @property
+    def data_type(self):
+        """Data type"""
+        return self._data_type
+
+    def data_deriv(self, data_complex, adjoint=False):
+        if self.data_type == 'complex':
+            data_complex_deriv = np.ones(data_complex.size, dtype='complex')
+        elif self.data_type == 'amp':
+            data_complex_deriv = data_complex.conj() / abs(data_complex)
+        else:
+            raise Exception("Not Implemented!")
+        if adjoint:
+            return data_complex_deriv.conj()
+        else:
+            return data_complex_deriv
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
@@ -608,10 +631,14 @@ class RxElectricPoint(Receiver, Point):
 
     """
 
-    def __init__(self, coordinates, relative=False):
+    def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate an electric point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative)
+        super().__init__(
+            coordinates=coordinates,
+            relative=relative,
+            data_type=data_type
+        )
 
 
 @utils._known_class
@@ -633,10 +660,14 @@ class RxMagneticPoint(Receiver, Point):
 
     """
 
-    def __init__(self, coordinates, relative=False):
+    def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate a magnetic point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative)
+        super().__init__(
+            coordinates=coordinates,
+            relative=relative,
+            data_type=data_type
+        )
 
 
 # ROTATIONS AND CONVERSIONS

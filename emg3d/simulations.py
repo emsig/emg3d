@@ -809,7 +809,16 @@ class Simulation:
 
             # Residual source strength: Weighted residual, normalized by -smu0.
             weight = self.data.weights.loc[source, name, frequency].data
-            strength = np.conj(residual * weight / -rfield.smu0)
+            data_complex_rec = self.data.synthetic.loc[
+                source, name, frequency
+            ].data
+            data_complex_rec_deriv = rec.data_deriv(
+                data_complex_rec, adjoint=True
+            )[0]
+            strength = np.conj(
+                residual * weight *
+                data_complex_rec_deriv / -rfield.smu0
+            )
 
             # TODO ideally, we want here simply a single call independent of
             # receiver type, and implement all receiver-type specific things in
@@ -904,6 +913,21 @@ class Simulation:
 
             # Store responses at receivers.
             resp = self._get_responses(src, freq, out[i][0])
+
+            # Apply a chainrule for the different data_type than complex
+            # (e.g. amp)
+            data_complex_deriv = []
+            for name, rec in self.survey.receivers.items():
+                data_complex_rec = self.data.synthetic.loc[
+                    src, name, freq
+                ].data
+                data_complex_rec_deriv = rec.data_deriv(
+                    data_complex_rec,
+                    adjoint=False
+                )
+                data_complex_deriv.append(data_complex_rec_deriv)
+            resp *= np.hstack(data_complex_deriv)
+
             self.data['jvec'].loc[src, :, freq] = resp
 
         return self.data['jvec'].data
