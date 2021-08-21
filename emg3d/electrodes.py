@@ -71,8 +71,11 @@ class Wire:
         # Check input.
         if equal:
             for name in self._serialize:
-                equal *= np.allclose(getattr(self, name),
-                                     getattr(electrode, name))
+                if name == 'data_type':
+                    equal *= getattr(self, name) == getattr(electrode, name)
+                else:
+                    equal *= np.allclose(getattr(self, name),
+                                         getattr(electrode, name))
 
         return bool(equal)
 
