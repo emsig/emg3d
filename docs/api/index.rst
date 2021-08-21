@@ -22,7 +22,6 @@ API reference
    maps
    meshes
    models
-   optimize
    simulations
    solver
    surveys
