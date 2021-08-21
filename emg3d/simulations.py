@@ -816,6 +816,16 @@ class Simulation:
             weight = self.data.weights.loc[source, name, frequency].data
             strength = np.conj(residual * weight / -rfield.smu0)
 
+            # TODO ideally, we want here simply a single call independent of
+            # receiver type, and implement all receiver-type specific things in
+            # the electrodes module as `adjoint_source`-method to `rec`.
+            #
+            #   rfield.field += fields.get_source_field(
+            #           grid=grid,
+            #           source=rec.adjoint_source(coords, strength=strength),
+            #           frequency=freq,
+            #   ).field
+
             # Create source.
             if rec.xtype == 'magnetic':
 
@@ -842,7 +852,8 @@ class Simulation:
                 ).field
 
             elif rec.xtype == 'magnetic':
-                # Use of SimPEG for calculating rfield
+                # Use of discretize for calculating rfield
+                # TODO implement so it is possible also without discretize.
                 C = grid.edge_curl
                 rec_loc = rec.coordinates[:3]
                 azimuth = rec.coordinates[3]
