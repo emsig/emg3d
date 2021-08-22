@@ -3,9 +3,9 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 import emg3d
-from emg3d import simulations
+from emg3d import simulations, optimize
 
-from . import helpers
+from . import alternatives
 
 
 # Soft dependencies
@@ -262,6 +262,11 @@ class TestSimulation():
         with pytest.warns(UserWarning, match='Receiver responses were obtain'):
             grad = simulation.gradient
 
+        # Test deprecation v1.4.0
+        with pytest.warns(FutureWarning, match="removed in v1.4.0"):
+            grad2 = optimize.gradient(simulation)
+        assert_allclose(grad, grad2)
+
         # Ensure the gradient has the shape of the model, not of the input.
         assert grad.shape == self.model.shape
 
@@ -491,179 +496,199 @@ class TestSimulation():
         )
 
 
-def test_expand_grid_model():
-    grid = emg3d.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))
-    model = emg3d.Model(grid, 1, np.ones(grid.shape_cells)*2, mu_r=3,
-                        epsilon_r=5)
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+def test_misfit():
+    data = 1
+    syn = 5
+    rel_err = 0.05
+    sources = emg3d.TxElectricDipole((0, 0, 0, 0, 0))
+    receivers = emg3d.RxElectricPoint((5, 0, 0, 0, 0))
 
-    o_model = simulations.expand_grid_model(model, [2, 3], 5)
+    survey = emg3d.Survey(
+        sources=sources, receivers=receivers, frequencies=100,
+        data=np.zeros((1, 1, 1))+data, relative_error=0.05,
+    )
 
-    # Grid.
-    assert_allclose(grid.nodes_z, o_model.grid.nodes_z[:-2])
-    assert o_model.grid.nodes_z[-2] == 5
-    assert o_model.grid.nodes_z[-1] == 105
+    grid = emg3d.TensorMesh([np.ones(10)*2, [2, 2], [2, 2]], (-10, -2, -2))
+    model = emg3d.Model(grid, 1)
 
-    # Property x (from float).
-    assert_allclose(o_model.property_x[:, :, :-2], 1)
-    assert_allclose(o_model.property_x[:, :, -2], 2)
-    assert_allclose(o_model.property_x[:, :, -1], 3)
+    simulation = simulations.Simulation(survey=survey, model=model)
 
-    # Property y (from shape_cells).
-    assert_allclose(o_model.property_y[:, :, :-2], model.property_y)
-    assert_allclose(o_model.property_y[:, :, -2], 2)
-    assert_allclose(o_model.property_y[:, :, -1], 3)
+    field = emg3d.Field(grid, dtype=np.float64)
+    field.field += syn
+    simulation._dict_efield['TxED-1']['f-1'] = field
+    simulation.data['synthetic'] = simulation.data['observed']*0 + syn
 
-    # Property z.
-    assert o_model.property_z is None
+    misfit = 0.5*((syn-data)/(rel_err*data))**2
 
-    # Property mu_r (from float).
-    assert_allclose(o_model.mu_r[:, :, :-2], 3)
-    assert_allclose(o_model.mu_r[:, :, -2], 1)
-    assert_allclose(o_model.mu_r[:, :, -1], 1)
+    def dummy():
+        pass
 
-    # Property epsilon_r (from float).
-    assert_allclose(o_model.epsilon_r[:, :, :-2], 5)
-    assert_allclose(o_model.epsilon_r[:, :, -2], 1)
-    assert_allclose(o_model.epsilon_r[:, :, -1], 1)
+    simulation.compute = dummy  # => switch of compute()
+
+    assert_allclose(simulation.misfit, misfit)
+
+    # Test deprecation v1.4.0
+    with pytest.warns(FutureWarning, match="removed in v1.4.0"):
+        misfit2 = optimize.misfit(simulation)
+    assert_allclose(misfit, misfit2)
+
+    # Missing noise_floor / std.
+    survey = emg3d.Survey(sources, receivers, 100)
+    simulation = simulations.Simulation(survey=survey, model=model)
+    with pytest.raises(ValueError, match="Either `noise_floor` or"):
+        simulation.misfit
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-class TestEstimateGriddingOpts():
-    if xarray is not None:
-        # Create a simple survey
-        sources = emg3d.surveys.txrx_coordinates_to_dict(
-                emg3d.TxElectricDipole,
-                (0, [1000, 3000, 5000], -950, 0, 0))
-        receivers = emg3d.surveys.txrx_coordinates_to_dict(
-                emg3d.RxElectricPoint,
-                (np.arange(11)*500, 2000, -1000, 0, 0))
-        frequencies = (0.1, 10.0)
+class TestGradient:
 
+    def test_errors(self):
+        mesh = emg3d.TensorMesh([[2, 2], [2, 2], [2, 2]], origin=(-1, -1, -1))
         survey = emg3d.Survey(
-                sources, receivers, frequencies, noise_floor=1e-15,
-                relative_error=0.05)
+            sources=emg3d.TxElectricDipole((-1.5, 0, 0, 0, 0)),
+            receivers=emg3d.RxElectricPoint((1.5, 0, 0, 0, 0)),
+            frequencies=1.0,
+            relative_error=0.01,
+        )
+        sim_inp = {'survey': survey, 'gridding': 'same',
+                   'receiver_interpolation': 'linear'}
 
-        # Create a simple grid and model
-        grid = emg3d.TensorMesh(
-                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
-                np.array([-1250, -1250, -2250]))
-        model = emg3d.Model(grid, 0.1, np.ones(grid.shape_cells)*10)
-        model.property_y[5, 8, 3] = 100000  # Cell at source center
+        # Anisotropic models.
+        simulation = simulations.Simulation(
+                model=emg3d.Model(mesh, 1, 2, 3), **sim_inp)
+        with pytest.raises(NotImplementedError, match='for isotropic models'):
+            simulation.gradient
 
-    def test_empty_dict(self):
-        gdict = simulations.estimate_gridding_opts({}, self.model, self.survey)
+        # Model with electric permittivity.
+        simulation = simulations.Simulation(
+                model=emg3d.Model(mesh, epsilon_r=3), **sim_inp)
+        with pytest.raises(NotImplementedError, match='for el. permittivity'):
+            simulation.gradient
 
-        assert gdict['frequency'] == 1.0
-        assert gdict['mapping'] == self.model.map.name
-        assert_allclose(gdict['center'], (0, 3000, -950))
-        assert_allclose(gdict['domain']['x'], (-500, 5500))
-        assert_allclose(gdict['domain']['y'], (600, 5400))
-        assert_allclose(gdict['domain']['z'], (-3651, -651))
-        assert_allclose(gdict['properties'], [100000, 10, 10, 10, 10, 10, 10])
+        # Model with magnetic permeability.
+        simulation = simulations.Simulation(
+                model=emg3d.Model(mesh, mu_r=np.ones(mesh.shape_cells)*np.pi),
+                **sim_inp)
+        with pytest.raises(NotImplementedError, match='for magn. permeabili'):
+            simulation.gradient
 
-    def test_mapping_vector(self):
-        gridding_opts = {
-            'mapping': "LgConductivity",
-            'vector': 'xZ',
-            }
-        gdict = simulations.estimate_gridding_opts(
-                gridding_opts, self.model, self.survey)
+    def test_as_vs_fd_gradient(self, capsys):
+        # Create a simple mesh.
+        hx = np.ones(64)*100
+        mesh = emg3d.TensorMesh([hx, hx, hx], origin=[0, 0, 0])
 
-        assert_allclose(
-                gdict['properties'],
-                np.log10(1/np.array([100000, 10, 10, 10, 10, 10, 10])),
-                atol=1e-15)
-        assert_allclose(gdict['vector']['x'], self.grid.nodes_x)
-        assert gdict['vector']['y'] is None
-        assert_allclose(gdict['vector']['z'], self.grid.nodes_z)
+        # Define a simple survey, including 1 el. & 1 magn. receiver
+        survey = emg3d.Survey(
+            sources=emg3d.TxElectricDipole((1650, 3200, 3200, 0, 0)),
+            receivers=[
+                emg3d.RxElectricPoint((4750, 3200, 3200, 0, 0)),
+                emg3d.RxMagneticPoint((4750, 3200, 3200, 90, 0)),
+            ],
+            frequencies=1.0,
+            relative_error=0.01,
+        )
 
-    def test_vector_domain_distance(self):
-        gridding_opts = {
-                'vector': 'Z',
-                'domain': (None, [-1000, 1000], None),
-                'distance': [[5, 10], None, None],
-                }
-        gdict = simulations.estimate_gridding_opts(
-                gridding_opts, self.model, self.survey)
+        # Background Model
+        con_init = np.ones(mesh.shape_cells)
 
-        assert gdict['vector']['x'] == gdict['vector']['y'] is None
-        assert_allclose(gdict['vector']['z'], self.model.grid.nodes_z)
+        # Target Model 1: One Block
+        con_true = np.ones(mesh.shape_cells)
+        con_true[27:37, 27:37, 15:25] = 0.001
 
-        assert gdict['domain']['x'] is None
-        assert gdict['domain']['y'] == [-1000, 1000]
-        assert gdict['domain']['z'] == [self.model.grid.nodes_z[0],
-                                        self.model.grid.nodes_z[-1]]
-        assert gdict['distance']['x'] == [5, 10]
-        assert gdict['distance']['y'] == gdict['distance']['z'] is None
+        model_init = emg3d.Model(mesh, con_init, mapping='Conductivity')
+        model_true = emg3d.Model(mesh, con_true, mapping='Conductivity')
+        # mesh.plot_3d_slicer(con_true)  # For debug / QC, needs discretize
 
-        # As dict
-        gridding_opts = {
-                'vector': 'Z',
-                'domain': {'x': None, 'y': [-1000, 1000], 'z': None},
-                'distance': {'x': [5, 10], 'y': None, 'z': None},
-                }
-        gdict = simulations.estimate_gridding_opts(
-                gridding_opts, self.model, self.survey)
-
-        assert gdict['vector']['x'] == gdict['vector']['y'] is None
-        assert_allclose(gdict['vector']['z'], self.model.grid.nodes_z)
-
-        assert gdict['domain']['x'] is None
-        assert gdict['domain']['y'] == [-1000, 1000]
-        assert gdict['domain']['z'] == [self.model.grid.nodes_z[0],
-                                        self.model.grid.nodes_z[-1]]
-        assert gdict['distance']['x'] == [5, 10]
-        assert gdict['distance']['y'] == gdict['distance']['z'] is None
-
-    def test_pass_along(self):
-        gridding_opts = {
-            'vector': {'x': None, 'y': 1, 'z': None},
-            'stretching': [1.2, 1.3],
-            'seasurface': -500,
-            'cell_numbers': [10, 20, 30],
-            'lambda_factor': 0.8,
-            'max_buffer': 10000,
-            'min_width_limits': ([20, 40], [20, 40], [20, 40]),
-            'min_width_pps': 4,
-            'verb': -1,
-            }
-
-        gdict = simulations.estimate_gridding_opts(
-                gridding_opts.copy(), self.model, self.survey)
-
-        # Check that all parameters passed unchanged.
-        gdict2 = {k: gdict[k] for k, _ in gridding_opts.items()}
-        # Except the tuple, which should be a dict now
-        gridding_opts['min_width_limits'] = {
-                'x': gridding_opts['min_width_limits'][0],
-                'y': gridding_opts['min_width_limits'][1],
-                'z': gridding_opts['min_width_limits'][2]
+        sim_inp = {
+            'survey': survey,
+            'solver_opts': {'plain': True, 'tol': 5e-5},  # Red. tol 4 speed
+            'max_workers': 1,
+            'gridding': 'same',
+            'verb': 0,
+            'receiver_interpolation': 'linear',
         }
-        assert helpers.compare_dicts(gdict2, gridding_opts)
 
-    def test_factor(self):
-        sources = emg3d.TxElectricDipole((0, 3000, -950, 0, 0))
-        receivers = emg3d.RxElectricPoint((0, 3000, -1000, 0, 0))
+        # Compute data (pre-computed and passed to Survey above)
+        sim_data = simulations.Simulation(model=model_true, **sim_inp)
+        sim_data.compute(observed=True)
 
-        # Adjusted x-domain.
-        survey = emg3d.Survey(
-                self.sources, receivers, self.frequencies, noise_floor=1e-15,
-                relative_error=0.05)
+        # Compute adjoint state misfit and gradient
+        sim_data = simulations.Simulation(model=model_init, **sim_inp)
+        data_misfit = sim_data.misfit
+        grad = sim_data.gradient
 
-        gdict = simulations.estimate_gridding_opts({}, self.model, survey)
+        # For Debug / QC, needs discretize
+        # from matplotlib.colors import LogNorm, SymLogNorm
+        # mesh.plot_3d_slicer(
+        #         grad.ravel('F'),
+        #         pcolor_opts={
+        #             'cmap': 'RdBu_r',
+        #             'norm': SymLogNorm(linthresh=1e-2, base=10,
+        #                                vmin=-1e1, vmax=1e1)}
+        #         )
 
-        assert_allclose(gdict['domain']['x'], (-800, 800))
+        # We test a pseudo-random cell from the inline xz slice.
+        #
+        # The NRMSD is (should) be below 1 %. However, (a) close to the
+        # boundary, (b) in regions where the gradient is almost zero, and (c)
+        # in regions where the gradient changes sign the NRMSD can become
+        # large. This is mainly due to numerics, our coarse mesh, and the
+        # reduced tolerance (which we reduced for speed). As such we only
+        # sample pseudo-random from 200 cells.
+        ixyz = ([20, 32, 17], [20, 32, 23], [20, 32, 24], [20, 32, 25],
+                [20, 32, 26], [20, 32, 27], [20, 32, 28], [20, 32, 29],
+                [20, 32, 30], [20, 32, 31], [20, 32, 32], [20, 32, 33],
+                [20, 32, 34], [20, 32, 35], [20, 32, 36], [20, 32, 37],
+                [20, 32, 38], [20, 32, 39], [21, 32, 23], [21, 32, 24],
+                [21, 32, 25], [21, 32, 26], [21, 32, 27], [21, 32, 28],
+                [21, 32, 29], [21, 32, 30], [21, 32, 32], [21, 32, 33],
+                [21, 32, 34], [21, 32, 35], [21, 32, 36], [21, 32, 37],
+                [21, 32, 38], [21, 32, 39], [22, 32, 16], [22, 32, 23],
+                [22, 32, 24], [22, 32, 25], [22, 32, 26], [22, 32, 27],
+                [22, 32, 28], [22, 32, 29], [22, 32, 30], [22, 32, 31],
+                [22, 32, 32], [22, 32, 33], [22, 32, 34], [22, 32, 35],
+                [22, 32, 36], [22, 32, 37], [22, 32, 38], [22, 32, 39],
+                [23, 32, 16], [23, 32, 23], [23, 32, 24], [23, 32, 25],
+                [23, 32, 26], [23, 32, 27], [23, 32, 28], [23, 32, 31],
+                [23, 32, 32], [23, 32, 34], [23, 32, 35], [23, 32, 36],
+                [23, 32, 37], [23, 32, 38], [23, 32, 39], [24, 32, 15],
+                [24, 32, 22], [24, 32, 23], [24, 32, 24], [24, 32, 25],
+                [24, 32, 26], [24, 32, 27], [24, 32, 28], [24, 32, 29],
+                [24, 32, 31], [24, 32, 32], [24, 32, 34], [24, 32, 35],
+                [24, 32, 37], [24, 32, 38], [24, 32, 39], [25, 32, 15],
+                [25, 32, 22], [25, 32, 23], [25, 32, 24], [25, 32, 25],
+                [25, 32, 26], [25, 32, 28], [25, 32, 31], [25, 32, 32],
+                [25, 32, 34], [25, 32, 35], [25, 32, 37], [25, 32, 38],
+                [25, 32, 39], [26, 32, 15], [26, 32, 22], [26, 32, 23],
+                [26, 32, 24], [26, 32, 25], [26, 32, 26], [26, 32, 31],
+                [26, 32, 32], [26, 32, 35], [26, 32, 37], [26, 32, 38],
+                [26, 32, 39], [27, 32, 15], [27, 32, 22], [27, 32, 23],
+                [27, 32, 24], [27, 32, 25], [27, 32, 26], [27, 32, 28],
+                [27, 32, 29], [27, 32, 31], [27, 32, 32], [27, 32, 35],
+                [27, 32, 37], [27, 32, 38], [27, 32, 39], [28, 32, 22],
+                [28, 32, 23], [28, 32, 24], [28, 32, 25], [28, 32, 26],
+                [28, 32, 31], [28, 32, 32], [28, 32, 37], [28, 32, 38],
+                [28, 32, 39], [29, 32, 22], [29, 32, 23], [29, 32, 24],
+                [29, 32, 25], [29, 32, 26], [29, 32, 31], [29, 32, 32],
+                [29, 32, 38], [29, 32, 39], [30, 32, 23], [30, 32, 24],
+                [30, 32, 25], [30, 32, 31], [30, 32, 32], [30, 32, 38],
+                [30, 32, 39], [31, 32, 23], [31, 32, 24], [31, 32, 25],
+                [31, 32, 31], [31, 32, 32], [31, 32, 39], [32, 32, 23],
+                [32, 32, 24], [32, 32, 25], [32, 32, 32], [32, 32, 39],
+                [33, 32, 23], [33, 32, 24], [33, 32, 25], [33, 32, 32],
+                [33, 32, 39], [34, 32, 23], [34, 32, 24], [34, 32, 25],
+                [34, 32, 32], [34, 32, 38], [34, 32, 39], [35, 32, 15],
+                [35, 32, 24], [35, 32, 25], [35, 32, 38], [35, 32, 39],
+                [36, 32, 15], [36, 32, 24], [36, 32, 25], [36, 32, 38],
+                [36, 32, 39], [37, 32, 15], [37, 32, 24], [37, 32, 25],
+                [37, 32, 38], [38, 32, 25], [38, 32, 38], [39, 32, 16],
+                [39, 32, 25], [39, 32, 26], [39, 32, 37], [40, 32, 16],
+                [40, 32, 26], [40, 32, 37], [42, 32, 17], [42, 32, 27],
+                [42, 32, 36], [43, 32, 18], [43, 32, 28], [43, 32, 35])
 
-        # Adjusted x-domain.
-        survey = emg3d.Survey(
-                sources, self.receivers, self.frequencies, noise_floor=1e-15,
-                relative_error=0.05)
+        nrmsd = alternatives.fd_vs_as_gradient(
+                ixyz[np.random.randint(len(ixyz))],
+                model_init, grad, data_misfit, sim_inp)
 
-        gdict = simulations.estimate_gridding_opts({}, self.model, survey)
-
-        assert_allclose(gdict['domain']['y'], (1500, 3500))
-
-    def test_error(self):
-        with pytest.raises(TypeError, match='Unexpected gridding_opts'):
-            _ = simulations.estimate_gridding_opts(
-                    {'what': True}, self.model, self.survey)
+        assert nrmsd < 0.3
