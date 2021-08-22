@@ -27,10 +27,10 @@ from copy import deepcopy
 
 import numpy as np
 
-from emg3d import (electrodes, fields, io, maps, meshes, models,
-                   optimize, solver, surveys, utils)
+from emg3d import (electrodes, fields, io, maps, meshes, models, solver,
+                   surveys, utils)
 
-__all__ = ['Simulation', 'expand_grid_model', 'estimate_gridding_opts']
+__all__ = ['Simulation', ]
 
 
 @utils._known_class
@@ -121,7 +121,7 @@ class Simulation:
         ``'both``' is passed to :func:`emg3d.meshes.construct_mesh`; consult
         the corresponding documentation for more information. Parameters that
         are not provided are estimated from the provided model, grid, and
-        survey using :func:`emg3d.simulations.estimate_gridding_opts`, which
+        survey using :func:`emg3d.meshes.estimate_gridding_opts`, which
         documentation contains more information too.
 
         There are two notably differences to the parameters described in
@@ -130,12 +130,12 @@ class Simulation:
         - ``vector``: besides the normal possibility it can also be a string
           containing one or several of ``'x'``, ``'y'``, and ``'z'``. In these
           cases the corresponding dimension of the input mesh is provided as
-          vector. See :func:`emg3d.simulations.estimate_gridding_opts`.
+          vector. See :func:`emg3d.meshes.estimate_gridding_opts`.
         - ``expand``: in the format of ``[property_sea, property_air]``; if
           provided, the input model is expanded up to the seasurface with sea
           water, and an air layer is added. The actual height of the seasurface
           can be defined with the key ``seasurface``. See
-          :func:`emg3d.simulations.expand_grid_model`.
+          :func:`emg3d.models.expand_grid_model`.
 
     solver_opts : dict, default: {'verb': 1'}
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
@@ -727,14 +727,60 @@ class Simulation:
     # OPTIMIZATION
     @property
     def gradient(self):
-        """Return the gradient of the misfit function.
+        r"""Compute the discrete gradient using the adjoint-state method.
 
-        See :func:`emg3d.optimize.gradient`.
+        The discrete adjoint-state gradient for a single source at a single
+        frequency is given by Equation (10) in [PlMu08]_,
+
+        .. math::
+
+            \nabla_p \phi(\textbf{p}) =
+                -&\sum_{k,l,m}\mathbf{\bar{\lambda}}_{x; k+\frac{1}{2}, l, m}
+                  \frac{\partial S_{k+\frac{1}{2}, l, m}}{\partial \textbf{p}}
+                  \textbf{E}_{x; k+\frac{1}{2}, l, m}\\
+                -&\sum_{k,l,m}\mathbf{\bar{\lambda}}_{y; k, l+\frac{1}{2}, m}
+                  \frac{\partial S_{k, l+\frac{1}{2}, m}}{\partial \textbf{p}}
+                  \textbf{E}_{y; k, l+\frac{1}{2}, m}\\
+                -&\sum_{k,l,m}\mathbf{\bar{\lambda}}_{z; k, l, m+\frac{1}{2}}
+                  \frac{\partial S_{k, l, m+\frac{1}{2}}}{\partial \textbf{p}}
+                  \textbf{E}_{z; k, l, m+\frac{1}{2}}\, ,
+
+
+        where :math:`\textbf{E}` is the electric (forward) field and
+        :math:`\mathbf{\lambda}` is the back-propagated residual field (from
+        electric and magnetic receivers); :math:`\bar{~}` denotes conjugate.
+        The :math:`\partial S`-part takes care of the volume-averaged model
+        parameters.
+
+        .. warning::
+
+            To obtain the proper adjoint-state gradient you have to choose
+            linear interpolation for the receiver responses:
+            ``emg3d.Simulation(..., receiver_interpolation='linear')``. The
+            reason is that the point-source is the adjoint of a tri-linear
+            interpolation, so the residual should come from a linear
+            interpolation.
+
+            Also, the adjoint test for magnetic receivers does not yet pass.
+            Electric receivers are good to go.
+
+        .. note::
+
+            The currently implemented gradient is only for isotropic models
+            without relative electric permittivity nor relative magnetic
+            permeability.
+
+
+        Returns
+        -------
+        grad : ndarray
+            Adjoint-state gradient (same shape as ``simulation.model``).
 
         """
         if self._gradient is None:
+
+            # Warn that cubic is not good for adjoint-state gradient.
             if self.receiver_interpolation == 'cubic':
-                # Warn that cubic is not good for adjoint-state gradient.
                 msg = (
                     "emg3d: Receiver responses were obtained with cubic "
                     "interpolation. This will not yield the exact gradient. "
@@ -742,18 +788,174 @@ class Simulation:
                     "Simulation()."
                 )
                 warnings.warn(msg, UserWarning)
-            self._gradient = optimize.gradient(self)
+
+            # Check limitation 1: So far only isotropic models.
+            if self.model.case != 'isotropic':
+                raise NotImplementedError(
+                    "Gradient only implemented for isotropic models."
+                )
+
+            # Check limitation 2: No epsilon_r, mu_r.
+            var = (self.model.epsilon_r, self.model.mu_r)
+            for v, n in zip(var, ('el. permittivity', 'magn. permeability')):
+                if v is not None and not np.allclose(v, 1.0):
+                    raise NotImplementedError(
+                        f"Gradient not implemented for {n}."
+                    )
+
+            # Ensure misfit has been computed
+            # (and therefore the electric fields).
+            _ = self.misfit
+
+            # Compute back-propagating electric fields.
+            self._bcompute()
+
+            # Pre-allocate the gradient on the mesh.
+            gradient_model = np.zeros(self.model.grid.shape_cells, order='F')
+
+            # Loop over source-frequency pairs.
+            for src, freq in self._srcfreq:
+
+                # Multiply forward field with backward field; take real part.
+                # This is the actual Equation (10), with:
+                #   del S / del p = iwu0 V sigma / sigma,
+                # where lambda and E are already volume averaged.
+                efield = self._dict_efield[src][freq]  # Forward electric field
+                bfield = self._dict_bfield[src][freq]  # Conj. backprop. field
+                gfield = fields.Field(
+                    grid=efield.grid,
+                    data=-np.real(bfield.field * efield.smu0 * efield.field),
+                    dtype=float,
+                )
+
+                # Bring the gradient back from the computation grid to the
+                # model grid.
+                gradient = gfield.interpolate_to_grid(self.model.grid)
+
+                # Pre-allocate the gradient for this src-freq.
+                shape = gradient.grid.shape_cells
+                grad_x = np.zeros(shape, order='F')
+                grad_y = np.zeros(shape, order='F')
+                grad_z = np.zeros(shape, order='F')
+
+                # Map the field to cell centers times volume.
+                cell_volumes = gradient.grid.cell_volumes.reshape(
+                        shape, order='F')
+                maps.interp_edges_to_vol_averages(
+                        ex=gradient.fx, ey=gradient.fy, ez=gradient.fz,
+                        volumes=cell_volumes,
+                        ox=grad_x, oy=grad_y, oz=grad_z)
+                grad = grad_x + grad_y + grad_z
+
+                # => Frequency-dependent depth-weighting should go here.
+
+                # Add this src-freq gradient to the total gradient.
+                gradient_model -= grad
+
+            # => Frequency-independent depth-weighting should go here.
+
+            # Apply derivative-chain of property-map
+            # (only relevant if `mapping` is something else than conductivity).
+            self.model.map.derivative_chain(
+                    gradient_model, self.model.property_x)
+
+            self._gradient = gradient_model
+
         return self._gradient[:, :, :self._input_sc2]
 
     @property
     def misfit(self):
-        """Return the misfit function.
+        r"""Misfit or cost function.
 
-        See :func:`emg3d.optimize.misfit`.
+        The data misfit or weighted least-squares functional using an
+        :math:`l_2` norm is given by
+
+        .. math::
+            :label: misfit
+
+                \phi = \frac{1}{2} \sum_s\sum_r\sum_f
+                    \left\lVert
+                        W_{s,r,f} \left(
+                        \textbf{d}_{s,r,f}^\text{pred}
+                        -\textbf{d}_{s,r,f}^\text{obs}
+                        \right) \right\rVert^2 \, ,
+
+        where :math:`s, r, f` stand for source, receiver, and frequency,
+        respectively; :math:`\textbf{d}^\text{obs}` are the observed electric
+        and magnetic data, and :math:`\textbf{d}^\text{pred}` are the synthetic
+        electric and magnetic data. As of now the misfit does not include any
+        regularization term.
+
+        The data weight of observation :math:`d_i` is given by :math:`W_i =
+        \varsigma^{-1}_i`, where :math:`\varsigma_i` is the standard deviation
+        of the observation, see
+        :attr:`emg3d.surveys.Survey.standard_deviation`.
+
+        .. note::
+
+            You can easily implement your own misfit function (to include,
+            e.g., a regularization term) by monkey patching this misfit
+            function with your own::
+
+                @property  # misfit is a property
+                def my_misfit_function(self):
+                    '''Returns the misfit as a float.'''
+
+                    if self._misfit is None:
+                        self.compute()  # Ensures fields are computed.
+
+                        # Computing your misfit...
+                        self._misfit = your misfit
+
+                    return self._misfit
+
+                # Monkey patch simulation.misfit:
+                emg3d.simulation.Simulation.misfit = my_misfit_function
+
+                # And now all the regular stuff, initiate a Simulation etc
+                simulation = emg3d.Simulation(survey, grid, model)
+                simulation.misfit
+                # => will return your misfit
+                #   (will also be used for the adjoint-state gradient).
+
+
+        Returns
+        -------
+        misfit : float
+            Value of the misfit function.
 
         """
         if self._misfit is None:
-            self._misfit = optimize.misfit(self)
+
+            # Ensure efields are computed
+            self.compute()
+
+            # Check if weights are stored already. (weights are currently
+            # simply 1/std^2; but might change in the future).
+            if 'weights' not in self.data.keys():
+
+                # Get standard deviation, raise warning if not set.
+                std = self.survey.standard_deviation
+                if std is None:
+                    raise ValueError(
+                        "Either `noise_floor` or `relative_error` or both "
+                        "must be provided (>0) to compute the "
+                        "`standard_deviation`. It can also be set directly "
+                        "(same shape as data). The standard deviation is "
+                        "required to compute the misfit."
+                    )
+
+                # Store weights
+                self.data['weights'] = std**-2
+
+            # Calculate and store residual.
+            residual = self.data.synthetic - self.data.observed
+            self.data['residual'] = residual
+
+            # Get weights, calculate misfit.
+            weights = self.data['weights']
+            self._misfit = np.sum(weights*(residual.conj()*residual)).real/2
+
         return self._misfit
 
     def _bcompute(self):
@@ -1141,360 +1343,31 @@ class Simulation:
                            "`g_opts['expand']` is provided.")
                     raise KeyError(msg) from e
 
-                model = expand_grid_model(model, expand, interface)
+                model = models.expand_grid_model(model, expand, interface)
 
             # Get automatic gridding input.
             # Estimate the parameters from survey and model if not provided.
-            gridding_opts = estimate_gridding_opts(
+            gridding_opts = meshes.estimate_gridding_opts(
                     g_opts, model, self.survey, self._input_sc2)
 
         self.gridding_opts = gridding_opts
         self.model = model
 
 
-# HELPER FUNCTIONS
+# DEPRECATED, will be removed from v1.4.0 onwards.
 def expand_grid_model(model, expand, interface):
-    """Expand model and grid according to provided parameters.
-
-    Expand the grid and corresponding model in positive z-direction from the
-    edge of the grid to the interface with property ``expand[0]``, and a 100 m
-    thick layer above the interface with property ``expand[1]``.
-
-    The provided properties are taken as isotropic (as is the case in water and
-    air); ``mu_r`` and ``epsilon_r`` are expanded with ones, if necessary.
-
-    The ``interface`` is usually the sea-surface, and ``expand`` is therefore
-    ``[property_sea, property_air]``.
-
-    Parameters
-    ----------
-    model : Model
-        The model; a :class:`emg3d.models.Model` instance.
-
-    expand : list
-        The two properties below and above the interface:
-        ``[below_interface, above_interface]``.
-
-    interface : float
-        Interface between the two properties in ``expand``.
-
-
-    Returns
-    -------
-    exp_grid : TensorMesh
-        Expanded grid; a :class:`emg3d.meshes.TensorMesh` instance.
-
-    exp_model : Model
-        The expanded model; a :class:`emg3d.models.Model` instance.
-
-    """
-    grid = model.grid
-
-    def extend_property(prop, add_values, nadd):
-        """Expand property `model.prop`, IF it is not None."""
-
-        if getattr(model, prop) is None:
-            prop_ext = None
-
-        else:
-            prop_ext = np.zeros((grid.shape_cells[0], grid.shape_cells[1],
-                                 grid.shape_cells[2]+nadd))
-            prop_ext[:, :, :-nadd] = getattr(model, prop)
-            if nadd == 2:
-                prop_ext[:, :, -2] = add_values[0]
-            prop_ext[:, :, -1] = add_values[1]
-
-        return prop_ext
-
-    # Initiate.
-    nzadd = 0
-    hz_ext = grid.h[2]
-
-    # Fill-up property_below.
-    if grid.nodes_z[-1] < interface-0.05:  # At least 5 cm.
-        hz_ext = np.r_[hz_ext, interface-grid.nodes_z[-1]]
-        nzadd += 1
-
-    # Add 100 m of property_above.
-    if grid.nodes_z[-1] <= interface+0.001:  # +1mm
-        hz_ext = np.r_[hz_ext, 100]
-        nzadd += 1
-
-    if nzadd > 0:
-        # Extend properties.
-        property_x = extend_property('property_x', expand, nzadd)
-        property_y = extend_property('property_y', expand, nzadd)
-        property_z = extend_property('property_z', expand, nzadd)
-        mu_r = extend_property('mu_r', [1, 1], nzadd)
-        epsilon_r = extend_property('epsilon_r', [1, 1], nzadd)
-
-        # Create extended grid and model.
-        grid = meshes.TensorMesh(
-                [grid.h[0], grid.h[1], hz_ext], origin=grid.origin)
-        model = models.Model(
-                grid, property_x, property_y, property_z, mu_r,
-                epsilon_r, mapping=model.map.name)
-
-    return model
+    """Deprecated, moved to models: `emg3d.models.expand_grid_model`."""
+    msg = ("emg3d: `expand_grid_model` moved from `simulations` to `models`. "
+           "Its availability in `simulations` will be removed in v1.4.0.")
+    warnings.warn(msg, FutureWarning)
+    return models.expand_grid_model(model, expand, interface)
 
 
 def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
-    """Estimate parameters for automatic gridding.
-
-    Automatically determines the required gridding options from the provided
-    model, and survey, if they are not provided in ``gridding_opts``.
-
-    The dict ``gridding_opts`` can contain any input parameter taken by
-    :func:`emg3d.meshes.construct_mesh`, see the corresponding documentation
-    for more details with regards to the possibilities.
-
-    Different keys of ``gridding_opts`` are treated differently:
-
-    - The following parameters are estimated from the ``model`` if not
-      provided:
-
-      - ``properties``: lowest conductivity / highest resistivity in the
-        outermost layer in a given direction. This is usually air in x/y and
-        positive z. Note: This is very conservative. If you go into deeper
-        water you could provide less conservative values.
-      - ``mapping``: taken from model.
-
-    - The following parameters are estimated from the ``survey`` if not
-      provided:
-
-      - ``frequency``: average (on log10-scale) of all frequencies.
-      - ``center``: center of all sources.
-      - ``domain``: from ``vector`` or ``distance``, if provided, or
-
-        - in x/y-directions: extent of sources and receivers plus 10% on each
-          side, ensuring ratio of 3.
-        - in z-direction: extent of sources and receivers, ensuring ratio of 2
-          to horizontal dimension; 1/10 tenth up, 9/10 down.
-
-        The ratio means that it is enforced that the survey dimension in x or
-        y-direction is not smaller than a third of the survey dimension in the
-        other direction. If not, the smaller dimension is expanded
-        symmetrically. Similarly in the vertical direction, which must be at
-        least half the dimension of the maximum horizontal dimension or 5 km,
-        whatever is smaller. Otherwise it is expanded in a ratio of 9 parts
-        downwards, one part upwards.
-
-    - The following parameter is taken from the ``grid`` if provided as a
-      string:
-
-      - ``vector``: This is the only real "difference" to the inputs of
-        :func:`emg3d.meshes.construct_mesh`. The normal input is accepted, but
-        it can also be a string containing any combination of ``'x'``, ``'y'``,
-        and ``'z'``. All directions contained in this string are then taken
-        from the provided grid. E.g., if ``gridding_opts['vector']='xz'`` it
-        will take the x- and z-directed vectors from the grid.
-
-    - The following parameters are simply passed along if they are provided,
-      nothing is done otherwise:
-
-      - ``vector``
-      - ``distance``
-      - ``stretching``
-      - ``seasurface``
-      - ``cell_numbers``
-      - ``lambda_factor``
-      - ``lambda_from_center``
-      - ``max_buffer``
-      - ``min_width_limits``
-      - ``min_width_pps``
-      - ``verb``
-
-
-    Parameters
-    ----------
-    gridding_opts : dict
-        Containing input parameters to provide to
-        :func:`emg3d.meshes.construct_mesh`. See the corresponding
-        documentation and the explanations above.
-
-    model : Model
-        The model; a :class:`emg3d.models.Model` instance.
-
-    survey : Survey
-        The survey; a :class:`emg3d.surveys.Survey` instance.
-
-    input_sc2 : int, default: None
-        If :func:`emg3d.simulations.expand_grid_model` was used, ``input_sc2``
-        corresponds to the original ``grid.shape_cells[2]``.
-
-
-    Returns
-    -------
-    gridding_opts : dict
-        Dict to provide to :func:`emg3d.meshes.construct_mesh`.
-
-    """
-    # Initiate new gridding_opts.
-    gopts = {}
-    grid = model.grid
-
-    # Optional values that we only include if provided.
-    for name in ['seasurface', 'cell_numbers', 'lambda_factor',
-                 'lambda_from_center', 'max_buffer', 'verb']:
-        if name in gridding_opts.keys():
-            gopts[name] = gridding_opts.pop(name)
-    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
-        if name in gridding_opts.keys():
-            value = gridding_opts.pop(name)
-            if isinstance(value, (list, tuple)) and len(value) == 3:
-                value = {'x': value[0], 'y': value[1], 'z': value[2]}
-            gopts[name] = value
-
-    # Mapping defaults to model map.
-    gopts['mapping'] = gridding_opts.pop('mapping', model.map)
-    if not isinstance(gopts['mapping'], str):
-        gopts['mapping'] = gopts['mapping'].name
-
-    # Frequency defaults to average frequency (log10).
-    frequency = 10**np.mean(np.log10([v for v in survey.frequencies.values()]))
-    gopts['frequency'] = gridding_opts.pop('frequency', frequency)
-
-    # Center defaults to center of all sources.
-    center = np.array([s.center for s in survey.sources.values()]).mean(0)
-    gopts['center'] = gridding_opts.pop('center', center)
-
-    # Vector.
-    vector = gridding_opts.pop('vector', None)
-    if isinstance(vector, str):
-        # If vector is a string we take the corresponding vectors from grid.
-        vector = (
-                grid.nodes_x if 'x' in vector.lower() else None,
-                grid.nodes_y if 'y' in vector.lower() else None,
-                grid.nodes_z[:input_sc2] if 'z' in vector.lower() else None,
-        )
-    gopts['vector'] = vector
-    if isinstance(vector, dict):
-        vector = (vector['x'], vector['y'], vector['z'])
-    elif vector is not None and len(vector) == 3:
-        gopts['vector'] = {'x': vector[0], 'y': vector[1], 'z': vector[2]}
-
-    # Distance.
-    distance = gridding_opts.pop('distance', None)
-    gopts['distance'] = distance
-    if isinstance(distance, dict):
-        distance = (distance['x'], distance['y'], distance['z'])
-    elif distance is not None and len(distance) == 3:
-        gopts['distance'] = {'x': distance[0], 'y': distance[1],
-                             'z': distance[2]}
-
-    # Properties defaults to lowest conductivities (AFTER model expansion).
-    properties = gridding_opts.pop('properties', None)
-    if properties is None:
-
-        # Get map (in principle the map in gridding_opts could be different
-        # from the map in the model).
-        m = gopts['mapping']
-        if isinstance(m, str):
-            m = getattr(maps, 'Map'+m)()
-
-        # Minimum conductivity of all values (x, y, z).
-        def get_min(ix, iy, iz):
-            """Get minimum: very conservative/costly, but avoiding problems."""
-
-            # Collect all x (y, z) values.
-            data = np.array([])
-            for p in ['x', 'y', 'z']:
-                prop = getattr(model, 'property_'+p)
-                if prop is not None:
-                    prop = model.map.backward(prop[ix, iy, iz])
-                    data = np.r_[data, np.min(prop)]
-
-            # Return minimum conductivity (on mapping).
-            return m.forward(min(data))
-
-        # Buffer properties.
-        xneg = get_min(0, slice(None), slice(None))
-        xpos = get_min(-1, slice(None), slice(None))
-        yneg = get_min(slice(None), 0, slice(None))
-        ypos = get_min(slice(None), -1, slice(None))
-        zneg = get_min(slice(None), slice(None), 0)
-        zpos = get_min(slice(None), slice(None), -1)
-
-        # Source property.
-        ix = np.argmin(abs(grid.nodes_x - gopts['center'][0]))
-        iy = np.argmin(abs(grid.nodes_y - gopts['center'][1]))
-        iz = np.argmin(abs(grid.nodes_z - gopts['center'][2]))
-        source = get_min(ix, iy, iz)
-
-        properties = [source, xneg, xpos, yneg, ypos, zneg, zpos]
-
-    gopts['properties'] = properties
-
-    # Domain; default taken from survey.
-    domain = gridding_opts.pop('domain', None)
-    if isinstance(domain, dict):
-        domain = (domain['x'], domain['y'], domain['z'])
-
-    def get_dim_diff(i):
-        """Return ([min, max], dim) of inp.
-
-        Take it from domain if provided, else from vector if provided, else
-        from survey, adding 10% on each side).
-        """
-        if domain is not None and domain[i] is not None:
-            # domain is provided.
-            dim = domain[i]
-            diff = np.diff(dim)[0]
-            get_it = False
-
-        elif vector is not None and vector[i] is not None:
-            # vector is provided.
-            dim = [np.min(vector[i]), np.max(vector[i])]
-            diff = np.diff(dim)[0]
-            get_it = False
-
-        elif distance is not None and distance[i] is not None:
-            # distance is provided.
-            dim = None
-            diff = abs(distance[i][0]) + abs(distance[i][1])
-            get_it = False
-
-        else:
-            # Get it from survey, add 5 % on each side.
-            inp = np.array([s.center[i] for s in survey.sources.values()])
-            for s in survey.sources.values():
-                inp = np.r_[inp, [r.center_abs(s)[i]
-                                  for r in survey.receivers.values()]]
-            dim = [min(inp), max(inp)]
-            diff = np.diff(dim)[0]
-            dim = [min(inp)-diff/10, max(inp)+diff/10]
-            diff = np.diff(dim)[0]
-            get_it = True
-
-        diff = np.where(diff > 1e-9, diff, 1e-9)  # Avoid division by 0 later
-        return dim, diff, get_it
-
-    xdim, xdiff, get_x = get_dim_diff(0)
-    ydim, ydiff, get_y = get_dim_diff(1)
-    zdim, zdiff, get_z = get_dim_diff(2)
-
-    # Ensure the ratio xdim:ydim is at most 3.
-    if get_y and xdiff/ydiff > 3:
-        diff = round((xdiff/3.0 - ydiff)/2.0)
-        ydim = [ydim[0]-diff, ydim[1]+diff]
-    elif get_x and ydiff/xdiff > 3:
-        diff = round((ydiff/3.0 - xdiff)/2.0)
-        xdim = [xdim[0]-diff, xdim[1]+diff]
-
-    # Ensure the ratio zdim:horizontal is at most 2.
-    hdist = min(10000, max(xdiff, ydiff))
-    if get_z and hdist/zdiff > 2:
-        diff = round((hdist/2.0 - zdiff)/10.0)
-        zdim = [zdim[0]-9*diff, zdim[1]+diff]
-
-    # Collect
-    gopts['domain'] = {'x': xdim, 'y': ydim, 'z': zdim}
-
-    # Ensure no gridding_opts left.
-    if gridding_opts:
-        raise TypeError(
-            f"Unexpected gridding_opts: {list(gridding_opts.keys())}."
-        )
-
-    # Return gridding_opts.
-    return gopts
+    """Deprecated, moved to meshes: `emg3d.meshes.estimate_gridding_opts`."""
+    msg = ("emg3d: `estimate_gridding_opts` moved from `simulations` to "
+           "`meshes`. Its availability in `simulations` will be removed in "
+           "v1.4.0.")
+    warnings.warn(msg, FutureWarning)
+    return meshes.estimate_gridding_opts(
+                gridding_opts, model, survey, input_sc2)
