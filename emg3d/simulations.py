@@ -1369,3 +1369,22 @@ class Simulation:
 
         self.gridding_opts = gridding_opts
         self.model = model
+
+
+# DEPRECATED, will be removed from v1.4.0 onwards.
+def expand_grid_model(model, expand, interface):
+    """Deprecated, moved to models: `emg3d.models.expand_grid_model`."""
+    msg = ("emg3d: `expand_grid_model` moved from `simulations` to `models`. "
+           "Its availability in `simulations` will be removed in v1.4.0.")
+    warnings.warn(msg, FutureWarning)
+    return models.expand_grid_model(model, expand, interface)
+
+
+def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
+    """Deprecated, moved to meshes: `emg3d.meshes.estimate_gridding_opts`."""
+    msg = ("emg3d: `estimate_gridding_opts` moved from `simulations` to "
+           "`meshes`. Its availability in `simulations` will be removed in "
+           "v1.4.0.")
+    warnings.warn(msg, FutureWarning)
+    return meshes.estimate_gridding_opts(
+                gridding_opts, model, survey, input_sc2)

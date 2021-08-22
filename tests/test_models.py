@@ -420,6 +420,10 @@ def test_expand_grid_model():
                         epsilon_r=5)
 
     o_model = models.expand_grid_model(model, [2, 3], 5)
+    # Test deprecation v1.4.0
+    with pytest.warns(FutureWarning, match="removed in v1.4.0"):
+        o_model2 = emg3d.simulations.expand_grid_model(model, [2, 3], 5)
+    assert o_model == o_model2
 
     # Grid.
     assert_allclose(grid.nodes_z, o_model.grid.nodes_z[:-2])

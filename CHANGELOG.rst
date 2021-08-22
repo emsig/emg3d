@@ -9,23 +9,22 @@ Changelog
 latest
 ------
 
-- Simulation:
+- ``simulations``:
 
   - Adjust printing: correct simulation results for adjusted solver printing
     levels; *default solver verbosity is new 1*; ``log`` can now be overwritten
     in ``solver_opts`` (mainly for debugging).
 
+  - Functions moved out of ``simulations``: ``expand_grid_model`` moved to
+    ``models`` and ``estimate_gridding_options`` to ``meshes``. The
+    availability of these functions through ``simulations`` will be removed in
+    v1.4.0.
 
-- Non-backwards compatible changes:
+- ``optimize``: the module is deprecated and will be removed in v1.4.0. The two
+  functions ``optimize.{misfit;gradient}`` are embedded directly in
+  ``Simulation.{misfit;gradient}``.
 
-    - There is no ``optimize`` module any longer. The ``misfit`` and
-      ``gradient`` are directly included in the Simulation class.
-    - ``expand_grid_model`` moved from ``simulations`` to ``models``.
-    - ``estimate_gridding_options`` moved from ``simulations`` to ``meshes``.
-
-- Bug fixes:
-
-  - Track order when saving to hdf5.
+- ``io``: Adjustment so that hdf5 tracks the order of dicts.
 
 
 v1.2.0: White noise
