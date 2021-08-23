@@ -455,6 +455,55 @@ def solve_source(model, source, frequency, **kwargs):
     return solve(model, sfield, **kwargs)
 
 
+def _solve(inp):
+    """Thin wrapper of `solve` or `solve_source` for a `process_map`.
+
+
+    Parameters
+    ----------
+    inp : tuple
+        - (model, sfield, efield, solver_opts)
+        - (model, grid, source, frequency, efield, solver_opts)
+
+        Notes:
+        - efield can be None.
+        - In the first case, grid is taken from sfield.
+        - In the second case, grid must be provided.
+        - Model will be interpolated to the grid.
+
+    """
+    # TODO: document, annotate, and test
+
+    # Get input.
+    if len(inp) == 4:
+        model, sfield, efield, solver_opts = inp
+        grid = sfield.grid
+    else:
+        model, grid, source, frequency, efield, solver_opts = inp
+
+    if model.grid != grid:
+        model = model.interpolate_to_grid(grid)
+
+    solver_input = {**solver_opts, 'model': model, 'efield': efield}
+
+    # Compute electric field.
+    if len(inp) == 4:
+        solver_input['sfield'] = sfield
+        out = solve(**solver_input)
+    else:
+        solver_input['source'] = source
+        solver_input['frequency'] = frequency
+        out = solve_source(**solver_input)
+
+    # Return electric field.
+    if efield is None:
+        return out          # out is either efield or (efield, info)
+    elif out:
+        return efield, out  # out is info
+    else:
+        return efield       # TODO test missing
+
+
 # SOLVERS
 def multigrid(model, sfield, efield, var, **kwargs):
     """Multigrid solver for three-dimensional electromagnetic diffusion.
