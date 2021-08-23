@@ -299,6 +299,9 @@ class Field:
     def interpolate_to_grid(self, grid, **interpolate_opts):
         """Interpolate the field to a new grid.
 
+        If the provided grid is identical to the grid of the field, it returns
+        the actual field (not a copy).
+
 
         Parameters
         ----------
@@ -316,6 +319,9 @@ class Field:
             A new :class:`emg3d.fields.Field` instance on ``grid``.
 
         """
+        # If grids are identical, return field.
+        if grid == self.grid:
+            return self
 
         # Get solver options, set to defaults if not provided.
         g2g_inp = {

@@ -481,8 +481,7 @@ def _solve(inp):
     else:
         model, grid, source, frequency, efield, solver_opts = inp
 
-    if model.grid != grid:
-        model = model.interpolate_to_grid(grid)
+    model = model.interpolate_to_grid(grid)
 
     solver_input = {**solver_opts, 'model': model, 'efield': efield}
 
