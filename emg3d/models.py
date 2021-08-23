@@ -307,6 +307,9 @@ class Model:
     def interpolate_to_grid(self, grid, **interpolate_opts):
         """Interpolate the model to a new grid.
 
+        If the provided grid is identical to the grid of the model, it returns
+        the actual model (not a copy).
+
 
         Parameters
         ----------
@@ -324,9 +327,9 @@ class Model:
             A new :class:`emg3d.models.Model` instance on ``grid``.
 
         """
-        # If grids are identical, return a copy.
+        # If grids are identical, return model.
         if grid == self.grid:
-            return self.copy()
+            return self
 
         # Get solver options, set to defaults if not provided.
         g2g_inp = {
