@@ -1042,7 +1042,7 @@ class Simulation:
 
             # Get absolute coordinates as fct of source.
             # (Only relevant in case of "relative" receivers.)
-            coords = rec.coordinates_abs(self.survey.sources[source])
+            coords = np.array(rec.coordinates_abs(self.survey.sources[source]))
 
             if rec.xtype == 'electric':
                 # Get residual field and add it to the total field.
