@@ -27,8 +27,7 @@ from copy import deepcopy
 
 import numpy as np
 
-from emg3d import (electrodes, fields, io, maps, meshes, models, solver,
-                   surveys, utils)
+from emg3d import fields, io, maps, meshes, models, solver, surveys, utils
 
 __all__ = ['Simulation', ]
 
@@ -996,92 +995,44 @@ class Simulation:
         """Return residual source field for given source and frequency."""
 
         freq = self.survey.frequencies[frequency]
-        grid = self.get_grid(source, frequency)
 
-        # Initiate empty residual source field
+        # Get values for this source and frequency.
+        grid = self.get_grid(source, frequency)
+        synthetic = self.data.synthetic.loc[source, :, frequency].data
+        residual = self.data.residual.loc[source, :, frequency].data
+        weight = self.data.weights.loc[source, :, frequency].data
+
+        # Initiate empty residual source field.
         rfield = fields.Field(grid, frequency=freq)
 
-        # Loop over receivers, input as source.
-        synthetic = self.data.synthetic.loc[source, :, frequency]
-        for name, rec in self.survey.receivers.items():
+        # Residual source strength: Weighted residual, normalized by -smu0.
+        strength = np.conj(residual * weight / -rfield.smu0)
 
-            # Get residual of this receiver.
-            residual = self.data.residual.loc[source, name, frequency].data
-            if np.isnan(residual):
+        # Loop over receivers, input as source.
+        for i, rec in enumerate(self.survey.receivers.values()):
+
+            # Skip if no data.
+            if np.isnan(residual[i]):
                 continue
 
-            # Residual source strength: Weighted residual, normalized by -smu0.
-            weight = self.data.weights.loc[source, name, frequency].data
-            strength = np.conj(residual * weight / -rfield.smu0)
-
             # Apply chain rule to strength if data_type != complex.
-            rec.derivative_chain(strength, synthetic.loc[name].data)
+            rec.derivative_chain(strength[i], synthetic[i])
 
-            # TODO ideally, we want here simply a single call independent of
-            # receiver type, and implement all receiver-type specific things in
-            # the electrodes module as `adjoint_source`-method to `rec`.
-            #
-            #   rfield.field += fields.get_source_field(
-            #           grid=grid,
-            #           source=rec.adjoint_source(coords, strength=strength),
-            #           frequency=freq,
-            #   ).field
-
-            # Create source.
-            if rec.xtype == 'magnetic':
-
-                # TODO: The adjoint test for magnetic receivers does not pass.
-                src_fct = electrodes.TxMagneticDipole
-
-                # If the data is from a magnetic point we have to undo another
-                # factor smu0 here, as the source will be a loop.
-                strength /= rfield.smu0
-
-            else:
-                src_fct = electrodes.TxElectricPoint
-
-            # Get absolute coordinates as fct of source.
-            # (Only relevant in case of "relative" receivers.)
-            coords = np.array(rec.coordinates_abs(self.survey.sources[source]))
-
-            if rec.xtype == 'electric':
-                # Get residual field and add it to the total field.
-                rfield.field += fields.get_source_field(
-                        grid=grid,
-                        source=src_fct(coords, strength=strength),
-                        frequency=freq,
-                ).field
-
-            elif rec.xtype == 'magnetic':
-                # Use of discretize for calculating rfield
-                # TODO implement so it is possible also without discretize.
-                C = grid.edge_curl
-                # Requires a generalization, but should be simple by combining
-                # x, y, z. Also no need to store P every time, so would be
-                # worthwhile to store in a receiver object?
-
-                if (rec.azimuth == 0) & (rec.elevation == 0):
-                    location_type = 'Fx'
-                elif (rec.azimuth == 90) & (rec.elevation == 0):
-                    location_type = 'Fy'
-                elif (rec.azimuth == 0) & (rec.elevation == 90):
-                    location_type = 'Fz'
-                P = grid.get_interpolation_matrix(
-                        coords[:3], location_type=location_type)
-                # h = -C*e / (i*omega*mu)
-                # smu0 = i*omega*mu
-                h_deriv = ((C.T @ P.T).toarray().ravel() / rfield.smu0).conj()
-
-                rfield.field += fields.Field(
-                        grid=grid,
-                        data=np.conj(-h_deriv * residual * weight),
-                        frequency=freq,
-                ).field
+            # Get and add this source field.
+            rfield.field += rec.adjoint_source(
+                source=self.survey.sources[source],
+                frequency=freq,
+                strength=strength[i],
+                grid=grid
+            ).field
 
         return rfield
 
     def _jvec(self, vec):
-        """Jvec = PA^-1 * G * vec."""
+        """Jvec = PA^-1 * G * vec.
+
+           TODO: Document and test.
+        """
 
         # Create iterable form src/freq-list to call the process_map.
         def collect_jfield_inputs(inp, vec=vec):
@@ -1109,15 +1060,17 @@ class Simulation:
             resp = self._get_responses(src, freq, out[i][0])
 
             # Apply chain rule to responses if data_type != complex.
-            synthetic = self.data.synthetic.loc[src, :, freq]
-            for ii, (name, rec) in enumerate(self.survey.receivers.items()):
-                rec.derivative_chain(resp[ii], synthetic.loc[name].data)
+            synthetic = self.data.synthetic.loc[src, :, freq].data
+            for ii, rec in enumerate(self.survey.receivers.values()):
+                rec.derivative_chain(resp[ii], synthetic[ii])
 
             self.data['jvec'].loc[src, :, freq] = resp
 
         return self.data['jvec'].data
 
+    @utils._requires('discretize')
     def _get_gvec_field(self, source, frequency, vec):
+        """TODO: Document and test."""
 
         # Forward electric field
         efield = self._dict_efield[source][frequency]
