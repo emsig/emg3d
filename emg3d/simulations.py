@@ -1056,21 +1056,18 @@ class Simulation:
                 # Use of discretize for calculating rfield
                 # TODO implement so it is possible also without discretize.
                 C = grid.edge_curl
-                rec_loc = rec.coordinates[:3]
-                azimuth = rec.coordinates[3]
-                elevation = rec.coordinates[4]
                 # Requires a generalization, but should be simple by combining
                 # x, y, z. Also no need to store P every time, so would be
                 # worthwhile to store in a receiver object?
 
-                if (azimuth == 0) & (elevation == 0):
+                if (rec.azimuth == 0) & (rec.elevation == 0):
                     location_type = 'Fx'
-                elif (azimuth == 90) & (elevation == 0):
+                elif (rec.azimuth == 90) & (rec.elevation == 0):
                     location_type = 'Fy'
-                elif (azimuth == 0) & (elevation == 90):
+                elif (rec.azimuth == 0) & (rec.elevation == 90):
                     location_type = 'Fz'
                 P = grid.get_interpolation_matrix(
-                        rec_loc, location_type=location_type)
+                        coords[:3], location_type=location_type)
                 # h = -C*e / (i*omega*mu)
                 # smu0 = i*omega*mu
                 h_deriv = ((C.T @ P.T).toarray().ravel() / rfield.smu0).conj()
