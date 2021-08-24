@@ -71,11 +71,11 @@ class Wire:
         # Check input.
         if equal:
             for name in self._serialize:
-                if name == 'data_type':
-                    equal *= getattr(self, name) == getattr(electrode, name)
+                comp = getattr(self, name)
+                if isinstance(comp, np.ndarray):
+                    equal *= np.allclose(comp, getattr(electrode, name))
                 else:
-                    equal *= np.allclose(getattr(self, name),
-                                         getattr(electrode, name))
+                    equal *= comp == getattr(electrode, name)
 
         return bool(equal)
 
@@ -558,19 +558,31 @@ class Receiver(Wire):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - 'complex': Complex values: Real + i.Imag
+        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+
     """
 
     # Add relative to attributes which have to be serialized.
     _serialize = {'relative', 'data_type'} | Wire._serialize
 
-    def __init__(self, relative, data_type='complex', **kwargs):
+    def __init__(self, relative, data_type, **kwargs):
         """Initiate a receiver."""
+
+        # Check data type is a known type.
+        if data_type.lower() not in ['complex', 'amp-pha']:
+            raise ValueError(f"Unknown `data_type` {data_type}.")
 
         # Store relative, add a repr-addition.
         self._relative = relative
-        self._data_type = data_type
+        self._data_type = data_type.lower()
         self._repr_add = (
-            f"{['absolute', 'relative'][self.relative]}; {data_type};"
+            f"{['absolute', 'relative'][self.relative]}; {self.data_type};"
         )
 
         super().__init__(**kwargs)
@@ -582,20 +594,14 @@ class Receiver(Wire):
 
     @property
     def data_type(self):
-        """Data type"""
+        """Data type of the measured responses."""
         return self._data_type
 
-    def data_deriv(self, data_complex, adjoint=False):
-        if self.data_type == 'complex':
-            data_complex_deriv = np.ones(data_complex.size, dtype='complex')
-        elif self.data_type == 'amp':
-            data_complex_deriv = data_complex.conj() / abs(data_complex)
-        else:
-            raise Exception("Not Implemented!")
-        if adjoint:
-            return data_complex_deriv.conj()
-        else:
-            return data_complex_deriv
+    def derivative_chain(self, data, complex_data):
+        """Chain rule for data types other than complex."""
+
+        if self.data_type == 'amp-pha':
+            data *= complex_data.conj() / abs(complex_data)
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
@@ -629,6 +635,14 @@ class RxElectricPoint(Receiver, Point):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str, default: 'complex'
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - 'complex': Complex values: Real + i.Imag
+        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+
     """
 
     def __init__(self, coordinates, relative=False, data_type='complex'):
@@ -657,6 +671,14 @@ class RxMagneticPoint(Receiver, Point):
 
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
+
+    data_type : str, default: 'complex'
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - 'complex': Complex values: Real + i.Imag
+        - 'amp-pha': Amplitude and phase: Amp + i.Pha
 
     """
 

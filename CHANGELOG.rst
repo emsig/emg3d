@@ -16,6 +16,12 @@ latest
     (``simulation._dict_model`` does not exist any longer).
   - Provided ``efields`` are now input to the solver.
 
+- WIP: Other data types than complex data.
+
+- WIP: Proper adjoint for magnetic receivers.
+
+- WIP: jvec
+
 
 v1.2.1: Remove optimize & bug fix
 ---------------------------------
