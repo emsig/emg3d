@@ -9,12 +9,17 @@ Changelog
 latest
 ------
 
-- WIP: Memory improvements for parallel execution in simulations.
+- Changes in Simulation and parallel execution.
 
   - Parallel computation is now not sharing the simulation any longer.
-  - ``get_model`` is done on the fly, not stored in a dict any longer
+  - ``get_model`` is done on the fly, not stored in a dict
     (``simulation._dict_model`` does not exist any longer).
   - Provided ``efields`` are now input to the solver.
+
+- Various small things:
+
+  - Models and Fields return itself (not a copy) when the grid provided to
+    ``interpolate_to_grid`` is the same as the current one.
 
 - WIP: Other data types than complex data.
 
