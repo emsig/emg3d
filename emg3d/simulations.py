@@ -202,7 +202,6 @@ class Simulation:
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
-        self._dict_model = self._dict_initiate
         self._dict_efield = self._dict_initiate
         self._dict_hfield = self._dict_initiate
         self._dict_efield_info = self._dict_initiate
@@ -292,7 +291,7 @@ class Simulation:
         if what in ['keepresults', 'all']:
 
             # These exist always and have to be initiated.
-            for name in ['_dict_grid', '_dict_model']:
+            for name in ['_dict_grid', ]:
                 delattr(self, name)
                 setattr(self, name, self._dict_initiate)
 
@@ -372,7 +371,7 @@ class Simulation:
                     out[name] = getattr(self, name)
 
             if what == 'all':
-                for name in ['_dict_grid', '_dict_model']:
+                for name in ['_dict_grid', ]:
                     if hasattr(self, name):
                         out[name] = getattr(self, name)
 
@@ -420,7 +419,7 @@ class Simulation:
         out = cls(**cls_inp)
 
         # Add existing derived/computed properties.
-        data = ['_dict_grid', '_dict_model',
+        data = ['_dict_grid',
                 '_dict_hfield', '_dict_efield', '_dict_efield_info',
                 '_dict_bfield', '_dict_bfield_info']
         for name in data:
@@ -594,69 +593,8 @@ class Simulation:
 
     def get_model(self, source, frequency):
         """Return model on the grid of the given source and frequency."""
-        freq = self._freq_inp2key(frequency)
-
-        # Return model if it exists already.
-        if self._dict_model[source][freq] is not None:
-            return self._dict_model[source][freq]
-
-        # Same grid as for provided model.
-        if self.gridding == 'same':
-
-            # Store link to model.
-            self._dict_model[source][freq] = self.model
-
-        # Frequency-dependent grids.
-        elif self.gridding == 'frequency':
-
-            # Initiate dict.
-            if not hasattr(self, '_model_frequency'):
-                self._model_frequency = {}
-
-            # Get model for this frequency if not yet computed.
-            if freq not in self._model_frequency.keys():
-                self._model_frequency[freq] = self.model.interpolate_to_grid(
-                        self.get_grid(source, freq))
-
-            # Store link to model.
-            self._dict_model[source][freq] = self._model_frequency[freq]
-
-        # Source-dependent grids.
-        elif self.gridding == 'source':
-
-            # Initiate dict.
-            if not hasattr(self, '_model_source'):
-                self._model_source = {}
-
-            # Get model for this source if not yet computed.
-            if source not in self._model_source.keys():
-                self._model_source[source] = self.model.interpolate_to_grid(
-                        self.get_grid(source, freq))
-
-            # Store link to model.
-            self._dict_model[source][freq] = self._model_source[source]
-
-        # Source- and frequency-dependent grids.
-        elif self.gridding == 'both':
-
-            # Get model and store it.
-            self._dict_model[source][freq] = self.model.interpolate_to_grid(
-                        self.get_grid(source, freq))
-
-        # Use a single grid for all sources and receivers.
-        # Default case; catches 'single' but also anything else.
-        else:
-
-            # Get model if not yet computed.
-            if not hasattr(self, '_model_single'):
-                self._model_single = self.model.interpolate_to_grid(
-                        self.get_grid(source, freq))
-
-            # Store link to model.
-            self._dict_model[source][freq] = self._model_single
-
-        # Use recursion to return model.
-        return self.get_model(source, frequency)
+        grid = self.get_grid(source, self._freq_inp2key(frequency))
+        return self.model.interpolate_to_grid(grid)
 
     def get_efield(self, source, frequency, **kwargs):
         """Return electric field for given source and frequency."""

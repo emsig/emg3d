@@ -9,6 +9,10 @@ Changelog
 latest
 ------
 
+- Changes in Simulation and parallel execution.
+
+  - ``get_model`` is done on the fly, not stored in a dict
+    (``simulation._dict_model`` does not exist any longer).
 
 - Various small things:
 
