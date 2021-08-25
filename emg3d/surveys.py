@@ -636,6 +636,39 @@ class Survey:
 
         self._data.attrs[name] = value
 
+    @property
+    def _irec_types(self):
+        """Return receiver types if electric (True) or magnetic (False)."""
+
+        # Create tuples if they do not exist yet.
+        if getattr(self, '_ierec', None) is None:
+            rec_types = tuple(
+                [r.xtype == 'electric' for r in self.receivers.values()])
+
+            # Store independently for electric and magnetic.
+            self._ierec = np.nonzero(rec_types)[0]
+            self._imrec = np.nonzero(np.logical_not(rec_types))[0]
+
+        return self._ierec, self._imrec
+
+    def _rec_types_coord(self, source):
+        """Return absolute receiver coordinates as function of source."""
+
+        # Create dict to store them.
+        if getattr(self, '_rec_coord', None) is None:
+            self._rec_coord = {}
+
+        # Absolute coordinates are stored in a source-dict.
+        if source not in self._rec_coord.keys():
+            self._rec_coord[source] = np.array(
+                [r.coordinates_abs(self.sources[source])
+                 for r in self.receivers.values()]
+            )
+
+        # Return per receiver type (erec, mrec).
+        indices = self._irec_types
+        return [tuple(self._rec_coord[source][ind].T) for ind in indices]
+
 
 def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):
     r"""Return random noise for given inputs.

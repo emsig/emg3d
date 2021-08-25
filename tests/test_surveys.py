@@ -192,8 +192,9 @@ class TestSurvey():
                 emg3d.TxElectricDipole((100, 200, 300, 400, 500, 600))
             ],
             receivers=[
-                emg3d.RxElectricPoint((1000, 0, 2000, 0, 0)),
-                emg3d.RxElectricPoint((1000, 0, 2000, 0, 0), relative=True)
+                emg3d.RxElectricPoint((1000, 0, 2000, 10, 0)),
+                emg3d.RxElectricPoint((1000, 0, 2000, 0, 0), relative=True),
+                emg3d.RxMagneticPoint((3000, 0, 2000, 0, 20)),
             ],
             frequencies=1,
         )
@@ -202,10 +203,25 @@ class TestSurvey():
                         [[0, 150], [0, 350], [0, 550]])
 
         assert_allclose(survey.receiver_coordinates(),
-                        [[1000, 1000, 1150], [0, 0, 350], [2000, 2000, 2550]])
+                        [[1000, 1000, 1150, 3000],
+                         [0, 0, 350, 0],
+                         [2000, 2000, 2550, 2000]])
 
         assert_allclose(survey.receiver_coordinates('TxED-2'),
-                        [[1000, 1150], [0, 350], [2000, 2550]])
+                        [[1000, 1150, 3000],
+                         [0, 350, 0],
+                         [2000, 2550, 2000]])
+
+        erec, _ = survey._irec_types
+        assert_allclose(erec, [0, 1])
+        assert_allclose(survey._imrec, [2])
+
+        ecoo, mcoo = survey._rec_types_coord('TxED-1')
+        assert_allclose(
+            ecoo,
+            ([1000., 1000.], [0., 0.], [2000., 2000.], [10., 0.], [0., 0.])
+        )
+        assert_allclose(mcoo, ([3000.], [0.], [2000.], [0.], [20.]))
 
     def test_add_noise(self):
         offs = np.linspace(0, 10000, 21)

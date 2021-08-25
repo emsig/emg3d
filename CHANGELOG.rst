@@ -6,6 +6,21 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Changes in Simulation and parallel execution.
+
+  - ``get_model`` is done on the fly, not stored in a dict
+    (``simulation._dict_model`` does not exist any longer).
+
+- Various small things:
+
+  - Models and Fields return itself (not a copy) when the grid provided to
+    ``interpolate_to_grid`` is the same as the current one.
+
+
+
 v1.2.1: Remove optimize & bug fix
 ---------------------------------
 
