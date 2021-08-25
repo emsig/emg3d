@@ -1023,7 +1023,7 @@ class Simulation:
                 source=self.survey.sources[source],
                 frequency=freq,
                 strength=strength[i],
-                grid=grid
+                grid=grid,
             ).field
 
         return rfield
