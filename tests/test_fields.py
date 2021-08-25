@@ -40,6 +40,7 @@ class TestField:
         assert ee.frequency is None
         assert ee.electric
         assert ee.field.dtype == self.field.dtype
+        assert ee == ee.interpolate_to_grid(ee.grid)
 
         # Check representation of Field.
         assert f"Field: electric; {ee.grid.shape_cells[0]} x" in ee.__repr__()
@@ -359,6 +360,14 @@ class TestGetSourceField:
         f2 = fields.get_source_field(grid, src_tuple, frequency=frequency,
                                      strength=strength)
         assert f1 == f2
+
+        # TxElectricPoint
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+        vfield = fields._point_vector(grid, (0, 0, 0, 0, 0))
+        src = emg3d.electrodes.TxElectricPoint((0, 0, 0, 0, 0))
+        sfield = fields.get_source_field(grid, src, frequency=None)
+        assert_allclose(sfield.field, vfield.field)
 
 
 class TestGetReceiver:

@@ -732,28 +732,16 @@ class Simulation:
         """Return electric and magnetic fields at receiver locations."""
         freq = self._freq_inp2key(frequency)
 
-        # Get receiver types.
-        rec_types = tuple([r.xtype == 'electric'
-                           for r in self.survey.receivers.values()])
-
-        # Get absolute coordinates as fct of source.
-        # (Only relevant in case of "relative" receivers.)
-        rl = list(self.survey.receivers.values())
-
-        def rec_coord_tuple(rec_list):
-            """Return abs. coordinates for as a fct of source."""
-            return tuple(np.array(
-                [rl[i].coordinates_abs(self.survey.sources[source])
-                 for i in rec_list]
-            ).T)
+        # Get receiver types and their coordinates.
+        erec, mrec = self.survey._irec_types
+        erec_coord, mrec_coord = self.survey._rec_types_coord(source)
 
         # Store electric receivers.
-        if rec_types.count(True):
+        if erec.size:
 
             # Extract data at receivers.
-            erec = np.nonzero(rec_types)[0]
             resp = self.get_efield(source, freq).get_receiver(
-                    receiver=rec_coord_tuple(erec),
+                    receiver=erec_coord,
                     method=self.receiver_interpolation,
             )
 
@@ -761,12 +749,11 @@ class Simulation:
             self.data.synthetic.loc[source, :, freq][erec] = resp
 
         # Store magnetic receivers.
-        if rec_types.count(False):
+        if mrec.size:
 
             # Extract data at receivers.
-            mrec = np.nonzero(np.logical_not(rec_types))[0]
             resp = self.get_hfield(source, freq).get_receiver(
-                    receiver=rec_coord_tuple(mrec),
+                    receiver=mrec_coord,
                     method=self.receiver_interpolation,
             )
 
