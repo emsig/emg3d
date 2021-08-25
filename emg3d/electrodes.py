@@ -729,9 +729,9 @@ class RxMagneticPoint(Receiver, Point):
         P = grid.get_interpolation_matrix(
                 coords[:3], location_type=location_type)
 
-        # h = -C*e / (i*omega*mu)
+        # h = C*e / (i*omega*mu)
         # smu0 = i*omega*mu
-        h_deriv = -np.conj(C.T @ P.T).toarray().ravel() * strength
+        h_deriv = np.conj(C.T @ P.T).toarray().ravel() * strength
 
         # Return adjoint source.
         return fields.Field(grid=grid, data=h_deriv, frequency=frequency)
