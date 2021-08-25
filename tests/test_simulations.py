@@ -74,12 +74,7 @@ class TestSimulation():
                 self.model, sfield, **self.simulation.solver_opts)
         assert self.simulation.get_efield('TxEW-3', 'f-1') == efield
 
-        # Unknown keyword
-        with pytest.raises(TypeError, match='Unexpected '):
-            self.simulation.get_efield('TxEW-3', 1.0, unknownkeyward=True)
-
         # See a single one
-        self.simulation._dict_efield['TxEW-3'][1.0] = None
         _, _ = capsys.readouterr()
         self.simulation.get_efield('TxEW-3', 1.0)
 
@@ -101,6 +96,14 @@ class TestSimulation():
                 info['rel_error'])
         exit = self.simulation._dict_efield_info['TxEW-3']['f-1']['exit']
         assert exit == info['exit'] == 1
+
+        # First hfield, ensure efield/hfield get computed.
+        sim = self.simulation.copy(what='all')
+        sim._dict_efield['TxEW-3']['f-1'] = None
+        sim._dict_hfield['TxEW-3']['f-1'] = None
+        sim.get_hfield('TxEW-3', 'f-1')
+        assert sim._dict_efield['TxEW-3']['f-1'] is not None
+        assert sim._dict_hfield['TxEW-3']['f-1'] is not None
 
     def test_responses(self):
         # Check min_offset were switched-off
@@ -517,6 +520,12 @@ def test_misfit():
     simulation.data['synthetic'] = simulation.data['observed']*0 + syn
 
     misfit = 0.5*((syn-data)/(rel_err*data))**2
+
+    def dummy():
+        pass
+
+    simulation.compute = dummy  # => switch of compute()
+
     assert_allclose(simulation.misfit, misfit)
 
     # Test deprecation v1.4.0

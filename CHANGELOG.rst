@@ -11,8 +11,10 @@ latest
 
 - Changes in Simulation and parallel execution.
 
+  - Parallel computation is now not sharing the simulation any longer.
   - ``get_model`` is done on the fly, not stored in a dict
     (``simulation._dict_model`` does not exist any longer).
+  - Provided ``efields`` are now input to the solver.
 
 - Various small things:
 
