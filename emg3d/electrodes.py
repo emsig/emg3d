@@ -731,10 +731,10 @@ class RxMagneticPoint(Receiver, Point):
 
         # h = C*e / (i*omega*mu)
         # smu0 = i*omega*mu
-        h_deriv = (C.T @ P.T).toarray().ravel() * np.conj(-strength)
+        h_deriv = -(C.T @ P.T).toarray().ravel() * strength
 
         # Return adjoint source.
-        return fields.Field(grid=grid, data=np.conj(h_deriv), frequency=frequency)
+        return fields.Field(grid=grid, data=h_deriv, frequency=frequency)
 
 
 # ROTATIONS AND CONVERSIONS
