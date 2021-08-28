@@ -299,8 +299,8 @@ def test_receiver():
     rcoo = [1000, -200, 0]
     scoo = [50, 50, 50, 0, 0]
 
-    ra = electrodes.Receiver(False, coordinates=rcoo)
-    rr = electrodes.Receiver(True, coordinates=rcoo)
+    ra = electrodes.Receiver(False, coordinates=rcoo, data_type='complex')
+    rr = electrodes.Receiver(True, coordinates=rcoo, data_type='complex')
     s1 = electrodes.TxElectricDipole(coordinates=scoo)
 
     assert ra.relative is False

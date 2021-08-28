@@ -999,6 +999,7 @@ class Simulation:
 
         # Get values for this source and frequency.
         grid = self.get_grid(source, frequency)
+        synthetic = self.data.synthetic.loc[source, :, frequency].data
         residual = self.data.residual.loc[source, :, frequency].data
         weight = self.data.weights.loc[source, :, frequency].data
 
@@ -1014,6 +1015,9 @@ class Simulation:
             # Skip if no data.
             if np.isnan(residual[i]):
                 continue
+
+            # Apply chain rule to strength if data_type != complex.
+            rec.derivative_chain(strength[i], synthetic[i])
 
             # Get absolute coordinates as fct of source.
             # (Only relevant in case of "relative" receivers.)
