@@ -1028,6 +1028,68 @@ class Simulation:
 
         return rfield
 
+    def _jvec(self, vec):
+        """Jvec = PA^-1 * G * vec.
+
+           TODO: Document and test.
+        """
+
+        # Create iterable form src/freq-list to call the process_map.
+        def collect_jfield_inputs(inp, vec=vec):
+            """Collect inputs."""
+            rfield = self._get_gvec_field(*inp, vec)
+            return self.model, rfield, None, self.solver_opts
+
+        # Compute and return A^-1 * G * vec
+        out = utils._process_map(
+                solver._solve,
+                list(map(collect_jfield_inputs, self._srcfreq)),
+                max_workers=self.max_workers,
+                **{'desc': 'Compute jvec', **self._tqdm_opts},
+        )
+
+        # Store gradient field and info.
+        if 'jvec' not in self.data.keys():
+            self.data['jvec'] = self.data.observed.copy(
+                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
+
+        # Loop over src-freq combinations to extract and store.
+        for i, (src, freq) in enumerate(self._srcfreq):
+
+            # Store responses at receivers.
+            resp = self._get_responses(src, freq, out[i][0])
+
+            # Apply chain rule to responses if data_type != complex.
+            synthetic = self.data.synthetic.loc[src, :, freq].data
+            for ii, rec in enumerate(self.survey.receivers.values()):
+                rec.derivative_chain(resp[ii], synthetic[ii])
+
+            self.data['jvec'].loc[src, :, freq] = resp
+
+        return self.data['jvec'].data
+
+    @utils._requires('discretize')
+    def _get_gvec_field(self, source, frequency, vec):
+        """TODO: Document and test."""
+
+        # Forward electric field
+        efield = self._dict_efield[source][frequency]
+
+        # Step2: compute G * vec = gvec (using discretize)
+        # TODO implement so it is possible also without discretize.
+        gvec = efield.grid.getEdgeInnerProductDeriv(
+                np.ones(efield.grid.n_cells))(efield.field) * vec
+        # Extension to sig_x, sig_y, sig_z is trivial
+        # gvec = mesh.getEdgeInnerProductDeriv(
+        #         np.ones(mesh.n_cells)*3)(efield.field) * vec
+
+        gvec_field = fields.Field(
+            grid=efield.grid,
+            data=-efield.smu0*gvec,
+            frequency=efield.frequency
+        )
+        return gvec_field
+
     # UTILS
     @property
     def _dict_initiate(self):
