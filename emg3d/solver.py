@@ -276,6 +276,9 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
           ...: efield = emg3d.solve(model, sfield, plain=True, verb=4)
 
     """
+    # Undocumented (internal):
+    # If `always_return=True`, efield is returned even if provided.
+    always_return = kwargs.pop('always_return', False)
 
     # Extract kwargs which do not go into MGParameters.
     if kwargs.pop('plain', False):
@@ -342,8 +345,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         efield.fz[0, :, :] = efield.fz[-1, :, :] = 0.
         efield.fz[:, 0, :] = efield.fz[:, -1, :] = 0.
 
-        # Set flag to NOT return the field.
-        var.do_return = False
+        # Set flag to NOT return the field (except if always_return was set).
+        var.do_return = always_return
 
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = residual(vmodel, sfield, efield, True)
@@ -458,49 +461,78 @@ def solve_source(model, source, frequency, **kwargs):
 def _solve(inp):
     """Thin wrapper of `solve` or `solve_source` for a `process_map`.
 
+    Used within a Simulation to call the solver in parallel.
+
 
     Parameters
     ----------
     inp : tuple
-        - (model, sfield, efield, solver_opts)
-        - (model, grid, source, frequency, efield, solver_opts)
+        Two formats are recognized:
+        - ``(model, sfield, efield, solver_opts)``:
+          Forwarded to `solve`.
+        - ``(model, grid, source, frequency, efield, solver_opts)``:
+          Forwarded to `solve_source`.
+
+        Consult the corresponding function for details on the input parameters.
 
         Notes:
-        - efield can be None.
-        - In the first case, grid is taken from sfield.
-        - In the second case, grid must be provided.
-        - Model will be interpolated to the grid.
+        - ``model`` will be interpolated to the provided grid or the grid of
+          the source field.
+        - ``efield`` can be ``None``.
+
+
+    Returns
+    -------
+    efield : Field
+        Resulting electric field, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
+
+    info_dict : dict
+        Resulting info dictionary, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
 
     """
-    # TODO: document, annotate, and test
 
-    # Get input.
+    # Four parameters => solve.
     if len(inp) == 4:
+
+        # Get input parameters.
         model, sfield, efield, solver_opts = inp
         grid = sfield.grid
-    else:
+
+        # Function to compute.
+        fct = solve
+
+        # Initiate input parameter dict.
+        solver_input = {**solver_opts, 'sfield': sfield}
+
+    # Six parameters => solve_source.
+    elif len(inp) == 6:
+
+        # Get input parameters.
         model, grid, source, frequency, efield, solver_opts = inp
 
+        # Function to compute.
+        fct = solve_source
+
+        # Initiate input parameter dict.
+        solver_input = {
+                **solver_opts, 'source': source, 'frequency': frequency}
+
+    else:
+        raise NotImplementedError('Input-tuple must be of length 4 or 6.')
+
+    # Interpolate model to source grid (if different).
     model = model.interpolate_to_grid(grid)
 
-    solver_input = {**solver_opts, 'model': model, 'efield': efield}
+    # Add general parameters to input dict.
+    solver_input['model'] = model
+    solver_input['efield'] = efield
+    solver_input['return_info'] = True
+    solver_input['always_return'] = True
 
-    # Compute electric field.
-    if len(inp) == 4:
-        solver_input['sfield'] = sfield
-        out = solve(**solver_input)
-    else:
-        solver_input['source'] = source
-        solver_input['frequency'] = frequency
-        out = solve_source(**solver_input)
-
-    # Return electric field.
-    if efield is None:
-        return out          # out is either efield or (efield, info)
-    elif out:
-        return efield, out  # out is info
-    else:
-        return efield       # TODO test missing
+    # Return the result.
+    return fct(**solver_input)
 
 
 # SOLVERS

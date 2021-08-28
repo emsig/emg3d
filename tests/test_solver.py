@@ -262,6 +262,30 @@ def test_solve_source():
     assert_allclose(dat['Fresult'].field, efield.field)
 
 
+def test__solve():
+    # len(inp) == 4
+    dat = REGRES['res']
+
+    model = emg3d.Model(**dat['input_model'])
+    sfield = emg3d.get_source_field(**dat['input_source'])
+    efield, info = solver._solve((model, sfield, None, {'plain': True}))
+    assert_allclose(dat['Fresult'].field, efield.field)
+
+    # len(inp) == 6
+    dat = REGRES['res']
+    model = emg3d.Model(**dat['input_model'])
+
+    efield, info = solver._solve(
+        (model, model.grid, dat['input_source']['source'],
+            dat['input_source']['frequency'], None, {'plain': True}))
+
+    assert_allclose(dat['Fresult'].field, efield.field)
+
+    # Wrong input.
+    with pytest.raises(NotImplementedError, match='must be of length'):
+        solver._solve((1, 2))
+
+
 class TestMultigrid:
     # Everything should be tested just fine in `test_solver`. Just check here
     # that all code is reached.

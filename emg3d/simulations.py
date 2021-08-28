@@ -689,6 +689,8 @@ class Simulation:
             grid = self.get_grid(source, freq)
             src = self.survey.sources[source]
             frequency = self.survey.frequencies[freq]
+            # TODO: create a (private) flag to enable, disable by default.
+            #       => Think it through again.
             efield = self._dict_efield[source][freq]
             return self.model, grid, src, frequency, efield, self.solver_opts
 
