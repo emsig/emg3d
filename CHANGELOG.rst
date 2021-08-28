@@ -33,6 +33,8 @@ latest
 
 - WIP: Proper adjoint for magnetic receivers.
 
+- WIP: jvec
+
 
 v1.2.1: Remove optimize & bug fix
 ---------------------------------
