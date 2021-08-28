@@ -613,6 +613,19 @@ class RxElectricPoint(Receiver, Point):
 
         super().__init__(coordinates=coordinates, relative=relative)
 
+    def adjoint_source(self, source, frequency, strength, grid):
+        """TODO document & test."""
+
+        # Get absolute coordinates as fct of source.
+        # (Only relevant in case of "relative" receivers.)
+        coords = self.coordinates_abs(source)
+
+        # Create source.
+        src = TxElectricPoint(coords, strength=strength)
+
+        # Return adjoint source.
+        return src.get_field(grid=grid, frequency=frequency)
+
 
 @utils._known_class
 class RxMagneticPoint(Receiver, Point):
@@ -637,6 +650,38 @@ class RxMagneticPoint(Receiver, Point):
         """Initiate a magnetic point receiver."""
 
         super().__init__(coordinates=coordinates, relative=relative)
+
+    @utils._requires('discretize')
+    def adjoint_source(self, source, frequency, strength, grid):
+        """TODO document & test; generalize."""
+
+        # Get absolute coordinates as fct of source.
+        # (Only relevant in case of "relative" receivers.)
+        coords = np.array(self.coordinates_abs(source))
+
+        # TODO Requires a generalization, but should be simple by
+        # combining x, y, z.
+        if (self.azimuth == 0) & (self.elevation == 0):
+            location_type = 'Fx'
+        elif (self.azimuth == 90) & (self.elevation == 0):
+            location_type = 'Fy'
+        elif (self.azimuth == 0) & (self.elevation == 90):
+            location_type = 'Fz'
+        else:
+            raise NotImplementedError
+
+        # Use of discretize for calculating the adjoint source.
+        # TODO implement so it is possible also without discretize.
+        C = grid.edge_curl
+        P = grid.get_interpolation_matrix(
+                coords[:3], location_type=location_type)
+
+        # h = C*e / (i*omega*mu)
+        # smu0 = i*omega*mu
+        h_deriv = -(C.T @ P.T).toarray().ravel() * strength
+
+        # Return adjoint source.
+        return fields.Field(grid=grid, data=h_deriv, frequency=frequency)
 
 
 # ROTATIONS AND CONVERSIONS
