@@ -27,8 +27,7 @@ from copy import deepcopy
 
 import numpy as np
 
-from emg3d import (electrodes, fields, io, maps, meshes, models, solver,
-                   surveys, utils)
+from emg3d import fields, io, maps, meshes, models, solver, surveys, utils
 
 __all__ = ['Simulation', ]
 
@@ -996,45 +995,35 @@ class Simulation:
         """Return residual source field for given source and frequency."""
 
         freq = self.survey.frequencies[frequency]
-        grid = self.get_grid(source, frequency)
 
-        # Initiate empty residual source field
+        # Get values for this source and frequency.
+        grid = self.get_grid(source, frequency)
+        synthetic = self.data.synthetic.loc[source, :, frequency].data
+        residual = self.data.residual.loc[source, :, frequency].data
+        weight = self.data.weights.loc[source, :, frequency].data
+
+        # Initiate empty residual source field.
         rfield = fields.Field(grid, frequency=freq)
 
-        # Loop over receivers, input as source.
-        for name, rec in self.survey.receivers.items():
+        # Residual source strength: Weighted residual, normalized by -smu0.
+        strength = np.conj(residual * weight / -rfield.smu0)
 
-            # Get residual of this receiver.
-            residual = self.data.residual.loc[source, name, frequency].data
-            if np.isnan(residual):
+        # Loop over receivers, input as source.
+        for i, rec in enumerate(self.survey.receivers.values()):
+
+            # Skip if no data.
+            if np.isnan(residual[i]):
                 continue
 
-            # Residual source strength: Weighted residual, normalized by -smu0.
-            weight = self.data.weights.loc[source, name, frequency].data
-            strength = np.conj(residual * weight / -rfield.smu0)
+            # Apply chain rule to strength if data_type != complex.
+            rec.derivative_chain(strength[i], synthetic[i])
 
-            # Create source.
-            if rec.xtype == 'magnetic':
-
-                # TODO: The adjoint test for magnetic receivers does not pass.
-                src_fct = electrodes.TxMagneticDipole
-
-                # If the data is from a magnetic point we have to undo another
-                # factor smu0 here, as the source will be a loop.
-                strength /= rfield.smu0
-
-            else:
-                src_fct = electrodes.TxElectricPoint
-
-            # Get absolute coordinates as fct of source.
-            # (Only relevant in case of "relative" receivers.)
-            coords = rec.coordinates_abs(self.survey.sources[source])
-
-            # Get residual field and add it to the total field.
-            rfield.field += fields.get_source_field(
-                    grid=grid,
-                    source=src_fct(coords, strength=strength),
-                    frequency=freq,
+            # Get and add this source field.
+            rfield.field += rec.adjoint_source(
+                source=self.survey.sources[source],
+                frequency=freq,
+                strength=strength[i],
+                grid=grid,
             ).field
 
         return rfield

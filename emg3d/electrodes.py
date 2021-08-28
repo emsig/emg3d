@@ -71,8 +71,11 @@ class Wire:
         # Check input.
         if equal:
             for name in self._serialize:
-                equal *= np.allclose(getattr(self, name),
-                                     getattr(electrode, name))
+                comp = getattr(self, name)
+                if isinstance(comp, np.ndarray):
+                    equal *= np.allclose(comp, getattr(electrode, name))
+                else:
+                    equal *= comp == getattr(electrode, name)
 
         return bool(equal)
 
@@ -555,17 +558,32 @@ class Receiver(Wire):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - 'complex': Complex values: Real + i.Imag
+        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+
     """
 
     # Add relative to attributes which have to be serialized.
-    _serialize = {'relative'} | Wire._serialize
+    _serialize = {'relative', 'data_type'} | Wire._serialize
 
-    def __init__(self, relative, **kwargs):
+    def __init__(self, relative, data_type, **kwargs):
         """Initiate a receiver."""
+
+        # Check data type is a known type.
+        if data_type.lower() not in ['complex', 'amp-pha']:
+            raise ValueError(f"Unknown `data_type` {data_type}.")
 
         # Store relative, add a repr-addition.
         self._relative = relative
-        self._repr_add = f"{['absolute', 'relative'][self.relative]};"
+        self._data_type = data_type.lower()
+        self._repr_add = (
+            f"{['absolute', 'relative'][self.relative]}; {self.data_type};"
+        )
 
         super().__init__(**kwargs)
 
@@ -573,6 +591,17 @@ class Receiver(Wire):
     def relative(self):
         """True if coordinates are relative to source, False if absolute."""
         return self._relative
+
+    @property
+    def data_type(self):
+        """Data type of the measured responses."""
+        return self._data_type
+
+    def derivative_chain(self, data, complex_data):
+        """Chain rule for data types other than complex."""
+
+        if self.data_type == 'amp-pha':
+            data *= complex_data.conj() / abs(complex_data)
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
@@ -606,12 +635,37 @@ class RxElectricPoint(Receiver, Point):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str, default: 'complex'
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - 'complex': Complex values: Real + i.Imag
+        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+
     """
 
-    def __init__(self, coordinates, relative=False):
+    def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate an electric point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative)
+        super().__init__(
+            coordinates=coordinates,
+            relative=relative,
+            data_type=data_type
+        )
+
+    def adjoint_source(self, source, frequency, strength, grid):
+        """TODO document & test."""
+
+        # Get absolute coordinates as fct of source.
+        # (Only relevant in case of "relative" receivers.)
+        coords = self.coordinates_abs(source)
+
+        # Create source.
+        src = TxElectricPoint(coords, strength=strength)
+
+        # Return adjoint source.
+        return src.get_field(grid=grid, frequency=frequency)
 
 
 @utils._known_class
@@ -631,12 +685,56 @@ class RxMagneticPoint(Receiver, Point):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str, default: 'complex'
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - 'complex': Complex values: Real + i.Imag
+        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+
     """
 
-    def __init__(self, coordinates, relative=False):
+    def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate a magnetic point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative)
+        super().__init__(
+            coordinates=coordinates,
+            relative=relative,
+            data_type=data_type
+        )
+
+    @utils._requires('discretize')
+    def adjoint_source(self, source, frequency, strength, grid):
+        """TODO document & test; generalize."""
+
+        # Get absolute coordinates as fct of source.
+        # (Only relevant in case of "relative" receivers.)
+        coords = np.array(self.coordinates_abs(source))
+
+        # TODO Requires a generalization, but should be simple by
+        # combining x, y, z.
+        if (self.azimuth == 0) & (self.elevation == 0):
+            location_type = 'Fx'
+        elif (self.azimuth == 90) & (self.elevation == 0):
+            location_type = 'Fy'
+        elif (self.azimuth == 0) & (self.elevation == 90):
+            location_type = 'Fz'
+        else:
+            raise NotImplementedError
+
+        # Use of discretize for calculating the adjoint source.
+        # TODO implement so it is possible also without discretize.
+        C = grid.edge_curl
+        P = grid.get_interpolation_matrix(
+                coords[:3], location_type=location_type)
+
+        # h = C*e / (i*omega*mu)
+        # smu0 = i*omega*mu
+        h_deriv = -(C.T @ P.T).toarray().ravel() * strength
+
+        # Return adjoint source.
+        return fields.Field(grid=grid, data=h_deriv, frequency=frequency)
 
 
 # ROTATIONS AND CONVERSIONS

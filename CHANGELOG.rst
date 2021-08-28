@@ -21,6 +21,9 @@ latest
   - Models and Fields return itself (not a copy) when the grid provided to
     ``interpolate_to_grid`` is the same as the current one.
 
+- WIP: Other data types than complex data.
+
+- WIP: Proper adjoint for magnetic receivers.
 
 
 v1.2.1: Remove optimize & bug fix
