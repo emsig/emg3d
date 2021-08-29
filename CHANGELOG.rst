@@ -11,8 +11,10 @@ latest
 
 - Changes in Simulation and parallel execution.
 
-  - ``get_model`` is done on the fly, not stored in a dict
-    (``simulation._dict_model`` does not exist any longer).
+  - Parallel computation is not sharing the simulation any longer.
+  - ``get_model`` and ``get_hfield`` are now done on the fly, not stored in a
+    dict anymore (``simulation._dict_model`` and ``simulation._dict_hfield``
+    do not exist any longer).
 
 - Various small things:
 

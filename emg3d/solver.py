@@ -276,6 +276,9 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
           ...: efield = emg3d.solve(model, sfield, plain=True, verb=4)
 
     """
+    # Undocumented (internal):
+    # If `always_return=True`, efield is returned even if provided.
+    always_return = kwargs.pop('always_return', False)
 
     # Extract kwargs which do not go into MGParameters.
     if kwargs.pop('plain', False):
@@ -342,8 +345,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
         efield.fz[0, :, :] = efield.fz[-1, :, :] = 0.
         efield.fz[:, 0, :] = efield.fz[:, -1, :] = 0.
 
-        # Set flag to NOT return the field.
-        var.do_return = False
+        # Set flag to NOT return the field (except if always_return was set).
+        var.do_return = always_return
 
         # If efield is provided, check if it is already sufficiently good.
         var.l2 = residual(vmodel, sfield, efield, True)
@@ -453,6 +456,80 @@ def solve_source(model, source, frequency, **kwargs):
     """
     sfield = fields.get_source_field(model.grid, source, frequency)
     return solve(model, sfield, **kwargs)
+
+
+def _solve(inp):
+    """Thin wrapper of `solve` or `solve_source` for a `process_map`.
+
+    Used within a Simulation to call the solver in parallel. This function
+    always returns the ``efield`` and the ``info_dict``, independent of the
+    provided solver options.
+
+
+    Parameters
+    ----------
+    inp : tuple
+        Two formats are recognized:
+        - ``(model, sfield, efield, solver_opts)``:
+          Forwarded to `solve`.
+        - ``(model, grid, source, frequency, efield, solver_opts)``:
+          Forwarded to `solve_source`.
+
+        Consult the corresponding function for details on the input parameters.
+
+        The ``model`` is interpolated to the grid of the source field (tuple of
+        length 4) or to the provided grid (tuple of length 6). Hence, the model
+        can be on a different grid (for source and frequency dependent
+        gridding).
+
+
+    Returns
+    -------
+    efield : Field
+        Resulting electric field, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
+
+    info_dict : dict
+        Resulting info dictionary, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
+
+    """
+
+    # Four parameters => solve.
+    if len(inp) == 4:
+
+        # Get input and initiate solver dict.
+        model, sfield, efield, solver_opts = inp
+        solver_input = {**solver_opts, 'sfield': sfield}
+        grid = sfield.grid
+
+        # Function to compute.
+        fct = solve
+
+    # Six parameters => solve_source.
+    elif len(inp) == 6:
+
+        # Get input and initiate solver dict.
+        model, grid, source, freq, efield, solver_opts = inp
+        solver_input = {**solver_opts, 'source': source, 'frequency': freq}
+
+        # Function to compute.
+        fct = solve_source
+
+    else:
+        raise NotImplementedError('Input-tuple must be of length 4 or 6.')
+
+    # Interpolate model to source grid (if different).
+    model = model.interpolate_to_grid(grid)
+
+    # Add general parameters to input dict.
+    solver_input['model'] = model
+    solver_input['efield'] = efield
+    solver_input['return_info'] = True
+    solver_input['always_return'] = True
+
+    # Return the result.
+    return fct(**solver_input)
 
 
 # SOLVERS
