@@ -203,7 +203,6 @@ class Simulation:
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
         self._dict_efield = self._dict_initiate
-        self._dict_hfield = self._dict_initiate
         self._dict_efield_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
@@ -299,7 +298,7 @@ class Simulation:
         if what in ['computed', 'keepresults', 'all']:
 
             # These exist always and have to be initiated.
-            for name in ['_dict_efield', '_dict_efield_info', '_dict_hfield']:
+            for name in ['_dict_efield', '_dict_efield_info']:
                 delattr(self, name)
                 setattr(self, name, self._dict_initiate)
 
@@ -365,7 +364,7 @@ class Simulation:
 
         # Store wanted dicts.
         if what in ['computed', 'all']:
-            for name in ['_dict_efield', '_dict_efield_info', '_dict_hfield',
+            for name in ['_dict_efield', '_dict_efield_info',
                          '_dict_bfield', '_dict_bfield_info']:
                 if hasattr(self, name):
                     out[name] = getattr(self, name)
@@ -420,7 +419,7 @@ class Simulation:
 
         # Add existing derived/computed properties.
         data = ['_dict_grid',
-                '_dict_hfield', '_dict_efield', '_dict_efield_info',
+                '_dict_efield', '_dict_efield_info',
                 '_dict_bfield', '_dict_bfield_info']
         for name in data:
             if name in inp.keys():
@@ -606,27 +605,25 @@ class Simulation:
 
         return self._dict_efield[source][freq]
 
-    def get_hfield(self, source, frequency, **kwargs):
+    def get_hfield(self, source, frequency):
         """Return magnetic field for given source and frequency."""
         freq = self._freq_inp2key(frequency)
 
-        # If magnetic field not computed yet compute it.
-        if self._dict_hfield[source][freq] is None:
-            if self._dict_efield[source][freq] is None:
-                self.compute(source=source, frequency=freq, **kwargs)
-            self._dict_hfield[source][freq] = fields.get_magnetic_field(
-                self.get_model(source, freq),
-                self._dict_efield[source][freq],
-            )
+        # If electric field not computed yet compute it.
+        if self._dict_efield[source][freq] is None:
+            self.compute(source=source, frequency=freq)
 
         # Return magnetic field.
-        return self._dict_hfield[source][freq]
+        return fields.get_magnetic_field(
+            self.get_model(source, freq),
+            self._dict_efield[source][freq],
+        )
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
         return self._dict_efield_info[source][self._freq_inp2key(frequency)]
 
-    def _get_responses(self, source, frequency, efield):
+    def _get_responses(self, source, frequency):
         """Return electric and magnetic fields at receiver locations."""
 
         # Get receiver types and their coordinates.
@@ -634,22 +631,26 @@ class Simulation:
         erec_coord, mrec_coord = self.survey._rec_types_coord(source)
 
         # Initiate output.
-        resp = np.zeros_like(
-                self.data.synthetic.loc[source, :, frequency].data)
+        resp = np.zeros_like(self.data.synthetic.loc[source, :, frequency])
 
-        # Store electric receivers.
+        # efield of this source/frequency.
+        efield = self._dict_efield[source][frequency]
+
         if erec.size:
+
+            # Store electric receivers.
             resp[erec] = efield.get_receiver(
                 receiver=erec_coord, method=self.receiver_interpolation,
             )
 
-        # Store magnetic receivers.
         if mrec.size:
 
+            # Compute magnetic field.
             hfield = fields.get_magnetic_field(
                 self.get_model(source, frequency), efield,
             )
 
+            # Store electric receivers.
             resp[mrec] = hfield.get_receiver(
                 receiver=mrec_coord, method=self.receiver_interpolation,
             )
@@ -673,6 +674,7 @@ class Simulation:
 
         """
 
+        # Undocumented (internal):
         # If the call is from `get_efield`, it will have source/frequency.
         # This use is only internal. End users should use `get_efield()`.
         srcfreq = [
@@ -689,12 +691,11 @@ class Simulation:
             grid = self.get_grid(source, freq)
             src = self.survey.sources[source]
             frequency = self.survey.frequencies[freq]
-            # TODO: create a (private) flag to enable, disable by default.
-            #       => Think it through again.
+            # efield is None if not computed yet; otherwise it is the solution.
             efield = self._dict_efield[source][freq]
             return self.model, grid, src, frequency, efield, self.solver_opts
 
-        # Initiate futures-dict to store output.
+        # Use process_map to compute fields in parallel.
         out = utils._process_map(
                 solver._solve,
                 list(map(collect_efield_inputs, self._srcfreq)),
@@ -710,7 +711,7 @@ class Simulation:
             self._dict_efield_info[src][freq] = out[i][1]
 
             # Store responses at receiver locations.
-            resp = self._get_responses(src, freq, out[i][0])
+            resp = self._get_responses(src, freq)
             self.data['synthetic'].loc[src, :, freq] = resp
 
         # Print solver info.
@@ -963,20 +964,21 @@ class Simulation:
     def _bcompute(self):
         """Compute bfields asynchronously for all sources and frequencies."""
 
-        # Create iterable form src/freq-list to call the process_map.
-        def collect_bfield_inputs(inp):
-            """Collect inputs."""
-            source, freq = inp
-            rfield = self._get_rfield(*inp)
-            bfield = self._dict_bfield[source][freq]
-            return self.model, rfield, bfield, self.solver_opts
-
         # Initiate back-propagated electric field and info dicts.
         if not hasattr(self, '_dict_bfield'):
             self._dict_bfield = self._dict_initiate
             self._dict_bfield_info = self._dict_initiate
 
-        # Initiate futures-dict to store output.
+        # Create iterable form src/freq-list to call the process_map.
+        def collect_bfield_inputs(inp):
+            """Collect inputs."""
+            source, freq = inp
+            rfield = self._get_rfield(source, freq)
+            # bfield is None unless it was explicitly set.
+            bfield = self._dict_bfield[source][freq]
+            return self.model, rfield, bfield, self.solver_opts
+
+        # Use process_map to compute fields in parallel.
         out = utils._process_map(
                 solver._solve,
                 list(map(collect_bfield_inputs, self._srcfreq)),

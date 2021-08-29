@@ -100,10 +100,8 @@ class TestSimulation():
         # First hfield, ensure efield/hfield get computed.
         sim = self.simulation.copy(what='all')
         sim._dict_efield['TxEW-3']['f-1'] = None
-        sim._dict_hfield['TxEW-3']['f-1'] = None
         sim.get_hfield('TxEW-3', 'f-1')
         assert sim._dict_efield['TxEW-3']['f-1'] is not None
-        assert sim._dict_hfield['TxEW-3']['f-1'] is not None
 
     def test_responses(self):
         # Check min_offset were switched-off
@@ -195,7 +193,6 @@ class TestSimulation():
         sim3 = self.simulation.copy()
         sim3.clean('all')
         assert sim3._dict_efield['TxMD-2']['f-1'] is None
-        assert sim3._dict_hfield['TxMD-2']['f-1'] is None
         assert sim3._dict_efield_info['TxMD-2']['f-1'] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             sim3.clean('nothing')
