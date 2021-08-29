@@ -477,10 +477,10 @@ def _solve(inp):
 
         Consult the corresponding function for details on the input parameters.
 
-        The ``model`` will be interpolated to the grid of the source field
-        (tuple of length 4) or to the provided grid (tuple of length 6). Hence,
-        the model can be on a different grid (for source and frequency
-        dependent gridding).
+        The ``model`` is interpolated to the grid of the source field (tuple of
+        length 4) or to the provided grid (tuple of length 6). Hence, the model
+        can be on a different grid (for source and frequency dependent
+        gridding).
 
 
     Returns
@@ -498,28 +498,23 @@ def _solve(inp):
     # Four parameters => solve.
     if len(inp) == 4:
 
-        # Get input parameters.
+        # Get input and initiate solver dict.
         model, sfield, efield, solver_opts = inp
+        solver_input = {**solver_opts, 'sfield': sfield}
         grid = sfield.grid
 
         # Function to compute.
         fct = solve
 
-        # Initiate input parameter dict.
-        solver_input = {**solver_opts, 'sfield': sfield}
-
     # Six parameters => solve_source.
     elif len(inp) == 6:
 
-        # Get input parameters.
-        model, grid, source, frequency, efield, solver_opts = inp
+        # Get input and initiate solver dict.
+        model, grid, source, freq, efield, solver_opts = inp
+        solver_input = {**solver_opts, 'source': source, 'frequency': freq}
 
         # Function to compute.
         fct = solve_source
-
-        # Initiate input parameter dict.
-        solver_input = {
-                **solver_opts, 'source': source, 'frequency': frequency}
 
     else:
         raise NotImplementedError('Input-tuple must be of length 4 or 6.')
