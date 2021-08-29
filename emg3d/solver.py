@@ -461,7 +461,9 @@ def solve_source(model, source, frequency, **kwargs):
 def _solve(inp):
     """Thin wrapper of `solve` or `solve_source` for a `process_map`.
 
-    Used within a Simulation to call the solver in parallel.
+    Used within a Simulation to call the solver in parallel. This function
+    always returns the ``efield`` and the ``info_dict``, independent of the
+    provided solver options.
 
 
     Parameters
@@ -475,10 +477,10 @@ def _solve(inp):
 
         Consult the corresponding function for details on the input parameters.
 
-        Notes:
-        - ``model`` will be interpolated to the provided grid or the grid of
-          the source field.
-        - ``efield`` can be ``None``.
+        The ``model`` will be interpolated to the grid of the source field
+        (tuple of length 4) or to the provided grid (tuple of length 6). Hence,
+        the model can be on a different grid (for source and frequency
+        dependent gridding).
 
 
     Returns
