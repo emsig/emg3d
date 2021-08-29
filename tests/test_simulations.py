@@ -75,6 +75,7 @@ class TestSimulation():
         assert self.simulation.get_efield('TxEW-3', 'f-1') == efield
 
         # See a single one
+        self.simulation._dict_efield['TxEW-3'][1.0] = None
         _, _ = capsys.readouterr()
         self.simulation.get_efield('TxEW-3', 1.0)
 
