@@ -236,6 +236,22 @@ def test_tx_electric_dipole():
     assert "m; e2={1.0" in rep
 
 
+def test_tx_magnetic_point():
+    coo = (0, 0, 0, 45, 45)
+    s1a = electrodes.TxMagneticPoint(coo, strength=np.pi)
+    assert s1a.xtype == 'magnetic'
+    assert s1a._prefix == 'TxMP'
+    s1b = electrodes.TxMagneticPoint.from_dict(s1a.to_dict())
+    assert s1a == s1b
+    assert_allclose(s1b.coordinates, coo)
+    assert_allclose(s1b.points, np.atleast_2d(coo[:3]))
+    assert_allclose(s1b.strength, np.pi)
+
+    rep = s1a.__repr__()
+    assert "3.1 A" in rep
+    assert "=0.0 m, θ=45.0°" in rep
+
+
 def test_tx_magnetic_dipole():
     s4a = electrodes.TxMagneticDipole(
             (0, 0, 0, 45, 45), strength=np.pi, length=4)
@@ -300,6 +316,9 @@ def test_receiver():
 
 def test_rx_electric_point():
     r1a = electrodes.RxElectricPoint((1200, -56, 23.214, 368, 15), True)
+
+    assert r1a._adjoint_source == electrodes.TxElectricPoint
+
     assert r1a.xtype == 'electric'
     assert r1a._prefix == 'RxEP'
     assert r1a.relative is True
@@ -325,6 +344,9 @@ def test_rx_electric_point():
 
 def test_rx_magnetic_point():
     r1a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
+
+    assert r1a._adjoint_source == electrodes.TxMagneticPoint
+
     assert r1a.xtype == 'magnetic'
     assert r1a._prefix == 'RxMP'
     assert r1a.relative is False

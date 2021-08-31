@@ -24,10 +24,14 @@ from scipy.special import sindg, cosdg
 
 from emg3d import fields, utils
 
-__all__ = ['Wire', 'Point', 'Dipole', 'Source', 'TxElectricDipole',
-           'TxMagneticDipole', 'TxElectricWire', 'RxElectricPoint',
-           'RxMagneticPoint', 'rotation', 'point_to_dipole', 'dipole_to_point',
-           'point_to_square_loop']
+__all__ = [
+    'Wire', 'Point', 'Dipole', 'Source',
+    'TxElectricPoint', 'TxMagneticPoint',
+    'TxElectricDipole', 'TxMagneticDipole',
+    'TxElectricWire',
+    'RxElectricPoint', 'RxMagneticPoint',
+    'rotation', 'point_to_dipole', 'dipole_to_point', 'point_to_square_loop',
+]
 
 
 # BASE ELECTRODE TYPES
@@ -444,7 +448,33 @@ class TxElectricPoint(Source, Point):
     """
 
     def __init__(self, coordinates, strength=1.0):
-        """Initiate an electric dipole source."""
+        """Initiate an electric point source."""
+
+        super().__init__(coordinates=coordinates, strength=strength)
+
+
+@utils._known_class
+class TxMagneticPoint(Source, Point):
+    """Magnetic point source.
+
+    .. note::
+
+        The magnetic point source is not implemented for magnetic permeability.
+
+
+    Parameters
+    ----------
+    coordinates : array_like
+        Point coordinates in the format (x, y, z, azimuth, elevation).
+
+    strength : float, default: 1.0
+        Source strength (A). (Note that the source field is always an electric
+        field; in this case the electric field due to a magnetic point.)
+
+    """
+
+    def __init__(self, coordinates, strength=1.0):
+        """Initiate an magnetic point source."""
 
         super().__init__(coordinates=coordinates, strength=strength)
 
@@ -607,24 +637,12 @@ class RxElectricPoint(Receiver, Point):
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
     """
+    _adjoint_source = TxElectricPoint
 
     def __init__(self, coordinates, relative=False):
         """Initiate an electric point receiver."""
 
         super().__init__(coordinates=coordinates, relative=relative)
-
-    def adjoint_source(self, source, frequency, strength, grid):
-        """TODO document & test."""
-
-        # Get absolute coordinates as fct of source.
-        # (Only relevant in case of "relative" receivers.)
-        coords = self.coordinates_abs(source)
-
-        # Create source.
-        src = TxElectricPoint(coords, strength=strength)
-
-        # Return adjoint source.
-        return src.get_field(grid=grid, frequency=frequency)
 
 
 @utils._known_class
@@ -645,43 +663,12 @@ class RxMagneticPoint(Receiver, Point):
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
     """
+    _adjoint_source = TxMagneticPoint
 
     def __init__(self, coordinates, relative=False):
         """Initiate a magnetic point receiver."""
 
         super().__init__(coordinates=coordinates, relative=relative)
-
-    @utils._requires('discretize')
-    def adjoint_source(self, source, frequency, strength, grid):
-        """TODO document & test; generalize."""
-
-        # Get absolute coordinates as fct of source.
-        # (Only relevant in case of "relative" receivers.)
-        coords = np.array(self.coordinates_abs(source))
-
-        # TODO Requires a generalization, but should be simple by
-        # combining x, y, z.
-        if (self.azimuth == 0) & (self.elevation == 0):
-            location_type = 'Fx'
-        elif (self.azimuth == 90) & (self.elevation == 0):
-            location_type = 'Fy'
-        elif (self.azimuth == 0) & (self.elevation == 90):
-            location_type = 'Fz'
-        else:
-            raise NotImplementedError
-
-        # Use of discretize for calculating the adjoint source.
-        # TODO implement so it is possible also without discretize.
-        C = grid.edge_curl
-        P = grid.get_interpolation_matrix(
-                coords[:3], location_type=location_type)
-
-        # h = C*e / (i*omega*mu)
-        # smu0 = i*omega*mu
-        h_deriv = -(C.T @ P.T).toarray().ravel() * strength
-
-        # Return adjoint source.
-        return fields.Field(grid=grid, data=h_deriv, frequency=frequency)
 
 
 # ROTATIONS AND CONVERSIONS

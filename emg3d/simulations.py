@@ -763,9 +763,6 @@ class Simulation:
             interpolation, so the residual should come from a linear
             interpolation.
 
-            Also, the adjoint test for magnetic receivers does not yet pass.
-            Electric receivers are good to go.
-
         .. note::
 
             The currently implemented gradient is only for isotropic models
@@ -1018,13 +1015,15 @@ class Simulation:
             if np.isnan(residual[i]):
                 continue
 
+            # Get absolute coordinates as fct of source.
+            # (Only relevant in case of "relative" receivers.)
+            coords = rec.coordinates_abs(self.survey.sources[source])
+
+            # Create adjoint source.
+            src = rec._adjoint_source(coords, strength=strength[i])
+
             # Get and add this source field.
-            rfield.field += rec.adjoint_source(
-                source=self.survey.sources[source],
-                frequency=freq,
-                strength=strength[i],
-                grid=grid,
-            ).field
+            rfield.field += src.get_field(grid=grid, frequency=freq).field
 
         return rfield
 
