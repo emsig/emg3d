@@ -9,6 +9,14 @@ Changelog
 latest
 ------
 
+- ``electrodes``:
+
+  - New source ``TxMagneticPoint`` (requires ``discretize``; mainly used as
+    adjoint source for magnetic receivers; does not work in the presence of
+    magnetic permeabilities in the vincinity of the source).
+  - Both receivers (``Rx{Electric;Magnetic}Point``) can now produce their
+    proper adjoint (thanks to @sgkang!).
+
 - Changes in Simulation and parallel execution.
 
   - Parallel computation is not sharing the simulation any longer.
@@ -21,7 +29,6 @@ latest
   - Models and Fields return itself (not a copy) when the grid provided to
     ``interpolate_to_grid`` is the same as the current one.
 
-- WIP: Proper adjoint for magnetic receivers.
 
 
 v1.2.1: Remove optimize & bug fix

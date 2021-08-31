@@ -16,8 +16,10 @@
 
 # Import most important functions and classes
 from emg3d.electrodes import (
-        TxElectricPoint, TxElectricDipole, TxMagneticDipole, TxElectricWire,
-        RxElectricPoint, RxMagneticPoint,
+    TxElectricPoint, TxMagneticPoint,
+    TxElectricDipole, TxMagneticDipole,
+    TxElectricWire,
+    RxElectricPoint, RxMagneticPoint,
 )
 from emg3d.fields import Field, get_source_field, get_magnetic_field
 from emg3d.io import save, load

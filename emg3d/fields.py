@@ -497,6 +497,8 @@ def get_source_field(grid, source, frequency, **kwargs):
     # Get vector field
     if isinstance(source, electrodes.TxElectricPoint):
         vfield = _point_vector(grid, source.coordinates)
+    elif isinstance(source, electrodes.TxMagneticPoint):
+        vfield = _point_vector_magnetic(grid, source.coordinates, frequency)
     else:
         vfield = _dipole_vector(grid, source.points)
 
@@ -735,6 +737,50 @@ def _point_vector(grid, coordinates):
     vfield.fx *= srcdir[0]
     vfield.fy *= srcdir[1]
     vfield.fz *= srcdir[2]
+
+    return vfield
+
+
+@utils._requires('discretize')
+def _point_vector_magnetic(grid, coordinates, frequency):
+    """Get magnetic point source using discretize functionality.
+
+
+    Parameters
+    ----------
+    grid : TensorMesh
+        The grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+    coordinates : array_like
+        Source coordinates in the format (x, y, z, azimuth, elevation).
+
+    frequency : float
+        Source frequency (Hz).
+
+
+    Returns
+    -------
+    vfield : Field
+        Source field, a :class:`emg3d.fields.Field` instance.
+
+    """
+
+    # Use discretize to get the source field for a magnetic point.
+    coords = np.array(coordinates)
+    rot = electrodes.rotation(coords[3], coords[4])
+    interp = (
+        rot[0]*grid.get_interpolation_matrix(coords[:3], 'faces_x') +
+        rot[1]*grid.get_interpolation_matrix(coords[:3], 'faces_y') +
+        rot[2]*grid.get_interpolation_matrix(coords[:3], 'faces_z')
+    )
+
+    # Compute the magnetic vector.
+    vfield = Field(grid, frequency=frequency)
+    vfield.field = -(grid.edge_curl.T @ interp.T).toarray().ravel()
+
+    # Divide by s*mu_0.
+    if frequency is not None:
+        vfield.field /= -vfield.smu0
 
     return vfield
 

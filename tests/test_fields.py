@@ -369,6 +369,17 @@ class TestGetSourceField:
         sfield = fields.get_source_field(grid, src, frequency=None)
         assert_allclose(sfield.field, vfield.field)
 
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    def test_all_alternatives_mag(self):
+        h = np.ones(20)*20
+        grid = emg3d.TensorMesh([h, h, h], (-200, -200, -200))
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+        vfield = fields._point_vector_magnetic(grid, (0, 0, 0, 0, 0), None)
+        src = emg3d.electrodes.TxMagneticPoint((0, 0, 0, 0, 0))
+        sfield = fields.get_source_field(grid, src, frequency=None)
+        assert_allclose(sfield.field, vfield.field)
+
 
 class TestGetReceiver:
     def test_runs_warnings(self):
@@ -556,6 +567,41 @@ class TestPointVector:
             fields._point_vector(grid, (5, 2, 2, 20, 10))
 
 
+@pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+class TestPointVectorMagnetic:
+    def test_basics_xdir_on_x(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+
+        # x-directed source in the middle
+        vfield = fields._point_vector_magnetic(grid, (0, 0, 0, 0, 0), None)
+
+        # x: exact in the middle on the two edges
+        assert_allclose(vfield.fx, 0)
+        # y: as exact "on" x-grid, falls to the right
+        assert_allclose(abs(vfield.fy[2:-2, 1:-1, 1:-1:2]), 0.25)
+        # z: as exact "on" x-grid, falls to top
+        assert_allclose(abs(vfield.fz[2:-2, 1:-1:2, 1:-1]), 0.25)
+
+    def test_basics_diag(self):
+        h = [2, 1, 1, 2]
+        grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
+
+        # Diagonal source in the middle
+        vfield = fields._point_vector_magnetic(grid, (0, 0, 0, 45, 45), None)
+
+        # x-field
+        assert_allclose(vfield.fx[1, :, :], vfield.fx[2, :, :])
+        assert_allclose(vfield.fx[1, 1:-1:2, 2], [-0.1767767, 0.1767767])
+        assert_allclose(vfield.fx[1, 2, 1:-1:2], [0.125, -0.125])
+
+        # Source is point symmetric horizontally
+        assert_allclose(vfield.fx[1:-2, 1:-2, 1:-2].ravel(),
+                        -vfield.fy[1:-2, 1:-2, 1:-2].ravel())
+        assert_allclose(vfield.fx[2:-1, 2:-1, 2:-1].ravel(),
+                        -vfield.fy[2:-1, 2:-1, 2:-1].ravel())
+
+
 class TestDipoleVector:
     def test_basics_xdir_on_x(self):
         h = [2, 1, 1, 2]
@@ -681,3 +727,56 @@ def test_edge_curl_factor(njit):
     assert_allclose(mx[1:-1, :, :], 0.005)  # (9/20 - 12/30) * 0.1
     assert_allclose(my[:, 1:-1, :], -0.01)  # (6/30 - 3/10) * 0.1
     assert_allclose(mz[:, :, 1:-1], 0.01)  # (2/10 - 2/20) * 0.1
+
+
+@pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+def test_reciprocity():
+    frequency = 1
+    center = (1_000, 10_000, 100_000)
+    grid = emg3d.construct_mesh(
+        center=center,
+        frequency=frequency,
+        properties=frequency,
+        distance=[-400, 800],
+    )
+
+    # Random model parameters
+    model = emg3d.Model(grid, (np.random.rand(grid.n_cells)+1)*10)
+    c = (0, 0, 0, 0, 0)
+
+    # Random angles
+    azm0, azm1 = np.random.randint(91), np.random.randint(91)
+    ele0, ele1 = np.random.randint(91), np.random.randint(91)
+
+    srcrec0 = [[emg3d.TxElectricPoint, emg3d.RxElectricPoint],
+               [emg3d.TxMagneticPoint, emg3d.RxMagneticPoint]]
+    srcrec1 = [[emg3d.RxElectricPoint, emg3d.TxElectricPoint],
+               [emg3d.RxMagneticPoint, emg3d.TxMagneticPoint]]
+
+    # print(f"   loc1  /  loc2   :   azm  /  ele   :  NMRSD (%)\n{98*'-'}")
+    for loc0 in srcrec0:
+        for loc1 in srcrec1:
+
+            coo1 = (center[0]+300, center[1]+200, center[2]+400, azm0, ele0)
+            coo2 = (center[0]+800, center[1]+700, center[2]+500, azm1, ele1)
+
+            field1 = emg3d.solve_source(
+                    model=model, source=loc0[0](coo1), frequency=frequency)
+            field2 = emg3d.solve_source(
+                    model=model, source=loc1[1](coo2), frequency=frequency)
+
+            if loc1[0](c).xtype == 'magnetic':
+                field1 = fields.get_magnetic_field(model, field1)
+            if loc0[1](c).xtype == 'magnetic':
+                field2 = fields.get_magnetic_field(model, field2)
+
+            resp1 = field1.get_receiver(loc1[0](coo2), 'linear')[0]
+            resp2 = field2.get_receiver(loc0[1](coo1), 'linear')[0]
+
+            nrmsd = 200.0*abs(resp1-resp2)/(abs(resp1)+abs(resp2))
+            # print(f" {str(loc0[0])[25:28]}-{str(loc1[0])[25:28]} /"
+            #       f" {str(loc1[1])[25:28]}-{str(loc0[1])[25:28]}"
+            #       f" : {azm0:03d};{azm1:03d}/{ele0:03d};{ele1:03d}"
+            #       f" : {nrmsd:6.2f}    {resp1:+.4e}; {resp2:+.4e}")
+
+            assert nrmsd < 1.0
