@@ -1032,19 +1032,23 @@ class Simulation:
 
         return rfield
 
-    def _jvec(self, vec):
-        """Jvec = PA^-1 * G * vec.
+    def _jvec(self, vector):
+        r"""Compute the sensitivity times a vector.
+
+        Jvec = PA^-1 * G * vector.
+
+        vector has size of the model.
 
            TODO: Document and test.
         """
 
         # Create iterable form src/freq-list to call the process_map.
-        def collect_jfield_inputs(inp, vec=vec):
+        def collect_jfield_inputs(inp, vector=vector):
             """Collect inputs."""
-            rfield = self._get_gvec_field(*inp, vec)
+            rfield = self._get_gvec_field(*inp, vector)
             return self.model, rfield, None, self.solver_opts
 
-        # Compute and return A^-1 * G * vec
+        # Compute and return A^-1 * G * vector
         out = utils._process_map(
                 solver._solve,
                 list(map(collect_jfield_inputs, self._srcfreq)),
@@ -1073,19 +1077,18 @@ class Simulation:
         return self.data['jvec'].data
 
     @utils._requires('discretize')
-    def _get_gvec_field(self, source, frequency, vec):
+    def _get_gvec_field(self, source, frequency, vector):
         """TODO: Document and test."""
 
         # Forward electric field
         efield = self._dict_efield[source][frequency]
 
-        # Step2: compute G * vec = gvec (using discretize)
-        # TODO implement so it is possible also without discretize.
-        gvec = efield.grid.getEdgeInnerProductDeriv(
-                np.ones(efield.grid.n_cells))(efield.field) * vec
+        # Step2: compute G * vector = gvec (using discretize)
+        gvec = efield.grid.get_edge_inner_product_deriv(
+                np.ones(efield.grid.n_cells))(efield.field) * vector
         # Extension to sig_x, sig_y, sig_z is trivial
-        # gvec = mesh.getEdgeInnerProductDeriv(
-        #         np.ones(mesh.n_cells)*3)(efield.field) * vec
+        # gvec = mesh.get_edge_inner_product_deriv(
+        #         np.ones(mesh.n_cells)*3)(efield.field) * vector
 
         gvec_field = fields.Field(
             grid=efield.grid,
@@ -1093,6 +1096,35 @@ class Simulation:
             frequency=efield.frequency
         )
         return gvec_field
+
+    def _jtvec(self, vector):
+        r"""Compute the sensitivity transpose times a vector.
+
+        If `vector`=residual, `jtvec` corresponds to the `gradient`.
+
+        Jvec = PA^-1 * G * vector.
+
+        vector has size of the data.
+
+           TODO: Document and test.
+        """
+
+        # TODO: stupid workaround atm.
+        # Make self.gradient cleverer (accept other data than residual).
+
+        # Replace residual by vector if provided
+        old = self.survey.data['residual'].copy()
+        self.survey.data['residual'][...] = vector
+
+        # Get gradient with `v` as residual.
+        self._gradient = None  # Reset gradient
+        jtvec = self.gradient
+
+        # Set back.
+        self._gradient = None
+        self.survey.data['residual'][...] = old
+
+        return jtvec
 
     # UTILS
     @property

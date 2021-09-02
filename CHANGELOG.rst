@@ -31,9 +31,7 @@ latest
 
 - WIP: Other data types than complex data.
 
-- WIP: Proper adjoint for magnetic receivers.
-
-- WIP: jvec
+- WIP: jvec, jtvec
 
 
 v1.2.1: Remove optimize & bug fix
