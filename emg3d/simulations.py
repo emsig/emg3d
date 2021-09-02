@@ -1035,9 +1035,12 @@ class Simulation:
     def _jvec(self, vector):
         r"""Compute the sensitivity times a vector.
 
-        Jvec = PA^-1 * G * vector.
+        .. math::
+            :label: jvec
 
-        vector has size of the model.
+            Jv = PA^{-1} G v
+
+        vector :math:`v` has size of the model.
 
            TODO: Document and test.
         """
@@ -1102,9 +1105,14 @@ class Simulation:
 
         If `vector`=residual, `jtvec` corresponds to the `gradient`.
 
-        Jvec = PA^-1 * G * vector.
 
-        vector has size of the data.
+        .. math::
+            :label: jtvec
+
+            J^H v = G^H A^{-H} P^H v
+
+
+        vector :math:`v` has size of the data.
 
            TODO: Document and test.
         """
