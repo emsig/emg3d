@@ -593,8 +593,10 @@ class Receiver(Wire):
         complex values, but the meaning of the real and imaginary part differs
         depending on the data type. Currently implemented are:
 
-        - 'complex': Complex values: Real + i.Imag
-        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+        - ``'complex'``: Complex values: Real + j Imag
+        - ``'amp-pha'``: Amplitude and phase: Amplitude + j Phase
+        - ``'amplitude'``: Amplitude and phase: Amplitude + j 0
+        - ``'phase'``: Amplitude and phase: 0 + j Phase
 
     """
 
@@ -605,7 +607,8 @@ class Receiver(Wire):
         """Initiate a receiver."""
 
         # Check data type is a known type.
-        if data_type.lower() not in ['complex', 'amp-pha']:
+        known = ['complex', 'amp-pha', 'amplitude', 'phase']
+        if data_type.lower() not in known:
             raise ValueError(f"Unknown `data_type` {data_type}.")
 
         # Store relative, add a repr-addition.
@@ -627,11 +630,29 @@ class Receiver(Wire):
         """Data type of the measured responses."""
         return self._data_type
 
+    def from_complex(self, complex_data):
+        """Return data in `data_type` from complex values."""
+
+        if self.data_type == 'amp-pha':
+            return abs(complex_data) + 1j*np.angle(complex_data)
+
+        elif self.data_type == 'amplitude':
+            return abs(complex_data) + 0j
+
+        elif self.data_type == 'phase':
+            return 1j*np.angle(complex_data)
+
+        else:
+            return complex_data
+
     def derivative_chain(self, data, complex_data):
         """Chain rule for data types other than complex."""
 
-        if self.data_type == 'amp-pha':
-            data *= complex_data.conj() / abs(complex_data)
+        if self.data_type in ['amp-pha', 'amplitude']:
+            data.real *= np.real(complex_data.conj()/abs(complex_data))
+
+        if self.data_type in ['amp-pha', 'phase']:
+            data.imag *= np.real(-1j*complex_data.conj()/abs(complex_data)**2)
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
@@ -670,8 +691,10 @@ class RxElectricPoint(Receiver, Point):
         complex values, but the meaning of the real and imaginary part differs
         depending on the data type. Currently implemented are:
 
-        - 'complex': Complex values: Real + i.Imag
-        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+        - ``'complex'``: Complex values: Real + j Imag
+        - ``'amp-pha'``: Amplitude and phase: Amplitude + j Phase
+        - ``'amplitude'``: Amplitude and phase: Amplitude + j 0
+        - ``'phase'``: Amplitude and phase: 0 + j Phase
 
     """
     _adjoint_source = TxElectricPoint
@@ -708,8 +731,10 @@ class RxMagneticPoint(Receiver, Point):
         complex values, but the meaning of the real and imaginary part differs
         depending on the data type. Currently implemented are:
 
-        - 'complex': Complex values: Real + i.Imag
-        - 'amp-pha': Amplitude and phase: Amp + i.Pha
+        - ``'complex'``: Complex values: Real + j Imag
+        - ``'amp-pha'``: Amplitude and phase: Amplitude + j Phase
+        - ``'amplitude'``: Amplitude and phase: Amplitude + j 0
+        - ``'phase'``: Amplitude and phase: 0 + j Phase
 
     """
     _adjoint_source = TxMagneticPoint

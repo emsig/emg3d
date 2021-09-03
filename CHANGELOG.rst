@@ -16,6 +16,9 @@ latest
     magnetic permeabilities in the vincinity of the source).
   - Both receivers (``Rx{Electric;Magnetic}Point``) can now produce their
     proper adjoint (thanks to @sgkang!).
+  - Receivers have a new parameter ``data_type``; by default this is
+    ``complex``, but in addition there are new the options ``amp-pha``,
+    ``amplitude``, and ``phase``.
 
 - Changes in Simulation and parallel execution.
 
@@ -28,10 +31,6 @@ latest
 
   - Models and Fields return itself (not a copy) when the grid provided to
     ``interpolate_to_grid`` is the same as the current one.
-
-- WIP: Other data types than complex data.
-
-- WIP: Proper adjoint for magnetic receivers.
 
 
 v1.2.1: Remove optimize & bug fix
