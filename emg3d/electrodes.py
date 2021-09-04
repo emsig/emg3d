@@ -593,10 +593,13 @@ class Receiver(Wire):
         complex values, but the meaning of the real and imaginary part differs
         depending on the data type. Currently implemented are:
 
-        - ``'complex'``: Complex values: Real + j Imag
-        - ``'amp-pha'``: Amplitude and phase: Amplitude + j Phase
-        - ``'amplitude'``: Amplitude and phase: Amplitude + j 0
-        - ``'phase'``: Amplitude and phase: 0 + j Phase
+        - ``'complex'``: Complex values:        Real + j Imag
+        - ``'amplitude'``: Amplitude and phase:  Amp + j 0
+        - ``'phase'``: Amplitude and phase:        0 + j Pha
+
+        The preferred choice is complex, but the latter two are implemented for
+        the case where phase or amplitude information is not available or very
+        poor.
 
     """
 
@@ -607,8 +610,7 @@ class Receiver(Wire):
         """Initiate a receiver."""
 
         # Check data type is a known type.
-        known = ['complex', 'amp-pha', 'amplitude', 'phase']
-        if data_type.lower() not in known:
+        if data_type.lower() not in ['complex', 'amplitude', 'phase']:
             raise ValueError(f"Unknown `data_type` {data_type}.")
 
         # Store relative, add a repr-addition.
@@ -631,13 +633,10 @@ class Receiver(Wire):
         return self._data_type
 
     def from_complex(self, complex_data):
-        """Return data in `data_type` from complex values."""
+        """Return data in `data_type`-format from complex values."""
 
-        if self.data_type == 'amp-pha':
-            return abs(complex_data) + 1j*np.angle(complex_data)
-
-        elif self.data_type == 'amplitude':
-            return abs(complex_data) + 0j
+        if self.data_type == 'amplitude':
+            return complex(abs(complex_data))
 
         elif self.data_type == 'phase':
             return 1j*np.angle(complex_data)
@@ -648,10 +647,10 @@ class Receiver(Wire):
     def derivative_chain(self, data, complex_data):
         """Chain rule for data types other than complex."""
 
-        if self.data_type in ['amp-pha', 'amplitude']:
+        if self.data_type == 'amplitude':  # Amp + j 0
             data.real *= np.real(complex_data.conj()/abs(complex_data))
 
-        if self.data_type in ['amp-pha', 'phase']:
+        elif self.data_type == 'phase':    # 0 + j Pha
             data.imag *= np.real(-1j*complex_data.conj()/abs(complex_data)**2)
 
     def center_abs(self, source):
@@ -691,10 +690,13 @@ class RxElectricPoint(Receiver, Point):
         complex values, but the meaning of the real and imaginary part differs
         depending on the data type. Currently implemented are:
 
-        - ``'complex'``: Complex values: Real + j Imag
-        - ``'amp-pha'``: Amplitude and phase: Amplitude + j Phase
-        - ``'amplitude'``: Amplitude and phase: Amplitude + j 0
-        - ``'phase'``: Amplitude and phase: 0 + j Phase
+        - ``'complex'``: Complex values:        Real + j Imag
+        - ``'amplitude'``: Amplitude and phase:  Amp + j 0
+        - ``'phase'``: Amplitude and phase:        0 + j Pha
+
+        The preferred choice is complex, but the latter two are implemented for
+        the case where phase or amplitude information is not available or very
+        poor.
 
     """
     _adjoint_source = TxElectricPoint
@@ -731,10 +733,13 @@ class RxMagneticPoint(Receiver, Point):
         complex values, but the meaning of the real and imaginary part differs
         depending on the data type. Currently implemented are:
 
-        - ``'complex'``: Complex values: Real + j Imag
-        - ``'amp-pha'``: Amplitude and phase: Amplitude + j Phase
-        - ``'amplitude'``: Amplitude and phase: Amplitude + j 0
-        - ``'phase'``: Amplitude and phase: 0 + j Phase
+        - ``'complex'``: Complex values:        Real + j Imag
+        - ``'amplitude'``: Amplitude and phase:  Amp + j 0
+        - ``'phase'``: Amplitude and phase:        0 + j Pha
+
+        The preferred choice is complex, but the latter two are implemented for
+        the case where phase or amplitude information is not available or very
+        poor.
 
     """
     _adjoint_source = TxMagneticPoint

@@ -681,14 +681,6 @@ class Survey:
             self._anyrec_non_complex_bool = any(cmpl)
         return self._anyrec_non_complex_bool
 
-    @property
-    def _anyrec_amp_pha(self):
-        """Boolean if any receiver has data_type amp-pha."""
-        if getattr(self, '_anyrec_amp_pha_bool', None) is None:
-            ampha = [r.data_type == 'amp-pha' for r in self.receivers.values()]
-            self._anyrec_amp_pha_bool = any(ampha)
-        return self._anyrec_amp_pha_bool
-
 
 def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):
     r"""Return random noise for given inputs.

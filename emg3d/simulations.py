@@ -210,7 +210,7 @@ class Simulation:
         # Sets self.model and self.gridding_opts.
         self._set_model(model, kwargs)
 
-        # Initiate complex and synthetic data with NaN's if they don't exist.
+        # Initiate synthetic and complex data with NaN's if they don't exist.
         if 'synthetic' not in self.survey.data.keys():
             self.survey._data['synthetic'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
@@ -736,9 +736,9 @@ class Simulation:
             # Add noise.
             if kwargs.get('add_noise', True):
 
-                # TODO
+                # Ensure there are no non-complex data.
                 if self.survey._anyrec_non_complex:
-                    msg = "Add noise only implemented for complex data."
+                    msg = "`add_noise` is only implemented for complex data."
                     raise NotImplementedError(msg)
 
                 self.survey.add_noise(**kwargs)
