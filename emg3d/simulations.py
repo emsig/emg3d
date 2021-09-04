@@ -622,7 +622,7 @@ class Simulation:
         """Return the solver information of the corresponding computation."""
         return self._dict_efield_info[source][self._freq_inp2key(frequency)]
 
-    def _get_responses(self, source, frequency):
+    def _get_responses(self, source, frequency, efield=None):
         """Return electric and magnetic fields at receiver locations."""
 
         # Get receiver types and their coordinates.
@@ -632,8 +632,9 @@ class Simulation:
         # Initiate output.
         resp = np.zeros_like(self.data.synthetic.loc[source, :, frequency])
 
-        # efield of this source/frequency.
-        efield = self._dict_efield[source][frequency]
+        # efield of this source/frequency if not provided.
+        if efield is None:
+            efield = self._dict_efield[source][frequency]
 
         if erec.size:
 
@@ -1026,6 +1027,114 @@ class Simulation:
             rfield.field += src.get_field(grid=grid, frequency=freq).field
 
         return rfield
+
+    @utils._requires('discretize')
+    def _jvec(self, vector):
+        r"""Compute the sensitivity times a vector.
+
+        .. math::
+            :label: jvec
+
+            J v = P A^{-1} G v \ ,
+
+        where :math:`v` has size of the model.
+
+
+        Parameters
+        ----------
+        vector : ndarray
+            Shape of the model.
+
+
+        Returns
+        -------
+        jvec : ndarray
+            Size of the data.
+
+        """
+
+        # Create iterable form src/freq-list to call the process_map.
+        def collect_jfield_inputs(inp, vector=vector):
+            """Collect inputs."""
+            source, frequency = inp
+
+            # Forward electric field
+            efield = self._dict_efield[source][frequency]
+
+            # Compute gvec = G * vector (using discretize)
+            gvec = efield.grid.get_edge_inner_product_deriv(
+                    np.ones(efield.grid.n_cells))(efield.field) * vector
+            # Extension for tri-axial anisotropy is trivial:
+            # gvec = mesh.get_edge_inner_product_deriv(
+            #         np.ones(mesh.n_cells)*3)(efield.field) * vector
+
+            gfield = fields.Field(
+                grid=efield.grid,
+                data=-efield.smu0*gvec,
+                frequency=efield.frequency
+            )
+
+            return self.model, gfield, None, self.solver_opts
+
+        # Compute and return A^-1 * G * vector
+        out = utils._process_map(
+                solver._solve,
+                list(map(collect_jfield_inputs, self._srcfreq)),
+                max_workers=self.max_workers,
+                **{'desc': 'Compute jvec', **self._tqdm_opts},
+        )
+
+        # Store gradient field and info.
+        if 'jvec' not in self.data.keys():
+            self.data['jvec'] = self.data.observed.copy(
+                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
+
+        # Loop over src-freq combinations to extract and store.
+        for i, (src, freq) in enumerate(self._srcfreq):
+
+            # Store responses at receivers.
+            resp = self._get_responses(src, freq, out[i][0])
+            self.data['jvec'].loc[src, :, freq] = resp
+
+        return self.data['jvec'].data
+
+    def _jtvec(self, vector):
+        r"""Compute the sensitivity transpose times a vector.
+
+        If `vector`=residual, `jtvec` corresponds to the `gradient`.
+
+        .. math::
+            :label: jtvec
+
+            J^H v = G^H A^{-H} P^H v \ ,
+
+        where :math:`v` has size of the data.
+
+
+        Parameters
+        ----------
+        vector : ndarray
+            Shape of the data.
+
+
+        Returns
+        -------
+        jtvec : ndarray
+            Adjoint-state gradient (same shape as ``simulation.model``)
+            for the provided vector.
+
+        """
+        # Note: The entire chain `gradient`->`_bcompute`->`_get_rfield` and
+        #       also `_jtvec` could be re-factored much smarter.
+
+        # Replace residual by vector if provided.
+        self.survey.data['residual'][...] = vector
+
+        # Reset gradient, so it will be computed.
+        self._gradient = None
+
+        # Get gradient with `v` as residual.
+        return self.gradient
 
     # UTILS
     @property
