@@ -13,6 +13,10 @@ try:
     import xarray
 except ImportError:
     xarray = None
+try:
+    import discretize
+except ImportError:
+    discretize = None
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -259,6 +263,15 @@ class TestSimulation():
 
         with pytest.warns(UserWarning, match='Receiver responses were obtain'):
             grad = simulation.gradient
+
+        with pytest.warns(UserWarning, match='Receiver responses were obtain'):
+            vec = simulation.data.residual.data.copy()
+            vec *= simulation.data.weights.data
+            jtvec = simulation.jtvec(vec)
+        assert_allclose(grad, jtvec)
+
+        jvec = simulation.jvec(np.ones(newgrid.n_cells))
+        assert jvec.shape == simulation.data.observed.data.shape
 
         # Test deprecation v1.4.0
         with pytest.warns(FutureWarning, match="removed in v1.4.0"):
@@ -541,37 +554,8 @@ def test_misfit():
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestGradient:
 
-    def test_errors(self):
-        mesh = emg3d.TensorMesh([[2, 2], [2, 2], [2, 2]], origin=(-1, -1, -1))
-        survey = emg3d.Survey(
-            sources=emg3d.TxElectricDipole((-1.5, 0, 0, 0, 0)),
-            receivers=emg3d.RxElectricPoint((1.5, 0, 0, 0, 0)),
-            frequencies=1.0,
-            relative_error=0.01,
-        )
-        sim_inp = {'survey': survey, 'gridding': 'same',
-                   'receiver_interpolation': 'linear'}
+    if xarray is not None:
 
-        # Anisotropic models.
-        simulation = simulations.Simulation(
-                model=emg3d.Model(mesh, 1, 2, 3), **sim_inp)
-        with pytest.raises(NotImplementedError, match='for isotropic models'):
-            simulation.gradient
-
-        # Model with electric permittivity.
-        simulation = simulations.Simulation(
-                model=emg3d.Model(mesh, epsilon_r=3), **sim_inp)
-        with pytest.raises(NotImplementedError, match='for el. permittivity'):
-            simulation.gradient
-
-        # Model with magnetic permeability.
-        simulation = simulations.Simulation(
-                model=emg3d.Model(mesh, mu_r=np.ones(mesh.shape_cells)*np.pi),
-                **sim_inp)
-        with pytest.raises(NotImplementedError, match='for magn. permeabili'):
-            simulation.gradient
-
-    def test_as_vs_fd_gradient(self, capsys):
         # Create a simple mesh.
         hx = np.ones(64)*100
         mesh = emg3d.TensorMesh([hx, hx, hx], origin=[0, 0, 0])
@@ -611,10 +595,42 @@ class TestGradient:
         sim_data = simulations.Simulation(model=model_true, **sim_inp)
         sim_data.compute(observed=True)
 
+    def test_errors(self):
+        mesh = emg3d.TensorMesh([[2, 2], [2, 2], [2, 2]], origin=(-1, -1, -1))
+        survey = emg3d.Survey(
+            sources=emg3d.TxElectricDipole((-1.5, 0, 0, 0, 0)),
+            receivers=emg3d.RxElectricPoint((1.5, 0, 0, 0, 0)),
+            frequencies=1.0,
+            relative_error=0.01,
+        )
+        sim_inp = {'survey': survey, 'gridding': 'same',
+                   'receiver_interpolation': 'linear'}
+
+        # Anisotropic models.
+        simulation = simulations.Simulation(
+                model=emg3d.Model(mesh, 1, 2, 3), **sim_inp)
+        with pytest.raises(NotImplementedError, match='for isotropic models'):
+            simulation.gradient
+
+        # Model with electric permittivity.
+        simulation = simulations.Simulation(
+                model=emg3d.Model(mesh, epsilon_r=3), **sim_inp)
+        with pytest.raises(NotImplementedError, match='for el. permittivity'):
+            simulation.gradient
+
+        # Model with magnetic permeability.
+        simulation = simulations.Simulation(
+                model=emg3d.Model(mesh, mu_r=np.ones(mesh.shape_cells)*np.pi),
+                **sim_inp)
+        with pytest.raises(NotImplementedError, match='for magn. permeabili'):
+            simulation.gradient
+
+    def test_as_vs_fd_gradient(self, capsys):
+
         # Compute adjoint state misfit and gradient
-        sim_data = simulations.Simulation(model=model_init, **sim_inp)
-        data_misfit = sim_data.misfit
-        grad = sim_data.gradient
+        sim = simulations.Simulation(model=self.model_init, **self.sim_inp)
+        data_misfit = sim.misfit
+        grad = sim.gradient
 
         # For Debug / QC, needs discretize
         # from matplotlib.colors import LogNorm, SymLogNorm
@@ -637,6 +653,39 @@ class TestGradient:
         indices = np.argwhere(abs(grad[:, iy, :]) > 3)
         ix, iz = indices[np.random.randint(indices.shape[0])]
         nrmsd = alternatives.fd_vs_as_gradient(
-                (ix, iy, iz), model_init, grad, data_misfit, sim_inp)
+                (ix, iy, iz), self.model_init, grad, data_misfit, self.sim_inp)
 
         assert nrmsd < 0.3
+
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    def test_adjoint(self):
+
+        sim = simulations.Simulation(model=self.model_init, **self.sim_inp)
+
+        v = np.random.rand(self.mesh.n_cells).reshape(self.mesh.shape_cells)
+        w = np.random.rand(self.survey.size).reshape(self.survey.shape)
+
+        wtJv = np.vdot(w, sim.jvec(v)).real
+        vtJtw = np.vdot(v, sim.jtvec(w).ravel('F'))
+
+        assert abs(wtJv - vtJtw) < 1e-10
+
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    def test_misfit(self):
+
+        sim = simulations.Simulation(model=self.model_init, **self.sim_inp)
+        m0 = 2*sim.model.property_x
+
+        def func2(x):
+            sim.model.property_x[...] = m0
+            return sim.jvec(x)
+
+        def func1(x):
+            sim.model.property_x[...] = x.reshape(sim.model.grid.shape_cells)
+            sim.clean('computed')
+            sim.compute()
+            return sim.data.synthetic.data, func2
+
+        assert discretize.tests.check_derivative(
+            func1, m0, plotIt=False, num=3,
+        )

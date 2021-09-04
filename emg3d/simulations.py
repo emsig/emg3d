@@ -684,7 +684,7 @@ class Simulation:
             # "Normal" case: all source-frequency pairs.
             srcfreq = self._srcfreq
 
-        # Create iterable form src/freq-list to call the process_map.
+        # Create iterable from src/freq-list to call the process_map.
         def collect_efield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
@@ -966,7 +966,7 @@ class Simulation:
             self._dict_bfield = self._dict_initiate
             self._dict_bfield_info = self._dict_initiate
 
-        # Create iterable form src/freq-list to call the process_map.
+        # Create iterable from src/freq-list to call the process_map.
         def collect_bfield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
@@ -1029,7 +1029,7 @@ class Simulation:
         return rfield
 
     @utils._requires('discretize')
-    def _jvec(self, vector):
+    def jvec(self, vector):
         r"""Compute the sensitivity times a vector.
 
         .. math::
@@ -1049,12 +1049,15 @@ class Simulation:
         Returns
         -------
         jvec : ndarray
-            Size of the data.
+            Shape of the data.
 
         """
+        # Ensure misfit has been computed
+        # (and therefore the electric fields).
+        _ = self.misfit
 
-        # Create iterable form src/freq-list to call the process_map.
-        def collect_jfield_inputs(inp, vector=vector):
+        # Create iterable from src/freq-list to call the process_map.
+        def collect_gfield_inputs(inp, vector=vector):
             """Collect inputs."""
             source, frequency = inp
 
@@ -1063,14 +1066,15 @@ class Simulation:
 
             # Compute gvec = G * vector (using discretize)
             gvec = efield.grid.get_edge_inner_product_deriv(
-                    np.ones(efield.grid.n_cells))(efield.field) * vector
+                np.ones(efield.grid.n_cells)
+            )(efield.field) * vector.ravel()
             # Extension for tri-axial anisotropy is trivial:
             # gvec = mesh.get_edge_inner_product_deriv(
             #         np.ones(mesh.n_cells)*3)(efield.field) * vector
 
             gfield = fields.Field(
                 grid=efield.grid,
-                data=-efield.smu0*gvec,
+                data=-efield.smu0*gvec,  # -iwu: To get complete source field.
                 frequency=efield.frequency
             )
 
@@ -1079,12 +1083,12 @@ class Simulation:
         # Compute and return A^-1 * G * vector
         out = utils._process_map(
                 solver._solve,
-                list(map(collect_jfield_inputs, self._srcfreq)),
+                list(map(collect_gfield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
-                **{'desc': 'Compute jvec', **self._tqdm_opts},
+                **{'desc': 'Compute jvec   ', **self._tqdm_opts},
         )
 
-        # Store gradient field and info.
+        # Initiate jvec data with NaN's if it doesn't exist.
         if 'jvec' not in self.data.keys():
             self.data['jvec'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
@@ -1098,10 +1102,11 @@ class Simulation:
 
         return self.data['jvec'].data
 
-    def _jtvec(self, vector):
+    def jtvec(self, vector):
         r"""Compute the sensitivity transpose times a vector.
 
-        If `vector`=residual, `jtvec` corresponds to the `gradient`.
+        If ``vector=residual*weights``, ``jtvec`` corresponds to the
+        ``gradient``.
 
         .. math::
             :label: jtvec
@@ -1120,18 +1125,21 @@ class Simulation:
         Returns
         -------
         jtvec : ndarray
-            Adjoint-state gradient (same shape as ``simulation.model``)
-            for the provided vector.
+            Adjoint-state gradient for the provided vector; shape of the model.
 
         """
         # Note: The entire chain `gradient`->`_bcompute`->`_get_rfield` and
-        #       also `_jtvec` could be re-factored much smarter.
+        #       also `_jtvec` should be re-factored.
 
-        # Replace residual by vector if provided.
-        self.survey.data['residual'][...] = vector
+        # Replace residual by provided vector
+        # (division by weight is undone in gradient).
+        self.data.residual[...] = vector/self.data.weights.data
 
         # Reset gradient, so it will be computed.
         self._gradient = None
+        for name in ['_dict_bfield', '_dict_bfield_info']:
+            if hasattr(self, name):
+                delattr(self, name)
 
         # Get gradient with `v` as residual.
         return self.gradient

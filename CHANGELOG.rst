@@ -23,6 +23,9 @@ latest
   - ``get_model`` and ``get_hfield`` are now done on the fly, not stored in a
     dict anymore (``simulation._dict_model`` and ``simulation._dict_hfield``
     do not exist any longer).
+  - New methods ``jvec`` (sensitivity times a vector) and ``jtvec``
+    (sensitivity transpose times a vector). These methods are currently
+    experimental; documentation and examples are lacking behind.
 
 - Various small things:
 
