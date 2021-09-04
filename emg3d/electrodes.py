@@ -75,8 +75,11 @@ class Wire:
         # Check input.
         if equal:
             for name in self._serialize:
-                equal *= np.allclose(getattr(self, name),
-                                     getattr(electrode, name))
+                comp = getattr(self, name)
+                if isinstance(comp, np.ndarray):
+                    equal *= np.allclose(comp, getattr(electrode, name))
+                else:
+                    equal *= comp == getattr(electrode, name)
 
         return bool(equal)
 
@@ -585,17 +588,28 @@ class Receiver(Wire):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str
+        Data type of the measured responses. Currently implemented is only
+        ``'complex'``.
+
     """
 
     # Add relative to attributes which have to be serialized.
-    _serialize = {'relative'} | Wire._serialize
+    _serialize = {'relative', 'data_type'} | Wire._serialize
 
-    def __init__(self, relative, **kwargs):
+    def __init__(self, relative, data_type, **kwargs):
         """Initiate a receiver."""
+
+        # Check data type is a known type.
+        if data_type.lower() != 'complex':
+            raise ValueError(f"Unknown data type '{data_type}'.")
 
         # Store relative, add a repr-addition.
         self._relative = relative
-        self._repr_add = f"{['absolute', 'relative'][self.relative]};"
+        self._data_type = data_type.lower()
+        self._repr_add = (
+            f"{['absolute', 'relative'][self.relative]}; {self.data_type};"
+        )
 
         super().__init__(**kwargs)
 
@@ -603,6 +617,11 @@ class Receiver(Wire):
     def relative(self):
         """True if coordinates are relative to source, False if absolute."""
         return self._relative
+
+    @property
+    def data_type(self):
+        """Data type of the measured responses."""
+        return self._data_type
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
@@ -636,13 +655,19 @@ class RxElectricPoint(Receiver, Point):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str, default: 'complex'
+        Data type of the measured responses. Currently implemented is only the
+        default value.
+
     """
     _adjoint_source = TxElectricPoint
 
-    def __init__(self, coordinates, relative=False):
+    def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate an electric point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative)
+        super().__init__(
+            coordinates=coordinates, relative=relative, data_type=data_type
+        )
 
 
 @utils._known_class
@@ -662,13 +687,19 @@ class RxMagneticPoint(Receiver, Point):
         Note that ``relative=True`` makes only sense in combination with
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
+    data_type : str, default: 'complex'
+        Data type of the measured responses. Currently implemented is only the
+        default value.
+
     """
     _adjoint_source = TxMagneticPoint
 
-    def __init__(self, coordinates, relative=False):
+    def __init__(self, coordinates, relative=False, data_type='complex'):
         """Initiate a magnetic point receiver."""
 
-        super().__init__(coordinates=coordinates, relative=relative)
+        super().__init__(
+            coordinates=coordinates, relative=relative, data_type=data_type
+        )
 
 
 # ROTATIONS AND CONVERSIONS
