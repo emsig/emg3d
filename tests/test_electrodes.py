@@ -341,6 +341,9 @@ def test_rx_electric_point():
     rep = r1a.__repr__()
     assert "relative" in rep
 
+    with pytest.raises(ValueError, match="Unknown data type 'bla'"):
+        electrodes.RxElectricPoint((0, 0, 0, 0, 0), data_type='bla')
+
 
 def test_rx_magnetic_point():
     r1a = electrodes.RxMagneticPoint((-1200, 56, -23.214, 0, 90))
