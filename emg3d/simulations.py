@@ -720,10 +720,11 @@ class Simulation:
             # Store responses at receiver locations.
             resp = self._get_responses(src, freq)
             if self.survey._anyrec_non_complex:
+                syn = np.zeros_like(self.data.synthetic.loc[src, :, freq])
+                for i, rec in enumerate(self.survey.receivers.values()):
+                    syn[i] = rec.from_complex(resp[i])
+                self.data['synthetic'].loc[src, :, freq] = syn
                 self.data['complex'].loc[src, :, freq] = resp
-                for i, dat in enumerate(resp):
-                    syn = self.survey.receivers.values()[i].from_complex(dat)
-                    self.data['synthetic'].loc[src, i, freq] = syn
             else:
                 self.data['synthetic'].loc[src, :, freq] = resp
 
