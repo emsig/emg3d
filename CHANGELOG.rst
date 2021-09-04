@@ -17,8 +17,8 @@ latest
   - Both receivers (``Rx{Electric;Magnetic}Point``) can now produce their
     proper adjoint (thanks to @sgkang!).
   - Receivers have a new parameter ``data_type``; by default this is
-    ``complex``, but in addition there are new the options ``amp-pha``,
-    ``amplitude``, and ``phase``.
+    ``complex``, but in addition there are new the (experimental) options
+    ``amplitude`` and ``phase``.
 
 - Changes in Simulation and parallel execution.
 

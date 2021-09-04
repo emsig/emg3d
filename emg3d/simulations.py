@@ -214,9 +214,11 @@ class Simulation:
         if 'synthetic' not in self.survey.data.keys():
             self.survey._data['synthetic'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
-        if 'complex' not in self.survey.data.keys():
-            self.survey._data['complex'] = self.data.observed.copy(
-                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
+        if self.survey._anyrec_non_complex:
+            # Only required if there are non-complex data.
+            if 'complex' not in self.survey.data.keys():
+                self.survey._data['complex'] = self.data.observed.copy(
+                        data=np.full(self.survey.shape, np.nan+1j*np.nan))
 
         # `tqdm`-options; undocumented.
         # Can be used to, e.g., disable tqdm completely via:
@@ -316,8 +318,9 @@ class Simulation:
                     del self.data[key]
             self.data['synthetic'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
-            self.data['complex'] = self.data.observed.copy(
-                    data=np.full(self.survey.shape, np.nan+1j*np.nan))
+            if self.survey._anyrec_non_complex:
+                self.data['complex'] = self.data.observed.copy(
+                        data=np.full(self.survey.shape, np.nan+1j*np.nan))
             for name in ['_gradient', '_misfit']:
                 delattr(self, name)
                 setattr(self, name, None)
@@ -635,7 +638,7 @@ class Simulation:
         erec_coord, mrec_coord = self.survey._rec_types_coord(source)
 
         # Initiate output.
-        resp = np.zeros_like(self.data.complex.loc[source, :, frequency])
+        resp = np.zeros_like(self.data.synthetic.loc[source, :, frequency])
 
         # efield of this source/frequency.
         efield = self._dict_efield[source][frequency]
@@ -716,8 +719,8 @@ class Simulation:
 
             # Store responses at receiver locations.
             resp = self._get_responses(src, freq)
-            self.data['complex'].loc[src, :, freq] = resp
             if self.survey._anyrec_non_complex:
+                self.data['complex'].loc[src, :, freq] = resp
                 for i, dat in enumerate(resp):
                     syn = self.survey.receivers.values()[i].from_complex(dat)
                     self.data['synthetic'].loc[src, i, freq] = syn
@@ -1016,7 +1019,8 @@ class Simulation:
 
         # Get values for this source and frequency.
         grid = self.get_grid(source, frequency)
-        complx = self.data.complex.loc[source, :, frequency].data
+        if self.survey._anyrec_non_complex:
+            complx = self.data.complex.loc[source, :, frequency].data
         residual = self.data.residual.loc[source, :, frequency].data
         weight = self.data.weights.loc[source, :, frequency].data
 
@@ -1034,7 +1038,8 @@ class Simulation:
                 continue
 
             # Apply chain rule to strength if data_type != complex.
-            rec.derivative_chain(strength[i], complx[i])
+            if self.survey._anyrec_non_complex:
+                rec.derivative_chain(strength[i], complx[i])
 
             # Get absolute coordinates as fct of source.
             # (Only relevant in case of "relative" receivers.)

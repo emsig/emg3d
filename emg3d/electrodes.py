@@ -595,7 +595,7 @@ class Receiver(Wire):
 
         - ``'complex'``: Complex values:        Real + j Imag
         - ``'amplitude'``: Amplitude and phase:  Amp + j 0
-        - ``'phase'``: Amplitude and phase:        0 + j Pha
+        - ``'phase'``: Amplitude and phase:      Pha + j 0
 
         The preferred choice is complex, but the latter two are implemented for
         the case where phase or amplitude information is not available or very
@@ -639,7 +639,7 @@ class Receiver(Wire):
             return complex(abs(complex_data))
 
         elif self.data_type == 'phase':
-            return 1j*np.angle(complex_data)
+            return complex(np.angle(complex_data))
 
         else:
             return complex_data
@@ -647,11 +647,11 @@ class Receiver(Wire):
     def derivative_chain(self, data, complex_data):
         """Chain rule for data types other than complex."""
 
-        if self.data_type == 'amplitude':  # Amp + j 0
-            data.real *= np.real(complex_data.conj()/abs(complex_data))
+        if self.data_type == 'amplitude':  # Amp + 0j
+            data *= complex_data.conj()/abs(complex_data)
 
-        elif self.data_type == 'phase':    # 0 + j Pha
-            data.imag *= np.real(-1j*complex_data.conj()/abs(complex_data)**2)
+        elif self.data_type == 'phase':    # Pha + 0j
+            data *= -1j*complex_data.conj()/abs(complex_data)**2
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
