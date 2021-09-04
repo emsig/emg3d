@@ -1032,24 +1032,53 @@ class Simulation:
 
         return rfield
 
+    @utils._requires('discretize')
     def _jvec(self, vector):
         r"""Compute the sensitivity times a vector.
 
         .. math::
             :label: jvec
 
-            Jv = PA^{-1} G v
+            J v = P A^{-1} G v \ ,
 
-        vector :math:`v` has size of the model.
+        where :math:`v` has size of the model.
 
-           TODO: Document and test.
+
+        Parameters
+        ----------
+        vector : ndarray
+            Shape of the model.
+
+
+        Returns
+        -------
+        jvec : ndarray
+            Size of the data.
+
         """
 
         # Create iterable form src/freq-list to call the process_map.
         def collect_jfield_inputs(inp, vector=vector):
             """Collect inputs."""
-            rfield = self._get_gvec_field(*inp, vector)
-            return self.model, rfield, None, self.solver_opts
+            source, frequency = *inp
+
+            # Forward electric field
+            efield = self._dict_efield[source][frequency]
+
+            # Compute gvec = G * vector (using discretize)
+            gvec = efield.grid.get_edge_inner_product_deriv(
+                    np.ones(efield.grid.n_cells))(efield.field) * vector
+            # Extension for tri-axial anisotropy is trivial:
+            # gvec = mesh.get_edge_inner_product_deriv(
+            #         np.ones(mesh.n_cells)*3)(efield.field) * vector
+
+            gfield = fields.Field(
+                grid=efield.grid,
+                data=-efield.smu0*gvec,
+                frequency=efield.frequency
+            )
+
+            return self.model, gfield, None, self.solver_opts
 
         # Compute and return A^-1 * G * vector
         out = utils._process_map(
@@ -1079,58 +1108,47 @@ class Simulation:
 
         return self.data['jvec'].data
 
-    @utils._requires('discretize')
-    def _get_gvec_field(self, source, frequency, vector):
-        """TODO: Document and test."""
-
-        # Forward electric field
-        efield = self._dict_efield[source][frequency]
-
-        # Step2: compute G * vector = gvec (using discretize)
-        gvec = efield.grid.get_edge_inner_product_deriv(
-                np.ones(efield.grid.n_cells))(efield.field) * vector
-        # Extension to sig_x, sig_y, sig_z is trivial
-        # gvec = mesh.get_edge_inner_product_deriv(
-        #         np.ones(mesh.n_cells)*3)(efield.field) * vector
-
-        gvec_field = fields.Field(
-            grid=efield.grid,
-            data=-efield.smu0*gvec,
-            frequency=efield.frequency
-        )
-        return gvec_field
-
     def _jtvec(self, vector):
         r"""Compute the sensitivity transpose times a vector.
 
         If `vector`=residual, `jtvec` corresponds to the `gradient`.
 
-
         .. math::
             :label: jtvec
 
-            J^H v = G^H A^{-H} P^H v
+            J^H v = G^H A^{-H} P^H v \ ,
+
+        where :math:`v` has size of the data.
 
 
-        vector :math:`v` has size of the data.
+        Parameters
+        ----------
+        vector : ndarray
+            Shape of the data.
 
-           TODO: Document and test.
+
+        Returns
+        -------
+        jtvec : ndarray
+            Adjoint-state gradient (same shape as ``simulation.model``)
+            for the provided vector.
+
         """
+        # Note/TODO:
+        # The entire chain `gradient`->`_bcompute`->`_get_rfield` and also
+        # `_jtvec` could be re-factored much smarter.
 
-        # TODO: stupid workaround atm.
-        # Make self.gradient cleverer (accept other data than residual).
-
-        # Replace residual by vector if provided
-        old = self.survey.data['residual'].copy()
+        # Replace residual by vector if provided.
         self.survey.data['residual'][...] = vector
 
+        # Reset gradient, so it will be computed.
+        self._gradient = None
+
         # Get gradient with `v` as residual.
-        self._gradient = None  # Reset gradient
         jtvec = self.gradient
 
-        # Set back.
-        self._gradient = None
-        self.survey.data['residual'][...] = old
+        # Reset misfit, so residual would be computed again.
+        self._misfit = None
 
         return jtvec
 
