@@ -6,6 +6,16 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- ``electrodes``:
+
+  - Receivers have a new parameter ``data_type``; by default this is
+    ``complex``, but in addition there are new the (experimental) options
+    ``amplitude`` and ``phase``.
+
+
 v1.3.2: Bugfix CLI-select
 -------------------------
 
@@ -38,9 +48,6 @@ v1.3.0: File-based computations
     magnetic permeabilities in the vicinity of the source).
   - Both receivers (``Rx{Electric;Magnetic}Point``) can now produce their
     proper adjoint (thanks to @sgkang!).
-  - Receivers have a new parameter ``data_type``; by default this is
-    ``complex``, but in addition there are new the (experimental) options
-    ``amplitude`` and ``phase``.
 
 - Changes in Simulation and parallel execution.
 

@@ -1116,6 +1116,7 @@ class Simulation:
 
             # Apply chain rule to strength if data_type != complex.
             if self.survey._anyrec_non_complex:
+                strength[i] = rec.from_complex(strength[i])
                 rec.derivative_chain(strength[i], complx[i])
 
             # Get absolute coordinates as fct of source.
@@ -1203,8 +1204,6 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
-
-            # Store responses at receivers.
             gfield = self._load(out[i][0], 'efield')
             resp = self._get_responses(src, freq, gfield)
 
@@ -1212,6 +1211,7 @@ class Simulation:
             if self.survey._anyrec_non_complex:
                 complx = self.data.complex.loc[src, :, freq].data
                 for ii, rec in enumerate(self.survey.receivers.values()):
+                    resp[ii] = rec.from_complex(resp[ii])
                     rec.derivative_chain(resp[ii], complx[ii])
 
             self.data['jvec'].loc[src, :, freq] = resp

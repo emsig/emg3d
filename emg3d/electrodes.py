@@ -648,10 +648,10 @@ class Receiver(Wire):
         """Chain rule for data types other than complex."""
 
         if self.data_type == 'amplitude':  # Amp + 0j
-            data *= complex_data.conj()/abs(complex_data)
+            data *= np.real(complex_data.conj()/abs(complex_data))
 
         elif self.data_type == 'phase':    # Pha + 0j
-            data *= -1j*complex_data.conj()/abs(complex_data)**2
+            data *= np.real(-1j*complex_data.conj()/abs(complex_data)**2)
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
