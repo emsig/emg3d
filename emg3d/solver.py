@@ -496,10 +496,10 @@ def _solve(inp):
     """
 
     # Four parameters => solve.
-    file_driven = False
+    fname = False
     if isinstance(inp, str):
         from emg3d import io
-        file_driven = inp[:-3]+'_out'+'.h5'
+        fname = inp.rsplit('.', 1)[0] + '_out' + inp.rsplit('.', 1)[1]
         data = io.load(inp, verb=0)
         if 'sfield' in data:
             inp = (data['model'], data['sfield'],
@@ -542,9 +542,9 @@ def _solve(inp):
 
     # Return the result.
     efield, info = fct(**solver_input)
-    if file_driven:
-        io.save(file_driven, efield=efield, info=info, verb=0)
-        return file_driven, None
+    if fname:
+        io.save(fname, efield=efield, info=info, verb=0)
+        return fname
     else:
         return efield, info
 

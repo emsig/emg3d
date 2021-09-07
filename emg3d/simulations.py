@@ -695,7 +695,7 @@ class Simulation:
             # efield is None if not computed yet; otherwise it is the solution.
             efield = self._dict_efield[source][freq]
             if self._file_dir:
-                fname = f"{self._file_dir}{source}_{freq}.h5"
+                fname = f"{self._file_dir}efield_{source}_{freq}.h5"
                 io.save(fname, model=self.model, grid=grid, source=src,
                         frequency=frequency, efield=efield,
                         solver_opts=self.solver_opts, verb=0)
@@ -715,8 +715,8 @@ class Simulation:
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
 
-            if isinstance(out[i][0], str):
-                data = io.load(out[i][0], verb=0)
+            if self._file_dir:
+                data = io.load(out[i], verb=0)
                 out[i] = data['efield'], data['info']
 
             # Store efield and solver info.
@@ -987,7 +987,7 @@ class Simulation:
             # bfield is None unless it was explicitly set.
             bfield = self._dict_bfield[source][freq]
             if self._file_dir:
-                fname = f"{self._file_dir}{source}_{freq}.h5"
+                fname = f"{self._file_dir}bfield_{source}_{freq}.h5"
                 io.save(fname, model=self.model, sfield=rfield,
                         efield=bfield, solver_opts=self.solver_opts, verb=0)
                 return fname
@@ -1005,8 +1005,8 @@ class Simulation:
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
 
-            if isinstance(out[i][0], str):
-                data = io.load(out[i][0], verb=0)
+            if self._file_dir:
+                data = io.load(out[i], verb=0)
                 out[i] = data['efield'], data['info']
 
             # Store bfield and solver info.
@@ -1102,7 +1102,7 @@ class Simulation:
             )
 
             if self._file_dir:
-                fname = f"{self._file_dir}{source}_{frequency}.h5"
+                fname = f"{self._file_dir}gfield_{source}_{frequency}.h5"
                 io.save(fname, model=self.model, sfield=gfield,
                         efield=None, solver_opts=self.solver_opts, verb=0)
                 return fname
@@ -1125,8 +1125,8 @@ class Simulation:
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
 
-            if isinstance(out[i][0], str):
-                data = io.load(out[i][0], verb=0)
+            if self._file_dir:
+                data = io.load(out[i], verb=0)
                 gfield = data['efield'], data['info']
             else:
                 gfield = out[i][0]
