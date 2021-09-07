@@ -190,6 +190,7 @@ class Simulation:
         self.info = kwargs.pop('info', None)
         self.receiver_interpolation = kwargs.pop(
                 'receiver_interpolation', 'cubic')
+        self._file_dir = '/home/dtr/Desktop/test/'
 
         # Assemble solver_opts.
         self.solver_opts = {
@@ -693,7 +694,15 @@ class Simulation:
             frequency = self.survey.frequencies[freq]
             # efield is None if not computed yet; otherwise it is the solution.
             efield = self._dict_efield[source][freq]
-            return self.model, grid, src, frequency, efield, self.solver_opts
+            if self._file_dir:
+                fname = f"{self._file_dir}{source}_{freq}.h5"
+                io.save(fname, model=self.model, grid=grid, source=src,
+                        frequency=frequency, efield=efield,
+                        solver_opts=self.solver_opts, verb=0)
+                return fname
+            else:
+                return (self.model, grid, src, frequency, efield,
+                        self.solver_opts)
 
         # Use process_map to compute fields in parallel.
         out = utils._process_map(
@@ -705,6 +714,10 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
+
+            if isinstance(out[i][0], str):
+                data = io.load(out[i][0], verb=0)
+                out[i] = data['efield'], data['info']
 
             # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
@@ -973,7 +986,13 @@ class Simulation:
             rfield = self._get_rfield(source, freq)
             # bfield is None unless it was explicitly set.
             bfield = self._dict_bfield[source][freq]
-            return self.model, rfield, bfield, self.solver_opts
+            if self._file_dir:
+                fname = f"{self._file_dir}{source}_{freq}.h5"
+                io.save(fname, model=self.model, sfield=rfield,
+                        efield=bfield, solver_opts=self.solver_opts, verb=0)
+                return fname
+            else:
+                return self.model, rfield, bfield, self.solver_opts
 
         # Use process_map to compute fields in parallel.
         out = utils._process_map(
@@ -985,6 +1004,10 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
+
+            if isinstance(out[i][0], str):
+                data = io.load(out[i][0], verb=0)
+                out[i] = data['efield'], data['info']
 
             # Store bfield and solver info.
             self._dict_bfield[src][freq] = out[i][0]
@@ -1078,7 +1101,13 @@ class Simulation:
                 frequency=efield.frequency
             )
 
-            return self.model, gfield, None, self.solver_opts
+            if self._file_dir:
+                fname = f"{self._file_dir}{source}_{frequency}.h5"
+                io.save(fname, model=self.model, sfield=gfield,
+                        efield=None, solver_opts=self.solver_opts, verb=0)
+                return fname
+            else:
+                return self.model, gfield, None, self.solver_opts
 
         # Compute and return A^-1 * G * vector
         out = utils._process_map(
@@ -1096,8 +1125,14 @@ class Simulation:
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
 
+            if isinstance(out[i][0], str):
+                data = io.load(out[i][0], verb=0)
+                gfield = data['efield'], data['info']
+            else:
+                gfield = out[i][0]
+
             # Store responses at receivers.
-            resp = self._get_responses(src, freq, out[i][0])
+            resp = self._get_responses(src, freq, gfield)
             self.data['jvec'].loc[src, :, freq] = resp
 
         return self.data['jvec'].data

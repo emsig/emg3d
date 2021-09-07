@@ -496,6 +496,18 @@ def _solve(inp):
     """
 
     # Four parameters => solve.
+    file_driven = False
+    if isinstance(inp, str):
+        from emg3d import io
+        file_driven = inp[:-3]+'_out'+'.h5'
+        data = io.load(inp, verb=0)
+        if 'sfield' in data:
+            inp = (data['model'], data['sfield'],
+                   data['efield'], data['solver_opts'])
+        else:
+            inp = (data['model'], data['grid'], data['source'],
+                   data['frequency'], data['efield'], data['solver_opts'])
+
     if len(inp) == 4:
 
         # Get input and initiate solver dict.
@@ -529,7 +541,12 @@ def _solve(inp):
     solver_input['always_return'] = True
 
     # Return the result.
-    return fct(**solver_input)
+    efield, info = fct(**solver_input)
+    if file_driven:
+        io.save(file_driven, efield=efield, info=info, verb=0)
+        return file_driven, None
+    else:
+        return efield, info
 
 
 # SOLVERS
