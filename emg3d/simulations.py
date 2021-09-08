@@ -21,8 +21,10 @@ a high-level, specialised modelling tool for the end user.
 # License for the specific language governing permissions and limitations under
 # the License.
 
+import os
 import warnings
 import itertools
+from pathlib import Path
 from copy import deepcopy
 
 import numpy as np
@@ -164,6 +166,21 @@ class Simulation:
         proper adjoint for the gradient the receiver has to be interpolated
         linearly too.
 
+    file_dir : str, default: None
+        Absolute or relative path, where temporary files should be stored. By
+        default, everything is done in memory. However, for large models with
+        many sources and frequencies this can become memory consuming.
+        Providing a ``file_dir`` can help with this. Fields and models are then
+        stored to disk, and each process accesses the files it needs. There is
+        only a gain if there are more source-frequency pairs than concurrent
+        running processes.
+
+        Note that the directory is created if it does not exist. However, the
+        parent directory must exist.
+
+        Also note that the files are stored as .h5-files, and you need to have
+        ``h5py`` installed to use this feature.
+
     """
 
     # Gridding descriptions (for repr's).
@@ -190,7 +207,6 @@ class Simulation:
         self.info = kwargs.pop('info', None)
         self.receiver_interpolation = kwargs.pop(
                 'receiver_interpolation', 'cubic')
-        self._file_dir = '/home/dtr/Desktop/test/'
 
         # Assemble solver_opts.
         self.solver_opts = {
@@ -207,6 +223,13 @@ class Simulation:
         self._gradient = None
         self._misfit = None
 
+        # Initiate file_dir
+        self.file_dir = kwargs.pop('file_dir', None)
+        if self.file_dir:
+            self.file_dir = os.path.abspath(self.file_dir)
+            # Create directory if it doesn't exist yet.
+            Path(self.file_dir).mkdir(exist_ok=True)
+
         # Get model taking gridding_opts into account.
         # Sets self.model and self.gridding_opts.
         self._set_model(model, kwargs)
@@ -219,10 +242,11 @@ class Simulation:
         # `tqdm`-options; undocumented.
         # Can be used to, e.g., disable tqdm completely via:
         # > emg3d.Simulation(args, kwargs, tqdm_opts={'disable': True})
-        self._tqdm_opts = kwargs.pop(
-                'tqdm_opts',
-                {'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]'}
-        )
+        tqdm_opts = kwargs.pop('tqdm_opts', {})
+        self._tqdm_opts = {
+            **tqdm_opts,
+            **{'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]'},
+        }
 
         # Ensure no kwargs left.
         if kwargs:
@@ -307,6 +331,11 @@ class Simulation:
                 if hasattr(self, name):
                     delattr(self, name)
 
+            # Remove files if they exist.
+            if self.file_dir:
+                for p in Path(self.file_dir).glob('[ebg]field_*.h5'):
+                    p.unlink()
+
         # Clean data.
         if what in ['computed', 'all']:
             for key in ['residual', 'weight']:
@@ -353,6 +382,9 @@ class Simulation:
             'verb': self.verb,
             'name': self.name,
             'info': self.info,
+            'tqdm_opts': self._tqdm_opts,
+            'receiver_interpolation': self.receiver_interpolation,
+            'file_dir': self.file_dir,
             '_input_sc2': self._input_sc2,
         }
 
@@ -413,6 +445,10 @@ class Simulation:
         input_sc2 = inp.pop('_input_sc2', False)
         if input_sc2:
             cls_inp['_input_sc2'] = input_sc2
+        cls_inp['receiver_interpolation'] = inp.pop(
+                'receiver_interpolation', 'cubic')
+        cls_inp['file_dir'] = inp.pop('file_dir', None)
+        cls_inp['tqdm_opts'] = inp.pop('tqdm_opts', {})
 
         # Instantiate the class.
         out = cls(**cls_inp)
@@ -456,7 +492,8 @@ class Simulation:
             - '``results'``:
               Stores only the response at receiver locations.
             - ``'all'``:
-              Stores everything.
+              Stores everything. Note that if ``file_dir`` is set, these files
+              will remain there.
             - ``'plain'``:
               Only stores the plain Simulation (as initiated).
 
@@ -600,28 +637,36 @@ class Simulation:
         freq = self._freq_inp2key(frequency)
 
         # If it doesn't exist yet, compute it.
-        if self._dict_efield[source][freq] is None:
+        if self._get('efield', source, freq) is None:
             self.compute(source=source, frequency=freq)
 
-        return self._dict_efield[source][freq]
+        return self._get('efield', source, freq)
 
     def get_hfield(self, source, frequency):
         """Return magnetic field for given source and frequency."""
         freq = self._freq_inp2key(frequency)
 
         # If electric field not computed yet compute it.
-        if self._dict_efield[source][freq] is None:
+        if self._get('efield', source, freq) is None:
             self.compute(source=source, frequency=freq)
 
         # Return magnetic field.
         return fields.get_magnetic_field(
             self.get_model(source, freq),
-            self._dict_efield[source][freq],
+            self._get('efield', source, freq),
         )
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
-        return self._dict_efield_info[source][self._freq_inp2key(frequency)]
+        return self._get('efield_info', source, self._freq_inp2key(frequency))
+
+    def _get(self, what, source, frequency):
+        """Return what for given source and frequency from dict or file."""
+        value = getattr(self, f"_dict_{what}")[source][frequency]
+        if self.file_dir and value is not None:
+            return io.load(value, verb=0)[['efield', 'info']['info' in what]]
+        else:
+            return value
 
     def _get_responses(self, source, frequency, efield=None):
         """Return electric and magnetic fields at receiver locations."""
@@ -635,7 +680,7 @@ class Simulation:
 
         # efield of this source/frequency if not provided.
         if efield is None:
-            efield = self._dict_efield[source][frequency]
+            efield = self._get('efield', source, frequency)
 
         if erec.size:
 
@@ -693,9 +738,10 @@ class Simulation:
             src = self.survey.sources[source]
             frequency = self.survey.frequencies[freq]
             # efield is None if not computed yet; otherwise it is the solution.
-            efield = self._dict_efield[source][freq]
-            if self._file_dir:
-                fname = f"{self._file_dir}efield_{source}_{freq}.h5"
+            efield = self._get('efield', source, freq)
+            if self.file_dir:
+                fname = os.path.join(
+                            self.file_dir, f"efield_{source}_{freq}.h5")
                 io.save(fname, model=self.model, grid=grid, source=src,
                         frequency=frequency, efield=efield,
                         solver_opts=self.solver_opts, verb=0)
@@ -714,10 +760,6 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
-
-            if self._file_dir:
-                data = io.load(out[i], verb=0)
-                out[i] = data['efield'], data['info']
 
             # Store efield and solver info.
             self._dict_efield[src][freq] = out[i][0]
@@ -833,8 +875,8 @@ class Simulation:
                 # This is the actual Equation (10), with:
                 #   del S / del p = iwu0 V sigma / sigma,
                 # where lambda and E are already volume averaged.
-                efield = self._dict_efield[src][freq]  # Forward electric field
-                bfield = self._dict_bfield[src][freq]  # Conj. backprop. field
+                efield = self._get('efield', src, freq)  # Fwd electric field
+                bfield = self._get('bfield', src, freq)  # Conj. bckprop. field
                 gfield = fields.Field(
                     grid=efield.grid,
                     data=-np.real(bfield.field * efield.smu0 * efield.field),
@@ -985,9 +1027,10 @@ class Simulation:
             source, freq = inp
             rfield = self._get_rfield(source, freq)
             # bfield is None unless it was explicitly set.
-            bfield = self._dict_bfield[source][freq]
-            if self._file_dir:
-                fname = f"{self._file_dir}bfield_{source}_{freq}.h5"
+            bfield = self._get('bfield', source, freq)
+            if self.file_dir:
+                fname = os.path.join(
+                            self.file_dir, f"bfield_{source}_{freq}.h5")
                 io.save(fname, model=self.model, sfield=rfield,
                         efield=bfield, solver_opts=self.solver_opts, verb=0)
                 return fname
@@ -1004,10 +1047,6 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
-
-            if self._file_dir:
-                data = io.load(out[i], verb=0)
-                out[i] = data['efield'], data['info']
 
             # Store bfield and solver info.
             self._dict_bfield[src][freq] = out[i][0]
@@ -1082,10 +1121,10 @@ class Simulation:
         # Create iterable from src/freq-list to call the process_map.
         def collect_gfield_inputs(inp, vector=vector):
             """Collect inputs."""
-            source, frequency = inp
+            source, freq = inp
 
             # Forward electric field
-            efield = self._dict_efield[source][frequency]
+            efield = self._get('efield', source, freq)
 
             # Compute gvec = G * vector (using discretize)
             gvec = efield.grid.get_edge_inner_product_deriv(
@@ -1101,8 +1140,9 @@ class Simulation:
                 frequency=efield.frequency
             )
 
-            if self._file_dir:
-                fname = f"{self._file_dir}gfield_{source}_{frequency}.h5"
+            if self.file_dir:
+                fname = os.path.join(
+                            self.file_dir, f"gfield_{source}_{freq}.h5")
                 io.save(fname, model=self.model, sfield=gfield,
                         efield=None, solver_opts=self.solver_opts, verb=0)
                 return fname
@@ -1125,9 +1165,8 @@ class Simulation:
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
 
-            if self._file_dir:
-                data = io.load(out[i], verb=0)
-                gfield = data['efield'], data['info']
+            if self.file_dir:
+                gfield = io.load(out[i][0], verb=0)['efield']
             else:
                 gfield = out[i][0]
 
@@ -1295,12 +1334,11 @@ class Simulation:
             return
 
         # Get info dict.
-        info = getattr(self, f"_dict_{field}_info", {})
         out = ""
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
-            cinfo = info[src][freq]
+            cinfo = self._get(f"{field}_info", src, freq)
 
             # Print if verbose or not converged.
             if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):

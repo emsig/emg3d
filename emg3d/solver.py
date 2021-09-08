@@ -499,7 +499,7 @@ def _solve(inp):
     fname = False
     if isinstance(inp, str):
         from emg3d import io
-        fname = inp.rsplit('.', 1)[0] + '_out' + inp.rsplit('.', 1)[1]
+        fname = inp.rsplit('.', 1)[0] + '_out.' + inp.rsplit('.', 1)[1]
         data = io.load(inp, verb=0)
         if 'sfield' in data:
             inp = (data['model'], data['sfield'],
@@ -544,7 +544,7 @@ def _solve(inp):
     efield, info = fct(**solver_input)
     if fname:
         io.save(fname, efield=efield, info=info, verb=0)
-        return fname
+        return fname, fname
     else:
         return efield, info
 
