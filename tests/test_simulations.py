@@ -1,3 +1,4 @@
+import os
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
@@ -17,6 +18,10 @@ try:
     import discretize
 except ImportError:
     discretize = None
+try:
+    import h5py
+except ImportError:
+    h5py = False
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -658,6 +663,7 @@ class TestGradient:
         assert nrmsd < 0.3
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
     def test_adjoint(self, tmpdir):
 
         sim = simulations.Simulation(
@@ -672,6 +678,7 @@ class TestGradient:
         assert abs(wtJv - vtJtw) < 1e-10
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
     def test_misfit(self, tmpdir):
 
         sim = simulations.Simulation(
@@ -685,6 +692,10 @@ class TestGradient:
         def func1(x):
             sim.model.property_x[...] = x.reshape(sim.model.grid.shape_cells)
             sim.clean('computed')
+
+            # Quick test that clean() removes the files
+            assert len(os.listdir(tmpdir)) == 0
+
             sim.compute()
             return sim.data.synthetic.data, func2
 
