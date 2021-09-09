@@ -241,6 +241,7 @@ class TestParser:
             f.write("max_workers=5\n")
             f.write("gridding=fancything\n")
             f.write("name=PyTest simulation\n")
+            f.write("file_dir=here\n")
             f.write("min_offset=1320")
 
         args_dict = self.args_dict.copy()
@@ -251,6 +252,7 @@ class TestParser:
         assert sim_opts['gridding'] == 'fancything'
         assert sim_opts['name'] == "PyTest simulation"
         assert sim_opts['min_offset'] == 1320.0
+        assert sim_opts['file_dir'] == 'here'
         with pytest.raises(KeyError, match="receiver_interpolation"):
             assert sim_opts['receiver_interpolation'] == 'linear'
 
