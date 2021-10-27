@@ -263,27 +263,26 @@ def test_solve_source():
 
 
 def test__solve():
-    # len(inp) == 4
+    # Has keys [model, sfield, efield, solver_opts]
     dat = REGRES['res']
-
-    model = emg3d.Model(**dat['input_model'])
-    sfield = emg3d.get_source_field(**dat['input_source'])
-    efield, info = solver._solve((model, sfield, None, {'plain': True}))
+    inp = {'model': emg3d.Model(**dat['input_model']),
+           'sfield': emg3d.get_source_field(**dat['input_source']),
+           'efield': None,
+           'solver_opts': {'plain': True}}
+    efield, info = solver._solve(inp)
     assert_allclose(dat['Fresult'].field, efield.field)
 
-    # len(inp) == 6
+    # Has keys [model, grid, source, frequency, efield, solver_opts]
     dat = REGRES['res']
-    model = emg3d.Model(**dat['input_model'])
-
-    efield, info = solver._solve(
-        (model, model.grid, dat['input_source']['source'],
-            dat['input_source']['frequency'], None, {'plain': True}))
-
+    model = model = emg3d.Model(**dat['input_model'])
+    inp = {'model': model,
+           'grid': model.grid,
+           'source': dat['input_source']['source'],
+           'frequency': dat['input_source']['frequency'],
+           'efield': None,
+           'solver_opts': {'plain': True}}
+    efield, info = solver._solve(inp)
     assert_allclose(dat['Fresult'].field, efield.field)
-
-    # Wrong input.
-    with pytest.raises(NotImplementedError, match='must be of length'):
-        solver._solve((1, 2))
 
 
 class TestMultigrid:

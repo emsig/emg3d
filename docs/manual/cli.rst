@@ -55,6 +55,8 @@ remove the comment signs to use them.
   # gridding = single
   # min_offset = 0.0   # Only relevant if `observed=True` (r<r_min set to NaN).
   # name = MyTestSimulation
+  # file_dir = None    # For file-based comp; absolute or relative path.
+  # receiver_interpolation = cubic  # Set it to <linear> for the gradient.
 
   # Solver options
   # --------------
@@ -69,7 +71,7 @@ remove the comment signs to use them.
   # sslsolver =            # bool
   # semicoarsening =       # bool
   # linerelaxation =       # bool
-  # cycl =                 # string
+  # cycle =                # string
   # tol =                  # float
   # verb =                 # int
   # maxit =                # int
@@ -97,6 +99,7 @@ remove the comment signs to use them.
   # min_width_pps =       # list, e.g.: 5, 3, 3
   # expand =              # list, e.g.: 0.3, 1e8
   # domain =              # list of lists, e.g.: -10000, 10000; None; None
+  # distance =            # list of lists, e.g., None; None; -10000, 10000
   # stretching =          # list of lists, e.g.: None; None; 1.05, 1.5
   # min_width_limits =    # list of lists, e.g.: 10, 100; None; 50
   # mapping =             # string, e.g.: Resistivity

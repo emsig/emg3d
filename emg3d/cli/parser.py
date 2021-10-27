@@ -188,6 +188,11 @@ def parse_config_file(args_dict):
         _ = all_sim.pop(key)
         simulation[key] = cfg.getfloat('simulation', key)
 
+    key = 'file_dir'
+    if cfg.has_option('simulation', key):
+        _ = all_sim.pop(key)
+        simulation[key] = cfg.get('simulation', key)
+
     key = 'receiver_interpolation'
     if cfg.has_option('simulation', key):
         _ = all_sim.pop(key)
