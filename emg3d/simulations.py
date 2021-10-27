@@ -637,38 +637,43 @@ class Simulation:
         freq = self._freq_inp2key(frequency)
 
         # If it doesn't exist yet, compute it.
-        if self._get('efield', source, freq) is None:
+        if self._dict_get('efield', source, freq) is None:
             self.compute(source=source, frequency=freq)
 
-        return self._get('efield', source, freq)
+        return self._dict_get('efield', source, freq)
 
     def get_hfield(self, source, frequency):
         """Return magnetic field for given source and frequency."""
         freq = self._freq_inp2key(frequency)
 
         # If electric field not computed yet compute it.
-        if self._get('efield', source, freq) is None:
+        if self._dict_get('efield', source, freq) is None:
             self.compute(source=source, frequency=freq)
 
         # Return magnetic field.
         return fields.get_magnetic_field(
             self.get_model(source, freq),
-            self._get('efield', source, freq),
+            self._dict_get('efield', source, freq),
         )
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
-        return self._get('efield_info', source, self._freq_inp2key(frequency))
+        freq = self._freq_inp2key(frequency)
+        return self._dict_get('efield_info', source, freq)
 
-    def _get(self, what, source, frequency):
-        """Return `what` for given source and frequency from dict or file.
+    def _dict_get(self, which, source, frequency):
+        """Return source-frequency pair from dictionary `which`.
 
-        `what` can be anything for which a ``self._dict_{what}`` exists.
-
+        Thin wrapper for ``self._dict_{which}[{source}][{frequency}]``, that
+        works as well for file-based computations.
         """
-        value = getattr(self, f"_dict_{what}")[source][frequency]
+        value = getattr(self, f"_dict_{which}")[source][frequency]
+        return self._load(value, ['efield', 'info']['info' in which])
+
+    def _load(self, value, what):
+        """Returns `value` (memory) or loads `value[what]` (files)."""
         if self.file_dir and value is not None:
-            return io.load(value, verb=0)[['efield', 'info']['info' in what]]
+            return io.load(value, verb=0)[what]
         else:
             return value
 
@@ -694,7 +699,7 @@ class Simulation:
 
         # efield of this source/frequency if not provided.
         if efield is None:
-            efield = self._get('efield', source, frequency)
+            efield = self._dict_get('efield', source, frequency)
 
         if erec.size:
 
@@ -755,7 +760,7 @@ class Simulation:
                 'source': self.survey.sources[source],
                 'frequency': self.survey.frequencies[freq],
                 # efield is None if not comp. yet; else it is the solution.
-                'efield': self._get('efield', source, freq),
+                'efield': self._dict_get('efield', source, freq),
                 'solver_opts': self.solver_opts,
             }
             return self._data_or_file('efield', source, freq, data)
@@ -885,8 +890,8 @@ class Simulation:
                 # This is the actual Equation (10), with:
                 #   del S / del p = iwu0 V sigma / sigma,
                 # where lambda and E are already volume averaged.
-                efield = self._get('efield', src, freq)  # Fwd electric field
-                bfield = self._get('bfield', src, freq)  # Conj. bckprop. field
+                efield = self._dict_get('efield', src, freq)
+                bfield = self._dict_get('bfield', src, freq)
                 gfield = fields.Field(
                     grid=efield.grid,
                     data=-np.real(bfield.field * efield.smu0 * efield.field),
@@ -1040,7 +1045,7 @@ class Simulation:
                 'model': self.model,
                 'sfield': self._get_rfield(source, freq),
                 # bfield is None unless it was explicitly set.
-                'efield': self._get('bfield', source, freq),
+                'efield': self._dict_get('bfield', source, freq),
                 'solver_opts': self.solver_opts
             }
             return self._data_or_file('bfield', source, freq, data)
@@ -1132,7 +1137,7 @@ class Simulation:
             source, freq = inp
 
             # Forward electric field
-            efield = self._get('efield', source, freq)
+            efield = self._dict_get('efield', source, freq)
 
             # Compute gvec = G * vector (using discretize)
             gvec = efield.grid.get_edge_inner_product_deriv(
@@ -1171,13 +1176,7 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
-
-            if self.file_dir:
-                gfield = io.load(out[i][0], verb=0)['efield']
-            else:
-                gfield = out[i][0]
-
-            # Store responses at receivers.
+            gfield = self._load(out[i][0], 'efield')
             resp = self._get_responses(src, freq, gfield)
             self.data['jvec'].loc[src, :, freq] = resp
 
@@ -1345,7 +1344,7 @@ class Simulation:
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
-            cinfo = self._get(f"{field}_info", src, freq)
+            cinfo = self._dict_get(f"{field}_info", src, freq)
 
             # Print if verbose or not converged.
             if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
