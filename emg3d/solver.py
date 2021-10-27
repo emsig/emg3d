@@ -468,11 +468,11 @@ def _solve(inp):
 
     Parameters
     ----------
-    inp : tuple, str
-        If tuple, two formats are recognized:
-        - ``(model, sfield, efield, solver_opts)``:
+    inp : dict, str
+        If dict, two formats are recognized:
+        - Has keys [model, sfield, efield, solver_opts]:
           Forwarded to `solve`.
-        - ``(model, grid, source, frequency, efield, solver_opts)``:
+        - Has keys [model, grid, source, frequency, efield, solver_opts]
           Forwarded to `solve_source`.
 
         Consult the corresponding function for details on the input parameters.
@@ -503,38 +503,34 @@ def _solve(inp):
     if isinstance(inp, str):
         from emg3d import io
         fname = inp.rsplit('.', 1)[0] + '_out.' + inp.rsplit('.', 1)[1]
-        data = io.load(inp, verb=0)
-        inp = tuple([data[n] for n in data['names']])
+        inp = io.load(inp, verb=0)['data']
 
-    if len(inp) == 4:
+    # Has keys [model, sfield, efield, solver_opts]
+    if 'sfield' in inp.keys():
 
         # Get input and initiate solver dict.
-        model, sfield, efield, solver_opts = inp
-        solver_input = {**solver_opts, 'sfield': sfield}
-        grid = sfield.grid
+        solver_input = {**inp['solver_opts'], 'sfield': inp['sfield']}
+        inp['grid'] = inp['sfield'].grid
 
         # Function to compute.
         fct = solve
 
-    # Six parameters => solve_source.
-    elif len(inp) == 6:
+    # Has keys [model, grid, source, frequency, efield, solver_opts]
+    else:
 
         # Get input and initiate solver dict.
-        model, grid, source, freq, efield, solver_opts = inp
-        solver_input = {**solver_opts, 'source': source, 'frequency': freq}
+        solver_input = {**inp['solver_opts'], 'source': inp['source'],
+                        'frequency': inp['frequency']}
 
         # Function to compute.
         fct = solve_source
 
-    else:
-        raise NotImplementedError('Input-tuple must be of length 4 or 6.')
-
     # Interpolate model to source grid (if different).
-    model = model.interpolate_to_grid(grid)
+    model = inp['model'].interpolate_to_grid(inp['grid'])
 
     # Add general parameters to input dict.
     solver_input['model'] = model
-    solver_input['efield'] = efield
+    solver_input['efield'] = inp['efield']
     solver_input['return_info'] = True
     solver_input['always_return'] = True
 

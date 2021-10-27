@@ -677,15 +677,7 @@ class Simulation:
         if self.file_dir:
             fname = os.path.join(
                 self.file_dir, f"{what}_{source}_{frequency}.h5")
-
-            if len(data) == 4:
-                pnames = ['sfield', 'efield']
-            else:
-                pnames = ['grid', 'source', 'frequency', 'efield']
-            names = ['model', *pnames, 'solver_opts']
-
-            io.save(fname, verb=0, names=names, **dict(zip(names, data)))
-
+            io.save(fname, data=data, verb=0)
             return fname
         else:
             return data
@@ -757,15 +749,15 @@ class Simulation:
             """Collect inputs."""
             source, freq = inp
 
-            data = (  # (model, grid, source, frequency, efield, solver_opts)
-                self.model,
-                self.get_grid(source, freq),
-                self.survey.sources[source],
-                self.survey.frequencies[freq],
+            data = {
+                'model': self.model,
+                'grid': self.get_grid(source, freq),
+                'source': self.survey.sources[source],
+                'frequency': self.survey.frequencies[freq],
                 # efield is None if not comp. yet; else it is the solution.
-                self._get('efield', source, freq),
-                self.solver_opts,
-            )
+                'efield': self._get('efield', source, freq),
+                'solver_opts': self.solver_opts,
+            }
             return self._data_or_file('efield', source, freq, data)
 
         # Use process_map to compute fields in parallel.
@@ -1044,13 +1036,13 @@ class Simulation:
             """Collect inputs."""
             source, freq = inp
 
-            data = (  # (model, sfield, efield, solver_opts)
-                self.model,
-                self._get_rfield(source, freq),
+            data = {
+                'model': self.model,
+                'sfield': self._get_rfield(source, freq),
                 # bfield is None unless it was explicitly set.
-                self._get('bfield', source, freq),
-                self.solver_opts
-            )
+                'efield': self._get('bfield', source, freq),
+                'solver_opts': self.solver_opts
+            }
             return self._data_or_file('bfield', source, freq, data)
 
         # Use process_map to compute fields in parallel.
@@ -1156,8 +1148,12 @@ class Simulation:
                 frequency=efield.frequency
             )
 
-            # (model, sfield, efield, solver_opts)
-            data = (self.model, gfield, None, self.solver_opts)
+            data = {
+                'model': self.model,
+                'sfield': gfield,
+                'efield': None,
+                'solver_opts': self.solver_opts,
+            }
             return self._data_or_file('gfield', source, freq, data)
 
         # Compute and return A^-1 * G * vector
