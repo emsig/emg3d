@@ -6,23 +6,30 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.3.0: File-based computations
+-------------------------------
+
+**2021-10-27**
 
 - ``electrodes``:
 
   - New source ``TxMagneticPoint`` (requires ``discretize``; mainly used as
     adjoint source for magnetic receivers; does not work in the presence of
-    magnetic permeabilities in the vincinity of the source).
+    magnetic permeabilities in the vicinity of the source).
   - Both receivers (``Rx{Electric;Magnetic}Point``) can now produce their
     proper adjoint (thanks to @sgkang!).
 
 - Changes in Simulation and parallel execution.
 
   - Parallel computation is not sharing the simulation any longer.
-  - ``get_model`` and ``get_hfield`` are now done on the fly, not stored in a
-    dict anymore (``simulation._dict_model`` and ``simulation._dict_hfield``
-    do not exist any longer).
+  - Parallel computation can new be done both file-based or all in memory.
+    The new possibility for file-based computation should make it possible
+    to compute responses for any amount of source-frequency pairs. See
+    parameter ``file_dir`` in the Simulation class (or corresponding parameter
+    in the CLI parameter file).
+  - ``get_model`` and ``get_hfield`` are now done on the fly, they are not
+    stored in a dict; ``simulation._dict_model`` and
+    ``simulation._dict_hfield`` do not exist any longer.
   - New methods ``jvec`` (sensitivity times a vector) and ``jtvec``
     (sensitivity transpose times a vector). These methods are currently
     experimental; documentation and examples are lacking behind.
