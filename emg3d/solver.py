@@ -468,14 +468,17 @@ def _solve(inp):
 
     Parameters
     ----------
-    inp : tuple
-        Two formats are recognized:
+    inp : tuple, str
+        If tuple, two formats are recognized:
         - ``(model, sfield, efield, solver_opts)``:
           Forwarded to `solve`.
         - ``(model, grid, source, frequency, efield, solver_opts)``:
           Forwarded to `solve_source`.
 
         Consult the corresponding function for details on the input parameters.
+
+        Alternatively the path to the h5-file can be provided as a string
+        (file-based computation).
 
         The ``model`` is interpolated to the grid of the source field (tuple of
         length 4) or to the provided grid (tuple of length 6). Hence, the model

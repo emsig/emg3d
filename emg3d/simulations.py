@@ -661,12 +661,26 @@ class Simulation:
         return self._get('efield_info', source, self._freq_inp2key(frequency))
 
     def _get(self, what, source, frequency):
-        """Return what for given source and frequency from dict or file."""
+        """Return `what` for given source and frequency from dict or file.
+
+        `what` can be anything for which a ``self._dict_{what}`` exists.
+
+        """
         value = getattr(self, f"_dict_{what}")[source][frequency]
         if self.file_dir and value is not None:
             return io.load(value, verb=0)[['efield', 'info']['info' in what]]
         else:
             return value
+
+    def _set_pm_input(self, what, source, frequency, data):
+        """Set process_map input for given what, source, and frequency."""
+        if self.file_dir:
+            fname = os.path.join(
+                self.file_dir, f"{what}_{source}_{frequency}.h5")
+            io.save(fname, **data, verb=0)
+            return fname
+        else:
+            return tuple(data.values())
 
     def _get_responses(self, source, frequency, efield=None):
         """Return electric and magnetic fields at receiver locations."""
@@ -734,21 +748,18 @@ class Simulation:
         def collect_efield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
-            grid = self.get_grid(source, freq)
-            src = self.survey.sources[source]
-            frequency = self.survey.frequencies[freq]
-            # efield is None if not computed yet; otherwise it is the solution.
-            efield = self._get('efield', source, freq)
-            if self.file_dir:
-                fname = os.path.join(
-                            self.file_dir, f"efield_{source}_{freq}.h5")
-                io.save(fname, model=self.model, grid=grid, source=src,
-                        frequency=frequency, efield=efield,
-                        solver_opts=self.solver_opts, verb=0)
-                return fname
-            else:
-                return (self.model, grid, src, frequency, efield,
-                        self.solver_opts)
+
+            data = {
+                'model': self.model,
+                'grid': self.get_grid(source, freq),
+                'source': self.survey.sources[source],
+                'frequency': self.survey.frequencies[freq],
+                # efield is None if not comp. yet; else it is the solution.
+                'efield': self._get('efield', source, freq),
+                'solver_opts': self.solver_opts
+            }
+
+            return self._set_pm_input('efield', source, freq, data)
 
         # Use process_map to compute fields in parallel.
         out = utils._process_map(
@@ -1025,17 +1036,16 @@ class Simulation:
         def collect_bfield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
-            rfield = self._get_rfield(source, freq)
-            # bfield is None unless it was explicitly set.
-            bfield = self._get('bfield', source, freq)
-            if self.file_dir:
-                fname = os.path.join(
-                            self.file_dir, f"bfield_{source}_{freq}.h5")
-                io.save(fname, model=self.model, sfield=rfield,
-                        efield=bfield, solver_opts=self.solver_opts, verb=0)
-                return fname
-            else:
-                return self.model, rfield, bfield, self.solver_opts
+
+            data = {
+                'model': self.model,
+                'sfield': self._get_rfield(source, freq),
+                # bfield is None unless it was explicitly set.
+                'efield': self._get('bfield', source, freq),
+                'solver_opts': self.solver_opts
+            }
+
+            return self._set_pm_input('bfield', source, freq, data)
 
         # Use process_map to compute fields in parallel.
         out = utils._process_map(
@@ -1140,14 +1150,14 @@ class Simulation:
                 frequency=efield.frequency
             )
 
-            if self.file_dir:
-                fname = os.path.join(
-                            self.file_dir, f"gfield_{source}_{freq}.h5")
-                io.save(fname, model=self.model, sfield=gfield,
-                        efield=None, solver_opts=self.solver_opts, verb=0)
-                return fname
-            else:
-                return self.model, gfield, None, self.solver_opts
+            data = {
+                'model': self.model,
+                'sfield': gfield,
+                'efield': None,
+                'solver_opts': self.solver_opts
+            }
+
+            return self._set_pm_input('gfield', source, freq, data)
 
         # Compute and return A^-1 * G * vector
         out = utils._process_map(
