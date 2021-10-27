@@ -504,12 +504,7 @@ def _solve(inp):
         from emg3d import io
         fname = inp.rsplit('.', 1)[0] + '_out.' + inp.rsplit('.', 1)[1]
         data = io.load(inp, verb=0)
-        if 'sfield' in data:
-            inp = (data['model'], data['sfield'],
-                   data['efield'], data['solver_opts'])
-        else:
-            inp = (data['model'], data['grid'], data['source'],
-                   data['frequency'], data['efield'], data['solver_opts'])
+        inp = tuple([data[n] for n in data['names']])
 
     if len(inp) == 4:
 
