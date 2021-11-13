@@ -309,7 +309,8 @@ class Survey:
         """Data, a :class:`xarray.Dataset` instance."""
         return self._data
 
-    def select(self, sources=None, receivers=None, frequencies=None):
+    def select(self, sources=None, receivers=None, frequencies=None,
+               remove_empty=True):
         """Return a Survey with selected sources, receivers, and frequencies.
 
 
@@ -318,6 +319,11 @@ class Survey:
         sources, receivers, frequencies : list, default: None
             Lists containing the wanted sources, receivers, and frequencies.
             If None, all are selected.
+
+        remove_empty : bool, default: True
+            If True, and self.data.observed has finite entries, it removes
+            empty source-receiver-frequency entries and according sources,
+            receivers, and frequencies.
 
 
         Returns
@@ -358,8 +364,36 @@ class Survey:
         for key in survey['data'].keys():
             survey['data'][key] = self.data[key].sel(**selection)
 
-        # Return new, reduced survey.
-        return Survey.from_dict(survey)
+            # Check if there are any finite observed data.
+            if remove_empty and key == 'observed':
+                data = survey['data'][key].data
+                remove_empty = np.isfinite(data).any()
+
+        # Create new, reduced survey.
+        red_survey = Survey.from_dict(survey)
+
+        # Remove empty source-receiver-frequency pairs.
+        if remove_empty:
+
+            def get_names(name, i0, i1, i2):
+                """Return non-NaN names."""
+                ibool = np.isnan(data).all(axis=(i1, i2))
+                ind = np.arange(data.shape[i0])[~ibool]
+                keys = survey[name].keys()
+                return [n for i, n in enumerate(keys) if i in ind]
+
+            # Get names.
+            srcnames = get_names('sources', 0, 1, 2)
+            recnames = get_names('receivers', 1, 0, 2)
+            freqnames = get_names('frequencies', 2, 0, 1)
+
+            # Use recursion to remove empty pairs.
+            red_survey = red_survey.select(
+                    sources=srcnames, receivers=recnames,
+                    frequencies=freqnames, remove_empty=False,
+            )
+
+        return red_survey
 
     @property
     def shape(self):

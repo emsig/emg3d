@@ -588,5 +588,5 @@ class TestRun:
 
         # Ensure dry_run returns same shaped data as the real thing.
         res = emg3d.load(os.path.join(tmpdir, 'output.npz'))
-        assert_allclose(res['data'].shape, (1, 5, 1))
+        assert_allclose(res['data'].shape, (1, 4, 1))
         assert res['n_observations'] == 4

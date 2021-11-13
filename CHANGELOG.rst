@@ -6,6 +6,15 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- ``survey``:
+
+  - ``select`` removes now empty source-receiver-frequency pairs. If you want
+    the old behaviour set ``remove_empty=False``.
+
+
 v1.3.0: File-based computations
 -------------------------------
 

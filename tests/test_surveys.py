@@ -185,6 +185,42 @@ class TestSurvey():
         t2 = survey.select(frequencies=[], receivers='RxEP-1')
         assert t2.shape == (3, 1, 0)
 
+    def test_select_remove_empty(self):
+        survey = surveys.Survey(
+            sources=surveys.txrx_coordinates_to_dict(
+                emg3d.TxElectricDipole,
+                ([0, 1, 2], 0, 0, 0, 0)
+            ),
+            receivers=surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                ([100, 101, 102], 0, 0, 0, 0)
+            ),
+            frequencies=np.array([1, 2, 3]),
+        )
+
+        selection = {'sources': ['TxED-2', 'TxED-3'],
+                     'receivers': ['RxEP-2', 'RxEP-3'],
+                     'frequencies': ['f-2', 'f-3']}
+
+        # Without 'observed', it should have no effect.
+        new = survey.select(**selection)
+        assert new.shape == (2, 2, 2)
+        new = survey.select(**selection, remove_empty=False)
+        assert new.shape == (2, 2, 2)
+
+        # Create and add 'observed' data.
+        data = np.arange(27.).reshape(3, 3, 3)
+        data = data + 1j*data
+        data[1:, 1:, 1:] = np.nan
+        data[2, 2, 2] = 26.0+26.0j
+        survey.data.observed[...] = data
+
+        # With observed, it should remove if True.
+        new = survey.select(**selection)
+        assert new.shape == (1, 1, 1)
+        new = survey.select(**selection, remove_empty=False)
+        assert new.shape == (2, 2, 2)
+
     def test_src_rec_coordinates(self):
         survey = surveys.Survey(
             sources=[
