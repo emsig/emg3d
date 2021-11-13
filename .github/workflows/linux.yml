@@ -55,6 +55,10 @@ jobs:
             name: plain
             os: ubuntu
             conda: "numba scipy"
+          - python-version: 3.10
+            name: plain
+            os: ubuntu
+            conda: "numba scipy"
 
     env:
       # Used to for coveralls flag
