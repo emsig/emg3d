@@ -6,13 +6,15 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.3.1: Select: remove empty pairs
+----------------------------------
 
-- ``survey``:
+**2021-11-20**
 
-  - ``select`` removes now empty source-receiver-frequency pairs. If you want
-    the old behaviour set ``remove_empty=False``.
+- ``Survey.select`` removes now empty source-receiver-frequency pairs. If you
+  want the old behaviour set ``remove_empty=False``.
+
+- Maintenance: Added a cron to GHA; 20th of every month at 14:14.
 
 
 v1.3.0: File-based computations
