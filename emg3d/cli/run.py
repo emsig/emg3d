@@ -96,10 +96,12 @@ def simulation(args_dict):
         # Select data.
         data = cfg['data']
         if data:
-            survey = survey.select(sources=data.get('sources', None),
-                                   receivers=data.get('receivers', None),
-                                   frequencies=data.get('frequencies', None),
-                                   remove_empty=False)
+            survey = survey.select(
+                sources=data.get('sources', None),
+                receivers=data.get('receivers', None),
+                frequencies=data.get('frequencies', None),
+                remove_empty=data.get('remove_empty', False),
+            )
 
         # Switch-off tqdm if verbosity is zero.
         if verb < 1:
