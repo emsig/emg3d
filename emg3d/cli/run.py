@@ -98,7 +98,8 @@ def simulation(args_dict):
         if data:
             survey = survey.select(sources=data.get('sources', None),
                                    receivers=data.get('receivers', None),
-                                   frequencies=data.get('frequencies', None))
+                                   frequencies=data.get('frequencies', None),
+                                   remove_empty=False)
 
         # Switch-off tqdm if verbosity is zero.
         if verb < 1:

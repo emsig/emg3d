@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- CLI:
+
+  - Don't remove empty entries for ``select``.
+
+
 v1.3.1: Select: remove empty pairs
 ----------------------------------
 
