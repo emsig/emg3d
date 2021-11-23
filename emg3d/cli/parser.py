@@ -266,6 +266,12 @@ def parse_config_file(args_dict):
             if value:
                 data[key] = [v.strip() for v in value.split(',')]
 
+        # Check for bools.
+        for key in ['remove_empty', ]:
+            if cfg.has_option('data', key):
+                _ = all_data.pop(key)
+                data[key] = cfg.getboolean('data', key)
+
         # Ensure no keys are left.
         if all_data:
             raise TypeError(

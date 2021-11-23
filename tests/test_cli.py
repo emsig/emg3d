@@ -567,7 +567,7 @@ class TestRun:
 
     def test_data(self, tmpdir, capsys):
 
-        # Write a config file.
+        # Write a config file; remove_empty=False (default)
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
             f.write("[data]\n")
@@ -584,6 +584,18 @@ class TestRun:
         args_dict = self.args_dict.copy()
         args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
         args_dict['path'] = tmpdir
+        cli.run.simulation(args_dict.copy())
+
+        # Ensure dry_run returns same shaped data as the real thing.
+        res = emg3d.load(os.path.join(tmpdir, 'output.npz'))
+        assert_allclose(res['data'].shape, (1, 5, 1))
+        assert res['n_observations'] == 4
+
+        # Append config file with: remove_empty=True
+        with open(config, 'a') as f:
+            f.write("\nremove_empty=True")
+
+        # Run a dry run (to output.npz).
         cli.run.simulation(args_dict)
 
         # Ensure dry_run returns same shaped data as the real thing.

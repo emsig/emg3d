@@ -119,3 +119,4 @@ remove the comment signs to use them.
   # sources = TxED-02, TxMD-08, TxEW-14
   # receivers = RxEP-01, RxMP-10
   # frequencies = f-1, f-3
+  # remove_empty = False  # CLI uses False by default.

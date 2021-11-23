@@ -6,6 +6,13 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- CLI: Add ``remove_empty`` to parameter file; set to ``False`` by default
+  (pre-v1.3.1 behaviour).
+
+
 v1.3.1: Select: remove empty pairs
 ----------------------------------
 
