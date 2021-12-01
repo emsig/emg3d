@@ -6,11 +6,13 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.3.2: Bugfix CLI-select
+-------------------------
 
-- CLI: Add ``remove_empty`` to parameter file; set to ``False`` by default
-  (pre-v1.3.1 behaviour).
+**2021-12-01**
+
+CLI: Add ``remove_empty`` to parameter file; set to ``False`` by default
+(pre-v1.3.1 behaviour, and therefore backwards compatible).
 
 
 v1.3.1: Select: remove empty pairs
