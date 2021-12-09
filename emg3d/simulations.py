@@ -794,7 +794,7 @@ class Simulation:
             self.data['observed'] = self.data['synthetic'].copy()
 
             # Add noise.
-            if kwargs.get('add_noise', True):
+            if kwargs.pop('add_noise', True):
                 self.survey.add_noise(**kwargs)
 
     # OPTIMIZATION
