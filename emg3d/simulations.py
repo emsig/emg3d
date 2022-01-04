@@ -5,7 +5,7 @@ due to a given model and survey.
 The simulation module combines the different pieces of ``emg3d`` providing
 a high-level, specialised modelling tool for the end user.
 """
-# Copyright 2018-2021 The emsig community.
+# Copyright 2018-2022 The emsig community.
 #
 # This file is part of emg3d.
 #
@@ -794,7 +794,7 @@ class Simulation:
             self.data['observed'] = self.data['synthetic'].copy()
 
             # Add noise.
-            if kwargs.get('add_noise', True):
+            if kwargs.pop('add_noise', True):
                 self.survey.add_noise(**kwargs)
 
     # OPTIMIZATION

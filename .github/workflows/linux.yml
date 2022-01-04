@@ -38,23 +38,23 @@ jobs:
           - python-version: 3.7
             name: full
             os: ubuntu
-            conda: "xarray empymod h5py scooby discretize matplotlib"  # tqdm
+            conda: "numba scipy xarray empymod h5py scooby discretize matplotlib"  # tqdm
           - python-version: 3.7
             name: plain
             os: ubuntu
-            conda: "numba"
+            conda: "numba scipy"
           - python-version: 3.8
             name: plain
             os: ubuntu
-            conda: "numba"
+            conda: "numba scipy"
           - python-version: 3.8
             name: full
             os: ubuntu
-            conda: "xarray tqdm empymod h5py scooby discretize matplotlib"
+            conda: "numba scipy xarray tqdm empymod h5py scooby discretize matplotlib"
           - python-version: 3.9
             name: plain
             os: ubuntu
-            conda: "numba"
+            conda: "numba scipy"
 
     env:
       # Used to for coveralls flag

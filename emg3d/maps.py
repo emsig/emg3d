@@ -5,7 +5,7 @@ thereof.
 
 Interpolation routines mapping values between different grids.
 """
-# Copyright 2018-2021 The emsig community.
+# Copyright 2018-2022 The emsig community.
 #
 # This file is part of emg3d.
 #
