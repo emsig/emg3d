@@ -93,6 +93,10 @@ class Survey:
 
         If None, it will be initiated with NaN's.
 
+        Data can be provided in different formats, which are defined when
+        creating receiver instances. Consult their documentation for more info;
+        default is always ``'complex'``.
+
     noise_floor, relative_error : {float, ndarray}, default: None
         Noise floor and relative error of the data. They can be arrays of a
         shape which can be broadcasted to the data shape, e.g., (nsrc, 1, 1) or
@@ -702,6 +706,14 @@ class Survey:
         # Return per receiver type (erec, mrec).
         indices = self._irec_types
         return [tuple(self._rec_coord[source][ind].T) for ind in indices]
+
+    @property
+    def _anyrec_non_complex(self):
+        """Boolean if any receiver has another data_type than complex."""
+        if getattr(self, '_anyrec_non_complex_bool', None) is None:
+            cmpl = [r.data_type != 'complex' for r in self.receivers.values()]
+            self._anyrec_non_complex_bool = any(cmpl)
+        return self._anyrec_non_complex_bool
 
 
 def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):

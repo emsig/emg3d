@@ -589,8 +589,17 @@ class Receiver(Wire):
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
     data_type : str
-        Data type of the measured responses. Currently implemented is only
-        ``'complex'``.
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - ``'complex'``: Complex values:        Real + j Imag
+        - ``'amplitude'``: Amplitude and phase:  Amp + j 0
+        - ``'phase'``: Amplitude and phase:      Pha + j 0
+
+        The preferred choice is complex, but the latter two are implemented for
+        the case where phase or amplitude information is not available or very
+        poor.
 
     """
 
@@ -601,7 +610,7 @@ class Receiver(Wire):
         """Initiate a receiver."""
 
         # Check data type is a known type.
-        if data_type.lower() != 'complex':
+        if data_type.lower() not in ['complex', 'amplitude', 'phase']:
             raise ValueError(f"Unknown data type '{data_type}'.")
 
         # Store relative, add a repr-addition.
@@ -622,6 +631,27 @@ class Receiver(Wire):
     def data_type(self):
         """Data type of the measured responses."""
         return self._data_type
+
+    def from_complex(self, complex_data):
+        """Return data in `data_type`-format from complex values."""
+
+        if self.data_type == 'amplitude':
+            return complex(abs(complex_data))
+
+        elif self.data_type == 'phase':
+            return complex(np.angle(complex_data))
+
+        else:
+            return complex_data
+
+    def derivative_chain(self, data, complex_data):
+        """Chain rule for data types other than complex."""
+
+        if self.data_type == 'amplitude':  # Amp + 0j
+            data *= np.real(complex_data.conj()/abs(complex_data))
+
+        elif self.data_type == 'phase':    # Pha + 0j
+            data *= np.real(-1j*complex_data.conj()/abs(complex_data)**2)
 
     def center_abs(self, source):
         """Returns points as absolute positions."""
@@ -656,8 +686,17 @@ class RxElectricPoint(Receiver, Point):
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
     data_type : str, default: 'complex'
-        Data type of the measured responses. Currently implemented is only the
-        default value.
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - ``'complex'``: Complex values:        Real + j Imag
+        - ``'amplitude'``: Amplitude and phase:  Amp + j 0
+        - ``'phase'``: Amplitude and phase:        0 + j Pha
+
+        The preferred choice is complex, but the latter two are implemented for
+        the case where phase or amplitude information is not available or very
+        poor.
 
     """
     _adjoint_source = TxElectricPoint
@@ -688,8 +727,17 @@ class RxMagneticPoint(Receiver, Point):
         sources, such as is the case in a :class:`emg3d.surveys.Survey`.
 
     data_type : str, default: 'complex'
-        Data type of the measured responses. Currently implemented is only the
-        default value.
+        Data type of the measured responses. The data are always stored as
+        complex values, but the meaning of the real and imaginary part differs
+        depending on the data type. Currently implemented are:
+
+        - ``'complex'``: Complex values:        Real + j Imag
+        - ``'amplitude'``: Amplitude and phase:  Amp + j 0
+        - ``'phase'``: Amplitude and phase:        0 + j Pha
+
+        The preferred choice is complex, but the latter two are implemented for
+        the case where phase or amplitude information is not available or very
+        poor.
 
     """
     _adjoint_source = TxMagneticPoint

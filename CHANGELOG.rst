@@ -6,6 +6,16 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- ``electrodes``:
+
+  - Receivers have a new parameter ``data_type``; by default this is
+    ``complex``, but in addition there are new the (experimental) options
+    ``amplitude`` and ``phase``.
+
+
 v1.3.2: Bugfix CLI-select
 -------------------------
 
@@ -58,7 +68,6 @@ v1.3.0: File-based computations
 
   - Models and Fields return itself (not a copy) when the grid provided to
     ``interpolate_to_grid`` is the same as the current one.
-
 
 
 v1.2.1: Remove optimize & bug fix
