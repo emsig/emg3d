@@ -496,12 +496,6 @@ class TestEstimateGriddingOpts():
     def test_empty_dict(self):
         gdict = meshes.estimate_gridding_opts({}, self.model, self.survey)
 
-        # Test deprecation v1.4.0
-        with pytest.warns(FutureWarning, match="removed in v1.4.0"):
-            gdict2 = emg3d.simulations.estimate_gridding_opts(
-                            {}, self.model, self.survey)
-        assert gdict['mapping'] == gdict2['mapping']
-
         assert gdict['frequency'] == 1.0
         assert gdict['mapping'] == self.model.map.name
         assert_allclose(gdict['center'], (0, 3000, -950))

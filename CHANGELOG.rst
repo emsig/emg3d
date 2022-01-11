@@ -6,6 +6,12 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Removed functions and modules that were deprecated in v1.2.1.
+
+
 v1.3.2: Bugfix CLI-select
 -------------------------
 
