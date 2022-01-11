@@ -4,7 +4,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 import emg3d
-from emg3d import simulations, optimize
+from emg3d import simulations
 
 from . import alternatives
 
@@ -278,11 +278,6 @@ class TestSimulation():
         jvec = simulation.jvec(np.ones(newgrid.n_cells))
         assert jvec.shape == simulation.data.observed.data.shape
 
-        # Test deprecation v1.4.0
-        with pytest.warns(FutureWarning, match="removed in v1.4.0"):
-            grad2 = optimize.gradient(simulation)
-        assert_allclose(grad, grad2)
-
         # Ensure the gradient has the shape of the model, not of the input.
         assert grad.shape == self.model.shape
 
@@ -543,11 +538,6 @@ def test_misfit():
     simulation.compute = dummy  # => switch of compute()
 
     assert_allclose(simulation.misfit, misfit)
-
-    # Test deprecation v1.4.0
-    with pytest.warns(FutureWarning, match="removed in v1.4.0"):
-        misfit2 = optimize.misfit(simulation)
-    assert_allclose(misfit, misfit2)
 
     # Missing noise_floor / std.
     survey = emg3d.Survey(sources, receivers, 100)
