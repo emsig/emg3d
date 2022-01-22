@@ -31,30 +31,34 @@ jobs:
       matrix:
         os: [ubuntu, ]  # macos, windows]  # Only Linux currently.
         case:
-          - python-version: 3.7
+          - python-version: "3.7"
             name: minimal
             os: ubuntu
             conda: "'scipy=1.4' 'numpy=1.17' 'numba=0.45'"
-          - python-version: 3.7
+          - python-version: "3.8"
             name: full
             os: ubuntu
             conda: "numba scipy xarray empymod h5py scooby discretize matplotlib"  # tqdm
-          - python-version: 3.7
+          - python-version: "3.8"
             name: plain
             os: ubuntu
             conda: "numba scipy"
-          - python-version: 3.8
+          - python-version: "3.9"
             name: plain
             os: ubuntu
             conda: "numba scipy"
-          - python-version: 3.8
+          - python-version: "3.9"
             name: full
             os: ubuntu
             conda: "numba scipy xarray tqdm empymod h5py scooby discretize matplotlib"
-          - python-version: 3.9
+          - python-version: "3.10"
             name: plain
             os: ubuntu
             conda: "numba scipy"
+          - python-version: "3.10"
+            name: full
+            os: ubuntu
+            conda: "numba scipy xarray tqdm empymod h5py scooby discretize matplotlib"
 
     env:
       # Used to for coveralls flag
