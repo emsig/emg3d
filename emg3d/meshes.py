@@ -623,11 +623,11 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             "and `vector` must be provided."
         )
     elif domain is None:
-        if vector is None:
+        if distance is None:
+            domain = np.array([vector.min(), vector.max()], dtype=float)
+        else:
             domain = np.array([center-abs(distance[0]),
                                center+abs(distance[1])])
-        else:
-            domain = np.array([vector.min(), vector.max()], dtype=float)
     else:
         domain = np.array(domain, dtype=np.float64)
         if vector is not None:
@@ -1270,16 +1270,16 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
             diff = np.diff(dim)[0]
             get_it = False
 
-        elif vector is not None and vector[i] is not None:
-            # vector is provided.
-            dim = [np.min(vector[i]), np.max(vector[i])]
-            diff = np.diff(dim)[0]
-            get_it = False
-
         elif distance is not None and distance[i] is not None:
             # distance is provided.
             dim = None
             diff = abs(distance[i][0]) + abs(distance[i][1])
+            get_it = False
+
+        elif vector is not None and vector[i] is not None:
+            # vector is provided.
+            dim = [np.min(vector[i]), np.max(vector[i])]
+            diff = np.diff(dim)[0]
             get_it = False
 
         else:
