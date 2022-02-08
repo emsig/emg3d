@@ -637,6 +637,16 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
                     "all of the survey domain."
                 )
 
+    # TODO make this optional per keyword
+    if vector is not None:  # and domain_dominates = True:
+        vmin = np.where(vector <= domain[0])[0]
+        if vmin.size > 1:
+            vector = vector[vmin[-1]:]
+
+        vmax = np.where(vector >= domain[1])[0]
+        if vmax.size > 1:
+            vector = vector[:vmax[1]]
+
     # Seasurface related checks.
     if seasurface is not None:
 
