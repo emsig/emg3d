@@ -56,7 +56,7 @@ References
    <https://doi.org/10.1088/0266-5611/24/3/034012>`_.
 .. [SlHM10] Slob, E., J. Hunziker, and W. A. Mulder, 2010, Green's tensors for
    the diffusive electric field in a VTI half-space: PIER, 107, 1--20: DOI:
-   `10.2528/PIER10052807 <http://doi.org/10.2528/PIER10052807>`_.
+   `10.2528/PIER10052807 <https://doi.org/10.2528/PIER10052807>`_.
 .. [Weil77] Weiland, T., 1977, Eine Methode zur Lösung der Maxwellschen
    Gleichungen für sechskomponentige Felder auf diskreter Basis: Archiv für
    Elektronik und Übertragungstechnik, 31, 116--120; pdf:
