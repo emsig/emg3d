@@ -371,10 +371,18 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         where ``center=(cx, cy, cz)``.
 
     vector : {tuple, ndarray, dict, None}, optional
-        Contains vectors of mesh-edges that should be used. If provided, the
-        vector *must* at least include all of the survey domain, to which
-        extent it will be cut. Format: ``(xvector, yvector, zvector)`` or
+        Contains vectors of mesh-edges that should be used. Format:
+        ``(xvector, yvector, zvector)`` or
         ``{'x': xvector, 'y': yvector, 'z': zvector}``.
+
+        If also ``domain`` or ``distance`` is defined, the following happens:
+        - There must be at least two cells within the domain, otherwise
+          ``vector`` is set to None.
+        - Where the ``vector`` is outside the domain, it will be trimmed to it.
+        - Where the ``vector`` is smaller than the domain, it will be extended
+          following the normal rules. The last cell-width in each direction
+          will be taken as starting cell width, together with the domain
+          stretching factor.
 
         It can be None, or individual ndarrays can be None (e.g., ``(xvector,
         yvector, None)``), in which case you have to provide a ``domain`` or
@@ -627,8 +635,7 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
 
     else:
         raise ValueError(
-            "At least one of `domain`, `distance`, "
-            "and `vector` must be provided."
+            "At least one of `domain`/`distance`/`vector` must be provided."
         )
 
     # Check vector if provided
@@ -643,12 +650,9 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         if vmax.size > 1:
             vector = vector[:vmax[1]]
 
-        # Ensure vector spans whole domain.
-        if vmin.size == 0 or vmax.size == 0:
-            raise ValueError(
-                "Provided vector MUST at least include "
-                "all of the survey domain."
-            )
+        # If vector is outside domain, set to None.
+        if len(vector) < 3:
+            vector = None
 
     # Seasurface related checks.
     if seasurface is not None:
@@ -700,32 +704,37 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         for sa in np.linspace(1.0, stretching[0], nsa):
 
             if vector is None:
-
-                # Get current stretched grid cell sizes.
-                thxl = dmin*sa**np.arange(nx)  # Left of origin.
-                thxr = dmin*sa**np.arange(nx)  # Right of origin.
-
-                # Adjust stretching for seasurface if required.
-                if seasurface is not None and seasurface > center:
-                    t_nx = np.r_[center, center+np.cumsum(thxr)]
-                    ii = np.argmin(abs(t_nx-seasurface))
-                    thxr[:ii] *= abs(seasurface-center)/np.sum(thxr[:ii])
-
-                # Fill from center to left and right domain.
-                nl = np.sum((center-np.cumsum(thxl)) > domain[0]) + 1
-                nr = np.sum((center+np.cumsum(thxr)) < domain[1]) + 1
-
-                # Create the current hx-array.
-                hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
-
-                # Get actual domain:
-                asurv_domain = [center - np.sum(thxl[:nl]),
-                                center + np.sum(thxr[:nr])]
-
+                cpart = [center, center]
+                dlr = [dmin, dmin]
+                nx0 = 0
             else:
-                # Store actual domain, current hx-array, and number of cells.
-                asurv_domain = [vector[0], vector[-1]]
-                hx = np.diff(vector)
+                cpart = [vector[0], vector[-1]]
+                dlr = [vector[1]-vector[0], vector[-1]-vector[-2]]
+                nx0 = 1
+
+            # Get current stretched grid cell sizes.
+            thxl = dlr[0]*sa**np.arange(nx0, nx)  # Left of origin.
+            thxr = dlr[1]*sa**np.arange(nx0, nx)  # Right of origin.
+
+            # Adjust stretching for seasurface if required.
+            if seasurface is not None and seasurface > cpart[1]:
+                t_nx = np.r_[cpart[1], cpart[1]+np.cumsum(thxr)]
+                ii = np.argmin(abs(t_nx-seasurface))
+                thxr[:ii] *= abs(seasurface-cpart[1])/np.sum(thxr[:ii])
+
+            # Fill from center to left and right domain.
+            nl = np.sum((cpart[0]-np.cumsum(thxl)) >= domain[0]) + (1-nx0)
+            nr = np.sum((cpart[1]+np.cumsum(thxr)) <= domain[1]) + (1-nx0)
+
+            # Create the current hx-array.
+            if vector is None:
+                hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
+            else:
+                hx = np.r_[thxl[:nl][::-1], np.diff(vector), thxr[:nr]]
+
+            # Get actual domain:
+            asurv_domain = [cpart[0] - np.sum(thxl[:nl]),
+                            cpart[1] + np.sum(thxr[:nr])]
 
             # Expand for seasurface if necessary.
             if seasurface is not None and seasurface > asurv_domain[-1]:

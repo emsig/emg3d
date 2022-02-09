@@ -251,11 +251,8 @@ class TestOriginAndWidths:
         with pytest.raises(TypeError, match='Unexpected '):
             meshes.origin_and_widths(1, 1, 0, [-1, 1], unknown=True)
 
-        with pytest.raises(ValueError, match="At least one of `domain`, `d"):
+        with pytest.raises(ValueError, match="At least one of `domain`/`d"):
             meshes.origin_and_widths(1, 1, 0)
-
-        with pytest.raises(ValueError, match="Provided vector MUST at least"):
-            meshes.origin_and_widths(1, 1, 0, [-1, 1], np.array([0, 1, 2]))
 
         with pytest.raises(ValueError, match="The `seasurface` must be bigge"):
             meshes.origin_and_widths(1, 1, 0, [-1, 1], seasurface=-2)
@@ -312,24 +309,35 @@ class TestOriginAndWidths:
 
     def test_domain_vector(self):
         inp = {'frequency': 1/np.pi, 'properties': 9*mu_0, 'center': 0.0,
-               'stretching': [1, 1]}
-        x01, hx1 = meshes.origin_and_widths(domain=[-1, 1], **inp)
-        x02, hx2 = meshes.origin_and_widths(vector=np.array([-1, 0, 1]), **inp)
-        x03, hx3 = meshes.origin_and_widths(  # vector will be cut
-                domain=[-1, 1], vector=np.array([-2, -1, 0, 1, 2]), **inp)
-        x04, hx4 = meshes.origin_and_widths(  # vector will be cut
-                distance=[1, 1], vector=np.array([-2, -1, 0, 1, 2]), **inp)
-        assert_allclose(x01, x02)
-        assert_allclose(x01, x03)
-        assert_allclose(x01, x04)
-        assert_allclose(hx1, hx2)
-        assert_allclose(hx1, hx3)
-        assert_allclose(hx1, hx4)
+               'stretching': [1, 1.5]}
 
-        x03, hx3 = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, 0.0, distance=[1, 1], stretching=[1, 1])
-        assert_allclose(x01, x03)
-        assert_allclose(hx1, hx3)
+        x01, hx1 = meshes.origin_and_widths(domain=[-1, 1], **inp)
+
+        x01b, hx1b = meshes.origin_and_widths(  # vector will be set to None
+                domain=[-1, 1], vector=[-2, -1, 0], **inp)
+        assert_allclose(x01, x01b)
+        assert_allclose(hx1, hx1b)
+
+        vector2 = np.array([-1, 0, 1])
+        x02, hx2 = meshes.origin_and_widths(vector=vector2, **inp)
+        assert np.in1d(vector2, x02 + np.cumsum(hx2)).all()
+
+        vector3 = np.array([-2, -1, 0, 1, 2])
+        x03, hx3 = meshes.origin_and_widths(  # vector will be cut
+                domain=[-1, 1], vector=vector3, **inp)
+        assert np.in1d(vector3[1:-1], x03 + np.cumsum(hx3)).all()
+        assert not np.in1d(vector3[0], x03 + np.cumsum(hx3))
+        assert not np.in1d(vector3[-1], x03 + np.cumsum(hx3))
+
+        x04, hx4 = meshes.origin_and_widths(  # vector will be cut
+                distance=[1, 1], vector=vector3, **inp)
+        assert_allclose(x03, x04)
+        assert_allclose(hx3, hx4)
+
+        x05, hx5 = meshes.origin_and_widths(  # vector will be expanded
+                distance=[2.0, 2.0], vector=vector2, **inp)
+        print(x05 + np.cumsum(hx5))
+        assert np.in1d(np.array([-2, -1, 0, 1, 2]), x05 + np.cumsum(hx5)).all()
 
     def test_seasurface(self):
         x01, hx1 = meshes.origin_and_widths(
