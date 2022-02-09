@@ -104,11 +104,14 @@ html_css_files = [
 
 # ==== 4. linkcheck ====
 
-# Papers from academic.oup results in a 104 error
+# Papers from academic.oup result in a 104 Error?
+# Papers from PIERS result in a 404 Client Error?
 linkcheck_ignore = [
     'https://doi.org/10.1111/j.1365-246X.2010.04544.x',
     'https://doi.org/10.1088/0266-5611/24/3/034012',
     'https://doi.org/10.1093/gji/ggab171',
+    'https://doi.org/10.2528/PIER10052807',
+    'https://doi.org/10.2528/PIER00080103',
     'https://www.terrasysgeo.com',
     'https://www.pygimli.org',
 ]
