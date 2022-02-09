@@ -356,8 +356,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
         It can be None, or individual lists can be None (e.g., ``(None, None,
         [zmin, zmax])``), in which case you have to provide either the
-        corresponding ``distance`` or ``vector``, which is then assumed to span
-        exactly the domain. If only one list is provided it is applied to all
+        corresponding ``distance`` or a ``vector``, from which the domain is
+        then calculated. If only one list is provided it is applied to all
         dimensions.
 
     distance : {tuple, list, dict, None}, optional
@@ -372,10 +372,9 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     vector : {tuple, ndarray, dict, None}, optional
         Contains vectors of mesh-edges that should be used. If provided, the
-        vector *must* at least include all of the survey domain. If ``domain``
-        is not provided, it is defined as the minimum/maximum of the provided
-        vector. Format: ``(xvector, yvector, zvector)`` or ``{'x': xvector,
-        'y': yvector, 'z': zvector}``.
+        vector *must* at least include all of the survey domain, to which
+        extent it will be cut. Format: ``(xvector, yvector, zvector)`` or
+        ``{'x': xvector, 'y': yvector, 'z': zvector}``.
 
         It can be None, or individual ndarrays can be None (e.g., ``(xvector,
         yvector, None)``), in which case you have to provide a ``domain`` or
@@ -616,29 +615,26 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     dmin = cell_width(skind[0], min_width_pps, min_width_limits)
 
     # Survey domain: if not provided get from vector or distance.
-    # Priority: domain > vector > distance.
-    if domain is None and vector is None and distance is None:
+    # Priority: domain > distance > vector.
+    if domain is not None:
+        domain = np.array(domain, dtype=np.float64)
+
+    elif distance is not None:
+        domain = np.array([center-abs(distance[0]), center+abs(distance[1])])
+
+    elif vector is not None:
+        domain = np.array([vector.min(), vector.max()], dtype=float)
+
+    else:
         raise ValueError(
             "At least one of `domain`, `distance`, "
             "and `vector` must be provided."
         )
-    elif domain is None:
-        if distance is None:
-            domain = np.array([vector.min(), vector.max()], dtype=float)
-        else:
-            domain = np.array([center-abs(distance[0]),
-                               center+abs(distance[1])])
-    else:
-        domain = np.array(domain, dtype=np.float64)
-        if vector is not None:
-            if domain[0] < vector.min() or domain[1] > vector.max():
-                raise ValueError(
-                    "Provided vector MUST at least include "
-                    "all of the survey domain."
-                )
 
-    # TODO make this optional per keyword
-    if vector is not None:  # and domain_dominates = True:
+    # Check vector if provided
+    if vector is not None:
+
+        # Cut vector to domain.
         vmin = np.where(vector <= domain[0])[0]
         if vmin.size > 1:
             vector = vector[vmin[-1]:]
@@ -646,6 +642,13 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         vmax = np.where(vector >= domain[1])[0]
         if vmax.size > 1:
             vector = vector[:vmax[1]]
+
+        # Ensure vector spans whole domain.
+        if vmin.size == 0 or vmax.size == 0:
+            raise ValueError(
+                "Provided vector MUST at least include "
+                "all of the survey domain."
+            )
 
     # Seasurface related checks.
     if seasurface is not None:
@@ -1092,7 +1095,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
 
       - ``frequency``: average (on log10-scale) of all frequencies.
       - ``center``: center of all sources.
-      - ``domain``: from ``vector`` or ``distance``, if provided, or
+      - ``domain``: from  ``distance`` or ``vector``, if provided, or
 
         - in x/y-directions: extent of sources and receivers plus 10% on each
           side, ensuring ratio of 3.
@@ -1261,29 +1264,28 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
     def get_dim_diff(i):
         """Return ([min, max], dim) of inp.
 
-        Take it from domain if provided, else from vector if provided, else
-        from survey, adding 10% on each side).
+        Take it from domain > distance > vector if provided, else from survey,
+        adding 10% on each side).
         """
+        get_it = False
+
+        # domain is provided.
         if domain is not None and domain[i] is not None:
-            # domain is provided.
             dim = domain[i]
             diff = np.diff(dim)[0]
-            get_it = False
 
+        # distance is provided.
         elif distance is not None and distance[i] is not None:
-            # distance is provided.
             dim = None
             diff = abs(distance[i][0]) + abs(distance[i][1])
-            get_it = False
 
+        # vector is provided.
         elif vector is not None and vector[i] is not None:
-            # vector is provided.
             dim = [np.min(vector[i]), np.max(vector[i])]
             diff = np.diff(dim)[0]
-            get_it = False
 
+        # Get it from survey, add 5 % on each side.
         else:
-            # Get it from survey, add 5 % on each side.
             inp = np.array([s.center[i] for s in survey.sources.values()])
             for s in survey.sources.values():
                 inp = np.r_[inp, [r.center_abs(s)[i]

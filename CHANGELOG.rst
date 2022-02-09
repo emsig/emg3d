@@ -6,10 +6,24 @@ Changelog
 """"""""""
 
 
-latest
-------
+*latest* will become v1.4.0
+---------------------------
+
+- Meshes: Non-backwards compatible change in ``construct_mesh``
+  (``origin_and_widths``; ``estimate_gridding_options``). It is implemented
+  non-backwards compatible as the old rules were not intuitive nor logic. The
+  previous meshes can still be obtained by setting the parameters carefully.
+  - Priority-order changed to ``domain > distance > vector`` (before it was
+    ``domain > vector > distance``).
+  - A ``vector`` is new cut to the corresponding domain, if ``domain`` or
+    ``distance`` was defined as well (cut at the first point where
+    ``vector <= domain[0]``, ``vector >= domain[1]``).
 
 - Removed functions and modules that were deprecated in v1.2.1.
+
+- Bugfix when adding ``add_noise`` explicitly to ``Simulation.compute()``.
+
+- Maintenance: Python 3.10 added to tests; Python 3.7 reduced to minimum.
 
 
 v1.3.2: Bugfix CLI-select

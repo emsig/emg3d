@@ -311,13 +311,20 @@ class TestOriginAndWidths:
         assert "2.98 / 3.00 / 3.02  [corr. to `properties`]" in out
 
     def test_domain_vector(self):
-        x01, hx1 = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1])
-        x02, hx2 = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, 0.0, vector=np.array([-1, 0, 1]),
-                stretching=[1, 1])
+        inp = {'frequency': 1/np.pi, 'properties': 9*mu_0, 'center': 0.0,
+               'stretching': [1, 1]}
+        x01, hx1 = meshes.origin_and_widths(domain=[-1, 1], **inp)
+        x02, hx2 = meshes.origin_and_widths(vector=np.array([-1, 0, 1]), **inp)
+        x03, hx3 = meshes.origin_and_widths(  # vector will be cut
+                domain=[-1, 1], vector=np.array([-2, -1, 0, 1, 2]), **inp)
+        x04, hx4 = meshes.origin_and_widths(  # vector will be cut
+                distance=[1, 1], vector=np.array([-2, -1, 0, 1, 2]), **inp)
         assert_allclose(x01, x02)
+        assert_allclose(x01, x03)
+        assert_allclose(x01, x04)
         assert_allclose(hx1, hx2)
+        assert_allclose(hx1, hx3)
+        assert_allclose(hx1, hx4)
 
         x03, hx3 = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, 0.0, distance=[1, 1], stretching=[1, 1])
@@ -378,10 +385,10 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 620 / 1125 / 50" in out
         assert "Survey dom. DS [m] : -2000 - -1000" in out
         assert "Comp. dom. DC  [m] : -10950 - 5300" in out
-        assert "Final extent   [m] : -13850 - 5386" in out
-        assert "Cell widths    [m] : 100 / 100 / 3158" in out
-        assert "Number of cells    : 40 (20 / 20 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.369" in out
+        assert "Final extent   [m] : -11118 - 6651" in out
+        assert "Cell widths    [m] : 100 / 100 / 1968" in out
+        assert "Number of cells    : 40 (15 / 25 / 0)" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.258" in out
 
         # High frequencies.
         _, _, out = meshes.origin_and_widths(
