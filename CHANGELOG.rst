@@ -6,14 +6,17 @@ Changelog
 """"""""""
 
 
-*latest* will become v1.4.0
----------------------------
+v1.4.0 : Meshing: improve vector
+--------------------------------
+
+**2022-02-09**
 
 - Meshes: Non-backwards compatible changes in ``construct_mesh``
   (``origin_and_widths``; ``estimate_gridding_options``) when providing
   ``vector``'s (implemented non-backwards compatible as the old rules were not
   intuitive nor logic; previous meshes can still be obtained, mostly, by
   setting the parameters carefully).
+
   - Priority-order changed to ``domain > distance > vector`` (before it was
     ``domain > vector > distance``).
   - A ``vector`` is new cut to the corresponding domain, if ``domain`` or
@@ -27,11 +30,11 @@ Changelog
 
 - Bugfix when adding ``add_noise`` explicitly to ``Simulation.compute()``.
 
-- Maintenance: Python 3.10 added to tests; Python 3.7 reduced to minimum.
+- Maintenance: Python 3.10 added to tests; Python 3.7 tests reduced to minimum.
 
 
-v1.3.2: Bugfix CLI-select
--------------------------
+v1.3.2 : Bugfix CLI-select
+--------------------------
 
 **2021-12-01**
 
@@ -39,8 +42,8 @@ CLI: Add ``remove_empty`` to parameter file; set to ``False`` by default
 (pre-v1.3.1 behaviour, and therefore backwards compatible).
 
 
-v1.3.1: Select: remove empty pairs
-----------------------------------
+v1.3.1 : Select: remove empty pairs
+-----------------------------------
 
 **2021-11-20**
 
@@ -50,8 +53,8 @@ v1.3.1: Select: remove empty pairs
 - Maintenance: Added a cron to GHA; 20th of every month at 14:14.
 
 
-v1.3.0: File-based computations
--------------------------------
+v1.3.0 : File-based computations
+--------------------------------
 
 **2021-10-27**
 
@@ -85,8 +88,8 @@ v1.3.0: File-based computations
 
 
 
-v1.2.1: Remove optimize & bug fix
----------------------------------
+v1.2.1 : Remove optimize & bug fix
+----------------------------------
 
 **2021-08-22**
 
@@ -108,8 +111,8 @@ v1.2.1: Remove optimize & bug fix
   ``Simulation.{misfit;gradient}``.
 
 
-v1.2.0: White noise
--------------------
+v1.2.0 : White noise
+--------------------
 
 **2021-07-27**
 
@@ -155,8 +158,8 @@ v1.2.0: White noise
   - Simplified (unified) ``_edge_curl_factor`` (private fct).
 
 
-v1.1.0: Adjoint-fix for electric receivers
-------------------------------------------
+v1.1.0 : Adjoint-fix for electric receivers
+-------------------------------------------
 
 **2021-06-30**
 
@@ -214,8 +217,8 @@ The changes in more detail:
   set in the parameter file, which overwrites the described default behaviour.
 
 
-v1.0.0: Stable API
-------------------
+v1.0.0 : Stable API
+-------------------
 
 **2021-05-28**
 
@@ -515,8 +518,8 @@ Detailed changes by module
 """"""""""
 
 
-v0.17.0: Magnetics in Simulation
---------------------------------
+v0.17.0 : Magnetics in Simulation
+---------------------------------
 
 **2021-03-03**
 
@@ -548,8 +551,8 @@ v0.17.0: Magnetics in Simulation
     stuff. Currently only stores the data selection to output data.
 
 
-v0.16.1: Verbosity & Logging
-----------------------------
+v0.16.1 : Verbosity & Logging
+-----------------------------
 
 **2021-02-09**
 
@@ -581,8 +584,8 @@ v0.16.1: Verbosity & Logging
   above).
 
 
-v0.16.0: Arbitrarily shaped sources
------------------------------------
+v0.16.0 : Arbitrarily shaped sources
+------------------------------------
 
 **2021-01-13**
 
@@ -632,8 +635,8 @@ v0.16.0: Arbitrarily shaped sources
   ``map_coordinates``.
 
 
-v0.15.3: Move to EMSiG
-----------------------
+v0.15.3 : Move to EMSiG
+-----------------------
 
 **2020-12-09**
 
