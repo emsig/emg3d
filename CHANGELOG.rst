@@ -19,18 +19,20 @@ v1.4.0 : Meshing: improve vector
 
   - Priority-order changed to ``domain > distance > vector`` (before it was
     ``domain > vector > distance``).
-  - A ``vector`` is new cut to the corresponding domain, if ``domain`` or
-    ``distance`` was defined as well (cut at the first point where
-    ``vector <= domain[0]``, ``vector >= domain[1]``).
-  - A ``vector`` can also be smaller than the defined domain, and the domain
-    is then filled according to the normal rules; the last cell of ``vector``
-    in each direction is taking as starting width for the expansion.
+  - A provided ``vector`` is new trimmed to the corresponding domain if it is
+    larger than a also provided domain (from ``domain`` or ``distance``);
+    trimmed at the first point where
+    ``vector <= domain[0]``, ``vector >= domain[1]``.
+  - A ``vector`` can new also be smaller than the defined domain, and the
+    domain is then filled according to the normal rules; the last cell of
+    ``vector`` in each direction is taken as starting width for the expansion.
 
-- Removed functions and modules that were deprecated in v1.2.1.
+- Bugfixes and maintenance:
 
-- Bugfix when adding ``add_noise`` explicitly to ``Simulation.compute()``.
-
-- Maintenance: Python 3.10 added to tests; Python 3.7 tests reduced to minimum.
+  - Removed functions and modules that were deprecated in v1.2.1.
+  - Fixed kwargs-error when adding ``add_noise`` explicitly to
+    ``Simulation.compute()``.
+  - Python 3.10 added to tests; Python 3.7 tests reduced to minimum.
 
 
 v1.3.2 : Bugfix CLI-select
