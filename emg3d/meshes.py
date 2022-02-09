@@ -651,7 +651,7 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             vector = vector[:vmax[1]]
 
         # If vector is outside domain, set to None.
-        if vector.size < 3:
+        if len(vector) < 3:
             vector = None
 
     # Seasurface related checks.

@@ -313,6 +313,11 @@ class TestOriginAndWidths:
 
         x01, hx1 = meshes.origin_and_widths(domain=[-1, 1], **inp)
 
+        x01b, hx1b = meshes.origin_and_widths(  # vector will be set to None
+                domain=[-1, 1], vector=[-2, -1, 0], **inp)
+        assert_allclose(x01, x01b)
+        assert_allclose(hx1, hx1b)
+
         vector2 = np.array([-1, 0, 1])
         x02, hx2 = meshes.origin_and_widths(vector=vector2, **inp)
         assert np.in1d(vector2, x02 + np.cumsum(hx2)).all()
