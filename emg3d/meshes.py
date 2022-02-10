@@ -376,6 +376,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         ``{'x': xvector, 'y': yvector, 'z': zvector}``.
 
         If also ``domain`` or ``distance`` is defined, the following happens:
+
         - There must be at least two cells within the domain, otherwise
           ``vector`` is set to None.
         - Where the ``vector`` is outside the domain, it will be trimmed to it.
