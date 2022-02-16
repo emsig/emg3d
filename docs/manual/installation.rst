@@ -29,6 +29,17 @@ advanced functionalities, namely:
 - ``tqdm``: For nice progress bars when computing many sources and frequencies.
 
 All soft dependencies are also available both on ``conda-forge`` and ``pip``.
+To get therefore the complete experience use one of the following options:
+
+.. code-block:: console
+
+   conda install -c conda-forge emg3d empymod discretize xarray matplotlib h5py tqdm scooby
+
+or via ``pip``:
+
+.. code-block:: console
+
+   pip install emg3d empymod discretize xarray matplotlib h5py tqdm scooby
 
 If you are new to Python we recommend using a Python distribution, which will
 ensure that all dependencies are met, specifically properly compiled versions
