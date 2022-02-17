@@ -881,7 +881,7 @@ class Simulation:
             self._bcompute()
 
             # Pre-allocate the gradient on the mesh.
-            gradient_model = np.zeros(self.model.grid.shape_cells, order='F')
+            gradient_model = np.zeros(self.model.shape, order='F')
 
             # Loop over source-frequency pairs.
             for src, freq in self._srcfreq:
@@ -1379,7 +1379,7 @@ class Simulation:
 
         # Store original input_sc2. Undocumented.
         # This should eventually be replaced by an `active_cells` mask.
-        self._input_sc2 = kwargs.pop('_input_sc2', model.grid.shape_cells[2])
+        self._input_sc2 = kwargs.pop('_input_sc2', model.shape[2])
 
         # Get gridding_opts from kwargs.
         gridding_opts = kwargs.pop('gridding_opts', {})

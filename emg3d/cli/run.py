@@ -157,7 +157,7 @@ def simulation(args_dict):
         logger.info("\n    :: BACKWARD COMPUTATION ::\n")
 
         if dry_run:
-            output['gradient'] = np.zeros(sim.model.grid.shape_cells)
+            output['gradient'] = np.zeros(sim.model.shape)
         else:
             output['gradient'] = sim.gradient
 

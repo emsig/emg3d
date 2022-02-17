@@ -680,7 +680,7 @@ class TestGradient:
             return sim.jvec(x)
 
         def func1(x):
-            sim.model.property_x[...] = x.reshape(sim.model.grid.shape_cells)
+            sim.model.property_x[...] = x.reshape(sim.model.shape)
             sim.clean('computed')
 
             # Quick test that clean() removes the files
