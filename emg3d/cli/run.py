@@ -105,7 +105,7 @@ def simulation(args_dict):
 
         # Switch-off tqdm if verbosity is zero.
         if verb < 1:
-            cfg['simulation_options']['tqdm_opts'] = {'disable': True}
+            cfg['simulation_options']['tqdm_opts'] = False
 
         # Create simulation.
         sim = simulations.Simulation(
@@ -157,7 +157,7 @@ def simulation(args_dict):
         logger.info("\n    :: BACKWARD COMPUTATION ::\n")
 
         if dry_run:
-            output['gradient'] = np.zeros(sim.model.grid.shape_cells)
+            output['gradient'] = np.zeros(sim.model.shape)
         else:
             output['gradient'] = sim.gradient
 

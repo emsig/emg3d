@@ -506,6 +506,20 @@ class TestSimulation():
             simulation.data.synthetic[:, 7, 0].data
         )
 
+    def test_tqdm(self):
+        inp = {'survey': self.survey, 'model': self.model}
+
+        sim = simulations.Simulation(tqdm_opts=False, **inp)
+        assert sim._tqdm_opts['disable']
+
+        sim = simulations.Simulation(tqdm_opts=True, **inp)
+        assert not sim._tqdm_opts['disable']
+        assert sim._tqdm_opts['bar_format']
+
+        tqdm_opts = {'bar_format': '{bar}'}
+        sim = simulations.Simulation(tqdm_opts={'bar_format': '{bar}'}, **inp)
+        assert sim._tqdm_opts == tqdm_opts
+
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_misfit():
@@ -680,7 +694,7 @@ class TestGradient:
             return sim.jvec(x)
 
         def func1(x):
-            sim.model.property_x[...] = x.reshape(sim.model.grid.shape_cells)
+            sim.model.property_x[...] = x.reshape(sim.model.shape)
             sim.clean('computed')
 
             # Quick test that clean() removes the files
