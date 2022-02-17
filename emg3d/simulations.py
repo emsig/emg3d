@@ -181,6 +181,10 @@ class Simulation:
         Also note that the files are stored as .h5-files, and you need to have
         ``h5py`` installed to use this feature.
 
+    tqdm_opts : {bool, dict}, default: True
+        Boolean if a progress bar should be shown (only if ``tqdm`` is
+        installed). If a dict is provided it will be forwarded to ``tqdm``.
+
     """
 
     # Gridding descriptions (for repr's).
@@ -239,13 +243,13 @@ class Simulation:
             self.survey._data['synthetic'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
 
-        # `tqdm`-options; undocumented.
-        # Can be used to, e.g., disable tqdm completely via:
-        # > emg3d.Simulation(args, kwargs, tqdm_opts={'disable': True})
+        # `tqdm`-options.
         tqdm_opts = kwargs.pop('tqdm_opts', {})
+        if isinstance(tqdm_opts, bool):
+            tqdm_opts = {'disable': not tqdm_opts}
         self._tqdm_opts = {
+            **{'bar_format': '{desc} {bar} {n_fmt}/{total_fmt}  [{elapsed}]'},
             **tqdm_opts,
-            **{'bar_format': '{desc}: {bar}{n_fmt}/{total_fmt}  [{elapsed}]'},
         }
 
         # Ensure no kwargs left.
@@ -1055,7 +1059,7 @@ class Simulation:
                 solver._solve,
                 list(map(collect_bfield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
-                **{'desc': 'Back-propagate ', **self._tqdm_opts},
+                **{'desc': 'Back-propagate', **self._tqdm_opts},
         )
 
         # Loop over src-freq combinations to extract and store.
@@ -1166,7 +1170,7 @@ class Simulation:
                 solver._solve,
                 list(map(collect_gfield_inputs, self._srcfreq)),
                 max_workers=self.max_workers,
-                **{'desc': 'Compute jvec   ', **self._tqdm_opts},
+                **{'desc': 'Compute jvec', **self._tqdm_opts},
         )
 
         # Initiate jvec data with NaN's if it doesn't exist.

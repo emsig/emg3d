@@ -5,6 +5,12 @@ Changelog
 1.x-Series
 """"""""""
 
+- Simulation:
+
+  - New optional keyword ``tqdm_opts``. With ``False`` you can switch off the
+    progress bars. Alternatively one can provide a dict, which is forwarded
+    to ``tqdm``.
+
 
 v1.4.0 : Meshing: improve vector
 --------------------------------

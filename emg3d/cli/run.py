@@ -105,7 +105,7 @@ def simulation(args_dict):
 
         # Switch-off tqdm if verbosity is zero.
         if verb < 1:
-            cfg['simulation_options']['tqdm_opts'] = {'disable': True}
+            cfg['simulation_options']['tqdm_opts'] = False
 
         # Create simulation.
         sim = simulations.Simulation(
