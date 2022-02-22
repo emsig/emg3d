@@ -242,7 +242,9 @@ class TestParser:
             f.write("gridding=fancything\n")
             f.write("name=PyTest simulation\n")
             f.write("file_dir=here\n")
-            f.write("min_offset=1320")
+            f.write("min_offset=1320\n")
+            f.write("mean_noise=1.0\n")
+            f.write("ntype=gaussian_uncorrelated")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -251,7 +253,9 @@ class TestParser:
         assert sim_opts['max_workers'] == 5
         assert sim_opts['gridding'] == 'fancything'
         assert sim_opts['name'] == "PyTest simulation"
-        assert sim_opts['min_offset'] == 1320.0
+        assert sim_opts['noise_kwargs']['min_offset'] == 1320.0
+        assert sim_opts['noise_kwargs']['mean_noise'] == 1.0
+        assert sim_opts['noise_kwargs']['ntype'] == 'gaussian_uncorrelated'
         assert sim_opts['file_dir'] == 'here'
         with pytest.raises(KeyError, match="receiver_interpolation"):
             assert sim_opts['receiver_interpolation'] == 'linear'

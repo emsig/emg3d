@@ -183,11 +183,6 @@ def parse_config_file(args_dict):
     else:
         simulation[key] = "emg3d CLI run"
 
-    key = 'min_offset'
-    if cfg.has_option('simulation', key):
-        _ = all_sim.pop(key)
-        simulation[key] = cfg.getfloat('simulation', key)
-
     key = 'file_dir'
     if cfg.has_option('simulation', key):
         _ = all_sim.pop(key)
@@ -200,6 +195,18 @@ def parse_config_file(args_dict):
     elif term['function'] == 'gradient':
         # Default is 'cubic' - gradient needs 'linear'
         simulation[key] = 'linear'
+
+    # Check noise parameters
+    simulation['noise_kwargs'] = {}
+    keys = ['min_offset', 'mean_noise']
+    for key in keys:
+        if cfg.has_option('simulation', key):
+            _ = all_sim.pop(key)
+            simulation['noise_kwargs'][key] = cfg.getfloat('simulation', key)
+    key = 'ntype'
+    if cfg.has_option('simulation', key):
+        _ = all_sim.pop(key)
+        simulation['noise_kwargs'][key] = cfg.get('simulation', key)
 
     # Ensure no keys are left.
     if all_sim:
