@@ -270,16 +270,9 @@ class TestOriginAndWidths:
         assert out[1] is None
         assert "No suitable grid found; relax your criteria." in outstr
 
-        # Stretching warning.
-        meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, -0.2, [-1, 2], stretching=[1, 1],
-                seasurface=1.2, verb=3)
-        out, _ = capsys.readouterr()
-        assert "Note: Stretching in DS >> 1.0.\nThe reason " in out
-
     def test_basics(self, capsys):
         x0, hx = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=1)
+                1/np.pi, 9*mu_0, 0.5, [-1, 1], stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
         assert_allclose(x0, -20)
@@ -290,7 +283,7 @@ class TestOriginAndWidths:
         assert "Comp. dom. DC  [m] : -19.8 - 19.8" in out
         assert "Final extent   [m] : -20.0 - 20.0" in out
         assert "Cell widths    [m] : 1.0 / 1.0 / 1.0  [min(DS) / m" in out
-        assert "Number of cells    : 40 (4 / 36 / 0)  [Total (DS/" in out
+        assert "Number of cells    : 40 (3 / 37 / 0)  [Total (DS/" in out
         assert "Max stretching     : 1.000 (1.000) / 1.000  [DS (" in out
 
         _ = meshes.origin_and_widths(
@@ -308,7 +301,7 @@ class TestOriginAndWidths:
         assert "2.98 / 3.00 / 3.02  [corr. to `properties`]" in out
 
     def test_domain_vector(self):
-        inp = {'frequency': 1/np.pi, 'properties': 9*mu_0, 'center': 0.0,
+        inp = {'frequency': 1/np.pi, 'properties': 9*mu_0, 'center': 0.5,
                'stretching': [1, 1.5]}
 
         x01, hx1 = meshes.origin_and_widths(domain=[-1, 1], **inp)
@@ -322,7 +315,7 @@ class TestOriginAndWidths:
         x02, hx2 = meshes.origin_and_widths(vector=vector2, **inp)
         assert np.in1d(vector2, x02 + np.cumsum(hx2)).all()
 
-        vector3 = np.array([-2, -1, 0, 1, 2])
+        vector3 = np.array([-2.5, -1, 0, 1, 2.5])
         x03, hx3 = meshes.origin_and_widths(  # vector will be cut
                 domain=[-1, 1], vector=vector3, **inp)
         assert np.in1d(vector3[1:-1], x03 + np.cumsum(hx3)).all()
@@ -330,30 +323,28 @@ class TestOriginAndWidths:
         assert not np.in1d(vector3[-1], x03 + np.cumsum(hx3))
 
         x04, hx4 = meshes.origin_and_widths(  # vector will be cut
-                distance=[1, 1], vector=vector3, **inp)
+                distance=[1.5, 0.5], vector=vector3, **inp)
         assert_allclose(x03, x04)
         assert_allclose(hx3, hx4)
 
         x05, hx5 = meshes.origin_and_widths(  # vector will be expanded
                 distance=[2.0, 2.0], vector=vector2, **inp)
-        print(x05 + np.cumsum(hx5))
         assert np.in1d(np.array([-2, -1, 0, 1, 2]), x05 + np.cumsum(hx5)).all()
 
     def test_seasurface(self):
-        x01, hx1 = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1])
-        x02, hx2 = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, -0.5, [-1, 0], seasurface=0.0,
-                stretching=[1, 1])
+        inp = {'frequency': 1/np.pi, 'properties': 9*mu_0,
+               'stretching': [1, 1], 'domain': [-1, 2]}
+        x01, hx1 = meshes.origin_and_widths(center=0.5, **inp)
+        x02, hx2 = meshes.origin_and_widths(center=0.7, seasurface=1.0, **inp)
         assert_allclose(x01, x02)
-        assert_allclose(hx1, hx2)
+        assert_allclose(hx1, hx2)  # second grid is shifted because of ss
 
     def test_status_quo_with_all(self, capsys):
         # Defaults.
         meshes.origin_and_widths(
             frequency=0.2,
             properties=[0.3, 1, 50],
-            center=-950,
+            center=-850,
             domain=[-2000, -1000],
             verb=1,
             )
@@ -363,7 +354,7 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 616 / 1125 / 7958" in out
         assert "Survey dom. DS [m] : -2000 - -1000" in out
         assert "Comp. dom. DC  [m] : -9071 - 49000" in out
-        assert "Final extent   [m] : -10223 - 50988" in out
+        assert "Final extent   [m] : -10226 - 50985" in out
         assert "Cell widths    [m] : 205 / 205 / 11769" in out
         assert "Number of cells    : 32 (7 / 25 / 0)" in out
         assert "Max stretching     : 1.000 (1.000) / 1.288" in out
@@ -372,7 +363,7 @@ class TestOriginAndWidths:
         meshes.origin_and_widths(
             frequency=0.2,
             properties=[3.3, 1, 500],
-            center=-950,
+            center=-1000,
             domain=[-2000, -1000],
             vector=-np.arange(20)[::-1]*100-600,
             seasurface=-500,
@@ -389,10 +380,9 @@ class TestOriginAndWidths:
             )
 
         out, _ = capsys.readouterr()
-
         assert "Skin depth     [m] : 620 / 1125 / 50" in out
-        assert "Survey dom. DS [m] : -2000 - -1000" in out
-        assert "Comp. dom. DC  [m] : -10950 - 5300" in out
+        assert "Survey dom. DS [m] : -2000 - -500" in out
+        assert "Comp. dom. DC  [m] : -11000 - 5575" in out
         assert "Final extent   [m] : -11118 - 6651" in out
         assert "Cell widths    [m] : 100 / 100 / 1968" in out
         assert "Number of cells    : 40 (15 / 25 / 0)" in out
@@ -410,10 +400,173 @@ class TestOriginAndWidths:
         assert "Skin depth     [m] : 0.113 / 0.050 / 0.356" in out
         assert "Survey dom. DS [m] : -1.000 - 1.000" in out
         assert "Comp. dom. DC  [m] : -1.316 - 3.236" in out
-        assert "Final extent   [m] : -1.327 - 3.262" in out
-        assert "Cell widths    [m] : 0.038 / 0.038 / 0.234" in out
-        assert "Number of cells    : 80 (54 / 26 / 0)" in out
-        assert "Max stretching     : 1.000 (1.000) / 1.096" in out
+        assert "Final extent   [m] : -1.357 - 3.296" in out
+        assert "Cell widths    [m] : 0.038 / 0.038 / 0.255" in out
+        assert "Number of cells    : 80 (55 / 25 / 0)" in out
+        assert "Max stretching     : 1.000 (1.000) / 1.106" in out
+
+
+class TestStretch:
+    def test_normal(self):
+        inp = {
+            'edges': np.array([-5.0, 5]),
+            'widths': np.array(10.),
+            'stretching': 1.1,
+            'nx': 16,
+            'domain': np.array([-40, 40]),
+        }
+        edges, widths, remain = meshes._stretch(use_up=False, **inp)
+        assert_allclose(edges, [-41.41, 41.41])
+        assert_allclose(widths, [13.31, 12.1, 11, 10, 11, 12.1, 13.31])
+        assert remain == 9
+
+        edges, widths, remain = meshes._stretch(use_up=True, **inp)
+        assert_allclose(edges, [-109.358881,  130.794769])
+        assert_allclose(widths[-1], 10*1.1**8)
+        assert remain == 0
+
+    def test_false(self):
+        inp = {
+            'edges': np.array([-5.0, 5]),
+            'widths': np.array(10.),
+            'stretching': 1.1,
+            'nx': 4,
+            'domain': np.array([-40, 40]),
+        }
+        edges, widths, remain = meshes._stretch(use_up=False, **inp)
+        assert not edges
+        assert not widths
+        assert not remain
+
+    def test_vector(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array([10, 10.]),
+            'stretching': 1.1,
+            'nx': 16,
+            'domain': np.array([-40, 40]),
+            'use_up': False,
+        }
+        edges, widths, remain = meshes._stretch(**inp)
+        assert_allclose(edges, [-46.41, 46.41])
+        assert_allclose(widths, [13.31, 12.1, 11, 10, 10, 11, 12.1, 13.31])
+        assert remain == 8
+
+    def test_edges(self):
+        inp = {
+            'edges': np.array([-5.0, 5]),
+            'widths': np.array(10.),
+            'stretching': 1.1,
+            'nx': 16,
+            'use_up': False,
+        }
+        edges, widths, remain = meshes._stretch(
+                domain=np.array([0, 40.]), **inp)
+        assert_allclose(edges, [-5, 41.41])
+        assert_allclose(widths, [10, 11, 12.1, 13.31])
+        assert remain == 12
+
+        edges, widths, remain = meshes._stretch(
+                domain=np.array([-40, 0.]), **inp)
+        assert_allclose(edges, [-41.41, 5])
+        assert_allclose(widths, [13.31, 12.1, 11, 10])
+        assert remain == 12
+
+
+class TestSeasurface:
+    def test_seasurface_close_to_center(self):
+        inp = {
+            'edges': np.array([0.0, 10]),
+            'widths': np.array(10.),
+            'center': 5.0,
+            'stretching': [1, 1],
+            'vector': None,
+            'limits': None,
+        }
+
+        # Seasurface below edge.
+        edges, widths = meshes._seasurface(seasurface=6.0, **inp)
+        assert_allclose(edges, [-4, 6])
+        assert_allclose(widths, 10)
+
+        # Seasurface above edge.
+        edges, widths = meshes._seasurface(seasurface=13.3333, **inp)
+        assert_allclose(edges, [3.3333, 13.3333])
+        assert_allclose(widths, 10)
+
+    def test_normal(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array(20.),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': None,
+            'limits': None,
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -10.5)  # moved edge
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 21)  # changed width
+
+    def test_vector(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array([10.0, 10.0]),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': np.array([-10.0, 0.0, 10.0]),
+            'limits': None,
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -10)
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 10)
+
+    def test_limits(self):
+        inp = {
+            'edges': np.array([0.0, 10]),
+            'widths': np.array([10.0]),
+            'center': 5.0,
+            'stretching': [1, 1.5],
+            'vector': None,
+            'limits': 10.0,
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], 0)
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 10)
+
+        inp = {
+            'edges': np.array([-5.5, 5.5]),
+            'widths': np.array([11.0]),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': None,
+            'limits': [10, 15],
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -5.5)
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 11)
+
+    def test_issues(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array([10.0, 10.0]),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': np.array([-10.0, 0.0, 10.0]),
+            'limits': None,
+        }
+        seasurface = 11.0
+        with pytest.warns(UserWarning, match='Seasurface is not at an actual'):
+            edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -10)
+        assert_allclose(widths[0], 10)
 
 
 def test_good_mg_cell_nr(capsys):

@@ -295,7 +295,7 @@ class TestSimulation():
         # Create a simple survey
         sources = emg3d.surveys.txrx_coordinates_to_dict(
                 emg3d.TxElectricDipole,
-                (0, [1000, 3000, 5000], -950, 0, 0))
+                (125, [1250, 3250, 5250], -700, 0, 0))
         receivers = emg3d.surveys.txrx_coordinates_to_dict(
                 emg3d.RxElectricPoint,
                 ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0))
@@ -323,10 +323,10 @@ class TestSimulation():
                 name='single', gridding='single', **inp)
 
         # Quick repr test.
-        assert " 24 x 24 (13,824) - 160 x 160 x 96 (2,457," in b_sim.__repr__()
-        assert " 24 x 24 (13,824) - 160 x 160 x 96 (2,457," in f_sim.__repr__()
-        assert "Source-dependent grids; 64 x 64 x 40 (163," in t_sim.__repr__()
-        assert "ources and frequencies; 64 x 64 x 40 (163," in s_sim.__repr__()
+        assert " 24 x 24 (18,432) - 160 x 160 x 96 (2,457," in b_sim.__repr__()
+        assert " 24 x 24 (18,432) - 160 x 160 x 96 (2,457," in f_sim.__repr__()
+        assert "Source-dependent grids; 64 x 64 x 32 (131," in t_sim.__repr__()
+        assert "ources and frequencies; 64 x 64 x 32 (131," in s_sim.__repr__()
 
         # Quick print_grid test:
         _, _ = capsys.readouterr()  # empty

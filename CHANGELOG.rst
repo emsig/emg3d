@@ -5,6 +5,20 @@ Changelog
 1.x-Series
 """"""""""
 
+
+**latest**
+----------
+
+- Meshes:
+
+  - Bugfix: ``construct_mesh`` and ``origin_and_widths`` (**non-backwards
+    compatible**): The ``center`` changed from being on the edge to being in
+    the center. It is regarded as a bugfix, hence it was changed without
+    deprecation period; but note that the constructed grids will slightly
+    change due to this change. Given the "opportunity" that the generated grids
+    will change anyway there were other changes made to ``origin_and_widths``,
+    together with a heavy refactoring.
+
 - Simulation:
 
   - New optional keyword ``tqdm_opts``. With ``False`` you can switch off the
