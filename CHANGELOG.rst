@@ -11,6 +11,11 @@ Changelog
     progress bars. Alternatively one can provide a dict, which is forwarded
     to ``tqdm``.
 
+- CLI:
+
+  - Expose ``mean_noise`` and ``ntype``, in addition to ``min_offset``, to the
+    CLI (for adding noise); also ``plain`` (for solver).
+
 
 v1.4.0 : Meshing: improve vector
 --------------------------------

@@ -51,9 +51,11 @@ remove the comment signs to use them.
   # (defined in their own section), but including the parameter `min_offset`
   # for `compute()`.
   [simulation]
-  # max_workers = 4    # Also via `-n` or `--nproc`.
+  # max_workers = 4      # Also via `-n` or `--nproc`.
   # gridding = single
-  # min_offset = 0.0   # Only relevant if `observed=True` (r<r_min set to NaN).
+  # min_offset = 0.0     # off < min_off set to NaN; only if `--forward`.
+  # mean_noise = 0.0     # Mean of the noise; only if `--forward`.
+  # ntype = white_noise  # Type of the noise; only if `--forward`.
   # name = MyTestSimulation
   # file_dir = None    # For file-based comp; absolute or relative path.
   # receiver_interpolation = cubic  # Set it to <linear> for the gradient.
@@ -80,6 +82,7 @@ remove the comment signs to use them.
   # nu_coarse =            # int
   # nu_post =              # int
   # clevel =               # int
+  # plain =                # bool
 
   # Gridding options
   # ----------------

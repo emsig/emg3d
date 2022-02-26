@@ -69,7 +69,7 @@ def simulation(args_dict):
     logger.debug("\n    :: CONFIGURATION ::\n")
     logger.debug(f"{term['config_file']}\n{paramdump}")
 
-    min_offset = cfg['simulation_options'].pop('min_offset', 0.0)
+    noise_kwargs = cfg['simulation_options'].pop('noise_kwargs')
 
     if cfg['files']['load']:
 
@@ -133,7 +133,7 @@ def simulation(args_dict):
     else:
 
         if function == 'forward':
-            sim.compute(observed=True, min_offset=min_offset)
+            sim.compute(observed=True, **noise_kwargs)
             output['data'] = sim.data.observed
         else:
             sim.compute()
