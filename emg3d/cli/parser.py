@@ -225,7 +225,7 @@ def parse_config_file(args_dict):
         all_solver = dict(cfg.items('solver_opts'))
 
         # Check for bools.
-        for key in ['sslsolver', 'semicoarsening', 'linerelaxation']:
+        for key in ['sslsolver', 'semicoarsening', 'linerelaxation', 'plain']:
             if cfg.has_option('solver_opts', key):
                 _ = all_solver.pop(key)
                 solver[key] = cfg.getboolean('solver_opts', key)

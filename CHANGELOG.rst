@@ -14,7 +14,7 @@ Changelog
 - CLI:
 
   - Expose ``mean_noise`` and ``ntype``, in addition to ``min_offset``, to the
-    CLI (for adding noise).
+    CLI (for adding noise); also ``plain`` (for solver).
 
 
 v1.4.0 : Meshing: improve vector

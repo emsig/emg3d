@@ -82,6 +82,7 @@ remove the comment signs to use them.
   # nu_coarse =            # int
   # nu_post =              # int
   # clevel =               # int
+  # plain =                # bool
 
   # Gridding options
   # ----------------
