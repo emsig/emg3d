@@ -13,10 +13,10 @@ help:
 	@echo ""
 
 install:
-	python setup.py develop
+	pip install -e .
 
 dev-install:
-	pip install -r requirements-dev.txt && python setup.py develop
+	pip install -r requirements-dev.txt && pip install -e .
 
 pytest:
 	rm -rf .coverage htmlcov/ .pytest_cache/ && pytest --cov=emg3d --flake8 && coverage html
@@ -37,7 +37,7 @@ linkcheck:
 	cd docs && make linkcheck
 
 clean:
-	python setup.py develop -u
+	pip uninstall emg3d -y
 	rm -rf build/ dist/ .eggs/ emg3d.egg-info/ emg3d/version.py  # build
 	rm -rf */__pycache__/ */*/__pycache__/      # python cache
 	rm -rf .coverage htmlcov/ .pytest_cache/    # tests and coverage
