@@ -142,6 +142,7 @@ Simulation
 Now that we have a model and a survey we can define our simulation:
 
 .. ipython::
+  :okwarning:
 
   In [1]: sim = emg3d.Simulation(
      ...:     survey=survey,

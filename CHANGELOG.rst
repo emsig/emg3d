@@ -11,13 +11,16 @@ Changelog
 
 - Meshes:
 
-  - Bugfix: ``construct_mesh`` and ``origin_and_widths`` (**non-backwards
-    compatible**): The ``center`` changed from being on the edge to being in
-    the center. It is regarded as a bugfix, hence it was changed without
-    deprecation period; but note that the constructed grids will slightly
-    change due to this change. Given the "opportunity" that the generated grids
-    will change anyway there were other changes made to ``origin_and_widths``,
-    together with a heavy refactoring.
+  - ``construct_mesh`` and ``origin_and_widths`` take a new variable
+    ``center_on_edge``: If ``True``, the center is put on an edge, if
+    ``False``, it is put at the cell center. Status quo is ``True``, but the
+    **default will change** to ``False`` in v1.7.0. If not set, it will
+    currently raise a FutureWarning making the user aware of the change.
+    Setting ``center_on_edge`` explicitly will suppress the warning.
+  - Constructed grids through ``construct_mesh`` and ``origin_and_widths`` with
+    a defined ``seasurface`` might slightly change due to some improvements and
+    refactoring in the course of the above changes to the center. The changes
+    should not be severe.
 
 - Simulation:
 
@@ -28,7 +31,8 @@ Changelog
 - CLI:
 
   - Expose ``mean_noise`` and ``ntype``, in addition to ``min_offset``, to the
-    CLI (for adding noise); also ``plain`` (for solver).
+    CLI (for adding noise); also ``plain`` (for solver), and ``center_on_edge``
+    (for gridding options).
 
 
 v1.4.0 : Meshing: improve vector

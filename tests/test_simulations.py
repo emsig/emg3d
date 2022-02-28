@@ -295,7 +295,7 @@ class TestSimulation():
         # Create a simple survey
         sources = emg3d.surveys.txrx_coordinates_to_dict(
                 emg3d.TxElectricDipole,
-                (125, [1250, 3250, 5250], -700, 0, 0))
+                (0, [1000, 3000, 5000], -950, 0, 0))
         receivers = emg3d.surveys.txrx_coordinates_to_dict(
                 emg3d.RxElectricPoint,
                 ([-3000, 0, 3000], [0, 3000, 6000], -1000, 0, 0))
@@ -312,9 +312,14 @@ class TestSimulation():
         model = emg3d.Model(grid, 1)
 
         # Create a simulation, compute all fields.
-        inp = {'survey': survey, 'model': model,
-               'gridding_opts': {
-                   'expand': [1, 0.5], 'seasurface': 0, 'verb': 1}}
+        inp = {
+            'survey': survey, 'model': model,
+            'gridding_opts': {
+                'expand': [1, 0.5], 'seasurface': 0, 'verb': 1,
+                'center_on_edge': (False, True, False),
+            },
+        }
+
         b_sim = simulations.Simulation(name='both', gridding='both', **inp)
         f_sim = simulations.Simulation(
                 name='freq', gridding='frequency', **inp)
@@ -323,10 +328,10 @@ class TestSimulation():
                 name='single', gridding='single', **inp)
 
         # Quick repr test.
-        assert " 24 x 24 (18,432) - 160 x 160 x 96 (2,457," in b_sim.__repr__()
-        assert " 24 x 24 (18,432) - 160 x 160 x 96 (2,457," in f_sim.__repr__()
-        assert "Source-dependent grids; 64 x 64 x 32 (131," in t_sim.__repr__()
-        assert "ources and frequencies; 64 x 64 x 32 (131," in s_sim.__repr__()
+        assert " 24 x 16 (12,288) - 160 x 160 x 96 (2,457," in b_sim.__repr__()
+        assert " 24 x 16 (12,288) - 160 x 160 x 96 (2,457," in f_sim.__repr__()
+        assert "Source-dependent grids; 64 x 64 x 40 (163," in t_sim.__repr__()
+        assert "ources and frequencies; 64 x 64 x 40 (163," in s_sim.__repr__()
 
         # Quick print_grid test:
         _, _ = capsys.readouterr()  # empty
@@ -555,7 +560,8 @@ def test_misfit():
 
     # Missing noise_floor / std.
     survey = emg3d.Survey(sources, receivers, 100)
-    simulation = simulations.Simulation(survey=survey, model=model)
+    simulation = simulations.Simulation(
+        survey=survey, model=model, gridding_opts={'center_on_edge': True})
     with pytest.raises(ValueError, match="Either `noise_floor` or"):
         simulation.misfit
 

@@ -347,7 +347,10 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     center : array_like
         Center coordinates (x, y, z). The mesh is centered around this point,
         which means that here is the smallest cell. Usually this is the source
-        location.
+        location. Note that from v1.7.0 the default will change: until then,
+        the center is assumed to be at the edge; from v1.7.0 onwards, it is
+        assumed to be at the cell center. It can be changed via the parameter
+        ``center_on_node``.
 
     domain : {tuple, list, dict, None}, optional
         Contains the survey-domain limits. This domain should include all
@@ -390,6 +393,14 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         yvector, None)``), in which case you have to provide a ``domain`` or
         ``distance``. If only one ndarray is provided it is applied to all
         dimensions.
+
+    center_on_edge : {tuple, bool, dict, None}, optional
+        Contains booleans defining if `center` is at the edge or at the cell
+        center. Format:
+        ``None``, ``bool``, ``(xbool, ybool, zbool)`` or
+        ``{'x': xbool, 'y': ybool, 'z': zbool}``.
+
+        Only relevant if no vector is provided in given direction.
 
     seasurface : float, default: None
         Air-sea interface, has to be above the center. This has only to be set
@@ -475,7 +486,6 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     """
     kwargs = deepcopy(kwargs)  # To not change a provided dict.
     verb = kwargs.get('verb', 0)
-    distance = kwargs.pop('distance', None)
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
@@ -510,8 +520,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                 data[name] = value[i]
 
     # Add optionally direction specific args.
-    for name, value in zip(['domain', 'vector', 'distance'],
-                           [domain, vector, distance]):
+    for name, value in zip(['domain', 'vector'], [domain, vector]):
         if value is None or isinstance(value, np.ndarray):
             kwargs[name] = value
         elif isinstance(value, dict):
@@ -523,10 +532,13 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
             kwargs[name] = value
 
     # Add optionally direction specific kwargs.
-    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
+    for name in ['distance', 'stretching', 'min_width_limits', 'min_width_pps',
+                 'center_on_edge']:
         value = kwargs.pop(name, None)
         if value is not None:
-            if isinstance(value, (int, float)):
+            if isinstance(value, bool):
+                kwargs[name] = value
+            elif isinstance(value, (int, float)):
                 kwargs[name] = np.array([value])
             elif isinstance(value, dict):
                 _put_in_dicts([xparams, yparams, zparams],
@@ -608,12 +620,25 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     lambda_from_center = kwargs.pop('lambda_from_center', False)
     pmap = kwargs.pop('mapping', 'Resistivity')
     cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
+    center_on_edge = kwargs.pop('center_on_edge', "notset")
     raise_error = kwargs.pop('raise_error', True)
     verb = kwargs.pop('verb', 0)
 
     # Ensure no kwargs left.
     if kwargs:
         raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
+
+    # If center_on_edge and no vector, raise FutureWarning about change.
+    if center_on_edge == 'notset':
+        if vector is None:
+            msg = (
+                "emg3d: `center` will change from being at an edge to "
+                "being at the cell center in v1.7.0. This behaviour can "
+                "be set via at `center_on_edge`. Set `center_on_edge` "
+                "specifically to suppress this warning."
+            )
+            warnings.warn(msg, FutureWarning)
+        center_on_edge = True  # Backwards compatible, until v1.7.0.
 
     # Get property map from string.
     if isinstance(pmap, str):
@@ -671,6 +696,10 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         # If vector is outside domain, set to None.
         if len(vector) < 3:
             vector = None
+
+    # If center_on_edge and no vector, we create a vector.
+    if vector is None and center_on_edge:
+        vector = np.r_[center-dmin, center, center+dmin]
 
     # Center part.
     if vector is None:
@@ -1366,7 +1395,8 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
                  'lambda_from_center', 'max_buffer', 'verb']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
-    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
+    for name in ['stretching', 'min_width_limits', 'min_width_pps',
+                 'center_on_edge']:
         if name in gridding_opts.keys():
             value = gridding_opts.pop(name)
             if isinstance(value, (list, tuple)) and len(value) == 3:
