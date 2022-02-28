@@ -117,35 +117,47 @@ class TestTensorMesh:
 
 class TestConstructMesh:
     def test_verb(self, capsys):
-        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=1)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=1)
         out, _ = capsys.readouterr()
         assert "         == GRIDDING IN X ==" in out
         assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
 
-        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=0)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=0)
         out, _ = capsys.readouterr()
         assert "" == out
         assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
 
-        mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=-1)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            mesh = meshes.construct_mesh(1.0, 1.0, (0, 0, 0), [-1, 1], verb=-1)
         out, _ = capsys.readouterr()
         assert "" == out
         assert "         == GRIDDING IN X ==" in mesh.construct_mesh_info
 
         # No suitable grid warning.
         with pytest.raises(RuntimeError, match="No suitable grid found; "):
-            meshes.construct_mesh(1, 1, (0, 0, 0), [-1, 1], cell_numbers=[1, ])
+            with pytest.warns(FutureWarning, match='`center` will change'):
+                meshes.construct_mesh(1, 1, (0, 0, 0), [-1, 1],
+                                      cell_numbers=[1, ])
 
     def test_compare_to_gow1(self):
         f = 1/np.pi
         p = 9*mu_0
         c = (1, 2, 3)
         d = [-1, 1]
-        x0, hx = meshes.origin_and_widths(f, p, c[0], d, stretching=[1, 1.3])
-        y0, hy = meshes.origin_and_widths(f, p, c[1], d, stretching=[1.5, 1])
-        z0, hz = meshes.origin_and_widths(f, p, c[2], d, stretching=[1, 1])
-        m = meshes.construct_mesh(
-                f, [p, p, p, p], c, d, stretching=([1, 1.3], [1.5, 1], [1, 1]))
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            x0, hx = meshes.origin_and_widths(f, p, c[0], d,
+                                              stretching=[1, 1.3])
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            y0, hy = meshes.origin_and_widths(f, p, c[1], d,
+                                              stretching=[1.5, 1])
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            z0, hz = meshes.origin_and_widths(f, p, c[2], d, stretching=[1, 1])
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m = meshes.construct_mesh(
+                    f, [p, p, p, p], c, d,
+                    stretching=([1, 1.3], [1.5, 1], [1, 1]))
 
         assert_allclose(m.origin, (x0, y0, z0))
         assert_allclose(m.h[0], hx)
@@ -153,9 +165,10 @@ class TestConstructMesh:
         assert_allclose(m.h[2], hz)
 
         # As dict
-        m = meshes.construct_mesh(
-                f, [p, p, p, p], c, d,
-                stretching={'x': [1, 1.3], 'y': [1.5, 1], 'z': [1, 1]})
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m = meshes.construct_mesh(
+                    f, [p, p, p, p], c, d,
+                    stretching={'x': [1, 1.3], 'y': [1.5, 1], 'z': [1, 1]})
 
         assert_allclose(m.origin, (x0, y0, z0))
         assert_allclose(m.h[0], hx)
@@ -164,20 +177,25 @@ class TestConstructMesh:
 
     def test_compare_to_gow2(self):
         vz = np.arange(100)[::-1]*-20
-        x0, hx = meshes.origin_and_widths(
-                0.77, [0.3, 1, 2], 0, [-1000, 1000], min_width_limits=[20, 40])
-        y0, hy = meshes.origin_and_widths(
-                0.77, [0.3, 2, 1], 0, [-2000, 2000], min_width_limits=[20, 40])
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            x0, hx = meshes.origin_and_widths(
+                    0.77, [0.3, 1, 2], 0, [-1000, 1000],
+                    min_width_limits=[20, 40])
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            y0, hy = meshes.origin_and_widths(
+                    0.77, [0.3, 2, 1], 0, [-2000, 2000],
+                    min_width_limits=[20, 40])
         z0, hz = meshes.origin_and_widths(
                 0.77, [0.3, 2, 1e8], 0, vector=vz, min_width_limits=[20, 40])
-        m = meshes.construct_mesh(
-                frequency=0.77,
-                properties=[0.3, 1, 2, 2, 1, 2, 1e8],
-                center=(0, 0, 0),
-                domain=([-1000, 1000], [-2000, 2000], None),
-                vector=(None, None, vz),
-                min_width_limits=[20, 40],
-                )
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m = meshes.construct_mesh(
+                    frequency=0.77,
+                    properties=[0.3, 1, 2, 2, 1, 2, 1e8],
+                    center=(0, 0, 0),
+                    domain=([-1000, 1000], [-2000, 2000], None),
+                    vector=(None, None, vz),
+                    min_width_limits=[20, 40],
+                    )
 
         assert_allclose(m.origin, (x0, y0, z0))
         assert_allclose(m.h[0], hx)
@@ -185,14 +203,15 @@ class TestConstructMesh:
         assert_allclose(m.h[2], hz)
 
         # As dict
-        m = meshes.construct_mesh(
-                frequency=0.77,
-                properties=[0.3, 1, 2, 2, 1, 2, 1e8],
-                center=(0, 0, 0),
-                domain={'x': [-1000, 1000], 'y': [-2000, 2000], 'z': None},
-                vector={'x': None, 'y': None, 'z': vz},
-                min_width_limits=[20, 40],
-                )
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m = meshes.construct_mesh(
+                    frequency=0.77,
+                    properties=[0.3, 1, 2, 2, 1, 2, 1e8],
+                    center=(0, 0, 0),
+                    domain={'x': [-1000, 1000], 'y': [-2000, 2000], 'z': None},
+                    vector={'x': None, 'y': None, 'z': vz},
+                    min_width_limits=[20, 40],
+                    )
 
         assert_allclose(m.origin, (x0, y0, z0))
         assert_allclose(m.h[0], hx)
@@ -200,19 +219,24 @@ class TestConstructMesh:
         assert_allclose(m.h[2], hz)
 
     def test_compare_to_gow3(self):
-        x0, hx = meshes.origin_and_widths(
-                0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
-        y0, hy = meshes.origin_and_widths(
-                0.2, [1.0, 2.0], 16, [-1234, 8956], min_width_limits=20)
-        z0, hz = meshes.origin_and_widths(
-                0.2, [1.0, 3.0], -33.3333, [-100, 100], min_width_limits=20)
-        m = meshes.construct_mesh(
-                frequency=0.2,
-                properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
-                center=(-423, 16, -33.3333),
-                domain=([-3333, 222], [-1234, 8956], [-100, 100]),
-                min_width_limits=20,
-                )
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            x0, hx = meshes.origin_and_widths(
+                    0.2, [1, 1], -423, [-3333, 222], min_width_limits=20)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            y0, hy = meshes.origin_and_widths(
+                    0.2, [1.0, 2.0], 16, [-1234, 8956], min_width_limits=20)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            z0, hz = meshes.origin_and_widths(
+                    0.2, [1.0, 3.0], -33.3333, [-100, 100],
+                    min_width_limits=20)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m = meshes.construct_mesh(
+                    frequency=0.2,
+                    properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
+                    center=(-423, 16, -33.3333),
+                    domain=([-3333, 222], [-1234, 8956], [-100, 100]),
+                    min_width_limits=20,
+                    )
 
         assert_allclose(m.origin, (x0, y0, z0), atol=1e-3)
         assert_allclose(m.h[0], hx)
@@ -220,14 +244,15 @@ class TestConstructMesh:
         assert_allclose(m.h[2], hz)
 
         # As dict.
-        m = meshes.construct_mesh(
-                frequency=0.2,
-                properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
-                center=(-423, 16, -33.3333),
-                domain={'x': [-3333, 222], 'y': [-1234, 8956],
-                        'z': [-100, 100]},
-                min_width_limits=20,
-                )
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m = meshes.construct_mesh(
+                    frequency=0.2,
+                    properties=[1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0],
+                    center=(-423, 16, -33.3333),
+                    domain={'x': [-3333, 222], 'y': [-1234, 8956],
+                            'z': [-100, 100]},
+                    min_width_limits=20,
+                    )
 
         assert_allclose(m.origin, (x0, y0, z0), atol=1e-3)
         assert_allclose(m.h[0], hx)
@@ -237,8 +262,10 @@ class TestConstructMesh:
     def test_compare_to_gow4(self):
         inp = {'frequency': 1.234, 'center': (0, 0, 0),
                'domain': ([-100, 100], [-100, 100], [-100, 100])}
-        m3 = meshes.construct_mesh(properties=[0.3, 1.0, 1e8], **inp)
-        m4 = meshes.construct_mesh(properties=[0.3, 1e8, 1.0, 1e8], **inp)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m3 = meshes.construct_mesh(properties=[0.3, 1.0, 1e8], **inp)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            m4 = meshes.construct_mesh(properties=[0.3, 1e8, 1.0, 1e8], **inp)
 
         assert_allclose(m3.origin, m4.origin)
         assert_allclose(m3.h[0], m4.h[0])
@@ -252,33 +279,29 @@ class TestOriginAndWidths:
             meshes.origin_and_widths(1, 1, 0, [-1, 1], unknown=True)
 
         with pytest.raises(ValueError, match="At least one of `domain`/`d"):
-            meshes.origin_and_widths(1, 1, 0)
+            meshes.origin_and_widths(1, 1, 0, center_on_edge=False)
 
         with pytest.raises(ValueError, match="The `seasurface` must be bigge"):
-            meshes.origin_and_widths(1, 1, 0, [-1, 1], seasurface=-2)
+            meshes.origin_and_widths(
+                1, 1, 0, [-1, 1], center_on_edge=False, seasurface=-2)
 
         # No suitable grid warning.
         with pytest.raises(RuntimeError, match="No suitable grid found; "):
-            meshes.origin_and_widths(1, 1, 0, [-100, 100], cell_numbers=[1, ])
+            meshes.origin_and_widths(
+                1, 1, 0, [-100, 100], cell_numbers=[1, ], center_on_edge=False)
 
         out = meshes.origin_and_widths(
                 1, 1, 0, [-100, 100], cell_numbers=[1, ], raise_error=False,
-                verb=1)
+                center_on_edge=False, verb=1)
         outstr, _ = capsys.readouterr()
 
         assert out[0] is None
         assert out[1] is None
         assert "No suitable grid found; relax your criteria." in outstr
 
-        # Stretching warning.
-        meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, -0.2, [-1, 2], stretching=[1, 1],
-                seasurface=1.2, verb=3)
-        out, _ = capsys.readouterr()
-        assert "Note: Stretching in DS >> 1.0.\nThe reason " in out
-
     def test_basics(self, capsys):
-        x0, hx = meshes.origin_and_widths(
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            x0, hx = meshes.origin_and_widths(
                 1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
@@ -293,16 +316,18 @@ class TestOriginAndWidths:
         assert "Number of cells    : 40 (4 / 36 / 0)  [Total (DS/" in out
         assert "Max stretching     : 1.000 (1.000) / 1.000  [DS (" in out
 
-        _ = meshes.origin_and_widths(
-                1/np.pi, [8.9*mu_0, 9*mu_0], 0.0, [-1, 1],
-                stretching=[1, 1], verb=1)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            _ = meshes.origin_and_widths(
+                    1/np.pi, [8.9*mu_0, 9*mu_0], 0.0, [-1, 1],
+                    stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
         assert "2.98 / 3.00  [corr. to `properties`]" in out
 
-        _ = meshes.origin_and_widths(
-                1/np.pi, [8.9*mu_0, 9*mu_0, 9.1*mu_0], 0.0, [-1, 1],
-                stretching=[1, 1], verb=1)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            _ = meshes.origin_and_widths(
+                    1/np.pi, [8.9*mu_0, 9*mu_0, 9.1*mu_0], 0.0, [-1, 1],
+                    stretching=[1, 1], verb=1)
         out, _ = capsys.readouterr()
 
         assert "2.98 / 3.00 / 3.02  [corr. to `properties`]" in out
@@ -311,7 +336,8 @@ class TestOriginAndWidths:
         inp = {'frequency': 1/np.pi, 'properties': 9*mu_0, 'center': 0.0,
                'stretching': [1, 1.5]}
 
-        x01, hx1 = meshes.origin_and_widths(domain=[-1, 1], **inp)
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            x01, hx1 = meshes.origin_and_widths(domain=[-1, 1], **inp)
 
         x01b, hx1b = meshes.origin_and_widths(  # vector will be set to None
                 domain=[-1, 1], vector=[-2, -1, 0], **inp)
@@ -330,32 +356,31 @@ class TestOriginAndWidths:
         assert not np.in1d(vector3[-1], x03 + np.cumsum(hx3))
 
         x04, hx4 = meshes.origin_and_widths(  # vector will be cut
-                distance=[1, 1], vector=vector3, **inp)
+                distance=[1.0, 1.0], vector=vector3, **inp)
         assert_allclose(x03, x04)
         assert_allclose(hx3, hx4)
 
         x05, hx5 = meshes.origin_and_widths(  # vector will be expanded
                 distance=[2.0, 2.0], vector=vector2, **inp)
-        print(x05 + np.cumsum(hx5))
         assert np.in1d(np.array([-2, -1, 0, 1, 2]), x05 + np.cumsum(hx5)).all()
 
     def test_seasurface(self):
-        x01, hx1 = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, 0.0, [-1, 1], stretching=[1, 1])
-        x02, hx2 = meshes.origin_and_widths(
-                1/np.pi, 9*mu_0, -0.5, [-1, 0], seasurface=0.0,
-                stretching=[1, 1])
-        assert_allclose(x01, x02)
-        assert_allclose(hx1, hx2)
+        inp = {'frequency': 1/np.pi, 'properties': 9*mu_0, 'domain': [-1, 2],
+               'center_on_edge': False, 'stretching': [1, 1]}
+        x03, hx3 = meshes.origin_and_widths(center=0.5, **inp)
+        x04, hx4 = meshes.origin_and_widths(center=0.7, seasurface=1.0, **inp)
+        assert_allclose(x03, x04)
+        assert_allclose(hx3, hx4)  # second grid is shifted because of ss
 
     def test_status_quo_with_all(self, capsys):
         # Defaults.
-        meshes.origin_and_widths(
-            frequency=0.2,
-            properties=[0.3, 1, 50],
-            center=-950,
-            domain=[-2000, -1000],
-            verb=1,
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            meshes.origin_and_widths(
+                frequency=0.2,
+                properties=[0.3, 1, 50],
+                center=-950,
+                domain=[-2000, -1000],
+                verb=1,
             )
 
         out, _ = capsys.readouterr()
@@ -386,25 +411,25 @@ class TestOriginAndWidths:
             cell_numbers=[20, 40, 80, 160],
             verb=1,
             raise_error=False,
-            )
+        )
 
         out, _ = capsys.readouterr()
-
         assert "Skin depth     [m] : 620 / 1125 / 50" in out
-        assert "Survey dom. DS [m] : -2000 - -1000" in out
-        assert "Comp. dom. DC  [m] : -10950 - 5300" in out
+        assert "Survey dom. DS [m] : -2000 - -500" in out
+        assert "Comp. dom. DC  [m] : -10950 - 5600" in out
         assert "Final extent   [m] : -11118 - 6651" in out
         assert "Cell widths    [m] : 100 / 100 / 1968" in out
         assert "Number of cells    : 40 (15 / 25 / 0)" in out
         assert "Max stretching     : 1.000 (1.000) / 1.258" in out
 
         # High frequencies.
-        _, _, out = meshes.origin_and_widths(
-            frequency=1e8,
-            properties=[5, 1, 50],
-            center=0,
-            domain=[-1, 1],
-            verb=-1,
+        with pytest.warns(FutureWarning, match='`center` will change'):
+            _, _, out = meshes.origin_and_widths(
+                frequency=1e8,
+                properties=[5, 1, 50],
+                center=0,
+                domain=[-1, 1],
+                verb=-1,
             )
 
         assert "Skin depth     [m] : 0.113 / 0.050 / 0.356" in out
@@ -414,6 +439,169 @@ class TestOriginAndWidths:
         assert "Cell widths    [m] : 0.038 / 0.038 / 0.234" in out
         assert "Number of cells    : 80 (54 / 26 / 0)" in out
         assert "Max stretching     : 1.000 (1.000) / 1.096" in out
+
+
+class TestStretch:
+    def test_normal(self):
+        inp = {
+            'edges': np.array([-5.0, 5]),
+            'widths': np.array(10.),
+            'stretching': 1.1,
+            'nx': 16,
+            'domain': np.array([-40, 40]),
+        }
+        edges, widths, remain = meshes._stretch(use_up=False, **inp)
+        assert_allclose(edges, [-41.41, 41.41])
+        assert_allclose(widths, [13.31, 12.1, 11, 10, 11, 12.1, 13.31])
+        assert remain == 9
+
+        edges, widths, remain = meshes._stretch(use_up=True, **inp)
+        assert_allclose(edges, [-109.358881,  130.794769])
+        assert_allclose(widths[-1], 10*1.1**8)
+        assert remain == 0
+
+    def test_false(self):
+        inp = {
+            'edges': np.array([-5.0, 5]),
+            'widths': np.array(10.),
+            'stretching': 1.1,
+            'nx': 4,
+            'domain': np.array([-40, 40]),
+        }
+        edges, widths, remain = meshes._stretch(use_up=False, **inp)
+        assert not edges
+        assert not widths
+        assert not remain
+
+    def test_vector(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array([10, 10.]),
+            'stretching': 1.1,
+            'nx': 16,
+            'domain': np.array([-40, 40]),
+            'use_up': False,
+        }
+        edges, widths, remain = meshes._stretch(**inp)
+        assert_allclose(edges, [-46.41, 46.41])
+        assert_allclose(widths, [13.31, 12.1, 11, 10, 10, 11, 12.1, 13.31])
+        assert remain == 8
+
+    def test_edges(self):
+        inp = {
+            'edges': np.array([-5.0, 5]),
+            'widths': np.array(10.),
+            'stretching': 1.1,
+            'nx': 16,
+            'use_up': False,
+        }
+        edges, widths, remain = meshes._stretch(
+                domain=np.array([0, 40.]), **inp)
+        assert_allclose(edges, [-5, 41.41])
+        assert_allclose(widths, [10, 11, 12.1, 13.31])
+        assert remain == 12
+
+        edges, widths, remain = meshes._stretch(
+                domain=np.array([-40, 0.]), **inp)
+        assert_allclose(edges, [-41.41, 5])
+        assert_allclose(widths, [13.31, 12.1, 11, 10])
+        assert remain == 12
+
+
+class TestSeasurface:
+    def test_seasurface_close_to_center(self):
+        inp = {
+            'edges': np.array([0.0, 10]),
+            'widths': np.array(10.),
+            'center': 5.0,
+            'stretching': [1, 1],
+            'vector': None,
+            'limits': None,
+        }
+
+        # Seasurface below edge.
+        edges, widths = meshes._seasurface(seasurface=6.0, **inp)
+        assert_allclose(edges, [-4, 6])
+        assert_allclose(widths, 10)
+
+        # Seasurface above edge.
+        edges, widths = meshes._seasurface(seasurface=13.3333, **inp)
+        assert_allclose(edges, [3.3333, 13.3333])
+        assert_allclose(widths, 10)
+
+    def test_normal(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array(20.),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': None,
+            'limits': None,
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -10.5)  # moved edge
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 21)  # changed width
+
+    def test_vector(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array([10.0, 10.0]),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': np.array([-10.0, 0.0, 10.0]),
+            'limits': None,
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -10)
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 10)
+
+    def test_limits(self):
+        inp = {
+            'edges': np.array([0.0, 10]),
+            'widths': np.array([10.0]),
+            'center': 5.0,
+            'stretching': [1, 1.5],
+            'vector': None,
+            'limits': 10.0,
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], 0)
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 10)
+
+        inp = {
+            'edges': np.array([-5.5, 5.5]),
+            'widths': np.array([11.0]),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': None,
+            'limits': [10, 15],
+        }
+        seasurface = 56.234
+        edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -5.5)
+        assert_allclose(edges[-1], seasurface)
+        assert_allclose(widths[0], 11)
+
+    def test_issues(self):
+        inp = {
+            'edges': np.array([-10.0, 10]),
+            'widths': np.array([10.0, 10.0]),
+            'center': 0.0,
+            'stretching': [1, 1.5],
+            'vector': np.array([-10.0, 0.0, 10.0]),
+            'limits': None,
+        }
+        seasurface = 11.0
+        with pytest.warns(UserWarning, match='Seasurface is not at an actual'):
+            edges, widths = meshes._seasurface(seasurface=seasurface, **inp)
+        assert_allclose(edges[0], -10)
+        assert_allclose(widths[0], 10)
 
 
 def test_good_mg_cell_nr(capsys):

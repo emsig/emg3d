@@ -22,6 +22,7 @@ from copy import deepcopy
 
 import numpy as np
 from scipy.constants import mu_0
+from scipy.optimize import brentq
 
 from emg3d import maps, utils
 
@@ -346,7 +347,10 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     center : array_like
         Center coordinates (x, y, z). The mesh is centered around this point,
         which means that here is the smallest cell. Usually this is the source
-        location.
+        location. Note that from v1.7.0 the default will change: until then,
+        the center is assumed to be at the edge; from v1.7.0 onwards, it is
+        assumed to be at the cell center. It can be changed via the parameter
+        ``center_on_node``.
 
     domain : {tuple, list, dict, None}, optional
         Contains the survey-domain limits. This domain should include all
@@ -390,12 +394,26 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         ``distance``. If only one ndarray is provided it is applied to all
         dimensions.
 
+    center_on_edge : {tuple, bool, dict, None}, optional
+        Contains booleans defining if `center` is at the edge or at the cell
+        center. Format:
+        ``None``, ``bool``, ``(xbool, ybool, zbool)`` or
+        ``{'x': xbool, 'y': ybool, 'z': zbool}``.
+
+        Only relevant if no vector is provided in given direction.
+
     seasurface : float, default: None
-        Air-sea interface. This has only to be set in the marine case, when the
-        mesh in z-direction is sought for (and the interface is not contained
-        in ``vector``). If set, it will ensure that at the sea surface is an
-        actual boundary. It has to be bigger than the lower limit of the survey
-        domain.
+        Air-sea interface, has to be above the center. This has only to be set
+        in the marine case, when the mesh in z-direction is sought for (and the
+        seasurface is not contained in ``vector``). If set, it will try to
+        ensure that at the sea surface is an actual boundary.
+
+        If the seasurface lies higher than the survey domain it will increase
+        the survey domain to include the seasurface.
+
+        If the seasurface is too close to the center it will most likely fail
+        to find a good grid. It will still create the grid, raising a warning
+        that the seasurface is not at an actual boundary.
 
     stretching : {tuple, list, dict}, default: [1.0, 1.5]
         Maximum stretching factors in the form of ``[max Ds, max Dc]``: the
@@ -468,7 +486,6 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     """
     kwargs = deepcopy(kwargs)  # To not change a provided dict.
     verb = kwargs.get('verb', 0)
-    distance = kwargs.pop('distance', None)
 
     # Initiate direction-specific dicts, add unambiguous args.
     kwargs['frequency'] = frequency
@@ -503,8 +520,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
                 data[name] = value[i]
 
     # Add optionally direction specific args.
-    for name, value in zip(['domain', 'vector', 'distance'],
-                           [domain, vector, distance]):
+    for name, value in zip(['domain', 'vector'], [domain, vector]):
         if value is None or isinstance(value, np.ndarray):
             kwargs[name] = value
         elif isinstance(value, dict):
@@ -516,10 +532,13 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
             kwargs[name] = value
 
     # Add optionally direction specific kwargs.
-    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
+    for name in ['distance', 'stretching', 'min_width_limits', 'min_width_pps',
+                 'center_on_edge']:
         value = kwargs.pop(name, None)
         if value is not None:
-            if isinstance(value, (int, float)):
+            if isinstance(value, bool):
+                kwargs[name] = value
+            elif isinstance(value, (int, float)):
                 kwargs[name] = np.array([value])
             elif isinstance(value, dict):
                 _put_in_dicts([xparams, yparams, zparams],
@@ -601,12 +620,25 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     lambda_from_center = kwargs.pop('lambda_from_center', False)
     pmap = kwargs.pop('mapping', 'Resistivity')
     cell_numbers = kwargs.pop('cell_numbers', good_mg_cell_nr())
+    center_on_edge = kwargs.pop('center_on_edge', "notset")
     raise_error = kwargs.pop('raise_error', True)
     verb = kwargs.pop('verb', 0)
 
     # Ensure no kwargs left.
     if kwargs:
         raise TypeError(f"Unexpected **kwargs: {list(kwargs.keys())}.")
+
+    # If center_on_edge and no vector, raise FutureWarning about change.
+    if center_on_edge == 'notset':
+        if vector is None:
+            msg = (
+                "emg3d: `center` will change from being at an edge to "
+                "being at the cell center in v1.7.0. This behaviour can "
+                "be set via at `center_on_edge`. Set `center_on_edge` "
+                "specifically to suppress this warning."
+            )
+            warnings.warn(msg, FutureWarning)
+        center_on_edge = True  # Backwards compatible, until v1.7.0.
 
     # Get property map from string.
     if isinstance(pmap, str):
@@ -639,6 +671,16 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             "At least one of `domain`/`distance`/`vector` must be provided."
         )
 
+    # Check seasurface.
+    if seasurface is not None:
+
+        # Check that seasurface > center.
+        if seasurface <= center:
+            raise ValueError("The `seasurface` must be bigger than `center`.")
+
+        # Expand domain to include seasurface if necessary.
+        domain[1] = max(domain[1], seasurface)
+
     # Check vector if provided
     if vector is not None:
 
@@ -655,16 +697,24 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         if len(vector) < 3:
             vector = None
 
-    # Seasurface related checks.
+    # If center_on_edge and no vector, we create a vector.
+    if vector is None and center_on_edge:
+        vector = np.r_[center-dmin, center, center+dmin]
+
+    # Center part.
+    if vector is None:
+        center_widths = dmin
+        center_edges = np.r_[center-dmin/2, center+dmin/2]
+    else:
+        center_widths = np.diff(vector)
+        center_edges = np.r_[vector[0], vector[-1]]
+
+    # Adjust center so seasurface is a boundary.
     if seasurface is not None:
-
-        # Check that seasurface > center.
-        if seasurface <= center:
-            raise ValueError("The `seasurface` must be bigger than `center`.")
-
-        # If center is close to seasurface, set it to seasurface.
-        if abs(seasurface - center) < dmin:
-            center = seasurface
+        center_edges, center_widths = _seasurface(
+            center_edges, center_widths, center, seasurface, stretching,
+            vector, min_width_limits,
+        )
 
     # Computation domain; big enough to avoid boundary effects.
     # To avoid boundary effects we want the signal to travel two wavelengths
@@ -704,94 +754,33 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         nsa = max(1, min(100, int((stretching[0] - 1) / 0.001)))
         for sa in np.linspace(1.0, stretching[0], nsa):
 
-            if vector is None:
-                cpart = [center, center]
-                dlr = [dmin, dmin]
-                nx0 = 0
-            else:
-                cpart = [vector[0], vector[-1]]
-                dlr = [vector[1]-vector[0], vector[-1]-vector[-2]]
-                nx0 = 1
-
-            # Get current stretched grid cell sizes.
-            thxl = dlr[0]*sa**np.arange(nx0, nx)  # Left of origin.
-            thxr = dlr[1]*sa**np.arange(nx0, nx)  # Right of origin.
-
-            # Adjust stretching for seasurface if required.
-            if seasurface is not None and seasurface > cpart[1]:
-                t_nx = np.r_[cpart[1], cpart[1]+np.cumsum(thxr)]
-                ii = np.argmin(abs(t_nx-seasurface))
-                thxr[:ii] *= abs(seasurface-cpart[1])/np.sum(thxr[:ii])
-
-            # Fill from center to left and right domain.
-            nl = np.sum((cpart[0]-np.cumsum(thxl)) >= domain[0]) + (1-nx0)
-            nr = np.sum((cpart[1]+np.cumsum(thxr)) <= domain[1]) + (1-nx0)
-
-            # Create the current hx-array.
-            if vector is None:
-                hx = np.r_[thxl[:nl][::-1], thxr[:nr]]
-            else:
-                hx = np.r_[thxl[:nl][::-1], np.diff(vector), thxr[:nr]]
-
-            # Get actual domain:
-            asurv_domain = [cpart[0] - np.sum(thxl[:nl]),
-                            cpart[1] + np.sum(thxr[:nr])]
-
-            # Expand for seasurface if necessary.
-            if seasurface is not None and seasurface > asurv_domain[-1]:
-                thxr = hx[-1]*sa**np.arange(nx)
-                sdepth = seasurface - asurv_domain[-1]
-
-                # Get number of element, round down, and stretch.
-                ii = np.argmax(np.cumsum(thxr) > sdepth)
-                thxr = thxr[:ii]  # Restrict.
-                thxr *= abs(seasurface-asurv_domain[-1])/np.sum(thxr)
-
-                # Adjust actual domain, hx, and count.
-                asurv_domain[1] += sum(thxr)
-                hx = np.r_[hx, thxr]
-
-            # Remaining number of cells
-            nx_remain = nx - hx.size
+            # Get origin, widths, and remaining cell number.
+            sd_edges, sd_hx, sd_remain = _stretch(
+                center_edges, center_widths, sa, nx, domain,
+            )
 
             # Not good, try next.
-            if nx_remain <= 0:
+            if sd_remain is False:
                 continue
 
             # Store for verbosity
-            hxo = hx
+            hxo = np.atleast_1d(sd_hx)
 
             # Loop over possible alphas for buffer.
             nca = max(1, min(100, int((stretching[1] - sa) / 0.001)))
             for ca in np.linspace(sa, stretching[1], nca):
 
-                # Get current stretched grid cell sizes.
-                thxl = hx[0]*ca**np.arange(1, nx_remain+1)   # Left of survey.
-                thxr = hx[-1]*ca**np.arange(1, nx_remain+1)  # Right of survey.
+                # Get origin, widths, and remaining cell number.
+                cd_edges, hx, remain = _stretch(
+                    sd_edges, sd_hx, ca, nx, comp_domain, use_up=True,
+                )
 
-                # Fill from survey to left and right domain.
-                nl = np.sum((asurv_domain[0] - np.cumsum(thxl)) >
-                            comp_domain[0]) + 1
-                nr = np.sum((asurv_domain[1] + np.cumsum(thxr)) <
-                            comp_domain[1]) + 1
+                if remain is not False:
+                    x0 = cd_edges[0]
 
-                # Get remaining number of cells.
-                nx_remain2 = nx_remain - nl - nr
-
-                if nx_remain2 < 0:  # Not good, try next.
-                    continue
-
-                # Create hx-array.
-                nl += int(np.floor(nx_remain2/2))  # If uneven, add one cell
-                nr += int(np.ceil(nx_remain2/2))   # more on the right.
-                hx = np.r_[thxl[:nl][::-1], hx, thxr[:nr]]
-
-                # Compute origin.
-                x0 = float(asurv_domain[0]-np.sum(thxl[:nl]))
-
-                # Mark it as finished and break out of the loop.
-                finished = True
-                break
+                    # Mark it as finished and break out of the loop.
+                    finished = True
+                    break
 
             if finished:
                 break
@@ -811,8 +800,8 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
     else:  # Collect info about final grid.
 
         # Check max stretching.
-        sa_adj = np.max([hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
-        sa_limit = min(1.5, stretching[0]+0.25)
+        # Can be higher than desired due to seasurface.
+        sa_adj = np.max(np.r_[1.0, hxo[1:]/hxo[:-1], hxo[:-1]/hxo[1:]])
 
         # Display precision.
         prec = int(np.ceil(max(0, -np.log10(min(hx))+1)))
@@ -837,15 +826,10 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             f"/ {max(hx):.{prec}f}  [min(DS) / max(DS) / max(DC)]\n"
             #
             f"Number of cells    : {nx} ({hxo.size} / "
-            f"{nx-hxo.size-nx_remain2} / {nx_remain2})  "
-            f"[Total (DS/DC/remain)]\n"
+            f"{nx-hxo.size-remain} / {remain})  [Total (DS/DC/remain)]\n"
             #
             f"Max stretching     : {sa:.3f} ({sa_adj:.3f}) / {ca:.3f}"
             "  [DS (seasurface) / DC]")
-
-        if sa_adj > sa_limit:
-            info += (f"\nNote: Stretching in DS >> {sa}.\nThe reason "
-                     "is usually the interplay of center/domain/seasurface.")
 
     if verb > 0:
         print(info)
@@ -855,6 +839,238 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         return x0, hx, info
     else:
         return x0, hx
+
+
+def _stretch(edges, widths, stretching, nx, domain, use_up=False):
+    """Get stretched cells.
+
+    Mainly used internally in :func:`origin_and_widths`.
+
+
+    Parameters
+    ----------
+    edges : array_like
+        Start and endpoint of already gridded center part.
+
+    widths : ndarray
+        Cell widths of the cells building the center part.
+
+    stretching : float
+        Stretching factor.
+
+    nx : int
+        Max number of cells; this includes the cells in the center provided
+        with ``widths``.
+
+    domain : array_like
+        Two values denoting left and right domain boundary.
+
+    use_up : bool, default: False
+        If False, only the amount of cells are used required to reach the
+        boundary. If True, the remaining cells are used as well going beyond
+        the boundary. The are split between left and right, where one more is
+        put on the right if an uneven number is left.
+
+
+    Returns
+    -------
+    edges_ext : float
+        Start and endpoint of the extended grid.
+
+    widths_ext : ndarray
+        Cell widths of the extended grid (including the provided center part).
+
+    remain : int
+        Remaining cells (always zero if ``use_up=True``).
+
+    """
+
+    # Stretched widths to the left and the right.
+    sfactors = stretching**np.arange(1, nx+1)
+    if widths.size > 1:
+        shxl = widths[0] * sfactors
+        shxr = widths[-1] * sfactors
+    else:
+        shxl = widths * sfactors
+        shxr = widths * sfactors
+
+    # Fill from center to left and right domain.
+    if edges[0] <= domain[0]:
+        nl = 0
+    else:
+        nl = np.sum((edges[0] - np.cumsum(shxl)) > domain[0]) + 1
+    if edges[1] >= domain[1]:
+        nr = 0
+    else:
+        nr = np.sum((edges[1] + np.cumsum(shxr)) < domain[1]) + 1
+
+    # Get remaining number of cells.
+    remain = nx - widths.size - nl - nr
+
+    # Get extent and ensure it reached the domain.
+    extent = [edges[0] - np.sum(shxl[:nl]), edges[1] + np.sum(shxr[:nr])]
+    reached = extent[0] <= domain[0] and extent[1] >= domain[1]
+
+    # If reached, get origin and widths.
+    if reached and remain >= 0:
+
+        # Split remaining cells; if uneven, one more to the right.
+        if use_up:
+            nl += int(np.floor(remain/2))
+            nr += int(np.ceil(remain/2))
+            remain = 0
+
+        # Compute widths and origin.
+        widths_ext = np.r_[shxl[:nl][::-1], widths, shxr[:nr]]
+        edges_ext = [float(edges[0] - np.sum(shxl[:nl])),
+                     float(edges[1] + np.sum(shxr[:nr]))]
+
+    else:
+        edges_ext = False
+        widths_ext = False
+        remain = False
+
+    return edges_ext, widths_ext, remain
+
+
+def _seasurface(edges, widths, center, seasurface, stretching, vector, limits):
+    """Ensure seasurface is a boundary.
+
+    Mainly used internally in :func:`origin_and_widths`.
+
+
+    Parameters
+    ----------
+    edges : ndarray
+        Start and endpoint of already gridded center part.
+
+    widths : ndarray
+        Cell widths of the cells building the center part.
+
+    center : float
+        Grid center.
+
+    seasurface : float
+        Seasurface, must be larger than the center.
+
+    stretching : float
+        Stretching factors.
+
+    vector : None or ndarray
+        Only used as restriction: If None, provided widths will be modified; if
+        not None, the provided widths will stay untouched.
+
+    limits : {None, float, array_like}
+        Limits on cell width, as used for :func:`cell_width`.
+
+        - ``None``: ``widths`` might be adjusted.
+        - ``float``: ``widths`` remain untouched.
+        - ``[min, max]``: ``widths`` might be adjusted, but within the limits.
+
+    Returns
+    -------
+    edges : float
+        Adjusted edges.
+
+    widths : ndarray
+        Adjusted widths
+
+    """
+    edges = edges.copy()
+    widths = widths.copy()
+
+    # If seasurface is within half cell width of the edge and the center is not
+    # defined by a vector, just move cell.
+    if vector is None and (abs(seasurface - edges[1]) <= widths/2):
+        edges += seasurface - edges[1]
+
+    else:
+
+        # Check if limits were used to define the width.
+        if limits is None:
+            lexists = False
+        else:
+            lexists = True
+            lsize = np.array(limits, ndmin=1).size
+
+        # If a vector is given don't adjust the given widths.
+        if vector is not None or (lexists and lsize == 1):
+            frange = [1.0, ]
+
+        # Width-stretching/squeezing factors.
+        else:
+
+            # Up to 1.3x/0.7x, in 0.05 incr.
+            fmin = 0.7
+            fmax = 1.3
+
+            # Limit range so cells would not be bigger/smaller than limits.
+            if lexists and lsize == 2:
+                rlimits = limits/widths
+                fmin = max(fmin, rlimits[0])
+                fmax = min(fmax, rlimits[1])
+
+            # Get values, ensure 1.0 is the first option.
+            frange = np.linspace(fmin, fmax, 13)
+            frange = frange[np.argsort(abs(frange-1))]  # 1.0, 0.95, 1.05, ...
+            if frange[0] != 1.0:
+                frange = np.r_[1.0, frange]
+
+        # Loop over stretching/squeezing factors.
+        for fact in frange:
+
+            # No vector given (only one existing cell).
+            if vector is None:
+                tdmin = fact*widths
+                cedge = center + tdmin/2
+                alphmax = 1.1*stretching[0]  # 10 % extra stretching.
+
+            # Vector given (variable amount of existing cells).
+            else:
+                tdmin = widths[-1]
+                cedge = edges[1]
+                alphmax = 1.25*stretching[0]  # 25 % extra stretching.
+
+            # Delta: distance to fill from edge to seasurface.
+            delta = seasurface - cedge
+            n = int(np.floor(delta / tdmin))  # Nr cells that fit inside compl.
+            if n < 1:
+                continue
+
+            def f(alpha):
+                """Find stretching required to match delta with n cells."""
+                return np.sum(tdmin*alpha**np.arange(1, n+1)) - delta
+
+            # Required stretching to fit n cells exactly into delta.
+            alph = brentq(f, 0.5, 10.0)
+
+            # If stretching is within tolerance, finish.
+            if alph < min(alphmax, stretching[1]):
+
+                # Get additional required cell widths.
+                hx = tdmin*alph**np.arange(1, n+1)
+
+                # Compile output.
+                if vector is None:
+                    widths = np.r_[tdmin, hx]
+                    edges[0] = center-tdmin/2  # Might have changed.
+                else:
+                    widths = np.r_[widths, hx]
+                edges = np.r_[edges[0], edges[0]+widths.sum()]
+
+                break
+
+    # Check that it is actually a boundary; throw warning if not.
+    nv = np.r_[edges[0], edges[0] + np.cumsum(widths)]
+    check = min(abs(nv - seasurface))
+    if not np.isclose(0.0, check):
+        msg = (
+            "emg3d: Seasurface is not at an actual boundary; "
+            "relax your criteria."
+        )
+        warnings.warn(msg, UserWarning)
+
+    return edges, widths
 
 
 def good_mg_cell_nr(max_nr=1024, max_lowest=5, min_div=3):
@@ -1179,7 +1395,8 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
                  'lambda_from_center', 'max_buffer', 'verb']:
         if name in gridding_opts.keys():
             gopts[name] = gridding_opts.pop(name)
-    for name in ['stretching', 'min_width_limits', 'min_width_pps']:
+    for name in ['stretching', 'min_width_limits', 'min_width_pps',
+                 'center_on_edge']:
         if name in gridding_opts.keys():
             value = gridding_opts.pop(name)
             if isinstance(value, (list, tuple)) and len(value) == 3:

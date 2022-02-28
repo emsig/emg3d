@@ -363,7 +363,8 @@ class TestParser:
             f.write("center=0, 0, -500\n")
             f.write("cell_number=20, 40, 80, 100\n")
             f.write("min_width_pps=2, 3, 4\n")
-            f.write("expand=1, 2")
+            f.write("expand=1, 2\n")
+            f.write("center_on_edge=False; False; True")
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
@@ -391,6 +392,9 @@ class TestParser:
         assert check['cell_number'] == [20, 40, 80, 100]
         assert check['min_width_pps'] == [2, 3, 4]
         assert check['expand'] == [1, 2]
+        assert check['center_on_edge']['x'] is False
+        assert check['center_on_edge']['y'] is False
+        assert check['center_on_edge']['z'] is True
 
         with pytest.raises(TypeError, match="Unexpected parameter in"):
             with open(config, 'a') as f:
@@ -510,6 +514,8 @@ class TestRun:
             f.write("semicoarsening=False\n")
             f.write("linerelaxation=False\n")
             f.write("maxit=1\n")
+            f.write("[gridding_opts]\n")
+            f.write("center_on_edge=True\n")
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)
@@ -574,10 +580,12 @@ class TestRun:
         # Write a config file; remove_empty=False (default)
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
+            f.write("[gridding_opts]\n")
+            f.write("center_on_edge=True\n")
             f.write("[data]\n")
             f.write("sources=TxED-1\n")
             f.write("receivers=RxEP-05, RxEP-10, RxEP-02, RxEP-12, RxEP-06\n")
-            f.write("frequencies=f-1")
+            f.write("frequencies=f-1\n")
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)

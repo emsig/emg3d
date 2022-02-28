@@ -13,10 +13,10 @@ help:
 	@echo ""
 
 install:
-	pip install -e .
+	pip install --no-build-isolation --no-deps -e .
 
 dev-install:
-	pip install -r requirements-dev.txt && pip install -e .
+	pip install -r requirements-dev.txt && pip install --no-build-isolation --no-deps -e .
 
 pytest:
 	rm -rf .coverage htmlcov/ .pytest_cache/ && pytest --cov=emg3d --flake8 && coverage html

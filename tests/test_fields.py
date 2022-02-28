@@ -420,6 +420,7 @@ class TestGetReceiver:
                 properties=res,
                 domain=[[0, 1000], [-25, 25], [-25, 25]],
                 min_width_limits=20,
+                center_on_edge=True,
         )
 
         model = emg3d.Model(grid, res)
@@ -738,6 +739,7 @@ def test_reciprocity():
         frequency=frequency,
         properties=frequency,
         distance=[-400, 800],
+        center_on_edge=True,
     )
 
     # Random model parameters

@@ -5,6 +5,23 @@ Changelog
 1.x-Series
 """"""""""
 
+
+**latest**
+----------
+
+- Meshes:
+
+  - ``construct_mesh`` and ``origin_and_widths`` take a new variable
+    ``center_on_edge``: If ``True``, the center is put on an edge, if
+    ``False``, it is put at the cell center. Status quo is ``True``, but the
+    **default will change** to ``False`` in v1.7.0. If not set, it will
+    currently raise a FutureWarning making the user aware of the change.
+    Setting ``center_on_edge`` explicitly will suppress the warning.
+  - Constructed grids through ``construct_mesh`` and ``origin_and_widths`` with
+    a defined ``seasurface`` might slightly change due to some improvements and
+    refactoring in the course of the above changes to the center. The changes
+    should not be severe.
+
 - Simulation:
 
   - New optional keyword ``tqdm_opts``. With ``False`` you can switch off the
@@ -14,7 +31,8 @@ Changelog
 - CLI:
 
   - Expose ``mean_noise`` and ``ntype``, in addition to ``min_offset``, to the
-    CLI (for adding noise); also ``plain`` (for solver).
+    CLI (for adding noise); also ``plain`` (for solver), and ``center_on_edge``
+    (for gridding options).
 
 
 v1.4.0 : Meshing: improve vector
