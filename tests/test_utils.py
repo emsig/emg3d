@@ -117,7 +117,7 @@ def test_Timer():
     time = utils.Timer()   # t0-stamp and a Timer-instance.
 
     # Ensure they are the same.
-    assert_allclose(t0, time.t0, atol=1e-3)
+    assert_allclose(t0, time.t0, atol=1e-2, rtol=1e-3)
 
     # Ensure `now` is a string of numbers and :.
     out = time.now

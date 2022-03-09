@@ -679,13 +679,18 @@ class TestGradient:
         sim = simulations.Simulation(
                 model=self.model_init, file_dir=str(tmpdir), **self.sim_inp)
 
-        v = np.random.rand(self.mesh.n_cells).reshape(self.mesh.shape_cells)
-        w = np.random.rand(self.survey.size).reshape(self.survey.shape)
-
-        wtJv = np.vdot(w, sim.jvec(v)).real
-        vtJtw = np.vdot(v, sim.jtvec(w).ravel('F'))
-
-        assert abs(wtJv - vtJtw) < 1e-10
+        # Note: rtol=5e-3 might look like a very low bar (which it is). The
+        #       reason is speed, as the tolerance of the solver is lowered to
+        #       solver-tol=5e-5 for speed. With solver-tol=1e-6 a rtol=1e-5
+        #       should be achieved, and with solver-tol=1e-8 the default of
+        #       assert_isadjoint, rtol=1e-6, should be achieved.
+        discretize.tests.assert_isadjoint(
+            lambda u: sim.jvec(u).real,
+            lambda v: sim.jtvec(v).ravel('F'),
+            self.mesh.n_cells,
+            self.survey.shape,
+            rtol=5e-3,
+        )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
     @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
