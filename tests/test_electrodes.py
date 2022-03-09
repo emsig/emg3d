@@ -6,6 +6,17 @@ import emg3d
 from emg3d import electrodes
 
 
+# Import soft dependencies.
+try:
+    import discretize
+except ImportError:
+    discretize = None
+
+
+# Random number generator.
+rng = np.random.default_rng()
+
+
 class TestWire:
 
     class Magnetic(electrodes.Dipole):
@@ -538,3 +549,59 @@ def test_rotation():
     rot1 = electrodes.rotation(azm, elv, deg=False)
     rot2 = electrodes.rotation(np.rad2deg(azm), np.rad2deg(elv))
     assert_allclose(rot1, rot2)
+
+
+@pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+def test_adjoint():
+    # Simple stretched mesh.
+    hx = [200, 100, 50, 100, 200]
+    mesh = emg3d.TensorMesh([hx, hx, hx], 'CCC')
+
+    # Randomly located & rotated point receivers in the middle cell.
+    rx, ry, rz = rng.uniform(-25, 25, 3)
+    azm = rng.uniform(-180, 180, 1)[0]
+    ele = rng.uniform(-90, 90, 1)[0]
+
+    # The two currently implemented receiver types.
+    RxEP = emg3d.RxElectricPoint((rx, ry, rz, azm, ele))
+    RxMP = emg3d.RxMagneticPoint((rx, ry, rz, azm, ele))
+
+    # Frequency
+    frequency = 0.7
+    omega = 2*np.pi*frequency
+    sval = 1j*omega
+    mu0 = 4e-7*np.pi
+    smu0 = sval*mu0
+
+    # Loop over receivers and check.
+    for rec in [RxEP, RxMP]:
+
+        def fwd(u):
+            """What does `Fields`."""
+            # Cast input vector to field instance
+            field = emg3d.Field(mesh, u.copy(), frequency)  # ¡ COPY !
+
+            # Get magnetic field if rec type is magnetic.
+            if rec.xtype == 'magnetic':
+                model = emg3d.Model(mesh)
+                field = emg3d.fields.get_magnetic_field(model, field)
+
+                # _point_vector_magnetic has a minus factor.
+                # Most likely correct, but verif with jvec/jtvec test ?
+                field.field *= -1
+
+            return field.get_receiver(rec.coordinates, method='linear')
+
+        def adj(v):
+            """What does `Simulation._get_rfield()`."""
+            # The strength in _get_rfield is conj(residual*weight), normalized
+            strength = complex(v/-smu0)
+            src = rec._adjoint_source(rec.coordinates, strength=strength)
+            return src.get_field(mesh, frequency).field
+
+        discretize.tests.assert_isadjoint(
+            forward=fwd, adjoint=adj,
+            shape_u=mesh.n_edges, shape_v=1,
+            complex_u=rng.choice([True, False]),  # Random float or complex.
+            complex_v=rng.choice([True, False]),  # Random float or complex.
+        )
