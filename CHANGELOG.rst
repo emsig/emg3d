@@ -24,6 +24,13 @@ Changelog
 
 - Simulation:
 
+  - ``gradient``: Changed slightly if the computational grids differ from the
+    inversion grid (interpolation back from computational to inversion grid
+    happens directly on the fields, not on the gradient).
+
+    Gently reminder that the functions ``gradient``, ``jvec``, and ``jtvec``
+    are still considered *experimental*, and might change.
+
   - New optional keyword ``tqdm_opts``. With ``False`` you can switch off the
     progress bars. Alternatively one can provide a dict, which is forwarded
     to ``tqdm``.

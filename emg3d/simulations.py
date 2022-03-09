@@ -884,49 +884,42 @@ class Simulation:
             # Compute back-propagating electric fields.
             self._bcompute()
 
+            # Inversion grid and its shape.
+            igrid = self.model.grid
+            ishape = igrid.shape_cells
+
             # Pre-allocate the gradient on the mesh.
-            gradient_model = np.zeros(self.model.shape, order='F')
+            gradient_model = np.zeros(ishape, order='F')
 
             # Loop over source-frequency pairs.
             for src, freq in self._srcfreq:
 
+                # Get electric and back-propagated fields
+                # (bringing them back to the inversion grid).
+                efield = self._dict_get(
+                    'efield', src, freq).interpolate_to_grid(igrid)
+                bfield = self._dict_get(
+                    'bfield', src, freq).interpolate_to_grid(igrid)
+
                 # Multiply forward field with backward field; take real part.
-                # This is the actual Equation (10), with:
-                #   del S / del p = iwu0 V sigma / sigma,
-                # where lambda and E are already volume averaged.
-                efield = self._dict_get('efield', src, freq)
-                bfield = self._dict_get('bfield', src, freq)
                 gfield = fields.Field(
-                    grid=efield.grid,
-                    data=-np.real(bfield.field * efield.smu0 * efield.field),
-                    dtype=float,
+                    grid=igrid,
+                    data=np.real(bfield.field * efield.smu0 * efield.field),
                 )
 
-                # Bring the gradient back from the computation grid to the
-                # model grid.
-                gradient = gfield.interpolate_to_grid(self.model.grid)
-
                 # Pre-allocate the gradient for this src-freq.
-                shape = gradient.grid.shape_cells
-                grad_x = np.zeros(shape, order='F')
-                grad_y = np.zeros(shape, order='F')
-                grad_z = np.zeros(shape, order='F')
+                grad_x = np.zeros(ishape, order='F')
+                grad_y = np.zeros(ishape, order='F')
+                grad_z = np.zeros(ishape, order='F')
 
                 # Map the field to cell centers times volume.
-                cell_volumes = gradient.grid.cell_volumes.reshape(
-                        shape, order='F')
                 maps.interp_edges_to_vol_averages(
-                        ex=gradient.fx, ey=gradient.fy, ez=gradient.fz,
-                        volumes=cell_volumes,
+                        ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+                        volumes=igrid.cell_volumes.reshape(ishape, order='F'),
                         ox=grad_x, oy=grad_y, oz=grad_z)
-                grad = grad_x + grad_y + grad_z
-
-                # => Frequency-dependent depth-weighting should go here.
 
                 # Add this src-freq gradient to the total gradient.
-                gradient_model -= grad
-
-            # => Frequency-independent depth-weighting should go here.
+                gradient_model += grad_x + grad_y + grad_z
 
             # Apply derivative-chain of property-map
             # (only relevant if `mapping` is something else than conductivity).
