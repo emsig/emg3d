@@ -24,6 +24,10 @@ except ImportError:
     h5py = False
 
 
+# Random number generator.
+rng = np.random.default_rng()
+
+
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestSimulation():
     if xarray is not None:
@@ -275,7 +279,7 @@ class TestSimulation():
             jtvec = simulation.jtvec(vec)
         assert_allclose(grad, jtvec)
 
-        jvec = simulation.jvec(np.ones(newgrid.n_cells))
+        jvec = simulation.jvec(np.ones(self.grid.shape_cells))
         assert jvec.shape == simulation.data.observed.data.shape
 
         # Ensure the gradient has the shape of the model, not of the input.
@@ -587,19 +591,27 @@ class TestGradient:
         )
 
         # Background Model
-        con_init = np.ones(mesh.shape_cells)
+        con_init = np.ones(mesh.shape_cells)*np.pi
 
         # Target Model 1: One Block
-        con_true = np.ones(mesh.shape_cells)
+        con_true = np.ones(mesh.shape_cells)*np.pi
         con_true[27:37, 27:37, 15:25] = 0.001
 
-        model_init = emg3d.Model(mesh, con_init, mapping='Conductivity')
-        model_true = emg3d.Model(mesh, con_true, mapping='Conductivity')
+        # Random mapping
+        mapping = rng.choice([
+            'Conductivity', 'LgConductivity', 'LnConductivity',
+            'Resistivity', 'LgResistivity', 'LnResistivity',
+        ])
+        k = getattr(emg3d.maps, 'Map'+mapping)()
+
+        model_init = emg3d.Model(mesh, k.forward(con_init), mapping=mapping)
+        model_true = emg3d.Model(mesh, k.forward(con_true), mapping=mapping)
+
         # mesh.plot_3d_slicer(con_true)  # For debug / QC, needs discretize
 
         sim_inp = {
             'survey': survey,
-            'solver_opts': {'plain': True, 'tol': 5e-5},  # Red. tol 4 speed
+            'solver_opts': {'plain': True, 'tol': 1e-5},  # Red. tol 4 speed
             'max_workers': 1,
             'gridding': 'same',
             'verb': 0,
@@ -679,17 +691,17 @@ class TestGradient:
         sim = simulations.Simulation(
                 model=self.model_init, file_dir=str(tmpdir), **self.sim_inp)
 
-        # Note: rtol=5e-3 might look like a very low bar (which it is). The
+        # Note: rtol=1e-3 might look like a very low bar (which it is). The
         #       reason is speed, as the tolerance of the solver is lowered to
-        #       solver-tol=5e-5 for speed. With solver-tol=1e-6 a rtol=1e-5
+        #       solver-tol=1e-5 for speed. With solver-tol=1e-6 a rtol=1e-5
         #       should be achieved, and with solver-tol=1e-8 the default of
         #       assert_isadjoint, rtol=1e-6, should be achieved.
         discretize.tests.assert_isadjoint(
-            lambda u: sim.jvec(u).real,
-            lambda v: sim.jtvec(v).ravel('F'),
-            self.mesh.n_cells,
+            sim.jvec,
+            sim.jtvec,
+            self.mesh.shape_cells,
             self.survey.shape,
-            rtol=5e-3,
+            rtol=1e-3,
         )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
@@ -702,7 +714,7 @@ class TestGradient:
 
         def func2(x):
             sim.model.property_x[...] = m0
-            return sim.jvec(x)
+            return sim.jvec(x.reshape(sim.model.shape, order='F'))
 
         def func1(x):
             sim.model.property_x[...] = x.reshape(sim.model.shape)
