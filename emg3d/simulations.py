@@ -1124,9 +1124,32 @@ class Simulation:
             Shape of the data.
 
         """
+        # Missing for jvec/jtvec
+        #
+        # - `jvec`:
+        #   - `vector` is interpolated like a field (cubic); is that good/bad?
+        #   - Should input be a Model instances?
+        #
+        # - `jtvec`:
+        #   - Input vector is already weighted: is that wanted?
+        #   - Should input be a Data instances?
+        #
+        # - General:
+        #   - Document properly jvec and jtvec.
+        #   - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
+        #   - Implement tri-axial anisotropy for gradients.
+
         # Ensure misfit has been computed
         # (and therefore the electric fields).
         _ = self.misfit
+
+        # Apply derivative-chain of property-map (copy to not overwrite).
+        vector = vector.copy().reshape(self.model.shape, order='F')
+        self.model.map.derivative_chain(vector, self.model.property_x)
+
+        # Interpolation options.
+        iopts = {'method': 'cubic', 'extrapolate': False,
+                 'log': False, 'grid': self.model.grid}
 
         # Create iterable from src/freq-list to call the process_map.
         def collect_gfield_inputs(inp, vector=vector):
@@ -1136,14 +1159,18 @@ class Simulation:
             # Forward electric field
             efield = self._dict_get('efield', source, freq)
 
-            # Compute gvec = G * vector (using discretize)
+            # Interpolate to computational grid.
+            cvector = maps.interpolate(values=vector, xi=efield.grid, **iopts)
+
+            # Compute gvec = G * vector (using discretize).
+            # Extension for tri-axial anisotropy is trivial:
+            #     gvec = get_edge_inner_product_deriv(
+            #                np.ones(mesh.n_cells)*3)(efield.field) * vector
             gvec = efield.grid.get_edge_inner_product_deriv(
                 np.ones(efield.grid.n_cells)
-            )(efield.field) * vector.ravel()
-            # Extension for tri-axial anisotropy is trivial:
-            # gvec = mesh.get_edge_inner_product_deriv(
-            #         np.ones(mesh.n_cells)*3)(efield.field) * vector
+                )(efield.field) * cvector.ravel('F')
 
+            # Create source field.
             gfield = fields.Field(
                 grid=efield.grid,
                 data=-efield.smu0*gvec,  # -iwu: To get complete source field.
@@ -1205,9 +1232,6 @@ class Simulation:
             Adjoint-state gradient for the provided vector; shape of the model.
 
         """
-        # Note: The entire chain `gradient`->`_bcompute`->`_get_rfield` and
-        #       also `_jtvec` should be re-factored.
-
         # Replace residual by provided vector
         # (division by weight is undone in gradient).
         self.data.residual[...] = vector/self.data.weights.data
@@ -1218,7 +1242,7 @@ class Simulation:
             if hasattr(self, name):
                 delattr(self, name)
 
-        # Get gradient with `v` as residual.
+        # Return gradient from weighted residual `vector`.
         return self.gradient
 
     # UTILS
