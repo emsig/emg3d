@@ -1127,9 +1127,7 @@ class Simulation:
         # Missing for jvec/jtvec
         #
         # - `jvec`:
-        #   - `vector` is currently interpolated like a field (cubic); is that
-        #     good/bad?
-        #   - Returns currently only the real part: check if OK.
+        #   - `vector` is interpolated like a field (cubic); is that good/bad?
         #   - Should input be a Model instances?
         #
         # - `jtvec`:
@@ -1138,9 +1136,8 @@ class Simulation:
         #
         # - General:
         #   - Document properly jvec and jtvec.
-        #   - Refactor `compute`; `gradient`; `_bcompute`; `_get_rfield`;
-        #     `jvec`; `jtvec`.
-        #   - `gradient` & `jvec`: Expand to tri-axial anisotropy.
+        #   - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
+        #   - Implement tri-axial anisotropy for gradients.
 
         # Ensure misfit has been computed
         # (and therefore the electric fields).
@@ -1207,7 +1204,7 @@ class Simulation:
             resp = self._get_responses(src, freq, gfield)
             self.data['jvec'].loc[src, :, freq] = resp
 
-        return self.data['jvec'].data.real
+        return self.data['jvec'].data
 
     def jtvec(self, vector):
         r"""Compute the sensitivity transpose times a vector.

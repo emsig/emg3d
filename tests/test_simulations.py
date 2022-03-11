@@ -699,7 +699,7 @@ class TestGradient:
         # Note: The randomness makes this to fail every now and then.
         #       Either allow failure or fix seed in assert_isadjoint.
         discretize.tests.assert_isadjoint(
-            sim.jvec,
+            lambda u: sim.jvec(u).real,  # Because jtvec returns .real
             sim.jtvec,
             self.mesh.shape_cells,
             self.survey.shape,
