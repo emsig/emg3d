@@ -1146,8 +1146,8 @@ class Simulation:
         # (and therefore the electric fields).
         _ = self.misfit
 
-        # Apply derivative-chain of property-map
-        vector = vector.copy()  # To not overwrite vector.
+        # Apply derivative-chain of property-map (copy to not overwrite).
+        vector = vector.copy().reshape(self.model.shape, order='F')
         self.model.map.derivative_chain(vector, self.model.property_x)
 
         # Interpolation options.

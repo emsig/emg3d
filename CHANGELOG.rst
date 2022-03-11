@@ -30,7 +30,8 @@ Changelog
 
   - ``jvec``: Adjusted to work for any mapping, not only conductivity, and also
     with adaptive gridding. It expects new a Fortran-ordered vector with the
-    shape of the model, and it only returns the real part of the result.
+    shape of the model (or a vector of that size), and it only returns the real
+    part of the result.
 
     Gently reminder that the functions ``gradient``, ``jvec``, and ``jtvec``
     are still considered *experimental*, and might change.
