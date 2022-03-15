@@ -350,7 +350,7 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         location. Note that from v1.7.0 the default will change: until then,
         the center is assumed to be at the edge; from v1.7.0 onwards, it is
         assumed to be at the cell center. It can be changed via the parameter
-        ``center_on_node``.
+        ``center_on_edge``.
 
     domain : {tuple, list, dict, None}, optional
         Contains the survey-domain limits. This domain should include all
