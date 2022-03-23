@@ -27,14 +27,11 @@ Changelog
   - ``gradient``: Changed slightly if the computational grids differ from the
     inversion grid (interpolation back from computational to inversion grid
     happens directly on the fields, not on the gradient).
-
   - ``jvec``: Adjusted to work for any mapping, not only conductivity, and also
     with adaptive gridding. It expects new a Fortran-ordered vector with the
     shape of the model (or a vector of that size).
-
     Gently reminder that the functions ``gradient``, ``jvec``, and ``jtvec``
     are still considered *experimental*, and might change.
-
   - New optional keyword ``tqdm_opts``. With ``False`` you can switch off the
     progress bars. Alternatively one can provide a dict, which is forwarded
     to ``tqdm``.

@@ -753,7 +753,7 @@ class Simulation:
             # "Normal" case: all source-frequency pairs.
             srcfreq = self._srcfreq
 
-        # Create iterable from src/freq-list to call the process_map.
+        # Create iterable from src/freq-list for parallel computation.
         def collect_efield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
@@ -769,13 +769,8 @@ class Simulation:
             }
             return self._data_or_file('efield', source, freq, data)
 
-        # Use process_map to compute fields in parallel.
-        out = utils._process_map(
-                solver._solve,
-                list(map(collect_efield_inputs, self._srcfreq)),
-                max_workers=self.max_workers,
-                **{'desc': 'Compute efields', **self._tqdm_opts},
-        )
+        # Compute fields in parallel.
+        out = self._compute(collect_efield_inputs, 'Compute efields', srcfreq)
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
@@ -800,6 +795,15 @@ class Simulation:
             # Add noise.
             if kwargs.pop('add_noise', True):
                 self.survey.add_noise(**kwargs)
+
+    def _compute(self, fn, description, srcfreq=None):
+        """Use utils._process_map to call solver._solve asynchronously."""
+        return utils._process_map(
+            solver._solve,
+            list(map(fn, self._srcfreq if srcfreq is None else srcfreq)),
+            max_workers=self.max_workers,
+            **{'desc': description, **self._tqdm_opts},
+        )
 
     # OPTIMIZATION
     @property
@@ -1033,7 +1037,7 @@ class Simulation:
             self._dict_bfield = self._dict_initiate
             self._dict_bfield_info = self._dict_initiate
 
-        # Create iterable from src/freq-list to call the process_map.
+        # Create iterable from src/freq-list for parallel computation.
         def collect_bfield_inputs(inp):
             """Collect inputs."""
             source, freq = inp
@@ -1047,13 +1051,8 @@ class Simulation:
             }
             return self._data_or_file('bfield', source, freq, data)
 
-        # Use process_map to compute fields in parallel.
-        out = utils._process_map(
-                solver._solve,
-                list(map(collect_bfield_inputs, self._srcfreq)),
-                max_workers=self.max_workers,
-                **{'desc': 'Back-propagate', **self._tqdm_opts},
-        )
+        # Compute fields in parallel.
+        out = self._compute(collect_bfield_inputs, 'Back-propagate')
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
@@ -1151,7 +1150,7 @@ class Simulation:
         iopts = {'method': 'cubic', 'extrapolate': False,
                  'log': False, 'grid': self.model.grid}
 
-        # Create iterable from src/freq-list to call the process_map.
+        # Create iterable from src/freq-list for parallel computation.
         def collect_gfield_inputs(inp, vector=vector):
             """Collect inputs."""
             source, freq = inp
@@ -1185,13 +1184,8 @@ class Simulation:
             }
             return self._data_or_file('gfield', source, freq, data)
 
-        # Compute and return A^-1 * G * vector
-        out = utils._process_map(
-                solver._solve,
-                list(map(collect_gfield_inputs, self._srcfreq)),
-                max_workers=self.max_workers,
-                **{'desc': 'Compute jvec', **self._tqdm_opts},
-        )
+        # Compute fields (A^-1 * G * vector) in parallel.
+        out = self._compute(collect_gfield_inputs, 'Compute jvec')
 
         # Initiate jvec data with NaN's if it doesn't exist.
         if 'jvec' not in self.data.keys():
