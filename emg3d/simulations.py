@@ -796,11 +796,11 @@ class Simulation:
             if kwargs.pop('add_noise', True):
                 self.survey.add_noise(**kwargs)
 
-    def _compute(self, fcn, description, srcfreq=None):
+    def _compute(self, fn, description, srcfreq=None):
         """Use utils._process_map to call solver._solve asynchronously."""
         return utils._process_map(
             solver._solve,
-            list(map(fcn, self._srcfreq if srcfreq is None else srcfreq)),
+            list(map(fn, self._srcfreq if srcfreq is None else srcfreq)),
             max_workers=self.max_workers,
             **{'desc': description, **self._tqdm_opts},
         )
