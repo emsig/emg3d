@@ -1154,7 +1154,7 @@ class Simulation:
 
         # Interpolation options.
         iopts = {'method': 'volume', 'extrapolate': True,
-                 'log': True, 'grid': self.model.grid }
+                 'log': True, 'grid': self.model.grid}
 
         # Create iterable from src/freq-list for parallel computation.
         def collect_gfield_inputs(inp, vector=vector):
