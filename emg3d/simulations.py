@@ -898,32 +898,38 @@ class Simulation:
             # Loop over source-frequency pairs.
             for src, freq in self._srcfreq:
 
-                # Get electric and back-propagated fields
-                # (bringing them back to the inversion grid).
-                efield = self._dict_get(
-                    'efield', src, freq).interpolate_to_grid(igrid)
-                bfield = self._dict_get(
-                    'bfield', src, freq).interpolate_to_grid(igrid)
+                efield = self._dict_get('efield', src, freq)
+                bfield = self._dict_get('bfield', src, freq)
 
                 # Multiply forward field with backward field; take real part.
                 gfield = fields.Field(
-                    grid=igrid,
+                    grid=efield.grid,
                     data=np.real(bfield.field * efield.smu0 * efield.field),
                 )
 
-                # Pre-allocate the gradient for this src-freq.
-                grad_x = np.zeros(ishape, order='F')
-                grad_y = np.zeros(ishape, order='F')
-                grad_z = np.zeros(ishape, order='F')
+                # Pre-allocate the gradient for the computational grid.
+                shape = gfield.grid.shape_cells
+                grad_x = np.zeros(shape, order='F')
+                grad_y = np.zeros(shape, order='F')
+                grad_z = np.zeros(shape, order='F')
 
                 # Map the field to cell centers times volume.
+                cell_volumes = gfield.grid.cell_volumes.reshape(
+                        shape, order='F')
                 maps.interp_edges_to_vol_averages(
                         ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
-                        volumes=igrid.cell_volumes.reshape(ishape, order='F'),
+                        volumes=cell_volumes,
                         ox=grad_x, oy=grad_y, oz=grad_z)
+                cgrad = grad_x + grad_y + grad_z
+
+                # Bring the gradient back from the computation grid to the
+                # model grid.
+                import discretize
+                P = discretize.utils.volume_average(igrid, gfield.grid)
+                grad = (P.T * cgrad.ravel('F')).reshape(ishape, order='F')
 
                 # Add this src-freq gradient to the total gradient.
-                gradient_model += grad_x + grad_y + grad_z
+                gradient_model += grad
 
             # Apply derivative-chain of property-map
             # (only relevant if `mapping` is something else than conductivity).
@@ -1147,8 +1153,8 @@ class Simulation:
         self.model.map.derivative_chain(vector, self.model.property_x)
 
         # Interpolation options.
-        iopts = {'method': 'cubic', 'extrapolate': False,
-                 'log': False, 'grid': self.model.grid}
+        iopts = {'method': 'volume', 'extrapolate': True,
+                 'log': True, 'grid': self.model.grid }
 
         # Create iterable from src/freq-list for parallel computation.
         def collect_gfield_inputs(inp, vector=vector):
@@ -1159,7 +1165,9 @@ class Simulation:
             efield = self._dict_get('efield', source, freq)
 
             # Interpolate to computational grid.
+            vector += 1e6
             cvector = maps.interpolate(values=vector, xi=efield.grid, **iopts)
+            cvector -= 1e6
 
             # Compute gvec = G * vector (using discretize).
             # Extension for tri-axial anisotropy is trivial:
