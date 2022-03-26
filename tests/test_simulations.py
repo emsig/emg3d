@@ -706,6 +706,20 @@ class TestGradient:
             rtol=1e-2,
         )
 
+        sim = simulations.Simulation(
+                model=self.model_init, file_dir=str(tmpdir),
+                **{**self.sim_inp, 'gridding': 'both',
+                   'gridding_opts': {'vector': 'xyz'}}
+        )
+
+        discretize.tests.assert_isadjoint(
+            lambda u: sim.jvec(u).real,  # Because jtvec returns .real
+            sim.jtvec,
+            self.mesh.shape_cells,
+            self.survey.shape,
+            rtol=1e-2,
+        )
+
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
     @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
     def test_misfit(self, tmpdir):

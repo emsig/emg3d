@@ -76,7 +76,7 @@ jobs:
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
           conda config --show
-          conda install numba pytest pytest-console-scripts pip
+          conda install numba scipy pytest pytest-console-scripts pip
           pip install setuptools_scm pytest-flake8
           conda info -a
           conda list
