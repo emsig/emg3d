@@ -717,12 +717,12 @@ def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
 
 @_requires('discretize')
 def _interp_volume_average_adj(values, ogrid, ngrid):
-    """Adjoint of volume averaging (in-place).
+    """Adjoint of volume averaging.
 
     .. todo::
 
-        Replace ``interp_volume_average`` by corresponding function from
-        ``discretize`` too.
+        Also replace ``interp_volume_average`` by corresponding function from
+        ``discretize``.
 
 
     Parameters
