@@ -1154,7 +1154,7 @@ class Simulation:
 
         # Interpolation options.
         iopts = {'method': 'volume', 'extrapolate': True,
-                 'log': True, 'grid': self.model.grid}
+                 'log': False, 'grid': self.model.grid}
 
         # Create iterable from src/freq-list for parallel computation.
         def collect_gfield_inputs(inp, vector=vector):
@@ -1165,9 +1165,7 @@ class Simulation:
             efield = self._dict_get('efield', source, freq)
 
             # Interpolate to computational grid.
-            vector += 1e6
             cvector = maps.interpolate(values=vector, xi=efield.grid, **iopts)
-            cvector -= 1e6
 
             # Compute gvec = G * vector (using discretize).
             # Extension for tri-axial anisotropy is trivial:
