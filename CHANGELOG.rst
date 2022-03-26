@@ -24,9 +24,9 @@ Changelog
 
 - Simulation:
 
-  - ``gradient``: Changed slightly if the computational grids differ from the
-    inversion grid (interpolation back from computational to inversion grid
-    happens directly on the fields, not on the gradient).
+  - ``gradient``: Changed slightly to use the proper adjoint (changed *only if*
+    the computational grids differ from the inversion grid; requires
+    ``discretize``).
   - ``jvec``: Adjusted to work for any mapping, not only conductivity, and also
     with adaptive gridding. It expects new a Fortran-ordered vector with the
     shape of the model (or a vector of that size).

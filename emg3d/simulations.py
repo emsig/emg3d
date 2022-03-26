@@ -914,19 +914,17 @@ class Simulation:
                 grad_z = np.zeros(shape, order='F')
 
                 # Map the field to cell centers times volume.
-                cell_volumes = gfield.grid.cell_volumes.reshape(
-                        shape, order='F')
+                cell_volumes = gfield.grid.cell_volumes
                 maps.interp_edges_to_vol_averages(
                         ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
-                        volumes=cell_volumes,
+                        volumes=cell_volumes.reshape(shape, order='F'),
                         ox=grad_x, oy=grad_y, oz=grad_z)
-                cgrad = grad_x + grad_y + grad_z
+                grad = grad_x + grad_y + grad_z
 
-                # Bring the gradient back from the computation grid to the
-                # model grid.
-                import discretize
-                P = discretize.utils.volume_average(igrid, gfield.grid)
-                grad = (P.T * cgrad.ravel('F')).reshape(ishape, order='F')
+                # Bring gradient back from computation grid to inversion grid.
+                if igrid != gfield.grid:
+                    grad = maps._interp_volume_average_adj(
+                            grad, igrid, gfield.grid)
 
                 # Add this src-freq gradient to the total gradient.
                 gradient_model += grad

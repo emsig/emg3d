@@ -26,7 +26,13 @@ import numpy as np
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import RegularGridInterpolator, interpnd, interp1d
 
+from emg3d.utils import _requires
 from emg3d.core import _numba_setting
+
+try:
+    import discretize
+except ImportError:
+    discretize = None
 
 __all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
@@ -707,3 +713,36 @@ def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
                     oz[ixp, iym, iz] += volumes[ixp, iym, iz]*ez[ix, iy, iz]/4
                     oz[ixm, iyp, iz] += volumes[ixm, iyp, iz]*ez[ix, iy, iz]/4
                     oz[ixp, iyp, iz] += volumes[ixp, iyp, iz]*ez[ix, iy, iz]/4
+
+
+@_requires('discretize')
+def _interp_volume_average_adj(values, ogrid, ngrid):
+    """Adjoint of volume averaging (in-place).
+
+    .. todo::
+
+        Replace ``interp_volume_average`` by corresponding function from 
+        ``discretize`` too.
+
+
+    Parameters
+    ----------
+    values : ndarray
+        Values corresponding to the new grid (of shape ``ngrid.shape_cells``).
+
+    ogrid : TensorMesh
+        Original grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+    ngrid : TensorMesh
+        New grid; a :class:`emg3d.meshes.TensorMesh` instance.
+
+
+    Returns
+    -------
+    values : ndarray
+        Values corresponding to the original grid (of shape
+        ``ogrid.shape_cells``).
+
+    """
+    P = discretize.utils.volume_average(ogrid, ngrid)
+    return (P.T * values.ravel('F')).reshape(ogrid.shape_cells, order='F')
