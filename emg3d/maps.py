@@ -721,7 +721,7 @@ def _interp_volume_average_adj(values, ogrid, ngrid):
 
     .. todo::
 
-        Replace ``interp_volume_average`` by corresponding function from 
+        Replace ``interp_volume_average`` by corresponding function from
         ``discretize`` too.
 
 
