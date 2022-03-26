@@ -898,33 +898,169 @@ class Simulation:
             # Loop over source-frequency pairs.
             for src, freq in self._srcfreq:
 
-                efield = self._dict_get('efield', src, freq)
-                bfield = self._dict_get('bfield', src, freq)
+                gradadjoint = getattr(self, 'gradadjoint', 'va.T')
 
-                # Multiply forward field with backward field; take real part.
-                gfield = fields.Field(
-                    grid=efield.grid,
-                    data=np.real(bfield.field * efield.smu0 * efield.field),
-                )
+                if gradadjoint == 'va.T':  # proper adjoint; was 'alt1'
+                    # Volume averaging of the gradient using the adjoint of
+                    # inversion-to-computational grid.
 
-                # Pre-allocate the gradient for the computational grid.
-                shape = gfield.grid.shape_cells
-                grad_x = np.zeros(shape, order='F')
-                grad_y = np.zeros(shape, order='F')
-                grad_z = np.zeros(shape, order='F')
+                    efield = self._dict_get('efield', src, freq)
+                    bfield = self._dict_get('bfield', src, freq)
 
-                # Map the field to cell centers times volume.
-                cell_volumes = gfield.grid.cell_volumes
-                maps.interp_edges_to_vol_averages(
+                    # Multiply forward field with backward field; take real
+                    # part.
+                    gfield = fields.Field(
+                        grid=efield.grid,
+                        data=np.real(bfield.field*efield.smu0*efield.field),
+                    )
+
+                    # Pre-allocate the gradient for the computational grid.
+                    shape = gfield.grid.shape_cells
+                    grad_x = np.zeros(shape, order='F')
+                    grad_y = np.zeros(shape, order='F')
+                    grad_z = np.zeros(shape, order='F')
+
+                    # Map the field to cell centers times volume.
+                    cell_volumes = gfield.grid.cell_volumes
+                    maps.interp_edges_to_vol_averages(
+                            ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+                            volumes=cell_volumes.reshape(shape, order='F'),
+                            ox=grad_x, oy=grad_y, oz=grad_z)
+                    grad = grad_x + grad_y + grad_z
+
+                    # Bring gradient back from computation grid to inversion
+                    # grid.
+                    if igrid != gfield.grid:
+                        grad = maps._interp_volume_average_adj(
+                                grad, igrid, gfield.grid)
+
+                elif gradadjoint == 'cubic-EB':  # was 'new'
+                    # Cubic interpolation of the forward/backward electric
+                    # fields from computational to inversion grid.
+
+                    # Get electric and back-propagated fields
+                    # (bringing them back to the inversion grid).
+                    efield = self._dict_get(
+                        'efield', src, freq).interpolate_to_grid(igrid)
+                    bfield = self._dict_get(
+                        'bfield', src, freq).interpolate_to_grid(igrid)
+
+                    # Multiply forward field with backward field; take real
+                    # part.
+                    gfield = fields.Field(
+                        grid=igrid,
+                        data=np.real(bfield.field*efield.smu0*efield.field),
+                    )
+
+                    # Pre-allocate the gradient for this src-freq.
+                    grad_x = np.zeros(ishape, order='F')
+                    grad_y = np.zeros(ishape, order='F')
+                    grad_z = np.zeros(ishape, order='F')
+
+                    # Map the field to cell centers times volume.
+                    cell_volumes = gfield.grid.cell_volumes.reshape(
+                            ishape, order='F')
+                    maps.interp_edges_to_vol_averages(
                         ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
-                        volumes=cell_volumes.reshape(shape, order='F'),
+                        volumes=cell_volumes,
                         ox=grad_x, oy=grad_y, oz=grad_z)
-                grad = grad_x + grad_y + grad_z
+                    grad = grad_x + grad_y + grad_z
 
-                # Bring gradient back from computation grid to inversion grid.
-                if igrid != gfield.grid:
-                    grad = maps._interp_volume_average_adj(
-                            grad, igrid, gfield.grid)
+                elif gradadjoint == 'cubic-Gf':  # was 'current'
+                    # Cubic interpolation of the gradient field (gradient
+                    # living on edges) from computational to inversion grid.
+
+                    efield = self._dict_get('efield', src, freq)
+                    bfield = self._dict_get('bfield', src, freq)
+                    gfield = fields.Field(
+                        grid=efield.grid,
+                        data=np.real(bfield.field*efield.smu0*efield.field),
+                        dtype=float,
+                    )
+
+                    # Bring the gradient back from the computation grid to the
+                    # model grid.
+                    gradient = gfield.interpolate_to_grid(igrid)
+
+                    # Pre-allocate the gradient for this src-freq.
+                    grad_x = np.zeros(ishape, order='F')
+                    grad_y = np.zeros(ishape, order='F')
+                    grad_z = np.zeros(ishape, order='F')
+
+                    # Map the field to cell centers times volume.
+                    cell_volumes = gradient.grid.cell_volumes.reshape(
+                            ishape, order='F')
+                    maps.interp_edges_to_vol_averages(
+                            ex=gradient.fx, ey=gradient.fy, ez=gradient.fz,
+                            volumes=cell_volumes,
+                            ox=grad_x, oy=grad_y, oz=grad_z)
+                    grad = grad_x + grad_y + grad_z
+
+                elif gradadjoint == 'cubic-Gm':  # was 'before'
+                    # Cubic interpolation of the gradient (cell-averaged
+                    # values) from computational to inversion grid.
+
+                    efield = self._dict_get('efield', src, freq)
+                    bfield = self._dict_get('bfield', src, freq)
+                    gfield = fields.Field(
+                        grid=efield.grid,
+                        data=np.real(bfield.field*efield.smu0*efield.field),
+                        dtype=float,
+                    )
+
+                    # Pre-allocate the gradient for the computational grid.
+                    shape = gfield.grid.shape_cells
+                    grad_x = np.zeros(shape, order='F')
+                    grad_y = np.zeros(shape, order='F')
+                    grad_z = np.zeros(shape, order='F')
+
+                    # Map the field to cell centers times volume.
+                    cell_volumes = gfield.grid.cell_volumes.reshape(
+                            shape, order='F')
+                    maps.interp_edges_to_vol_averages(
+                            ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+                            volumes=cell_volumes,
+                            ox=grad_x, oy=grad_y, oz=grad_z)
+                    cgrad = grad_x + grad_y + grad_z
+
+                    # Bring the gradient back from the computation grid to the
+                    # model grid.
+                    grad = maps.interpolate(
+                                gfield.grid, cgrad, igrid,
+                                method='cubic')
+
+                elif gradadjoint == 'va':  # was 'alt2'
+                    # Volume averaging of the gradient from computational to
+                    # inversion grid.
+
+                    efield = self._dict_get('efield', src, freq)
+                    bfield = self._dict_get('bfield', src, freq)
+                    gfield = fields.Field(
+                        grid=efield.grid,
+                        data=np.real(bfield.field*efield.smu0*efield.field),
+                        dtype=float,
+                    )
+
+                    # Pre-allocate the gradient for the computational grid.
+                    shape = gfield.grid.shape_cells
+                    grad_x = np.zeros(shape, order='F')
+                    grad_y = np.zeros(shape, order='F')
+                    grad_z = np.zeros(shape, order='F')
+
+                    # Map the field to cell centers times volume.
+                    cell_volumes = gfield.grid.cell_volumes.reshape(
+                            shape, order='F')
+                    maps.interp_edges_to_vol_averages(
+                            ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+                            volumes=cell_volumes,
+                            ox=grad_x, oy=grad_y, oz=grad_z)
+                    cgrad = grad_x + grad_y + grad_z
+
+                    # Bring the gradient back from the computation grid to the
+                    # model grid.
+                    import discretize
+                    P = discretize.utils.volume_average(gfield.grid, igrid)
+                    grad = (P * cgrad.ravel('F')).reshape(ishape, order='F')
 
                 # Add this src-freq gradient to the total gradient.
                 gradient_model += grad
