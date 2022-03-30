@@ -1128,22 +1128,13 @@ class Simulation:
 
         """
         # Missing for jvec/jtvec
-        #
-        # - `jvec`:
-        #   - `vector` is interpolated like a field (cubic); is that good/bad?
-        #   - Should input be a Model instances?
-        #
-        # - `jtvec`:
-        #   - Input vector is already weighted: is that wanted?
-        #   - Should input be a Data instances?
-        #
-        # - General:
-        #   - Document properly jvec and jtvec.
-        #   - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
-        #   - Implement tri-axial anisotropy for gradients.
+        # - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
+        # - Implement tri-axial anisotropy for gradients.
+        # - Document properly jvec and jtvec.
+        # - `jvec`: Should input be a Model instances?
+        # - `jtvec`: Should input be a Data instances?
 
-        # Ensure misfit has been computed
-        # (and therefore the electric fields).
+        # Ensure misfit has been computed (and therefore the electric fields).
         _ = self.misfit
 
         # Apply derivative-chain of property-map (copy to not overwrite).
