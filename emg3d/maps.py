@@ -744,5 +744,8 @@ def _interp_volume_average_adj(values, ogrid, ngrid):
         ``ogrid.shape_cells``).
 
     """
-    P = discretize.utils.volume_average(ogrid, ngrid)
-    return (P.T * values.ravel('F')).reshape(ogrid.shape_cells, order='F')
+    if ogrid != ngrid:
+        P = discretize.utils.volume_average(ogrid, ngrid)
+        return (P.T * values.ravel('F')).reshape(ogrid.shape_cells, order='F')
+    else:
+        return values
