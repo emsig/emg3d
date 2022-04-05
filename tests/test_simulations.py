@@ -633,12 +633,6 @@ class TestGradient:
         sim_inp = {'survey': survey, 'gridding': 'same',
                    'receiver_interpolation': 'linear'}
 
-        # Anisotropic models.
-        simulation = simulations.Simulation(
-                model=emg3d.Model(mesh, 1, 2, 3), **sim_inp)
-        with pytest.raises(NotImplementedError, match='for isotropic models'):
-            simulation.gradient
-
         # Model with electric permittivity.
         simulation = simulations.Simulation(
                 model=emg3d.Model(mesh, epsilon_r=3), **sim_inp)

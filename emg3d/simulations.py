@@ -844,15 +844,17 @@ class Simulation:
 
         .. note::
 
-            The currently implemented gradient is only for isotropic models
+            The currently implemented gradient does only work for models
             without relative electric permittivity nor relative magnetic
             permeability.
 
 
         Returns
         -------
+        # v v v TODO v v v
         grad : ndarray
             Adjoint-state gradient (same shape as ``simulation.model``).
+        # ^ ^ ^ TODO ^ ^ ^
 
         """
         if self._gradient is None:
@@ -867,13 +869,7 @@ class Simulation:
                 )
                 warnings.warn(msg, UserWarning)
 
-            # Check limitation 1: So far only isotropic models.
-            if self.model.case != 'isotropic':
-                raise NotImplementedError(
-                    "Gradient only implemented for isotropic models."
-                )
-
-            # Check limitation 2: No epsilon_r, mu_r.
+            # Check limitation: No epsilon_r, mu_r.
             var = (self.model.epsilon_r, self.model.mu_r)
             for v, n in zip(var, ('el. permittivity', 'magn. permeability')):
                 if v is not None and not np.allclose(v, 1.0):
@@ -893,7 +889,9 @@ class Simulation:
             ishape = igrid.shape_cells
 
             # Pre-allocate the gradient on the mesh.
+            # v v v TODO v v v
             gradient_model = np.zeros(ishape, order='F')
+            # ^ ^ ^ TODO ^ ^ ^
 
             # Loop over source-frequency pairs.
             for src, freq in self._srcfreq:
@@ -919,6 +917,8 @@ class Simulation:
                         ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
                         volumes=cell_volumes.reshape(shape, order='F'),
                         ox=grad_x, oy=grad_y, oz=grad_z)
+
+                # v v v TODO v v v
                 grad = grad_x + grad_y + grad_z
 
                 # Bring gradient back from computation grid to inversion grid.
@@ -937,6 +937,7 @@ class Simulation:
             self._gradient = gradient_model
 
         return self._gradient[:, :, :self._input_sc2]
+        # ^ ^ ^ TODO ^ ^ ^
 
     @property
     def misfit(self):
@@ -1112,13 +1113,17 @@ class Simulation:
 
             J v = P A^{-1} G v \ ,
 
+        # v v v TODO v v v
         where :math:`v` has size of the model.
+        # ^ ^ ^ TODO ^ ^ ^
 
 
         Parameters
         ----------
+        # v v v TODO v v v
         vector : ndarray
             Shape of the model.
+        # ^ ^ ^ TODO ^ ^ ^
 
 
         Returns
@@ -1129,7 +1134,6 @@ class Simulation:
         """
         # Missing for jvec/jtvec
         # - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
-        # - Implement tri-axial anisotropy for gradients.
         # - Document properly jvec and jtvec.
         # - `jvec`: Should input be a Model instances?
         # - `jtvec`: Should input be a Data instances?
@@ -1138,8 +1142,10 @@ class Simulation:
         _ = self.misfit
 
         # Apply derivative-chain of property-map (copy to not overwrite).
+        # v v v TODO v v v
         vector = vector.copy().reshape(self.model.shape, order='F')
         self.model.map.derivative_chain(vector, self.model.property_x)
+        # ^ ^ ^ TODO ^ ^ ^
 
         # Interpolation options.
         iopts = {'method': 'volume', 'extrapolate': True,
@@ -1154,6 +1160,7 @@ class Simulation:
             efield = self._dict_get('efield', source, freq)
 
             # Interpolate to computational grid.
+            # v v v TODO v v v
             cvector = maps.interpolate(values=vector, xi=efield.grid, **iopts)
 
             # Compute gvec = G * vector (using discretize).
@@ -1163,6 +1170,7 @@ class Simulation:
             gvec = efield.grid.get_edge_inner_product_deriv(
                 np.ones(efield.grid.n_cells)
                 )(efield.field) * cvector.ravel('F')
+            # ^ ^ ^ TODO ^ ^ ^
 
             # Create source field.
             gfield = fields.Field(
@@ -1217,8 +1225,10 @@ class Simulation:
 
         Returns
         -------
+        # v v v TODO v v v
         jtvec : ndarray
             Adjoint-state gradient for the provided vector; shape of the model.
+        # ^ ^ ^ TODO ^ ^ ^
 
         """
         # Replace residual by provided vector
