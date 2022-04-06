@@ -922,12 +922,11 @@ class Simulation:
 
                 # Bring gradient back from computation grid to inversion grid
                 # and add this src-freq gradient to the total gradient.
-                gradient_x += maps._interp_volume_average_adj(
-                        grad_x, igrid, gfield.grid)
-                gradient_y += maps._interp_volume_average_adj(
-                        grad_y, igrid, gfield.grid)
-                gradient_z += maps._interp_volume_average_adj(
-                        grad_z, igrid, gfield.grid)
+                igradient = maps._interp_volume_average_adj(
+                        [grad_x, grad_y, grad_z], igrid, gfield.grid)
+                gradient_x += igradient[0]
+                gradient_y += igradient[1]
+                gradient_z += igradient[2]
 
             # Apply derivative-chain of property-map
             # (only relevant if `mapping` is something else than conductivity).

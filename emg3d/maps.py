@@ -727,8 +727,10 @@ def _interp_volume_average_adj(values, ogrid, ngrid):
 
     Parameters
     ----------
-    values : ndarray
+    values : ndarray, list
         Values corresponding to the new grid (of shape ``ngrid.shape_cells``).
+        It can be a list of several ndarray's of values, all corresponding
+        to the same grids.
 
     ogrid : TensorMesh
         Original grid; a :class:`emg3d.meshes.TensorMesh` instance.
@@ -739,13 +741,19 @@ def _interp_volume_average_adj(values, ogrid, ngrid):
 
     Returns
     -------
-    values : ndarray
+    values : ndarray, list
         Values corresponding to the original grid (of shape
-        ``ogrid.shape_cells``).
+        ``ogrid.shape_cells``). If a list was provided as input the equivalent
+        list is returned.
 
     """
     if ogrid != ngrid:
         P = discretize.utils.volume_average(ogrid, ngrid)
-        return (P.T * values.ravel('F')).reshape(ogrid.shape_cells, order='F')
+        shape = ogrid.shape_cells
+        if isinstance(values, list):
+            return [(P.T * v.ravel('F')).reshape(shape, order='F')
+                    for v in values]
+        else:
+            return (P.T * values.ravel('F')).reshape(shape, order='F')
     else:
         return values
