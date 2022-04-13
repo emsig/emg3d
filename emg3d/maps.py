@@ -717,13 +717,13 @@ def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
 
 @_requires('discretize')
 def _interp_volume_average_adj(oval, ogrid, nval, ngrid):
-    """Adjoint of volume averaging.
+    """In-place adjoint of volume averaging.
 
     .. todo::
 
         Also replace ``interp_volume_average`` by corresponding function from
         ``discretize``. Ideally, everything should be accessible through
-        ``interpolate``, with a ``adjoint`` flag. In the future, everything
+        ``interpolate``, with an ``adjoint`` flag. In the future, everything
         could be done by ``discretize``; however, currently it does not have
         cubic interpolation.
 

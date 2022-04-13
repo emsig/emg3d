@@ -852,7 +852,7 @@ class Simulation:
         Returns
         -------
         grad : ndarray
-            Adjoint-state gradient. Shape depends on the anisotropy case:
+            Adjoint-state gradient. Shape depends on the anisotropy type:
 
             - isotropic: (nx, ny, nz)
             - HTI/VTI: (2, nx, ny, nz)
@@ -1132,7 +1132,7 @@ class Simulation:
         Parameters
         ----------
         vector : ndarray
-            Vector applied to J. Shape depends on the anisotropy case:
+            Vector applied to J. Shape depends on the anisotropy type:
 
             - isotropic: (nx, ny, nz) or (1, nx, ny, nz)
             - HTI/VTI: (2, nx, ny, nz)
@@ -1148,7 +1148,7 @@ class Simulation:
         # Missing for jvec/jtvec
         # - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
         # - Document properly jvec and jtvec.
-        # - `jvec`: Should input be a Model instances?
+        # - Would gradient (?, nx, ny, nz) be better a Model-like instance?
 
         # Ensure misfit has been computed (and therefore the electric fields).
         _ = self.misfit
@@ -1259,7 +1259,7 @@ class Simulation:
         -------
         jtvec : ndarray
             Adjoint-state gradient for the provided vector. Shape depends on
-            the anisotropy case:
+            the anisotropy type:
 
             - isotropic: (nx, ny, nz)
             - HTI/VTI: (2, nx, ny, nz)

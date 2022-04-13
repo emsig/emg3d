@@ -6,6 +6,15 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+- Simulation:
+
+  - ``gradient``, ``jvec``, and ``jtvec`` new support triaxial anisotropy (also
+    through the CLI).
+
+
 v1.5.0 : Meshing: center on edge
 --------------------------------
 

@@ -157,12 +157,12 @@ def simulation(args_dict):
         logger.info("\n    :: BACKWARD COMPUTATION ::\n")
 
         if dry_run:
-            if sim.model.case == 'isotropic':
-                output['gradient'] = np.zeros(sim.model.shape)
-            elif sim.model.case in ['HTI', 'VTI']:
-                output['gradient'] = np.zeros((2, *sim.model.shape))
-            else:
-                output['gradient'] = np.zeros((3, *sim.model.shape))
+            shape = sim.model.shape
+            if sim.model.case in ['HTI', 'VTI']:
+                shape = (2, *shape)
+            elif sim.model.case == 'triaxial':
+                shape = (3, *shape)
+            output['gradient'] = np.zeros(shape)
         else:
             output['gradient'] = sim.gradient
 
