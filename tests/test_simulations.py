@@ -1,7 +1,6 @@
 import os
 import pytest
 import numpy as np
-from copy import deepcopy as dc
 from numpy.testing import assert_allclose
 
 import emg3d
@@ -651,7 +650,7 @@ class TestGradient:
     def test_as_vs_fd_gradient(self, capsys):
 
         # Compute adjoint state misfit and gradient
-        sim = simulations.Simulation(model=self.model_init, **dc(self.sim_inp))
+        sim = simulations.Simulation(model=self.model_init, **self.sim_inp)
         data_misfit = sim.misfit
         grad = sim.gradient
 
@@ -700,8 +699,7 @@ class TestGradient:
 
         # Compute NRMSD.
         nrmsd = alternatives.fd_vs_as_gradient(
-                (ix, iy, iz), self.model_init, grad, data_misfit,
-                dc(self.sim_inp))
+                (ix, iy, iz), self.model_init, grad, data_misfit, self.sim_inp)
 
         assert nrmsd < 1.5
 
@@ -710,8 +708,7 @@ class TestGradient:
     def test_adjoint(self, tmpdir):
 
         sim = simulations.Simulation(
-                model=self.model_init, file_dir=str(tmpdir),
-                **dc(self.sim_inp))
+                model=self.model_init, file_dir=str(tmpdir), **self.sim_inp)
 
         discretize.tests.assert_isadjoint(
             lambda u: sim.jvec(u).real,  # Because jtvec returns .real
@@ -722,7 +719,7 @@ class TestGradient:
 
         sim = simulations.Simulation(
                 model=self.model_init, file_dir=str(tmpdir),
-                **{**dc(self.sim_inp), 'gridding': 'both',
+                **{**self.sim_inp, 'gridding': 'both',
                    'gridding_opts': {'vector': 'xyz'}}
         )
 
@@ -744,7 +741,7 @@ class TestGradient:
             mapping=self.mapping
         )
 
-        sim = simulations.Simulation(model=model_init, **dc(self.sim_inp))
+        sim = simulations.Simulation(model=model_init, **self.sim_inp)
 
         discretize.tests.assert_isadjoint(
             lambda u: sim.jvec(u).real,
@@ -764,7 +761,7 @@ class TestGradient:
             mapping=self.mapping
         )
 
-        sim = simulations.Simulation(model=model_init, **dc(self.sim_inp))
+        sim = simulations.Simulation(model=model_init, **self.sim_inp)
 
         discretize.tests.assert_isadjoint(
             lambda u: sim.jvec(u).real,
@@ -785,7 +782,7 @@ class TestGradient:
             mapping=self.mapping
         )
 
-        sim = simulations.Simulation(model=model_init, **dc(self.sim_inp))
+        sim = simulations.Simulation(model=model_init, **self.sim_inp)
 
         discretize.tests.assert_isadjoint(
             lambda u: sim.jvec(u).real,
@@ -799,8 +796,7 @@ class TestGradient:
     def test_misfit(self, tmpdir):
 
         sim = simulations.Simulation(
-                model=self.model_init, file_dir=str(tmpdir),
-                **dc(self.sim_inp))
+                model=self.model_init, file_dir=str(tmpdir), **self.sim_inp)
         m0 = 2*sim.model.property_x
 
         def func2(x):
@@ -825,7 +821,7 @@ class TestGradient:
     @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
     def test_jtvec_gradient(self):
         # Gradient is the same as jtvec(residual*weights).
-        sim = simulations.Simulation(model=self.model_init, **dc(self.sim_inp))
+        sim = simulations.Simulation(model=self.model_init, **self.sim_inp)
         g = sim.gradient
         j = sim.jtvec(vector=sim.survey.data.residual*sim.survey.data.weights)
         assert_allclose(g, j)
