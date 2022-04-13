@@ -934,34 +934,28 @@ class Simulation:
                     gradient_y += grad_y
                     gradient_z += grad_z
 
-            # Apply derivative-chain of property-map
-            # (only relevant if `mapping` is something else than conductivity).
+            # Apply derivative-chain of property-map (only relevant if
+            # `mapping` is something else than conductivity) and collect.
+            gradient = []
             if self.model.case in ['HTI', 'triaxial']:
                 self.model.map.derivative_chain(
                         gradient_y, self.model.property_y)
+                gradient.append(gradient_y)
             else:
                 gradient_x += gradient_y
 
             if self.model.case in ['VTI', 'triaxial']:
                 self.model.map.derivative_chain(
                         gradient_z, self.model.property_z)
+                gradient.append(gradient_z)
             else:
                 gradient_x += gradient_z
 
             self.model.map.derivative_chain(gradient_x, self.model.property_x)
+            gradient.insert(0, gradient_x)
 
-            if self.model.case == 'isotropic':
-                gradient = gradient_x
-
-            elif self.model.case == 'VTI':
-                gradient = np.stack([gradient_x, gradient_z])
-
-            elif self.model.case == 'HTI':
-                gradient = np.stack([gradient_x, gradient_y])
-
-            else:
-                gradient = np.stack([gradient_x, gradient_y, gradient_z])
-
+            # Cast and excluded "expanded" layers.
+            gradient = np.stack(gradient).squeeze()
             self._gradient = gradient[..., :self._input_sc2]
 
         return self._gradient
