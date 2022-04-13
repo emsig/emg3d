@@ -1157,7 +1157,6 @@ class Simulation:
         # - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
         # - Document properly jvec and jtvec.
         # - `jvec`: Should input be a Model instances?
-        # - `jtvec`: Should input be a Data instances?
 
         # Ensure misfit has been computed (and therefore the electric fields).
         _ = self.misfit
@@ -1165,16 +1164,16 @@ class Simulation:
         # Apply derivative-chain of property-map (copy to not overwrite).
         shape = self.model.shape
         if self.model.case == 'isotropic':
-            vector_x = vector.copy().reshape(shape, order='F')
+            vector_x = vector.copy()
         else:
-            vector_x = vector[0, :, :, :].copy().reshape(shape, order='F')
+            vector_x = vector[0, :, :, :].copy()
         self.model.map.derivative_chain(vector_x, self.model.property_x)
         if self.model.case in ['HTI', 'triaxial']:
-            vector_y = vector[1, :, :, :].copy().reshape(shape, order='F')
+            vector_y = vector[1, :, :, :].copy()
             self.model.map.derivative_chain(vector_y, self.model.property_y)
         if self.model.case in ['VTI', 'triaxial']:
             n = 1 if self.model.case == 'VTI' else 2
-            vector_z = vector[n, :, :, :].copy().reshape(shape, order='F')
+            vector_z = vector[n, :, :, :].copy()
             self.model.map.derivative_chain(vector_z, self.model.property_z)
 
         if self.model.case == 'isotropic':
@@ -1267,13 +1266,14 @@ class Simulation:
 
             J^H v = G^H A^{-H} P^H v \ ,
 
-        where :math:`v` has size of the data.
+        where :math:`v` has the shape of the data.
 
 
         Parameters
         ----------
-        vector : ndarray
-            Shape of the data.
+        vector : ndarray, DataArray
+            An array with the shape of the data, or directly a DataArray as
+            stored in the :class:`emg3d.surveys.Survey`.
 
 
         Returns
