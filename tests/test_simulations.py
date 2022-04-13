@@ -1,6 +1,7 @@
 import os
 import pytest
 import numpy as np
+from copy import deepcopy as dc
 from numpy.testing import assert_allclose
 
 import emg3d
@@ -576,7 +577,7 @@ class TestGradient:
     if xarray is not None:
 
         # Create a simple mesh.
-        hx = np.ones(64)*100
+        hx = np.ones(32)*200
         mesh = emg3d.TensorMesh([hx, hx, hx], origin=[0, 0, 0])
 
         # Define a simple survey, including 1 el. & 1 magn. receiver
@@ -595,7 +596,7 @@ class TestGradient:
 
         # Target Model 1: One Block
         con_true = np.ones(mesh.shape_cells)*np.pi
-        con_true[27:37, 27:37, 15:25] = 0.001
+        con_true[13:18, 13:18, 7:13] = 0.001
 
         # Random mapping
         mapping = rng.choice([
@@ -611,7 +612,7 @@ class TestGradient:
 
         sim_inp = {
             'survey': survey,
-            'solver_opts': {'plain': True, 'tol': 1e-5},  # Red. tol 4 speed
+            'solver_opts': {'plain': True},
             'max_workers': 1,
             'gridding': 'same',
             'verb': 0,
@@ -621,6 +622,7 @@ class TestGradient:
         # Compute data (pre-computed and passed to Survey above)
         sim_data = simulations.Simulation(model=model_true, **sim_inp)
         sim_data.compute(observed=True)
+        del sim_inp['survey'].data['synthetic']
 
     def test_errors(self):
         mesh = emg3d.TensorMesh([[2, 2], [2, 2], [2, 2]], origin=(-1, -1, -1))
@@ -649,7 +651,7 @@ class TestGradient:
     def test_as_vs_fd_gradient(self, capsys):
 
         # Compute adjoint state misfit and gradient
-        sim = simulations.Simulation(model=self.model_init, **self.sim_inp)
+        sim = simulations.Simulation(model=self.model_init, **dc(self.sim_inp))
         data_misfit = sim.misfit
         grad = sim.gradient
 
@@ -663,46 +665,64 @@ class TestGradient:
         #                                vmin=-1e1, vmax=1e1)}
         #         )
 
-        # We test a random cell from the inline xz slice, where the grad > 3.
-        #
-        # The NRMSD is (should) be below 1 %. However, (a) close to the
-        # boundary, (b) in regions where the gradient is almost zero, and (c)
-        # in regions where the gradient changes sign the NRMSD can become
-        # large. This is mainly due to numerics, our coarse mesh, and the
-        # reduced tolerance (which we reduced for speed).
-        iy = 32
-        indices = np.argwhere(abs(grad[:, iy, :]) > 3)
-        ix, iz = indices[np.random.randint(indices.shape[0])]
-        nrmsd = alternatives.fd_vs_as_gradient(
-                (ix, iy, iz), self.model_init, grad, data_misfit, self.sim_inp)
+        # We test a random cell. The NRMSD should be way below 1 %. However,
+        # - close to the boundary,
+        # - in regions where the gradient is almost zero,
+        # - in regions where the gradient changes sign, and
+        # - close to the source,
+        # the NRMSD can become large. This is mainly due to numerics and our
+        # coarse mesh (MAIN REASON; used for speed). We limit therefore the
+        # "randomness" to cells where the gradient (resp. its
+        # "conductivity-equivalent") is bigger than 3.0 (gradient varies
+        # roughly from -70 to +70), exclude cells close to the source, and only
+        # assure that the NRMSD is less than 1.5 %.
 
-        assert nrmsd < 0.3
+        # The mapping is random, but for the limitation check, we use the
+        # conductivity equivalent by undoing map.derivative_chain().
+        cgrad = grad.copy()
+        if self.mapping == 'Resistivity':
+            cgrad /= -self.con_init**2
+        elif self.mapping == 'LgResistivity':
+            cgrad /= -self.con_init*np.log(10)
+        elif self.mapping == 'LnResistivity':
+            cgrad /= -self.con_init
+        elif self.mapping == 'LgConductivity':
+            cgrad /= self.con_init*np.log(10)
+        elif self.mapping == 'LnConductivity':
+            cgrad /= self.con_init
+
+        # Exclude cells around the source.
+        cgrad[5:12, 12:20, 12:20] = 0.0
+
+        # Get possible indices and select a random set.
+        indices = np.argwhere(abs(cgrad) > 3.0)
+        ix, iy, iz = indices[np.random.randint(indices.shape[0])]
+
+        # Compute NRMSD.
+        nrmsd = alternatives.fd_vs_as_gradient(
+                (ix, iy, iz), self.model_init, grad, data_misfit,
+                dc(self.sim_inp))
+
+        assert nrmsd < 1.5
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
     @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
     def test_adjoint(self, tmpdir):
 
         sim = simulations.Simulation(
-                model=self.model_init, file_dir=str(tmpdir), **self.sim_inp)
+                model=self.model_init, file_dir=str(tmpdir),
+                **dc(self.sim_inp))
 
-        # Note: rtol=1e-2 might look like a very low bar (which it is). The
-        #       reason is speed, as the tolerance of the solver is lowered to
-        #       solver-tol=1e-5 for speed. With solver-tol=1e-6 a rtol=1e-5
-        #       should be achieved, and with solver-tol=1e-8 the default of
-        #       assert_isadjoint, rtol=1e-6, should be achieved.
-        # Note: The randomness makes this to fail every now and then.
-        #       Either allow failure or fix seed in assert_isadjoint.
         discretize.tests.assert_isadjoint(
             lambda u: sim.jvec(u).real,  # Because jtvec returns .real
             sim.jtvec,
             self.mesh.shape_cells,
             self.survey.shape,
-            rtol=1e-2,
         )
 
         sim = simulations.Simulation(
                 model=self.model_init, file_dir=str(tmpdir),
-                **{**self.sim_inp, 'gridding': 'both',
+                **{**dc(self.sim_inp), 'gridding': 'both',
                    'gridding_opts': {'vector': 'xyz'}}
         )
 
@@ -711,7 +731,6 @@ class TestGradient:
             sim.jtvec,
             self.mesh.shape_cells,
             self.survey.shape,
-            rtol=1e-2,
         )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
@@ -719,7 +738,8 @@ class TestGradient:
     def test_misfit(self, tmpdir):
 
         sim = simulations.Simulation(
-                model=self.model_init, file_dir=str(tmpdir), **self.sim_inp)
+                model=self.model_init, file_dir=str(tmpdir),
+                **dc(self.sim_inp))
         m0 = 2*sim.model.property_x
 
         def func2(x):
@@ -739,3 +759,12 @@ class TestGradient:
         assert discretize.tests.check_derivative(
             func1, m0, plotIt=False, num=3,
         )
+
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
+    def test_jtvec_gradient(self):
+        # Gradient is the same as jtvec(residual*weights).
+        sim = simulations.Simulation(model=self.model_init, **dc(self.sim_inp))
+        g = sim.gradient
+        j = sim.jtvec(vector=sim.survey.data.residual*sim.survey.data.weights)
+        assert_allclose(g, j)

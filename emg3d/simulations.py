@@ -854,9 +854,9 @@ class Simulation:
         grad : ndarray
             Adjoint-state gradient. Shape depends on the anisotropy case:
 
-            - isotropic: grid.shape_cells
-            - HTI/VTI: (2, *grid.shape_cells)
-            - triaxial: (3, *grid.shape_cells)
+            - isotropic: (nx, ny, nz)
+            - HTI/VTI: (2, nx, ny, nz)
+            - triaxial: (3, nx, ny, nz)
 
         """
         if self._gradient is None:
@@ -1282,11 +1282,12 @@ class Simulation:
             Adjoint-state gradient for the provided vector. Shape depends on
             the anisotropy case:
 
-            - isotropic: grid.shape_cells
-            - HTI/VTI: (2, *grid.shape_cells)
-            - triaxial: (3, *grid.shape_cells)
+            - isotropic: (nx, ny, nz)
+            - HTI/VTI: (2, nx, ny, nz)
+            - triaxial: (3, nx, ny, nz)
 
         """
+
         # Replace residual by provided vector
         # (division by weight is undone in gradient).
         self.data.residual[...] = vector/self.data.weights.data
