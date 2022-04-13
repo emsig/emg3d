@@ -947,9 +947,8 @@ class Simulation:
             self.model.map.derivative_chain(
                     gradient[0, ...], self.model.property_x)
 
-            # Cast and excluded "expanded" layers.
-            gradient = gradient[indices, ...].squeeze()
-            self._gradient = gradient[..., :self._input_sc2]
+            # Select required directions, excluded "expanded" layers & squeeze.
+            self._gradient = gradient[indices, ..., :self._input_sc2].squeeze()
 
         return self._gradient
 
