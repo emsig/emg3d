@@ -446,6 +446,8 @@ class TestRun:
     xx = np.ones(16)*500
     grid = emg3d.TensorMesh([xx, xx, xx], origin=np.array([0, 0, 0]))
     model = emg3d.Model(grid, 1.)
+    model_vti = emg3d.Model(grid, 1., property_z=2.0)
+    model_tri = emg3d.Model(grid, 1., 1.5, 2.0)
 
     def test_basic(self, tmpdir, capsys):
 
@@ -502,6 +504,42 @@ class TestRun:
         assert join("phantom", "output") in e.value.code
         assert join("phantom", "simulation") in e.value.code
 
+    def test_gradient_shape_anisotropy(self, tmpdir):
+
+        # Write a config file.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[gridding_opts]\n")
+            f.write("center_on_edge=True\n")
+
+        self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=0)
+
+        fname = os.path.join(tmpdir, 'model.npz')
+        saveinp = {'fname': fname, 'mesh': self.grid, 'verb': 0}
+
+        args_dict = self.args_dict.copy()
+        args_dict['path'] = tmpdir
+        args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
+        args_dict['verbosity'] = -1
+
+        # isotropic
+        emg3d.save(model=self.model, **saveinp)
+        cli.run.simulation(args_dict.copy())
+        iso = emg3d.load(os.path.join(tmpdir, 'output.npz'))
+        assert_allclose(iso['gradient'].shape, self.model.shape)
+
+        # VTI
+        emg3d.save(model=self.model_vti, **saveinp)
+        cli.run.simulation(args_dict.copy())
+        vti = emg3d.load(os.path.join(tmpdir, 'output.npz'))
+        assert_allclose(vti['gradient'].shape, (2, *self.model.shape))
+
+        # tri-axial
+        emg3d.save(model=self.model_tri, **saveinp)
+        cli.run.simulation(args_dict.copy())
+        tri = emg3d.load(os.path.join(tmpdir, 'output.npz'))
+        assert_allclose(tri['gradient'].shape, (3, *self.model.shape))
+
     def test_run(self, tmpdir, capsys):
 
         # Write a config file.
@@ -519,7 +557,7 @@ class TestRun:
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)
-        emg3d.save(os.path.join(tmpdir, 'model.npz'), model=self.model,
+        emg3d.save(os.path.join(tmpdir, 'model.npz'), model=self.model_vti,
                    mesh=self.grid, verb=1)
 
         # Run a dry run (to output.npz).
@@ -542,6 +580,8 @@ class TestRun:
         assert_allclose(res1['data'].shape, res2['data'].shape)
         assert_allclose(res1['misfit'].shape, res2['misfit'].shape)
         assert_allclose(res1['gradient'].shape, res2['gradient'].shape)
+        # Double-check VTI gradient.
+        assert_allclose(res2['gradient'].shape, (2, *self.model.shape))
         # Assert we can load the simulation
         emg3d.Simulation.from_file(os.path.join(tmpdir, 'mysim.npz'))
         assert res1['n_observations'] == np.isfinite(self.data).sum()

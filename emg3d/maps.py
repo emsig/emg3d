@@ -716,33 +716,37 @@ def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
 
 
 @_requires('discretize')
-def _interp_volume_average_adj(values, ogrid, ngrid):
-    """Adjoint of volume averaging.
+def _interp_volume_average_adj(oval, ogrid, nval, ngrid):
+    """In-place adjoint of volume averaging.
 
     .. todo::
 
         Also replace ``interp_volume_average`` by corresponding function from
-        ``discretize``.
+        ``discretize``. Ideally, everything should be accessible through
+        ``interpolate``, with an ``adjoint`` flag. In the future, everything
+        could be done by ``discretize``; however, currently it does not have
+        cubic interpolation.
 
 
     Parameters
     ----------
-    values : ndarray
-        Values corresponding to the new grid (of shape ``ngrid.shape_cells``).
+    oval : ndarray
+        Arrays of the original grid, to which the results are added (of shape
+        ``(3, *ogrid.shape_cells)``).
 
     ogrid : TensorMesh
         Original grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
+    nval : ndarray
+        Arrays of the new grid (of shape ``(3, *ngrid.shape_cells)``), which
+        are adjoint-interpolated to the original grid.
+
     ngrid : TensorMesh
         New grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-
-    Returns
-    -------
-    values : ndarray
-        Values corresponding to the original grid (of shape
-        ``ogrid.shape_cells``).
-
     """
     P = discretize.utils.volume_average(ogrid, ngrid)
-    return (P.T * values.ravel('F')).reshape(ogrid.shape_cells, order='F')
+    shape = ogrid.shape_cells
+    oval[0, ...] += (P.T * nval[0, ...].ravel('F')).reshape(shape, order='F')
+    oval[1, ...] += (P.T * nval[1, ...].ravel('F')).reshape(shape, order='F')
+    oval[2, ...] += (P.T * nval[2, ...].ravel('F')).reshape(shape, order='F')

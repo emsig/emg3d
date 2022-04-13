@@ -844,7 +844,7 @@ class Simulation:
 
         .. note::
 
-            The currently implemented gradient is only for isotropic models
+            The currently implemented gradient does only work for models
             without relative electric permittivity nor relative magnetic
             permeability.
 
@@ -852,7 +852,11 @@ class Simulation:
         Returns
         -------
         grad : ndarray
-            Adjoint-state gradient (same shape as ``simulation.model``).
+            Adjoint-state gradient. Shape depends on the anisotropy type:
+
+            - isotropic: (nx, ny, nz)
+            - HTI/VTI: (2, nx, ny, nz)
+            - triaxial: (3, nx, ny, nz)
 
         """
         if self._gradient is None:
@@ -867,13 +871,7 @@ class Simulation:
                 )
                 warnings.warn(msg, UserWarning)
 
-            # Check limitation 1: So far only isotropic models.
-            if self.model.case != 'isotropic':
-                raise NotImplementedError(
-                    "Gradient only implemented for isotropic models."
-                )
-
-            # Check limitation 2: No epsilon_r, mu_r.
+            # Check limitation: No epsilon_r, mu_r.
             var = (self.model.epsilon_r, self.model.mu_r)
             for v, n in zip(var, ('el. permittivity', 'magn. permeability')):
                 if v is not None and not np.allclose(v, 1.0):
@@ -893,7 +891,7 @@ class Simulation:
             ishape = igrid.shape_cells
 
             # Pre-allocate the gradient on the mesh.
-            gradient_model = np.zeros(ishape, order='F')
+            gradient = np.zeros((3, *ishape), order='F')
 
             # Loop over source-frequency pairs.
             for src, freq in self._srcfreq:
@@ -909,34 +907,50 @@ class Simulation:
 
                 # Pre-allocate the gradient for the computational grid.
                 shape = gfield.grid.shape_cells
-                grad_x = np.zeros(shape, order='F')
-                grad_y = np.zeros(shape, order='F')
-                grad_z = np.zeros(shape, order='F')
+                grad = np.zeros((3, *shape), order='F')
 
                 # Map the field to cell centers times volume.
                 cell_volumes = gfield.grid.cell_volumes
                 maps.interp_edges_to_vol_averages(
                         ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
                         volumes=cell_volumes.reshape(shape, order='F'),
-                        ox=grad_x, oy=grad_y, oz=grad_z)
-                grad = grad_x + grad_y + grad_z
+                        ox=grad[0, ...], oy=grad[1, ...], oz=grad[2, ...])
 
-                # Bring gradient back from computation grid to inversion grid.
+                # Bring gradient back from computation grid to inversion grid
+                # and add it to the total gradient.
                 if igrid != gfield.grid:
-                    grad = maps._interp_volume_average_adj(
-                            grad, igrid, gfield.grid)
+                    # Requires discretize; for this reason wrapped in own fct.
+                    maps._interp_volume_average_adj(
+                        oval=gradient, ogrid=igrid,
+                        nval=grad, ngrid=gfield.grid,
+                    )
+                else:
+                    gradient += grad
 
-                # Add this src-freq gradient to the total gradient.
-                gradient_model += grad
+            # Apply derivative-chain of property-map (only relevant if
+            # `mapping` is something else than conductivity) and collect.
+            indices = [0, ]
+            if self.model.case in ['HTI', 'triaxial']:
+                self.model.map.derivative_chain(
+                        gradient[1, ...], self.model.property_y)
+                indices.append(1)
+            else:
+                gradient[0, ...] += gradient[1, ...]
 
-            # Apply derivative-chain of property-map
-            # (only relevant if `mapping` is something else than conductivity).
+            if self.model.case in ['VTI', 'triaxial']:
+                self.model.map.derivative_chain(
+                        gradient[2, ...], self.model.property_z)
+                indices.append(2)
+            else:
+                gradient[0, ...] += gradient[2, ...]
+
             self.model.map.derivative_chain(
-                    gradient_model, self.model.property_x)
+                    gradient[0, ...], self.model.property_x)
 
-            self._gradient = gradient_model
+            # Select required directions, excluded "expanded" layers & squeeze.
+            self._gradient = gradient[indices, ..., :self._input_sc2].squeeze()
 
-        return self._gradient[:, :, :self._input_sc2]
+        return self._gradient
 
     @property
     def misfit(self):
@@ -1118,7 +1132,11 @@ class Simulation:
         Parameters
         ----------
         vector : ndarray
-            Shape of the model.
+            Vector applied to J. Shape depends on the anisotropy type:
+
+            - isotropic: (nx, ny, nz) or (1, nx, ny, nz)
+            - HTI/VTI: (2, nx, ny, nz)
+            - triaxial: (3, nx, ny, nz)
 
 
         Returns
@@ -1129,17 +1147,26 @@ class Simulation:
         """
         # Missing for jvec/jtvec
         # - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
-        # - Implement tri-axial anisotropy for gradients.
         # - Document properly jvec and jtvec.
-        # - `jvec`: Should input be a Model instances?
-        # - `jtvec`: Should input be a Data instances?
+        # - Would gradient (?, nx, ny, nz) be better a Model-like instance?
 
         # Ensure misfit has been computed (and therefore the electric fields).
         _ = self.misfit
 
         # Apply derivative-chain of property-map (copy to not overwrite).
-        vector = vector.copy().reshape(self.model.shape, order='F')
-        self.model.map.derivative_chain(vector, self.model.property_x)
+        if vector.ndim == 3:
+            vector = vector[None, ...].copy()
+        else:
+            vector = vector.copy()
+
+        self.model.map.derivative_chain(vector[0, ...], self.model.property_x)
+        if self.model.case in ['HTI', 'triaxial']:
+            self.model.map.derivative_chain(
+                    vector[1, ...], self.model.property_y)
+        if self.model.case in ['VTI', 'triaxial']:
+            n = 1 if self.model.case == 'VTI' else 2
+            self.model.map.derivative_chain(
+                    vector[n, ...], self.model.property_z)
 
         # Interpolation options.
         iopts = {'method': 'volume', 'extrapolate': True,
@@ -1154,15 +1181,27 @@ class Simulation:
             efield = self._dict_get('efield', source, freq)
 
             # Interpolate to computational grid.
-            cvector = maps.interpolate(values=vector, xi=efield.grid, **iopts)
+            cvector = [
+                maps.interpolate(values=v, xi=efield.grid, **iopts).ravel('F')
+                for v in vector[:, ...]
+            ]
+
+            if self.model.case == 'isotropic':
+                ncase = 1
+                cvector = cvector[0]
+            else:
+                ncase = 3
+                if self.model.case == 'HTI':
+                    cvector = np.r_[cvector[0], cvector[1], cvector[0]]
+                elif self.model.case == 'VTI':
+                    cvector = np.r_[cvector[0], cvector[0], cvector[1]]
+                else:
+                    cvector = np.r_[cvector].ravel()
 
             # Compute gvec = G * vector (using discretize).
-            # Extension for tri-axial anisotropy is trivial:
-            #     gvec = get_edge_inner_product_deriv(
-            #                np.ones(mesh.n_cells)*3)(efield.field) * vector
             gvec = efield.grid.get_edge_inner_product_deriv(
-                np.ones(efield.grid.n_cells)
-                )(efield.field) * cvector.ravel('F')
+                np.ones(efield.grid.n_cells*ncase)
+            )(efield.field) * cvector
 
             # Create source field.
             gfield = fields.Field(
@@ -1206,21 +1245,28 @@ class Simulation:
 
             J^H v = G^H A^{-H} P^H v \ ,
 
-        where :math:`v` has size of the data.
+        where :math:`v` has the shape of the data.
 
 
         Parameters
         ----------
-        vector : ndarray
-            Shape of the data.
+        vector : ndarray, DataArray
+            An array with the shape of the data, or directly a DataArray as
+            stored in the :class:`emg3d.surveys.Survey`.
 
 
         Returns
         -------
         jtvec : ndarray
-            Adjoint-state gradient for the provided vector; shape of the model.
+            Adjoint-state gradient for the provided vector. Shape depends on
+            the anisotropy type:
+
+            - isotropic: (nx, ny, nz)
+            - HTI/VTI: (2, nx, ny, nz)
+            - triaxial: (3, nx, ny, nz)
 
         """
+
         # Replace residual by provided vector
         # (division by weight is undone in gradient).
         self.data.residual[...] = vector/self.data.weights.data
