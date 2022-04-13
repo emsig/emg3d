@@ -891,9 +891,7 @@ class Simulation:
             ishape = igrid.shape_cells
 
             # Pre-allocate the gradient on the mesh.
-            gradient_x = np.zeros(ishape, order='F')
-            gradient_y = np.zeros(ishape, order='F')
-            gradient_z = np.zeros(ishape, order='F')
+            gradient = np.zeros((3, *ishape), order='F')
 
             # Loop over source-frequency pairs.
             for src, freq in self._srcfreq:
@@ -909,53 +907,48 @@ class Simulation:
 
                 # Pre-allocate the gradient for the computational grid.
                 shape = gfield.grid.shape_cells
-                grad_x = np.zeros(shape, order='F')
-                grad_y = np.zeros(shape, order='F')
-                grad_z = np.zeros(shape, order='F')
+                grad = np.zeros((3, *shape), order='F')
 
                 # Map the field to cell centers times volume.
                 cell_volumes = gfield.grid.cell_volumes
                 maps.interp_edges_to_vol_averages(
                         ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
                         volumes=cell_volumes.reshape(shape, order='F'),
-                        ox=grad_x, oy=grad_y, oz=grad_z)
+                        ox=grad[0, ...], oy=grad[1, ...], oz=grad[2, ...])
 
                 # Bring gradient back from computation grid to inversion grid
                 # and add it to the total gradient.
                 if igrid != gfield.grid:
                     # Requires discretize; for this reason wrapped in own fct.
                     maps._interp_volume_average_adj(
-                        ox=gradient_x, oy=gradient_y, oz=gradient_z,
-                        ogrid=igrid,
-                        nx=grad_x, ny=grad_y, nz=grad_z, ngrid=gfield.grid,
+                        oval=gradient, ogrid=igrid,
+                        nval=grad, ngrid=gfield.grid,
                     )
                 else:
-                    gradient_x += grad_x
-                    gradient_y += grad_y
-                    gradient_z += grad_z
+                    gradient += grad
 
             # Apply derivative-chain of property-map (only relevant if
             # `mapping` is something else than conductivity) and collect.
-            gradient = []
+            indices = [0, ]
             if self.model.case in ['HTI', 'triaxial']:
                 self.model.map.derivative_chain(
-                        gradient_y, self.model.property_y)
-                gradient.append(gradient_y)
+                        gradient[1, ...], self.model.property_y)
+                indices.append(1)
             else:
-                gradient_x += gradient_y
+                gradient[0, ...] += gradient[1, ...]
 
             if self.model.case in ['VTI', 'triaxial']:
                 self.model.map.derivative_chain(
-                        gradient_z, self.model.property_z)
-                gradient.append(gradient_z)
+                        gradient[2, ...], self.model.property_z)
+                indices.append(2)
             else:
-                gradient_x += gradient_z
+                gradient[0, ...] += gradient[2, ...]
 
-            self.model.map.derivative_chain(gradient_x, self.model.property_x)
-            gradient.insert(0, gradient_x)
+            self.model.map.derivative_chain(
+                    gradient[0, ...], self.model.property_x)
 
             # Cast and excluded "expanded" layers.
-            gradient = np.stack(gradient).squeeze()
+            gradient = gradient[indices, ...].squeeze()
             self._gradient = gradient[..., :self._input_sc2]
 
         return self._gradient
