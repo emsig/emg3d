@@ -921,12 +921,18 @@ class Simulation:
                         ox=grad_x, oy=grad_y, oz=grad_z)
 
                 # Bring gradient back from computation grid to inversion grid
-                # and add this src-freq gradient to the total gradient.
-                igradient = maps._interp_volume_average_adj(
-                        [grad_x, grad_y, grad_z], igrid, gfield.grid)
-                gradient_x += igradient[0]
-                gradient_y += igradient[1]
-                gradient_z += igradient[2]
+                # and add it to the total gradient.
+                if igrid != gfield.grid:
+                    # Requires discretize; for this reason wrapped in own fct.
+                    maps._interp_volume_average_adj(
+                        ox=gradient_x, oy=gradient_y, oz=gradient_z,
+                        ogrid=igrid,
+                        nx=grad_x, ny=grad_y, nz=grad_z, ngrid=gfield.grid,
+                    )
+                else:
+                    gradient_x += grad_x
+                    gradient_y += grad_y
+                    gradient_z += grad_z
 
             # Apply derivative-chain of property-map
             # (only relevant if `mapping` is something else than conductivity).
@@ -1142,9 +1148,9 @@ class Simulation:
         vector : ndarray
             Vector applied to J. Shape depends on the anisotropy case:
 
-            - isotropic: grid.shape_cells
-            - HTI/VTI: (2, *grid.shape_cells)
-            - triaxial: (3, *grid.shape_cells)
+            - isotropic: (nx, ny, nz) or (1, nx, ny, nz)
+            - HTI/VTI: (2, nx, ny, nz)
+            - triaxial: (3, nx, ny, nz)
 
 
         Returns
@@ -1162,28 +1168,19 @@ class Simulation:
         _ = self.misfit
 
         # Apply derivative-chain of property-map (copy to not overwrite).
-        shape = self.model.shape
-        if self.model.case == 'isotropic':
-            vector_x = vector.copy()
+        if vector.ndim == 3:
+            vector = vector[None, ...].copy()
         else:
-            vector_x = vector[0, :, :, :].copy()
-        self.model.map.derivative_chain(vector_x, self.model.property_x)
+            vector = vector.copy()
+
+        self.model.map.derivative_chain(vector[0, ...], self.model.property_x)
         if self.model.case in ['HTI', 'triaxial']:
-            vector_y = vector[1, :, :, :].copy()
-            self.model.map.derivative_chain(vector_y, self.model.property_y)
+            self.model.map.derivative_chain(
+                    vector[1, ...], self.model.property_y)
         if self.model.case in ['VTI', 'triaxial']:
             n = 1 if self.model.case == 'VTI' else 2
-            vector_z = vector[n, :, :, :].copy()
-            self.model.map.derivative_chain(vector_z, self.model.property_z)
-
-        if self.model.case == 'isotropic':
-            vector = np.stack([vector_x, ])
-        elif self.model.case == 'HTI':
-            vector = np.stack([vector_x, vector_y])
-        elif self.model.case == 'VTI':
-            vector = np.stack([vector_x, vector_z])
-        else:
-            vector = np.stack([vector_x, vector_y, vector_z])
+            self.model.map.derivative_chain(
+                    vector[n, ...], self.model.property_z)
 
         # Interpolation options.
         iopts = {'method': 'volume', 'extrapolate': True,
@@ -1198,30 +1195,26 @@ class Simulation:
             efield = self._dict_get('efield', source, freq)
 
             # Interpolate to computational grid.
-            cvector_x = maps.interpolate(
-                values=vector[0, :, :, :], xi=efield.grid, **iopts
-            ).ravel('F')
-            if self.model.case in ['HTI', 'triaxial']:
-                cvector_y = maps.interpolate(
-                    values=vector[1, :, :, :], xi=efield.grid, **iopts
-                ).ravel('F')
-            if self.model.case in ['VTI', 'triaxial']:
-                cvector_z = maps.interpolate(
-                    values=vector[n, :, :, :], xi=efield.grid, **iopts
-                ).ravel('F')
+            cvector = [
+                maps.interpolate(values=v, xi=efield.grid, **iopts).ravel('F')
+                for v in vector[:, ...]
+            ]
 
             if self.model.case == 'isotropic':
-                cvector = np.r_[cvector_x, cvector_x, cvector_x]
-            elif self.model.case == 'HTI':
-                cvector = np.r_[cvector_x, cvector_y, cvector_x]
-            elif self.model.case == 'VTI':
-                cvector = np.r_[cvector_x, cvector_x, cvector_z]
+                ncase = 1
+                cvector = cvector[0]
             else:
-                cvector = np.r_[cvector_x, cvector_y, cvector_z]
+                ncase = 3
+                if self.model.case == 'HTI':
+                    cvector = np.r_[cvector[0], cvector[1], cvector[0]]
+                elif self.model.case == 'VTI':
+                    cvector = np.r_[cvector[0], cvector[0], cvector[1]]
+                else:
+                    cvector = np.r_[cvector].ravel()
 
             # Compute gvec = G * vector (using discretize).
             gvec = efield.grid.get_edge_inner_product_deriv(
-                np.ones(efield.grid.n_cells*3)
+                np.ones(efield.grid.n_cells*ncase)
             )(efield.field) * cvector
 
             # Create source field.

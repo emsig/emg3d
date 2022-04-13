@@ -735,6 +735,67 @@ class TestGradient:
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
     @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
+    def test_adjoint_hti(self):
+
+        model_init = emg3d.Model(
+            self.mesh,
+            self.k.forward(self.con_init),
+            property_y=self.k.forward(1.1*self.con_init),
+            mapping=self.mapping
+        )
+
+        sim = simulations.Simulation(model=model_init, **dc(self.sim_inp))
+
+        discretize.tests.assert_isadjoint(
+            lambda u: sim.jvec(u).real,
+            sim.jtvec,
+            (2, *self.mesh.shape_cells),
+            self.survey.shape,
+        )
+
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
+    def test_adjoint_vti(self):
+
+        model_init = emg3d.Model(
+            self.mesh,
+            self.k.forward(self.con_init),
+            property_z=self.k.forward(1.4*self.con_init),
+            mapping=self.mapping
+        )
+
+        sim = simulations.Simulation(model=model_init, **dc(self.sim_inp))
+
+        discretize.tests.assert_isadjoint(
+            lambda u: sim.jvec(u).real,
+            sim.jtvec,
+            (2, *self.mesh.shape_cells),
+            self.survey.shape,
+        )
+
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
+    def test_adjoint_triaxial(self):
+
+        model_init = emg3d.Model(
+            self.mesh,
+            self.k.forward(self.con_init),
+            property_y=self.k.forward(1.1*self.con_init),
+            property_z=self.k.forward(1.4*self.con_init),
+            mapping=self.mapping
+        )
+
+        sim = simulations.Simulation(model=model_init, **dc(self.sim_inp))
+
+        discretize.tests.assert_isadjoint(
+            lambda u: sim.jvec(u).real,
+            sim.jtvec,
+            (3, *self.mesh.shape_cells),
+            self.survey.shape,
+        )
+
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
     def test_misfit(self, tmpdir):
 
         sim = simulations.Simulation(

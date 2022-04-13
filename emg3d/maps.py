@@ -716,44 +716,36 @@ def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
 
 
 @_requires('discretize')
-def _interp_volume_average_adj(values, ogrid, ngrid):
+def _interp_volume_average_adj(ox, oy, oz, ogrid, nx, ny, nz, ngrid):
     """Adjoint of volume averaging.
 
     .. todo::
 
         Also replace ``interp_volume_average`` by corresponding function from
-        ``discretize``.
+        ``discretize``. Ideally, everything should be accessible through
+        ``interpolate``, with a ``adjoint`` flag. In the future, everything
+        could be done by ``discretize``; however, currently it does not have
+        cubic interpolation.
 
 
     Parameters
     ----------
-    values : ndarray, list
-        Values corresponding to the new grid (of shape ``ngrid.shape_cells``).
-        It can be a list of several ndarray's of values, all corresponding
-        to the same grids.
+    ox, oy, oz : ndarray
+        Arrays of the original grid, to which the results are added (of shape
+        ``ogrid.shape_cells``).
 
     ogrid : TensorMesh
         Original grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
+    nx, ny, nz : ndarray
+        Arrays of the new grid (of shape ``ngrid.shape_cells``), which are
+        adjoint-interpolated to the original grid.
+
     ngrid : TensorMesh
         New grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-
-    Returns
-    -------
-    values : ndarray, list
-        Values corresponding to the original grid (of shape
-        ``ogrid.shape_cells``). If a list was provided as input the equivalent
-        list is returned.
-
     """
-    if ogrid != ngrid:
-        P = discretize.utils.volume_average(ogrid, ngrid)
-        shape = ogrid.shape_cells
-        if isinstance(values, list):
-            return [(P.T * v.ravel('F')).reshape(shape, order='F')
-                    for v in values]
-        else:
-            return (P.T * values.ravel('F')).reshape(shape, order='F')
-    else:
-        return values
+    P = discretize.utils.volume_average(ogrid, ngrid)
+    ox += (P.T * nx.ravel('F')).reshape(ogrid.shape_cells, order='F')
+    oy += (P.T * ny.ravel('F')).reshape(ogrid.shape_cells, order='F')
+    oz += (P.T * nz.ravel('F')).reshape(ogrid.shape_cells, order='F')

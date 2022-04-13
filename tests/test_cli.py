@@ -505,6 +505,13 @@ class TestRun:
         assert join("phantom", "simulation") in e.value.code
 
     def test_gradient_shape_anisotropy(self, tmpdir):
+
+        # Write a config file.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[gridding_opts]\n")
+            f.write("center_on_edge=True\n")
+
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=0)
 
         fname = os.path.join(tmpdir, 'model.npz')
@@ -512,6 +519,7 @@ class TestRun:
 
         args_dict = self.args_dict.copy()
         args_dict['path'] = tmpdir
+        args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
         args_dict['verbosity'] = -1
 
         # isotropic
