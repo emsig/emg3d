@@ -6,13 +6,17 @@ Changelog
 """"""""""
 
 
-*latest*
---------
+v1.6.0 : Anisotropic gradient
+-----------------------------
 
-- Simulation:
+**2022-04-30**
 
-  - ``gradient``, ``jvec``, and ``jtvec`` new support triaxial anisotropy (also
-    through the CLI).
+- Simulation: ``gradient``, ``jvec``, and ``jtvec`` new support triaxial
+  anisotropy (also through the CLI). As a consequence, ``gradient`` and
+  ``jtvec`` return an ndarray of shape ``(nx, ny, nz)`` (isotropic) or
+  ``({2;3}, nx, ny, nz)`` (VTI/HTI; triaxial), and ``jvec`` expects an ndarray
+  of shape ``(nx, ny, nz)`` (isotropic) or ``({1;2;3}, nx, ny, nz)``
+  (isotropic; VTI/HTI; triaxial).
 
 
 v1.5.0 : Meshing: center on edge
