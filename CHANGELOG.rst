@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+- Survey: ``add_noise`` takes new a ``max_offset`` argument; receivers
+  responses at offsets greater than maximum offset are set to NaN (also
+  available through the CLI).
+
+
 v1.6.0 : Anisotropic gradient
 -----------------------------
 

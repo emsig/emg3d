@@ -198,7 +198,7 @@ def parse_config_file(args_dict):
 
     # Check noise parameters
     simulation['noise_kwargs'] = {}
-    keys = ['min_offset', 'mean_noise']
+    keys = ['min_offset', 'mean_noise', 'max_offset']
     for key in keys:
         if cfg.has_option('simulation', key):
             _ = all_sim.pop(key)
