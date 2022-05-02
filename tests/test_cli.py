@@ -243,6 +243,7 @@ class TestParser:
             f.write("name=PyTest simulation\n")
             f.write("file_dir=here\n")
             f.write("min_offset=1320\n")
+            f.write("max_offset=5320\n")
             f.write("mean_noise=1.0\n")
             f.write("ntype=gaussian_uncorrelated")
 
@@ -254,6 +255,7 @@ class TestParser:
         assert sim_opts['gridding'] == 'fancything'
         assert sim_opts['name'] == "PyTest simulation"
         assert sim_opts['noise_kwargs']['min_offset'] == 1320.0
+        assert sim_opts['noise_kwargs']['max_offset'] == 5320.0
         assert sim_opts['noise_kwargs']['mean_noise'] == 1.0
         assert sim_opts['noise_kwargs']['ntype'] == 'gaussian_uncorrelated'
         assert sim_opts['file_dir'] == 'here'

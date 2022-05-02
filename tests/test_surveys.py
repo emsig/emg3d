@@ -289,6 +289,10 @@ class TestSurvey():
         survey.add_noise(min_offset=0, min_amplitude=10e-50, add_to='test2')
         assert np.sum(np.isnan(survey.data.test2.data)) == 0
 
+        # Max offset
+        survey.add_noise(max_offset=5000, add_to='test3')
+        assert np.sum(np.isnan(survey.data.test3.data)) == 10
+
         # Defaults
         survey.add_noise()
         # Ensure low amplitudes are NaN
