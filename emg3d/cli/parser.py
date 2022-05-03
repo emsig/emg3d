@@ -65,7 +65,7 @@ def parse_config_file(args_dict):
     term['config_file'] = configfile
 
     # Get terminal input.
-    for key in ['verbosity', 'nproc', 'dry_run']:
+    for key in ['verbosity', 'nproc', 'dry_run', 'clean']:
         term[key] = args_dict.pop(key)
 
     for key in ['forward', 'misfit', 'gradient']:
@@ -76,7 +76,7 @@ def parse_config_file(args_dict):
         term['function'] = 'forward'
 
     # Get file names.
-    for key in ['path', 'survey', 'model', 'output', 'save', 'load']:
+    for key in ['path', 'survey', 'model', 'output', 'save', 'load', 'cache']:
         term[key] = args_dict.pop(key)
 
     # Ensure no keys are left.
@@ -106,7 +106,7 @@ def parse_config_file(args_dict):
     path = os.path.abspath(path)
 
     # Initiate files dict with defaults.
-    files = {'save': False, 'load': False,
+    files = {'save': False, 'load': False, 'cache': False,
              'survey': 'survey', 'model': 'model', 'output': 'emg3d_out'}
     for key, value in files.items():
 
@@ -136,10 +136,11 @@ def parse_config_file(args_dict):
         # Store in dict.
         files[key] = str(ffile)
 
-    # If a simulation is provided, the model and survey are not used.
-    if files['load']:
-        files['model'] = False
-        files['survey'] = False
+    # If cache, it overwrites save/load:
+    cache = files.pop('cache')
+    if cache:
+        files['load'] = cache
+        files['save'] = cache
 
     # Add log file.
     files['log'] = logfile
@@ -197,16 +198,16 @@ def parse_config_file(args_dict):
         simulation[key] = 'linear'
 
     # Check noise parameters
-    simulation['noise_kwargs'] = {}
+    noise_kwargs = {}
     keys = ['min_offset', 'mean_noise', 'max_offset']
     for key in keys:
         if cfg.has_option('simulation', key):
             _ = all_sim.pop(key)
-            simulation['noise_kwargs'][key] = cfg.getfloat('simulation', key)
+            noise_kwargs[key] = cfg.getfloat('simulation', key)
     key = 'ntype'
     if cfg.has_option('simulation', key):
         _ = all_sim.pop(key)
-        simulation['noise_kwargs'][key] = cfg.get('simulation', key)
+        noise_kwargs[key] = cfg.get('simulation', key)
 
     # Ensure no keys are left.
     if all_sim:
@@ -357,6 +358,22 @@ def parse_config_file(args_dict):
         if grid:
             simulation['gridding_opts'] = grid
 
+    # # Finish # #
+
+    # If a simulation is provided, the model, survey, and simulation_options
+    # are not used.
+    if files['load']:
+        files['survey'] = False
+        data = False
+        gopts = simulation.pop('gridding_opts', {})
+        simulation = {'gridding_opts': {
+            'expand': gopts.get('expand', None),
+            'seasurface': gopts.get('seasurface', 0.0),
+        }}
+        if not term['clean']:
+            files['model'] = False
+
     # Return.
-    out = {'files': files, 'simulation_options': simulation, 'data': data}
+    out = {'files': files, 'simulation_options': simulation, 'data': data,
+           'noise_kwargs': noise_kwargs}
     return out, term

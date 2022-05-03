@@ -17,6 +17,9 @@ provided in the command line overwrite the settings in the configuration file.
 For an example see the `CLI example
 <https://emsig.xyz/emg3d-gallery/gallery/tutorials/cli.html>`_ in the gallery.
 
+Please note that the CLI is not very well documented. If you plan to use it and
+struggle with it please get in touch.
+
 
 Format of the config file
 -------------------------
@@ -44,6 +47,9 @@ remove the comment signs to use them.
   # # - The survey and model under [files]
   # # - Sections [simulation], [solver_opts], [gridding_opts], and [data]
   # load = my_sim.h5       # Also via `--load`
+  #
+  # # Shortcut for `load` and `save` if the same filename is used for both.
+  # cache = my_sim.h5    # Also via `--cache`
 
   # Simulation parameters
   # ---------------------

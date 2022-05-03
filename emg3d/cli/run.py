@@ -25,7 +25,7 @@ import logging
 
 import numpy as np
 
-from emg3d import io, utils, simulations
+from emg3d import io, utils, simulations, models
 from emg3d.cli import parser
 
 
@@ -69,8 +69,6 @@ def simulation(args_dict):
     logger.debug("\n    :: CONFIGURATION ::\n")
     logger.debug(f"{term['config_file']}\n{paramdump}")
 
-    noise_kwargs = cfg['simulation_options'].pop('noise_kwargs')
-
     if cfg['files']['load']:
 
         # Load input.
@@ -80,6 +78,26 @@ def simulation(args_dict):
                 cfg['files']['load'], verb=-1)
         logger.info(sinfo.split('\n')[0])
         logger.debug(sinfo.split('\n')[1])
+
+        # Clean simulation.
+        if term['clean']:
+
+            # Remove existing fields.
+            sim.clean('computed')
+
+            # Replace model.
+            model, minfo = io.load(cfg['files']['model'], verb=-1)
+            logger.info(minfo.split('\n')[0])
+            logger.debug(minfo.split('\n')[1])
+            sim.model = model['model']
+
+            # Expand model if necessary.
+            gopts = cfg['simulation_options']['gridding_opts']
+            expand = gopts.pop('expand', None)
+            if expand is not None:
+                interface = gopts.pop('seasurface', 0.0)
+                sim.model = models.expand_grid_model(
+                        sim.model, expand, interface)
 
     else:
 
@@ -133,7 +151,7 @@ def simulation(args_dict):
     else:
 
         if function == 'forward':
-            sim.compute(observed=True, **noise_kwargs)
+            sim.compute(observed=True, **cfg['noise_kwargs'])
             output['data'] = sim.data.observed
         else:
             sim.compute()
