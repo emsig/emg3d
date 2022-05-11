@@ -12,11 +12,12 @@ Changelog
 - CLI:
 
   - New command-line argument ``--clean``: If an existing simulation is loaded,
-    setting clean will remove any existing computed fields and replace the
-    model with the currently provided one.
-  - New parameter ``cache`` (on the command-line via ``--cache`` or in
-    the configuration file under ``[files]``), which acts as a shortcut for
-    ``--load --save`` using the same file name.
+    setting clean will remove any existing computed data (fields, misfit,
+    gradient, residuals, synthetic data) and replace the model with the
+    currently provided one.
+  - New command-line argument ``--cache`` (or as parameter ``cache`` in the
+    configuration file under ``[files]``): Acts as a shortcut for ``--load
+    --save`` using the same file name.
 
 
 v1.6.1 : Max offset
