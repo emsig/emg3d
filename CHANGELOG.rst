@@ -6,8 +6,8 @@ Changelog
 """"""""""
 
 
-*latest*
---------
+v1.6.1 : Max offset
+-------------------
 
 - Survey: ``add_noise`` takes new a ``max_offset`` argument; receivers
   responses at offsets greater than maximum offset are set to NaN (also
