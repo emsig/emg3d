@@ -360,8 +360,7 @@ def parse_config_file(args_dict):
 
     # # Finish # #
 
-    # If a simulation is provided, the model, survey, and simulation_options
-    # are not used.
+    # If a simulation is provided, survey and simulation_options are not used.
     if files['load']:
         files['survey'] = False
         data = False
@@ -370,6 +369,8 @@ def parse_config_file(args_dict):
             'expand': gopts.get('expand', None),
             'seasurface': gopts.get('seasurface', 0.0),
         }}
+
+        # If not --clean, then the model is not used either.
         if not term['clean']:
             files['model'] = False
 

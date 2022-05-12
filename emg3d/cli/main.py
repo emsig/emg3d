@@ -142,7 +142,7 @@ def main(args=None):
         "--clean",
         action="store_true",
         default=False,
-        help="replace model and remove fields of loaded simulation"
+        help="replace model and all computed data of loaded simulation"
     )
 
     # arg: Verbosity.
