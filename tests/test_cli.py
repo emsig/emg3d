@@ -137,8 +137,8 @@ class TestParser:
         args_dict['load'] = 'test.npz'
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict.copy())
-        assert cfg['files']['survey'] is False
-        assert cfg['files']['model'] is False
+        assert cfg['files']['survey'] == join(tmpdir, 'test.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'unkno.h5')
         assert cfg['files']['output'] == join(tmpdir, 'out.npz')
         assert cfg['files']['save'] == join(tmpdir, 'test.npz')
         assert cfg['files']['load'] == join(tmpdir, 'test.npz')
@@ -237,8 +237,8 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['files']['survey'] is False
-        assert cfg['files']['model'] is False
+        assert cfg['files']['survey'] == join(tmpdir, 'testit.json')
+        assert cfg['files']['model'] == join(tmpdir, 'thismodel.h5')
         assert cfg['files']['output'] == join(tmpdir, 'results.npz')
         assert cfg['files']['log'] == join(tmpdir, 'results.log')
         assert cfg['files']['save'] == join(tmpdir, 'test.h5')

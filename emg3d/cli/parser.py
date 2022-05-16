@@ -358,22 +358,6 @@ def parse_config_file(args_dict):
         if grid:
             simulation['gridding_opts'] = grid
 
-    # # Finish # #
-
-    # If a simulation is provided, survey and simulation_options are not used.
-    if files['load']:
-        files['survey'] = False
-        data = False
-        gopts = simulation.pop('gridding_opts', {})
-        simulation = {'gridding_opts': {
-            'expand': gopts.get('expand', None),
-            'seasurface': gopts.get('seasurface', 0.0),
-        }}
-
-        # If not --clean, then the model is not used either.
-        if not term['clean']:
-            files['model'] = False
-
     # Return.
     out = {'files': files, 'simulation_options': simulation, 'data': data,
            'noise_kwargs': noise_kwargs}
