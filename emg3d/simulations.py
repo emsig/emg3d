@@ -400,15 +400,11 @@ class Simulation:
 
         # Store wanted dicts.
         if what in ['computed', 'all']:
-            for name in ['_dict_efield', '_dict_efield_info',
+            for name in ['_dict_grid',
+                         '_dict_efield', '_dict_efield_info',
                          '_dict_bfield', '_dict_bfield_info']:
                 if hasattr(self, name):
                     out[name] = getattr(self, name)
-
-            if what == 'all':
-                for name in ['_dict_grid', ]:
-                    if hasattr(self, name):
-                        out[name] = getattr(self, name)
 
         # Store gradient and misfit.
         if what in ['computed', 'results', 'all']:
@@ -490,16 +486,15 @@ class Simulation:
         what : str, default: 'computed'
             What to store. Possibilities:
 
-            - ``'computed'``:
+            - ``'computed'``, ``'all'``:
               Stores all computed properties: electric fields and responses at
               receiver locations.
             - '``results'``:
               Stores only the response at receiver locations.
-            - ``'all'``:
-              Stores everything. Note that if ``file_dir`` is set, these files
-              will remain there.
             - ``'plain'``:
               Only stores the plain Simulation (as initiated).
+
+            Note that if ``file_dir`` is set, those files will remain there.
 
         name : str, default: 'simulation'
             Name with which the simulation is stored in the file.
@@ -564,14 +559,6 @@ class Simulation:
         if self._dict_grid[source][freq] is not None:
             return self._dict_grid[source][freq]
 
-        # TODO
-        def get_mesh(inp):
-            grid = self._dict_get('efield', source, freq)
-            if grid is None:
-                return meshes.construct_mesh(**inp)
-            else:
-                return grid.grid
-
         # Same grid as for provided model.
         if self.gridding == 'same':
 
@@ -591,7 +578,7 @@ class Simulation:
                 # Get grid and store it.
                 inp = {**self.gridding_opts, 'frequency':
                        self.survey.frequencies[freq]}
-                self._grid_frequency[freq] = get_mesh(inp)
+                self._grid_frequency[freq] = meshes.construct_mesh(**inp)
 
             # Store link to grid.
             self._dict_grid[source][freq] = self._grid_frequency[freq]
@@ -609,7 +596,7 @@ class Simulation:
                 # Get grid and store it.
                 center = self.survey.sources[source].center
                 inp = {**self.gridding_opts, 'center': center}
-                self._grid_source[source] = get_mesh(inp)
+                self._grid_source[source] = meshes.construct_mesh(**inp)
 
             # Store link to grid.
             self._dict_grid[source][freq] = self._grid_source[source]
@@ -621,7 +608,7 @@ class Simulation:
             center = self.survey.sources[source].center
             inp = {**self.gridding_opts, 'frequency':
                    self.survey.frequencies[freq], 'center': center}
-            self._dict_grid[source][freq] = get_mesh(inp)
+            self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
 
         # Use a single grid for all sources and receivers.
         # Default case; catches 'single' but also anything else.
@@ -631,7 +618,7 @@ class Simulation:
             if not hasattr(self, '_grid_single'):
 
                 # Get grid and store it.
-                self._grid_single = get_mesh(self.gridding_opts)
+                self._grid_single = meshes.construct_mesh(**self.gridding_opts)
 
             # Store link to grid.
             self._dict_grid[source][freq] = self._grid_single
