@@ -82,6 +82,9 @@ def simulation(args_dict):
         # Clean simulation.
         if term['clean']:
 
+            # Exchange model.
+            logger.info("\n    :: LOAD MODEL ::\n")
+
             # Remove existing fields.
             sim.clean('computed')
 

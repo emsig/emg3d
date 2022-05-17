@@ -564,6 +564,14 @@ class Simulation:
         if self._dict_grid[source][freq] is not None:
             return self._dict_grid[source][freq]
 
+        # TODO
+        def get_mesh(inp):
+            grid = self._dict_get('efield', source, freq)
+            if grid is None:
+                return meshes.construct_mesh(**inp)
+            else:
+                return grid.grid
+
         # Same grid as for provided model.
         if self.gridding == 'same':
 
@@ -583,7 +591,7 @@ class Simulation:
                 # Get grid and store it.
                 inp = {**self.gridding_opts, 'frequency':
                        self.survey.frequencies[freq]}
-                self._grid_frequency[freq] = meshes.construct_mesh(**inp)
+                self._grid_frequency[freq] = get_mesh(inp)
 
             # Store link to grid.
             self._dict_grid[source][freq] = self._grid_frequency[freq]
@@ -601,7 +609,7 @@ class Simulation:
                 # Get grid and store it.
                 center = self.survey.sources[source].center
                 inp = {**self.gridding_opts, 'center': center}
-                self._grid_source[source] = meshes.construct_mesh(**inp)
+                self._grid_source[source] = get_mesh(inp)
 
             # Store link to grid.
             self._dict_grid[source][freq] = self._grid_source[source]
@@ -613,7 +621,7 @@ class Simulation:
             center = self.survey.sources[source].center
             inp = {**self.gridding_opts, 'frequency':
                    self.survey.frequencies[freq], 'center': center}
-            self._dict_grid[source][freq] = meshes.construct_mesh(**inp)
+            self._dict_grid[source][freq] = get_mesh(inp)
 
         # Use a single grid for all sources and receivers.
         # Default case; catches 'single' but also anything else.
@@ -623,7 +631,7 @@ class Simulation:
             if not hasattr(self, '_grid_single'):
 
                 # Get grid and store it.
-                self._grid_single = meshes.construct_mesh(**self.gridding_opts)
+                self._grid_single = get_mesh(self.gridding_opts)
 
             # Store link to grid.
             self._dict_grid[source][freq] = self._grid_single
