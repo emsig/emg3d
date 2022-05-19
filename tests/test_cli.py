@@ -86,6 +86,8 @@ class TestParser:
             'output': None,
             'save': None,
             'load': None,
+            'cache': None,
+            'clean': False,
             'verbosity': 0,
             'dry_run': False,
             }
@@ -134,12 +136,20 @@ class TestParser:
         args_dict['save'] = 'test.npz'
         args_dict['load'] = 'test.npz'
         args_dict['config'] = config
-        cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['files']['survey'] is False
-        assert cfg['files']['model'] is False
+        cfg, term = cli.parser.parse_config_file(args_dict.copy())
+        assert cfg['files']['survey'] == join(tmpdir, 'test.h5')
+        assert cfg['files']['model'] == join(tmpdir, 'unkno.h5')
         assert cfg['files']['output'] == join(tmpdir, 'out.npz')
         assert cfg['files']['save'] == join(tmpdir, 'test.npz')
         assert cfg['files']['load'] == join(tmpdir, 'test.npz')
+        # Check save/load through cache with clean
+        args_dict['model'] = 'model.h5'  # will NOT be removed
+        args_dict['cache'] = 'new.npz'
+        args_dict['clean'] = True
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        assert cfg['files']['model'] == join(tmpdir, 'model.h5')
+        assert cfg['files']['save'] == join(tmpdir, 'new.npz')
+        assert cfg['files']['load'] == join(tmpdir, 'new.npz')
 
         # .-trick.
         args_dict = self.args_dict.copy()
@@ -159,6 +169,7 @@ class TestParser:
         args_dict['nproc'] = -1
         args_dict['verbosity'] = 20
         args_dict['dry_run'] = True
+        args_dict['clean'] = True
         args_dict['gradient'] = True
         args_dict['path'] = tmpdir
         args_dict['survey'] = 'testit'
@@ -167,6 +178,7 @@ class TestParser:
         cfg, term = cli.parser.parse_config_file(args_dict)
         assert term['verbosity'] == 2  # Maximum 2!
         assert term['dry_run'] is True
+        assert term['clean'] is True
         assert term['function'] == 'gradient'
         assert cfg['simulation_options']['max_workers'] == 1
         assert cfg['files']['survey'] == join(tmpdir, 'testit.h5')
@@ -225,8 +237,8 @@ class TestParser:
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
-        assert cfg['files']['survey'] is False
-        assert cfg['files']['model'] is False
+        assert cfg['files']['survey'] == join(tmpdir, 'testit.json')
+        assert cfg['files']['model'] == join(tmpdir, 'thismodel.h5')
         assert cfg['files']['output'] == join(tmpdir, 'results.npz')
         assert cfg['files']['log'] == join(tmpdir, 'results.log')
         assert cfg['files']['save'] == join(tmpdir, 'test.h5')
@@ -251,13 +263,14 @@ class TestParser:
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
         sim_opts = cfg['simulation_options']
+        noise_kwargs = cfg['noise_kwargs']
         assert sim_opts['max_workers'] == 5
         assert sim_opts['gridding'] == 'fancything'
         assert sim_opts['name'] == "PyTest simulation"
-        assert sim_opts['noise_kwargs']['min_offset'] == 1320.0
-        assert sim_opts['noise_kwargs']['max_offset'] == 5320.0
-        assert sim_opts['noise_kwargs']['mean_noise'] == 1.0
-        assert sim_opts['noise_kwargs']['ntype'] == 'gaussian_uncorrelated'
+        assert noise_kwargs['min_offset'] == 1320.0
+        assert noise_kwargs['max_offset'] == 5320.0
+        assert noise_kwargs['mean_noise'] == 1.0
+        assert noise_kwargs['ntype'] == 'gaussian_uncorrelated'
         assert sim_opts['file_dir'] == 'here'
         with pytest.raises(KeyError, match="receiver_interpolation"):
             assert sim_opts['receiver_interpolation'] == 'linear'
@@ -422,6 +435,8 @@ class TestRun:
             'output': 'output.npz',
             'save': None,
             'load': None,
+            'cache': None,
+            'clean': False,
             'verbosity': 0,
             'dry_run': True,
             }
@@ -542,7 +557,7 @@ class TestRun:
         tri = emg3d.load(os.path.join(tmpdir, 'output.npz'))
         assert_allclose(tri['gradient'].shape, (3, *self.model.shape))
 
-    def test_run(self, tmpdir, capsys):
+    def test_run(self, tmpdir):
 
         # Write a config file.
         config = os.path.join(tmpdir, 'emg3d.cfg')
@@ -617,7 +632,7 @@ class TestRun:
         assert 'misfit' in res3
         assert 'gradient' not in res3
 
-    def test_data(self, tmpdir, capsys):
+    def test_data(self, tmpdir):
 
         # Write a config file; remove_empty=False (default)
         config = os.path.join(tmpdir, 'emg3d.cfg')
@@ -656,3 +671,55 @@ class TestRun:
         res = emg3d.load(os.path.join(tmpdir, 'output.npz'))
         assert_allclose(res['data'].shape, (1, 4, 1))
         assert res['n_observations'] == 4
+
+    def test_expand(self, tmpdir):
+
+        # Write a config file; remove_empty=False (default)
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[gridding_opts]\n")
+            f.write("center_on_edge=True\n")
+            f.write("expand=2, 3\n")
+            f.write("seasurface=8000.0\n")
+
+        # Store survey and model.
+        self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=1)
+        emg3d.save(os.path.join(tmpdir, 'model.npz'), model=self.model,
+                   mesh=self.grid, verb=1)
+
+        # Run a dry run to store simulation.
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
+        args_dict['path'] = tmpdir
+        args_dict['save'] = 'simulation1.h5'
+        cli.run.simulation(args_dict.copy())
+
+        # Replace / add dicts
+        s = emg3d.Simulation.from_file(os.path.join(tmpdir, 'simulation1.h5'))
+        s._dict_efield = {'bla': 1.0}
+        s._dict_bfield = {'2': 3.4}
+        s.to_file(os.path.join(tmpdir, 'simulation1.h5'))
+
+        # Run a second dry run loading existing with clean; use other model.
+        emg3d.save(os.path.join(tmpdir, 'model.npz'), model=self.model_vti,
+                   mesh=self.grid, verb=1)
+        args_dict['model'] = 'model.npz'
+        args_dict['load'] = 'simulation1.h5'
+        args_dict['save'] = 'simulation2.h5'
+        args_dict['clean'] = True
+        cli.run.simulation(args_dict.copy())
+
+        s1 = emg3d.Simulation.from_file(os.path.join(tmpdir, 'simulation1.h5'))
+        s2 = emg3d.Simulation.from_file(os.path.join(tmpdir, 'simulation2.h5'))
+
+        # Ensure model has changed.
+        assert s1.model.property_z is None
+        assert s2.model.property_z is not None
+        assert_allclose(s1.model.property_x[..., -1],
+                        s2.model.property_z[..., -1])
+        assert_allclose(s1.model.property_x[..., :-1]*2,
+                        s2.model.property_z[..., :-1])
+        assert s1._dict_efield == {'bla': 1.0}  # Made-up one
+        assert s1._dict_bfield == {'2': 3.4}    # Made-up one
+        assert s2._dict_efield == {'TxED-1': {'f-1': None}}  # Re-created
+        assert not hasattr(s2, '_dict_bfield')  # Deleted

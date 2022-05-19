@@ -119,7 +119,30 @@ def main(args=None):
         "--load",
         type=str,
         default=None,
-        help="file-name to load simulation; not used by default"
+        help=(
+            "file-name to load simulation; not used by default; if set, "
+            "the provided survey and almost all parameters in the config "
+            "file are ignored; provided model is only used if --clean is set"
+        )
+    )
+
+    # arg: Shortcut for load and save together.
+    parser.add_argument(
+        "--cache",
+        type=str,
+        default=None,
+        help=(
+            "shortcut: file-name for --load --save "
+            "(cache overrules load and save)"
+        )
+    )
+
+    # arg: Replace model and remove fields from existing simulation
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        default=False,
+        help="replace model and all computed data of loaded simulation"
     )
 
     # arg: Verbosity.

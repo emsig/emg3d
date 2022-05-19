@@ -400,15 +400,11 @@ class Simulation:
 
         # Store wanted dicts.
         if what in ['computed', 'all']:
-            for name in ['_dict_efield', '_dict_efield_info',
+            for name in ['_dict_grid',
+                         '_dict_efield', '_dict_efield_info',
                          '_dict_bfield', '_dict_bfield_info']:
                 if hasattr(self, name):
                     out[name] = getattr(self, name)
-
-            if what == 'all':
-                for name in ['_dict_grid', ]:
-                    if hasattr(self, name):
-                        out[name] = getattr(self, name)
 
         # Store gradient and misfit.
         if what in ['computed', 'results', 'all']:
@@ -490,16 +486,15 @@ class Simulation:
         what : str, default: 'computed'
             What to store. Possibilities:
 
-            - ``'computed'``:
+            - ``'computed'``, ``'all'``:
               Stores all computed properties: electric fields and responses at
               receiver locations.
             - '``results'``:
               Stores only the response at receiver locations.
-            - ``'all'``:
-              Stores everything. Note that if ``file_dir`` is set, these files
-              will remain there.
             - ``'plain'``:
               Only stores the plain Simulation (as initiated).
+
+            Note that if ``file_dir`` is set, those files will remain there.
 
         name : str, default: 'simulation'
             Name with which the simulation is stored in the file.

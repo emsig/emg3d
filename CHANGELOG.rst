@@ -6,6 +6,25 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+- CLI:
+
+  - New command-line argument ``--clean``: If an existing simulation is loaded,
+    setting clean will remove any existing computed data (fields, misfit,
+    gradient, residuals, synthetic data) and replace the model with the
+    currently provided one.
+  - New command-line argument ``--cache`` (or as parameter ``cache`` in the
+    configuration file under ``[files]``): Acts as a shortcut for ``--load
+    --save`` using the same file name.
+
+- Simulation:
+
+  - ``'all'`` is now the same as ``'computed'`` in ``to_file`` and ``to_dict``,
+    meaning the grids are stored as well.
+
+
 v1.6.1 : Max offset
 -------------------
 
