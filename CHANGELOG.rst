@@ -19,6 +19,11 @@ Changelog
     configuration file under ``[files]``): Acts as a shortcut for ``--load
     --save`` using the same file name.
 
+- Simulation:
+
+  - ``'all'`` is now the same as ``'computed'`` in ``to_file`` and ``to_dict``,
+    meaning the grids are stored as well.
+
 
 v1.6.1 : Max offset
 -------------------
