@@ -1378,6 +1378,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
     input_sc2 : int, default: None
         If :func:`emg3d.models.expand_grid_model` was used, ``input_sc2``
         corresponds to the original ``grid.shape_cells[2]``.
+        NOTE: Will be removed in v1.8.0.
 
 
     Returns

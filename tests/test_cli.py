@@ -261,7 +261,8 @@ class TestParser:
 
         args_dict = self.args_dict.copy()
         args_dict['config'] = config
-        cfg, term = cli.parser.parse_config_file(args_dict)
+        with pytest.warns(FutureWarning, match='in their own section'):
+            cfg, term = cli.parser.parse_config_file(args_dict)
         sim_opts = cfg['simulation_options']
         noise_kwargs = cfg['noise_kwargs']
         assert sim_opts['max_workers'] == 5
@@ -301,6 +302,33 @@ class TestParser:
         cfg, term = cli.parser.parse_config_file(args_dict)
         sim_opts = cfg['simulation_options']
         assert sim_opts['receiver_interpolation'] == 'cubic'
+
+    def test_noise(self, tmpdir):
+
+        # Write a config file.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[noise_opts]\n")
+            f.write("min_offset=1320\n")
+            f.write("max_offset=5320\n")
+            f.write("mean_noise=1.0\n")
+            f.write("ntype=gaussian_uncorrelated")
+
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = config
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        noise_kwargs = cfg['noise_kwargs']
+        assert noise_kwargs['min_offset'] == 1320.0
+        assert noise_kwargs['max_offset'] == 5320.0
+        assert noise_kwargs['mean_noise'] == 1.0
+        assert noise_kwargs['ntype'] == 'gaussian_uncorrelated'
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            with open(config, 'a') as f:
+                f.write("\nanother=True")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            _ = cli.parser.parse_config_file(args_dict)
 
     def test_solver(self, tmpdir):
 
@@ -692,7 +720,8 @@ class TestRun:
         args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
         args_dict['path'] = tmpdir
         args_dict['save'] = 'simulation1.h5'
-        cli.run.simulation(args_dict.copy())
+        with pytest.warns(FutureWarning, match='A property-complete'):
+            cli.run.simulation(args_dict.copy())
 
         # Replace / add dicts
         s = emg3d.Simulation.from_file(os.path.join(tmpdir, 'simulation1.h5'))

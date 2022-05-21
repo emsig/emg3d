@@ -54,15 +54,10 @@ remove the comment signs to use them.
   # Simulation parameters
   # ---------------------
   # Input parameters for the `Simulation` class, except for `solver_opts`
-  # (defined in their own section), but including the parameter `min_offset`
-  # for `compute()`.
+  # (defined in their own section).
   [simulation]
   # max_workers = 4      # Also via `-n` or `--nproc`.
   # gridding = single
-  # min_offset = 0.0      # off < min_off set to NaN; only if `--forward`.
-  # max_offset = np.infty # off > max_off set to NaN; only if `--forward`.
-  # mean_noise = 0.0      # Mean of the noise; only if `--forward`.
-  # ntype = white_noise   # Type of the noise; only if `--forward`.
   # name = MyTestSimulation
   # file_dir = None       # For file-based comp; absolute or relative path.
   # receiver_interpolation = cubic  # Set it to <linear> for the gradient.
@@ -120,6 +115,16 @@ remove the comment signs to use them.
   # lambda_factor =       # float, e.g.: 1.0
   # verb =                # int, e.g.: 0
   # lambda_from_center =  # bool, e.g.: False
+
+  # Noise options
+  # -------------
+  # Only if `--forward`, the noise options are passed to
+  # `Simulation.compute(observed=True, **noise_opts)`.
+  [noise_opts]
+  # min_offset = 0.0      # off < min_off set to NaN.
+  # max_offset = np.infty # off > max_off set to NaN.
+  # mean_noise = 0.0      # Mean of the noise.
+  # ntype = white_noise   # Type of the noise.
 
   # Data
   # ----

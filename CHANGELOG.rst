@@ -20,11 +20,17 @@ v1.6.2 : CLI-clean
   - New command-line argument ``--cache`` (or as parameter ``cache`` in the
     configuration file under ``[files]``): Acts as a shortcut for ``--load
     --save`` using the same file name.
+  - Parameters for noise generation should new be provided under their own
+    section ``[noise_opts]``; providing them under ``[simulation]`` is
+    deprecated and will be removed in v1.8.0.
 
 - Simulation:
 
   - ``'all'`` is now the same as ``'computed'`` in ``to_file`` and ``to_dict``,
     meaning the grids are stored as well.
+  - Deprecation: The ``'expand'``-functionality in the gridding options is
+    deprecated and will be removed in v1.8.0. A property-complete model has to
+    be provided.
 
 
 v1.6.1 : Max offset
