@@ -1,6 +1,7 @@
 import os
 import pytest
 import numpy as np
+from os.path import join, dirname
 from numpy.testing import assert_allclose
 
 import emg3d
@@ -23,6 +24,9 @@ try:
 except ImportError:
     h5py = False
 
+
+# Data generated with tests/create_data/regression.py
+REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
 
 # Random number generator.
 rng = np.random.default_rng()
@@ -831,3 +835,26 @@ class TestGradient:
         g = sim.gradient
         j = sim.jtvec(vector=sim.survey.data.residual*sim.survey.data.weights)
         assert_allclose(g, j)
+
+
+def test__solve():
+    # Has keys [model, sfield, efield, solver_opts]
+    dat = REGRES['res']
+    inp = {'model': emg3d.Model(**dat['input_model']),
+           'sfield': emg3d.get_source_field(**dat['input_source']),
+           'efield': None,
+           'solver_opts': {'plain': True}}
+    efield, info = simulations._solve(inp)
+    assert_allclose(dat['Fresult'].field, efield.field)
+
+    # Has keys [model, grid, source, frequency, efield, solver_opts]
+    dat = REGRES['res']
+    model = model = emg3d.Model(**dat['input_model'])
+    inp = {'model': model,
+           'grid': model.grid,
+           'source': dat['input_source']['source'],
+           'frequency': dat['input_source']['frequency'],
+           'efield': None,
+           'solver_opts': {'plain': True}}
+    efield, info = simulations._solve(inp)
+    assert_allclose(dat['Fresult'].field, efield.field)

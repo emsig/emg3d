@@ -796,7 +796,7 @@ class Simulation:
     def _compute(self, fn, description, srcfreq=None):
         """Use utils._process_map to call solver._solve asynchronously."""
         return utils._process_map(
-            solver._solve,
+            _solve,
             list(map(fn, self._srcfreq if srcfreq is None else srcfreq)),
             max_workers=self.max_workers,
             **{'desc': description, **self._tqdm_opts},
@@ -1478,3 +1478,88 @@ class Simulation:
 
         self.gridding_opts = gridding_opts
         self.model = model
+
+
+def _solve(inp):
+    """Thin wrapper of `solve` or `solve_source` for a `process_map`.
+
+    Used within a Simulation to call the solver in parallel. This function
+    always returns the ``efield`` and the ``info_dict``, independent of the
+    provided solver options.
+
+
+    Parameters
+    ----------
+    inp : dict, str
+        If dict, two formats are recognized:
+        - Has keys [model, sfield, efield, solver_opts]:
+          Forwarded to `solve`.
+        - Has keys [model, grid, source, frequency, efield, solver_opts]
+          Forwarded to `solve_source`.
+
+        Consult the corresponding function for details on the input parameters.
+
+        Alternatively the path to the h5-file can be provided as a string
+        (file-based computation).
+
+        The ``model`` is interpolated to the grid of the source field (tuple of
+        length 4) or to the provided grid (tuple of length 6). Hence, the model
+        can be on a different grid (for source and frequency dependent
+        gridding).
+
+
+    Returns
+    -------
+    efield : Field
+        Resulting electric field, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
+
+    info_dict : dict
+        Resulting info dictionary, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
+
+    """
+
+    # Four parameters => solve.
+    fname = False
+    if isinstance(inp, str):
+        from emg3d import io
+        fname = inp.rsplit('.', 1)[0] + '_out.' + inp.rsplit('.', 1)[1]
+        inp = io.load(inp, verb=0)['data']
+
+    # Has keys [model, sfield, efield, solver_opts]
+    if 'sfield' in inp.keys():
+
+        # Get input and initiate solver dict.
+        solver_input = {**inp['solver_opts'], 'sfield': inp['sfield']}
+        inp['grid'] = inp['sfield'].grid
+
+        # Function to compute.
+        fct = solver.solve
+
+    # Has keys [model, grid, source, frequency, efield, solver_opts]
+    else:
+
+        # Get input and initiate solver dict.
+        solver_input = {**inp['solver_opts'], 'source': inp['source'],
+                        'frequency': inp['frequency']}
+
+        # Function to compute.
+        fct = solver.solve_source
+
+    # Interpolate model to source grid (if different).
+    model = inp['model'].interpolate_to_grid(inp['grid'])
+
+    # Add general parameters to input dict.
+    solver_input['model'] = model
+    solver_input['efield'] = inp['efield']
+    solver_input['return_info'] = True
+    solver_input['always_return'] = True
+
+    # Return the result.
+    efield, info = fct(**solver_input)
+    if fname:
+        io.save(fname, efield=efield, info=info, verb=0)
+        return fname, fname
+    else:
+        return efield, info
