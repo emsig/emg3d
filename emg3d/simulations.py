@@ -137,8 +137,8 @@ class Simulation:
           water, and an air layer is added. The actual height of the seasurface
           can be defined with the key ``seasurface``. See
           :func:`emg3d.models.expand_grid_model`.
-          NOTE: ``expand`` is deprecated in v1.6.2, and will be removed in
-          v1.8.0. A property-complete model has to be provided.
+          NOTE: ``expand`` is deprecated in v1.7.0, and will be removed in
+          v1.9.0. A property-complete model has to be provided.
 
     solver_opts : dict, default: {'verb': 1'}
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
@@ -1459,7 +1459,7 @@ class Simulation:
             expand = g_opts.pop('expand', None)
             if expand is not None:
                 msg = ("emg3d: `expand` is deprecated and will be removed in "
-                       "v1.8.0. A property-complete model has to be provided.")
+                       "v1.9.0. A property-complete model has to be provided.")
                 warnings.warn(msg, FutureWarning)
 
                 try:

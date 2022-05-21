@@ -220,9 +220,9 @@ def parse_config_file(args_dict):
 
     if len(noise_kwargs) > 0:
         msg = ("emg3d: `min_offset`, `max_offset`, `mean_noise`, and `ntype` "
-               "belong since v1.6.2 in their own section [noise_opts]; "
+               "belong since v1.7.0 in their own section [noise_opts]; "
                "providing them in [simulation] is deprecated and will be "
-               "removed in v1.8.0.")
+               "removed in v1.9.0.")
         warnings.warn(msg, FutureWarning)
 
     # Check if parameter-file has a noise-section, add it otherwise.
