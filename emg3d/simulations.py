@@ -222,13 +222,6 @@ class Simulation:
                 'return_info': True,  # return_info=True is forced.
         }
 
-        # Initiate dictionaries and other values with None's.
-        self._dict_grid = self._dict_initiate
-        self._dict_forward_efield = self._dict_initiate
-        self._dict_forward_info = self._dict_initiate
-        self._gradient = None
-        self._misfit = None
-
         # Initiate file_dir
         self.file_dir = kwargs.pop('file_dir', None)
         if self.file_dir:
@@ -316,33 +309,32 @@ class Simulation:
         if what not in ['computed', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}.")
 
-        # Clean grid/model-dicts.
+        # Clean grid-dict.
         if what in ['keepresults', 'all']:
-
-            # These exist always and have to be initiated.
-            for name in ['_dict_grid', ]:
-                delattr(self, name)
-                setattr(self, name, self._dict_initiate)
+            if hasattr(self, '_dict_grid'):
+                delattr(self, '_dict_grid')
 
         # Clean field-dicts.
         if what in ['computed', 'keepresults', 'all']:
 
-            # These exist always and have to be initiated.
-            for name in ['_dict_forward_efield', '_dict_forward_info']:
-                delattr(self, name)
-                setattr(self, name, self._dict_initiate)
-
-            # These only exist with gradient; don't initiate them.
-            for name in ['_dict_jvec_gfield', '_dict_jvec_info',
-                         '_dict_jtvec_bfield', '_dict_jtvec_info',
-                         '_dict_jtvec_gradient']:
-                if hasattr(self, name):
-                    delattr(self, name)
-
             # Remove files if they exist.
             if self.file_dir:
-                for p in Path(self.file_dir).glob('[ebg]field_*.h5'):
-                    p.unlink()
+
+                names = ['forward', 'jvec', 'jtvec']
+                for name in names:
+                    for p in Path(self.file_dir).glob(name+'_*_*.h5'):
+                        p.unlink()
+
+            # Remove dicts if they exist.
+            else:
+
+                # These exist always and have to be initiated.
+                names = ['forward_efield', 'forward_info',
+                         'jvec_gfield', 'jvec_info',
+                         'jtvec_bfield', 'jtvec_info', 'jtvec_gradient']
+                for name in names:
+                    if hasattr(self, '_dict_'+name):
+                        delattr(self, '_dict_'+name)
 
         # Clean data.
         if what in ['computed', 'all']:
@@ -353,7 +345,6 @@ class Simulation:
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
             for name in ['_gradient', '_misfit']:
                 delattr(self, name)
-                setattr(self, name, None)
 
     def copy(self, what='computed'):
         """Return a copy of the Simulation.
@@ -404,13 +395,12 @@ class Simulation:
 
         # Store wanted dicts.
         if what in ['computed', 'all']:
-            for name in ['_dict_grid',
-                         '_dict_forward_efield', '_dict_forward_info',
-                         '_dict_jvec_gfield', '_dict_jvec_info',
-                         '_dict_jtvec_bfield', '_dict_jtvec_info',
-                         '_dict_jtvec_gradient']:
-                if hasattr(self, name):
-                    out[name] = getattr(self, name)
+            names = ['grid', 'forward_efield', 'forward_info',
+                     'jvec_gfield', 'jvec_info',
+                     'jtvec_bfield', 'jtvec_info', 'jtvec_gradient']
+            for name in names:
+                if hasattr(self, '_dict_'+name):
+                    out[name] = getattr(self, '_dict_'+name)
 
         # Store gradient and misfit.
         if what in ['computed', 'results', 'all']:
@@ -692,6 +682,7 @@ class Simulation:
         Thin wrapper for ``self._dict_{name}_{what}[{source}][{frequency}]``,
         that works as well for file-based computations.
         """
+        if self.file_dir:
         data = getattr(self, f"_dict_{name}_{what}")[source][frequency]
         return self._load_or_return(data, what)
 
@@ -989,7 +980,7 @@ class Simulation:
 
         # Initiate back-propagated electric field and info dicts.
         # TODO - seriously, do we want it?
-        if not hasattr(self, '_dict_jtvec'):
+        if not self.file_dir and not hasattr(self, '_dict_jtvec'):
             self._dict_jtvec_bfield = self._dict_initiate
             self._dict_jtvec_info = self._dict_initiate
             self._dict_jtvec_gradient = self._dict_initiate
@@ -1203,7 +1194,7 @@ class Simulation:
 
         # Initiate back-propagated electric field and info dicts.
         # TODO do we want to store it?
-        if not hasattr(self, '_dict_jvec'):
+        if not self.file_dir and not hasattr(self, '_dict_jvec'):
             self._dict_jvec_gfield = self._dict_initiate
             self._dict_jvec_info = self._dict_initiate
 
