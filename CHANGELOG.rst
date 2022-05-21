@@ -6,8 +6,10 @@ Changelog
 """"""""""
 
 
-*latest*
---------
+v1.6.2 : CLI-clean
+------------------
+
+**2022-05-21**
 
 - CLI:
 
@@ -27,6 +29,8 @@ Changelog
 
 v1.6.1 : Max offset
 -------------------
+
+**2022-05-11**
 
 - Survey: ``add_noise`` takes new a ``max_offset`` argument; receivers
   responses at offsets greater than maximum offset are set to NaN (also
