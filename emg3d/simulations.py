@@ -333,7 +333,7 @@ class Simulation:
                 setattr(self, name, self._dict_initiate)
 
             # These only exist with gradient; don't initiate them.
-            for name in ['_dict_jvec_bfield', '_dict_jvec_info',
+            for name in ['_dict_jvec_gfield', '_dict_jvec_info',
                          '_dict_jtvec_bfield', '_dict_jtvec_info',
                          '_dict_jtvec_gradient']:
                 if hasattr(self, name):
@@ -406,8 +406,9 @@ class Simulation:
         if what in ['computed', 'all']:
             for name in ['_dict_grid',
                          '_dict_forward_efield', '_dict_forward_info',
-                         '_dict_jvec_efield', '_dict_jvec_info',
-                         '_dict_jtvec_bfield', '_dict_jtvec_info']:
+                         '_dict_jvec_gfield', '_dict_jvec_info',
+                         '_dict_jtvec_bfield', '_dict_jtvec_info',
+                         '_dict_jtvec_gradient']:
                 if hasattr(self, name):
                     out[name] = getattr(self, name)
 
@@ -460,8 +461,10 @@ class Simulation:
 
         # Add existing derived/computed properties.
         data = ['_dict_grid',
-                '_dict_jvec_efield', '_dict_jvec_info',
-                '_dict_jtvec_bfield', '_dict_jtvec_info']
+                '_dict_forward_efield', '_dict_forward_info',
+                '_dict_jvec_gfield', '_dict_jvec_info',
+                '_dict_jtvec_bfield', '_dict_jtvec_info',
+                '_dict_jtvec_gradient']
         for name in data:
             if name in inp.keys():
                 values = inp.pop(name)
@@ -666,8 +669,8 @@ class Simulation:
         freq = self._freq_inp2key(frequency)
         return self._dict_get('forward', source, freq, 'info')
 
-    def _store_data_or_file(self, name, source, frequency, data):
-        """Return data, or file-name for given name, source, and frequency."""
+    def _store_or_return(self, name, source, frequency, data):
+        """Returns `data` (memory) or file-name where data is stored."""
         if self.file_dir:
             fstr = f"{name}_{source}_{frequency}.h5"
             fname = os.path.join(self.file_dir, fstr)
@@ -676,7 +679,7 @@ class Simulation:
         else:
             return data
 
-    def _load_data_or_file(self, data, what):
+    def _load_or_return(self, data, what):
         """Returns `data` (memory) or loads `data[what]` (files)."""
         if self.file_dir and data is not None:
             return io.load(data, verb=0)[what]
@@ -690,7 +693,7 @@ class Simulation:
         that works as well for file-based computations.
         """
         data = getattr(self, f"_dict_{name}_{what}")[source][frequency]
-        return self._load_data_or_file(data, what)
+        return self._load_or_return(data, what)
 
     def _get_responses(self, source, frequency, efield=None):
         """Return electric and magnetic fields at receiver locations."""
@@ -729,6 +732,7 @@ class Simulation:
 
     # ASYNCHRONOUS COMPUTATION
     def compute(self, observed=False, **kwargs):
+        # TODO shortcut for jvec(); plus observed-stuff. 
         """Compute efields asynchronously for all sources and frequencies.
 
         Parameters
@@ -768,7 +772,7 @@ class Simulation:
                 'efield': self._dict_get('forward', source, freq, 'efield'),
                 'solver_opts': self.solver_opts,
             }
-            return self._store_data_or_file('efield', source, freq, data)
+            return self._store_or_return('efield', source, freq, data)
 
         # Compute fields in parallel.
         out = utils._process_map(
@@ -804,7 +808,7 @@ class Simulation:
 
     # OPTIMIZATION
     @property
-    def gradient(self):
+    def gradient(self):  # TODO adjust docs
         r"""Compute the discrete gradient using the adjoint-state method.
 
         The discrete adjoint-state gradient for a single source at a single
@@ -1000,7 +1004,7 @@ class Simulation:
                 'efield': self._dict_get('forward', source, freq, 'efield'),
                 'solver_opts': self.solver_opts
             }
-            return self._store_data_or_file('bfield', source, freq, data)
+            return self._store_or_return('bfield', source, freq, data)
 
         # Compute fields in parallel.
         """Use utils._process_map to call solver._solve asynchronously."""
@@ -1087,6 +1091,7 @@ class Simulation:
 
     @utils._requires('discretize')
     def jvec(self, vector):
+        # TODO include compute(), without observed stuff
         r"""Compute the sensitivity times a vector.
 
         .. math::
@@ -1184,7 +1189,7 @@ class Simulation:
                 'efield': None,
                 'solver_opts': self.solver_opts,
             }
-            return self._store_data_or_file('gfield', source, freq, data)
+            return self._store_or_return('gfield', source, freq, data)
 
         # Compute fields (A^-1 * G * vector) in parallel.
         out = utils._process_map(
@@ -1201,13 +1206,13 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
-            gfield = self._load_data_or_file(out[i][0], 'efield')
+            gfield = self._load_or_return(out[i][0], 'efield')
             resp = self._get_responses(src, freq, gfield)
             self.data['jvec'].loc[src, :, freq] = resp
 
         return self.data['jvec'].data
 
-    def jtvec(self, vector):
+    def jtvec(self, vector):  # vector=None ??  # TODO adjust docs
         r"""Compute the sensitivity transpose times a vector.
 
         If ``vector=residual*weights``, ``jtvec`` corresponds to the
