@@ -224,8 +224,8 @@ class Simulation:
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
-        self._dict_efield = self._dict_initiate
-        self._dict_efield_info = self._dict_initiate
+        self._dict_forward_efield = self._dict_initiate
+        self._dict_forward_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
 
@@ -328,12 +328,14 @@ class Simulation:
         if what in ['computed', 'keepresults', 'all']:
 
             # These exist always and have to be initiated.
-            for name in ['_dict_efield', '_dict_efield_info']:
+            for name in ['_dict_forward_efield', '_dict_forward_info']:
                 delattr(self, name)
                 setattr(self, name, self._dict_initiate)
 
             # These only exist with gradient; don't initiate them.
-            for name in ['_dict_bfield', '_dict_bfield_info']:
+            for name in ['_dict_jvec_bfield', '_dict_jvec_info',
+                         '_dict_jtvec_bfield', '_dict_jtvec_info',
+                         '_dict_jtvec_gradient']:
                 if hasattr(self, name):
                     delattr(self, name)
 
@@ -403,8 +405,9 @@ class Simulation:
         # Store wanted dicts.
         if what in ['computed', 'all']:
             for name in ['_dict_grid',
-                         '_dict_efield', '_dict_efield_info',
-                         '_dict_bfield', '_dict_bfield_info']:
+                         '_dict_forward_efield', '_dict_forward_info',
+                         '_dict_jvec_efield', '_dict_jvec_info',
+                         '_dict_jtvec_bfield', '_dict_jtvec_info']:
                 if hasattr(self, name):
                     out[name] = getattr(self, name)
 
@@ -457,8 +460,8 @@ class Simulation:
 
         # Add existing derived/computed properties.
         data = ['_dict_grid',
-                '_dict_efield', '_dict_efield_info',
-                '_dict_bfield', '_dict_bfield_info']
+                '_dict_jvec_efield', '_dict_jvec_info',
+                '_dict_jtvec_bfield', '_dict_jtvec_info']
         for name in data:
             if name in inp.keys():
                 values = inp.pop(name)
@@ -496,7 +499,8 @@ class Simulation:
             - ``'plain'``:
               Only stores the plain Simulation (as initiated).
 
-            Note that if ``file_dir`` is set, those files will remain there.
+            Note that if ``file_dir`` is set, those files will remain there,
+            and the simulation stores their paths.
 
         name : str, default: 'simulation'
             Name with which the simulation is stored in the file.
@@ -638,55 +642,55 @@ class Simulation:
         freq = self._freq_inp2key(frequency)
 
         # If it doesn't exist yet, compute it.
-        if self._dict_get('efield', source, freq) is None:
+        if self._dict_get('forward', source, freq, 'efield') is None:
             self.compute(source=source, frequency=freq)
 
-        return self._dict_get('efield', source, freq)
+        return self._dict_get('forward', source, freq, 'efield')
 
     def get_hfield(self, source, frequency):
         """Return magnetic field for given source and frequency."""
         freq = self._freq_inp2key(frequency)
 
         # If electric field not computed yet compute it.
-        if self._dict_get('efield', source, freq) is None:
+        if self._dict_get('forward', source, freq, 'efield') is None:
             self.compute(source=source, frequency=freq)
 
         # Return magnetic field.
         return fields.get_magnetic_field(
             self.get_model(source, freq),
-            self._dict_get('efield', source, freq),
+            self._dict_get('forward', source, freq, 'efield'),
         )
 
     def get_efield_info(self, source, frequency):
         """Return the solver information of the corresponding computation."""
         freq = self._freq_inp2key(frequency)
-        return self._dict_get('efield_info', source, freq)
+        return self._dict_get('forward', source, freq, 'info')
 
-    def _dict_get(self, which, source, frequency):
-        """Return source-frequency pair from dictionary `which`.
-
-        Thin wrapper for ``self._dict_{which}[{source}][{frequency}]``, that
-        works as well for file-based computations.
-        """
-        value = getattr(self, f"_dict_{which}")[source][frequency]
-        return self._load(value, ['efield', 'info']['info' in which])
-
-    def _load(self, value, what):
-        """Returns `value` (memory) or loads `value[what]` (files)."""
-        if self.file_dir and value is not None:
-            return io.load(value, verb=0)[what]
-        else:
-            return value
-
-    def _data_or_file(self, what, source, frequency, data):
-        """Return data or file-name for given what, source, and frequency."""
+    def _store_data_or_file(self, name, source, frequency, data):
+        """Return data, or file-name for given name, source, and frequency."""
         if self.file_dir:
-            fname = os.path.join(
-                self.file_dir, f"{what}_{source}_{frequency}.h5")
-            io.save(fname, data=data, verb=0)
+            fstr = f"{name}_{source}_{frequency}.h5"
+            fname = os.path.join(self.file_dir, fstr)
+            io.save(fname, verb=0, **data)
             return fname
         else:
             return data
+
+    def _load_data_or_file(self, data, what):
+        """Returns `data` (memory) or loads `data[what]` (files)."""
+        if self.file_dir and data is not None:
+            return io.load(data, verb=0)[what]
+        else:
+            return data
+
+    def _dict_get(self, name, source, frequency, what):
+        """Return `what` from `name-source-frequency` dictionary.
+
+        Thin wrapper for ``self._dict_{name}_{what}[{source}][{frequency}]``,
+        that works as well for file-based computations.
+        """
+        data = getattr(self, f"_dict_{name}_{what}")[source][frequency]
+        return self._load_data_or_file(data, what)
 
     def _get_responses(self, source, frequency, efield=None):
         """Return electric and magnetic fields at receiver locations."""
@@ -700,7 +704,7 @@ class Simulation:
 
         # efield of this source/frequency if not provided.
         if efield is None:
-            efield = self._dict_get('efield', source, frequency)
+            efield = self._dict_get('forward', source, frequency, 'efield')
 
         if erec.size:
 
@@ -761,20 +765,25 @@ class Simulation:
                 'source': self.survey.sources[source],
                 'frequency': self.survey.frequencies[freq],
                 # efield is None if not comp. yet; else it is the solution.
-                'efield': self._dict_get('efield', source, freq),
+                'efield': self._dict_get('forward', source, freq, 'efield'),
                 'solver_opts': self.solver_opts,
             }
-            return self._data_or_file('efield', source, freq, data)
+            return self._store_data_or_file('efield', source, freq, data)
 
         # Compute fields in parallel.
-        out = self._compute(collect_efield_inputs, 'Compute efields', srcfreq)
+        out = utils._process_map(
+            _solve,
+            list(map(collect_efield_inputs, srcfreq)),
+            max_workers=self.max_workers,
+            **{'desc': 'Compute efields', **self._tqdm_opts},
+        )
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
 
             # Store efield and solver info.
-            self._dict_efield[src][freq] = out[i][0]
-            self._dict_efield_info[src][freq] = out[i][1]
+            self._dict_forward_efield[src][freq] = out[i][0]
+            self._dict_forward_info[src][freq] = out[i][1]
 
             # Store responses at receiver locations.
             resp = self._get_responses(src, freq)
@@ -792,15 +801,6 @@ class Simulation:
             # Add noise.
             if kwargs.pop('add_noise', True):
                 self.survey.add_noise(**kwargs)
-
-    def _compute(self, fn, description, srcfreq=None):
-        """Use utils._process_map to call solver._solve asynchronously."""
-        return utils._process_map(
-            solver._solve,
-            list(map(fn, self._srcfreq if srcfreq is None else srcfreq)),
-            max_workers=self.max_workers,
-            **{'desc': description, **self._tqdm_opts},
-        )
 
     # OPTIMIZATION
     @property
@@ -881,71 +881,8 @@ class Simulation:
             _ = self.misfit
 
             # Compute back-propagating electric fields.
-            self._bcompute()
-
-            # Inversion grid and its shape.
-            igrid = self.model.grid
-            ishape = igrid.shape_cells
-
-            # Pre-allocate the gradient on the mesh.
-            gradient = np.zeros((3, *ishape), order='F')
-
-            # Loop over source-frequency pairs.
-            for src, freq in self._srcfreq:
-
-                efield = self._dict_get('efield', src, freq)
-                bfield = self._dict_get('bfield', src, freq)
-
-                # Multiply forward field with backward field; take real part.
-                gfield = fields.Field(
-                    grid=efield.grid,
-                    data=np.real(bfield.field * efield.smu0 * efield.field),
-                )
-
-                # Pre-allocate the gradient for the computational grid.
-                shape = gfield.grid.shape_cells
-                grad = np.zeros((3, *shape), order='F')
-
-                # Map the field to cell centers times volume.
-                cell_volumes = gfield.grid.cell_volumes
-                maps.interp_edges_to_vol_averages(
-                        ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
-                        volumes=cell_volumes.reshape(shape, order='F'),
-                        ox=grad[0, ...], oy=grad[1, ...], oz=grad[2, ...])
-
-                # Bring gradient back from computation grid to inversion grid
-                # and add it to the total gradient.
-                if igrid != gfield.grid:
-                    # Requires discretize; for this reason wrapped in own fct.
-                    maps._interp_volume_average_adj(
-                        oval=gradient, ogrid=igrid,
-                        nval=grad, ngrid=gfield.grid,
-                    )
-                else:
-                    gradient += grad
-
-            # Apply derivative-chain of property-map (only relevant if
-            # `mapping` is something else than conductivity) and collect.
-            indices = [0, ]
-            if self.model.case in ['HTI', 'triaxial']:
-                self.model.map.derivative_chain(
-                        gradient[1, ...], self.model.property_y)
-                indices.append(1)
-            else:
-                gradient[0, ...] += gradient[1, ...]
-
-            if self.model.case in ['VTI', 'triaxial']:
-                self.model.map.derivative_chain(
-                        gradient[2, ...], self.model.property_z)
-                indices.append(2)
-            else:
-                gradient[0, ...] += gradient[2, ...]
-
-            self.model.map.derivative_chain(
-                    gradient[0, ...], self.model.property_x)
-
-            # Select required directions, excluded "expanded" layers & squeeze.
-            self._gradient = gradient[indices, ..., :self._input_sc2].squeeze()
+            # TODO :: temp
+            self._gradient = self._bcompute()
 
         return self._gradient
 
@@ -1048,36 +985,70 @@ class Simulation:
         """Compute bfields asynchronously for all sources and frequencies."""
 
         # Initiate back-propagated electric field and info dicts.
-        if not hasattr(self, '_dict_bfield'):
-            self._dict_bfield = self._dict_initiate
-            self._dict_bfield_info = self._dict_initiate
+        if not hasattr(self, '_dict_jtvec'):
+            self._dict_jtvec_bfield = self._dict_initiate
+            self._dict_jtvec_info = self._dict_initiate
 
         # Create iterable from src/freq-list for parallel computation.
-        def collect_bfield_inputs(inp):
+        def collect_gradient_inputs(inp):
             """Collect inputs."""
             source, freq = inp
 
             data = {
                 'model': self.model,
                 'sfield': self._get_rfield(source, freq),
-                # bfield is None unless it was explicitly set.
-                'efield': self._dict_get('bfield', source, freq),
+                'efield': self._dict_get('forward', source, freq, 'efield'),
                 'solver_opts': self.solver_opts
             }
-            return self._data_or_file('bfield', source, freq, data)
+            return self._store_data_or_file('bfield', source, freq, data)
 
         # Compute fields in parallel.
-        out = self._compute(collect_bfield_inputs, 'Back-propagate')
+        """Use utils._process_map to call solver._solve asynchronously."""
+        out = utils._process_map(
+            _compute_gradient,
+            list(map(collect_gradient_inputs, self._srcfreq)),
+            max_workers=self.max_workers,
+            **{'desc': 'Gradient', **self._tqdm_opts},
+        )
 
-        # Loop over src-freq combinations to extract and store.
+        # TODO :: tmp; this has to be combined with _bcompute
+        # TODO    DO NOT save bfield, but directly gradient
+
+        # Pre-allocate the gradient on the mesh.
+        gradient = np.zeros((3, *self.model.grid.shape_cells), order='F')
+
+        # Loop over source-frequency pairs.
         for i, (src, freq) in enumerate(self._srcfreq):
+            self._dict_jtvec_bfield[src][freq] = out[i][0]
+            self._dict_jtvec_info[src][freq] = out[i][1]
 
-            # Store bfield and solver info.
-            self._dict_bfield[src][freq] = out[i][0]
-            self._dict_bfield_info[src][freq] = out[i][1]
+            gradient += self._dict_get('jtvec', src, freq, 'bfield')
 
         # Print solver info.
         self.print_solver_info('bfield', verb=self.verb)
+
+        # Apply derivative-chain of property-map (only relevant if
+        # `mapping` is something else than conductivity) and collect.
+        indices = [0, ]
+        if self.model.case in ['HTI', 'triaxial']:
+            self.model.map.derivative_chain(
+                    gradient[1, ...], self.model.property_y)
+            indices.append(1)
+        else:
+            gradient[0, ...] += gradient[1, ...]
+
+        if self.model.case in ['VTI', 'triaxial']:
+            self.model.map.derivative_chain(
+                    gradient[2, ...], self.model.property_z)
+            indices.append(2)
+        else:
+            gradient[0, ...] += gradient[2, ...]
+
+        self.model.map.derivative_chain(
+                gradient[0, ...], self.model.property_x)
+
+        # Select required directions, excluded "expanded" layers & squeeze.
+        return gradient[indices, ..., :self._input_sc2].squeeze()
 
     def _get_rfield(self, source, frequency):
         """Return residual source field for given source and frequency."""
@@ -1175,7 +1146,7 @@ class Simulation:
             source, freq = inp
 
             # Forward electric field
-            efield = self._dict_get('efield', source, freq)
+            efield = self._dict_get('forward', source, freq, 'efield')
 
             # Interpolate to computational grid.
             cvector = [
@@ -1213,10 +1184,15 @@ class Simulation:
                 'efield': None,
                 'solver_opts': self.solver_opts,
             }
-            return self._data_or_file('gfield', source, freq, data)
+            return self._store_data_or_file('gfield', source, freq, data)
 
         # Compute fields (A^-1 * G * vector) in parallel.
-        out = self._compute(collect_gfield_inputs, 'Compute jvec')
+        out = utils._process_map(
+            _solve,
+            list(map(collect_gfield_inputs, self._srcfreq)),
+            max_workers=self.max_workers,
+            **{'desc': 'Compute jvec', **self._tqdm_opts},
+        )
 
         # Initiate jvec data with NaN's if it doesn't exist.
         if 'jvec' not in self.data.keys():
@@ -1225,7 +1201,7 @@ class Simulation:
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
-            gfield = self._load(out[i][0], 'efield')
+            gfield = self._load_data_or_file(out[i][0], 'efield')
             resp = self._get_responses(src, freq, gfield)
             self.data['jvec'].loc[src, :, freq] = resp
 
@@ -1270,7 +1246,7 @@ class Simulation:
 
         # Reset gradient, so it will be computed.
         self._gradient = None
-        for name in ['_dict_bfield', '_dict_bfield_info']:
+        for name in ['_dict_jtvec_bfield', '_dict_jtvec_info']:
             if hasattr(self, name):
                 delattr(self, name)
 
@@ -1385,7 +1361,7 @@ class Simulation:
         elif out:
             print(out)
 
-    def print_solver_info(self, field='efield', verb=1, return_info=False):
+    def print_solver_info(self, what='forward', verb=1, return_info=False):
         """Print solver info."""
 
         # If not verbose, return.
@@ -1397,7 +1373,7 @@ class Simulation:
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
-            cinfo = self._dict_get(f"{field}_info", src, freq)
+            cinfo = self._dict_get(f"{what}", src, freq, "info")
 
             # Print if verbose or not converged.
             if cinfo is not None and (verb > 0 or cinfo['exit'] != 0):
@@ -1478,3 +1454,145 @@ class Simulation:
 
         self.gridding_opts = gridding_opts
         self.model = model
+
+
+def _solve(inp):
+    """Thin wrapper of `solve` or `solve_source` for a `process_map`.
+
+    Used within a Simulation to call the solver in parallel. This function
+    always returns the ``efield`` and the ``info_dict``, independent of the
+    provided solver options.
+
+
+    Parameters
+    ----------
+    inp : dict, str
+        If dict, two formats are recognized:
+        - Has keys [model, sfield, efield, solver_opts]:
+          Forwarded to `solve`.
+        - Has keys [model, grid, source, frequency, efield, solver_opts]
+          Forwarded to `solve_source`.
+
+        Consult the corresponding function for details on the input parameters.
+
+        Alternatively the path to the h5-file can be provided as a string
+        (file-based computation).
+
+        The ``model`` is interpolated to the grid of the source field (tuple of
+        length 4) or to the provided grid (tuple of length 6). Hence, the model
+        can be on a different grid (for source and frequency dependent
+        gridding).
+
+
+    Returns
+    -------
+    efield : Field
+        Resulting electric field, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
+
+    info_dict : dict
+        Resulting info dictionary, as returned from :func:`emg3d.solver.solve`
+        or :func:`emg3d.solver.solve_source`.
+
+    """
+
+    # Four parameters => solve.
+    fname = False
+    if isinstance(inp, str):
+        from emg3d import io
+        fname = inp
+        inp = io.load(inp, verb=0)
+
+    # Has keys [model, sfield, efield, solver_opts]
+    if 'sfield' in inp.keys():
+
+        # Get input and initiate solver dict.
+        solver_input = {**inp['solver_opts'], 'sfield': inp['sfield']}
+        inp['grid'] = inp['sfield'].grid
+
+        # Function to compute.
+        fct = solver.solve
+
+    # Has keys [model, grid, source, frequency, efield, solver_opts]
+    else:
+
+        # Get input and initiate solver dict.
+        solver_input = {**inp['solver_opts'], 'source': inp['source'],
+                        'frequency': inp['frequency']}
+
+        # Function to compute.
+        fct = solver.solve_source
+
+    # Interpolate model to source grid (if different).
+    model = inp['model'].interpolate_to_grid(inp['grid'])
+
+    # Add general parameters to input dict.
+    solver_input['model'] = model
+    solver_input['efield'] = inp['efield']
+    solver_input['return_info'] = True
+    solver_input['always_return'] = True
+
+    # Return the result.
+    efield, info = fct(**solver_input)
+    if fname:
+        io.save(fname, efield=efield, info=info, verb=0)
+        return fname, fname
+    else:
+        return efield, info
+
+
+def _compute_gradient(inp):
+
+    fname = False
+    if isinstance(inp, str):
+        fname = inp
+        inp = io.load(inp, verb=0)
+
+    efield = inp['efield']
+    model = inp['model']
+
+    inp = {
+        **inp['solver_opts'],
+        'model': model.interpolate_to_grid(efield.grid),
+        'sfield': inp['sfield'],
+        'return_info': True,
+        'always_return': True,
+    }
+
+    bfield, info = solver.solve(**inp)
+
+    # Multiply forward field with backward field; take real part.
+    gfield = fields.Field(
+        grid=efield.grid,
+        data=np.real(bfield.field * efield.smu0 * efield.field),
+    )
+
+    # Pre-allocate the gradient for the computational grid.
+    shape = gfield.grid.shape_cells
+    grad = np.zeros((3, *shape), order='F')
+
+    # Map the field to cell centers times volume.
+    cell_volumes = gfield.grid.cell_volumes
+    maps.interp_edges_to_vol_averages(
+            ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+            volumes=cell_volumes.reshape(shape, order='F'),
+            ox=grad[0, ...], oy=grad[1, ...], oz=grad[2, ...])
+
+    # Bring gradient back from computation grid to inversion grid
+    # and add it to the total gradient.
+    if model.grid != gfield.grid:
+        # Requires discretize; for this reason wrapped in own fct.
+        gradient = np.zeros((3, *model.grid.shape_cells), order='F')
+        maps._interp_volume_average_adj(
+            oval=gradient, ogrid=model.grid,
+            nval=grad, ngrid=gfield.grid,
+        )
+    else:
+        gradient = grad
+
+    if fname:
+        # TODO bfield=> make dict_get more flexible
+        io.save(fname, efield=gradient, info=info, verb=0)
+        return fname, fname
+    else:
+        return gradient, info

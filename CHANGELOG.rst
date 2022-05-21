@@ -6,6 +6,19 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+- Simulation:
+
+  - The gradient is new computed in parallel. Until now, only the
+    back-propagation was assembled in parallel, but the actual gradient was
+    done in one thread.
+  - No initial back-propagated field can be provided any longer (a feature that
+    got never used I think). Instead of the back-propagated fields, the
+    gradients per source-receiver are now stored, on the inversion grid.
+
+
 v1.7.0 : CLI-clean
 ------------------
 
