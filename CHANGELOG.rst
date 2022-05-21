@@ -6,6 +6,24 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+
+- TODO - OLD simulations cannot be loaded with the changes!
+
+
+- Various internal changes (from underscore functions).
+
+  - ``_solve`` moved from ``solver`` to ``simulations``; split-up for forward,
+    jvec, and jtvec.
+  - Dictionaries are only built if ``file_dir`` is not provided.
+  - Dictionaries and misfit/gradient are not set initially.
+  - Renaming dictionaries and created files. New scheme:
+    - ``_dict_{forward;jvec;jtvec}_{efield;gfield;bfield;gradient;info}``
+    - ``file_dir/source_frequency_{forward;jvec;jtvec}.h5``
+
+
 v1.7.0 : CLI-clean
 ------------------
 
