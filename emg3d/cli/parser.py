@@ -18,6 +18,7 @@ Parser for the configuration file of the command-line interface.
 # the License.
 
 import os
+import warnings
 import configparser
 from pathlib import Path
 
@@ -197,7 +198,7 @@ def parse_config_file(args_dict):
         # Default is 'cubic' - gradient needs 'linear'
         simulation[key] = 'linear'
 
-    # Check noise parameters
+    # Check noise parameters => deprecated in ``simulation``, see [noise_opts]!
     noise_kwargs = {}
     keys = ['min_offset', 'mean_noise', 'max_offset']
     for key in keys:
@@ -214,6 +215,38 @@ def parse_config_file(args_dict):
         raise TypeError(
             f"Unexpected parameter in [simulation]: {list(all_sim.keys())}."
         )
+
+    # # Noise parameters  # #
+
+    if len(noise_kwargs) > 0:
+        msg = ("emg3d: `min_offset`, `max_offset`, `mean_noise`, and `ntype` "
+               "belong since v1.7.0 in their own section [noise_opts]; "
+               "providing them in [simulation] is deprecated and will be "
+               "removed in v1.9.0.")
+        warnings.warn(msg, FutureWarning)
+
+    # Check if parameter-file has a noise-section, add it otherwise.
+    # Note: values in noise_opts overwrite values from simulation.
+    if 'noise_opts' in cfg.sections():
+
+        all_noise = dict(cfg.items('noise_opts'))
+
+        keys = ['min_offset', 'max_offset', 'mean_noise']
+        for key in keys:
+            if cfg.has_option('noise_opts', key):
+                _ = all_noise.pop(key)
+                noise_kwargs[key] = cfg.getfloat('noise_opts', key)
+        key = 'ntype'
+        if cfg.has_option('noise_opts', key):
+            _ = all_noise.pop(key)
+            noise_kwargs[key] = cfg.get('noise_opts', key)
+
+        # Ensure no keys are left.
+        if all_noise:
+            raise TypeError(
+                f"Unexpected parameter in [noise_opts]: "
+                f"{list(all_noise.keys())}."
+            )
 
     # # Solver parameters  # #
 

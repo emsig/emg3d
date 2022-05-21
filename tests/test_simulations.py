@@ -149,9 +149,10 @@ class TestSimulation():
 
         # expand without seasurface
         with pytest.raises(KeyError, match="is required if"):
-            simulations.Simulation(
-                    self.survey, self.model, name='Test',
-                    gridding='single', gridding_opts={'expand': [1, 2]})
+            with pytest.warns(FutureWarning, match='A property-complete'):
+                simulations.Simulation(
+                        self.survey, self.model, name='Test',
+                        gridding='single', gridding_opts={'expand': [1, 2]})
 
     def test_reprs(self):
         test = self.simulation.__repr__()
@@ -324,11 +325,16 @@ class TestSimulation():
             },
         }
 
-        b_sim = simulations.Simulation(name='both', gridding='both', **inp)
-        f_sim = simulations.Simulation(
+        with pytest.warns(FutureWarning, match='A property-complete'):
+            b_sim = simulations.Simulation(name='both', gridding='both', **inp)
+        with pytest.warns(FutureWarning, match='A property-complete'):
+            f_sim = simulations.Simulation(
                 name='freq', gridding='frequency', **inp)
-        t_sim = simulations.Simulation(name='src', gridding='source', **inp)
-        s_sim = simulations.Simulation(
+        with pytest.warns(FutureWarning, match='A property-complete'):
+            t_sim = simulations.Simulation(
+                name='src', gridding='source', **inp)
+        with pytest.warns(FutureWarning, match='A property-complete'):
+            s_sim = simulations.Simulation(
                 name='single', gridding='single', **inp)
 
         # Quick repr test.

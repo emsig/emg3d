@@ -347,8 +347,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     center : array_like
         Center coordinates (x, y, z). The mesh is centered around this point,
         which means that here is the smallest cell. Usually this is the source
-        location. Note that from v1.7.0 the default will change: until then,
-        the center is assumed to be at the edge; from v1.7.0 onwards, it is
+        location. Note that from v1.9.0 the default will change: until then,
+        the center is assumed to be at the edge; from v1.9.0 onwards, it is
         assumed to be at the cell center. It can be changed via the parameter
         ``center_on_edge``.
 
@@ -633,12 +633,12 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         if vector is None:
             msg = (
                 "emg3d: `center` will change from being at an edge to "
-                "being at the cell center in v1.7.0. This behaviour can "
+                "being at the cell center in v1.9.0. This behaviour can "
                 "be set via at `center_on_edge`. Set `center_on_edge` "
                 "specifically to suppress this warning."
             )
             warnings.warn(msg, FutureWarning)
-        center_on_edge = True  # Backwards compatible, until v1.7.0.
+        center_on_edge = True  # Backwards compatible, until v1.9.0.
 
     # Get property map from string.
     if isinstance(pmap, str):
@@ -1378,6 +1378,7 @@ def estimate_gridding_opts(gridding_opts, model, survey, input_sc2=None):
     input_sc2 : int, default: None
         If :func:`emg3d.models.expand_grid_model` was used, ``input_sc2``
         corresponds to the original ``grid.shape_cells[2]``.
+        NOTE: Will be removed in v1.9.0.
 
 
     Returns

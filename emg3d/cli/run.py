@@ -95,6 +95,7 @@ def simulation(args_dict):
             sim.model = model['model']
 
             # Expand model if necessary.
+            # Deprecated, will be removed in v1.9.0.
             gopts = cfg['simulation_options']['gridding_opts']
             expand = gopts.pop('expand', None)
             if expand is not None:
