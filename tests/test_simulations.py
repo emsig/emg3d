@@ -92,7 +92,7 @@ class TestSimulation():
         assert self.simulation.get_efield('TxEW-3', 'f-1') == efield
 
         # See a single one
-        self.simulation._dict_efield['TxEW-3'][1.0] = None
+        self.simulation._dict_forward_efield['TxEW-3'][1.0] = None
         _, _ = capsys.readouterr()
         self.simulation.get_efield('TxEW-3', 1.0)
 
@@ -105,21 +105,21 @@ class TestSimulation():
         s_hfield = self.simulation.get_hfield('TxEW-3', 1.0)
         assert s_hfield == hfield
         assert_allclose(
-                self.simulation._dict_efield_info[
+                self.simulation._dict_forward_info[
                     'TxEW-3']['f-1']['abs_error'],
                 info['abs_error'])
         assert_allclose(
-                self.simulation._dict_efield_info[
+                self.simulation._dict_forward_info[
                     'TxEW-3']['f-1']['rel_error'],
                 info['rel_error'])
-        exit = self.simulation._dict_efield_info['TxEW-3']['f-1']['exit']
+        exit = self.simulation._dict_forward_info['TxEW-3']['f-1']['exit']
         assert exit == info['exit'] == 1
 
         # First hfield, ensure efield/hfield get computed.
         sim = self.simulation.copy(what='all')
-        sim._dict_efield['TxEW-3']['f-1'] = None
+        sim._dict_forward_efield['TxEW-3']['f-1'] = None
         sim.get_hfield('TxEW-3', 'f-1')
-        assert sim._dict_efield['TxEW-3']['f-1'] is not None
+        assert sim._dict_forward_efield['TxEW-3']['f-1'] is not None
 
     def test_responses(self):
         # Check min_offset were switched-off
@@ -211,8 +211,8 @@ class TestSimulation():
         # Clean and ensure it is empty
         sim3 = self.simulation.copy()
         sim3.clean('all')
-        assert sim3._dict_efield['TxMD-2']['f-1'] is None
-        assert sim3._dict_efield_info['TxMD-2']['f-1'] is None
+        assert sim3._dict_forward_efield['TxMD-2']['f-1'] is None
+        assert sim3._dict_forward_info['TxMD-2']['f-1'] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             sim3.clean('nothing')
 
@@ -436,12 +436,12 @@ class TestSimulation():
         assert out == ""
 
         # Errors with verb=0.
-        out = simulation.print_solver_info('efield', verb=0, return_info=True)
+        out = simulation.print_solver_info('forward', verb=0, return_info=True)
         assert "= Source TxED-1; Frequency 1.0 Hz = MAX. ITERATION REAC" in out
 
         # Errors with verb=1.
         _, _ = capsys.readouterr()  # empty
-        simulation.print_solver_info('efield', verb=1)
+        simulation.print_solver_info('forward', verb=1)
         out, _ = capsys.readouterr()
         assert "= Source TxED-1; Frequency 1.0 Hz = 2.6e-02; 1; 0:00:" in out
 
@@ -560,7 +560,7 @@ def test_misfit():
 
     field = emg3d.Field(grid, dtype=np.float64)
     field.field += syn
-    simulation._dict_efield['TxED-1']['f-1'] = field
+    simulation._dict_forward_efield['TxED-1']['f-1'] = field
     simulation.data['synthetic'] = simulation.data['observed']*0 + syn
 
     misfit = 0.5*((syn-data)/(rel_err*data))**2
@@ -837,24 +837,24 @@ class TestGradient:
         assert_allclose(g, j)
 
 
-def test__solve():
-    # Has keys [model, sfield, efield, solver_opts]
-    dat = REGRES['res']
-    inp = {'model': emg3d.Model(**dat['input_model']),
-           'sfield': emg3d.get_source_field(**dat['input_source']),
-           'efield': None,
-           'solver_opts': {'plain': True}}
-    efield, info = simulations._solve(inp)
-    assert_allclose(dat['Fresult'].field, efield.field)
+class TestSolve:
+    def test_solve_forward(self):
+        dat = REGRES['res']
+        model = model = emg3d.Model(**dat['input_model'])
+        inp = {'model': model,
+               'grid': model.grid,
+               'source': dat['input_source']['source'],
+               'frequency': dat['input_source']['frequency'],
+               'efield': None,
+               'solver_opts': {'plain': True}}
+        efield, info = simulations._solve_forward(inp)
+        assert_allclose(dat['Fresult'].field, efield.field)
 
-    # Has keys [model, grid, source, frequency, efield, solver_opts]
-    dat = REGRES['res']
-    model = model = emg3d.Model(**dat['input_model'])
-    inp = {'model': model,
-           'grid': model.grid,
-           'source': dat['input_source']['source'],
-           'frequency': dat['input_source']['frequency'],
-           'efield': None,
-           'solver_opts': {'plain': True}}
-    efield, info = simulations._solve(inp)
-    assert_allclose(dat['Fresult'].field, efield.field)
+    def test_solve_jvec(self):
+        dat = REGRES['res']
+        inp = {'model': emg3d.Model(**dat['input_model']),
+               'sfield': emg3d.get_source_field(**dat['input_source']),
+               'efield': None,
+               'solver_opts': {'plain': True}}
+        efield, info = simulations._solve_jvec(inp)
+        assert_allclose(dat['Fresult'].field, efield.field)
