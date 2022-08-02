@@ -34,9 +34,9 @@ jobs:
 
     steps:
 
-      # Cancel any previous run of the test job; [pin v0.8.0 (2021-02-13)]
+      # Cancel any previous run of the test job; [pin v0.10.0 (2022-06-27)]
       - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@3d86a7cc43670094ac248017207be0295edbc31d
+        uses: styfle/cancel-workflow-action@bb6001c4ea612bf59c3abfc4756fbceee4f870c7
         with:
           access_token: ${{ github.token }}
 
@@ -66,7 +66,7 @@ jobs:
           python-version: ${{ matrix.python }}
           miniforge-variant: Mambaforge
           use-mamba: true
-          # The following should not be necessary with Mambaforg(?).
+          # The following should not be necessary with Mambaforge(?).
           channels: conda-forge,defaults
           channel-priority: strict
 
@@ -76,8 +76,7 @@ jobs:
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
           conda config --show
-          conda install numba scipy pytest pytest-console-scripts pip
-          pip install setuptools_scm pytest-flake8
+          conda install numba scipy pytest pytest-console-scripts pytest-flake8 scooby setuptools_scm
           conda info -a
           conda list
 

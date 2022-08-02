@@ -671,16 +671,6 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
             "At least one of `domain`/`distance`/`vector` must be provided."
         )
 
-    # Check seasurface.
-    if seasurface is not None:
-
-        # Check that seasurface > center.
-        if seasurface <= center:
-            raise ValueError("The `seasurface` must be bigger than `center`.")
-
-        # Expand domain to include seasurface if necessary.
-        domain[1] = max(domain[1], seasurface)
-
     # Check vector if provided
     if vector is not None:
 
@@ -696,6 +686,16 @@ def origin_and_widths(frequency, properties, center, domain=None, vector=None,
         # If vector is outside domain, set to None.
         if len(vector) < 3:
             vector = None
+
+    # Check seasurface.
+    if seasurface is not None:
+
+        # Check that seasurface > center.
+        if seasurface <= center:
+            raise ValueError("The `seasurface` must be bigger than `center`.")
+
+        # Expand domain to include seasurface if necessary.
+        domain[1] = max(domain[1], seasurface)
 
     # If center_on_edge and no vector, we create a vector.
     if vector is None and center_on_edge:
