@@ -9,6 +9,8 @@ Changelog
 v1.7.1 : Bugfix trimmed z-vector
 --------------------------------
 
+**2022-08-02**
+
 - Meshing: Small fix to the automatic gridding from v1.5.0 (non-backwards
   compatible). A provided z-vector is new trimmed to the domain before the
   domain might be expanded due to the provided seasurface (which is as it was
