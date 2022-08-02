@@ -67,9 +67,9 @@ jobs:
 
     steps:
 
-      # Cancel any previous run of the test job; [pin v0.8.0 (2021-02-13)]
+      # Cancel any previous run of the test job; [pin v0.10.0 (2022-06-27)]
       - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@3d86a7cc43670094ac248017207be0295edbc31d
+        uses: styfle/cancel-workflow-action@bb6001c4ea612bf59c3abfc4756fbceee4f870c7
         with:
           access_token: ${{ github.token }}
 
@@ -109,7 +109,7 @@ jobs:
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
           conda config --show
-          conda install ${{ matrix.case.conda }} pytest pytest-cov pytest-console-scripts setuptools_scm coveralls pytest-flake8
+          conda install ${{ matrix.case.conda }} pytest pytest-cov pytest-console-scripts coveralls pytest-flake8 setuptools_scm
           conda info -a
           conda list
 
@@ -165,7 +165,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: "3.8"
+          python-version: "3.9"
 
       - name: Install dependencies
         run: |
