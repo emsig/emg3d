@@ -328,6 +328,9 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
 
     elif method == 'cubic':
 
+        # Note: SciPy v1.9 (07/2022) introduced cubic spline for
+        #       RegularGridInterpolator; replace this eventually.
+
         opts = {
             'mode': 'nearest' if extrapolate else 'constant',
             **({} if kwargs is None else kwargs),
