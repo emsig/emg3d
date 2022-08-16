@@ -28,5 +28,4 @@ asv
 pytest
 coveralls
 pytest-cov
-pytest-flake8
 pytest-console-scripts

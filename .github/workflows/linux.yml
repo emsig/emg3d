@@ -109,15 +109,19 @@ jobs:
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
           conda config --show
-          conda install ${{ matrix.case.conda }} pytest pytest-cov pytest-console-scripts coveralls pytest-flake8 setuptools_scm
+          conda install ${{ matrix.case.conda }} pytest pytest-cov pytest-console-scripts coveralls flake8 setuptools_scm
           conda info -a
           conda list
+
+      - name: Flake8
+        shell: bash -l {0}
+        run: flake8 docs/ setup.py emg3d/ tests/
 
       - name: Test with pytest
         shell: bash -l {0}
         run: |
           python setup.py install
-          pytest --cov=emg3d --flake8
+          pytest --cov=emg3d
 
       - name: Coveralls
         # [pin v20201129]
