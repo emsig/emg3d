@@ -1385,7 +1385,7 @@ class Simulation:
         elif out:
             print(out)
 
-    def print_solver_info(self, field='efield', verb=1, return_info=False):
+    def print_solver_info(self, field='efield', verb=1, return_info=False):#####
         """Print solver info."""
 
         # If not verbose, return.
@@ -1427,6 +1427,7 @@ class Simulation:
         elif out:
             print(out)
 
+
     def _set_model(self, model, kwargs):
         """Set self.model and self.gridding_opts."""
 
@@ -1444,6 +1445,7 @@ class Simulation:
         # If 'input', TensorMesh should be provided
         elif self.gridding == 'input':
             self._grid_single = gridding_opts
+
 
         # If 'same', there shouldn't be any options.
         elif self.gridding == 'same':

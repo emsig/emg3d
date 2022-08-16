@@ -115,7 +115,9 @@ jobs:
 
       - name: Flake8
         shell: bash -l {0}
-        run: flake8 docs/ setup.py emg3d/ tests/
+        run: |
+          ls -la
+          flake8 docs/ setup.py emg3d/ tests/
 
       - name: Test with pytest
         shell: bash -l {0}
