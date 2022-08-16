@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Maintenance
+
+  - Replace ``pytest-flake8`` by plain ``flake8``.
+
+
 v1.7.1 : Bugfix trimmed z-vector
 --------------------------------
 
