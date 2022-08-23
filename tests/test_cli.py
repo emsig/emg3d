@@ -309,6 +309,7 @@ class TestParser:
         config = os.path.join(tmpdir, 'emg3d.cfg')
         with open(config, 'w') as f:
             f.write("[noise_opts]\n")
+            f.write("add_noise=True\n")
             f.write("min_offset=1320\n")
             f.write("max_offset=5320\n")
             f.write("mean_noise=1.0\n")
@@ -318,6 +319,7 @@ class TestParser:
         args_dict['config'] = config
         cfg, term = cli.parser.parse_config_file(args_dict)
         noise_kwargs = cfg['noise_kwargs']
+        assert noise_kwargs['add_noise']
         assert noise_kwargs['min_offset'] == 1320.0
         assert noise_kwargs['max_offset'] == 5320.0
         assert noise_kwargs['mean_noise'] == 1.0

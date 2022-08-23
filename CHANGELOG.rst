@@ -9,6 +9,19 @@ Changelog
 latest
 ------
 
+- CLI takes new the boolean ``add_noise`` in the section ``[noise_opts]``
+  (default is True).
+
+- Bug fixes / tiny improvements
+
+  - Simulation.misfit returns an ndarray again instead of an DataArray (was
+    erroneously changed in v1.2.1).
+  - Write json can now handle NumPy int/bool/float.
+  - A clean on a Simulation now removes correctly the weights.
+  - Capture error in jtvec if weight is complex NaN (should be real).
+  - Model: ``mapping`` can now be an already instantiated map (sort of
+    undocumented).
+
 - Maintenance
 
   - Replace ``pytest-flake8`` by plain ``flake8``.

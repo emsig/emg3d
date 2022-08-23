@@ -194,7 +194,8 @@ class TestModel:
                 np.zeros(3))
 
         model1 = models.Model(grid)
-        model2 = models.Model(grid, mapping='Conductivity')
+        mapping = emg3d.maps.MapConductivity()
+        model2 = models.Model(grid, mapping=mapping)
 
         check = model1 == model2
 

@@ -121,6 +121,7 @@ remove the comment signs to use them.
   # Only if `--forward`, the noise options are passed to
   # `Simulation.compute(observed=True, **noise_opts)`.
   [noise_opts]
+  # add_noise = True      # Set to False to switch noise off.
   # min_offset = 0.0      # off < min_off set to NaN.
   # max_offset = np.infty # off > max_off set to NaN.
   # mean_noise = 0.0      # Mean of the noise.

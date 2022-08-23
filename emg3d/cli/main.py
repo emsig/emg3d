@@ -145,6 +145,14 @@ def main(args=None):
         help="replace model and all computed data of loaded simulation"
     )
 
+    # arg: Run without emg3d-computation.
+    parser.add_argument(
+        "-d", "--dry-run",
+        action="store_true",
+        default=False,
+        help="only display what would have been done"
+    )
+
     # arg: Verbosity.
     group3 = parser.add_mutually_exclusive_group()
     group3.add_argument(
@@ -166,14 +174,6 @@ def main(args=None):
         const=-1,
         dest="verbosity",
         help="decrease verbosity"
-    )
-
-    # arg: Run without emg3d-computation.
-    parser.add_argument(
-        "-d", "--dry-run",
-        action="store_true",
-        default=False,
-        help="only display what would have been done"
     )
 
     # arg: Report

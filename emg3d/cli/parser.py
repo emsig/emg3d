@@ -240,6 +240,10 @@ def parse_config_file(args_dict):
         if cfg.has_option('noise_opts', key):
             _ = all_noise.pop(key)
             noise_kwargs[key] = cfg.get('noise_opts', key)
+        key = 'add_noise'
+        if cfg.has_option('noise_opts', key):
+            _ = all_noise.pop(key)
+            noise_kwargs[key] = cfg.getboolean('noise_opts', key)
 
         # Ensure no keys are left.
         if all_noise:

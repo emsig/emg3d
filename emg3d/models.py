@@ -111,7 +111,11 @@ class Model:
         self.size = self.grid.n_cells
 
         # Get and store map.
-        self.map = getattr(maps, 'Map'+mapping)()
+        if isinstance(mapping, maps.BaseMap):
+            # It can be an already instantiated map (not in docstring).
+            self.map = mapping
+        else:
+            self.map = getattr(maps, 'Map'+mapping)()
 
         # Initiate and store all parameters.
         self._property_x = self._init_parameter(property_x, 'property_x')
@@ -187,10 +191,8 @@ class Model:
 
         # Compare values if not None.
         if equal:
-            for prop in self._properties:
-                val = getattr(self, prop)
-                if val is not None:
-                    equal *= np.allclose(val, getattr(model, prop))
+            for prop in self._def_properties:
+                equal *= np.allclose(getattr(self, prop), getattr(model, prop))
 
         return bool(equal)
 
@@ -303,6 +305,15 @@ class Model:
         self._check_positive_finite(epsilon_r, 'epsilon_r')
         self._epsilon_r[:] = np.asfortranarray(epsilon_r, dtype=np.float64)
 
+    @property
+    def _def_properties(self):
+        """Returns a list of the defined (not-None) properties."""
+        if not hasattr(self, '__def_properties'):
+            self.__def_properties = [
+                k for k in self._properties if getattr(self, k) is not None
+            ]
+        return self.__def_properties
+
     # INTERPOLATION
     def interpolate_to_grid(self, grid, **interpolate_opts):
         """Interpolate the model to a new grid.
@@ -343,12 +354,9 @@ class Model:
 
         # Interpolate property_{x;y;z}; mu_r; and epsilon_r; add to dict.
         model_inp = {}
-        for prop in self._properties:
+        for prop in self._def_properties:
             var = getattr(self, prop)
-            if var is None:
-                model_inp[prop] = None
-            else:
-                model_inp[prop] = maps.interpolate(values=var, **g2g_inp)
+            model_inp[prop] = maps.interpolate(values=var, **g2g_inp)
 
         # Assemble new model.
         return Model(grid, mapping=self.map.name, **model_inp)
@@ -428,12 +436,8 @@ class Model:
 
         # Apply operator to property_{x;y;z}; mu_r; and epsilon_r; add to dict.
         kwargs = {}
-        for prop in self._properties:
-            val = getattr(self, prop)
-            if val is None:
-                kwargs[prop] = None
-            else:
-                kwargs[prop] = operator(val, getattr(model, prop))
+        for prop in self._def_properties:
+            kwargs[prop] = operator(getattr(self, prop), getattr(model, prop))
 
         return kwargs
 

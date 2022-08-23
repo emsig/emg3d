@@ -206,11 +206,16 @@ class TestSimulation():
 
         # Clean and ensure it is empty
         sim3 = self.simulation.copy()
+        _ = sim3.misfit
         sim3.clean('all')
         assert sim3._dict_efield['TxMD-2']['f-1'] is None
         assert sim3._dict_efield_info['TxMD-2']['f-1'] is None
         with pytest.raises(TypeError, match="Unrecognized `what`: nothing"):
             sim3.clean('nothing')
+        with pytest.raises(AttributeError, match="no attribute 'weights'"):
+            sim3.data.weights
+        with pytest.raises(AttributeError, match="no attribute 'residuals'"):
+            sim3.data.residuals
 
     def test_dicts_provided(self):
         grids = self.simulation._dict_grid.copy()
