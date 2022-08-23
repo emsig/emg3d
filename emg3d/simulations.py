@@ -344,7 +344,7 @@ class Simulation:
 
         # Clean data.
         if what in ['computed', 'all']:
-            for key in ['residual', 'weight']:
+            for key in ['residual', 'weights']:
                 if key in self.data.keys():
                     del self.data[key]
             self.data['synthetic'] = self.data.observed.copy(
@@ -1042,7 +1042,7 @@ class Simulation:
             weights = self.data['weights']
             self._misfit = np.sum(weights*(residual.conj()*residual)).real/2
 
-        return self._misfit
+        return self._misfit.data
 
     def _bcompute(self):
         """Compute bfields asynchronously for all sources and frequencies."""
@@ -1266,7 +1266,8 @@ class Simulation:
 
         # Replace residual by provided vector
         # (division by weight is undone in gradient).
-        self.data.residual[...] = vector/self.data.weights.data
+        with np.errstate(invalid='ignore'):  # (For division by cplx-NaN.)
+            self.data.residual[...] = vector/self.data.weights.data
 
         # Reset gradient, so it will be computed.
         self._gradient = None

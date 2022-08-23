@@ -226,6 +226,22 @@ def test_dict_dearray_decomp_array_comp():
     assert_allclose(d1, data['d1'])
     assert_allclose(d2, data['d3']['d2'])
 
+    # Test added np formats.
+    deac = io._dict_dearray_decomp({
+        'int': np.int64(0),
+        'bool': np.bool_(True),
+        'float': np.float32(2.0),
+    })
+
+    assert isinstance(deac['int'], int)
+    assert isinstance(deac['bool'], bool)
+    assert isinstance(deac['float'], float)
+
+    data = io._dict_array_comp(deac)
+    assert data['int'] == 0
+    assert data['bool']
+    assert data['float'] == 2.0
+
 
 def test_hdf5_dump_load(tmpdir):
     d1 = np.arange(10)

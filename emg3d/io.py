@@ -418,6 +418,10 @@ def _dict_unflatten(data):
 def _dict_dearray_decomp(data):
     """Return dict where arrays are replaced by lists, complex by real numbers.
 
+    Note:
+    This would better be implemented with a custom json.JSONEncoder. However,
+    here we add the '__complex'- and '__array'-flags, so we can re-construct
+    them when loading the json.
 
     Parameters
     ----------
@@ -452,6 +456,18 @@ def _dict_dearray_decomp(data):
         if isinstance(value, np.ndarray):
             key += '__array-'+value.dtype.name
             value = value.tolist()
+
+        # Convert numpy ints.
+        if isinstance(value, np.integer):
+            value = int(value)
+
+        # Convert NumPy floats.
+        if isinstance(value, np.floating):
+            value = float(value)
+
+        # Convert NumPy booleans.
+        if isinstance(value, np.bool_):
+            value = bool(value)
 
         # Store this key-value-pair.
         out[key] = value
