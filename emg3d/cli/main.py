@@ -145,6 +145,14 @@ def main(args=None):
         help="replace model and all computed data of loaded simulation"
     )
 
+    # arg: Use layered models with empymod.
+    parser.add_argument(
+        "-l", "--layered",
+        action="store_true",
+        default=False,
+        help="use a layered model and empymod for each src-rec pair"
+    )
+
     # arg: Run without emg3d-computation.
     parser.add_argument(
         "-d", "--dry-run",
