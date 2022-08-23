@@ -37,7 +37,8 @@ except ImportError:
 __all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
            'MapLnConductivity', 'MapResistivity', 'MapLgResistivity',
            'MapLnResistivity', 'interpolate', 'interp_spline_3d',
-           'interp_volume_average', 'interp_edges_to_vol_averages']
+           'interp_volume_average', 'interp_edges_to_vol_averages',
+           'ellipse_indices']
 
 
 class BaseMap:
@@ -753,3 +754,118 @@ def _interp_volume_average_adj(oval, ogrid, nval, ngrid):
     oval[0, ...] += (P.T * nval[0, ...].ravel('F')).reshape(shape, order='F')
     oval[1, ...] += (P.T * nval[1, ...].ravel('F')).reshape(shape, order='F')
     oval[2, ...] += (P.T * nval[2, ...].ravel('F')).reshape(shape, order='F')
+
+
+# INDEX TRICKS
+def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
+    r"""Return bool which points fall within a general ellipse.
+
+    The general ellipse is given by
+
+    .. math::
+       :label: ellipse
+
+        A (x-x_0)^2 + B (x-x_0) (y-y_0) + C (y-y_0)^2 = 1  \ ,
+
+    where
+
+    .. math::
+
+        A &= \cos^2\theta / a^2 + \sin^2\theta / b^2 \ , \\
+        B &= 2 \cos\theta \sin\theta (1/a^2 - 1/b^2) \ , \\
+        C &= \sin^2\theta / a^2 + \cos^2\theta / b^2 \ . \\
+
+    Here,
+
+    - :math:`(x_0;y_0)` is the center, the midpoint between the two provided
+      points ``p0`` and ``p1``;
+    - :math:`a` is the *semi-major axis*, defined as
+
+      .. math::
+         :label: major
+
+         a = \max(f c, c + r)\ ,
+
+      where :math:`c` is the distance between the center and either of the
+      points ``{p0;p1}``, :math:`r` is the provided ``radius``, and :math:`f`
+      the provided ``factor``;
+    - :math:`b` is the *semi-minor axis*, defined as :math:`b = m a`, where
+      :math:`m` is provided as ``minor``;
+    - :math:`\theta` is the angle between the two points.
+
+
+    .. figure:: ../_static/ellipse.svg
+       :align: center
+       :alt: Sketch for ellipse indices.
+       :name: ellipse
+
+       Definition of the ellipse as a function of two points (black dots),
+       a certain radius :math:`r` around them, a factor :math:`f`, and
+       a minor factor :math:`m`.
+
+
+    Parameters
+    ----------
+    coo : tuple of ndarray
+        Tuple of two arrays defining the points in x and y.
+
+    p0, p1 : ndarray
+        (x, y)-coordinates of two points.
+
+    radius : float
+        Radius of the circle around the points that should be included in the
+        ellipse. This defines also the minimum value for the major and minor
+        axes of the ellipse.
+
+    factor : float, default: 1.0
+        The semi-major axis length is defined as a = max(f c, c + r),
+        where f is this factor.
+
+    minor : float, default: 1.0
+        The semi-minor axis is defined as the semi-major axis multiplied by
+        ``minor``, usually a value <= 1.0, where 1.0 defines a circle. The
+        enforced lower limit of the minor axis is the radius. The provided
+        ``minor`` might be overruled if ``check_foci=True``.
+
+    check_foci : bool, default: True
+        If True, it is ensured that {p0;p1} are at least as far from the center
+        as the foci of the ellipse; ``minor`` is adjusted accordingly if
+        necessary.
+
+
+    Returns
+    -------
+    ind : ndarray
+        Boolean with same shape as the provided coordinates containing True
+        where (x;y) are inside or on the ellipse, and False otherwise.
+
+    """
+    # Center coordinates
+    cx, cy = (p0 + p1) / 2
+
+    # Adjacent and opposite sides
+    dx, dy = (p1 - p0) / 2
+
+    # c: linear eccentricity
+    dxy = np.linalg.norm([dx, dy])
+
+    # Angles
+    if dy == 0.0:
+        cos, sin = 1.0, 0.0
+    else:
+        cos, sin = dx/dxy, dy/dxy
+
+    # a: semi-major axis
+    major = max(dxy * factor, dxy + radius)
+
+    # b: semi-minor axis
+    minor = max(minor * major, radius)
+    if check_foci:
+        minor = max(minor, np.sqrt(abs(major**2 - dxy**2)))
+
+    # Return indices falling within or on a general ellipse.
+    X, Y = coo[0] - cx, coo[1] - cy
+    A = (cos/major)**2 + (sin/minor)**2
+    B = 2*cos*sin*(major**-2 - minor**-2)
+    C = (sin/major)**2 + (cos/minor)**2
+    return A*X**2 + B*X*Y + C*Y**2 <= 1.0

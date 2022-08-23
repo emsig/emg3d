@@ -12,6 +12,9 @@ latest
 - CLI takes new the boolean ``add_noise`` in the section ``[noise_opts]``
   (default is True).
 
+- Maps: New function ``ellipse_indices`` returning a boolean indicating which
+  points fall within a general ellipse for the provided input parameters.
+
 - Bug fixes / tiny improvements
 
   - Simulation.misfit returns an ndarray again instead of an DataArray (was

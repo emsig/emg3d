@@ -702,3 +702,38 @@ def test_interp_edges_to_vol_averages(njit):
         assert_allclose(grad_x, out_x.reshape(grid.shape_cells, order='F'))
         assert_allclose(grad_y, out_y.reshape(grid.shape_cells, order='F'))
         assert_allclose(grad_z, out_z.reshape(grid.shape_cells, order='F'))
+
+
+def test_ellipse_indices():
+
+    # Circle
+    p0, p1 = np.array([0, 0]), np.array([0, 0])
+    x = np.arange(5)-2
+    X, Y = np.meshgrid(x, x)
+    out = maps.ellipse_indices((X, Y), p0, p1, radius=2)
+    res = np.array([[False, False,  True, False, False],
+                    [False,  True,  True,  True, False],
+                    [True,   True,  True,  True,  True],
+                    [False,  True,  True,  True, False],
+                    [False, False,  True, False, False]])
+    assert_allclose(out, res)
+    # plt.pcolormesh(out); plt.axis('equal')
+
+    # Ellipse
+    p0, p1 = np.array([-1, 0]), np.array([2, 2])
+    x = np.arange(9)-4
+    X, Y = np.meshgrid(x, x)
+    out = maps.ellipse_indices((X, Y), p0, p1, radius=1, minor=0.5)
+    res = np.array([
+        [False, False, False, False, False, False, False, False, False],
+        [False, False, False, False, False, False, False, False, False],
+        [False, False, False, False, False, False, False, False, False],
+        [False, False, False,  True,  True,  True, False, False, False],
+        [False, False,  True,  True,  True,  True,  True, False, False],
+        [False, False,  True,  True,  True,  True,  True,  True, False],
+        [False, False, False,  True,  True,  True,  True,  True, False],
+        [False, False, False, False,  True,  True,  True, False, False],
+        [False, False, False, False, False, False, False, False, False]
+    ])
+    assert_allclose(out, res)
+    # plt.pcolormesh(out); plt.axis('equal')
