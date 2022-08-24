@@ -16,15 +16,15 @@ Helper routines to call functions with multiprocessing/concurrent.futures.
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-
-# Note: Against best practices, most required modules are here lazy imported
-# within the functions (to avoid circular imports, amongst other reasons).
+from concurrent.futures import ProcessPoolExecutor
 
 try:
     import tqdm
     import tqdm.contrib.concurrent
 except ImportError:
     tqdm = None
+
+from emg3d import io, solver
 
 
 def process_map(fn, *iterables, max_workers, **kwargs):
@@ -40,7 +40,6 @@ def process_map(fn, *iterables, max_workers, **kwargs):
     execution.
 
     """
-    from concurrent.futures import ProcessPoolExecutor
 
     # Parallel
     if max_workers > 1 and tqdm is None:
@@ -101,8 +100,6 @@ def solve(inp):
         or :func:`emg3d.solver.solve_source`.
 
     """
-    from emg3d import io
-    from emg3d import solver
 
     # Four parameters => solve.
     fname = False
