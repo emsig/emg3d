@@ -161,3 +161,7 @@ class TestFourier:
 
         # Compare.
         assert_allclose(data_true, tdata, rtol=1e-4)
+
+
+def test_all_dir():
+    assert set(time.__all__) == set(dir(time))

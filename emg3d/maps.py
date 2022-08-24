@@ -41,6 +41,10 @@ __all__ = ['BaseMap', 'MapConductivity', 'MapLgConductivity',
            'ellipse_indices']
 
 
+def __dir__():
+    return __all__
+
+
 class BaseMap:
     """Maps variable `x` to computational variable `σ` (conductivity).
 

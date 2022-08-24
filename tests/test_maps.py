@@ -737,3 +737,7 @@ def test_ellipse_indices():
     ])
     assert_allclose(out, res)
     # plt.pcolormesh(out); plt.axis('equal')
+
+
+def test_all_dir():
+    assert set(maps.__all__) == set(dir(maps))

@@ -505,3 +505,7 @@ def test_restrict_weights(njit):
     assert_allclose(wxl, wl)
     assert_allclose(wx0, w0)
     assert_allclose(wxr, wr)
+
+
+def test_all_dir():
+    assert set(core.__all__) == set(dir(core))

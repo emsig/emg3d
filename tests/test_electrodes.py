@@ -605,3 +605,7 @@ def test_adjoint():
             complex_u=rng.choice([True, False]),  # Random float or complex.
             complex_v=rng.choice([True, False]),  # Random float or complex.
         )
+
+
+def test_all_dir():
+    assert set(electrodes.__all__) == set(dir(electrodes))

@@ -268,3 +268,7 @@ def test_hdf5_dump_load(tmpdir):
         with pytest.warns(UserWarning, match='emg3d: This feature requires'):
             io._hdf5_dump(fname=str(tmpdir) + 'test.h5',
                           data=orig, compression='gzip')
+
+
+def test_all_dir():
+    assert set(io.__all__) == set(dir(io))

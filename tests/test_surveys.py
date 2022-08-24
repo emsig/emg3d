@@ -382,3 +382,7 @@ def test_frequencies_to_dict():
 
     with pytest.raises(ValueError, match="Contains non-unique frequencies: "):
         surveys.frequencies_to_dict([1, 2, 3, 4, 1])
+
+
+def test_all_dir():
+    assert set(surveys.__all__) == set(dir(surveys))

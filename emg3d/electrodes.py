@@ -34,6 +34,10 @@ __all__ = [
 ]
 
 
+def __dir__():
+    return __all__
+
+
 # BASE ELECTRODE TYPES
 class Wire:
     """A wire consists of an arbitrary number of electrodes.

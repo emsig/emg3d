@@ -782,3 +782,7 @@ def test_reciprocity():
             #       f" : {nrmsd:6.2f}    {resp1:+.4e}; {resp2:+.4e}")
 
             assert nrmsd < 1.0
+
+
+def test_all_dir():
+    assert set(fields.__all__) == set(dir(fields))
