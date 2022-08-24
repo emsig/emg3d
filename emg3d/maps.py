@@ -797,6 +797,8 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
       :math:`m` is provided as ``minor``;
     - :math:`\theta` is the angle between the two points.
 
+    The following figure explains it graphically (only visible in the web
+    version of the API docs on https://emg3d.emsig.xyz).
 
     .. figure:: ../_static/ellipse.svg
        :align: center
