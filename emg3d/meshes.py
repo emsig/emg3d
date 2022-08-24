@@ -233,7 +233,7 @@ class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
 
 def construct_mesh(frequency, properties, center, domain=None, vector=None,
                    seasurface=None, **kwargs):
-    r"""Return a TensorMesh for given parameters.
+    r"""Return a TensorMesh for given input parameters.
 
     Designing an appropriate grid is the most time-consuming part of any 3D
     modelling:
@@ -249,13 +249,15 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     and the survey type.
 
     This function is a helper routine to construct an appropriate grid.
-    However, there is no guarantee that it is the best or even a good grid. The
-    constructed grid is frequency- and property-dependent. Some details are
-    explained in other functions:
+    However, **there is no guarantee that it is the best or even a good grid**.
+    (For this a solid grid-convergence test would be needed.) The constructed
+    grid is frequency- and property-dependent. Some details are explained in
+    other functions:
 
     - The minimum cell width :math:`\Delta_\text{min}` is a function of
       ``frequency``, ``properties[0]``, ``min_width_pps``, and
-      ``min_width_limits``, see Equation :eq:`mincellwidth`.
+      ``min_width_limits``, see Equation :eq:`mincellwidth`. (However, a
+      provided ``vector`` will overrule it.)
     - The skin depth :math:`\delta` is a function of ``frequency`` and
       ``properties``, see Equation :eq:`skindepth`.
     - The wavelength :math:`\lambda` is a function of ``frequency`` and
@@ -306,8 +308,8 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
     ----------
 
     frequency : float
-        Frequency (Hz) to calculate skin depth; both the minimum cell width and
-        the extent of the buffer zone, and therefore of the computational
+        Frequency (Hz) to calculate the skin depth; both the minimum cell width
+        and the extent of the buffer zone, and therefore of the computational
         domain, are a function of skin depth.
 
     properties : {float, array_like}
@@ -350,11 +352,11 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
 
     center : array_like
         Center coordinates (x, y, z). The mesh is centered around this point,
-        which means that here is the smallest cell. Usually this is the source
-        location. Note that from v1.9.0 the default will change: until then,
-        the center is assumed to be at the edge; from v1.9.0 onwards, it is
-        assumed to be at the cell center. It can be changed via the parameter
-        ``center_on_edge``.
+        which means that it is the location of the smallest cell. Usually this
+        is the source location. Note that from v1.9.0 the default will change:
+        until then, the center is assumed to be at the edge; from v1.9.0
+        onwards, it is assumed to be at the cell center. It can be changed via
+        the parameter ``center_on_edge``.
 
     domain : {tuple, list, dict, None}, optional
         Contains the survey-domain limits. This domain should include all
@@ -429,24 +431,25 @@ def construct_mesh(frequency, properties, center, domain=None, vector=None,
         no influence on dimensions where a ``vector`` is provided.
 
     min_width_limits : {float, list, tuple, dict, None}, default: None
-        Passed through to :func:`cell_width` as ``limits``. A tuple of three
-        or a dict with ``x;y;z`` can be provided for direction dependent
-        values. Note that this value has no influence on dimensions where a
-        ``vector`` is provided.
+        Limits on cell width; passed through to :func:`cell_width` as
+        ``limits``. A tuple of three or a dict with ``x;y;z`` can be provided
+        for direction dependent values. Note that this value has no influence
+        on dimensions where a ``vector`` is provided.
 
     min_width_pps : {float, tuple, dict}, default: 3.0
-        Passed through to :func:`cell_width` as ``pps``. A tuple of three or a
-        dict with ``x;y;z`` can be provided for direction dependent values.
-        Note that this value has no influence on dimensions where a ``vector``
-        is provided.
+        Points per skin depth; passed through to :func:`cell_width` as ``pps``.
+        A tuple of three or a dict with ``x;y;z`` can be provided for direction
+        dependent values. Note that this value has no influence on dimensions
+        where a ``vector`` is provided.
 
     lambda_factor : float, default: 1.0
-        The buffer is taken as one wavelength from the survey domain. This can
-        be regarded as quite conservative (but safe). The parameter
-        ``lambda_factor`` can be used to reduce (or increase) this factor.
+        The buffer is set to one wavelength, starting at the survey domain (or
+        at the center if ``lambda_from_center=True``). This can be regarded as
+        quite conservative (but safe). The parameter ``lambda_factor`` can be
+        used to reduce (or increase) this factor.
 
     max_buffer : float, default: 100_000
-        Maximum thickness of the buffer zone around survey domain. If
+        Maximum thickness of the buffer zone around the survey domain. If
         ``lambda_from_center=True``, this is the maximum distance from the
         center to the end of the computational domain.
 

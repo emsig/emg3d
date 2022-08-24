@@ -15,7 +15,7 @@ latest
 - Maps: New function ``ellipse_indices`` returning a boolean indicating which
   points fall within a general ellipse for the provided input parameters.
 
-- Bug fixes / tiny improvements
+- Bug fixes, small improvements and maintenance
 
   - Simulation.misfit returns an ndarray again instead of an DataArray (was
     erroneously changed in v1.2.1).
@@ -24,10 +24,9 @@ latest
   - Capture error in jtvec if weight is complex NaN (should be real).
   - Model: ``mapping`` can now be an already instantiated map (sort of
     undocumented).
-
-- Maintenance
-
+  - Cleaned-up the namespace by setting ``dir()`` explicitly.
   - Replace ``pytest-flake8`` by plain ``flake8``.
+  - Moved all multiprocessing-related functions to ``_multiprocessing.py``.
 
 
 v1.7.1 : Bugfix trimmed z-vector
