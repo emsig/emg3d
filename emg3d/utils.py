@@ -22,7 +22,6 @@ import warnings
 import importlib
 from time import perf_counter
 from datetime import datetime, timedelta
-from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
@@ -31,12 +30,6 @@ try:
 except ImportError:
     class ScoobyReport:
         """Dummy placeholder."""
-
-try:
-    import tqdm
-    import tqdm.contrib.concurrent
-except ImportError:
-    tqdm = None
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
@@ -52,6 +45,10 @@ except ImportError:
     __version__ = 'unknown-'+datetime.today().strftime('%Y%m%d')
 
 __all__ = ['Report', 'EMArray', 'Timer']
+
+
+def __dir__():
+    return __all__
 
 
 # Set emg3d-warnings to always.
@@ -121,39 +118,6 @@ def _requires(*args, **kwargs):
             return passer
 
     return inner
-
-
-def _process_map(fn, *iterables, max_workers, **kwargs):
-    """Dispatch processes in parallel or not, using tqdm or not.
-
-    :class:`emg3d.simulations.Simulation` uses the function
-    ``tqdm.contrib.concurrent.process_map`` to run jobs asynchronously.
-    However, ``tqdm`` is a soft dependency. In case it is not installed we use
-    the class ``concurrent.futures.ProcessPoolExecutor`` directly, from the
-    standard library, and imitate the behaviour of process_map (basically a
-    ``ProcessPoolExecutor.map``, returned as a list, and wrapped in a context
-    manager). If max_workers is smaller than two then we we avoid parallel
-    execution.
-
-    """
-    # Parallel
-    if max_workers > 1 and tqdm is None:
-        with ProcessPoolExecutor(max_workers=max_workers) as ex:
-            return list(ex.map(fn, *iterables))
-
-    # Parallel with tqdm
-    elif max_workers > 1:
-        return tqdm.contrib.concurrent.process_map(
-                fn, *iterables, max_workers=max_workers, **kwargs)
-
-    # Sequential
-    elif tqdm is None:
-        return list(map(fn, *iterables))
-
-    # Sequential with tqdm
-    else:
-        return list(tqdm.auto.tqdm(
-            iterable=map(fn, *iterables), total=len(iterables[0]), **kwargs))
 
 
 # PUBLIC UTILS

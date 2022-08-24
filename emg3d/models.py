@@ -27,6 +27,10 @@ from emg3d import maps, meshes, utils
 __all__ = ['Model', 'VolumeModel', 'expand_grid_model']
 
 
+def __dir__():
+    return __all__
+
+
 # MODEL
 @utils._known_class
 class Model:

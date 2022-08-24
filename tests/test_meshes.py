@@ -813,3 +813,7 @@ class TestEstimateGriddingOpts():
         with pytest.raises(TypeError, match='Unexpected gridding_opts'):
             _ = meshes.estimate_gridding_opts(
                     {'what': True}, self.model, self.survey)
+
+
+def test_all_dir():
+    assert set(meshes.__all__) == set(dir(meshes))

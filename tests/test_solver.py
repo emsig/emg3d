@@ -262,29 +262,6 @@ def test_solve_source():
     assert_allclose(dat['Fresult'].field, efield.field)
 
 
-def test__solve():
-    # Has keys [model, sfield, efield, solver_opts]
-    dat = REGRES['res']
-    inp = {'model': emg3d.Model(**dat['input_model']),
-           'sfield': emg3d.get_source_field(**dat['input_source']),
-           'efield': None,
-           'solver_opts': {'plain': True}}
-    efield, info = solver._solve(inp)
-    assert_allclose(dat['Fresult'].field, efield.field)
-
-    # Has keys [model, grid, source, frequency, efield, solver_opts]
-    dat = REGRES['res']
-    model = model = emg3d.Model(**dat['input_model'])
-    inp = {'model': model,
-           'grid': model.grid,
-           'source': dat['input_source']['source'],
-           'frequency': dat['input_source']['frequency'],
-           'efield': None,
-           'solver_opts': {'plain': True}}
-    efield, info = solver._solve(inp)
-    assert_allclose(dat['Fresult'].field, efield.field)
-
-
 class TestMultigrid:
     # Everything should be tested just fine in `test_solver`. Just check here
     # that all code is reached.
@@ -1148,3 +1125,7 @@ def test_print_one_liner(capsys):
     out, _ = capsys.readouterr()
     assert '3(5); 0:00:' in out
     assert '; CONVERGED' in out
+
+
+def test_all_dir():
+    assert set(solver.__all__) == set(dir(solver))

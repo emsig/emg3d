@@ -33,6 +33,10 @@ __all__ = ['Survey', 'random_noise', 'txrx_coordinates_to_dict',
            'txrx_lists_to_dict', 'frequencies_to_dict']
 
 
+def __dir__():
+    return __all__
+
+
 @utils._known_class
 class Survey:
     """Create a survey containing sources, receivers, and data.

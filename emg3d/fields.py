@@ -32,6 +32,10 @@ from emg3d import maps, meshes, models, utils, electrodes
 __all__ = ['Field', 'get_source_field', 'get_receiver', 'get_magnetic_field']
 
 
+def __dir__():
+    return __all__
+
+
 @utils._known_class
 class Field:
     r"""A Field contains the x-, y-, and z- directed electromagnetic fields.

@@ -836,3 +836,7 @@ class TestGradient:
         g = sim.gradient
         j = sim.jtvec(vector=sim.survey.data.residual*sim.survey.data.weights)
         assert_allclose(g, j)
+
+
+def test_all_dir():
+    assert set(simulations.__all__) == set(dir(simulations))

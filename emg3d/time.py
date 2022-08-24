@@ -30,8 +30,11 @@ except ImportError:
 
 from emg3d import utils
 
-
 __all__ = ['Fourier', ]
+
+
+def __dir__():
+    return __all__
 
 
 @utils._requires('empymod')

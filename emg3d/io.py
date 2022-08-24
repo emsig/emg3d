@@ -34,6 +34,10 @@ from emg3d import meshes, utils
 __all__ = ['save', 'load']
 
 
+def __dir__():
+    return __all__
+
+
 def save(fname, **kwargs):
     """Save simulations, surveys, meshes, models, fields, and more to disk.
 

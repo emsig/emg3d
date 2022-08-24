@@ -36,6 +36,10 @@ __all__ = ['TensorMesh', 'BaseMesh', 'construct_mesh', 'origin_and_widths',
            'check_mesh', 'estimate_gridding_opts']
 
 
+def __dir__():
+    return __all__
+
+
 class BaseMesh:
     """Minimal TensorMesh for internal multigrid computation.
 

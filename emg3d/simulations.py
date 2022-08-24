@@ -29,9 +29,14 @@ from copy import deepcopy
 
 import numpy as np
 
-from emg3d import fields, io, maps, meshes, models, solver, surveys, utils
+from emg3d import _multiprocessing as _mp
+from emg3d import fields, io, maps, meshes, models, surveys, utils
 
 __all__ = ['Simulation', ]
+
+
+def __dir__():
+    return __all__
 
 
 @utils._known_class
@@ -794,9 +799,9 @@ class Simulation:
                 self.survey.add_noise(**kwargs)
 
     def _compute(self, fn, description, srcfreq=None):
-        """Use utils._process_map to call solver._solve asynchronously."""
-        return utils._process_map(
-            solver._solve,
+        """Use _mp.process_map to call solver.solve asynchronously."""
+        return _mp.process_map(
+            _mp.solve,
             list(map(fn, self._srcfreq if srcfreq is None else srcfreq)),
             max_workers=self.max_workers,
             **{'desc': description, **self._tqdm_opts},

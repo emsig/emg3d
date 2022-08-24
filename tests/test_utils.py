@@ -11,11 +11,6 @@ try:
 except ImportError:
     scooby = None
 
-try:
-    import tqdm
-except ImportError:
-    tqdm = None
-
 
 def test_known_class():
     @utils._known_class
@@ -35,36 +30,6 @@ def test_requires(capsys):
         a = dummy()
     out1, _ = capsys.readouterr()
     assert a is None
-
-
-def dummy(inp):
-    """Dummy fct to test process_map."""
-    return inp
-
-
-def test_process_map():
-
-    # Parallel
-    out = utils._process_map(dummy, [1, 2], max_workers=4, disable=True)
-    assert out == [1, 2]
-
-    # Sequential
-    out = utils._process_map(dummy, [1, 2], max_workers=1, disable=True)
-    assert out == [1, 2]
-
-    # If tqdm is installed, run now without.
-    if tqdm is not None:
-        utils.tqdm = None
-
-        # Parallel
-        out = utils._process_map(dummy, [1, 2], max_workers=4, disable=True)
-        assert out == [1, 2]
-
-        # Sequential
-        out = utils._process_map(dummy, [1, 2], max_workers=1, disable=True)
-        assert out == [1, 2]
-
-    utils.tqdm = tqdm
 
 
 def test_Report(capsys):
@@ -129,3 +94,7 @@ def test_Timer():
 
     # Check representation of Timer.
     assert 'Runtime : 0:00:0' in time.__repr__()
+
+
+def test_all_dir():
+    assert set(utils.__all__) == set(dir(utils))

@@ -451,3 +451,7 @@ def test_expand_grid_model():
     assert_allclose(o_model.epsilon_r[:, :, :-2], 5)
     assert_allclose(o_model.epsilon_r[:, :, -2], 1)
     assert_allclose(o_model.epsilon_r[:, :, -1], 1)
+
+
+def test_all_dir():
+    assert set(models.__all__) == set(dir(models))

@@ -42,6 +42,16 @@ import numpy as np
 # Numba-settings
 _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
+__all__ = [
+    'amat_x', 'gauss_seidel', 'gauss_seidel_x', 'gauss_seidel_y',
+    'gauss_seidel_z', 'blocks_to_amat', 'solve', 'restrict',
+    'restrict_weights',
+]
+
+
+def __dir__():
+    return __all__
+
 
 # LinearOperator to compute A x
 @nb.njit(**_numba_setting)
