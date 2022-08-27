@@ -79,7 +79,9 @@ class BaseMesh:
         self.origin = np.array(origin)
 
         # Width of cells, cast to arrays.
-        self.h = [np.array(h[0]), np.array(h[1]), np.array(h[2])]
+        self.h = [np.array(h[0], dtype=float),
+                  np.array(h[1], dtype=float),
+                  np.array(h[2], dtype=float)]
 
         # Node related properties.
         shape_nodes = (self.h[0].size+1, self.h[1].size+1, self.h[2].size+1)

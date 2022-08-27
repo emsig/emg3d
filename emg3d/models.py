@@ -365,6 +365,184 @@ class Model:
         # Assemble new model.
         return Model(grid, mapping=self.map.name, **model_inp)
 
+    def extract_1d(self, method, p0, p1=None, ellipse=None, merge=False,
+                   return_imat=False):
+        """Return a layered (1D) model.
+
+        The returned model has shape (1, 1, nz), where nz is the original
+        number of cells in vertical direction (except if ``merge=True``). How
+        this 1D model is obtained depends on the input parameters.
+
+        .. note::
+
+            If ``method`` is either ``'cylinder'`` or ``'prism'``, an
+            ``ellipse``-dict has to be provided with at least the key-value
+            pair for ``'radius'``. E.g., ``ellipse={'radius': 1000}``.
+
+
+        Parameters
+        ----------
+        method : str
+            Method how to obtain the layered model. Implemented are:
+
+            - ``'midpoint'``: Returns the model at the midpoint between ``p0``
+              and ``p1``. If ``p1`` is not provided, the model at ``p0`` is
+              returned. The x- and y-width of the returned model corresponds to
+              the selected cell.
+            - ``'cylinder'``: Volume-averages the values of each layer within a
+              right elliptic cylinder, using the function
+              :func:`emg3d.maps.ellipse_indices` to obtain the ellipse. This
+              method requires the ``ellipse``-parameter. The x- and y-width of
+              the returned model corresponds to the x- and y-width of the
+              ellipse.
+            - ``'prism'``: Same as ``'cylinder'``, but an enveloping right
+              rectangular prism is fit around the cylinder.
+
+        p0, p1 : array_like
+            (x, y)-coordinates of two points. If ``p1`` is not provided, it is
+            set to ``p0``.
+
+        ellipse : dict, default: None
+            Options-dict passed through to :func:`emg3d.maps.ellipse_indices`.
+            This is only used in the methods ``'cylinder'`` and ``'prism'``,
+            for which it is a required parameter.
+
+        merge : bool, default: False
+            If True, adjacent layers of identical properties are combined. That
+            implies that the returned model might have less (but larger) cells
+            in z-direction than the original model.
+
+        return_imat : bool, default: False
+            If True, the interpolation matrix is returned in addition to the
+            model. This matrix can be used, for instance, to inspect the chosen
+            selection.
+
+        Returns
+        -------
+        layered : Model
+            The layered Model; a :class:`emg3d.models.Model` instance.
+
+        imat : ndarray, returned if return_imat=True
+            Interpolation matrix of shape (nx, ny) of the original model.
+
+        """
+        # Get ellipse dict.
+        ellipse = {} if ellipse is None else ellipse
+
+        # Check if input is consistent with method.
+        methods = ['midpoint', 'cylinder', 'prism']
+        if method not in methods:
+            raise ValueError(
+                f"Unknown method '{method}'; implemented: {methods}."
+            )
+        if method != 'midpoint' and 'radius' not in ellipse.keys():
+            raise TypeError(
+                f"Method '{method}' requires the dict 'ellipse' "
+                "containing at least the parameter 'radius'."
+            )
+
+        # Flag if midpoint is used or another method.
+        midpoint = method == 'midpoint'
+
+        # If p1 is not given, we set it to p0.
+        if p1 is None:
+            p1 = p0
+
+        # Get relevant indices and the used-cells matrix.
+        if not midpoint:
+
+            # Indices of used cells.
+            coo = (self.grid.cell_centers_x, self.grid.cell_centers_y)
+            use = maps.ellipse_indices(coo=coo, p0=p0, p1=p1, **ellipse)
+
+            # Start and end indices.
+            ix, iy = use.nonzero()
+            if not ix.size:  # Switch to 'midpoint' if selection is empty.
+                midpoint = True
+            else:
+                six, eix = ix.min(), ix.max()
+                siy, eiy = iy.min(), iy.max()
+
+        if midpoint:
+
+            # Find corresponding indices, limit to grid.
+            def index(nodes, coo):
+                """Return index for interval btw nodes in which coo resides."""
+                x = np.asarray(coo < np.r_[nodes, np.infty]).nonzero()[0][0]-1
+                return np.clip(x, 0, nodes.size-2)
+
+            # Start and end indices.
+            six = eix = index(self.grid.nodes_x, (p0[0] + p1[0])/2)
+            siy = eiy = index(self.grid.nodes_y, (p0[1] + p1[1])/2)
+
+        # Create interpolation matrix.
+        imat = np.zeros(self.shape[:2])
+        if not midpoint:
+            pp = np.outer(self.grid.h[0][six:eix+1], self.grid.h[1][siy:eiy+1])
+            if method == "cylinder":
+                pp *= use[six:eix+1, siy:eiy+1]
+            pp /= pp.sum()
+        else:
+            pp = 1.0
+        imat[six:eix+1, siy:eiy+1] = pp
+
+        # Interpolate property_{x;y;z}; mu_r; and epsilon_r.
+        props = {}
+        for prop in self._def_properties:
+            values = getattr(self, prop)
+
+            if not midpoint:
+                if not self.map.name.startswith('L'):
+                    values = np.log10(values)
+                val = np.einsum('ij,ijk->k', imat, values)
+                if not self.map.name.startswith('L'):
+                    val = 10**val
+            else:
+                val = values[six, siy, :]
+
+            props[prop] = val
+
+        # If merge, combine adjacent layers of identical properties.
+        if merge:
+
+            # Get indices of non-merge sequences.
+            diff = np.zeros(self.shape[2])
+            for k, v in props.items():
+                diff += abs(np.diff(np.r_[-1, v]))
+            ind = diff.nonzero()[0]
+
+            # Merge.
+            props = {k: v[ind] for k, v in props.items()}
+
+            # Get cell sizes in z.
+            hz = np.diff(np.r_[self.grid.nodes_z[ind], self.grid.nodes_z[-1]])
+
+        else:
+            hz = self.grid.h[2]
+
+        # Create (1, 1, nz) grid.
+        grid_out = meshes.TensorMesh(
+            h=(
+                [self.grid.nodes_x[eix+1] - self.grid.nodes_x[six], ],
+                [self.grid.nodes_y[eiy+1] - self.grid.nodes_y[siy], ],
+                hz
+            ),
+            origin=(
+                self.grid.nodes_x[six],
+                self.grid.nodes_y[siy],
+                self.grid.origin[2]
+            ),
+        )
+
+        # Get layered model on grid_out.
+        layered = Model(grid=grid_out, **props, mapping=self.map)
+
+        # Return "1D" model (only 1 cell in x/y).
+        if return_imat:
+            return layered, imat
+        else:
+            return layered
+
     # INTERNAL UTILITIES
     def _init_parameter(self, values, name):
         """Initiate parameter by casting and broadcasting."""

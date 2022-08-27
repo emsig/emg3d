@@ -9,6 +9,10 @@ Changelog
 latest
 ------
 
+- Model instances have a new attribute ``exctract_1d``, which returns a layered
+  (1D) model, extracted from the 3D model according the provided parameters;
+  see :attr:`emg3d.models.Model.extract_1d`.
+
 - CLI takes new the boolean ``add_noise`` in the section ``[noise_opts]``
   (default is True).
 

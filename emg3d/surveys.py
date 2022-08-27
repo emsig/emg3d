@@ -66,7 +66,7 @@ class Survey:
 
     Parameters
     ----------
-    sources, receivers : {Tx*, Rx*, list, dict)
+    sources, receivers : {Tx*, Rx*, list, dict}
         Any of the available sources or receivers, e.g.,
         :class:`emg3d.electrodes.TxElectricDipole`, or a list or dict of
         Tx*/Rx* instances. If it is a dict, it is used as is, including the

@@ -812,10 +812,14 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
 
     Parameters
     ----------
-    coo : tuple of ndarray
-        Tuple of two arrays defining the points in x and y.
+    coo : tuple of two ndarrays
+        Tuple of two arrays defining the points in x and y:
+        - If two vectors are given (of same or different size), they are taken
+          as the x- and y-values of a regular grid.
+        - If two 2D-arrays are given of the same shape, they are taken as the
+          (regular or irregular) x- and y-values.
 
-    p0, p1 : ndarray
+    p0, p1 : array_like
         (x, y)-coordinates of two points.
 
     radius : float
@@ -847,10 +851,12 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
 
     """
     # Center coordinates
-    cx, cy = (p0 + p1) / 2
+    cx = (p0[0] + p1[0]) / 2
+    cy = (p0[1] + p1[1]) / 2
 
     # Adjacent and opposite sides
-    dx, dy = (p1 - p0) / 2
+    dx = (p1[0] - p0[0]) / 2
+    dy = (p1[1] - p0[1]) / 2
 
     # c: linear eccentricity
     dxy = np.linalg.norm([dx, dy])
@@ -874,4 +880,7 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
     A = (cos/major)**2 + (sin/minor)**2
     B = 2*cos*sin*(major**-2 - minor**-2)
     C = (sin/major)**2 + (cos/minor)**2
-    return A*X**2 + B*X*Y + C*Y**2 <= 1.0
+    if X.ndim == 1:
+        return A*X[:, None]**2 + B*np.outer(X, Y) + C*Y[None, :]**2 <= 1.0
+    else:
+        return A*X**2 + B*X*Y + C*Y**2 <= 1.0

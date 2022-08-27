@@ -709,7 +709,7 @@ def test_ellipse_indices():
     # Circle
     p0, p1 = np.array([0, 0]), np.array([0, 0])
     x = np.arange(5)-2
-    X, Y = np.meshgrid(x, x)
+    X, Y = np.meshgrid(x, x, indexing='ij')
     out = maps.ellipse_indices((X, Y), p0, p1, radius=2)
     res = np.array([[False, False,  True, False, False],
                     [False,  True,  True,  True, False],
@@ -720,10 +720,9 @@ def test_ellipse_indices():
     # plt.pcolormesh(out); plt.axis('equal')
 
     # Ellipse
-    p0, p1 = np.array([-1, 0]), np.array([2, 2])
+    p0, p1 = [-1, 0], (2, 2)
     x = np.arange(9)-4
-    X, Y = np.meshgrid(x, x)
-    out = maps.ellipse_indices((X, Y), p0, p1, radius=1, minor=0.5)
+    out = maps.ellipse_indices((x, x), p0, p1, radius=1, minor=0.5)
     res = np.array([
         [False, False, False, False, False, False, False, False, False],
         [False, False, False, False, False, False, False, False, False],
@@ -734,7 +733,7 @@ def test_ellipse_indices():
         [False, False, False,  True,  True,  True,  True,  True, False],
         [False, False, False, False,  True,  True,  True, False, False],
         [False, False, False, False, False, False, False, False, False]
-    ])
+    ]).T
     assert_allclose(out, res)
     # plt.pcolormesh(out); plt.axis('equal')
 
