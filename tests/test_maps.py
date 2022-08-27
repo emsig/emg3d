@@ -720,7 +720,7 @@ def test_ellipse_indices():
     # plt.pcolormesh(out); plt.axis('equal')
 
     # Ellipse
-    p0, p1 = np.array([-1, 0]), np.array([2, 2])
+    p0, p1 = [-1, 0], (2, 2)
     x = np.arange(9)-4
     X, Y = np.meshgrid(x, x)
     out = maps.ellipse_indices((X, Y), p0, p1, radius=1, minor=0.5)

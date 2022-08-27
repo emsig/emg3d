@@ -815,7 +815,7 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
     coo : tuple of ndarray
         Tuple of two arrays defining the points in x and y.
 
-    p0, p1 : ndarray
+    p0, p1 : array_like
         (x, y)-coordinates of two points.
 
     radius : float
@@ -847,10 +847,12 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
 
     """
     # Center coordinates
-    cx, cy = (p0 + p1) / 2
+    cx = (p0[0] + p1[0]) / 2
+    cy = (p0[1] + p1[1]) / 2
 
     # Adjacent and opposite sides
-    dx, dy = (p1 - p0) / 2
+    dx = (p1[0] - p0[0]) / 2
+    dy = (p1[1] - p0[1]) / 2
 
     # c: linear eccentricity
     dxy = np.linalg.norm([dx, dy])

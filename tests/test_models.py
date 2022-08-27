@@ -417,6 +417,90 @@ class TestModelOperators:
             models.Model.from_dict(mdict)
 
 
+class TestExtract1D:
+
+    grid = emg3d.TensorMesh(
+            [[1, 2, 3, 4], [3, 2, 2, 3, 4], [1, 1, 1, 1, 1]], (0, 0, 0))
+    num = np.arange(1, 21).reshape((4, 5), order='F')
+    property_x = np.zeros((4, 5, 5), order='F')
+    property_x[:, :, 0] = num+100
+    property_x[:, :, 1] = num+100
+    property_x[:, :, 2] = num
+    property_x[:, :, 3] = num+200
+    property_x[:, :, 4] = num+200
+    property_y = property_x/2.0
+    property_z = property_x*1.4
+    mu_r = property_x*1.11
+    epsilon_r = property_x*2.22
+
+    mlin = models.Model(
+        grid, property_x, property_y, property_z, mu_r, epsilon_r
+    )
+    mlog = models.Model(
+        grid, np.log10(property_x), np.log10(property_y), np.log10(property_z),
+        np.log10(mu_r), np.log10(epsilon_r), mapping='LgResistivity'
+    )
+
+    def test_errors(self):
+        # Unknown method
+        with pytest.raises(ValueError, match="Unknown method 'unknown'"):
+            self.mlin.extract_1d(method='unknown', p0=[0, 0])
+
+        # Missing ellipse
+        with pytest.raises(TypeError, match="requires the dict 'ellipse'"):
+            self.mlin.extract_1d(method='prism', p0=[0, 0])
+
+        # Ellipse but missing radius
+        with pytest.raises(TypeError, match="the parameter 'radius'"):
+            self.mlin.extract_1d(
+                method='cylinder', p0=[0, 0], ellipse={'factor': 1.2}
+            )
+
+    def test_midpoint(self):
+
+        # One point, outside
+        layered, imat = self.mlin.extract_1d(
+                'midpoint', [-3, -3], return_imat=True)
+        assert_allclose(layered.property_x[0, 0, :],
+                        [101.0, 101.0, 1.0, 201.0, 201.0])
+        assert_allclose(layered.property_y, layered.property_x/2.0)
+        assert_allclose(layered.property_z, layered.property_x*1.4)
+        assert_allclose(layered.mu_r, layered.property_x*1.11)
+        assert_allclose(layered.epsilon_r, layered.property_x*2.22)
+        assert imat[0, 0] == 1.0
+        assert imat.sum() == 1.0
+
+        # Two points, merge
+        layered = self.mlog.extract_1d('midpoint', [2, 4], [7, 8], merge=True)
+        assert_allclose(10**layered.property_x[0, 0, :], [111.0, 11.0, 211.0])
+
+    def test_averaging(self):
+
+        # Empty selection => same as midpoint
+        mpt = self.mlin.extract_1d('midpoint', [2.1, 7.1])
+        cyl = self.mlin.extract_1d(
+                'cylinder', [2.1, 7.1], ellipse={'radius': 0.001})
+        assert mpt == cyl
+
+        cylin, cmat = self.mlin.extract_1d(
+                'cylinder', [2, 4], [7, 8], ellipse={'radius': 1.5},
+                return_imat=True)
+        cylog, _ = self.mlog.extract_1d(
+                'cylinder', [2, 4], [7, 8], ellipse={'radius': 1.5},
+                return_imat=True)
+
+        vals = [110.4, 110.4, 9.4, 210.5, 210.5]
+        assert_allclose(cylin.property_x[0, 0, :], vals, atol=0.1)
+        assert_allclose(10**cylog.property_x[0, 0, :], vals, atol=0.1)
+
+        cylin, pmat = self.mlin.extract_1d(
+                'prism', [2, 4], [7, 8], ellipse={'radius': 1.5},
+                return_imat=True)
+
+        assert_allclose(pmat[:, :-1] > 0, 1)
+        assert_allclose(pmat[:, -1], 0.0)
+
+
 def test_expand_grid_model():
     grid = emg3d.TensorMesh([[4, 2, 2, 4], [2, 2, 2, 2], [1, 1]], (0, 0, 0))
     model = emg3d.Model(grid, 1, np.ones(grid.shape_cells)*2, mu_r=3,
