@@ -280,20 +280,20 @@ def parse_config_file(args_dict):
             layered_opts[key] = cfg.getboolean('layered', key)
 
         # Collect Ellipse-Options
-        ellipse_opts = {}
+        ellipse = {}
 
         for key in ['radius', 'minor', 'factor']:
             if cfg.has_option('layered', key):
                 _ = all_layered.pop(key)
-                ellipse_opts[key] = float(cfg.get('layered', key))
+                ellipse[key] = float(cfg.get('layered', key))
 
         key = 'check_foci'
         if cfg.has_option('layered', key):
             _ = all_layered.pop(key)
-            ellipse_opts[key] = cfg.getboolean('layered', key)
+            ellipse[key] = cfg.getboolean('layered', key)
 
-        if ellipse_opts:
-            layered_opts['ellipse_opts'] = ellipse_opts
+        if ellipse:
+            layered_opts['ellipse'] = ellipse
 
         # Ensure no keys are left.
         if all_layered:

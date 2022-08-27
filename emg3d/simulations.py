@@ -1474,7 +1474,7 @@ class Simulation:
             if self.layered_opts['method'] in ['prism', 'cylinder']:
                 opts = '; '.join(
                     [f"{k}: {v:.2f}" for k, v in
-                     self.layered_opts['ellipse_opts'].items()]
+                     self.layered_opts['ellipse'].items()]
                 )
                 info += "; "+opts
 
@@ -1675,15 +1675,14 @@ class Simulation:
 
         # 'cylinder' needs a radius. Try to get it from gridding_opts,
         # else switch to 'midpoint'.
-        needs_ellipse = method in ['prism', 'cylinder']
-        ellipse_opts = lopts.get('ellipse_opts', {})
+        ellipse = lopts.get('ellipse', {})
         can_estimate = self.gridding not in ['dict', 'input', 'same']
 
-        if needs_ellipse and can_estimate:
+        if method in ['prism', 'cylinder'] and can_estimate:
             lopts['method'] = lopts.get('method', 'cylinder')
 
             # Radius
-            if 'radius' not in ellipse_opts.keys():
+            if 'radius' not in ellipse.keys():
 
                 # Lowest frequency.
                 freq = min(self.survey.frequencies.values())
@@ -1695,11 +1694,11 @@ class Simulation:
                     cond = m.backward(prop[-1])
                 else:
                     cond = m.backward(prop[-2])
-                ellipse_opts['radius'] = meshes.skin_depth(freq, cond)
+                ellipse['radius'] = meshes.skin_depth(freq, cond)
 
-            ellipse_opts['factor'] = ellipse_opts.get('factor', 1.2)
-            ellipse_opts['minor'] = ellipse_opts.get('minor', 0.8)
-            lopts['ellipse_opts'] = ellipse_opts
+            ellipse['factor'] = ellipse.get('factor', 1.2)
+            ellipse['minor'] = ellipse.get('minor', 0.8)
+            lopts['ellipse'] = ellipse
 
         else:
             lopts['method'] = lopts.get('method', 'midpoint')
