@@ -876,4 +876,7 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
     A = (cos/major)**2 + (sin/minor)**2
     B = 2*cos*sin*(major**-2 - minor**-2)
     C = (sin/major)**2 + (cos/minor)**2
-    return A*X**2 + B*X*Y + C*Y**2 <= 1.0
+    if X.ndim == 1:
+        return A*X[:, None]**2 + B*np.outer(X, Y) + C*Y[None, :]**2 <= 1.0
+    else:
+        return A*X**2 + B*X*Y + C*Y**2 <= 1.0

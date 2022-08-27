@@ -452,10 +452,8 @@ class Model:
         if not midpoint:
 
             # Indices of used cells.
-            size = np.prod(self.shape[:2])
-            cell_centers = self.grid.cell_centers[:size, :2]
-            X = cell_centers[:, 0].reshape(self.shape[:2], order='F')
-            Y = cell_centers[:, 1].reshape(self.shape[:2], order='F')
+            X = self.grid.cell_centers_x
+            Y = self.grid.cell_centers_y
             use = maps.ellipse_indices((X, Y), p0, p1, **ellipse)
 
             # Start and end indices.
