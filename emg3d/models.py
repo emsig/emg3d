@@ -452,9 +452,8 @@ class Model:
         if not midpoint:
 
             # Indices of used cells.
-            X = self.grid.cell_centers_x
-            Y = self.grid.cell_centers_y
-            use = maps.ellipse_indices((X, Y), p0, p1, **ellipse)
+            coo = (self.grid.cell_centers_x, self.grid.cell_centers_y)
+            use = maps.ellipse_indices(coo=coo, p0=p0, p1=p1, **ellipse)
 
             # Start and end indices.
             ix, iy = use.nonzero()
