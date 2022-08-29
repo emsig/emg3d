@@ -864,7 +864,6 @@ class Simulation:
 
         # empymod_opts = {'verb': self.verb+1, **self._empymod_opts}
         empymod_opts = {'verb': self.verb+1}
-        frequencies = [f for f in self.survey.frequencies.values()]
 
         # TODO create a better switch.
         has_data = np.isfinite(self.data.observed.data).sum() > 0
@@ -880,7 +879,7 @@ class Simulation:
                 'model': self.model,
                 'src': self.survey.sources[source],
                 'receivers': self.survey.receivers,
-                'freqtime': frequencies,
+                'frequencies': self.survey.frequencies,
                 'empymod_opts': empymod_opts,
                 'observed': None,
                 'layered_opts': self.layered_opts,

@@ -150,46 +150,59 @@ def solve(inp):
 
 @utils._requires('empymod')
 def layered(inp):
-    """TODO :: Work in progress for emg3d(empymod)
+    """Returns response or gradient using layered models; for a `process_map`.
 
-    All below is old
+    Used within a Simulation to call the empymod in parallel for layered
+    models. Depending on the input it returns either the forward responses or
+    the finite-difference gradient.
 
-    Thin wrapper of `solve` or `solve_source` for a `process_map`.
-
-    Used within a Simulation to call the solver in parallel. This function
-    always returns the ``efield`` and the ``info_dict``, independent of the
-    provided solver options.
-
+    The parameters section describes the content of the input dict.
 
     Parameters
     ----------
-    inp : dict, str
-        If dict, two formats are recognized:
-        - Has keys [model, sfield, efield, solver_opts]:
-          Forwarded to `solve`.
-        - Has keys [model, grid, source, frequency, efield, solver_opts]
-          Forwarded to `solve_source`.
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance.
 
-        Consult the corresponding function for details on the input parameters.
+    src : Tx*
+        Any of the available sources, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`.
 
-        Alternatively the path to the h5-file can be provided as a string
-        (file-based computation).
+    receivers : dict of Rx*
+        Receiver dict (:attr:`emg3d.surveys.Survey.receivers`).
 
-        The ``model`` is interpolated to the grid of the source field (tuple of
-        length 4) or to the provided grid (tuple of length 6). Hence, the model
-        can be on a different grid (for source and frequency dependent
-        gridding).
+    frequencies : dict
+        Frequency dict (:attr:`emg3d.surveys.Survey.frequencies`).
+
+    empymod_opts : dict
+        Options passed to empymod ({src;rec}pts, {h;f}t, {h;f}targ, xdirect,
+        loop).
+
+    observed : DataArray
+        Observed data of this source.
+
+    layered_opts' : dict
+        Options passed to :attr:`emg3d.models.Model.extract_1d`.
+
+    gradient : bool
+        If False, the electromagnetic responses are returned; if True, the
+        gradient is returned.
+
+    weights : DataArray, optional
+        Data weights corresponding to the data; only required if
+        ``gradient=True``.
+
+    residual : DataArray
+        Residual using the current model; only required if ``gradient=True``.
 
 
     Returns
     -------
-    efield : Field
-        Resulting electric field, as returned from :func:`emg3d.solver.solve`
-        or :func:`emg3d.solver.solve_source`.
+    out : ndarray
+        If ``gradient=False``, the output are the electromagnetic responses
+        (synthetic data) of shape (nrec, nfreq).
 
-    info_dict : dict
-        Resulting info dictionary, as returned from :func:`emg3d.solver.solve`
-        or :func:`emg3d.solver.solve_source`.
+        If ``gradient=True``, the output is the finite-difference gradient of
+        shape (3, nx, ny, nz).
 
     """
 
@@ -197,7 +210,7 @@ def layered(inp):
     model = inp['model']
     src = inp['src']
     receivers = inp['receivers']
-    freqtime = inp['freqtime']
+    frequencies = [f for f in inp['frequencies'].values()]
     empymod_opts = inp['empymod_opts']
     observed = inp['observed']
     lopts = dc(inp['layered_opts'])
@@ -241,17 +254,17 @@ def layered(inp):
 
     else:
         # Responses.
-        out = np.full((len(receivers), len(freqtime)), np.nan+1j*np.nan)
+        out = np.full((len(receivers), len(frequencies)), np.nan+1j*np.nan)
 
     # Loop over receivers.
     for i, (rkey, rec) in enumerate(receivers.items()):
 
         # Check observed data, limit to finite values if provided.
         if observed is not None:
-            fi = np.isfinite(observed[i, :].data)
+            fi = np.isfinite(observed.loc[rkey, :].data)
             if fi.sum() == 0:
                 continue
-            freqs = np.array(freqtime)[fi]
+            freqs = np.array(frequencies)[fi]
 
         # Skip gradient if no observed data.
         elif observed is None and gradient:
@@ -259,11 +272,11 @@ def layered(inp):
 
         # Generating obs data for all.
         else:
-            fi = np.ones(len(freqtime), dtype=bool)
-            freqs = freqtime
+            fi = np.ones(len(frequencies), dtype=bool)
+            freqs = frequencies
 
         # Get 1D model.
-        # Note: if 'method='source', this would be faster outside the loop.
+        # Note: if method='source', this would be faster outside the loop.
         oned, imat = model.extract_1d(**_get_points(method, src, rec), **lopts)
 
         # Collect input.
@@ -310,19 +323,61 @@ def layered(inp):
 
 @utils._requires('empymod')
 def _empymod_fwd(cond_h, cond_v, empymod_inp):
-    # Compute empymod and place in output array.
+    """Thin wrapper for empymod.bipole().
+
+    Parameters
+    ----------
+    cond_h, cond_v : ndarray
+        Horizontal and vertical conductivities (S/m). ``cond_v`` can be None,
+        in which case an isotropic medium is assumed.
+
+    empymod_inp : dict
+        Passed through to :func:`empymod.model.bipole`. Any parameter except
+        for ``res`` and ``aniso``.
+
+
+    Returns
+    -------
+    resp : EMArray
+        Electromagnetic field as returned from :func:`empymod.model.bipole`.
+
+
+    """
     from empymod import bipole
     aniso = None if cond_v is None else np.sqrt(cond_h/cond_v)
     return bipole(res=1/cond_h, aniso=aniso, **empymod_inp)
 
 
 def _get_points(method, src, rec):
+    """Returns correct method and points for model.extract_1d.
+
+    Parameters
+    ----------
+    method : str
+        All methods accepted by :attr:`emg3d.models.Model.extract_1d` plus
+        ``'source'``, ``'receiver'``.
+
+    src, rec : {Tx*, Rx*)
+        Any of the available sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`.
+
+    Returns
+    -------
+    out : dict
+        Can be passed directly to :attr:`emg3d.models.Model.extract_1d` for the
+        parameters ``method``, ``p0``, and ``p1``.
+
+    """
+
+    # Get default points.
     p0 = src.center[:2]
     p1 = rec.center[:2]
 
+    # If source or receiver, we re-set one point and rename the method
     if method == 'source':
         p1 = p0
         method = 'midpoint'
+
     elif method == 'receiver':
         p0 = p1
         method = 'midpoint'
@@ -331,7 +386,43 @@ def _get_points(method, src, rec):
 
 
 def _fd_gradient(gradient, cond_h, cond_v, data, weight, misfit, empymod_inp,
-                 imat, vertical=False):
+                 imat, vertical):
+    """Computes the finite-difference gradient using empymod.
+
+    The result is added to ``gradient`` using the ``imat`` interpolation
+    matrix: ``[0, ...]`` if ``vertical=False``, else ``[2, ...]`` otherwise.
+
+    Parameters
+    ----------
+    gradient : ndarray of shape (3, nx, ny, nz)
+        Array to which to add this gradient.
+
+    cond_h, cond_v : ndarray
+        Horizontal and vertical conductivities (S/m). ``cond_v`` can be None,
+        in which case an isotropic medium is assumed.
+
+    data : ndarray
+        Observed data.
+
+    weight : ndarray
+        Weights corresponding to these data.
+
+    misfit : float
+        Misfit using the current model.
+
+    empymod_inp : dict
+        Passed through to :func:`empymod.model.bipole`. Any parameter except
+        for ``res`` and ``aniso``.
+
+    imat : ndarray
+        Interpolation matrix as returned by
+        :attr:`emg3d.models.Model.extract_1d`.
+
+    vertical : bool
+        If True, the gradient for the vertical conductivities is assumed,
+        otherwise the gradient for the horizontal conductivities.
+
+    """
 
     # Loop over layers and compute FD gradient for each.
     for iz in range(cond_h.size):
@@ -353,5 +444,6 @@ def _fd_gradient(gradient, cond_h, cond_v, data, weight, misfit, empymod_inp,
         residual = response - data
         fd_misfit = np.sum(weight*(residual.conj()*residual)).real/2
         grad = (fd_misfit - misfit)/delta
-        # TODO Check the einsum!
-        gradient[..., iz] += np.einsum('ji,->ij', imat.T, grad)
+
+        # Bring back to full grid.
+        gradient[..., iz] += np.einsum('ij,->ij', imat, grad)
