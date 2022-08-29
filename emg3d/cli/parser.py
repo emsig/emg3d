@@ -302,6 +302,10 @@ def parse_config_file(args_dict):
                 f"{list(all_layered.keys())}."
             )
 
+        # Add to simulation dict if not empty.
+        if layered_opts:
+            simulation['layered_opts'] = layered_opts
+
     # # Solver parameters  # #
 
     # Check if parameter-file has a solver-section, add it otherwise.
@@ -444,8 +448,6 @@ def parse_config_file(args_dict):
         # Add to simulation dict if not empty.
         if grid:
             simulation['gridding_opts'] = grid
-        if layered_opts:
-            simulation['layered_opts'] = layered_opts
 
     # Return.
     out = {'files': files, 'simulation_options': simulation, 'data': data,

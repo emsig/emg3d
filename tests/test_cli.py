@@ -179,6 +179,7 @@ class TestParser:
         args_dict['nproc'] = -1
         args_dict['verbosity'] = 20
         args_dict['dry_run'] = True
+        args_dict['layered'] = True
         args_dict['clean'] = True
         args_dict['gradient'] = True
         args_dict['path'] = tmpdir
@@ -191,6 +192,7 @@ class TestParser:
         assert term['clean'] is True
         assert term['function'] == 'gradient'
         assert cfg['simulation_options']['max_workers'] == 1
+        assert cfg['simulation_options']['layered'] is True
         assert cfg['files']['survey'] == join(tmpdir, 'testit.h5')
         assert cfg['files']['model'] == join(tmpdir, 'model.json')
         assert cfg['files']['output'] == join(tmpdir, 'output.npz')
@@ -312,6 +314,41 @@ class TestParser:
         cfg, term = cli.parser.parse_config_file(args_dict)
         sim_opts = cfg['simulation_options']
         assert sim_opts['receiver_interpolation'] == 'cubic'
+
+    def test_layered(self, tmpdir):
+
+        # Write a config file.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[simulation]\n")
+            f.write("layered=True\n")
+            f.write("[layered]\n")
+            f.write("method=prism\n")
+            f.write("radius=3000\n")
+            f.write("factor=1.2\n")
+            f.write("minor=0.8\n")
+            f.write("check_foci=True\n")
+            f.write("merge=False")
+
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = config
+        args_dict['layered'] = None
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        sim_opts = cfg['simulation_options']
+        lay_opts = sim_opts['layered_opts']
+        assert sim_opts['layered'] is True
+        assert lay_opts['ellipse']['radius'] == 3000.0
+        assert lay_opts['ellipse']['factor'] == 1.2
+        assert lay_opts['ellipse']['minor'] == 0.8
+        assert lay_opts['ellipse']['check_foci'] is True
+        assert lay_opts['merge'] is False
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            with open(config, 'a') as f:
+                f.write("\nanother=True")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            _ = cli.parser.parse_config_file(args_dict)
 
     def test_noise(self, tmpdir):
 

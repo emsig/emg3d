@@ -149,8 +149,8 @@ def main(args=None):
     parser.add_argument(
         "-l", "--layered",
         action="store_true",
-        default=False,
-        help="use a layered model and empymod for each src-rec pair"
+        default=None,
+        help="use a layered model with empymod for each src-rec pair"
     )
 
     # arg: Run without emg3d-computation.
