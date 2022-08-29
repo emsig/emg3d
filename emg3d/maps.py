@@ -750,7 +750,7 @@ def _discretize_volume_average(grid_in, grid_out):
 
     Returns
     -------
-    pmat : scipy.sparse.csr_matrix
+    imat : scipy.sparse.csr_matrix
         Interpolation matrix of shape (grid_out.n_cells, grid_in.n_cells).
 
     """

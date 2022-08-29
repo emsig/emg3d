@@ -874,6 +874,7 @@ class Simulation:
             """Collect inputs."""
 
             # TODO provide survey always? Time it!
+            # TODO case _must_ be 'isotropic' or 'VTI'
 
             data = {
                 'model': self.model,
@@ -895,7 +896,7 @@ class Simulation:
 
         # Compute fields in parallel.
         out = _mp.process_map(
-            _mp.empymod,
+            _mp.layered,
             list(map(collect_empymod_inputs, self.survey.sources.keys())),
             max_workers=self.max_workers,
             **{'desc': 'Compute empymod', **self._tqdm_opts},
@@ -1678,29 +1679,45 @@ class Simulation:
         ellipse = lopts.get('ellipse', {})
         can_estimate = self.gridding not in ['dict', 'input', 'same']
 
-        if method in ['prism', 'cylinder'] and can_estimate:
-            lopts['method'] = lopts.get('method', 'cylinder')
+        if method in ['prism', 'cylinder']:
+            if can_estimate:
 
-            # Radius
-            if 'radius' not in ellipse.keys():
+                # Radius
+                if 'radius' not in ellipse.keys():
 
-                # Lowest frequency.
-                freq = min(self.survey.frequencies.values())
+                    # Lowest frequency.
+                    freq = min(self.survey.frequencies.values())
 
-                # Take the negative z property
-                prop = np.atleast_1d(self.gridding_opts['properties'])
-                m = getattr(maps, 'Map'+self.gridding_opts['mapping'])()
-                if prop.size < 3:
-                    cond = m.backward(prop[-1])
-                else:
-                    cond = m.backward(prop[-2])
-                ellipse['radius'] = meshes.skin_depth(freq, cond)
+                    # Take the negative z property
+                    prop = np.atleast_1d(self.gridding_opts['properties'])
+                    m = getattr(maps, 'Map'+self.gridding_opts['mapping'])()
+                    if prop.size < 3:
+                        cond = m.backward(prop[-1])
+                    else:
+                        cond = m.backward(prop[-2])
+                    ellipse['radius'] = meshes.skin_depth(freq, cond)
 
-            ellipse['factor'] = ellipse.get('factor', 1.2)
-            ellipse['minor'] = ellipse.get('minor', 0.8)
-            lopts['ellipse'] = ellipse
+                ellipse['factor'] = ellipse.get('factor', 1.2)
+                ellipse['minor'] = ellipse.get('minor', 0.8)
+                lopts['ellipse'] = ellipse
+
+            if not ellipse.get('radius', None):
+                lopts['method'] = 'midpoint'
+            else:
+                lopts['method'] = method
 
         else:
-            lopts['method'] = lopts.get('method', 'midpoint')
+            lopts['method'] = method
 
         self._layered_opts = lopts
+
+        # Ensure we can handle the source and receivers.
+        srlist = list(self.survey.sources.values())
+        srlist = srlist + list(self.survey.receivers.values())
+        for sr in srlist:
+            name = sr.__class__.__name__
+            if 'Point' not in name and 'Dipole' not in name:
+                raise ValueError(
+                    "Layered: Only Points and Dipoles supported, "
+                    f"provided: {sr}!"
+                )

@@ -16,6 +16,7 @@ Helper routines to call functions with multiprocessing/concurrent.futures.
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+from copy import deepcopy as dc
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -148,7 +149,7 @@ def solve(inp):
 
 
 @utils._requires('empymod')
-def empymod(inp):
+def layered(inp):
     """TODO :: Work in progress for emg3d(empymod)
 
     All below is old
@@ -191,52 +192,32 @@ def empymod(inp):
         or :func:`emg3d.solver.solve_source`.
 
     """
-    from empymod import bipole
 
     # Extract input.
+    model = inp['model']
     src = inp['src']
     receivers = inp['receivers']
     freqtime = inp['freqtime']
-    model = inp['model']
     empymod_opts = inp['empymod_opts']
     observed = inp['observed']
-    lopts = inp['layered_opts']
-    method = lopts.pop('method', 'midpoint')
+    lopts = dc(inp['layered_opts'])
+    gradient = inp['gradient']
+
+    # Get method and set to return_imat.
+    method = lopts.pop('method')
     lopts['return_imat'] = True
 
-    gradient = inp.get('gradient', False)
-    if gradient:
-        weights = inp['weights']
-        residual = inp['residual']
-
-    # Ensure we can handle the source and receivers.
-    fail = False
-
-    point = 'Point' in src.__class__.__name__
-    dipole = 'Dipole' in src.__class__.__name__
-    if not (point or dipole):
-        fail = True
-
-    for r in receivers.values():
-        point = 'Point' in r.__class__.__name__
-        dipole = 'Dipole' in r.__class__.__name__
-        if not (point or dipole):
-            fail = True
-            break
-
-    # TODO improve!
-    if fail:
-        raise ValueError("Layered: Only Points and Dipoles supported!")
-
-    # rec-independent empymod options
+    # Collect rec-independent empymod options.
     empymod_opts = {
         # User input ({src;rec}pts, {h;f}t, {h;f}targ, xdirect, loop).
         # Contains also verb from simulation class.
         **empymod_opts,
+        #
         # Source properties, same for all receivers.
         'src': src.coordinates,
         'msrc': src.xtype != 'electric',
         'strength': src.strength,
+        #
         # Enforced properties (not implemented).
         'signal': None,
         'epermV': None,
@@ -244,134 +225,133 @@ def empymod(inp):
         'squeeze': True,
     }
 
-    # If method='source', we get the layered model only once.
-    if method == 'source':
-        p0 = src.center[:2]
-        lopts['method'] = 'midpoint'
-        # NOTE: IF 'source', and IF all rec_z equal, it would be faster
-        # computing it here for all receivers at once.
-        oned, imat = model.extract_1d(p0=p0, **lopts)
-    elif method == 'receiver':
-        lopts['method'] = 'midpoint'
-    else:
-        p0 = src.center[:2]
-        lopts['method'] = method
+    # Create some flags.
+    epsilon_r = model.epsilon_r is not None
+    mu_r = model.mu_r is not None
+    vti = model.case == 'VTI'
 
     # Pre-allocate output array.
     if gradient:
+        # Gradient.
         out = np.zeros((3, *model.shape))
+
+        # Get weights and residual if the gradient is wanted.
+        weights = inp['weights']
+        residual = inp['residual']
+
     else:
+        # Responses.
         out = np.full((len(receivers), len(freqtime)), np.nan+1j*np.nan)
 
     # Loop over receivers.
     for i, (rkey, rec) in enumerate(receivers.items()):
 
-        # Skip src-rec-freq pairs without data.
+        # Check observed data, limit to finite values if provided.
         if observed is not None:
             fi = np.isfinite(observed[i, :].data)
             if fi.sum() == 0:
                 continue
             freqs = np.array(freqtime)[fi]
+
+        # Skip gradient if no observed data.
         elif observed is None and gradient:
             continue
+
+        # Generating obs data for all.
         else:
             fi = np.ones(len(freqtime), dtype=bool)
             freqs = freqtime
 
-        if method != 'source':
-            if method == 'receiver':
-                p0 = rec.center[:2]
-                p1 = None
-            else:
-                p1 = rec.center[:2]
-
-            oned, imat = model.extract_1d(p0=p0, p1=p1, **lopts)
-
-        def none_squeeze(inp):
-            return None if inp is None else inp[0, 0, :]
-
-        def none_bwd_squeeze(inp):
-            if inp is None:
-                return None
-            else:
-                return oned.map.backward(inp[0, 0, :])
-
-        def none_aniso(cond_h, cond_v):
-            if cond_v is None:
-                return None
-            else:
-                return np.sqrt(cond_h/cond_v)
+        # Get 1D model.
+        # Note: if 'method='source', this would be faster outside the loop.
+        oned, imat = model.extract_1d(**_get_points(method, src, rec), **lopts)
 
         # Collect input.
         empymod_inp = {
             **empymod_opts,
             'rec': rec.coordinates,
+            'mrec': rec.xtype != 'electric',
             'depth': oned.grid.nodes_z[1:-1],
             'freqtime': freqs,
-            'mrec': rec.xtype != 'electric',
-            'epermH': none_squeeze(oned.epsilon_r),
-            'mpermH': none_squeeze(oned.mu_r),
+            'epermH': None if not epsilon_r else oned.epsilon_r[0, 0, :],
+            'mpermH': None if not mu_r else oned.mu_r[0, 0, :],
         }
 
-        cond_h = none_bwd_squeeze(oned.property_x)
-        cond_v = none_bwd_squeeze(oned.property_z)
+        # Get horizontal and vertical conductivities.
+        map2cond = oned.map.backward
+        cond_h = map2cond(oned.property_x[0, 0, :])
+        cond_v = None if not vti else map2cond(oned.property_z[0, 0, :])
 
-        # TODO simplify, factor out this whole fd-grad shabang.
+        # Compute gradient.
         if gradient:
 
             # Get misfit of this src-rec pair.
-            obs = observed.loc[rkey, :].data[fi]
-            rwgt = weights.loc[rkey, :].data[fi]
-            rres = residual.loc[rkey, :].data[fi]
-            rmis = np.sum(rwgt*(rres.conj()*rres)).real/2
+            data = observed.loc[rkey, :].data[fi]
+            weight = weights.loc[rkey, :].data[fi]
+            residual = residual.loc[rkey, :].data[fi]
+            misfit = np.sum(weight*(residual.conj()*residual)).real/2
 
-            for iz in range(model.shape[2]):
+            # Get horizontal gradient.
+            _fd_gradient(out[0, ...], cond_h, cond_v, data, weight, misfit,
+                         empymod_inp, imat, vertical=False)
 
-                # Get 1D model.
-                lcond = cond_h.copy()
+            # Get vertical gradient if VTI.
+            if vti:
 
-                # Add a relative error of 0.1 % to the layer.
-                delta = lcond[iz] * 0.0001
-                lcond[iz] += delta
+                _fd_gradient(out[2, ...], cond_h, cond_v, data, weight, misfit,
+                             empymod_inp, imat, vertical=True)
 
-                # Compute empymod and place in output array.
-                aniso = none_aniso(lcond, cond_v)
-                resp = bipole(res=1/lcond, aniso=aniso, **empymod_inp)
-
-                # Get misfit
-                lres = resp - obs
-                lmis = np.sum(rwgt*(lres.conj()*lres)).real/2
-
-                # Return gradient
-                grad = (lmis - rmis)/delta
-                out[0, :, :, iz] += np.einsum('ji,->ij', imat.T,  grad)
-
-            if oned.property_z is not None:
-
-                for iz in range(model.shape[2]):
-
-                    # Get 1D model.
-                    lcond = cond_v.copy()
-
-                    # Add a relative error of 0.1 % to the layer.
-                    delta = lcond[iz] * 0.0001
-                    lcond[iz] += delta
-
-                    # Compute empymod and place in output array.
-                    aniso = none_aniso(cond_h, lcond)
-                    resp = bipole(res=1/cond_h, aniso=aniso, **empymod_inp)
-
-                    # Get misfit
-                    lres = resp - obs
-                    lmis = np.sum(rwgt*(lres.conj()*lres)).real/2
-
-                    # Return gradient
-                    grad = (lmis - rmis)/delta
-                    out[2, :, :, iz] += np.einsum('ji,->ij', imat.T,  grad)
-
+        # Compute response.
         else:
-            # Compute empymod and place in output array.
-            aniso = none_aniso(cond_h, cond_v)
-            out[i, fi] = bipole(res=1/cond_h, aniso=aniso, **empymod_inp)
+            out[i, fi] = _empymod_fwd(cond_h, cond_v, empymod_inp)
 
     return out
+
+
+@utils._requires('empymod')
+def _empymod_fwd(cond_h, cond_v, empymod_inp):
+    # Compute empymod and place in output array.
+    from empymod import bipole
+    aniso = None if cond_v is None else np.sqrt(cond_h/cond_v)
+    return bipole(res=1/cond_h, aniso=aniso, **empymod_inp)
+
+
+def _get_points(method, src, rec):
+    p0 = src.center[:2]
+    p1 = rec.center[:2]
+
+    if method == 'source':
+        p1 = p0
+        method = 'midpoint'
+    elif method == 'receiver':
+        p0 = p1
+        method = 'midpoint'
+
+    return {'method': method, 'p0': p0, 'p1': p1}
+
+
+def _fd_gradient(gradient, cond_h, cond_v, data, weight, misfit, empymod_inp,
+                 imat, vertical=False):
+
+    # Loop over layers and compute FD gradient for each.
+    for iz in range(cond_h.size):
+
+        # Get 1D model.
+        cond_p = cond_v.copy() if vertical else cond_h.copy()
+
+        # Add a relative error of 0.1 % to the layer.
+        delta = cond_p[iz] * 0.0001
+        cond_p[iz] += delta
+
+        # Call empymod.
+        if vertical:
+            response = _empymod_fwd(cond_h, cond_p, empymod_inp)
+        else:
+            response = _empymod_fwd(cond_p, cond_v, empymod_inp)
+
+        # Calculate gradient and add it.
+        residual = response - data
+        fd_misfit = np.sum(weight*(residual.conj()*residual)).real/2
+        grad = (fd_misfit - misfit)/delta
+        # TODO Check the einsum!
+        gradient[..., iz] += np.einsum('ji,->ij', imat.T, grad)
