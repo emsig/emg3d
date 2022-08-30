@@ -1677,10 +1677,12 @@ class Simulation:
 
     @property
     def layered(self):
+        """If True, use layered computations (empymod)."""
         return self._layered
 
     @layered.setter
     def layered(self, layered):
+        """Update layered."""
         self._layered = layered
         if layered:
             self._layered_opts = models._estimate_layered_opts(
@@ -1689,8 +1691,10 @@ class Simulation:
 
     @property
     def layered_opts(self):
+        """Layered options for 1D computations."""
         return self._layered_opts
 
     @property
     def gridding_opts(self):
+        """Gridding options for automatic gridding."""
         return self._gridding_opts

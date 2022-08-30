@@ -8,6 +8,13 @@ from emg3d import models
 from . import helpers
 
 
+# Soft dependencies
+try:
+    import xarray
+except ImportError:
+    xarray = None
+
+
 class TestModel:
 
     def test_regression(self, capsys):
@@ -537,6 +544,7 @@ def test_expand_grid_model():
     assert_allclose(o_model.epsilon_r[:, :, -1], 1)
 
 
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_estimate_layered_opts():
 
     # Regular survey.

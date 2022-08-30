@@ -19,6 +19,9 @@ latest
 - Maps: New function ``ellipse_indices`` returning a boolean indicating which
   points fall within a general ellipse for the provided input parameters.
 
+- Simulation:
+  - `gridding_opts` is new a property.
+
 - Bug fixes, small improvements and maintenance
 
   - Simulation.misfit returns an ndarray again instead of an DataArray (was
