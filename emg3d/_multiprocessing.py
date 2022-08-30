@@ -16,7 +16,7 @@ Helper routines to call functions with multiprocessing/concurrent.futures.
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-from copy import deepcopy as dc
+from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -215,7 +215,7 @@ def layered(inp):
     frequencies = np.array([f for f in inp['frequencies'].values()])
     empymod_opts = inp['empymod_opts']
     observed = inp['observed']
-    lopts = dc(inp['layered_opts'])
+    lopts = deepcopy(inp['layered_opts'])
     gradient = inp['gradient']
 
     # Get method and set to return_imat.

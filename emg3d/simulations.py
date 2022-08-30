@@ -202,6 +202,13 @@ class Simulation:
         TODO :: add to {to;from}_dict
         Options passed to Model.extract_1d(), except source and
         receiver.
+        - method:
+          - 'cylinder' if 'radius' given or can be estimated.
+          - 'midpoint' otherwise.
+        - radius: one skin depth using the lowest frequency of the survey and
+          the downwards property form the gridding options.
+        - factor: 1.2.
+        - minor: 0.8.
         TODO expand!
 
     """
@@ -843,6 +850,26 @@ class Simulation:
 
         """
         from emg3d import _multiprocessing as _mp
+
+        # Ensure we can handle the sources and receivers.
+        srlist = list(self.survey.sources.values())
+        srlist = srlist + list(self.survey.receivers.values())
+        for sr in srlist:
+            name = sr.__class__.__name__
+            if 'Point' not in name and 'Dipole' not in name:
+                raise ValueError(
+                    "Layered: Only Points and Dipoles supported, "
+                    f"provided: {sr}!"
+                )
+        # Test to implement
+        # # Survey with unsupported electrodes.
+        # survey = emg3d.Survey(
+        #     sources=emg3d.TxElectricWire([[0, 0, 0], [2, 2, 2]]),
+        #     receivers=emg3d.RxElectricPoint((1000, 500, 100, 0, 0)),
+        #     frequencies=1.0,
+        # )
+        # with pytest.raises(ValueError, match='Layered: Only Points and D'):
+        #     emg3d.models._estimate_layered_opts({}, survey, None)
 
         # TODO
         # - Proper description
@@ -1656,7 +1683,9 @@ class Simulation:
     def layered(self, layered):
         self._layered = layered
         if layered:
-            self._set_layered()
+            self._layered_opts = models._estimate_layered_opts(
+                self._layered_opts, self.survey, self.gridding_opts
+            )
 
     @property
     def layered_opts(self):
@@ -1665,58 +1694,3 @@ class Simulation:
     @property
     def gridding_opts(self):
         return self._gridding_opts
-
-    def _set_layered(self):
-
-        lopts = self._layered_opts
-
-        # Default method: cylinder
-        method = lopts.get('method', 'cylinder')
-
-        # 'cylinder' needs a radius. Try to get it from gridding_opts,
-        # else switch to 'midpoint'.
-        ellipse = lopts.get('ellipse', {})
-        can_estimate = self.gridding not in ['dict', 'input', 'same']
-
-        if method in ['prism', 'cylinder']:
-            if can_estimate:
-
-                # Radius
-                if 'radius' not in ellipse.keys():
-
-                    # Lowest frequency.
-                    freq = min(self.survey.frequencies.values())
-
-                    # Take the negative z property
-                    prop = np.atleast_1d(self.gridding_opts['properties'])
-                    m = getattr(maps, 'Map'+self.gridding_opts['mapping'])()
-                    if prop.size < 3:
-                        cond = m.backward(prop[-1])
-                    else:
-                        cond = m.backward(prop[-2])
-                    ellipse['radius'] = meshes.skin_depth(freq, cond)
-
-                ellipse['factor'] = ellipse.get('factor', 1.2)
-                ellipse['minor'] = ellipse.get('minor', 0.8)
-                lopts['ellipse'] = ellipse
-
-            if not ellipse.get('radius', None):
-                lopts['method'] = 'midpoint'
-            else:
-                lopts['method'] = method
-
-        else:
-            lopts['method'] = method
-
-        self._layered_opts = lopts
-
-        # Ensure we can handle the source and receivers.
-        srlist = list(self.survey.sources.values())
-        srlist = srlist + list(self.survey.receivers.values())
-        for sr in srlist:
-            name = sr.__class__.__name__
-            if 'Point' not in name and 'Dipole' not in name:
-                raise ValueError(
-                    "Layered: Only Points and Dipoles supported, "
-                    f"provided: {sr}!"
-                )

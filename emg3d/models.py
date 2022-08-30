@@ -799,3 +799,71 @@ def expand_grid_model(model, expand, interface):
                       epsilon_r, mapping=model.map.name)
 
     return model
+
+
+def _estimate_layered_opts(layered_opts, survey, gridding_opts):
+    """Sets default options for layered modelling; no checks.
+
+    Parameters
+    ----------
+    layered_opts : dict
+        Options provided.
+
+    survey : Survey
+        The survey; a :class:`emg3d.surveys.Survey` instance.
+
+    gridding_opts : {dict, None}
+        The gridding options from a :class:`emg3d.simulations.Simulation`
+        instance.
+
+    Returns
+    -------
+    layered_opts : dict
+        Potentially adjusted options.
+
+    """
+
+    # Ensure method is defined; default: cylinder
+    layered_opts['method'] = layered_opts.get('method', 'cylinder')
+
+    # For cylinder/prism, ensure there is ellipse['radius'].
+    if layered_opts['method'] in ['prism', 'cylinder']:
+
+        # Initiate or get ellipse dict.
+        ellipse = layered_opts.get('ellipse', {})
+
+        # Try to estimate radius if not given.
+        if not ellipse.get('radius'):
+
+            # Check if we can estimate the radius.
+            try:
+                prop = gridding_opts['properties']
+                prop = np.atleast_1d(prop)
+                m = getattr(maps, 'Map'+gridding_opts['mapping'])()
+                can_estimate = True
+            except (KeyError, TypeError):
+                can_estimate = False
+
+            if can_estimate:
+
+                # Lowest frequency.
+                freq = min(survey.frequencies.values())
+
+                # Take the negative z property
+                ind = -1 if prop.size < 3 else -2
+                cond = m.backward(prop[ind])
+
+                # Set the radius to one skin depth.
+                ellipse['radius'] = meshes.skin_depth(freq, cond)
+
+        # Change method if radius not given.
+        if not ellipse.get('radius'):
+            layered_opts['method'] = 'midpoint'
+
+        # Else, set factor/minor and store back.
+        else:
+            ellipse['factor'] = ellipse.get('factor', 1.2)
+            ellipse['minor'] = ellipse.get('minor', 0.8)
+            layered_opts['ellipse'] = ellipse
+
+    return layered_opts
