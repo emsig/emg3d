@@ -210,7 +210,7 @@ def layered(inp):
     model = inp['model']
     src = inp['src']
     receivers = inp['receivers']
-    frequencies = [f for f in inp['frequencies'].values()]
+    frequencies = np.array([f for f in inp['frequencies'].values()])
     empymod_opts = inp['empymod_opts']
     observed = inp['observed']
     lopts = dc(inp['layered_opts'])
@@ -254,7 +254,7 @@ def layered(inp):
 
     else:
         # Responses.
-        out = np.full((len(receivers), len(frequencies)), np.nan+1j*np.nan)
+        out = np.full((len(receivers), frequencies.size), np.nan+1j*np.nan)
 
     # Loop over receivers.
     for i, (rkey, rec) in enumerate(receivers.items()):
@@ -264,7 +264,7 @@ def layered(inp):
             fi = np.isfinite(observed.loc[rkey, :].data)
             if fi.sum() == 0:
                 continue
-            freqs = np.array(frequencies)[fi]
+            freqs = frequencies[fi]
 
         # Skip gradient if no observed data.
         elif observed is None and gradient:
@@ -272,7 +272,7 @@ def layered(inp):
 
         # Generating obs data for all.
         else:
-            fi = np.ones(len(frequencies), dtype=bool)
+            fi = np.ones(frequencies.size, dtype=bool)
             freqs = frequencies
 
         # Get 1D model.
@@ -299,20 +299,20 @@ def layered(inp):
         if gradient:
 
             # Get misfit of this src-rec pair.
-            data = observed.loc[rkey, :].data[fi]
-            weight = weights.loc[rkey, :].data[fi]
-            residual = residual.loc[rkey, :].data[fi]
-            misfit = np.sum(weight*(residual.conj()*residual)).real/2
+            obs = observed.loc[rkey, :].data[fi]
+            wgt = weights.loc[rkey, :].data[fi]
+            res = residual.loc[rkey, :].data[fi]
+            misfit = np.sum(wgt*(res.conj()*res)).real/2
 
             # Get horizontal gradient.
-            _fd_gradient(out[0, ...], cond_h, cond_v, data, weight, misfit,
-                         empymod_inp, imat, vertical=False)
+            out[0, ...] += _fd_gradient(cond_h, cond_v, obs, wgt, misfit,
+                                        empymod_inp, imat, vertical=False)
 
             # Get vertical gradient if VTI.
             if vti:
 
-                _fd_gradient(out[2, ...], cond_h, cond_v, data, weight, misfit,
-                             empymod_inp, imat, vertical=True)
+                out[2, ...] += _fd_gradient(cond_h, cond_v, obs, wgt, misfit,
+                                            empymod_inp, imat, vertical=True)
 
         # Compute response.
         else:
@@ -385,12 +385,15 @@ def _get_points(method, src, rec):
     return {'method': method, 'p0': p0, 'p1': p1}
 
 
-def _fd_gradient(gradient, cond_h, cond_v, data, weight, misfit, empymod_inp,
-                 imat, vertical):
+def _fd_gradient(cond_h, cond_v, data, weight, misfit, empymod_inp, imat,
+                 vertical):
     """Computes the finite-difference gradient using empymod.
 
     The result is added to ``gradient`` using the ``imat`` interpolation
     matrix: ``[0, ...]`` if ``vertical=False``, else ``[2, ...]`` otherwise.
+
+    Theh finite difference is obtained by adding a relative difference of
+    0.01 % to the layer (currently hard-coded).
 
     Parameters
     ----------
@@ -421,16 +424,19 @@ def _fd_gradient(gradient, cond_h, cond_v, data, weight, misfit, empymod_inp,
     vertical : bool
         If True, the gradient for the vertical conductivities is assumed,
         otherwise the gradient for the horizontal conductivities.
+        If ``vertical=True``, ``cond_v`` cannot be None (not checked, will fail
+        with an AttributeError).
 
     """
 
     # Loop over layers and compute FD gradient for each.
+    grad = np.zeros(cond_h.size)
     for iz in range(cond_h.size):
 
         # Get 1D model.
         cond_p = cond_v.copy() if vertical else cond_h.copy()
 
-        # Add a relative error of 0.1 % to the layer.
+        # Add a relative difference of 0.01 % to the layer.
         delta = cond_p[iz] * 0.0001
         cond_p[iz] += delta
 
@@ -443,7 +449,7 @@ def _fd_gradient(gradient, cond_h, cond_v, data, weight, misfit, empymod_inp,
         # Calculate gradient and add it.
         residual = response - data
         fd_misfit = np.sum(weight*(residual.conj()*residual)).real/2
-        grad = (fd_misfit - misfit)/delta
+        grad[iz] = (fd_misfit - misfit)/delta
 
-        # Bring back to full grid.
-        gradient[..., iz] += np.einsum('ij,->ij', imat, grad)
+    # Bring back to full grid and return.
+    return imat[..., None] * grad[None, :]

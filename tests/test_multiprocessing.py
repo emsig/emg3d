@@ -91,6 +91,7 @@ def test_empymod_fwd():
     assert_allclose(resp1, resp2)
 
 
+@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 def test_get_points():
 
     class DummySrcRec:
@@ -120,7 +121,44 @@ def test_get_points():
     assert out['p1'] == rec.center
 
 
-# def test_fd_gradient():
-#
-#     _fd_gradient(gradient, cond_h, cond_v, data, weight, misfit, empymod_inp,
-#                  imat, vertical)
+def test_fd_gradient():
+
+    res = np.array([0.9876, ])
+
+    empymod_inp = {
+        'src': (0, 0, 0, 20, 5),
+        'rec': (100, 0, 0, -5, -5),
+        'depth': [],
+        'freqtime': 1.0,
+        'verb': 1,
+    }
+
+    obs = empymod.bipole(res=res, **empymod_inp)
+
+    d = 1/res*0.0001
+    dobs_h = empymod.bipole(res=d+res, **empymod_inp)
+    dobs_v = empymod.bipole(
+            res=res, aniso=np.sqrt((d+res)/res), **empymod_inp)
+
+    weight = np.pi
+    misfit = np.e
+    inp = {
+        'data': obs,
+        'weight': weight,
+        'misfit': misfit,
+        'empymod_inp': empymod_inp,
+        'imat': np.array([[0.5, 0.0], [0.0, 0.0], [.1, 0.4]]),
+    }
+
+    rh = dobs_h-obs
+    gh = (np.real(weight*(rh.conj()*rh)/2) - misfit)/d
+    rv = dobs_v-obs
+    gv = (np.real(weight*(rv.conj()*rv)/2) - misfit)/d
+
+    cond = 1/res
+    ghc = _mp._fd_gradient(cond_h=cond, cond_v=None, vertical=False, **inp)
+    gvc = _mp._fd_gradient(cond_h=cond, cond_v=cond, vertical=True, **inp)
+
+    assert_allclose(gh, 2*ghc[0, 0])
+    assert_allclose(gv, 10*gvc[2, 0])
+    assert_allclose(gv, 2.5*gvc[2, 1])
