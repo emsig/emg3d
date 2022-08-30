@@ -75,6 +75,89 @@ def test__solve():
 
 
 @pytest.mark.skipif(empymod is None, reason="empymod not installed.")
+def test_layered():
+
+    src = emg3d.TxElectricDipole((-2000, 0, 200, 20, 5))
+    off = np.array([2000, 6000])
+    rz = -250
+    rec = emg3d.surveys.txrx_coordinates_to_dict(
+            emg3d.RxElectricPoint, (off, 0, rz, 0, 0))
+    freqs = [1.0, 2.0, 3.0]
+
+    grid = emg3d.TensorMesh(
+        h=[[4000, 4000, 4000], [2000, 2000], [100, 250, 100]],
+        origin=(-4000, -2000, -350),
+    )
+    res = [2e14, 0.3, 1.0]
+    model = emg3d.Model(grid, property_x=1.0, property_z=1.0)
+    model.property_x[:, :, 1] = res[1]
+    model.property_z[:, :, 1] = res[1]
+    model.property_x[:, :, 2] = res[0]
+    model.property_z[:, :, 2] = res[0]
+
+    obs = empymod.bipole(
+            src=src.coordinates,
+            rec=(off, off*0, rz, 0, 0),
+            depth=[0, -250],
+            res=[res[0], res[1], 2*res[2]],
+            freqtime=freqs,
+            verb=1,
+    )
+    syn = empymod.bipole(
+            src=src.coordinates,
+            rec=(off, off*0, rz, 0, 0),
+            depth=[0, -250],
+            res=res,
+            freqtime=freqs,
+            verb=1,
+    )
+
+    survey = emg3d.Survey(src, rec, freqs)
+    survey.data.observed[0, ...] = obs.T
+    survey.data['synthetic'] = survey.data['observed'].copy()
+    survey.data.synthetic[0, ...] = obs.T
+
+    inp = {
+        'model': model,
+        'src': survey.sources['TxED-1'],
+        'receivers': survey.receivers,
+        'frequencies': survey.frequencies,
+        'empymod_opts': {'verb': 1},
+        'observed': None,
+        'layered_opts': {'method': 'receiver'},
+        'gradient': False,
+    }
+
+    # Forward - generate data
+    out = _mp.layered(inp)
+    assert_allclose(out, syn.T)
+
+    # Gradient without required data.
+    inp['gradient'] = True
+    out = _mp.layered(inp)
+    assert_allclose(out, 0.0)
+
+    # Gradient but all-NaN obs.
+    inp['observed'] = survey.data.observed[0, :, :]*np.nan
+    inp['weights'] = survey.data['observed'].copy()*0+1
+    inp['weights'] = inp['weights'][0, :, :]
+    inp['residual'] = survey.data.synthetic - survey.data.observed
+    inp['residual'] = inp['residual'][0, :, :]
+    out = _mp.layered(inp)
+    assert_allclose(out, 0.0)
+
+    # Gradient
+    inp['observed'] = survey.data.observed[0, :, :]
+    out = _mp.layered(inp)
+    # Only checking locations, not actual gradient
+    # (that is done in _fd_gradient)
+    assert_allclose(out[1, ...], 0.0)
+    assert_allclose(out[::2, 0, :, :], 0.0)
+    assert_allclose(out[::2, :, 0, :], 0.0)
+    assert np.all(out[::2, 1:, 1, :] != 0.0)
+
+
+@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 def test_empymod_fwd():
     # Simple check for status quo.
     empymod_inp = {
@@ -91,7 +174,6 @@ def test_empymod_fwd():
     assert_allclose(resp1, resp2)
 
 
-@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 def test_get_points():
 
     class DummySrcRec:
@@ -121,6 +203,7 @@ def test_get_points():
     assert out['p1'] == rec.center
 
 
+@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 def test_fd_gradient():
 
     res = np.array([0.9876, ])

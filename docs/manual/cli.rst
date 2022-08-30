@@ -59,8 +59,9 @@ remove the comment signs to use them.
   # max_workers = 4      # Also via `-n` or `--nproc`.
   # gridding = single
   # name = MyTestSimulation
-  # file_dir = None       # For file-based comp; absolute or relative path.
+  # file_dir = None      # For file-based comp; absolute or relative path.
   # receiver_interpolation = cubic  # Set it to <linear> for the gradient.
+  # layered = False      # Also via `-l` or `--layered`.
 
   # Solver options
   # --------------
@@ -102,7 +103,6 @@ remove the comment signs to use them.
   # center =              # list, e.g.: 0, 0, 0
   # cell_number =         # list, e.g.: 8, 16, 32, 64, 128
   # min_width_pps =       # list, e.g.: 5, 3, 3
-  # expand =              # list, e.g.: 0.3, 1e8
   # domain =              # list of lists, e.g.: -10000, 10000; None; None
   # distance =            # list of lists, e.g., None; None; -10000, 10000
   # stretching =          # list of lists, e.g.: None; None; 1.05, 1.5
@@ -136,3 +136,15 @@ remove the comment signs to use them.
   # receivers = RxEP-01, RxMP-10
   # frequencies = f-1, f-3
   # remove_empty = False  # CLI uses False by default.
+
+  # Layered computation
+  # -------------------
+  # The following parameters are only used if `-l`/`--layered` is set or the
+  # simulation section has set `layered` to True.
+  [layered]
+  # method =               # str
+  # radius =               # float
+  # factor =               # float
+  # minor =                # float
+  # merge =                # bool
+  # check_foci =           # bool

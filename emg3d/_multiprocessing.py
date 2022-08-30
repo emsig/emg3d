@@ -185,6 +185,8 @@ def layered(inp):
 
     gradient : bool
         If False, the electromagnetic responses are returned; if True, the
+        gradient is returned. If True, the following things _have_ to be
+        provided: ``observed``, ``weights``, ``residual``; otherwise a zero
         gradient is returned.
 
     weights : DataArray, optional
@@ -249,8 +251,10 @@ def layered(inp):
         out = np.zeros((3, *model.shape))
 
         # Get weights and residual if the gradient is wanted.
-        weights = inp['weights']
-        residual = inp['residual']
+        weights = inp.get('weights', None)
+        residual = inp.get('residual', None)
+        if weights is None or residual is None or observed is None:
+            return out
 
     else:
         # Responses.
@@ -265,10 +269,6 @@ def layered(inp):
             if fi.sum() == 0:
                 continue
             freqs = frequencies[fi]
-
-        # Skip gradient if no observed data.
-        elif observed is None and gradient:
-            continue
 
         # Generating obs data for all.
         else:
@@ -310,7 +310,6 @@ def layered(inp):
 
             # Get vertical gradient if VTI.
             if vti:
-
                 out[2, ...] += _fd_gradient(cond_h, cond_v, obs, wgt, misfit,
                                             empymod_inp, imat, vertical=True)
 
