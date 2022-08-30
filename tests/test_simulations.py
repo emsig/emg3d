@@ -6,7 +6,7 @@ from numpy.testing import assert_allclose
 import emg3d
 from emg3d import simulations
 
-from . import alternatives
+from . import alternatives, helpers
 
 
 # Soft dependencies
@@ -539,6 +539,70 @@ class TestSimulation():
         tqdm_opts = {'bar_format': '{bar}'}
         sim = simulations.Simulation(tqdm_opts={'bar_format': '{bar}'}, **inp)
         assert sim._tqdm_opts == tqdm_opts
+
+
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+class TestLayeredSimulation():
+    if xarray is not None:
+        # Create a simple survey
+
+        # Sources: 1 Electric Dipole, 1 Magnetic Dipole.
+        s1 = emg3d.TxElectricDipole((0, 1000, -950, 0, 0))
+        s2 = emg3d.TxMagneticDipole((0, 3000, -950, 90, 0))
+        sources = emg3d.surveys.txrx_lists_to_dict([s1, s2])
+
+        # Receivers: 1 Electric Point, 1 Magnetic Point
+        e_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                (np.arange(6)*1000, 0, -1000, 0, 0))
+        m_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxMagneticPoint,
+                (np.arange(6)*1000, 0, -1000, 90, 0))
+        receivers = emg3d.surveys.txrx_lists_to_dict([e_rec, m_rec])
+
+        # Frequencies
+        frequencies = (1.0, 2.0)
+
+        survey = emg3d.Survey(
+                sources, receivers, frequencies, name='TestSurv',
+                noise_floor=1e-15, relative_error=0.05)
+
+        # Create a simple grid and model
+        grid = emg3d.TensorMesh(
+                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
+                np.array([-1250, -1250, -2250]))
+        model = emg3d.Model(grid, 1)
+
+        # Create a simulation, compute all fields.
+        simulation = simulations.Simulation(
+            survey, model, name='TestSim', max_workers=1, gridding='single',
+            layered=True, layered_opts={'ellipse': {'minor': 0.99}}
+        )
+
+        # Compute observed.
+        simulation.compute(observed=True, min_offset=1100)
+
+    def test_reprs(self):
+        test = self.simulation.__repr__()
+
+        assert "Simulation «TestSim»" in test
+        assert "Survey «TestSurv»: 2 sources; 12 receivers; 2 frequenc" in test
+        assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
+        assert "Gridding: layered computation using method 'cylinder'" in test
+
+        test = self.simulation._repr_html_()
+        assert "Simulation «TestSim»" in test
+        assert "Survey «TestSurv»:    2 sources;    12 receivers;    2" in test
+        assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
+        assert "Gridding: layered computation using method 'cylinder'" in test
+
+    def test_copy(self, tmpdir):
+
+        sim2 = self.simulation.copy()
+        assert self.simulation.layered == sim2.layered
+        assert helpers.compare_dicts(self.simulation.layered_opts,
+                                     sim2.layered_opts)
+        assert sim2.layered_opts['ellipse']['minor'] == 0.99
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

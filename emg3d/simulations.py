@@ -192,24 +192,42 @@ class Simulation:
         installed). If a dict is provided it will be forwarded to ``tqdm``.
 
     layered : bool, default: False
-        TODO :: add to {to;from}_dict
-        If set, the responses are computed with approximated layered models for
-        each source-receiver pair using empymod. In this case, the fields are
-        not computed for the entire domain, only for the receiver location.
-        TODO :: list all the implications.
+        If True, the responses are computed with approximated layered (1D)
+        models for each source-receiver pair using empymod.
 
-    layered_opts : dict, default: None
-        TODO :: add to {to;from}_dict
-        Options passed to Model.extract_1d(), except source and
-        receiver.
-        - method:
-          - 'cylinder' if 'radius' given or can be estimated.
-          - 'midpoint' otherwise.
-        - radius: one skin depth using the lowest frequency of the survey and
-          the downwards property form the gridding options.
-        - factor: 1.2.
-        - minor: 0.8.
-        TODO expand!
+        The computation happens in parallel for each source location. Each
+        source-receiver pair is done separately, but all frequencies at once.
+
+        If layered is set, the gradient is is computed using the
+        finite-difference method, by perturbing each layer slightly.
+
+        Setting this to True also means:
+        - There are no {e;h}fields, only the fields at receiver locations.
+        - ``gridding``, most of ``gridding_opts``, ``solver_opts``,
+          ``receiver_interpolation``, and ``file_dir`` have no effect.
+        - There is no :attr:`emg3d.simulations.Simulation.jvec``.
+
+    layered_opts : dict, default: {}
+        Options passed to :attr:`emg3d.models.Model.extract_1d`, defining how
+        the layered model is obtained from the 3D model. ``p0`` and ``p1``
+        are taken to be the source and receiver locations. Consult that
+        function for more information. Below are only things described which
+        differ.
+
+        The possible methods are: cylinder, prism, midpoint, source, receiver.
+        The last two are the same as ``midpoint``, where just both points are
+        set either to the source or receiver location, respectively.
+
+        The following defaults are set or estimated from the other inputs if
+        not provided:
+
+        - ``method``:
+          - ``'cylinder'`` if ``ellipse['radius']`` given or can be estimated.
+          - ``'midpoint'`` otherwise.
+        - ``ellipse['radius']``: one skin depth using the lowest frequency of
+          the survey and the downwards property form the gridding options.
+        - ``ellipse['factor']``: 1.2.
+        - ``ellipse['minor']``: 0.8.
 
     """
 
@@ -415,6 +433,7 @@ class Simulation:
             'info': self.info,
             'tqdm_opts': self._tqdm_opts,
             'layered': self.layered,
+            'layered_opts': self.layered_opts,
             'receiver_interpolation': self.receiver_interpolation,
             'file_dir': self.file_dir,
             '_input_sc2': self._input_sc2,
@@ -430,8 +449,7 @@ class Simulation:
         if what in ['computed', 'all']:
             for name in ['_dict_grid',
                          '_dict_efield', '_dict_efield_info',
-                         '_dict_bfield', '_dict_bfield_info',
-                         'layered_opts']:
+                         '_dict_bfield', '_dict_bfield_info']:
                 if hasattr(self, name):
                     out[name] = getattr(self, name)
 
