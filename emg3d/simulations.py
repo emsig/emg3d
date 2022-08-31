@@ -202,10 +202,12 @@ class Simulation:
         method, by perturbing each layer slightly.
 
         Current limitations:
+
         - Only point and dipole sources.
         - Only isotropic and VTI models.
 
         Setting this to True also means:
+
         - There are no {e;h}fields, only the fields at receiver locations.
         - ``gridding``, most of ``gridding_opts``, ``solver_opts``,
           ``receiver_interpolation``, and ``file_dir`` have no effect.
@@ -225,6 +227,7 @@ class Simulation:
 
         The default method is ``'cylinder'``. If the ellipse parameters are not
         given for the methods cylinder and prism, they are set as follows:
+
         - factor: 1.2.
         - minor: 0.8.
         - radius: one skin depth using the lowest frequency of the survey and
