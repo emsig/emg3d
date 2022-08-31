@@ -89,6 +89,7 @@ class TestParser:
             'forward': False,
             'misfit': False,
             'gradient': False,
+            'layered': False,
             'path': None,
             'survey': None,
             'model': None,
@@ -178,6 +179,7 @@ class TestParser:
         args_dict['nproc'] = -1
         args_dict['verbosity'] = 20
         args_dict['dry_run'] = True
+        args_dict['layered'] = True
         args_dict['clean'] = True
         args_dict['gradient'] = True
         args_dict['path'] = tmpdir
@@ -190,6 +192,7 @@ class TestParser:
         assert term['clean'] is True
         assert term['function'] == 'gradient'
         assert cfg['simulation_options']['max_workers'] == 1
+        assert cfg['simulation_options']['layered'] is True
         assert cfg['files']['survey'] == join(tmpdir, 'testit.h5')
         assert cfg['files']['model'] == join(tmpdir, 'model.json')
         assert cfg['files']['output'] == join(tmpdir, 'output.npz')
@@ -311,6 +314,41 @@ class TestParser:
         cfg, term = cli.parser.parse_config_file(args_dict)
         sim_opts = cfg['simulation_options']
         assert sim_opts['receiver_interpolation'] == 'cubic'
+
+    def test_layered(self, tmpdir):
+
+        # Write a config file.
+        config = os.path.join(tmpdir, 'emg3d.cfg')
+        with open(config, 'w') as f:
+            f.write("[simulation]\n")
+            f.write("layered=True\n")
+            f.write("[layered]\n")
+            f.write("method=prism\n")
+            f.write("radius=3000\n")
+            f.write("factor=1.2\n")
+            f.write("minor=0.8\n")
+            f.write("check_foci=True\n")
+            f.write("merge=False")
+
+        args_dict = self.args_dict.copy()
+        args_dict['config'] = config
+        args_dict['layered'] = None
+        cfg, term = cli.parser.parse_config_file(args_dict)
+        sim_opts = cfg['simulation_options']
+        lay_opts = sim_opts['layered_opts']
+        assert sim_opts['layered'] is True
+        assert lay_opts['ellipse']['radius'] == 3000.0
+        assert lay_opts['ellipse']['factor'] == 1.2
+        assert lay_opts['ellipse']['minor'] == 0.8
+        assert lay_opts['ellipse']['check_foci'] is True
+        assert lay_opts['merge'] is False
+
+        with pytest.raises(TypeError, match="Unexpected parameter in"):
+            with open(config, 'a') as f:
+                f.write("\nanother=True")
+            args_dict = self.args_dict.copy()
+            args_dict['config'] = config
+            _ = cli.parser.parse_config_file(args_dict)
 
     def test_noise(self, tmpdir):
 
@@ -468,6 +506,7 @@ class TestRun:
             'forward': False,
             'misfit': False,
             'gradient': True,
+            'layered': False,
             'path': None,
             'survey': 'survey.npz',
             'model': 'model.npz',
@@ -505,7 +544,7 @@ class TestRun:
     model_vti = emg3d.Model(grid, 1., property_z=2.0)
     model_tri = emg3d.Model(grid, 1., 1.5, 2.0)
 
-    def test_basic(self, tmpdir, capsys):
+    def test_basic(self, tmpdir):
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=0)
@@ -521,7 +560,6 @@ class TestRun:
         args_dict['path'] = tmpdir
         args_dict['config'] = 'bla'
         args_dict['verbosity'] = 2
-        _, _ = capsys.readouterr()
 
         with pytest.raises(SystemExit) as e:
             cli.run.simulation(args_dict)
@@ -656,7 +694,7 @@ class TestRun:
         assert 'misfit' not in res3
         assert 'gradient' not in res3
 
-        # Redo for misfit, loading existing simulation.
+        # Redo for misfit, loading existing simulation, setting to layered.
         args_dict = self.args_dict.copy()
         args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
         args_dict['path'] = tmpdir
@@ -664,9 +702,14 @@ class TestRun:
         args_dict['misfit'] = True
         args_dict['gradient'] = False
         args_dict['dry_run'] = False
+        args_dict['layered'] = True  # Change to layered!
         args_dict['load'] = 'mysim.npz'
         args_dict['output'] = 'output3.npz'
         cli.run.simulation(args_dict)
+        with open(os.path.join(tmpdir, 'output3.log'), 'r') as f:
+            log = f.read()
+        assert "Change «layered» of simulation to True." in log
+        assert "Gridding: layered computation using method 'cylinder'" in log
         res3 = emg3d.load(os.path.join(tmpdir, 'output3.npz'))
         assert 'misfit' in res3
         assert 'gradient' not in res3

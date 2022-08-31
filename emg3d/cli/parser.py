@@ -66,7 +66,7 @@ def parse_config_file(args_dict):
     term['config_file'] = configfile
 
     # Get terminal input.
-    for key in ['verbosity', 'nproc', 'dry_run', 'clean']:
+    for key in ['verbosity', 'nproc', 'dry_run', 'clean', 'layered']:
         term[key] = args_dict.pop(key)
 
     for key in ['forward', 'misfit', 'gradient']:
@@ -171,6 +171,15 @@ def parse_config_file(args_dict):
         simulation[key] = cfg.getint('simulation', key)
     del term['nproc']
 
+    # Check layered.
+    key = 'layered'
+    _ = all_sim.pop(key, None)
+    if term[key] is not None:
+        simulation[key] = term[key]
+    elif cfg.has_option('simulation', key):
+        simulation[key] = cfg.getboolean('simulation', key)
+    del term[key]
+
     # Check gridding.
     key = 'gridding'
     if cfg.has_option('simulation', key):
@@ -251,6 +260,51 @@ def parse_config_file(args_dict):
                 f"Unexpected parameter in [noise_opts]: "
                 f"{list(all_noise.keys())}."
             )
+
+    # # Layered parameters  # #
+
+    # Check if parameter-file has a layered-section, add it otherwise.
+    layered_opts = {}
+    if 'layered' in cfg.sections():
+
+        all_layered = dict(cfg.items('layered'))
+
+        key = 'method'
+        if cfg.has_option('layered', key):
+            _ = all_layered.pop(key)
+            layered_opts[key] = cfg.get('layered', key)
+
+        key = 'merge'
+        if cfg.has_option('layered', key):
+            _ = all_layered.pop(key)
+            layered_opts[key] = cfg.getboolean('layered', key)
+
+        # Collect Ellipse-Options
+        ellipse = {}
+
+        for key in ['radius', 'minor', 'factor']:
+            if cfg.has_option('layered', key):
+                _ = all_layered.pop(key)
+                ellipse[key] = float(cfg.get('layered', key))
+
+        key = 'check_foci'
+        if cfg.has_option('layered', key):
+            _ = all_layered.pop(key)
+            ellipse[key] = cfg.getboolean('layered', key)
+
+        if ellipse:
+            layered_opts['ellipse'] = ellipse
+
+        # Ensure no keys are left.
+        if all_layered:
+            raise TypeError(
+                f"Unexpected parameter in [layered]: "
+                f"{list(all_layered.keys())}."
+            )
+
+        # Add to simulation dict if not empty.
+        if layered_opts:
+            simulation['layered_opts'] = layered_opts
 
     # # Solver parameters  # #
 

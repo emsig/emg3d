@@ -6,7 +6,7 @@ from numpy.testing import assert_allclose
 import emg3d
 from emg3d import simulations
 
-from . import alternatives
+from . import alternatives, helpers
 
 
 # Soft dependencies
@@ -542,6 +542,160 @@ class TestSimulation():
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
+class TestLayeredSimulation():
+    if xarray is not None:
+        # Create a simple survey
+
+        # Sources: 1 Electric Dipole, 1 Magnetic Dipole.
+        s1 = emg3d.TxElectricDipole((0, 1000, -950, 0, 0))
+        s2 = emg3d.TxMagneticDipole((0, 3000, -950, 90, 0))
+        sources = emg3d.surveys.txrx_lists_to_dict([s1, s2])
+
+        # Receivers: 1 Electric Point, 1 Magnetic Point
+        e_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxElectricPoint,
+                (np.arange(6)*1000, 0, -1000, 0, 0))
+        m_rec = emg3d.surveys.txrx_coordinates_to_dict(
+                emg3d.RxMagneticPoint,
+                (np.arange(6)*1000, 0, -1000, 90, 0))
+        receivers = emg3d.surveys.txrx_lists_to_dict([e_rec, m_rec])
+
+        # Frequencies
+        frequencies = (1.0, 2.0)
+
+        survey = emg3d.Survey(
+                sources, receivers, frequencies, name='TestSurv',
+                noise_floor=1e-15, relative_error=0.05)
+
+        # Create a simple grid and model
+        grid = emg3d.TensorMesh(
+                [np.ones(32)*250, np.ones(16)*500, np.ones(16)*500],
+                np.array([-1250, -1250, -2250]))
+        model = emg3d.Model(grid, 1)
+
+        # Create a simulation, compute all fields.
+        simulation = simulations.Simulation(
+            survey, model, name='TestSim', max_workers=1, gridding='single',
+            layered=True, layered_opts={'ellipse': {'minor': 0.99}}
+        )
+
+        # Compute observed.
+        simulation.compute(observed=True, min_offset=1100)
+        del simulation.survey.data['synthetic']
+
+    def test_reprs(self):
+        test = self.simulation.__repr__()
+
+        assert "Simulation «TestSim»" in test
+        assert "Survey «TestSurv»: 2 sources; 12 receivers; 2 frequenc" in test
+        assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
+        assert "Gridding: layered computation using method 'cylinder'" in test
+
+        test = self.simulation._repr_html_()
+        assert "Simulation «TestSim»" in test
+        assert "Survey «TestSurv»:    2 sources;    12 receivers;    2" in test
+        assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
+        assert "Gridding: layered computation using method 'cylinder'" in test
+
+        # Also _info_grids
+        txt = ("Gridding: layered computation using method 'cylinder'; "
+               "minor: 0.99; radius: 503.29; factor: 1.20")
+        assert txt == self.simulation._info_grids
+
+    def test_copy(self, tmpdir):
+
+        sim2 = self.simulation.copy()
+        assert self.simulation.layered == sim2.layered
+        assert helpers.compare_dicts(self.simulation.layered_opts,
+                                     sim2.layered_opts)
+        assert sim2.layered_opts['ellipse']['minor'] == 0.99
+
+    def test_layered_opts(self):
+        sminp = {'survey': self.survey, 'model': self.model}
+
+        # layered=False: layered_opts just stored as is
+        inp = {'ellipse': {'minor': 0.99}}
+        simulation = simulations.Simulation(**sminp, layered_opts=inp)
+        assert helpers.compare_dicts(simulation.layered_opts, inp)
+
+        # layered=True: layered_opts complete
+        simulation.layered = True
+        assert simulation.layered_opts['ellipse']['factor'] == 1.2
+
+        # If method not in 'prism'/'cylinder': layered_opts just stored as is
+        inp = {'method': 'aoeuaoeu', 'whatever_else': 'yes'}
+        sim = simulations.Simulation(**sminp, layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'aoeuaoeu'
+        assert sim.layered_opts['whatever_else'] == 'yes'
+
+        # no gridding -> estimate from model
+        inp = {'method': 'prism'}
+        sim = simulations.Simulation(
+                **sminp, gridding='same', layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'prism'
+        assert round(sim.layered_opts['ellipse']['radius']) == 503
+
+        # Check defaults for cylinder.
+        inp = {'ellipse': {'check_foci': True, 'merge': True}}
+        sim = simulations.Simulation(**sminp, layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'cylinder'
+        assert round(sim.layered_opts['ellipse']['radius']) == 503
+        # Skindepth 1 Hz; 1 Ohm.m
+        assert sim.layered_opts['ellipse']['factor'] == 1.2
+        assert sim.layered_opts['ellipse']['minor'] == 0.8
+        assert sim.layered_opts['ellipse']['merge']
+
+        # Ensure it doesn't change.
+        inp = {'mapping': 'Conductivity',
+               'properties':  [1/0.3, 1.0, 1.0, 1e-8]}
+        inp = {'ellipse': {'factor': 2.0, 'minor': 0.5}}
+        sim = simulations.Simulation(**sminp, layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'cylinder'
+        assert round(sim.layered_opts['ellipse']['radius']) == 503
+        # Skindepth 1 Hz; 1 Ohm.m
+        assert sim.layered_opts['ellipse']['factor'] == 2.0
+        assert sim.layered_opts['ellipse']['minor'] == 0.5
+
+    def test_print_info(self):
+        assert self.simulation.print_solver_info(return_info=True) == ""
+        assert self.simulation.print_grid_info(return_info=True) == ""
+
+    def test_not_implemented_things(self):
+        with pytest.raises(NotImplementedError, match="for `layered`"):
+            self.simulation.jvec('vector')
+
+        with pytest.raises(NotImplementedError, match="No fields if `laye"):
+            self.simulation.get_efield('TxED-1', 'f-1')
+
+        # Survey with unsupported electrodes.
+        survey = emg3d.Survey(
+            sources=emg3d.TxElectricWire([[0, 0, 0], [2, 2, 2]]),
+            receivers=emg3d.RxElectricPoint((1000, 500, 100, 0, 0)),
+            frequencies=1.0,
+        )
+        with pytest.raises(ValueError, match='Layered: Only Points and D'):
+            simulations.Simulation(survey, self.model, layered=True)
+
+        model = emg3d.Model(self.grid, 1.0, 2.0, 3.0)
+        with pytest.raises(NotImplementedError, match='Layered compute not'):
+            simulations.Simulation(self.survey, model, layered=True)
+
+    def test_compute_1d(self):
+
+        # Just checking the workflow, not the actual result.
+        assert not np.isfinite(self.simulation.data.synthetic.data).sum() > 0
+        assert not self.simulation._computed
+        self.simulation.compute()
+        assert self.simulation._computed
+        assert np.isfinite(self.simulation.data.synthetic.data).sum() > 0
+
+        assert self.simulation.misfit > 0.0
+
+        grad = self.simulation.gradient
+        assert grad.shape == self.model.shape
+
+
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_misfit():
     data = 1
     syn = 5
@@ -645,9 +799,13 @@ class TestGradient:
         sim_inp = {'survey': survey, 'gridding': 'same',
                    'receiver_interpolation': 'linear'}
 
+        # Dummy misfit, so it doesn't want to compute it.
+        misfit = np.sum(self.survey.data.observed)
+
         # Model with electric permittivity.
         simulation = simulations.Simulation(
                 model=emg3d.Model(mesh, epsilon_r=3), **sim_inp)
+        simulation._misfit = misfit
         with pytest.raises(NotImplementedError, match='for el. permittivity'):
             simulation.gradient
 
@@ -655,6 +813,7 @@ class TestGradient:
         simulation = simulations.Simulation(
                 model=emg3d.Model(mesh, mu_r=np.ones(mesh.shape_cells)*np.pi),
                 **sim_inp)
+        simulation._misfit = misfit
         with pytest.raises(NotImplementedError, match='for magn. permeabili'):
             simulation.gradient
 

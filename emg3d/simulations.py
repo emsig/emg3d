@@ -191,6 +191,49 @@ class Simulation:
         Boolean if a progress bar should be shown (only if ``tqdm`` is
         installed). If a dict is provided it will be forwarded to ``tqdm``.
 
+    layered : bool, default: False
+        If True, the responses are computed with approximated layered (1D)
+        models for each source-receiver pair using empymod.
+
+        The computation happens in parallel for each source location. Each
+        source-receiver pair is done separately, but all frequencies at once.
+
+        If layered is set, the gradient is computed using the finite-difference
+        method, by perturbing each layer slightly.
+
+        Current limitations:
+
+        - Only point and dipole sources.
+        - Only isotropic and VTI models.
+
+        Setting this to True also means:
+
+        - There are no {e;h}fields, only the fields at receiver locations.
+        - ``gridding``, most of ``gridding_opts``, ``solver_opts``,
+          ``receiver_interpolation``, and ``file_dir`` have no effect.
+        - The attribute :attr:`emg3d.simulations.Simulation.jvec`` is not
+          implemented.
+
+    layered_opts : dict, default: {}
+        Options passed to :attr:`emg3d.models.Model.extract_1d`, defining how
+        the layered model is obtained from the 3D model. ``p0`` and ``p1``
+        are taken to be the source and receiver locations. Consult that
+        function for more information. Below are only things described which
+        differ.
+
+        The possible methods are: cylinder, prism, midpoint, source, receiver.
+        The last two are the same as ``midpoint``, where just both points are
+        set either to the source or receiver location, respectively.
+
+        The default method is ``'cylinder'``. If the ellipse parameters are not
+        given for the methods cylinder and prism, they are set as follows:
+
+        - factor: 1.2.
+        - minor: 0.8.
+        - radius: one skin depth using the lowest frequency of the survey and
+          the downwards property from the gridding options (or the minimum
+          conductivity value in the lowest vertical layer).
+
     """
 
     # Gridding descriptions (for repr's).
@@ -232,6 +275,7 @@ class Simulation:
         self._dict_efield_info = self._dict_initiate
         self._gradient = None
         self._misfit = None
+        self._computed = False
 
         # Initiate file_dir
         self.file_dir = kwargs.pop('file_dir', None)
@@ -243,6 +287,8 @@ class Simulation:
         # Get model taking gridding_opts into account.
         # Sets self.model and self.gridding_opts.
         self._set_model(model, kwargs)
+        self._set_layered_opts(kwargs.pop('layered', False),
+                               kwargs.pop('layered_opts', {}))
 
         # Initiate synthetic data with NaN's if they don't exist.
         if 'synthetic' not in self.survey.data.keys():
@@ -279,8 +325,7 @@ class Simulation:
                 f"{self.survey.shape[1]} receivers; "
                 f"{self.survey.shape[2]} frequencies\n"
                 f"- {self.model.__repr__()}\n"
-                f"- Gridding: {self._gridding_descr[self.gridding]}; "
-                f"{self._info_grids}")
+                f"- {self._info_grids}")
 
     def _repr_html_(self):
         """HTML representation."""
@@ -294,8 +339,7 @@ class Simulation:
                 f"    {self.survey.shape[1]} receivers;"
                 f"    {self.survey.shape[2]} frequencies</li>"
                 f"  <li>{self.model.__repr__()}</li>"
-                f"  <li>Gridding: {self._gridding_descr[self.gridding]}; "
-                f"    {self._info_grids}</li>"
+                f"  <li>{self._info_grids}</li>"
                 f"</ul>")
 
     def clean(self, what='computed'):
@@ -348,6 +392,7 @@ class Simulation:
 
         # Clean data.
         if what in ['computed', 'all']:
+            self._computed = False
             for key in ['residual', 'weights']:
                 if key in self.data.keys():
                     del self.data[key]
@@ -393,6 +438,8 @@ class Simulation:
             'name': self.name,
             'info': self.info,
             'tqdm_opts': self._tqdm_opts,
+            'layered': self.layered,
+            'layered_opts': self.layered_opts,
             'receiver_interpolation': self.receiver_interpolation,
             'file_dir': self.file_dir,
             '_input_sc2': self._input_sc2,
@@ -416,6 +463,7 @@ class Simulation:
         if what in ['computed', 'results', 'all']:
             out['gradient'] = self._gradient
             out['misfit'] = self._misfit
+            out['computed'] = self._computed
 
         if copy:
             return deepcopy(out)
@@ -455,6 +503,8 @@ class Simulation:
                 'receiver_interpolation', 'cubic')
         cls_inp['file_dir'] = inp.pop('file_dir', None)
         cls_inp['tqdm_opts'] = inp.pop('tqdm_opts', {})
+        cls_inp['layered'] = inp.pop('layered', False)
+        cls_inp['layered_opts'] = inp.pop('layered_opts', {})
 
         # Instantiate the class.
         out = cls(**cls_inp)
@@ -473,7 +523,7 @@ class Simulation:
                 setattr(out, name, values)
 
         # Add gradient and misfit.
-        data = ['gradient', 'misfit']
+        data = ['gradient', 'misfit', 'computed']
         for name in data:
             if name in inp.keys():
                 setattr(out, '_'+name, inp.pop(name))
@@ -743,13 +793,35 @@ class Simulation:
             :meth:`emg3d.surveys.Survey.add_noise`.
 
         """
+        source = kwargs.pop('source', None)
+        frequency = kwargs.pop('frequency', None)
+        if self.layered:
+            if source or frequency:
+                raise NotImplementedError("No fields if `layered` is used.")
+            self._compute_1d()
+        else:
+            # Undocumented (internal):
+            # If the call is from `get_efield`, it will have source/frequency.
+            # This use is only internal. End users should use `get_efield()`.
+            self._compute([(source, frequency), ])
 
-        # Undocumented (internal):
-        # If the call is from `get_efield`, it will have source/frequency.
-        # This use is only internal. End users should use `get_efield()`.
-        srcfreq = [
-            (kwargs.pop('source', None), kwargs.pop('frequency', None)),
-        ]
+        # If it shall be used as observed data save a copy.
+        if observed:
+
+            # Copy synthetic to observed.
+            self.data['observed'] = self.data['synthetic'].copy()
+
+            # Add noise.
+            if kwargs.pop('add_noise', True):
+                self.survey.add_noise(**kwargs)
+
+        elif source is None and frequency is None:
+            self._computed = True
+
+    def _compute(self, srcfreq):
+        """Compute efields and responses asynchronously using emg3d.solve()."""
+        from emg3d import _multiprocessing as _mp
+
         if not srcfreq[0][0]:
             # "Normal" case: all source-frequency pairs.
             srcfreq = self._srcfreq
@@ -771,7 +843,12 @@ class Simulation:
             return self._data_or_file('efield', source, freq, data)
 
         # Compute fields in parallel.
-        out = self._compute(collect_efield_inputs, 'Compute efields', srcfreq)
+        out = _mp.process_map(
+            _mp.solve,
+            list(map(collect_efield_inputs, srcfreq)),
+            max_workers=self.max_workers,
+            **{'desc': 'Compute efields', **self._tqdm_opts},
+        )
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(srcfreq):
@@ -787,25 +864,65 @@ class Simulation:
         # Print solver info.
         self.print_solver_info('efield', verb=self.verb)
 
-        # If it shall be used as observed data save a copy.
-        if observed:
-
-            # Copy synthetic to observed.
-            self.data['observed'] = self.data['synthetic'].copy()
-
-            # Add noise.
-            if kwargs.pop('add_noise', True):
-                self.survey.add_noise(**kwargs)
-
-    def _compute(self, fn, description, srcfreq=None):
-        """Use process_map to call solver.solve asynchronously."""
+    def _compute_1d(self, gradient=False):
+        """Compute responses asynchronously using empymod.bipole()."""
         from emg3d import _multiprocessing as _mp
-        return _mp.process_map(
-            _mp.solve,
-            list(map(fn, self._srcfreq if srcfreq is None else srcfreq)),
+
+        # Check if there are observed data.
+        has_data = np.isfinite(self.data.observed.data).sum() > 0
+
+        # Create iterable from src-list for parallel computation.
+        def collect_empymod_inputs(source):
+            """Collect inputs."""
+
+            data = {
+                'model': self.model,
+                'src': self.survey.sources[source],
+                'receivers': self.survey.receivers,
+                'frequencies': self.survey.frequencies,
+                'empymod_opts': self._empymod_opts,
+                'observed': None,
+                'layered_opts': self.layered_opts,
+                'gradient': gradient,
+            }
+
+            # If there is data, add it.
+            if has_data:
+                data['observed'] = self.data.observed.loc[source, :, :]
+
+            # For the gradient we also need the residuals and weights.
+            if gradient:
+                data['residual'] = self.data.residual.loc[source, :, :]
+                data['weights'] = self.data.weights.loc[source, :, :]
+
+            return data
+
+        # Compute responses in parallel.
+        out = _mp.process_map(
+            _mp.layered,
+            list(map(collect_empymod_inputs, self.survey.sources.keys())),
             max_workers=self.max_workers,
-            **{'desc': description, **self._tqdm_opts},
+            **{'desc': 'Compute empymod', **self._tqdm_opts},
         )
+
+        # If gradient, return it.
+        if gradient:
+
+            # Pre-allocate the gradient on the mesh.
+            grad = np.zeros((3, *self.model.grid.shape_cells), order='F')
+
+            # Sum all sources up and return.
+            for val in out:
+                grad += val
+
+            return grad
+
+        # If forward, store responses in synthetic.
+        else:
+
+            # Loop over sources to extract and store.
+            for i, src in enumerate(self.survey.sources.keys()):
+                self.data['synthetic'].loc[src, :, :] = out[i]
 
     # OPTIMIZATION
     @property
@@ -850,6 +967,11 @@ class Simulation:
             without relative electric permittivity nor relative magnetic
             permeability.
 
+        .. note::
+
+            If ``layered=True``, the gradient is computed using finite
+            differences.
+
 
         Returns
         -------
@@ -863,71 +985,73 @@ class Simulation:
         """
         if self._gradient is None:
 
-            # Warn that cubic is not good for adjoint-state gradient.
-            if self.receiver_interpolation == 'cubic':
-                msg = (
-                    "emg3d: Receiver responses were obtained with cubic "
-                    "interpolation. This will not yield the exact gradient. "
-                    "Change `receiver_interpolation='linear'` in the call to "
-                    "Simulation()."
-                )
-                warnings.warn(msg, UserWarning)
-
-            # Check limitation: No epsilon_r, mu_r.
-            var = (self.model.epsilon_r, self.model.mu_r)
-            for v, n in zip(var, ('el. permittivity', 'magn. permeability')):
-                if v is not None and not np.allclose(v, 1.0):
-                    raise NotImplementedError(
-                        f"Gradient not implemented for {n}."
-                    )
-
             # Ensure misfit has been computed
             # (and therefore the electric fields).
             _ = self.misfit
 
-            # Compute back-propagating electric fields.
-            self._bcompute()
+            if self.layered:  # 1D finite-difference gradient.
+                gradient = self._compute_1d(gradient=True)
 
-            # Inversion grid and its shape.
-            igrid = self.model.grid
-            ishape = igrid.shape_cells
+            else:             # 3D adjoint-state gradient
 
-            # Pre-allocate the gradient on the mesh.
-            gradient = np.zeros((3, *ishape), order='F')
-
-            # Loop over source-frequency pairs.
-            for src, freq in self._srcfreq:
-
-                efield = self._dict_get('efield', src, freq)
-                bfield = self._dict_get('bfield', src, freq)
-
-                # Multiply forward field with backward field; take real part.
-                gfield = fields.Field(
-                    grid=efield.grid,
-                    data=np.real(bfield.field * efield.smu0 * efield.field),
-                )
-
-                # Pre-allocate the gradient for the computational grid.
-                shape = gfield.grid.shape_cells
-                grad = np.zeros((3, *shape), order='F')
-
-                # Map the field to cell centers times volume.
-                cell_volumes = gfield.grid.cell_volumes
-                maps.interp_edges_to_vol_averages(
-                        ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
-                        volumes=cell_volumes.reshape(shape, order='F'),
-                        ox=grad[0, ...], oy=grad[1, ...], oz=grad[2, ...])
-
-                # Bring gradient back from computation grid to inversion grid
-                # and add it to the total gradient.
-                if igrid != gfield.grid:
-                    # Requires discretize; for this reason wrapped in own fct.
-                    maps._interp_volume_average_adj(
-                        oval=gradient, ogrid=igrid,
-                        nval=grad, ngrid=gfield.grid,
+                # Warn that cubic is not good for adjoint-state gradient.
+                if self.receiver_interpolation == 'cubic':
+                    msg = (
+                        "emg3d: Receiver responses were obtained with cubic "
+                        "interpolation. This will not yield the exact "
+                        "gradient. Change `receiver_interpolation='linear'` "
+                        "in the call to Simulation()."
                     )
-                else:
-                    gradient += grad
+                    warnings.warn(msg, UserWarning)
+
+                # Check limitation: No epsilon_r, mu_r.
+                var = (self.model.epsilon_r, self.model.mu_r)
+                nam = ('el. permittivity', 'magn. permeability')
+                for v, n in zip(var, nam):
+                    if v is not None and not np.allclose(v, 1.0):
+                        raise NotImplementedError(
+                            f"Gradient not implemented for {n}."
+                        )
+
+                # Compute back-propagating electric fields.
+                self._bcompute()
+
+                # Pre-allocate the gradient on the mesh.
+                gradient = np.zeros((3, *self.model.shape), order='F')
+
+                # Loop over source-frequency pairs.
+                for src, freq in self._srcfreq:
+
+                    efield = self._dict_get('efield', src, freq)
+                    bfield = self._dict_get('bfield', src, freq)
+
+                    # Multiply forward field with backward; take real part.
+                    gfield = fields.Field(
+                        grid=efield.grid,
+                        data=np.real(bfield.field*efield.smu0*efield.field),
+                    )
+
+                    # Pre-allocate the gradient for the computational grid.
+                    shape = gfield.grid.shape_cells
+                    grad = np.zeros((3, *shape), order='F')
+
+                    # Map the field to cell centers times volume.
+                    cell_volumes = gfield.grid.cell_volumes
+                    maps.interp_edges_to_vol_averages(
+                            ex=gfield.fx, ey=gfield.fy, ez=gfield.fz,
+                            volumes=cell_volumes.reshape(shape, order='F'),
+                            ox=grad[0, ...], oy=grad[1, ...], oz=grad[2, ...])
+
+                    # Bring gradient back from computation grid to inversion
+                    # grid and add it to the total gradient.
+                    if self.model.grid != gfield.grid:
+                        # Wrapped in own function as it requires discretize.
+                        maps._interp_volume_average_adj(
+                            oval=gradient, ogrid=self.model.grid,
+                            nval=grad, ngrid=gfield.grid,
+                        )
+                    else:
+                        gradient += grad
 
             # Apply derivative-chain of property-map (only relevant if
             # `mapping` is something else than conductivity) and collect.
@@ -1016,10 +1140,12 @@ class Simulation:
             Value of the misfit function.
 
         """
+
         if self._misfit is None:
 
             # Ensure efields are computed
-            self.compute()
+            if not self._computed:
+                self.compute()
 
             # Check if weights are stored already. (weights are currently
             # simply 1/std^2; but might change in the future).
@@ -1051,6 +1177,7 @@ class Simulation:
 
     def _bcompute(self):
         """Compute bfields asynchronously for all sources and frequencies."""
+        from emg3d import _multiprocessing as _mp
 
         # Initiate back-propagated electric field and info dicts.
         if not hasattr(self, '_dict_bfield'):
@@ -1072,7 +1199,12 @@ class Simulation:
             return self._data_or_file('bfield', source, freq, data)
 
         # Compute fields in parallel.
-        out = self._compute(collect_bfield_inputs, 'Back-propagate')
+        out = _mp.process_map(
+            _mp.solve,
+            list(map(collect_bfield_inputs, self._srcfreq)),
+            max_workers=self.max_workers,
+            **{'desc': 'Back-propagate', **self._tqdm_opts},
+        )
 
         # Loop over src-freq combinations to extract and store.
         for i, (src, freq) in enumerate(self._srcfreq):
@@ -1147,6 +1279,12 @@ class Simulation:
             Shape of the data.
 
         """
+        from emg3d import _multiprocessing as _mp
+
+        if self.layered:
+            msg = "`jvec` is not implemented for `layered`."
+            raise NotImplementedError(msg)
+
         # Missing for jvec/jtvec
         # - Refactor `compute/gradient/_bcompute/_get_rfield/jvec/jtvec`.
         # - Document properly jvec and jtvec.
@@ -1221,7 +1359,12 @@ class Simulation:
             return self._data_or_file('gfield', source, freq, data)
 
         # Compute fields (A^-1 * G * vector) in parallel.
-        out = self._compute(collect_gfield_inputs, 'Compute jvec')
+        out = _mp.process_map(
+            _mp.solve,
+            list(map(collect_gfield_inputs, self._srcfreq)),
+            max_workers=self.max_workers,
+            **{'desc': 'Compute jvec', **self._tqdm_opts},
+        )
 
         # Initiate jvec data with NaN's if it doesn't exist.
         if 'jvec' not in self.data.keys():
@@ -1318,6 +1461,21 @@ class Simulation:
     def _info_grids(self):
         """Return a string with "min {- max}" grid size."""
 
+        info = "Gridding: "
+
+        if self.layered:
+            info += "layered computation using method "
+            info += f"'{self.layered_opts['method']}'"
+
+            if self.layered_opts['method'] in ['prism', 'cylinder']:
+                opts = '; '.join(
+                    [f"{k}: {v:.2f}" for k, v in
+                     self.layered_opts['ellipse'].items()]
+                )
+                info += "; "+opts
+
+            return info
+
         # Single grid for all sources and receivers.
         if self.gridding in ['same', 'single', 'input']:
             grid = self.get_grid(*self._srcfreq[0])
@@ -1341,7 +1499,8 @@ class Simulation:
             has_minmax = min_nc != max_nc
 
         # Assemble info.
-        info = f"{min_vc[0]} x {min_vc[1]} x {min_vc[2]} ({min_nc:,})"
+        info += f"{self._gridding_descr[self.gridding]}; "
+        info += f"{min_vc[0]} x {min_vc[1]} x {min_vc[2]} ({min_nc:,})"
         if has_minmax:
             info += f" - {max_vc[0]} x {max_vc[1]} x {max_vc[2]} ({max_nc:,})"
 
@@ -1349,6 +1508,13 @@ class Simulation:
 
     def print_grid_info(self, verb=1, return_info=False):
         """Print info for all generated grids."""
+
+        # Act depending on gridding:
+        out = ""
+
+        # If layered, return.
+        if self.layered:
+            return out if return_info else None
 
         def get_grid_info(src, freq):
             """Return grid info for given source and frequency."""
@@ -1358,9 +1524,6 @@ class Simulation:
                 out += grid.construct_mesh_info
             out += grid.__repr__()
             return out
-
-        # Act depending on gridding:
-        out = ""
 
         # Frequency-dependent.
         if self.gridding == 'frequency':
@@ -1394,12 +1557,12 @@ class Simulation:
     def print_solver_info(self, field='efield', verb=1, return_info=False):
         """Print solver info."""
 
-        # If not verbose, return.
-        if verb < 0:
-            return
-
         # Get info dict.
         out = ""
+
+        # If not verbose or layered, return.
+        if verb < 0 or self.layered:
+            return out if return_info else None
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
@@ -1484,3 +1647,85 @@ class Simulation:
 
         self.gridding_opts = gridding_opts
         self.model = model
+
+    @property
+    def layered(self):
+        """If True, use layered computations (empymod)."""
+        return self._layered
+
+    @layered.setter
+    def layered(self, layered):
+        """Update layered and therefore layered_opts."""
+        self._set_layered_opts(layered, self.layered_opts)
+
+    def _set_layered_opts(self, layered, layered_opts):
+        """Set self.layered and self.layered_opts."""
+
+        # Set layered.
+        self._layered = layered
+
+        # If not layered, just store layered_opts and return.
+        if not layered:
+            self.layered_opts = layered_opts
+            return
+
+        # Ensure we can handle the sources and receivers.
+        srlist = list(self.survey.sources.values())
+        srlist = srlist + list(self.survey.receivers.values())
+        for sr in srlist:
+            name = sr.__class__.__name__
+            if 'Point' not in name and 'Dipole' not in name:
+                raise ValueError(
+                    "Layered: Only Points and Dipoles supported, "
+                    f"provided: {sr}!"
+                )
+
+        # Check limitation: Only isotropic and VTI.
+        if self.model.case not in ['isotropic', 'VTI']:
+            raise NotImplementedError(
+                f"Layered compute not implemented for {self.model.case} case."
+            )
+
+        # Make a copy of layered to not overwrite.
+        layered_opts = deepcopy(layered_opts)
+
+        # Ensure method is defined; default: cylinder
+        layered_opts['method'] = layered_opts.get('method', 'cylinder')
+
+        # For cylinder/prism, ensure there is ellipse['radius'].
+        if layered_opts['method'] in ['prism', 'cylinder']:
+
+            # Initiate or get ellipse dict.
+            ellipse = layered_opts.get('ellipse', {})
+
+            # Try to estimate radius if not given.
+            if not ellipse.get('radius'):
+
+                # Check if negz-cond is in gridding_opts.
+                try:
+                    prop = self.gridding_opts['properties']
+                    prop = np.atleast_1d(prop)
+                    m = getattr(maps, 'Map' + self.gridding_opts['mapping'])()
+                    # Take the negative z property
+                    ind = -1 if prop.size < 3 else -2
+                    cond = m.backward(prop[ind])
+
+                # If not, calculate it.
+                except (KeyError, TypeError):
+                    zneg = self.model.property_x[:, :, 0]
+                    cond = np.min(self.model.map.backward(zneg))
+
+                # Lowest frequency.
+                freq = min(self.survey.frequencies.values())
+
+                # Set the radius to one skin depth.
+                ellipse['radius'] = meshes.skin_depth(freq, cond)
+
+            # Set factor/minor and store back.
+            ellipse['factor'] = ellipse.get('factor', 1.2)
+            ellipse['minor'] = ellipse.get('minor', 0.8)
+            layered_opts['ellipse'] = ellipse
+
+        # Store layered options.
+        self.layered_opts = layered_opts
+        self._empymod_opts = {'verb': self.verb+1}

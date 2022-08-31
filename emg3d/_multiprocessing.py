@@ -16,7 +16,10 @@ Helper routines to call functions with multiprocessing/concurrent.futures.
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor
+
+import numpy as np
 
 try:
     import tqdm
@@ -24,7 +27,7 @@ try:
 except ImportError:
     tqdm = None
 
-from emg3d import io, solver
+from emg3d import io, solver, utils
 
 
 def process_map(fn, *iterables, max_workers, **kwargs):
@@ -143,3 +146,314 @@ def solve(inp):
         return fname, fname
     else:
         return efield, info
+
+
+@utils._requires('empymod')
+def layered(inp):
+    """Returns response or gradient using layered models; for a `process_map`.
+
+    Used within a Simulation to call empymod in parallel for layered models.
+    Depending on the input it returns either the forward responses or the
+    finite-difference gradient.
+
+    The parameters section describes the content of the input dict.
+
+    Parameters
+    ----------
+    model : Model
+        The model; a :class:`emg3d.models.Model` instance. Must be isotropic or
+        VTI.
+
+    src : Tx*
+        Any dipole or point source of the available sources, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`.
+
+    receivers : dict of Rx*
+        Receiver dict (:attr:`emg3d.surveys.Survey.receivers`).
+
+    frequencies : dict
+        Frequency dict (:attr:`emg3d.surveys.Survey.frequencies`).
+
+    empymod_opts : dict
+        Options passed to empymod ({src;rec}pts, {h;f}t, {h;f}targ, xdirect,
+        loop).
+
+    observed : DataArray
+        Observed data of this source.
+
+    layered_opts : dict
+        Options passed to :attr:`emg3d.models.Model.extract_1d`.
+
+    gradient : bool
+        If False, the electromagnetic responses are returned; if True, the
+        gradient is returned.
+
+        If True, the following things _have_ to be provided: ``observed``,
+        ``weights``, and ``residual``; otherwise a zero gradient is returned.
+
+    weights : DataArray, optional
+        Data weights corresponding to the data; only required if
+        ``gradient=True``.
+
+    residual : DataArray
+        Residuals using the current model; only required if ``gradient=True``.
+
+
+    Returns
+    -------
+    out : ndarray
+        If ``gradient=False``, the output are the electromagnetic responses
+        (synthetic data) of shape (nrec, nfreq).
+
+        If ``gradient=True``, the output is the finite-difference gradient of
+        shape (3, nx, ny, nz).
+
+    """
+
+    # Extract input.
+    model = inp['model']
+    src = inp['src']
+    receivers = inp['receivers']
+    frequencies = np.array([f for f in inp['frequencies'].values()])
+    empymod_opts = inp['empymod_opts']
+    observed = inp['observed']
+    lopts = deepcopy(inp['layered_opts'])
+    gradient = inp['gradient']
+
+    # Get method and set to return_imat.
+    method = lopts.pop('method')
+    lopts['return_imat'] = True
+
+    # Collect rec-independent empymod options.
+    empymod_opts = {
+        # User input ({src;rec}pts, {h;f}t, {h;f}targ, xdirect, loop).
+        # Contains also verb from simulation class.
+        **empymod_opts,
+        #
+        # Source properties, same for all receivers.
+        'src': src.coordinates,
+        'msrc': src.xtype != 'electric',
+        'strength': src.strength,
+        #
+        # Enforced properties (not implemented).
+        'signal': None,
+        'epermV': None,
+        'mpermV': None,
+        'squeeze': True,
+    }
+
+    # Create some flags.
+    epsilon_r = model.epsilon_r is not None
+    mu_r = model.mu_r is not None
+    vti = model.case == 'VTI'
+
+    # Pre-allocate output array.
+    if gradient:
+        # Gradient.
+        out = np.zeros((3, *model.shape))
+
+        # Get weights and residual if the gradient is wanted.
+        weights = inp.get('weights', None)
+        residual = inp.get('residual', None)
+        if weights is None or residual is None or observed is None:
+            return out
+
+    else:
+        # Responses.
+        out = np.full((len(receivers), frequencies.size), np.nan+1j*np.nan)
+
+    # Loop over receivers.
+    for i, (rkey, rec) in enumerate(receivers.items()):
+
+        # Check observed data, limit to finite values if provided.
+        if observed is not None:
+            fi = np.isfinite(observed.loc[rkey, :].data)
+            if fi.sum() == 0:
+                continue
+            freqs = frequencies[fi]
+
+        # Generating obs data for all.
+        else:
+            fi = np.ones(frequencies.size, dtype=bool)
+            freqs = frequencies
+
+        # Get 1D model.
+        # Note: if method='source', this would be faster outside the loop.
+        oned, imat = model.extract_1d(**_get_points(method, src, rec), **lopts)
+
+        # Collect input.
+        empymod_inp = {
+            **empymod_opts,
+            'rec': rec.coordinates,
+            'mrec': rec.xtype != 'electric',
+            'depth': oned.grid.nodes_z[1:-1],
+            'freqtime': freqs,
+            'epermH': None if not epsilon_r else oned.epsilon_r[0, 0, :],
+            'mpermH': None if not mu_r else oned.mu_r[0, 0, :],
+        }
+
+        # Get horizontal and vertical conductivities.
+        map2cond = oned.map.backward
+        cond_h = map2cond(oned.property_x[0, 0, :])
+        cond_v = None if not vti else map2cond(oned.property_z[0, 0, :])
+
+        # Compute gradient.
+        if gradient:
+
+            # Get misfit of this src-rec pair.
+            obs = observed.loc[rkey, :].data[fi]
+            wgt = weights.loc[rkey, :].data[fi]
+            res = residual.loc[rkey, :].data[fi]
+            misfit = np.sum(wgt*(res.conj()*res)).real/2
+
+            # Get horizontal gradient.
+            out[0, ...] += _fd_gradient(cond_h, cond_v, obs, wgt, misfit,
+                                        empymod_inp, imat, vertical=False)
+
+            # Get vertical gradient if VTI.
+            if vti:
+                out[2, ...] += _fd_gradient(cond_h, cond_v, obs, wgt, misfit,
+                                            empymod_inp, imat, vertical=True)
+
+        # Compute response.
+        else:
+            out[i, fi] = _empymod_fwd(cond_h, cond_v, empymod_inp)
+
+    return out
+
+
+@utils._requires('empymod')
+def _empymod_fwd(cond_h, cond_v, empymod_inp):
+    """Thin wrapper for empymod.bipole().
+
+    Parameters
+    ----------
+    cond_h, cond_v : ndarray
+        Horizontal and vertical conductivities (S/m). ``cond_v`` can be None,
+        in which case an isotropic medium is assumed.
+
+    empymod_inp : dict
+        Passed through to :func:`empymod.model.bipole`. Any parameter except
+        for ``res`` and ``aniso``.
+
+
+    Returns
+    -------
+    resp : EMArray
+        Electromagnetic field as returned from :func:`empymod.model.bipole`.
+
+
+    """
+    from empymod import bipole
+    aniso = None if cond_v is None else np.sqrt(cond_h/cond_v)
+    return bipole(res=1/cond_h, aniso=aniso, **empymod_inp)
+
+
+def _get_points(method, src, rec):
+    """Returns correct method and points for model.extract_1d.
+
+    Parameters
+    ----------
+    method : str
+        All methods accepted by :attr:`emg3d.models.Model.extract_1d` plus
+        ``'source'``, ``'receiver'``.
+
+    src, rec : {Tx*, Rx*)
+        Any of the available point and dipole sources or receivers, e.g.,
+        :class:`emg3d.electrodes.TxElectricDipole`.
+
+    Returns
+    -------
+    out : dict
+        Can be passed directly to :attr:`emg3d.models.Model.extract_1d` for the
+        parameters ``method``, ``p0``, and ``p1``.
+
+    """
+
+    # Get default points.
+    p0 = src.center[:2]
+    p1 = rec.center[:2]
+
+    # If source or receiver, we re-set one point and rename the method
+    if method == 'source':
+        p1 = p0
+        method = 'midpoint'
+
+    elif method == 'receiver':
+        p0 = p1
+        method = 'midpoint'
+
+    return {'method': method, 'p0': p0, 'p1': p1}
+
+
+def _fd_gradient(cond_h, cond_v, data, weight, misfit, empymod_inp, imat,
+                 vertical):
+    """Computes the finite-difference gradient using empymod.
+
+    The finite difference is obtained by adding a relative difference of 0.01 %
+    to the layer (currently hard-coded).
+
+    Parameters
+    ----------
+    cond_h, cond_v : ndarray
+        Horizontal and vertical conductivities (S/m). ``cond_v`` can be None,
+        in which case an isotropic medium is assumed.
+
+    data : ndarray
+        Observed data.
+
+    weight : ndarray
+        Weights corresponding to these data.
+
+    misfit : float
+        Misfit using the current model.
+
+    empymod_inp : dict
+        Passed through to :func:`empymod.model.bipole`. Any parameter except
+        for ``res`` and ``aniso``.
+
+    imat : ndarray
+        Interpolation matrix as returned by
+        :attr:`emg3d.models.Model.extract_1d`.
+
+    vertical : bool
+        If True, the gradient for the vertical conductivities is assumed,
+        otherwise the gradient for the horizontal conductivities.
+        If ``vertical=True``, ``cond_v`` cannot be None (not checked, will fail
+        with an AttributeError).
+
+
+    Returns
+    -------
+    gradient : ndarray of shape (nx, ny, nz)
+        Gradient.
+
+
+    """
+    # Relative difference fixed to 0.01 %; could be made an input parameter.
+    rel_diff = 0.0001
+
+    # Loop over layers and compute FD gradient for each.
+    grad = np.zeros(cond_h.size)
+    for iz in range(cond_h.size):
+
+        # Get 1D model.
+        cond_p = cond_h.copy() if not vertical else cond_v.copy()
+
+        # Add relative difference to the layer.
+        delta = cond_p[iz] * rel_diff
+        cond_p[iz] += delta
+
+        # Call empymod.
+        if vertical:
+            response = _empymod_fwd(cond_h, cond_p, empymod_inp)
+        else:
+            response = _empymod_fwd(cond_p, cond_v, empymod_inp)
+
+        # Calculate gradient and add it.
+        residual = response - data
+        fd_misfit = np.sum(weight*(residual.conj()*residual)).real/2
+        grad[iz] = (fd_misfit - misfit)/delta
+
+    # Bring back to full grid and return.
+    return imat[..., None] * grad[None, :]
