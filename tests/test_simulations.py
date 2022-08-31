@@ -605,20 +605,50 @@ class TestLayeredSimulation():
         assert sim2.layered_opts['ellipse']['minor'] == 0.99
 
     def test_layered_opts(self):
-        with pytest.raises(AttributeError, match="can't set attribute"):
-            self.simulation.layered_opts = {}
-
-        inp = {'ellipse': {'minor': 0.99}}
-        simulation = simulations.Simulation(
-            self.survey, self.model, gridding='single', layered_opts=inp
-        )
+        sminp = {'survey': self.survey, 'model': self.model}
 
         # layered=False: layered_opts just stored as is
+        inp = {'ellipse': {'minor': 0.99}}
+        simulation = simulations.Simulation(**sminp, layered_opts=inp)
         assert helpers.compare_dicts(simulation.layered_opts, inp)
 
         # layered=True: layered_opts complete
         simulation.layered = True
         assert simulation.layered_opts['ellipse']['factor'] == 1.2
+
+        # If method not in 'prism'/'cylinder': layered_opts just stored as is
+        inp = {'method': 'aoeuaoeu', 'whatever_else': 'yes'}
+        sim = simulations.Simulation(**sminp, layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'aoeuaoeu'
+        assert sim.layered_opts['whatever_else'] == 'yes'
+
+        # no gridding -> estimate from model
+        inp = {'method': 'prism'}
+        sim = simulations.Simulation(
+                **sminp, gridding='same', layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'prism'
+        assert round(sim.layered_opts['ellipse']['radius']) == 503
+
+        # Check defaults for cylinder.
+        inp = {'ellipse': {'check_foci': True, 'merge': True}}
+        sim = simulations.Simulation(**sminp, layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'cylinder'
+        assert round(sim.layered_opts['ellipse']['radius']) == 503
+        # Skindepth 1 Hz; 1 Ohm.m
+        assert sim.layered_opts['ellipse']['factor'] == 1.2
+        assert sim.layered_opts['ellipse']['minor'] == 0.8
+        assert sim.layered_opts['ellipse']['merge']
+
+        # Ensure it doesn't change.
+        inp = {'mapping': 'Conductivity',
+               'properties':  [1/0.3, 1.0, 1.0, 1e-8]}
+        inp = {'ellipse': {'factor': 2.0, 'minor': 0.5}}
+        sim = simulations.Simulation(**sminp, layered=True, layered_opts=inp)
+        assert sim.layered_opts['method'] == 'cylinder'
+        assert round(sim.layered_opts['ellipse']['radius']) == 503
+        # Skindepth 1 Hz; 1 Ohm.m
+        assert sim.layered_opts['ellipse']['factor'] == 2.0
+        assert sim.layered_opts['ellipse']['minor'] == 0.5
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

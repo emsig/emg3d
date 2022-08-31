@@ -427,6 +427,8 @@ def _fd_gradient(cond_h, cond_v, data, weight, misfit, empymod_inp, imat,
         with an AttributeError).
 
     """
+    # Relative difference fixed to 0.01 %; could be made an input parameter.
+    rel_diff = 0.0001
 
     # Loop over layers and compute FD gradient for each.
     grad = np.zeros(cond_h.size)
@@ -435,8 +437,8 @@ def _fd_gradient(cond_h, cond_v, data, weight, misfit, empymod_inp, imat,
         # Get 1D model.
         cond_p = cond_v.copy() if vertical else cond_h.copy()
 
-        # Add a relative difference of 0.01 % to the layer.
-        delta = cond_p[iz] * 0.0001
+        # Add relative difference to the layer.
+        delta = cond_p[iz] * rel_diff
         cond_p[iz] += delta
 
         # Call empymod.

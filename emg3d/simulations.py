@@ -282,8 +282,8 @@ class Simulation:
         # Get model taking gridding_opts into account.
         # Sets self.model and self.gridding_opts.
         self._set_model(model, kwargs)
-        self._layered_opts = deepcopy(kwargs.pop('layered_opts', {}))
-        self.layered = kwargs.pop('layered', False)
+        self._set_layered_opts(kwargs.pop('layered', False),
+                               kwargs.pop('layered_opts', {}))
 
         # Initiate synthetic data with NaN's if they don't exist.
         if 'synthetic' not in self.survey.data.keys():
@@ -1700,14 +1700,58 @@ class Simulation:
 
     @layered.setter
     def layered(self, layered):
-        """Update layered."""
-        self._layered = layered
-        if layered:
-            self._layered_opts = models._estimate_layered_opts(
-                self._layered_opts, self.survey, self.gridding_opts
-            )
+        """Update layered and therefore layered_opts."""
+        self._set_layered_opts(layered, self.layered_opts)
 
-    @property
-    def layered_opts(self):
-        """Layered options for 1D computations."""
-        return self._layered_opts
+    def _set_layered_opts(self, layered, layered_opts):
+        """Set self.layered and self.layered_opts."""
+
+        # Set layered.
+        self._layered = layered
+
+        # If not layered, just store layered_opts and return.
+        if not layered:
+            self.layered_opts = layered_opts
+            return
+
+        # Make a copy of layered to not overwrite.
+        layered_opts = deepcopy(layered_opts)
+
+        # Ensure method is defined; default: cylinder
+        layered_opts['method'] = layered_opts.get('method', 'cylinder')
+
+        # For cylinder/prism, ensure there is ellipse['radius'].
+        if layered_opts['method'] in ['prism', 'cylinder']:
+
+            # Initiate or get ellipse dict.
+            ellipse = layered_opts.get('ellipse', {})
+
+            # Try to estimate radius if not given.
+            if not ellipse.get('radius'):
+
+                # Check if negz-cond is in gridding_opts.
+                try:
+                    prop = self.gridding_opts['properties']
+                    prop = np.atleast_1d(prop)
+                    m = getattr(maps, 'Map' + self.gridding_opts['mapping'])()
+                    # Take the negative z property
+                    ind = -1 if prop.size < 3 else -2
+                    cond = m.backward(prop[ind])
+
+                # If not, calculate it.
+                except (KeyError, TypeError):
+                    zneg = self.model.property_x[:, :, 0]
+                    cond = np.min(self.model.map.backward(zneg))
+
+                # Lowest frequency.
+                freq = min(self.survey.frequencies.values())
+
+                # Set the radius to one skin depth.
+                ellipse['radius'] = meshes.skin_depth(freq, cond)
+
+            # Set factor/minor and store back.
+            ellipse['factor'] = ellipse.get('factor', 1.2)
+            ellipse['minor'] = ellipse.get('minor', 0.8)
+            layered_opts['ellipse'] = ellipse
+
+        self.layered_opts = layered_opts

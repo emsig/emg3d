@@ -8,13 +8,6 @@ from emg3d import models
 from . import helpers
 
 
-# Soft dependencies
-try:
-    import xarray
-except ImportError:
-    xarray = None
-
-
 class TestModel:
 
     def test_regression(self, capsys):
@@ -542,53 +535,6 @@ def test_expand_grid_model():
     assert_allclose(o_model.epsilon_r[:, :, :-2], 5)
     assert_allclose(o_model.epsilon_r[:, :, -2], 1)
     assert_allclose(o_model.epsilon_r[:, :, -1], 1)
-
-
-@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
-def test_estimate_layered_opts():
-
-    # Regular survey.
-    survey = emg3d.Survey(
-        sources=emg3d.TxElectricDipole((0, 0, 0, 0, 0)),
-        receivers=emg3d.RxElectricPoint((1000, 500, 100, 0, 0)),
-        frequencies=[1.0, 2.0, 3.0],
-    )
-
-    # If method not in ['prism', 'cylinder', lopts_in == lopts_out
-    lopts = {'method': 'aoeuaoeu', 'whatever_else': 'yes'}
-    out = emg3d.models._estimate_layered_opts(lopts, survey, None)
-    assert out['method'] == 'aoeuaoeu'
-    assert out['whatever_else'] == 'yes'
-
-    # empty -> 'midpoint'
-    lopts = {'method': 'prism'}
-    out = emg3d.models._estimate_layered_opts(lopts, survey, None)
-    assert out['method'] == 'midpoint'
-
-    # prism; radius; no gopts
-    lopts = {'method': 'prism', 'ellipse': {'radius': 1000.0}}
-    out = emg3d.models._estimate_layered_opts(lopts, survey, {'a': 1})
-    assert out['method'] == 'prism'
-    assert out['ellipse']['radius'] == 1000.0
-
-    # Check defaults for cylinder.
-    gopts = {'mapping': 'Resistivity', 'properties':  [0.3, 1.0]}
-    lopts = {'ellipse': {'check_foci': True, 'merge': True}}
-    out = emg3d.models._estimate_layered_opts(lopts, survey, gopts)
-    assert out['method'] == 'cylinder'
-    assert round(out['ellipse']['radius']) == 503  # Skindepth 1 Hz; 1 Ohm.m
-    assert out['ellipse']['factor'] == 1.2
-    assert out['ellipse']['minor'] == 0.8
-    assert out['ellipse']['merge']
-
-    # Ensure it doesn't change.
-    gopts = {'mapping': 'Conductivity', 'properties':  [1/0.3, 1.0, 1.0, 1e-8]}
-    lopts = {'ellipse': {'factor': 2.0, 'minor': 0.5}}
-    out = emg3d.models._estimate_layered_opts(lopts, survey, gopts)
-    assert out['method'] == 'cylinder'
-    assert round(out['ellipse']['radius']) == 503  # Skindepth 1 Hz; 1 Ohm.m
-    assert out['ellipse']['factor'] == 2.0
-    assert out['ellipse']['minor'] == 0.5
 
 
 def test_all_dir():
