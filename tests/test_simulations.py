@@ -596,6 +596,11 @@ class TestLayeredSimulation():
         assert "Model: resistivity; isotropic; 32 x 16 x 16 (8,192)" in test
         assert "Gridding: layered computation using method 'cylinder'" in test
 
+        # Also _info_grids
+        txt = ("Gridding: layered computation using method 'cylinder'; "
+               "minor: 0.99; radius: 503.29; factor: 1.20")
+        assert txt == self.simulation._info_grids
+
     def test_copy(self, tmpdir):
 
         sim2 = self.simulation.copy()
@@ -649,6 +654,14 @@ class TestLayeredSimulation():
         # Skindepth 1 Hz; 1 Ohm.m
         assert sim.layered_opts['ellipse']['factor'] == 2.0
         assert sim.layered_opts['ellipse']['minor'] == 0.5
+
+    def test_print_info(self):
+        assert self.simulation.print_solver_info(return_info=True) == ""
+        assert self.simulation.print_grid_info(return_info=True) == ""
+
+    def test_jvec(self):
+        with pytest.raises(NotImplementedError, match="for `layered`"):
+            self.simulation.jvec('vector')
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")

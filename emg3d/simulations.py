@@ -1186,10 +1186,6 @@ class Simulation:
 
         """
 
-        # TODO implement for layered
-
-        # TODO check: does that work if some data is NaN?
-
         if self._misfit is None:
 
             # Ensure efields are computed
@@ -1558,6 +1554,13 @@ class Simulation:
     def print_grid_info(self, verb=1, return_info=False):
         """Print info for all generated grids."""
 
+        # Act depending on gridding:
+        out = ""
+
+        # If layered, return.
+        if self.layered:
+            return out if return_info else None
+
         def get_grid_info(src, freq):
             """Return grid info for given source and frequency."""
             grid = self.get_grid(src, freq)
@@ -1566,9 +1569,6 @@ class Simulation:
                 out += grid.construct_mesh_info
             out += grid.__repr__()
             return out
-
-        # Act depending on gridding:
-        out = ""
 
         # Frequency-dependent.
         if self.gridding == 'frequency':
@@ -1602,12 +1602,12 @@ class Simulation:
     def print_solver_info(self, field='efield', verb=1, return_info=False):
         """Print solver info."""
 
-        # If not verbose or layered, return.
-        if verb < 0 or self.layered:
-            return
-
         # Get info dict.
         out = ""
+
+        # If not verbose or layered, return.
+        if verb < 0 or self.layered:
+            return out if return_info else None
 
         # Loop over sources and frequencies.
         for src, freq in self._srcfreq:
