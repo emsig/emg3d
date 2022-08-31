@@ -544,7 +544,7 @@ class TestRun:
     model_vti = emg3d.Model(grid, 1., property_z=2.0)
     model_tri = emg3d.Model(grid, 1., 1.5, 2.0)
 
-    def test_basic(self, tmpdir, capsys):
+    def test_basic(self, tmpdir):
 
         # Store survey and model.
         self.survey.to_file(os.path.join(tmpdir, 'survey.npz'), verb=0)
@@ -560,7 +560,6 @@ class TestRun:
         args_dict['path'] = tmpdir
         args_dict['config'] = 'bla'
         args_dict['verbosity'] = 2
-        _, _ = capsys.readouterr()
 
         with pytest.raises(SystemExit) as e:
             cli.run.simulation(args_dict)
@@ -695,7 +694,7 @@ class TestRun:
         assert 'misfit' not in res3
         assert 'gradient' not in res3
 
-        # Redo for misfit, loading existing simulation.
+        # Redo for misfit, loading existing simulation, setting to layered.
         args_dict = self.args_dict.copy()
         args_dict['config'] = os.path.join(tmpdir, 'emg3d.cfg')
         args_dict['path'] = tmpdir
@@ -703,9 +702,14 @@ class TestRun:
         args_dict['misfit'] = True
         args_dict['gradient'] = False
         args_dict['dry_run'] = False
+        args_dict['layered'] = True  # Change to layered!
         args_dict['load'] = 'mysim.npz'
         args_dict['output'] = 'output3.npz'
         cli.run.simulation(args_dict)
+        with open(os.path.join(tmpdir, 'output3.log'), 'r') as f:
+            log = f.read()
+        assert "Change «layered» of simulation to True." in log
+        assert "Gridding: layered computation using method 'cylinder'" in log
         res3 = emg3d.load(os.path.join(tmpdir, 'output3.npz'))
         assert 'misfit' in res3
         assert 'gradient' not in res3

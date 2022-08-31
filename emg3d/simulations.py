@@ -282,7 +282,7 @@ class Simulation:
         # Get model taking gridding_opts into account.
         # Sets self.model and self.gridding_opts.
         self._set_model(model, kwargs)
-        self._layered_opts = kwargs.pop('layered_opts', {})
+        self._layered_opts = deepcopy(kwargs.pop('layered_opts', {}))
         self.layered = kwargs.pop('layered', False)
 
         # Initiate synthetic data with NaN's if they don't exist.
@@ -1690,7 +1690,7 @@ class Simulation:
             gridding_opts = meshes.estimate_gridding_opts(
                     g_opts, model, self.survey, self._input_sc2)
 
-        self._gridding_opts = gridding_opts
+        self.gridding_opts = gridding_opts
         self.model = model
 
     @property
@@ -1711,8 +1711,3 @@ class Simulation:
     def layered_opts(self):
         """Layered options for 1D computations."""
         return self._layered_opts
-
-    @property
-    def gridding_opts(self):
-        """Gridding options for automatic gridding."""
-        return self._gridding_opts

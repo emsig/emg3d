@@ -103,6 +103,12 @@ def simulation(args_dict):
                 sim.model = models.expand_grid_model(
                         sim.model, expand, interface)
 
+        # Set layered according to user input if it differs.
+        layered = cfg['simulation_options'].get('layered', False)
+        if sim.layered != layered:
+            logger.info(f"Change «layered» of simulation to {layered}.")
+            sim.layered = layered
+
     else:
 
         # Load input.

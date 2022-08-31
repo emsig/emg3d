@@ -604,6 +604,22 @@ class TestLayeredSimulation():
                                      sim2.layered_opts)
         assert sim2.layered_opts['ellipse']['minor'] == 0.99
 
+    def test_layered_opts(self):
+        with pytest.raises(AttributeError, match="can't set attribute"):
+            self.simulation.layered_opts = {}
+
+        inp = {'ellipse': {'minor': 0.99}}
+        simulation = simulations.Simulation(
+            self.survey, self.model, gridding='single', layered_opts=inp
+        )
+
+        # layered=False: layered_opts just stored as is
+        assert helpers.compare_dicts(simulation.layered_opts, inp)
+
+        # layered=True: layered_opts complete
+        simulation.layered = True
+        assert simulation.layered_opts['ellipse']['factor'] == 1.2
+
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_misfit():
