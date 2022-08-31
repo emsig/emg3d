@@ -152,19 +152,20 @@ def solve(inp):
 def layered(inp):
     """Returns response or gradient using layered models; for a `process_map`.
 
-    Used within a Simulation to call the empymod in parallel for layered
-    models. Depending on the input it returns either the forward responses or
-    the finite-difference gradient.
+    Used within a Simulation to call empymod in parallel for layered models.
+    Depending on the input it returns either the forward responses or the
+    finite-difference gradient.
 
     The parameters section describes the content of the input dict.
 
     Parameters
     ----------
     model : Model
-        The model; a :class:`emg3d.models.Model` instance.
+        The model; a :class:`emg3d.models.Model` instance. Must be isotropic or
+        VTI.
 
     src : Tx*
-        Any of the available sources, e.g.,
+        Any dipole or point source of the available sources, e.g.,
         :class:`emg3d.electrodes.TxElectricDipole`.
 
     receivers : dict of Rx*
@@ -180,21 +181,22 @@ def layered(inp):
     observed : DataArray
         Observed data of this source.
 
-    layered_opts' : dict
+    layered_opts : dict
         Options passed to :attr:`emg3d.models.Model.extract_1d`.
 
     gradient : bool
         If False, the electromagnetic responses are returned; if True, the
-        gradient is returned. If True, the following things _have_ to be
-        provided: ``observed``, ``weights``, ``residual``; otherwise a zero
         gradient is returned.
+
+        If True, the following things _have_ to be provided: ``observed``,
+        ``weights``, and ``residual``; otherwise a zero gradient is returned.
 
     weights : DataArray, optional
         Data weights corresponding to the data; only required if
         ``gradient=True``.
 
     residual : DataArray
-        Residual using the current model; only required if ``gradient=True``.
+        Residuals using the current model; only required if ``gradient=True``.
 
 
     Returns
@@ -357,7 +359,7 @@ def _get_points(method, src, rec):
         ``'source'``, ``'receiver'``.
 
     src, rec : {Tx*, Rx*)
-        Any of the available sources or receivers, e.g.,
+        Any of the available point and dipole sources or receivers, e.g.,
         :class:`emg3d.electrodes.TxElectricDipole`.
 
     Returns
@@ -388,17 +390,11 @@ def _fd_gradient(cond_h, cond_v, data, weight, misfit, empymod_inp, imat,
                  vertical):
     """Computes the finite-difference gradient using empymod.
 
-    The result is added to ``gradient`` using the ``imat`` interpolation
-    matrix: ``[0, ...]`` if ``vertical=False``, else ``[2, ...]`` otherwise.
-
-    Theh finite difference is obtained by adding a relative difference of
-    0.01 % to the layer (currently hard-coded).
+    The finite difference is obtained by adding a relative difference of 0.01 %
+    to the layer (currently hard-coded).
 
     Parameters
     ----------
-    gradient : ndarray of shape (3, nx, ny, nz)
-        Array to which to add this gradient.
-
     cond_h, cond_v : ndarray
         Horizontal and vertical conductivities (S/m). ``cond_v`` can be None,
         in which case an isotropic medium is assumed.
@@ -426,6 +422,13 @@ def _fd_gradient(cond_h, cond_v, data, weight, misfit, empymod_inp, imat,
         If ``vertical=True``, ``cond_v`` cannot be None (not checked, will fail
         with an AttributeError).
 
+
+    Returns
+    -------
+    gradient : ndarray of shape (nx, ny, nz)
+        Gradient.
+
+
     """
     # Relative difference fixed to 0.01 %; could be made an input parameter.
     rel_diff = 0.0001
@@ -435,7 +438,7 @@ def _fd_gradient(cond_h, cond_v, data, weight, misfit, empymod_inp, imat,
     for iz in range(cond_h.size):
 
         # Get 1D model.
-        cond_p = cond_v.copy() if vertical else cond_h.copy()
+        cond_p = cond_h.copy() if not vertical else cond_v.copy()
 
         # Add relative difference to the layer.
         delta = cond_p[iz] * rel_diff

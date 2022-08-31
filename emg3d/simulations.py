@@ -198,14 +198,19 @@ class Simulation:
         The computation happens in parallel for each source location. Each
         source-receiver pair is done separately, but all frequencies at once.
 
-        If layered is set, the gradient is is computed using the
-        finite-difference method, by perturbing each layer slightly.
+        If layered is set, the gradient is computed using the finite-difference
+        method, by perturbing each layer slightly.
+
+        Current limitations:
+        - Only point and dipole sources.
+        - Only isotropic and VTI models.
 
         Setting this to True also means:
         - There are no {e;h}fields, only the fields at receiver locations.
         - ``gridding``, most of ``gridding_opts``, ``solver_opts``,
           ``receiver_interpolation``, and ``file_dir`` have no effect.
-        - There is no :attr:`emg3d.simulations.Simulation.jvec``.
+        - The attribute :attr:`emg3d.simulations.Simulation.jvec`` is not
+          implemented.
 
     layered_opts : dict, default: {}
         Options passed to :attr:`emg3d.models.Model.extract_1d`, defining how
@@ -218,16 +223,13 @@ class Simulation:
         The last two are the same as ``midpoint``, where just both points are
         set either to the source or receiver location, respectively.
 
-        The following defaults are set or estimated from the other inputs if
-        not provided:
-
-        - ``method``:
-          - ``'cylinder'`` if ``ellipse['radius']`` given or can be estimated.
-          - ``'midpoint'`` otherwise.
-        - ``ellipse['radius']``: one skin depth using the lowest frequency of
-          the survey and the downwards property form the gridding options.
-        - ``ellipse['factor']``: 1.2.
-        - ``ellipse['minor']``: 0.8.
+        The default method is ``'cylinder'``. If the ellipse parameters are not
+        given for the methods cylinder and prism, they are set as follows:
+        - factor: 1.2.
+        - minor: 0.8.
+        - radius: one skin depth using the lowest frequency of the survey and
+          the downwards property from the gridding options (or the minimum
+          conductivity value in the lowest vertical layer).
 
     """
 

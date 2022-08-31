@@ -6,8 +6,24 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.8.0 : Layered modelling
+--------------------------
+
+**2022-08-31**
+
+The simulation class takes new the parameters ``layered`` and ``layered_opts``,
+where the default values are False and None, respectively. If ``layered=True``,
+there will be no 3D computations. Instead, it will create a local layered (1D)
+model for each source-receiver pair, and compute the response using the
+semi-analytical code ``empymod`` (which needs to be installed manually, as it
+is a soft dependency). In this case an eventual gradient is computed using the
+finite-difference method, not the adjoint-state method, perturbing each layer
+slightly. The main purpose of these layered computations is for quick checks,
+QC, verifications, etc. Layered computation is also possible through the CLI,
+through the new flag ``-l`` or ``--layered``, and a new section ``[layered]``
+in the config file.
+
+Other changes (many of them related to the above):
 
 - Model instances have a new attribute ``exctract_1d``, which returns a layered
   (1D) model, extracted from the 3D model according the provided parameters;
