@@ -659,9 +659,12 @@ class TestLayeredSimulation():
         assert self.simulation.print_solver_info(return_info=True) == ""
         assert self.simulation.print_grid_info(return_info=True) == ""
 
-    def test_jvec(self):
+    def test_not_implemented_things(self):
         with pytest.raises(NotImplementedError, match="for `layered`"):
             self.simulation.jvec('vector')
+
+        with pytest.raises(NotImplementedError, match="No fields if `laye"):
+            self.simulation.get_efield('TxED-1', 'f-1')
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
@@ -768,9 +771,13 @@ class TestGradient:
         sim_inp = {'survey': survey, 'gridding': 'same',
                    'receiver_interpolation': 'linear'}
 
+        # Dummy misfit, so it doesn't want to compute it.
+        misfit = np.sum(self.survey.data.observed)
+
         # Model with electric permittivity.
         simulation = simulations.Simulation(
                 model=emg3d.Model(mesh, epsilon_r=3), **sim_inp)
+        simulation._misfit = misfit
         with pytest.raises(NotImplementedError, match='for el. permittivity'):
             simulation.gradient
 
@@ -778,6 +785,7 @@ class TestGradient:
         simulation = simulations.Simulation(
                 model=emg3d.Model(mesh, mu_r=np.ones(mesh.shape_cells)*np.pi),
                 **sim_inp)
+        simulation._misfit = misfit
         with pytest.raises(NotImplementedError, match='for magn. permeabili'):
             simulation.gradient
 

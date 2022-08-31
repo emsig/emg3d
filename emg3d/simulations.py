@@ -809,7 +809,7 @@ class Simulation:
                 self.survey.add_noise(**kwargs)
 
     def _compute(self, srcfreq):
-        """Compute efields asynchronously for all sources and frequencies."""
+        """Compute efields and responses asynchronously using emg3d.solve()."""
         from emg3d import _multiprocessing as _mp
 
         if not srcfreq[0][0]:
@@ -856,17 +856,16 @@ class Simulation:
         self.print_solver_info('efield', verb=self.verb)
 
     def _compute_1d(self, gradient=False):
-        """TODO :: Work in progress for emg3d(empymod)
+        """Compute responses asynchronously using empymod.bipole()."""
 
-        empymod_opts - make it undocumented, as self._empymod_opts or similar.
+        # empymod_opts - make it undocumented, as self._empymod_opts or similar
+        #
+        # empymod_opts : dict, default: {'verb': 1}
+        #     Most parameters for ``empymod.bipole()`` are given from the
+        #     provided survey. However, there are a couple of parameters that
+        #     can be set: ``{src;rec}pts``, ``verb``, ``{h;f}t``,
+        #     ``{ht;ft}arg``, ``xdirect``, ``loop``.
 
-        empymod_opts : dict, default: {'verb': 1}
-            Most parameters for ``empymod.bipole()`` are given from the
-            provided survey. However, there are a couple of parameters that can
-            be set: ``{src;rec}pts``, ``verb``, ``{h;f}t``, ``{ht;ft}arg``,
-            ``xdirect``, ``loop``.
-
-        """
         from emg3d import _multiprocessing as _mp
 
         # Ensure we can handle the sources and receivers.
@@ -1010,6 +1009,11 @@ class Simulation:
             without relative electric permittivity nor relative magnetic
             permeability.
 
+        .. note::
+
+            If ``layered=True``, the gradient is computed using finite
+            differences.
+
 
         Returns
         -------
@@ -1023,44 +1027,39 @@ class Simulation:
         """
         if self._gradient is None:
 
-            # Warn that cubic is not good for adjoint-state gradient.
-            if not self.layered and self.receiver_interpolation == 'cubic':
-                msg = (
-                    "emg3d: Receiver responses were obtained with cubic "
-                    "interpolation. This will not yield the exact gradient. "
-                    "Change `receiver_interpolation='linear'` in the call to "
-                    "Simulation()."
-                )
-                warnings.warn(msg, UserWarning)
-
-            # Check limitation: No epsilon_r, mu_r.
-            var = (self.model.epsilon_r, self.model.mu_r)
-            for v, n in zip(var, ('el. permittivity', 'magn. permeability')):
-                if v is not None and not np.allclose(v, 1.0):
-                    raise NotImplementedError(
-                        f"Gradient not implemented for {n}."
-                    )
-
             # Ensure misfit has been computed
             # (and therefore the electric fields).
             _ = self.misfit
 
-            if self.layered:
-
-                # TODO check:
-                # layered: good for epsilon_r/mu_r, not property_y
-                # regular: the other way around
-                # layered: NEEDS property_x
-
+            if self.layered:  # 1D finite-difference gradient.
                 gradient = self._compute_1d(gradient=True)
 
-            else:
+            else:             # 3D adjoint-state gradient
 
-                # Pre-allocate the gradient on the mesh.
-                gradient = np.zeros((3, *self.model.shape), order='F')
+                # Warn that cubic is not good for adjoint-state gradient.
+                if self.receiver_interpolation == 'cubic':
+                    msg = (
+                        "emg3d: Receiver responses were obtained with cubic "
+                        "interpolation. This will not yield the exact "
+                        "gradient. Change `receiver_interpolation='linear'` "
+                        "in the call to Simulation()."
+                    )
+                    warnings.warn(msg, UserWarning)
+
+                # Check limitation: No epsilon_r, mu_r.
+                var = (self.model.epsilon_r, self.model.mu_r)
+                nam = ('el. permittivity', 'magn. permeability')
+                for v, n in zip(var, nam):
+                    if v is not None and not np.allclose(v, 1.0):
+                        raise NotImplementedError(
+                            f"Gradient not implemented for {n}."
+                        )
 
                 # Compute back-propagating electric fields.
                 self._bcompute()
+
+                # Pre-allocate the gradient on the mesh.
+                gradient = np.zeros((3, *self.model.shape), order='F')
 
                 # Loop over source-frequency pairs.
                 for src, freq in self._srcfreq:
@@ -1089,12 +1088,10 @@ class Simulation:
                     # grid and add it to the total gradient.
                     if self.model.grid != gfield.grid:
                         # Wrapped in own function as it requires discretize.
-                        P = maps._discretize_volume_average(
-                                self.model.grid, gfield.grid)
-                        for i in range(3):
-                            gradient[i, ...] += (
-                                P.T * grad[i, ...].ravel('F')
-                            ).reshape(self.model.shape, order='F')
+                        maps._interp_volume_average_adj(
+                            oval=gradient, ogrid=self.model.grid,
+                            nval=grad, ngrid=gfield.grid,
+                        )
                     else:
                         gradient += grad
 

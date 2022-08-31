@@ -724,12 +724,8 @@ def interp_edges_to_vol_averages(ex, ey, ez, volumes, ox, oy, oz):
 
 
 @_requires('discretize')
-def _discretize_volume_average(grid_in, grid_out):
-    """Return volume-averaging matrix from discretize.
-
-    Thin wrapper around :func:`discretize.utils.volume_average`. Wrapped in own
-    function as it requires the _soft_ dependency discretize.
-
+def _interp_volume_average_adj(oval, ogrid, nval, ngrid):
+    """In-place adjoint of volume averaging.
 
     .. todo::
 
@@ -742,19 +738,26 @@ def _discretize_volume_average(grid_in, grid_out):
 
     Parameters
     ----------
-    grid_in : TensorMesh
-        Original (input) grid; a :class:`emg3d.meshes.TensorMesh` instance.
+    oval : ndarray
+        Arrays of the original grid, to which the results are added (of shape
+        ``(3, *ogrid.shape_cells)``).
 
-    grid_out : TensorMesh
-        New (output) grid; a :class:`emg3d.meshes.TensorMesh` instance.
+    ogrid : TensorMesh
+        Original grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
-    Returns
-    -------
-    imat : scipy.sparse.csr_matrix
-        Interpolation matrix of shape (grid_out.n_cells, grid_in.n_cells).
+    nval : ndarray
+        Arrays of the new grid (of shape ``(3, *ngrid.shape_cells)``), which
+        are adjoint-interpolated to the original grid.
+
+    ngrid : TensorMesh
+        New grid; a :class:`emg3d.meshes.TensorMesh` instance.
 
     """
-    return discretize.utils.volume_average(grid_in, grid_out)
+    P = discretize.utils.volume_average(ogrid, ngrid)
+    shape = ogrid.shape_cells
+    oval[0, ...] += (P.T * nval[0, ...].ravel('F')).reshape(shape, order='F')
+    oval[1, ...] += (P.T * nval[1, ...].ravel('F')).reshape(shape, order='F')
+    oval[2, ...] += (P.T * nval[2, ...].ravel('F')).reshape(shape, order='F')
 
 
 # INDEX TRICKS
