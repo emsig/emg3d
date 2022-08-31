@@ -387,6 +387,7 @@ class Simulation:
 
         # Clean data.
         if what in ['computed', 'all']:
+            self._computed = False
             for key in ['residual', 'weights']:
                 if key in self.data.keys():
                     del self.data[key]
@@ -457,6 +458,7 @@ class Simulation:
         if what in ['computed', 'results', 'all']:
             out['gradient'] = self._gradient
             out['misfit'] = self._misfit
+            out['computed'] = self._computed
 
         if copy:
             return deepcopy(out)
@@ -516,7 +518,7 @@ class Simulation:
                 setattr(out, name, values)
 
         # Add gradient and misfit.
-        data = ['gradient', 'misfit']
+        data = ['gradient', 'misfit', 'computed']
         for name in data:
             if name in inp.keys():
                 setattr(out, '_'+name, inp.pop(name))
@@ -808,6 +810,9 @@ class Simulation:
             if kwargs.pop('add_noise', True):
                 self.survey.add_noise(**kwargs)
 
+        elif source is None and frequency is None:
+            self._computed = True
+
     def _compute(self, srcfreq):
         """Compute efields and responses asynchronously using emg3d.solve()."""
         from emg3d import _multiprocessing as _mp
@@ -815,7 +820,6 @@ class Simulation:
         if not srcfreq[0][0]:
             # "Normal" case: all source-frequency pairs.
             srcfreq = self._srcfreq
-            self._computed = True
 
         # Create iterable from src/freq-list for parallel computation.
         def collect_efield_inputs(inp):
@@ -857,87 +861,38 @@ class Simulation:
 
     def _compute_1d(self, gradient=False):
         """Compute responses asynchronously using empymod.bipole()."""
-
-        # empymod_opts - make it undocumented, as self._empymod_opts or similar
-        #
-        # empymod_opts : dict, default: {'verb': 1}
-        #     Most parameters for ``empymod.bipole()`` are given from the
-        #     provided survey. However, there are a couple of parameters that
-        #     can be set: ``{src;rec}pts``, ``verb``, ``{h;f}t``,
-        #     ``{ht;ft}arg``, ``xdirect``, ``loop``.
-
         from emg3d import _multiprocessing as _mp
 
-        # Ensure we can handle the sources and receivers.
-        srlist = list(self.survey.sources.values())
-        srlist = srlist + list(self.survey.receivers.values())
-        for sr in srlist:
-            name = sr.__class__.__name__
-            if 'Point' not in name and 'Dipole' not in name:
-                raise ValueError(
-                    "Layered: Only Points and Dipoles supported, "
-                    f"provided: {sr}!"
-                )
-        # Test to implement
-        # # Survey with unsupported electrodes.
-        # survey = emg3d.Survey(
-        #     sources=emg3d.TxElectricWire([[0, 0, 0], [2, 2, 2]]),
-        #     receivers=emg3d.RxElectricPoint((1000, 500, 100, 0, 0)),
-        #     frequencies=1.0,
-        # )
-        # with pytest.raises(ValueError, match='Layered: Only Points and D'):
-        #     emg3d.models._estimate_layered_opts({}, survey, None)
-
-        # TODO
-        # - Proper description
-        # - printing/logging
-        # - jvec
-        # - jtvec
-        # - to_dict/from_dict
-        # - repr's
-        # - all the checks to stuff that does not apply if layered
-
-        # Check limitation: No property_y, epsilon_r, mu_r
-        var = (self.model.property_y, self.model.epsilon_r, self.model.mu_r)
-        for v, n in zip(var, ('triaxial properties', 'el. permittivity',
-                              'magn. permeability')):
-            if v is not None and not np.allclose(v, 1.0):
-                raise NotImplementedError(
-                    f"Layered compute not implemented for {n}."
-                )
-
-        # empymod_opts = {'verb': self.verb+1, **self._empymod_opts}
-        empymod_opts = {'verb': self.verb+1}
-
-        # TODO create a better switch.
+        # Check if there are observed data.
         has_data = np.isfinite(self.data.observed.data).sum() > 0
 
-        # Create iterable from src/freq-list for parallel computation.
+        # Create iterable from src-list for parallel computation.
         def collect_empymod_inputs(source):
             """Collect inputs."""
-
-            # TODO provide survey always? Time it!
-            # TODO case _must_ be 'isotropic' or 'VTI'
 
             data = {
                 'model': self.model,
                 'src': self.survey.sources[source],
                 'receivers': self.survey.receivers,
                 'frequencies': self.survey.frequencies,
-                'empymod_opts': empymod_opts,
+                'empymod_opts': self._empymod_opts,
                 'observed': None,
                 'layered_opts': self.layered_opts,
                 'gradient': gradient,
             }
+
+            # If there is data, add it.
             if has_data:
                 data['observed'] = self.data.observed.loc[source, :, :]
+
+            # For the gradient we also need the residuals and weights.
             if gradient:
                 data['residual'] = self.data.residual.loc[source, :, :]
                 data['weights'] = self.data.weights.loc[source, :, :]
 
             return data
 
-        # Compute fields in parallel.
+        # Compute responses in parallel.
         out = _mp.process_map(
             _mp.layered,
             list(map(collect_empymod_inputs, self.survey.sources.keys())),
@@ -945,9 +900,8 @@ class Simulation:
             **{'desc': 'Compute empymod', **self._tqdm_opts},
         )
 
+        # If gradient, return it.
         if gradient:
-
-            # TODO should probably be done in parallel
 
             # Pre-allocate the gradient on the mesh.
             grad = np.zeros((3, *self.model.grid.shape_cells), order='F')
@@ -958,13 +912,12 @@ class Simulation:
 
             return grad
 
+        # If forward, store responses in synthetic.
         else:
 
             # Loop over sources to extract and store.
             for i, src in enumerate(self.survey.sources.keys()):
                 self.data['synthetic'].loc[src, :, :] = out[i]
-
-            self._computed = True
 
     # OPTIMIZATION
     @property
@@ -1711,6 +1664,23 @@ class Simulation:
             self.layered_opts = layered_opts
             return
 
+        # Ensure we can handle the sources and receivers.
+        srlist = list(self.survey.sources.values())
+        srlist = srlist + list(self.survey.receivers.values())
+        for sr in srlist:
+            name = sr.__class__.__name__
+            if 'Point' not in name and 'Dipole' not in name:
+                raise ValueError(
+                    "Layered: Only Points and Dipoles supported, "
+                    f"provided: {sr}!"
+                )
+
+        # Check limitation: Only isotropic and VTI.
+        if self.model.case not in ['isotropic', 'VTI']:
+            raise NotImplementedError(
+                f"Layered compute not implemented for {self.model.case} case."
+            )
+
         # Make a copy of layered to not overwrite.
         layered_opts = deepcopy(layered_opts)
 
@@ -1751,4 +1721,6 @@ class Simulation:
             ellipse['minor'] = ellipse.get('minor', 0.8)
             layered_opts['ellipse'] = ellipse
 
+        # Store layered options.
         self.layered_opts = layered_opts
+        self._empymod_opts = {'verb': self.verb+1}

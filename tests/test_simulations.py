@@ -581,6 +581,7 @@ class TestLayeredSimulation():
 
         # Compute observed.
         simulation.compute(observed=True, min_offset=1100)
+        del simulation.survey.data['synthetic']
 
     def test_reprs(self):
         test = self.simulation.__repr__()
@@ -665,6 +666,33 @@ class TestLayeredSimulation():
 
         with pytest.raises(NotImplementedError, match="No fields if `laye"):
             self.simulation.get_efield('TxED-1', 'f-1')
+
+        # Survey with unsupported electrodes.
+        survey = emg3d.Survey(
+            sources=emg3d.TxElectricWire([[0, 0, 0], [2, 2, 2]]),
+            receivers=emg3d.RxElectricPoint((1000, 500, 100, 0, 0)),
+            frequencies=1.0,
+        )
+        with pytest.raises(ValueError, match='Layered: Only Points and D'):
+            simulations.Simulation(survey, self.model, layered=True)
+
+        model = emg3d.Model(self.grid, 1.0, 2.0, 3.0)
+        with pytest.raises(NotImplementedError, match='Layered compute not'):
+            simulations.Simulation(self.survey, model, layered=True)
+
+    def test_compute_1d(self):
+
+        # Just checking the workflow, not the actual result.
+        assert not np.isfinite(self.simulation.data.synthetic.data).sum() > 0
+        assert not self.simulation._computed
+        self.simulation.compute()
+        assert self.simulation._computed
+        assert np.isfinite(self.simulation.data.synthetic.data).sum() > 0
+
+        assert self.simulation.misfit > 0.0
+
+        grad = self.simulation.gradient
+        assert grad.shape == self.model.shape
 
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
