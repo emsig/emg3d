@@ -851,12 +851,12 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
 
     """
     # Center coordinates
-    cx = (p0[0] + p1[0]) / 2
-    cy = (p0[1] + p1[1]) / 2
+    cx = (p0[0] + p1[0]) / 2.0
+    cy = (p0[1] + p1[1]) / 2.0
 
     # Adjacent and opposite sides
-    dx = (p1[0] - p0[0]) / 2
-    dy = (p1[1] - p0[1]) / 2
+    dx = (p1[0] - p0[0]) / 2.0
+    dy = (p1[1] - p0[1]) / 2.0
 
     # c: linear eccentricity
     dxy = np.linalg.norm([dx, dy])
@@ -868,12 +868,13 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
         cos, sin = dx/dxy, dy/dxy
 
     # a: semi-major axis
-    major = max(dxy * factor, dxy + radius)
+    minimum_axis = 1e-9
+    major = max(dxy * factor, dxy + radius, minimum_axis)
 
     # b: semi-minor axis
-    minor = max(minor * major, radius)
+    minor = max(minor * major, radius, minimum_axis)
     if check_foci:
-        minor = max(minor, np.sqrt(abs(major**2 - dxy**2)))
+        minor = max(minor, np.sqrt(abs(major**2 - dxy**2)), minimum_axis)
 
     # Return indices falling within or on a general ellipse.
     X, Y = coo[0] - cx, coo[1] - cy

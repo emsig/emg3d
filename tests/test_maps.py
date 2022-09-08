@@ -737,6 +737,15 @@ def test_ellipse_indices():
     assert_allclose(out, res)
     # plt.pcolormesh(out); plt.axis('equal')
 
+    # Strange inputs (important is that no warnings/errors are raised)
+    inp = {'p0': [1, 1], 'p1': [3, 3],
+           'radius': -10000, 'factor': 0.0, 'minor': 0.0}
+    out = emg3d.maps.ellipse_indices((np.array([2.0]), np.array([2.0])), **inp)
+    assert out[0, 0]
+    out = emg3d.maps.ellipse_indices(
+            (np.array([2.00001]), np.array([2.0])), **inp)
+    assert not out[0, 0]
+
 
 def test_all_dir():
     assert set(maps.__all__) == set(dir(maps))
