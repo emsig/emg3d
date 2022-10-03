@@ -1699,7 +1699,7 @@ class Simulation:
             ellipse = layered_opts.get('ellipse', {})
 
             # Try to estimate radius if not given.
-            if not ellipse.get('radius'):
+            if ellipse.get('radius') is None:
 
                 # Check if negz-cond is in gridding_opts.
                 try:
