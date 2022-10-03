@@ -6,6 +6,17 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+
+- Small improvements to the ellipse-function (and the CLI):
+
+  - The major and minor axis of the ellipse are new forced to be at least 1e-9.
+  - A radius of 0.0 provided through the CLI is now respected (was before
+    overwritten).
+
+
 v1.8.0 : Layered modelling
 --------------------------
 
