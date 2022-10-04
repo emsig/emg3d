@@ -148,7 +148,6 @@ class Simulation:
         Passed through to :func:`emg3d.solver.solve`. The dict can contain any
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
         ``model``, ``sfield``, ``efield``, ``return_info``, and ``log``.
-        Default verbosity is ``verb=2``.
 
     verb : int, default: 0
         Level of verbosity. Possible options:

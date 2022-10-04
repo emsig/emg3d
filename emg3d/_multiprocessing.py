@@ -227,7 +227,7 @@ def layered(inp):
     # Collect rec-independent empymod options.
     empymod_opts = {
         # User input ({src;rec}pts, {h;f}t, {h;f}targ, xdirect, loop).
-        # Contains also verb from simulation class.
+        # Contains also verb=verb+1 from simulation class.
         **empymod_opts,
         #
         # Source properties, same for all receivers.
