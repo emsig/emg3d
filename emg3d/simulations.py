@@ -1727,4 +1727,4 @@ class Simulation:
 
         # Store layered options.
         self.layered_opts = layered_opts
-        self._empymod_opts = {'verb': self.verb+1}
+        self._empymod_opts = {'verb': 1}

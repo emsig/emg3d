@@ -176,7 +176,7 @@ def layered(inp):
 
     empymod_opts : dict
         Options passed to empymod ({src;rec}pts, {h;f}t, {h;f}targ, xdirect,
-        loop).
+        loop, verb).
 
     observed : DataArray
         Observed data of this source.
@@ -226,8 +226,7 @@ def layered(inp):
 
     # Collect rec-independent empymod options.
     empymod_opts = {
-        # User input ({src;rec}pts, {h;f}t, {h;f}targ, xdirect, loop).
-        # Contains also verb=verb+1 from simulation class.
+        # User input ({src;rec}pts, {h;f}t, {h;f}targ, xdirect, loop, verb).
         **empymod_opts,
         #
         # Source properties, same for all receivers.
