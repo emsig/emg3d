@@ -10,7 +10,7 @@ license, text (e.g., the manual) is released under the CC-BY 4.0 license.
 License of Text and Website
 ---------------------------
 
- This work is licensed under Attribution 4.0 International (CC-BY-4.0).
+This work is licensed under Attribution 4.0 International (CC-BY-4.0).
 
     https://creativecommons.org/licenses/by/4.0/
 

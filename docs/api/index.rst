@@ -29,33 +29,29 @@ API reference
    utils
 
 
-.. panels::
-    :container: container-lg pb-1
-    :column: col-lg-12 p-2
+.. grid:: 1
+    :gutter: 2
 
-    Grid: :class:`emg3d.meshes.TensorMesh`
+    .. grid-item-card::
 
-    ---
-    :column: col-lg-12 p-2
+        Grid: :class:`emg3d.meshes.TensorMesh`
 
-    Model: :class:`emg3d.models.Model`
+    .. grid-item-card::
 
-    ---
-    :column: col-lg-12 p-2
+        Model: :class:`emg3d.models.Model`
 
-    Survey: :class:`emg3d.surveys.Survey`
+    .. grid-item-card::
 
-    ---
-    :column: col-lg-12 p-2
+        Survey: :class:`emg3d.surveys.Survey`
 
-    Simulation: :class:`emg3d.simulations.Simulation`
+    .. grid-item-card::
 
-    ---
-    :column: col-lg-12 p-2
+        Simulation: :class:`emg3d.simulations.Simulation`
 
-    Solver: :func:`emg3d.solver.solve`
+    .. grid-item-card::
 
-    ---
-    :column: col-lg-12 p-2
+        Solver: :func:`emg3d.solver.solve`
 
-    All sources and receivers are in :mod:`emg3d.electrodes`
+    .. grid-item-card::
+
+        All sources and receivers are in :mod:`emg3d.electrodes`
