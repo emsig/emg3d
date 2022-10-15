@@ -6,8 +6,10 @@ Changelog
 """"""""""
 
 
-*latest*
---------
+v1.8.1 : Bugfix ellipse
+-----------------------
+
+**2022-10-15**
 
 
 - Small improvements to the ellipse-function (and the CLI):
@@ -15,6 +17,12 @@ Changelog
   - The major and minor axis of the ellipse are new forced to be at least 1e-9.
   - A radius of 0.0 provided through the CLI is now respected (was before
     overwritten).
+
+- ``empymod`` is more verbose when using ``layered`` computations.
+
+- Maintenance:
+
+  - Replace deprecated ``sphinx-panels`` with ``sphinx-design``.
 
 
 v1.8.0 : Layered modelling

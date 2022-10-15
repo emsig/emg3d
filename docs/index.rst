@@ -18,113 +18,125 @@ emg3d Documentation
    dev/index
 
 
-.. panels::
+.. grid:: 1 1 2 2
+    :gutter: 2
 
-    ---
+    .. grid-item-card::
 
-    :fa:`book,fa-4x`
+        :fa:`book;fa-4x`
 
-    User Guide
-    ^^^^^^^^^^
+        User Guide
+        ^^^^^^^^^^
 
-    The manual contains installation instructions, information on how to get
-    started, tips and tricks, background theory, how to cite emg3d, important
-    references, license information, and much more!
+        The manual contains installation instructions, information on how to
+        get started, tips and tricks, background theory, how to cite emg3d,
+        important references, license information, and much more!
 
-    +++
+        +++
 
-    .. link-button:: manual
-            :type: ref
-            :text: To the user guide
-            :classes: btn-block btn-info stretched-link
+        .. button-ref:: manual
+            :expand:
+            :color: info
+            :click-parent:
 
-    ---
+            To the user guide
 
-    :fa:`fas fa-picture-o,fa-4x`
+    .. grid-item-card::
 
-    Gallery
-    ^^^^^^^
+        :fa:`fas fa-picture-o;fa-4x`
 
-    The gallery contains examples and tutorials on the usage of emg3d, and is
-    generally the best way to get started. Download them and modify them to
-    your needs! It is also a good place to see what is possible with emg3d.
+        Gallery
+        ^^^^^^^
 
-    +++
+        The gallery contains examples and tutorials on the usage of emg3d, and is
+        generally the best way to get started. Download them and modify them to
+        your needs! It is also a good place to see what is possible with emg3d.
 
-    .. link-button:: https://emsig.xyz/emg3d-gallery/gallery
-            :type: url
-            :text: To the gallery
-            :classes: btn-block btn-info stretched-link
+        +++
 
-    ---
+        .. button-link:: https://emsig.xyz/emg3d-gallery/gallery
+            :expand:
+            :color: info
+            :click-parent:
 
-    :fa:`code,fa-4x`
+            To the gallery
 
-    API reference
-    ^^^^^^^^^^^^^
+    .. grid-item-card::
 
-    The API reference of emg3d is extensive, and includes almost every function
-    and class. A lot of the underlying theory is described in the docstring of
-    the functions, particularly in the ``core`` module.
+        :fa:`code;fa-4x`
 
-    +++
+        API reference
+        ^^^^^^^^^^^^^
 
-    .. link-button:: api
-            :type: ref
-            :text: To the API reference
-            :classes: btn-block btn-info stretched-link
+        The API reference of emg3d is extensive, and includes almost every
+        function and class. A lot of the underlying theory is described in the
+        docstring of the functions, particularly in the ``core`` module.
 
-    ---
+        +++
 
-    :fa:`terminal,fa-4x`
+        .. button-ref:: api
+            :expand:
+            :color: info
+            :click-parent:
 
-    Developer guide
-    ^^^^^^^^^^^^^^^
+            To the API reference
 
-    emg3d is a community code, please help to shape its future! From typos to
-    bugs to new developments, every contribution is welcomed. This section is
-    the best way to get started.
+    .. grid-item-card::
 
-    +++
+        :fa:`terminal;fa-4x`
 
-    .. link-button:: development
-            :type: ref
-            :text: To the development guide
-            :classes: btn-block btn-info stretched-link
+        Developer guide
+        ^^^^^^^^^^^^^^^
 
-    ---
-    :column: col-lg-12 p-2
+        emg3d is a community code, please help to shape its future! From typos to
+        bugs to new developments, every contribution is welcomed. This section is
+        the best way to get started.
 
-    :fa:`comments,fa-4x`
+        +++
 
-    Contact
-    ^^^^^^^
+        .. button-ref:: development
+            :expand:
+            :color: info
+            :click-parent:
 
-    .. link-button:: https://emsig.xyz/#contributing-contact
-            :type: url
-            :text: Go to «Contributing & Contact» @ emsig.xyz
-            :classes: btn-block btn-info stretched-link
-    ---
-    :column: col-lg-12 p-2
+            To the development guide
 
-    .. dropdown:: About the name and logo of **emg3d**
+    .. grid-item-card::
+        :columns: 12
 
-        The name **emg3d** is a portmanteau of *electromagnetic* (em),
-        *multigrid* (mg), and *three-dimensional* (3D): emg3d is a
-        three-dimensional multigrid solver for electromagnetic diffusion.
+        :fa:`comments;fa-4x`
 
-        The symbol stands for the full ('F') multigrid cycling scheme through
-        the different grid sizes. This is given, for a maximum of three
-        coarsening steps, by::
+        Contact
+        ^^^^^^^
 
-            h_
-           2h_ \          /
-           4h_  \    /\  /
-           8h_   \/\/  \/
+        .. button-link:: https://emsig.xyz/#contributing-contact
+            :expand:
+            :color: info
+            :click-parent:
+
+            Go to «Contributing & Contact» @ emsig.xyz
+
+    .. grid-item-card::
+        :columns: 12
+
+        .. dropdown:: About the name and logo of emg3d
+
+            The name **emg3d** is a portmanteau of *electromagnetic* (em),
+            *multigrid* (mg), and *three-dimensional* (3D): emg3d is a
+            three-dimensional multigrid solver for electromagnetic diffusion.
+
+            The symbol stands for the full ('F') multigrid cycling scheme
+            through the different grid sizes. This is given, for a maximum of
+            three coarsening steps, by::
+
+                h_
+               2h_ \          /
+               4h_  \    /\  /
+               8h_   \/\/  \/
 
 
-        See, for example, the theory section around :numref:`Figure %s
-        <Muld06_Fig5>`.
+            See, for example, the theory section around :numref:`Figure %s
+            <Muld06_Fig5>`.
 
-        .. image:: ./_static/emg3d-logo.svg
+            .. image:: ./_static/emg3d-logo.svg
 
