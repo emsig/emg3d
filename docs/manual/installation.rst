@@ -39,7 +39,7 @@ or via ``pip``:
 
 .. code-block:: console
 
-   pip install emg3d empymod discretize xarray matplotlib h5py tqdm scooby
+   pip install emg3d[full]
 
 If you are new to Python we recommend using a Python distribution, which will
 ensure that all dependencies are met, specifically properly compiled versions

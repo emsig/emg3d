@@ -39,6 +39,17 @@ setup(
         "scipy>=1.4",
         "numba>=0.45",
     ],
+    extras_require={
+        'full': [
+            'tqdm',
+            'h5py',
+            'scooby',
+            'xarray',
+            'empymod',
+            'discretize>=0.7.3',
+            'matplotlib',
+        ],
+    },
     use_scm_version={
         "root": ".",
         "relative_to": __file__,
