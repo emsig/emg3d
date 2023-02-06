@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+
+- Installation through pip has new the option ``pip install emg3d[full]``,
+  which installs all soft dependencies as well.
+
+
 v1.8.1 : Bugfix ellipse
 -----------------------
 
