@@ -111,6 +111,8 @@ linkcheck_ignore = [
     'https://doi.org/10.1093/gji/ggab171',
     'https://doi.org/10.2528/PIER10052807',
     'https://doi.org/10.2528/PIER00080103',
+    'https://doi.org/10.1137/0731021',
+    'https://doi.org/10.1137/1.9780898719505',
     'https://www.terrasysgeo.com',
     'https://www.pygimli.org',
 ]
