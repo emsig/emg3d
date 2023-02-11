@@ -814,6 +814,7 @@ def ellipse_indices(coo, p0, p1, radius, factor=1., minor=1., check_foci=True):
     ----------
     coo : tuple of two ndarrays
         Tuple of two arrays defining the points in x and y:
+
         - If two vectors are given (of same or different size), they are taken
           as the x- and y-values of a regular grid.
         - If two 2D-arrays are given of the same shape, they are taken as the
