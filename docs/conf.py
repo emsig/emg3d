@@ -103,8 +103,7 @@ html_css_files = [
 
 # ==== 4. linkcheck ====
 
-# Papers from academic.oup result in a 104 Error?
-# Papers from PIERS result in a 404 Client Error?
+# Many journals do not allow the ping (???)
 linkcheck_ignore = [
     'https://doi.org/10.1111/j.1365-246X.2010.04544.x',
     'https://doi.org/10.1088/0266-5611/24/3/034012',
@@ -113,6 +112,8 @@ linkcheck_ignore = [
     'https://doi.org/10.2528/PIER00080103',
     'https://doi.org/10.1137/0731021',
     'https://doi.org/10.1137/1.9780898719505',
+    'https://doi.org/10.1111/j.1365-2478.2010.00899.x',
+    'https://doi.org/10.1111/j.1365-2478.2006.00558.x',
     'https://www.terrasysgeo.com',
     'https://www.pygimli.org',
 ]

@@ -91,6 +91,8 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
 
         Current possibilities:
 
+            - ``False``: Not used, in which case multigrid acts as solver on
+              its own, not as pre-conditioner.
             - ``True`` or ``'bicgstab'``: BiConjugate Gradient STABilized
               (:func:`scipy.sparse.linalg.bicgstab`).
             - ``'cgs'``: Conjugate Gradient Squared
