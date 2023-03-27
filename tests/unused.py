@@ -7,7 +7,7 @@ These are unused code snippets that might come in handy at some point, maybe
 even just for testing purposes.
 
 """
-# Copyright 2018-2022 The emsig community.
+# Copyright 2018-2023 The emsig community.
 #
 # This file is part of emg3d.
 #

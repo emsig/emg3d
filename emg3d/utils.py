@@ -1,7 +1,7 @@
 """
 Utility functions for the multigrid solver.
 """
-# Copyright 2018-2022 The emsig community.
+# Copyright 2018-2023 The emsig community.
 #
 # This file is part of emg3d.
 #
