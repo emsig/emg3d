@@ -10,7 +10,7 @@ you are interested in understanding how the multigrid solver works, the theory
 and its implementation.
 
 """
-# Copyright 2018-2022 The emsig community.
+# Copyright 2018-2023 The emsig community.
 #
 # This file is part of emg3d.
 #
