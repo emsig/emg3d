@@ -10,6 +10,8 @@ latest
 ------
 
 
+- ``io``: New function ``convert`` to convert a file that was saved with emg3d
+  to another file format.
 - Installation through pip has new the option ``pip install emg3d[full]``,
   which installs all soft dependencies as well.
 

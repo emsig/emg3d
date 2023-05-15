@@ -31,7 +31,7 @@ except ImportError:
 
 from emg3d import meshes, utils
 
-__all__ = ['save', 'load']
+__all__ = ['save', 'load', 'convert']
 
 
 def __dir__():
@@ -215,6 +215,24 @@ def load(fname, **kwargs):
         data = (data, info)
 
     return data
+
+
+def convert(ifname, ofname, **kwargs):
+    """Convert a file that was saved with emg3d to another file format.
+
+    See functions :func:`emg3d.io.load` and :func:`emg3d.io.load` for more
+    information.
+
+
+    Parameters
+    ----------
+    ifname, ofname : str
+        {Input;Output} file name with absolute or relative path including
+        suffix, which defines the used data format. Implemented are currently:
+
+    """
+    data = load(ifname, **kwargs)
+    save(ofname, **data)
 
 
 def _dict_serialize(inp):
