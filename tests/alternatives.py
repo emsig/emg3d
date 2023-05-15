@@ -13,7 +13,7 @@ can use them for cross-checking with the main code. Also, they might (or might
 not) be easier to understand.
 
 """
-# Copyright 2018-2023 The emsig community.
+# Copyright 2018 The emsig community.
 #
 # This file is part of emg3d.
 #

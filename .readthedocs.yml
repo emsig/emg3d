@@ -13,6 +13,8 @@ formats: []
 python:
   version: 3.8
   install:
+    # Temporary workaround to have discretize wheels built.
+    - requirements: .rtd-requirements.txt
     - requirements: requirements-dev.txt
     - method: pip
       path: .

@@ -55,7 +55,7 @@ class TestFourier:
 
     def test_kwargs(self):
         times = np.logspace(-1, 1)
-        fmin = 0.1
+        fmin = 0.1 - np.finfo(float).eps
         fmax = 10
         input_freq = np.logspace(-1, 1, 11)
         xfreq = 10

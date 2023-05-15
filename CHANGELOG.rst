@@ -6,14 +6,29 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.8.2 : convert & pip-full
+---------------------------
+
+**2023-05-31**
 
 
 - ``io``: New function ``convert`` to convert a file that was saved with emg3d
-  to another file format.
+  from one file format to another file format.
 - Installation through pip has new the option ``pip install emg3d[full]``,
   which installs all soft dependencies as well.
+
+- Bumped the minimum requirements to:
+
+  - Python 3.8
+  - NumPy 1.19
+  - SciPy 1.5
+  - Numba 0.50
+
+- Bug fixes, small improvements and maintenance
+
+  - Testing: added Python 3.11, dropped Python 3.7.
+  - Adjust copyright notice to only include original year, so it has not to be
+    adjusted each year.
 
 
 v1.8.1 : Bugfix ellipse

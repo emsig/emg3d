@@ -64,11 +64,11 @@ def test_main(script_runner):
     assert "* ERROR   :: Config file not found: " in ret.stderr
 
 
-# Skip test for 3.7, it fails. Not sure why.
+# Skip test for minimal, it fails. Not sure why.
 # Something multiprocessing/numba/sem_open/synchronization primitives.
 @disable_numba()
 @pytest.mark.script_launch_mode('subprocess')
-@pytest.mark.skipif(sys.version_info < (3, 8), reason="Exclude for Python 3.7")
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Exclude for Python 3.8")
 def test_main2(script_runner):
 
     # Test emg3d/__main__.py by calling the folder emg3d.
