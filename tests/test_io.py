@@ -111,6 +111,17 @@ class TestSaveLoad:
         assert_allclose(self.field.fx, out_json['Field'].fx)
         assert_allclose(self.grid.cell_volumes, out_json['Grid'].cell_volumes)
 
+    def test_convert(self, tmpdir):
+        io.save(tmpdir+'/test.h5', **self.data)
+        io.convert(tmpdir+'/test.h5', tmpdir+'/test.json')
+        h5 = io.load(tmpdir+'/test.h5')
+        js = io.load(tmpdir+'/test.json')
+
+        assert h5['_format'] == js['_format']
+        assert h5['_date'] != js['_date']
+        assert h5['Field'] == js['Field']
+        assert h5.keys() == js.keys()
+
     def test_warnings(self, tmpdir, capsys):
         # Check message from loading another file
         data = io._dict_serialize({'meshes': self.grid})
