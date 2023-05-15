@@ -112,9 +112,9 @@ class TestSaveLoad:
         assert_allclose(self.grid.cell_volumes, out_json['Grid'].cell_volumes)
 
     def test_convert(self, tmpdir):
-        io.save(tmpdir+'/test.h5', **self.data)
-        io.convert(tmpdir+'/test.h5', tmpdir+'/test.json')
-        h5 = io.load(tmpdir+'/test.h5')
+        io.save(tmpdir+'/test.npz', **self.data)
+        io.convert(tmpdir+'/test.npz', tmpdir+'/test.json')
+        h5 = io.load(tmpdir+'/test.npz')
         js = io.load(tmpdir+'/test.json')
 
         assert h5['_format'] == js['_format']
