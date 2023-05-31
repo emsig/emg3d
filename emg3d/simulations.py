@@ -5,7 +5,7 @@ due to a given model and survey.
 The simulation module combines the different pieces of ``emg3d`` providing
 a high-level, specialised modelling tool for the end user.
 """
-# Copyright 2018-2023 The emsig community.
+# Copyright 2018 The emsig community.
 #
 # This file is part of emg3d.
 #

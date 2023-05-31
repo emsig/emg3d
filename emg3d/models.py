@@ -1,7 +1,7 @@
 """
 Everything to store electromagnetic material properties for the solver.
 """
-# Copyright 2018-2023 The emsig community.
+# Copyright 2018 The emsig community.
 #
 # This file is part of emg3d.
 #

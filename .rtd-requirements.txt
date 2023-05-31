@@ -1,0 +1,4 @@
+# Temporary workaround to have discretize wheels built.
+numpy
+cython
+

@@ -1,4 +1,3 @@
-import time
 from emg3d import __version__
 
 # ==== 1. Extensions  ====
@@ -57,7 +56,7 @@ master_doc = 'index'
 # General information about the project.
 project = 'emg3d'
 author = 'The emsig community'
-copyright = f'2018-{time.strftime("%Y")}, {author}'
+copyright = f'2018, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).
 version = __version__
@@ -103,17 +102,9 @@ html_css_files = [
 
 # ==== 4. linkcheck ====
 
-# Many journals do not allow the ping (???)
+# Many journals do not allow the ping; no idea why. I exclude all DOI's from
+# the check; they "should" be permanent, that is their entire purpose; doi.org
+# is responsible for resolving them.
 linkcheck_ignore = [
-    'https://doi.org/10.1111/j.1365-246X.2010.04544.x',
-    'https://doi.org/10.1088/0266-5611/24/3/034012',
-    'https://doi.org/10.1093/gji/ggab171',
-    'https://doi.org/10.2528/PIER10052807',
-    'https://doi.org/10.2528/PIER00080103',
-    'https://doi.org/10.1137/0731021',
-    'https://doi.org/10.1137/1.9780898719505',
-    'https://doi.org/10.1111/j.1365-2478.2010.00899.x',
-    'https://doi.org/10.1111/j.1365-2478.2006.00558.x',
-    'https://www.terrasysgeo.com',
-    'https://www.pygimli.org',
+    "https://doi.org/10.*",
 ]

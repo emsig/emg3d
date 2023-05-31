@@ -1,7 +1,7 @@
 """
 Functionalities related to time-domain modelling using a frequency-domain code.
 """
-# Copyright 2018-2023 The emsig community.
+# Copyright 2018 The emsig community.
 #
 # This file is part of emg3d.
 #

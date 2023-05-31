@@ -1,7 +1,7 @@
 """
 Utility functions for writing and reading data.
 """
-# Copyright 2018-2023 The emsig community.
+# Copyright 2018 The emsig community.
 #
 # This file is part of emg3d.
 #
@@ -227,8 +227,7 @@ def convert(ifname, ofname, **kwargs):
     Parameters
     ----------
     ifname, ofname : str
-        {Input;Output} file name with absolute or relative path including
-        suffix, which defines the used data format. Implemented are currently:
+        {Input;Output} file names (absolute or relative path) including suffix.
 
     """
     data = load(ifname, **kwargs)
