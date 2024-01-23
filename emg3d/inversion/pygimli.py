@@ -34,97 +34,135 @@ def __dir__():
 
 @utils._requires('pygimli')
 class Jacobian(pygimli.Matrix):
-    """Create a Jacobian operator to use emg3d as kernel within pyGIMLi."""
+    """Create a Jacobian operator to use emg3d within a pyGIMLi inversion.
 
-    def __init__(self, sim):
+    This never builds the actual Jacobian, but provides functions to compute
+    the Jacobian times a vector (``Jvec``) and the Jacobian transposed times a
+    vector (``Jtvec``).
+
+
+    Parameters
+    ----------
+    simulation : Simulation
+        The emg3d simulation a :class:`emg3d.simulations.Simulation` instance.
+
+    """
+
+    def __init__(self, simulation):
+        """Initiate a new Jacobian instance."""
         super().__init__()
-        self.sim = sim
+
+        # Store the simulation.
+        self.simulation = simulation
 
     def cols(self):
-        """ToDo"""
-        # sim.model.size corresponds to the number of cells
-        return self.sim.model.size
+        """The number of columns corresponds to the model size."""
+        return self.simulation.model.size
 
     def rows(self):
-        """ToDo"""
-        # sim.survey.count corresponds to the number of non-NaN data points.
-        # Multiply by 2 for real + imaginary parts.
-        return self.sim.survey.count * 2
+        """The number of rows corresponds to the data size.
+
+        To be precise, the data size times two, to account for real and
+        imaginary parts.
+        """
+        return self.simulation.survey.count * 2
 
     def mult(self, x):
-        """J * x """
-        # - Input x has size of the model; later, we want to generalize that
-        #   to allow for anisotropic models etc.
-        # - Output has size of non-NaN data [Re, Im]
-        jvec = self.sim.jvec(np.reshape(x, self.sim.model.shape, order='F'))
-        data = jvec[self.sim._finite_data]
+        """Multiply Jacobian with a vector, J * x."""
+
+        # Compute jvec.
+        jvec = self.simulation.jvec(
+            vector=np.reshape(x, self.simulation.model.shape, order='F')
+        )
+
+        # Get non-NaN data.
+        data = jvec[self.simulation.survey.isfinite]
+
+        # Return real and imaginary parts stacked.
         return np.hstack((data.real, data.imag))
 
     def transMult(self, x):
-        """J.T * x = (x * J.T)^T """
-        # - Input has size of non-NaN data [Re, Im]
-        # - Output has size of the model
+        """Multiply  Jacobian transposed with a vector, J^H*x = (x*J^H)^H."""
+
+        # Cast finite [Re, Im] data from pyGIMLi into the emg3d format.
         data = np.ones(
-                self.sim.survey.shape,
-                dtype=self.sim.data.observed.dtype
+                self.simulation.survey.shape,
+                dtype=self.simulation.data.observed.dtype
         )*np.nan
         x = np.asarray(x)
-        data[self.sim._finite_data] = x[:x.size//2] + 1j*x[x.size//2:]
-        return self.sim.jtvec(data).ravel('F')
+        xl = x.size//2
+        data[self.simulation.survey.isfinite] = x[:xl] + 1j*x[xl:]
+
+        # Return jtvec as a 1D array.
+        return self.simulation.jtvec(data).ravel('F')
 
     def save(self, *args):
-        """ToDo"""
+        """There is no save for this pseudo-Jacobian."""
         pass
 
 
 @utils._requires('pygimli')
 class Kernel(pygimli.Modelling):
-    """Create a forward operator to use emg3d as kernel within pyGIMLi."""
+    """Create a forward operator to use emg3d within a pyGIMLi inversion.
 
-    def __init__(self, sim):
+
+    Parameters
+    ----------
+    simulation : Simulation
+        The emg3d simulation a :class:`emg3d.simulations.Simulation` instance.
+
+    """
+
+    def __init__(self, simulation):
         """Initialize the pyGIMLi(emg3d)-wrapper."""
 
         # Initiate first pygimli.Modelling, which will do its magic.
         super().__init__()
 
-        # Check current limitations; PURELY for development
-        # IMPROVE (implement fully or convert to checks, do not do assert!)
-        assert sim.model.case == 'isotropic'
-        assert sim.model.map.name == 'Conductivity'
+        # Check limitation: Only isotropic so far.
+        mcase = simulation.model.case
+        if mcase != 'isotropic':
+            raise NotImplementedError(
+                f"pyGIMLi(emg3d) not implemented for {mcase} case."
+            )
 
-        # Add a bool to the simulation which selects all data
-        # which are finite (this should go into emg3d.survey directly!)
-        sim._finite_data = np.isfinite(sim.data.observed.data)
+        # Store the simulation.
+        self.simulation = simulation
 
-        # Store the simulation
-        self.sim = sim
-
-        # Translate discretize TensorMesh to pygimli-Grid
+        # Translate discretize TensorMesh to pygimli-Grid.
         self.mesh_ = pygimli.createGrid(
-            x=sim.model.grid.nodes_x,
-            y=sim.model.grid.nodes_y,
-            z=sim.model.grid.nodes_z,
+            x=simulation.model.grid.nodes_x,
+            y=simulation.model.grid.nodes_y,
+            z=simulation.model.grid.nodes_z,
         )
 
+        # HEEEEEEEERE TODO
+
+        # TODO This has to go to the notebook
         # Set marker -> water is 1, subsurface is 0
         # JUST TO DEVELOP, this SHOULD NOT be hard-coded in the wrapper
         self.mesh_.setCellMarkers(pygimli.z(self.mesh_.cellCenters()) > 0)
 
-        # Set the mesh properly
+        # Set the mesh properly TODO can this be done nicer?
         self.setMesh(self.mesh_)
 
         # Define J and setJacobian
-        self.J = Jacobian(sim)
+        self.J = Jacobian(simulation)  # TODO do we have to store sim again?
         self.setJacobian(self.J)
 
-        # Store obs-data and obs-error
-        cplx_data = sim.data.observed.data[sim._finite_data]
+        # Store obs-data and obs-error # TODO move to survey.finite_data
+        cplx_data = simulation.data.observed.data[simulation.survey.isfinite]
         self.obs_data = np.hstack([cplx_data.real, cplx_data.imag])
 
-        abs_errors = sim.survey.standard_deviation.data[sim._finite_data]
+        # TODO improve; use in-built error
+        abs_errors = simulation.survey.standard_deviation.data[
+                simulation.survey.isfinite
+        ]
         self.obs_errors = np.hstack(
                 [abs_errors, abs_errors]
         ) / abs(self.obs_data)
+
+        # TODO does it make any difference, is it needed?
         # To completely ignore big errors
         # => Test if it is actually necessary or not
         self.obs_errors[self.obs_errors > 0.5] = 1e8
@@ -133,27 +171,29 @@ class Kernel(pygimli.Modelling):
         """Create synthetic data for provided model."""
 
         # Clean emg3d-simulation, so things are recomputed
-        self.sim.clean('computed')
+        self.simulation.clean('computed')
 
         # Replace model
-        self.sim.model = models.Model(
-            grid=self.sim.model.grid,
+        self.simulation.model = models.Model(
+            grid=self.simulation.model.grid,
             property_x=model,
             mapping='Conductivity'
         )
 
         # Compute forward model and set initial residuals.
-        _ = self.sim.misfit
+        _ = self.simulation.misfit
 
         # Return the responses
-        data = self.sim.data.synthetic.data[self.sim._finite_data]
+        data = self.simulation.data.synthetic.data[
+                self.simulation.survey.isfinite
+        ]
         return np.hstack((data.real, data.imag))
 
     def createStartModel(self, dataVals):   # NOT SURE ABOUT THIS
         """Create a start model...????"""
         # Use the model in the simulation as starting model
         # => make this more flexibel!
-        return self.sim.model.property_x.ravel('F')
+        return self.simulation.model.property_x.ravel('F')
 
     def createJacobian(self, model):
         """Dummy to prevent pygimli.Modelling from doing it the hard way."""

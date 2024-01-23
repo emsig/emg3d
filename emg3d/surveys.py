@@ -713,6 +713,12 @@ class Survey:
         indices = self._irec_types
         return [tuple(self._rec_coord[source][ind].T) for ind in indices]
 
+    @property
+    def isfinite(self):
+        if not hasattr(self, '_isfinite'):
+            self._isfinite = np.isfinite(self.data.observed.data)
+        return self._isfinite
+
 
 def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):
     r"""Return random noise for given inputs.
