@@ -15,7 +15,7 @@ setup(
     author_email="info@emsig.xyz",
     url="https://emsig.xyz",
     license="Apache-2.0",
-    packages=["emg3d", "emg3d.cli"],
+    packages=["emg3d", "emg3d.inversion", "emg3d.cli"],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "License :: OSI Approved :: Apache Software License",
@@ -40,6 +40,7 @@ setup(
             "xarray",
             "discretize",
             "matplotlib",
+            "pygimli",
         ],
     },
     use_scm_version={

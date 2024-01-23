@@ -27,6 +27,7 @@ API reference
    surveys
    time
    utils
+   inversion/index
 
 
 .. grid:: 1

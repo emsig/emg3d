@@ -43,6 +43,7 @@ def process_map(fn, *iterables, max_workers, **kwargs):
     execution.
 
     """
+    process_map.count += 1
 
     # Parallel
     if max_workers > 1 and tqdm is None:
@@ -62,6 +63,10 @@ def process_map(fn, *iterables, max_workers, **kwargs):
     else:
         return list(tqdm.auto.tqdm(
             iterable=map(fn, *iterables), total=len(iterables[0]), **kwargs))
+
+
+# Counter for processing map (used, e.g., for inversions).
+process_map.count = 0
 
 
 def solve(inp):
