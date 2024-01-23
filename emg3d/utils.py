@@ -42,6 +42,8 @@ except ImportError:
 
 __all__ = ['Report', 'EMArray', 'Timer']
 
+OPTIONAL = ['xarray', 'discretize', 'h5py', 'matplotlib', 'tqdm', 'IPython']
+
 
 def __dir__():
     return __all__
@@ -158,8 +160,7 @@ class Report(ScoobyReport):
         core = ['numpy', 'scipy', 'numba', 'emg3d', 'empymod']
 
         # Optional packages.
-        optional = ['xarray', 'discretize', 'h5py', 'matplotlib',
-                    'tqdm', 'IPython']
+        optional = OPTIONAL
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)

@@ -8,6 +8,7 @@ xarray
 discretize
 matplotlib
 ipympl
+pygimli
 
 # SETUP RELATED
 setuptools_scm
