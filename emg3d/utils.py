@@ -42,6 +42,8 @@ except ImportError:
 
 __all__ = ['Report', 'EMArray', 'Timer']
 
+OPTIONAL = ['xarray', 'discretize', 'h5py', 'matplotlib', 'tqdm', 'IPython']
+
 
 def __dir__():
     return __all__
@@ -158,8 +160,7 @@ class Report(ScoobyReport):
         core = ['numpy', 'scipy', 'numba', 'emg3d', 'empymod']
 
         # Optional packages.
-        optional = ['xarray', 'discretize', 'h5py', 'matplotlib',
-                    'tqdm', 'IPython']
+        optional = OPTIONAL
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
@@ -171,6 +172,7 @@ class Timer:
     def __init__(self):
         """Initiate timer with a performance counter."""
         self._t0 = perf_counter()
+        self._previous = 0
 
     def __repr__(self):
         """Simple representation."""
@@ -190,6 +192,13 @@ class Timer:
     def runtime(self):
         """Return elapsed time as hh:mm:ss string."""
         return str(timedelta(seconds=np.round(self.elapsed)))
+
+    @property
+    def laptime(self):
+        """Return time of this lap as hh:mm:ss string."""
+        previous = self._previous
+        self._previous = self.elapsed
+        return str(timedelta(seconds=np.round(self._previous-previous)))
 
     @property
     def elapsed(self):

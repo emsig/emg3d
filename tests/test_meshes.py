@@ -101,6 +101,14 @@ class TestTensorMesh:
 
         assert mesh.cell_volumes.sum() > 69046392
 
+        # Check contains.
+        tgrid = meshes.TensorMesh(
+            [cgrid.h[0][:3], cgrid.h[1][:5], cgrid.h[2]], origin=cgrid.origin)
+        assert emg3dgrid.contains(tgrid)
+        newgrid = meshes.TensorMesh(
+                [np.ones(3), np.ones(3), np.ones(3)], np.zeros(3))
+        assert not emg3dgrid.contains(newgrid)
+
     def test_TensorMesh_repr(self):
         # Create some dummy data
         grid = meshes.TensorMesh(

@@ -37,8 +37,10 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
     "discretize": ("https://discretize.simpeg.xyz/en/main", None),
     "empymod": ("https://empymod.emsig.xyz/en/stable", None),
-    "xarray": ("https://xarray.pydata.org/en/stable", None),
+    "xarray": ("https://docs.xarray.dev/en/stable", None),
     "numba": ("https://numba.readthedocs.io/en/stable", None),
+    "numba": ("https://numba.readthedocs.io/en/stable", None),
+    "pygimli": ("https://www.pygimli.org", None),
 }
 
 # ==== 2. General Settings ====

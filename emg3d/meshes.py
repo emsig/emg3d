@@ -180,6 +180,29 @@ class TensorMesh(discretize.TensorMesh if discretize else BaseMesh):
 
         return bool(equal)
 
+    def contains(self, mesh):
+        """Check if input mesh is a subset of this mesh.
+
+        The provided ``mesh`` can be either an emg3d or a discretize
+        TensorMesh instance.
+
+        """
+
+        # Check if mesh is of the same instance.
+        equal = mesh.__class__.__name__ == self.__class__.__name__
+
+        # Check dimensions.
+        if equal:
+            equal *= len(mesh.shape_cells) == len(self.shape_cells)
+
+        # Check distances and origin.
+        if equal:
+            equal *= np.isin(mesh.nodes_x, self.nodes_x).all()
+            equal *= np.isin(mesh.nodes_y, self.nodes_y).all()
+            equal *= np.isin(mesh.nodes_z, self.nodes_z).all()
+
+        return bool(equal)
+
     def copy(self):
         """Return a copy of the TensorMesh."""
         return self.from_dict(self.to_dict(True))
