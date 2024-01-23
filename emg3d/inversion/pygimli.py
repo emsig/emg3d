@@ -150,23 +150,6 @@ class Kernel(pygimli.Modelling):
         self.J = Jacobian(simulation)  # TODO do we have to store sim again?
         self.setJacobian(self.J)
 
-        # Store obs-data and obs-error # TODO move to survey.finite_data
-        cplx_data = simulation.data.observed.data[simulation.survey.isfinite]
-        self.obs_data = np.hstack([cplx_data.real, cplx_data.imag])
-
-        # TODO improve; use in-built error
-        abs_errors = simulation.survey.standard_deviation.data[
-                simulation.survey.isfinite
-        ]
-        self.obs_errors = np.hstack(
-                [abs_errors, abs_errors]
-        ) / abs(self.obs_data)
-
-        # TODO does it make any difference, is it needed?
-        # To completely ignore big errors
-        # => Test if it is actually necessary or not
-        self.obs_errors[self.obs_errors > 0.5] = 1e8
-
     def response(self, model):
         """Create synthetic data for provided model."""
 
@@ -207,8 +190,20 @@ class Inversion(pygimli.Inversion):
         super().__init__(fop=Kernel(fop), inv=inv,  **kwargs)
 
     def run(self, dataVals=None, errorVals=None, **kwargs):
-        super().run(
-            dataVals=self.fop.obs_data if dataVals is None else dataVals,
-            errorVals=self.fop.obs_errors if errorVals is None else errorVals,
-            **kwargs
-        )
+
+        if dataVals is None:
+            finite_data = self.fop.simulation.survey.finite_data()
+            dataVals = np.hstack([finite_data.real, finite_data.imag])
+
+        if errorVals is None:
+            # TODO - IS THIS CORRECT?
+            std_dev_full = self.fop.simulation.survey.standard_deviation
+            std_dev = std_dev_full.data[self.fop.simulation.survey.isfinite]
+            errorVals = np.hstack([std_dev, std_dev]) / abs(dataVals)
+
+            # TODO does it make any difference, is it needed?
+            # To completely ignore big errors
+            # => Test if it is actually necessary or not
+            errorVals[errorVals > 0.5] = 1e8
+
+        super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)

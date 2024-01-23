@@ -715,9 +715,14 @@ class Survey:
 
     @property
     def isfinite(self):
+        """TODO: document!"""
         if not hasattr(self, '_isfinite'):
             self._isfinite = np.isfinite(self.data.observed.data)
         return self._isfinite
+
+    def finite_data(self, data='observed'):
+        """TODO: document!"""
+        return self.data[data].data[self.isfinite]
 
 
 def random_noise(standard_deviation, mean_noise=0.0, ntype='white_noise'):
