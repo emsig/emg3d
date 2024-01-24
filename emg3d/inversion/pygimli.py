@@ -129,22 +129,7 @@ class Kernel(pygimli.Modelling):
         # Store the simulation.
         self.simulation = simulation
 
-        # Translate discretize TensorMesh to pygimli-Grid.
-        self.mesh_ = pygimli.createGrid(
-            x=simulation.model.grid.nodes_x,
-            y=simulation.model.grid.nodes_y,
-            z=simulation.model.grid.nodes_z,
-        )
-
         # HEEEEEEEERE TODO
-
-        # TODO This has to go to the notebook
-        # Set marker -> water is 1, subsurface is 0
-        # JUST TO DEVELOP, this SHOULD NOT be hard-coded in the wrapper
-        self.mesh_.setCellMarkers(pygimli.z(self.mesh_.cellCenters()) > 0)
-
-        # Set the mesh properly TODO can this be done nicer?
-        self.setMesh(self.mesh_)
 
         # Define J and setJacobian
         self.J = Jacobian(simulation)  # TODO do we have to store sim again?
@@ -189,12 +174,27 @@ class Inversion(pygimli.Inversion):
     def __init__(self, fop, inv=None, **kwargs):
         super().__init__(fop=Kernel(fop), inv=inv,  **kwargs)
 
+        # Translate discretize TensorMesh to pygimli-Grid.
+        self.inv_mesh = pygimli.createGrid(
+            x=self.fop.simulation.model.grid.nodes_x,
+            y=self.fop.simulation.model.grid.nodes_y,
+            z=self.fop.simulation.model.grid.nodes_z,
+        )
+
     def run(self, dataVals=None, errorVals=None, **kwargs):
 
+        # Set the mesh.
+        self.fop.setMesh(self.inv_mesh)
+
+        # Start timer.
+        time = utils.Timer()
+
+        # Take data from the survey if not provided.
         if dataVals is None:
             finite_data = self.fop.simulation.survey.finite_data()
             dataVals = np.hstack([finite_data.real, finite_data.imag])
 
+        # Take the error from the survey if not provided.
         if errorVals is None:
             # TODO - IS THIS CORRECT?
             std_dev_full = self.fop.simulation.survey.standard_deviation
@@ -206,4 +206,9 @@ class Inversion(pygimli.Inversion):
             # => Test if it is actually necessary or not
             errorVals[errorVals > 0.5] = 1e8
 
+        # Run the inversion.
         super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
+
+        # Print passed time and exit.
+        print(f"\n:: pyGIMLi(emg3d) END   :: {time.now} :: "
+              f"runtime = {time.runtime}\n")
