@@ -13,6 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import time
 
 import numpy as np
 
@@ -69,6 +70,7 @@ class Jacobian(pygimli.Matrix):
 
     def mult(self, x):
         """Multiply Jacobian with a vector, J * x."""
+        self.simulation._count_jvec += 1
 
         # Compute jvec.
         jvec = self.simulation.jvec(
@@ -83,6 +85,7 @@ class Jacobian(pygimli.Matrix):
 
     def transMult(self, x):
         """Multiply  Jacobian transposed with a vector, J^H*x = (x*J^H)^H."""
+        self.simulation._count_jtvec += 1
 
         # Cast finite [Re, Im] data from pyGIMLi into the emg3d format.
         data = np.ones(
@@ -149,6 +152,7 @@ class Kernel(pygimli.Modelling):
         )
 
         # Compute forward model and set initial residuals.
+        self.simulation._count_forward += 1
         _ = self.simulation.misfit
 
         # Return the responses
@@ -168,10 +172,31 @@ class Kernel(pygimli.Modelling):
         pass  # do nothing
 
 
+def post_step(n, inv):
+    """TODO"""
+
+    print(f"Iteration {n:2d} :: total {inv.time.runtime}; "
+          f"iteration {inv.time.laptime} :: "
+          f"#fwd {inv.fop.simulation._count_forward:3d}; "
+          f"#jvec {inv.fop.simulation._count_jvec:3d}; "
+          f"#jtvec {inv.fop.simulation._count_jtvec:3d}")
+    time.sleep(.1)
+
+    # Reset counters
+    inv.fop.simulation._count_forward = 0
+    inv.fop.simulation._count_jvec = 0
+    inv.fop.simulation._count_jtvec = 0
+
+    # TODO: save data, model, and everything to re-start inversion.
+
+
 @utils._requires('pygimli')
 class Inversion(pygimli.Inversion):
 
     def __init__(self, fop, inv=None, **kwargs):
+        fop._count_forward = 0
+        fop._count_jvec = 0
+        fop._count_jtvec = 0
         super().__init__(fop=Kernel(fop), inv=inv,  **kwargs)
 
         # Translate discretize TensorMesh to pygimli-Grid.
@@ -181,13 +206,15 @@ class Inversion(pygimli.Inversion):
             z=self.fop.simulation.model.grid.nodes_z,
         )
 
+        self.setPostStep(post_step)
+
     def run(self, dataVals=None, errorVals=None, **kwargs):
 
         # Set the mesh.
         self.fop.setMesh(self.inv_mesh)
 
         # Start timer.
-        time = utils.Timer()
+        self.time = utils.Timer()
 
         # Take data from the survey if not provided.
         if dataVals is None:
@@ -207,8 +234,10 @@ class Inversion(pygimli.Inversion):
             errorVals[errorVals > 0.5] = 1e8
 
         # Run the inversion.
-        super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
+        out = super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
 
         # Print passed time and exit.
-        print(f"\n:: pyGIMLi(emg3d) END   :: {time.now} :: "
-              f"runtime = {time.runtime}\n")
+        print(f"\n:: pyGIMLi(emg3d) END   :: {self.time.now} :: "
+              f"runtime = {self.time.runtime}\n")
+
+        return out

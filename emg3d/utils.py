@@ -261,6 +261,7 @@ class Timer:
     def __init__(self):
         """Initiate timer with a performance counter."""
         self._t0 = perf_counter()
+        self._previous = 0
 
     def __repr__(self):
         """Simple representation."""
@@ -280,6 +281,13 @@ class Timer:
     def runtime(self):
         """Return elapsed time as hh:mm:ss string."""
         return str(timedelta(seconds=np.round(self.elapsed)))
+
+    @property
+    def laptime(self):
+        """Return time of this lap as hh:mm:ss string."""
+        previous = self._previous
+        self._previous = self.elapsed
+        return str(timedelta(seconds=np.round(self._previous-previous)))
 
     @property
     def elapsed(self):
