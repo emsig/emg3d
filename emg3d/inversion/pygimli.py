@@ -13,7 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-import time
+import sys
 
 import numpy as np
 
@@ -172,15 +172,18 @@ class Kernel(pygimli.Modelling):
         pass  # do nothing
 
 
-def post_step(n, inv):
+def post_step(_, inv):
     """TODO"""
 
-    print(f"Iteration {n:2d} :: total {inv.time.runtime}; "
-          f"iteration {inv.time.laptime} :: "
-          f"#F(m) {inv.fop.simulation._count_forward:3d}; "
-          f"#Jm {inv.fop.simulation._count_jvec:3d}; "
-          f"#Jᵀd {inv.fop.simulation._count_jtvec:3d}")
-    time.sleep(.1)
+    kc = (inv.fop.simulation._count_forward
+          + inv.fop.simulation._count_jvec
+          + inv.fop.simulation._count_jtvec)
+
+    sys.stdout.flush()
+    print(f"\n{inv.iter}: {inv.time.runtime} ({inv.time.laptime}) :: "
+          f"chi² = {inv.chi2():7.2f} :: "
+          f"#CGLS {max(0, inv.fop.simulation._count_jvec-1):2d}; "
+          f"#solver {kc:2d}\n", flush=True)
 
     # Reset counters
     inv.fop.simulation._count_forward = 0
