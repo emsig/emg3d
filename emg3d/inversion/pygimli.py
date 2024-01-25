@@ -177,7 +177,7 @@ def post_step(n, inv):
 
     print(f"Iteration {n:2d} :: total {inv.time.runtime}; "
           f"iteration {inv.time.laptime} :: "
-          f"#fwd {inv.fop.simulation._count_forward:3d}; "
+          f"#F(m) {inv.fop.simulation._count_forward:3d}; "
           f"#Jm {inv.fop.simulation._count_jvec:3d}; "
           f"#Jᵀd {inv.fop.simulation._count_jtvec:3d}")
     time.sleep(.1)
