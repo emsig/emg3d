@@ -38,8 +38,8 @@ class Jacobian(pygimli.Matrix):
     """Create a Jacobian operator to use emg3d within a pyGIMLi inversion.
 
     This never builds the actual Jacobian, but provides functions to compute
-    the Jacobian times a vector (``Jvec``) and the Jacobian transposed times a
-    vector (``Jtvec``).
+    the Jacobian times a model vector (Jm) and the Jacobian transposed times
+    a data vector (Jᵀd).
 
 
     Parameters
@@ -69,7 +69,7 @@ class Jacobian(pygimli.Matrix):
         return self.simulation.survey.count * 2
 
     def mult(self, x):
-        """Multiply Jacobian with a vector, J * x."""
+        """Multiply Jacobian with a vector, Jm."""
         self.simulation._count_jvec += 1
 
         # Compute jvec.
@@ -84,7 +84,7 @@ class Jacobian(pygimli.Matrix):
         return np.hstack((data.real, data.imag))
 
     def transMult(self, x):
-        """Multiply  Jacobian transposed with a vector, J^H*x = (x*J^H)^H."""
+        """Multiply  Jacobian transposed with a vector, Jᵀd = (dJᵀ)ᵀ."""
         self.simulation._count_jtvec += 1
 
         # Cast finite [Re, Im] data from pyGIMLi into the emg3d format.
@@ -178,8 +178,8 @@ def post_step(n, inv):
     print(f"Iteration {n:2d} :: total {inv.time.runtime}; "
           f"iteration {inv.time.laptime} :: "
           f"#fwd {inv.fop.simulation._count_forward:3d}; "
-          f"#jvec {inv.fop.simulation._count_jvec:3d}; "
-          f"#jtvec {inv.fop.simulation._count_jtvec:3d}")
+          f"#Jm {inv.fop.simulation._count_jvec:3d}; "
+          f"#Jᵀd {inv.fop.simulation._count_jtvec:3d}")
     time.sleep(.1)
 
     # Reset counters
