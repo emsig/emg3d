@@ -13,8 +13,6 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-import sys
-
 import numpy as np
 
 try:
@@ -172,18 +170,27 @@ class Kernel(pygimli.Modelling):
         pass  # do nothing
 
 
-def post_step(_, inv):
+def post_step(n, inv):
     """TODO"""
 
     kc = (inv.fop.simulation._count_forward
           + inv.fop.simulation._count_jvec
           + inv.fop.simulation._count_jtvec)
-
-    sys.stdout.flush()
-    print(f"\n{inv.iter}: {inv.time.runtime} ({inv.time.laptime}) :: "
-          f"chi² = {inv.chi2():7.2f} :: "
-          f"#CGLS {max(0, inv.fop.simulation._count_jvec-1):2d}; "
-          f"#solver {kc:2d}\n", flush=True)
+    cglsit = max(0, inv.fop.simulation._count_jvec-1)
+    phi = inv.inv.getPhi()
+    if not hasattr(inv, 'lastphi'):
+        lastphi = ""
+    else:
+        lastphi = f"; Δϕ = {(1-phi/inv.lastphi)*100:.2f}%"
+    inv.lastphi = phi
+    pygimli.info(
+        f"{n}: "
+        f"χ² = {inv.inv.chi2():7.2f}; "
+        f"λ = {inv.inv.getLambda()}; "
+        f"#CGLS {cglsit:2d} ({kc:2d} solves); "
+        f"ϕ = {inv.inv.getPhiD():.2f} + {inv.inv.getPhiM():.2f} = "
+        f"{phi:.2f}{lastphi}"
+    )
 
     # Reset counters
     inv.fop.simulation._count_forward = 0
@@ -191,6 +198,9 @@ def post_step(_, inv):
     inv.fop.simulation._count_jtvec = 0
 
     # TODO: save data, model, and everything to re-start inversion.
+
+    # inv.chi2History
+    # inv.modelHistory
 
 
 @utils._requires('pygimli')
@@ -213,11 +223,11 @@ class Inversion(pygimli.Inversion):
 
     def run(self, dataVals=None, errorVals=None, **kwargs):
 
+        pygimli.info("pyGIMLi(emg3d) START")
+        itime = utils.Timer()  # Timer.
+
         # Set the mesh.
         self.fop.setMesh(self.inv_mesh)
-
-        # Start timer.
-        self.time = utils.Timer()
 
         # Take data from the survey if not provided.
         if dataVals is None:
@@ -240,7 +250,6 @@ class Inversion(pygimli.Inversion):
         out = super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
 
         # Print passed time and exit.
-        print(f"\n:: pyGIMLi(emg3d) END   :: {self.time.now} :: "
-              f"runtime = {self.time.runtime}\n")
+        pygimli.info(f"pyGIMLi(emg3d) END :: {itime.runtime}")
 
         return out
