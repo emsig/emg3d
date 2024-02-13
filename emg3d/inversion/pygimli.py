@@ -159,10 +159,8 @@ class Kernel(pygimli.Modelling):
         ]
         return np.hstack((data.real, data.imag))
 
-    def createStartModel(self, dataVals):   # NOT SURE ABOUT THIS
-        """Create a start model...????"""
-        # Use the model in the simulation as starting model
-        # => make this more flexibel!
+    def createStartModel(self, dataVals=None):
+        """Returns the model from the provided simulation."""
         return self.simulation.model.property_x.ravel('F')
 
     def createJacobian(self, model):
@@ -213,6 +211,8 @@ class Inversion(pygimli.Inversion):
         super().__init__(fop=Kernel(fop), inv=inv,  **kwargs)
 
         # Translate discretize TensorMesh to pygimli-Grid.
+        # => TODO move to Kernel __init__, where it belongs
+        # Maybe that could be a dummy mesh of sizes 1
         self.inv_mesh = pygimli.createGrid(
             x=self.fop.simulation.model.grid.nodes_x,
             y=self.fop.simulation.model.grid.nodes_y,
@@ -227,6 +227,7 @@ class Inversion(pygimli.Inversion):
         itime = utils.Timer()  # Timer.
 
         # Set the mesh.
+        # => TODO move to Kernel __init__, where it belongs
         self.fop.setMesh(self.inv_mesh)
 
         # Take data from the survey if not provided.
