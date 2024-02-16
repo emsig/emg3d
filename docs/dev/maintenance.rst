@@ -38,7 +38,7 @@ release.
      :target: https://coveralls.io/github/emsig/emg3d?branch=main
      :alt: Coveralls
   .. image:: https://app.codacy.com/project/badge/Grade/0412e617e8cd42fea05303fe490b09b5
-     :target: https://www.codacy.com/gh/emsig/emg3d/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=emsig/emg3d&amp;utm_campaign=Badge_Grade
+     :target: https://app.codacy.com/gh/emsig/emg3d/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=emsig/emg3d&amp;utm_campaign=Badge_Grade
      :alt: Codacy
 
   Check CI coverage and code quality is good.
