@@ -106,5 +106,5 @@ html_css_files = [
 # the check; they "should" be permanent, that is their entire purpose; doi.org
 # is responsible for resolving them.
 linkcheck_ignore = [
-    "https://doi.org/10.*",
+    "https://doi.org/*",  # DOIs should be permanent (their entire purpose)
 ]

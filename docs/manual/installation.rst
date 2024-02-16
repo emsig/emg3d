@@ -13,9 +13,8 @@ or via ``pip``:
 
    pip install emg3d
 
-Minimum requirements are Python version 3.8 or higher and the modules ``scipy``
-and ``numba``. Various other packages are recommended or required for some
-advanced functionalities, namely:
+Requirements are the modules ``scipy`` and ``numba``. Various other packages
+are recommended or required for some advanced functionalities, namely:
 
 - ``xarray``: For the :class:`emg3d.surveys.Survey` and
   :class:`emg3d.simulations.Simulation` classes (model many sources and
