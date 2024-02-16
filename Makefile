@@ -13,10 +13,10 @@ help:
 	@echo ""
 
 install:
-	pip install --no-build-isolation --no-deps -e .
+	python -m pip install --no-build-isolation --no-deps -e .
 
 dev-install:
-	pip install -r requirements-dev.txt && pip install --no-build-isolation --no-deps -e .
+	python -m pip install -r requirements-dev.txt && python -m pip install --no-build-isolation --no-deps -e .
 
 pytest:
 	rm -rf .coverage htmlcov/ .pytest_cache/ && pytest --cov=emg3d && coverage html
@@ -37,7 +37,7 @@ linkcheck:
 	cd docs && make linkcheck
 
 clean:
-	pip uninstall emg3d -y
+	python -m pip uninstall emg3d -y
 	rm -rf build/ dist/ .eggs/ emg3d.egg-info/ emg3d/version.py  # build
 	rm -rf */__pycache__/ */*/__pycache__/      # python cache
 	rm -rf .coverage htmlcov/ .pytest_cache/    # tests and coverage

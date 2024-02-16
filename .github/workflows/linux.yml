@@ -31,31 +31,31 @@ jobs:
       matrix:
         os: [ubuntu, ]  # macos, windows]  # Only Linux currently.
         case:
-          - python-version: "3.8"
+          - python-version: "3.9"
             name: minimal
             os: ubuntu
-            conda: "'scipy=1.5' 'numpy=1.19' 'numba=0.50'"
-          - python-version: "3.9"
+            conda: "'scipy=1.8' 'numba=0.53'"
+          - python-version: "3.10"
             name: full
             os: ubuntu
             conda: "numba scipy xarray empymod h5py scooby discretize matplotlib"  # tqdm
-          - python-version: "3.9"
-            name: plain
-            os: ubuntu
-            conda: "numba scipy"
           - python-version: "3.10"
             name: plain
             os: ubuntu
             conda: "numba scipy"
-          - python-version: "3.10"
+          - python-version: "3.11"
+            name: plain
+            os: ubuntu
+            conda: "numba scipy"
+          - python-version: "3.11"
             name: full
             os: ubuntu
             conda: "numba scipy xarray tqdm empymod h5py scooby discretize matplotlib"
-          - python-version: "3.11"
+          - python-version: "3.12"
             name: plain
             os: ubuntu
             conda: "numba scipy"
-          - python-version: "3.11"
+          - python-version: "3.12"
             name: full
             os: ubuntu
             conda: "numba scipy xarray tqdm empymod h5py scooby discretize matplotlib"
@@ -67,9 +67,9 @@ jobs:
 
     steps:
 
-      # Cancel any previous run of the test job; [pin v0.10.0 (2022-06-27)]
+      # Cancel any previous run of the test job; [pin v0.12.1 (2024-01-25)]
       - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@bb6001c4ea612bf59c3abfc4756fbceee4f870c7
+        uses: styfle/cancel-workflow-action@85880fa0301c86cca9da44039ee3bb12d3bedbfa
         with:
           access_token: ${{ github.token }}
 
@@ -91,8 +91,8 @@ jobs:
         run: git fetch origin 'refs/tags/*:refs/tags/*'
 
       - name: Setup miniconda
-        # [pin v2.1.1 (2021-04-01)]
-        uses: conda-incubator/setup-miniconda@35d1405e78aa3f784fe3ce9a2eb378d5eeb62169
+        # [pin v3.0.1 (2023-11-29)]
+        uses: conda-incubator/setup-miniconda@11b562958363ec5770fef326fe8ef0366f8cbf8a
         with:
           auto-update-conda: true
           python-version: ${{ matrix.case.python-version }}
@@ -120,7 +120,7 @@ jobs:
       - name: Test with pytest
         shell: bash -l {0}
         run: |
-          pip install --no-build-isolation --no-deps .
+          python -m pip install .
           pytest --cov=emg3d
 
       - name: Coveralls
@@ -174,7 +174,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install wheel setuptools-scm
+          python -m pip install build setuptools-scm
 
       - name: Build source and wheel distributions
         if: github.ref == 'refs/heads/main'
@@ -187,8 +187,7 @@ jobs:
       - name: Build source and wheel distributions
         run: |
           # Build source and wheel packages
-          python setup.py sdist
-          python setup.py bdist_wheel
+          python -m build
           echo ""
           echo "Generated files:"
           ls -lh dist/

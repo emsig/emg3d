@@ -43,7 +43,7 @@ emg3d Documentation
 
     .. grid-item-card::
 
-        :fa:`fas fa-picture-o;fa-4x`
+        :fa:`image;fa-4x`
 
         Gallery
         ^^^^^^^

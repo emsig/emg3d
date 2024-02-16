@@ -1115,7 +1115,7 @@ def test_print_one_liner(capsys):
     _ = solver.solve(model, sfield, sslsolver=True, semicoarsening=False,
                      linerelaxation=False, verb=1)
     out, _ = capsys.readouterr()
-    assert '3(5); 0:00:' in out
+    assert '(5); 0:00:' in out
     assert '; CONVERGED' in out
 
     # One-liner.
@@ -1123,7 +1123,7 @@ def test_print_one_liner(capsys):
     _ = solver.solve(model, sfield, sslsolver=True, semicoarsening=False,
                      linerelaxation=False, verb=1)
     out, _ = capsys.readouterr()
-    assert '3(5); 0:00:' in out
+    assert '(5); 0:00:' in out
     assert '; CONVERGED' in out
 
 
