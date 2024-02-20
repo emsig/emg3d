@@ -762,9 +762,8 @@ def krylov(model, sfield, efield, var):
     # The ssl solvers do not abort if the norm diverges or is not finite. We
     # therefore throw an exception in `_terminate`, and catch it here.
     try:
-        tol = {TOL: var.tol}
         efield.field, i = getattr(ssl, var.sslsolver)(
-                A=A, b=sfield.field, x0=efield.field, **tol,
+                A=A, b=sfield.field, x0=efield.field, **{TOL: var.tol},
                 maxiter=var.ssl_maxit, atol=1e-30, M=M, callback=callback)
     except _ConvergenceError:
         i = -1  # Mark it as error; returned field is all zero.
