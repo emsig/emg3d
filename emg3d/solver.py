@@ -31,6 +31,7 @@ from typing import Union
 from dataclasses import dataclass
 
 import numpy as np
+import scipy as sp
 import scipy.linalg as sl
 import scipy.sparse.linalg as ssl
 
@@ -39,6 +40,10 @@ from emg3d import core, meshes, models, fields, utils
 __all__ = ['solve', 'solve_source', 'multigrid', 'krylov', 'smoothing',
            'restriction', 'prolongation', 'residual', 'MGParameters',
            'RegularGridProlongator']
+
+
+# Remove once scipy >= 3.12 is required!
+TOL = 'tol' if int(sp.__version__.split('.')[1]) < 12 else 'rtol'
 
 
 def __dir__():
@@ -758,7 +763,7 @@ def krylov(model, sfield, efield, var):
     # therefore throw an exception in `_terminate`, and catch it here.
     try:
         efield.field, i = getattr(ssl, var.sslsolver)(
-                A=A, b=sfield.field, x0=efield.field, tol=var.tol,
+                A=A, b=sfield.field, x0=efield.field, **{TOL: var.tol},
                 maxiter=var.ssl_maxit, atol=1e-30, M=M, callback=callback)
     except _ConvergenceError:
         i = -1  # Mark it as error; returned field is all zero.

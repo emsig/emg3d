@@ -595,7 +595,7 @@ def test_adjoint():
         def adj(v):
             """What does `Simulation._get_rfield()`."""
             # The strength in _get_rfield is conj(residual*weight), normalized
-            strength = complex(v/-smu0)
+            strength = complex(v.item()/-smu0)
             src = rec._adjoint_source(rec.coordinates, strength=strength)
             return src.get_field(mesh, frequency).field
 

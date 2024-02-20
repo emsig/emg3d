@@ -1,3 +1,4 @@
+import time
 import pytest
 import numpy as np
 from copy import deepcopy
@@ -113,6 +114,7 @@ class TestSaveLoad:
 
     def test_convert(self, tmpdir):
         io.save(tmpdir+'/test.npz', **self.data)
+        time.sleep(0.1)
         io.convert(tmpdir+'/test.npz', tmpdir+'/test.json')
         h5 = io.load(tmpdir+'/test.npz')
         js = io.load(tmpdir+'/test.json')

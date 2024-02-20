@@ -1030,7 +1030,7 @@ def _seasurface(edges, widths, center, seasurface, stretching, vector, limits):
 
             # No vector given (only one existing cell).
             if vector is None:
-                tdmin = fact*widths
+                tdmin = fact*widths.item()
                 cedge = center + tdmin/2
                 alphmax = 1.1*stretching[0]  # 10 % extra stretching.
 

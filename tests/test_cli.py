@@ -35,7 +35,7 @@ class disable_numba(ContextDecorator):
 def test_main(script_runner):
 
     # Test the installed version runs by -h.
-    ret = script_runner.run('emg3d', '-h')
+    ret = script_runner.run(['emg3d', '-h'])
     assert ret.success
     assert "Multigrid solver for 3D electromagnetic diffusion." in ret.stdout
 
@@ -47,19 +47,19 @@ def test_main(script_runner):
 
     # Test emg3d/cli/_main_.py by calling the file - I.
     ret = script_runner.run(
-            'python', join('emg3d', 'cli', 'main.py'), '--version')
+            ['python', join('emg3d', 'cli', 'main.py'), '--version'])
     assert ret.success
     assert "emg3d v" in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - II.
     ret = script_runner.run(
-            'python', join('emg3d', 'cli', 'main.py'), '--report')
+            ['python', join('emg3d', 'cli', 'main.py'), '--report'])
     assert ret.success
     # Exclude time to avoid errors.
     assert emg3d.utils.Report().__repr__()[115:475] in ret.stdout
 
     # Test emg3d/cli/_main_.py by calling the file - III.
-    ret = script_runner.run('python', join('emg3d', 'cli', 'main.py'), '-d')
+    ret = script_runner.run(['python', join('emg3d', 'cli', 'main.py'), '-d'])
     assert not ret.success
     assert "* ERROR   :: Config file not found: " in ret.stderr
 
@@ -72,7 +72,7 @@ def test_main(script_runner):
 def test_main2(script_runner):
 
     # Test emg3d/__main__.py by calling the folder emg3d.
-    ret = script_runner.run('python', 'emg3d', '--report')
+    ret = script_runner.run(['python', 'emg3d', '--report'])
     assert ret.success
     # Exclude time to avoid errors.
     # Exclude empymod-version (after 475), because if run locally without
