@@ -1,3 +1,4 @@
+import time
 import pytest
 import numpy as np
 from copy import deepcopy
@@ -113,8 +114,9 @@ class TestSaveLoad:
 
     def test_convert(self, tmpdir):
         io.save(tmpdir+'/test.npz', **self.data)
-        h5 = io.load(tmpdir+'/test.npz')
+        time.sleep(0.1)
         io.convert(tmpdir+'/test.npz', tmpdir+'/test.json')
+        h5 = io.load(tmpdir+'/test.npz')
         js = io.load(tmpdir+'/test.json')
 
         assert h5['_format'] == js['_format']
