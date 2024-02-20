@@ -758,7 +758,7 @@ def krylov(model, sfield, efield, var):
     # therefore throw an exception in `_terminate`, and catch it here.
     try:
         efield.field, i = getattr(ssl, var.sslsolver)(
-                A=A, b=sfield.field, x0=efield.field, tol=var.tol,
+                A=A, b=sfield.field, x0=efield.field, rtol=var.tol,
                 maxiter=var.ssl_maxit, atol=1e-30, M=M, callback=callback)
     except _ConvergenceError:
         i = -1  # Mark it as error; returned field is all zero.
