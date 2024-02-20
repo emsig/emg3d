@@ -113,8 +113,8 @@ class TestSaveLoad:
 
     def test_convert(self, tmpdir):
         io.save(tmpdir+'/test.npz', **self.data)
-        io.convert(tmpdir+'/test.npz', tmpdir+'/test.json')
         h5 = io.load(tmpdir+'/test.npz')
+        io.convert(tmpdir+'/test.npz', tmpdir+'/test.json')
         js = io.load(tmpdir+'/test.json')
 
         assert h5['_format'] == js['_format']
