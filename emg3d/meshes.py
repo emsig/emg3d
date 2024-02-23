@@ -21,8 +21,7 @@ import warnings
 from copy import deepcopy
 
 import numpy as np
-from scipy.constants import mu_0
-from scipy.optimize import brentq
+import scipy as sp
 
 from emg3d import maps, utils
 
@@ -1051,7 +1050,7 @@ def _seasurface(edges, widths, center, seasurface, stretching, vector, limits):
                 return np.sum(tdmin*alpha**np.arange(1, n+1)) - delta
 
             # Required stretching to fit n cells exactly into delta.
-            alph = brentq(f, 0.5, 10.0)
+            alph = sp.optimize.brentq(f, 0.5, 10.0)
 
             # If stretching is within tolerance, finish.
             if alph < min(alphmax, stretching[1]):
@@ -1178,7 +1177,8 @@ def skin_depth(frequency, conductivity, mu_r=1.0):
         Skin depth (m).
 
     """
-    skindepth = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu_r*mu_0)
+    mu = mu_r*sp.constants.mu_0
+    skindepth = 1/np.sqrt(np.pi*abs(frequency)*conductivity*mu)
 
     # For Laplace-domain computations.
     if frequency < 0:
