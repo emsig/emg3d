@@ -20,7 +20,7 @@ Electrodes define any type of sources and receivers used in a survey.
 from copy import deepcopy
 
 import numpy as np
-from scipy.special import sindg, cosdg
+import scipy as sp
 
 from emg3d import fields, utils
 
@@ -847,7 +847,7 @@ def rotation(azimuth, elevation, deg=True):
 
     """
     if deg:
-        cos, sin = cosdg, sindg
+        cos, sin = sp.special.cosdg, sp.special.sindg
     else:
         cos, sin = np.cos, np.sin
 

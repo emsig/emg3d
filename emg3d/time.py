@@ -20,8 +20,7 @@ Functionalities related to time-domain modelling using a frequency-domain code.
 import warnings
 
 import numpy as np
-from scipy.interpolate import PchipInterpolator as Pchip
-from scipy.interpolate import InterpolatedUnivariateSpline as Spline
+import scipy as sp
 
 try:
     import empymod
@@ -339,6 +338,7 @@ class Fourier:
         # interpolate from fmin to fmax.
         if self.freq_coarse.size != self.freq_required.size:
 
+            Spline = sp.interpolate.InterpolatedUnivariateSpline
             int_real = Spline(np.log(self.freq_compute),
                               fdata.real)(np.log(self.freq_interpolate))
             int_imag = Spline(np.log(self.freq_compute),
@@ -359,6 +359,7 @@ class Fourier:
         data_ext = np.r_[fdata[0].real-1e-100j, fdata]
 
         # 2.b Actual 'extrapolation' (now an interpolation).
+        Pchip = sp.interpolate.PchipInterpolator
         ext_real = Pchip(freq_ext, data_ext.real)(self.freq_extrapolate)
         ext_imag = Pchip(freq_ext, data_ext.imag)(self.freq_extrapolate)
 

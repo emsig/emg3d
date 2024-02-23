@@ -24,7 +24,7 @@ from copy import deepcopy
 
 import numba as nb
 import numpy as np
-from scipy.constants import mu_0
+import scipy as sp
 
 from emg3d.core import _numba_setting
 from emg3d import maps, meshes, models, utils, electrodes
@@ -271,7 +271,7 @@ class Field:
         """s*mu_0; mu_0 = magn permeability of free space [H/m]."""
         if getattr(self, '_smu0', None) is None:
             if self.sval is not None:
-                self._smu0 = self.sval*mu_0
+                self._smu0 = self.sval*sp.constants.mu_0
             else:
                 self._smu0 = None
 

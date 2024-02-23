@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import scipy as sp
 from numpy.testing import assert_allclose
 
 import emg3d
@@ -107,7 +108,7 @@ class TestModel:
         assert_allclose(tres*4., model3.property_z)
 
         # Check eta
-        iomep = sfield.sval*models.epsilon_0
+        iomep = sfield.sval*sp.constants.epsilon_0
         eta_x = -sfield.smu0*(1./model3.property_x - iomep)*gridvol
         eta_y = -sfield.smu0*(1./model3.property_y - iomep)*gridvol
         eta_z = -sfield.smu0*(1./model3.property_z - iomep)*gridvol

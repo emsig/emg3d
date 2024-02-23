@@ -23,8 +23,7 @@ Interpolation routines mapping values between different grids.
 
 import numba as nb
 import numpy as np
-from scipy.ndimage import map_coordinates
-from scipy.interpolate import RegularGridInterpolator, interpnd, interp1d
+import scipy as sp
 
 from emg3d.utils import _requires
 from emg3d.core import _numba_setting
@@ -352,9 +351,9 @@ def interpolate(grid, values, xi, method='linear', extrapolate=True,
             **({} if kwargs is None else kwargs),
         }
 
-        values_x = RegularGridInterpolator(
-                points=points, values=values, method=method,
-                **opts)(xi=new_points)
+        values_x = sp.interpolate.RegularGridInterpolator(
+            points=points, values=values, method=method, **opts
+        )(xi=new_points)
 
     # Return to linear if log10 was applied.
     if log:
@@ -480,7 +479,7 @@ def _points_from_grids(grid, values, xi, method):
         else:
             # Replicate the same expansion of xi as used in
             # RegularGridInterpolator, so the input xi can be quite flexible.
-            new_points = interpnd._ndim_coords_from_arrays(
+            new_points = sp.interpolate.interpnd._ndim_coords_from_arrays(
                     xi, ndim=3)
             shape = new_points.shape[:-1]
             new_points = new_points.reshape(-1, 3, order='F')
@@ -541,16 +540,17 @@ def interp_spline_3d(points, values, xi, **kwargs):
     # coordinates to this artificial coordinate system too.
     coords = np.empty(xi.T.shape)
     for i in range(3):
-        coords[i] = interp1d(points[i], np.arange(len(points[i])),
-                             kind='cubic', bounds_error=False,
-                             fill_value='extrapolate')(xi[:, i])
+        coords[i] = sp.interpolate.interp1d(
+            points[i], np.arange(len(points[i])), kind='cubic',
+            bounds_error=False, fill_value='extrapolate'
+        )(xi[:, i])
 
     # `map_coordinates` only works for real data; split it up if complex.
     # Note: SciPy 1.6 (12/2020) introduced complex-valued
     #       ndimage.map_coordinates; replace eventually.
-    values_x = map_coordinates(values.real, coords, **kwargs)
+    values_x = sp.ndimage.map_coordinates(values.real, coords, **kwargs)
     if 'complex' in values.dtype.name:
-        imag = map_coordinates(values.imag, coords, **kwargs)
+        imag = sp.ndimage.map_coordinates(values.imag, coords, **kwargs)
         values_x = values_x + 1j*imag
 
     return values_x

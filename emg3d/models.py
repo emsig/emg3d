@@ -20,7 +20,7 @@ Everything to store electromagnetic material properties for the solver.
 from copy import deepcopy
 
 import numpy as np
-from scipy.constants import epsilon_0
+import scipy as sp
 
 from emg3d import maps, meshes, utils
 
@@ -679,8 +679,8 @@ class VolumeModel:
 
                 # Complete version.
                 else:
-                    eta = -sfield.smu0*vol*(
-                            cond + sfield.sval*epsilon_0*model.epsilon_r)
+                    smu = sfield.sval*sp.constants.epsilon_0*model.epsilon_r
+                    eta = -sfield.smu0*vol*(cond + smu)
 
             setattr(self, '_eta_' + name[-1], eta)
 
