@@ -806,3 +806,14 @@ class TestRun:
         assert s1._dict_bfield == {'2': 3.4}    # Made-up one
         assert s2._dict_efield == {'TxED-1': {'f-1': None}}  # Re-created
         assert not hasattr(s2, '_dict_bfield')  # Deleted
+
+
+@disable_numba()
+@pytest.mark.script_launch_mode('subprocess')
+def test_import_time(script_runner):
+    # Relevant for the responsiveness of the CLI:
+    # How long does it take to import?
+    cmd = ["python", "-Ximporttime", "-c", "import emg3d"]
+    out = script_runner.run(cmd, print_result=False)
+    # Currently we check t < 0.5 s.
+    assert float(out.stderr.split('|')[-2])/1e6 < 0.5
