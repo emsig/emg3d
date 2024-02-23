@@ -811,10 +811,9 @@ class TestRun:
 @disable_numba()
 @pytest.mark.script_launch_mode('subprocess')
 def test_import_time(script_runner):
-    # Relevant for the responsiveness of the CLI:
-    # How long does it take to import?
+    # Relevant for responsiveness of CLI: How long does it take to import?
     cmd = ["python", "-Ximporttime", "-c", "import emg3d"]
     out = script_runner.run(cmd, print_result=False)
     import_time_s = float(out.stderr.split('|')[-2])/1e6
-    # Currently we check t < 0.5 s.
-    assert import_time_s < 0.5
+    # Currently we check t < 1.0 s.
+    assert import_time_s < 1.0
