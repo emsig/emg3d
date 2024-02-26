@@ -21,6 +21,8 @@ latest
 
   - Fix remaining outdated ``python setup.py`` commands.
 
+  - Many small things to keep the package updated.
+
 
 v1.8.2 : convert & pip-full
 ---------------------------
