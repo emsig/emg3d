@@ -30,16 +30,15 @@ setup(
     install_requires=[
         "scipy>=1.9",
         "numba>=0.53",
+        "empymod>=2.3.0",
     ],
     extras_require={
-        'full': [
-            'tqdm',
-            'h5py',
-            'scooby',
-            'xarray',
-            'empymod',
-            'discretize>=0.7.3',
-            'matplotlib',
+        "full": [
+            "tqdm",
+            "h5py",
+            "xarray",
+            "discretize",
+            "matplotlib",
         ],
     },
     use_scm_version={

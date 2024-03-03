@@ -19,15 +19,9 @@ Functionalities related to time-domain modelling using a frequency-domain code.
 
 import warnings
 
+import empymod
 import numpy as np
 import scipy as sp
-
-try:
-    import empymod
-except ImportError:
-    empymod = None
-
-from emg3d import utils
 
 __all__ = ['Fourier', ]
 
@@ -36,7 +30,6 @@ def __dir__():
     return __all__
 
 
-@utils._requires('empymod')
 class Fourier:
     r"""Time-domain CSEM computation.
 

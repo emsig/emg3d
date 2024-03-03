@@ -33,7 +33,7 @@ class TestFourier:
         assert Fourier.signal == 0        # Impulse respons
         assert_allclose(times, Fourier.time, 0, 0)
         assert Fourier.verb == 3          # Verbose by default
-        assert 'key' in out.lower()
+        assert 'key' in out
         assert 'Req. freq' in out
         assert 'Calc. freq' in out
         assert Fourier.freq_compute.min() >= fmin

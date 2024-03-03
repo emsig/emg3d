@@ -1,15 +1,10 @@
 import re
 import pytest
-import numpy as np
 from timeit import default_timer
 from numpy.testing import assert_allclose
 
+import scooby
 from emg3d import utils
-
-try:
-    import scooby
-except ImportError:
-    scooby = None
 
 
 def test_known_class():
@@ -37,44 +32,15 @@ def test_Report(capsys):
 
     # Reporting is now done by the external package scooby.
     # We just ensure the shown packages do not change (core and optional).
-    if scooby:
-        out1 = utils.Report()
-        out2 = scooby.Report(
-                core=['numpy', 'scipy', 'numba', 'emg3d'],
-                optional=['empymod', 'xarray', 'discretize', 'h5py',
-                          'matplotlib', 'tqdm', 'IPython'],
-                ncol=4)
+    out1 = utils.Report()
+    out2 = scooby.Report(
+            core=['numpy', 'scipy', 'numba', 'emg3d'],
+            optional=['empymod', 'xarray', 'discretize', 'h5py',
+                      'matplotlib', 'tqdm', 'IPython'],
+            ncol=4)
 
-        # Ensure they're the same; exclude time to avoid errors.
-        assert out1.__repr__()[115:] == out2.__repr__()[115:]
-
-    else:  # soft dependency
-        with pytest.warns(UserWarning, match='emg3d: This feature requires'):
-            _ = utils.Report()
-
-
-def test_EMArray():
-    out = utils.EMArray(3)
-    assert out.amp() == 3
-    assert out.pha() == 0
-    assert out.real == 3
-    assert out.imag == 0
-
-    out = utils.EMArray(1+1j)
-    assert out.amp() == np.sqrt(2)
-    assert_allclose(out.pha(), np.pi/4)
-    assert out.real == 1
-    assert out.imag == 1
-
-    out = utils.EMArray([1+1j, 0+1j, -1-1j])
-    assert_allclose(out.amp(), [np.sqrt(2), 1, np.sqrt(2)])
-    assert_allclose(out.pha(unwrap=False), [np.pi/4, np.pi/2, -3*np.pi/4])
-    assert_allclose(out.pha(deg=True, unwrap=False), [45., 90., -135.])
-    assert_allclose(out.pha(deg=True, unwrap=False, lag=False),
-                    [-45., -90., 135.])
-    assert_allclose(out.pha(deg=True, lag=False), [-45., -90., -225.])
-    assert_allclose(out.real, [1, 0, -1])
-    assert_allclose(out.imag, [1, 1, -1])
+    # Ensure they're the same; exclude time to avoid errors.
+    assert out1.__repr__()[115:] == out2.__repr__()[115:]
 
 
 def test_Timer():

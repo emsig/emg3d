@@ -24,12 +24,8 @@ from time import perf_counter
 from datetime import datetime, timedelta
 
 import numpy as np
-
-try:
-    from scooby import Report as ScoobyReport
-except ImportError:
-    class ScoobyReport:
-        """Dummy placeholder."""
+from empymod import EMArray
+from scooby import Report as ScoobyReport
 
 # Version: We take care of it here instead of in __init__, so we can use it
 # within the package itself (logs).
@@ -121,7 +117,6 @@ def _requires(*args, **kwargs):
 
 
 # PUBLIC UTILS
-@_requires('scooby')
 class Report(ScoobyReport):
     r"""Print date, time, and version information.
 
@@ -165,92 +160,14 @@ class Report(ScoobyReport):
         """Initiate a scooby.Report instance."""
 
         # Mandatory packages.
-        core = ['numpy', 'scipy', 'numba', 'emg3d']
+        core = ['numpy', 'scipy', 'numba', 'emg3d', 'empymod']
 
         # Optional packages.
-        optional = ['empymod', 'xarray', 'discretize', 'h5py', 'matplotlib',
+        optional = ['xarray', 'discretize', 'h5py', 'matplotlib',
                     'tqdm', 'IPython']
 
         super().__init__(additional=add_pckg, core=core, optional=optional,
                          ncol=ncol, text_width=text_width, sort=sort)
-
-
-class EMArray(np.ndarray):
-    r"""An EM-ndarray adds the methods `amp` (amplitude) and `pha` (phase).
-
-    Parameters
-    ----------
-    data : ndarray
-        Data to which to add ``.amp`` and ``.pha`` attributes.
-
-
-    Examples
-    --------
-
-    .. ipython::
-
-       In [1]: import numpy as np
-          ...: from empymod.utils import EMArray
-          ...: emvalues = EMArray(np.array([1+1j, 1-4j, -1+2j]))
-
-       # Amplitudes
-       In [2]: emvalues.amp()
-       Out[2]: EMArray([1.41421356, 4.12310563, 2.23606798])
-
-       # Phase in radians
-       In [3]: emvalues.pha()
-       Out[3]: EMArray([ 0.78539816, -1.32581766, -4.24874137])
-
-       # Phase in degrees
-       In [4]: emvalues.pha(deg=True)
-       Out[4]: EMArray([  45.        ,  -75.96375653, -243.43494882])
-
-       # Phase in degrees, lead defined
-       In [5]: emvalues.pha(deg=True, lag=False)
-       Out[5]: EMArray([-45.        ,  75.96375653, 243.43494882])
-
-    """
-
-    def __new__(cls, data):
-        r"""Create a new EMArray."""
-        return np.asarray(data).view(cls)
-
-    def amp(self):
-        """Amplitude of the electromagnetic field."""
-        return np.abs(self.view())
-
-    def pha(self, deg=False, unwrap=True, lag=True):
-        """Phase of the electromagnetic field.
-
-        Parameters
-        ----------
-        deg : bool, default: False
-            The returned phase is in degrees if True, else in radians.
-
-        unwrap : bool, default: True
-            The returned phase is unwrapped if True.
-
-        lag : bool, default: True
-            The returned phase is lag defined if True, else lead defined.
-
-        """
-        # Get phase, lead or lag defined.
-        if lag:
-            pha = np.angle(self.view())
-        else:
-            pha = np.angle(np.conj(self.view()))
-
-        # Unwrap if `unwrap`.
-        # np.unwrap removes the EMArray class;
-        # for consistency, we wrap it in EMArray again.
-        if unwrap and self.size > 1:
-            pha = EMArray(np.unwrap(pha))
-
-        # Convert to degrees if `deg`.
-        if deg:
-            pha *= 180/np.pi
-
-        return pha
 
 
 class Timer:
