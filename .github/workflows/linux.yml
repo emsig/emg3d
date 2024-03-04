@@ -12,14 +12,6 @@ on:
   schedule:
     - cron: "14 14 20 * *"
 
-# Use bash by default in all jobs
-defaults:
-  run:
-    # Using "-l {0}" is necessary for conda environments to be activated
-    # But this breaks on MacOS if using actions/setup-python:
-    # https://github.com/actions/setup-python/issues/132
-    shell: bash
-
 # Cancel any previous run of the test job.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,31 +31,31 @@ jobs:
           - python-version: "3.9"
             name: minimal
             os: ubuntu
-            conda: "'scipy=1.9' 'numba=0.53'"
+            extra: "'scipy=1.9' 'numba=0.53'"
           - python-version: "3.10"
             name: full
             os: ubuntu
-            conda: "numba scipy xarray h5py discretize matplotlib"  # tqdm
+            extra: "numba scipy xarray h5py discretize matplotlib"  # tqdm
           - python-version: "3.10"
             name: plain
             os: ubuntu
-            conda: "numba scipy"
+            extra: "numba scipy"
           - python-version: "3.11"
             name: plain
             os: ubuntu
-            conda: "numba scipy"
+            extra: "numba scipy"
           - python-version: "3.11"
             name: full
             os: ubuntu
-            conda: "numba scipy xarray tqdm h5py discretize matplotlib"
+            extra: "numba scipy xarray tqdm h5py discretize matplotlib"
           - python-version: "3.12"
             name: plain
             os: ubuntu
-            conda: "numba scipy"
+            extra: "numba scipy"
           - python-version: "3.12"
             name: full
             os: ubuntu
-            conda: "numba scipy xarray tqdm h5py discretize matplotlib"
+            extra: "numba scipy xarray tqdm h5py discretize matplotlib"
 
     env:
       # Used for coveralls flag
@@ -89,27 +81,16 @@ jobs:
       - name: Fetch git tags
         run: git fetch origin 'refs/tags/*:refs/tags/*'
 
-      - name: Setup miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          auto-update-conda: true
           python-version: ${{ matrix.case.python-version }}
-          miniforge-version: "latest"
-          miniforge-variant: Mambaforge
-          use-mamba: true
 
       - name: Install dependencies
         shell: bash -l {0}
         run: |
-          conda config --set always_yes yes --set changeps1 no
-          conda config --show-sources
-          conda config --show
-          conda info -a
-          conda install ${{ matrix.case.conda }} pytest pytest-cov pytest-console-scripts coveralls flake8 setuptools-scm
-
-      - name: Conda list
-        shell: bash -l {0}
-        run: conda list
+          python -m pip install --upgrade pip
+          python -m pip install ${{ matrix.case.extra }} pytest pytest-cov pytest-console-scripts coveralls flake8 setuptools-scm
 
       - name: Flake8
         shell: bash -l {0}
