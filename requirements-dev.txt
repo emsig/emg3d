@@ -4,10 +4,7 @@
 # SOFT DEPENDENCIES
 tqdm
 h5py
-scooby
 xarray
-empymod
-cython
 discretize
 matplotlib
 

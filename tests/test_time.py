@@ -1,16 +1,11 @@
 import pytest
+import empymod
 import numpy as np
 from numpy.testing import assert_allclose
 
 from emg3d import time
 
-try:
-    import empymod
-except ImportError:
-    empymod = None
 
-
-@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 class TestFourier:
     def test_defaults(self, capsys):
         times = np.logspace(-2, 2)
@@ -33,7 +28,7 @@ class TestFourier:
         assert Fourier.signal == 0        # Impulse respons
         assert_allclose(times, Fourier.time, 0, 0)
         assert Fourier.verb == 3          # Verbose by default
-        assert 'key' in out.lower()
+        assert 'key' in out
         assert 'Req. freq' in out
         assert 'Calc. freq' in out
         assert Fourier.freq_compute.min() >= fmin

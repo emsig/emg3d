@@ -19,15 +19,9 @@ Functionalities related to time-domain modelling using a frequency-domain code.
 
 import warnings
 
+import empymod
 import numpy as np
 import scipy as sp
-
-try:
-    import empymod
-except ImportError:
-    empymod = None
-
-from emg3d import utils
 
 __all__ = ['Fourier', ]
 
@@ -36,7 +30,6 @@ def __dir__():
     return __all__
 
 
-@utils._requires('empymod')
 class Fourier:
     r"""Time-domain CSEM computation.
 
@@ -67,12 +60,6 @@ class Fourier:
     - Data for :math:`f_\mathrm{min}\le f \le f_\mathrm{max}` is computed
       with cubic spline interpolation (on a log-scale) using
       :class:`scipy.interpolate.InterpolatedUnivariateSpline`.
-
-    .. note::
-
-        The package ``empymod`` has to be installed in order to use
-        ``Fourier``:
-        ``pip install empymod`` or ``conda install -c conda-forge empymod``.
 
 
     Parameters
@@ -106,7 +93,7 @@ class Fourier:
         - If ``ft='dlf'``:
 
            - ``dlf``: string of filter name in :mod:`empymod.filters` or the
-             filter method itself; default: ``'key_201_CosSin_2012'``.
+             filter method itself; default: ``'key_201_2012'``.
            - ``pts_per_dec``: points per decade; default: -1.
 
               - If 0: Standard DLF;

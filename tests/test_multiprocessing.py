@@ -5,6 +5,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 import emg3d
+import empymod
 from emg3d import _multiprocessing as _mp
 
 try:
@@ -13,9 +14,9 @@ except ImportError:
     tqdm = None
 
 try:
-    import empymod
+    import xarray
 except ImportError:
-    empymod = None
+    xarray = None
 
 # Data generated with tests/create_data/regression.py
 REGRES = emg3d.load(join(dirname(__file__), 'data', 'regression.npz'))
@@ -74,7 +75,7 @@ def test__solve():
     assert_allclose(dat['Fresult'].field, efield.field)
 
 
-@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_layered():
 
     src = emg3d.TxElectricDipole((-2000, 0, 200, 20, 5))
@@ -157,7 +158,6 @@ def test_layered():
     assert np.all(out[::2, 1:, 1, :] != 0.0)
 
 
-@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 def test_empymod_fwd():
     # Simple check for status quo.
     empymod_inp = {
@@ -203,7 +203,7 @@ def test_get_points():
     assert out['p1'] == rec.center
 
 
-@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
+@pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_fd_gradient():
 
     res = np.array([0.9876, ])

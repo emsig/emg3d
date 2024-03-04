@@ -342,5 +342,4 @@ high-level class ``Simulation``. It has to be carried out by using
 above. Have a look at the repo https://github.com/emsig/article-TDEM.
 
 
-*Note:* In addition to ``emg3d`` this requires the soft dependency ``empymod``
-(``discretize`` is recommended).
+*Note:* In addition to ``emg3d``, the soft dependency ``discretize`` is recommended for this.

@@ -13,8 +13,9 @@ or via ``pip``:
 
    pip install emg3d
 
-Requirements are the modules ``scipy`` and ``numba``. Various other packages
-are recommended or required for some advanced functionalities, namely:
+Requirements are the modules ``scipy``, ``numba``, and ``empymod``. Various
+other packages are recommended or required for some advanced functionalities,
+namely:
 
 - ``xarray``: For the :class:`emg3d.surveys.Survey` and
   :class:`emg3d.simulations.Simulation` classes (model many sources and
@@ -23,8 +24,6 @@ are recommended or required for some advanced functionalities, namely:
   plotting utilities).
 - ``matplotlib``: To use the plotting utilities within ``discretize``.
 - ``h5py``: Save and load data in the HDF5 format.
-- ``empymod``: Time-domain modelling (:class:`emg3d.time.Fourier`).
-- ``scooby``: For the version and system report (:class:`emg3d.utils.Report`).
 - ``tqdm``: For nice progress bars when computing many sources and frequencies.
 
 All soft dependencies are also available both on ``conda-forge`` and ``pip``.
@@ -32,7 +31,7 @@ To get therefore the complete experience use one of the following options:
 
 .. code-block:: console
 
-   conda install -c conda-forge emg3d empymod discretize xarray matplotlib h5py tqdm scooby
+   conda install -c conda-forge emg3d discretize xarray matplotlib h5py tqdm
 
 or via ``pip``:
 
