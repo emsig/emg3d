@@ -133,11 +133,6 @@ class Report(ScoobyReport):
 
     All modules provided in ``add_pckg`` are also shown.
 
-    .. note::
-
-        The package ``scooby`` has to be installed in order to use ``Report``:
-        ``pip install scooby`` or ``conda install -c conda-forge scooby``.
-
 
     Parameters
     ----------
