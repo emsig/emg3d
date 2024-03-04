@@ -93,7 +93,7 @@ class Fourier:
         - If ``ft='dlf'``:
 
            - ``dlf``: string of filter name in :mod:`empymod.filters` or the
-             filter method itself; default: ``'key_201_CosSin_2012'``.
+             filter method itself; default: ``'key_201_2012'``.
            - ``pts_per_dec``: points per decade; default: -1.
 
               - If 0: Standard DLF;

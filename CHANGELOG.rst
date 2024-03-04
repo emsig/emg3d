@@ -9,6 +9,8 @@ Changelog
 latest
 ------
 
+TODO: some text about empymod, scooby.
+
 - Maintenance:
 
   - Bumped the minimum requirements to:
@@ -16,6 +18,7 @@ latest
     - Python 3.9
     - SciPy 1.9
     - Numba 0.53
+    - empymod 2.3.0 (NEW requirement)
 
   - Testing: added Python 3.12, dropped Python 3.8.
 
