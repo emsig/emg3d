@@ -1,16 +1,11 @@
 import pytest
+import empymod
 import numpy as np
 from numpy.testing import assert_allclose
 
 from emg3d import time
 
-try:
-    import empymod
-except ImportError:
-    empymod = None
 
-
-@pytest.mark.skipif(empymod is None, reason="empymod not installed.")
 class TestFourier:
     def test_defaults(self, capsys):
         times = np.logspace(-2, 2)
