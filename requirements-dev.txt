@@ -5,7 +5,6 @@
 tqdm
 h5py
 xarray
-cython
 discretize
 matplotlib
 
