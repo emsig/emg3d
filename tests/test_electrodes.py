@@ -273,6 +273,8 @@ def test_tx_magnetic_dipole():
     s5a = electrodes.TxMagneticDipole(
             (-1, 1, -1, 1, -np.sqrt(2), np.sqrt(2)), strength=np.pi)
     s5b = electrodes.TxMagneticDipole.from_dict(s5a.to_dict())
+    rep = s5b.__repr__()
+    assert "m; e2={1.0; 1.0; " in rep
     assert s5a == s5b
     s6a = electrodes.TxMagneticDipole(
             [[-1, -1, -np.sqrt(2)], [1, 1, np.sqrt(2)]], strength=np.pi)
@@ -287,7 +289,7 @@ def test_tx_magnetic_dipole():
 
     rep = s6b.__repr__()
     assert "3.1 A" in rep
-    assert "m; e2={-0.7" in rep
+    assert "m; e2={1.0; 1.0; " in rep
 
 
 def test_tx_electric_wire():
