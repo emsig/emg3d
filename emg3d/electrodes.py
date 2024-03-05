@@ -323,7 +323,7 @@ class Dipole(Wire):
 
             if is_flat:
                 # Re-arrange for points.
-                points = np.array([coordinates[::2], coordinates[1::2]])
+                points = coordinates.reshape((2, 3), order='F')
 
                 # Store original input.
                 self._coordinates = coordinates
@@ -375,10 +375,20 @@ class Dipole(Wire):
 
         # Finite dipole.
         else:
-            s1 = (f"    e1={{{self.points[0, 0]:,.1f}; "
-                  f"{self.points[0, 1]:,.1f}; {self.points[0, 2]:,.1f}}} m; ")
-            s2 = (f"e2={{{self.points[1, 0]:,.1f}; "
-                  f"{self.points[1, 1]:,.1f}; {self.points[1, 2]:,.1f}}} m")
+
+            # Finite magnetic dipole.
+            if self._xtype == 'magnetic':
+                if self.coordinates.ndim == 1:
+                    points = self.coordinates
+                else:
+                    points = self.coordinates.ravel('F')
+            else:
+                points = self.points.ravel('F')
+
+            s1 = (f"    e1={{{points[0]:,.1f}; "
+                  f"{points[2]:,.1f}; {points[4]:,.1f}}} m; ")
+            s2 = (f"e2={{{points[1]:,.1f}; "
+                  f"{points[3]:,.1f}; {points[5]:,.1f}}} m")
 
         return s0 + s1 + s2 if len(s1+s2) < 80 else s0 + s1 + "\n    " + s2
 
