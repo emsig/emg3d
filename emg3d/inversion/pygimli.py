@@ -87,14 +87,17 @@ class Kernel(pygimli.Modelling):
         # Set mesh and, if provided, markers.
         if markers is not None:
             mesh.setCellMarkers(markers.ravel('F'))
+            self.markers = markers
+        else:
+            self.markes = np.zeros(simulation.model.size, dtype=int)
         self.setMesh(mesh)
 
         # Create J, store and set it.
         self.J = self.Jacobian(
             simulation=self.simulation,
-            data2pygimli=self.data2pygimli,
+            data2gimli=self.data2gimli,
             data2emg3d=self.data2emg3d,
-            model2pygimli=self.model2pygimli,
+            model2gimli=self.model2gimli,
             model2emg3d=self.model2emg3d,
         )
         self.setJacobian(self.J)
@@ -112,16 +115,16 @@ class Kernel(pygimli.Modelling):
         _ = self.simulation.misfit
 
         # Return the responses as pyGIMLi array
-        return self.data2pygimli(self.simulation.data.synthetic.data)
+        return self.data2gimli(self.simulation.data.synthetic.data)
 
     def createStartModel(self, dataVals=None):
         """Returns the model from the provided simulation."""
-        return self.model2pygimli(self.simulation.model.property_x)
+        return self.model2gimli(self.simulation.model.property_x)
 
     def createJacobian(self, model):
         """Dummy to prevent pyGIMLi from doing it the hard way."""
 
-    def data2pygimli(self, data):
+    def data2gimli(self, data):
         """Convert an emg3d data-xarray to a pyGIMLi data array."""
         out = data[self.simulation.survey.isfinite]
         if np.iscomplexobj(out):
@@ -140,13 +143,41 @@ class Kernel(pygimli.Modelling):
         out[self.simulation.survey.isfinite] = data[:ind] + 1j*data[ind:]
         return out
 
-    def model2pygimli(self, model):
+    def model2gimli(self, model):
         """Convert an emg3d Model property to a pyGIMLi model array.
 
         This function deals with the regions defined in pyGIMLi.
         """
-        out = np.empty(model.size)
-        out[self.mesh().cellMarkers()] = model.ravel('F')
+        # pygimli.info('model2gimli')
+
+        # If the inversion model is smaller than the model, we have to
+        # take care of the regions.
+        if len(model) != self.simulation.model.size:
+
+            out = np.zeros(self.simulation.model.size)
+            i = 0
+
+            for n, v in self.regionProperties().items():
+                if v['fix']:
+                    # pygimli.info(f"{n} - fixed")
+                    pass
+                elif v['single']:
+                    # TODO Should this be an average, or what?
+                    # pygimli.info(f"{n} - single")
+                    out[i] = np.average(model[self.markers == n])
+                    i += 1
+                else:
+                    # pygimli.info(f"{n} - free")
+                    ii = np.sum(self.markers == n)
+                    out[i:i+ii] = model[self.markers == n].ravel('F')
+                    i += ii
+
+            out = out[:i]
+
+        else:
+            out = np.empty(model.size)
+            out[self.mesh().cellMarkers()] = model.ravel('F')
+
         return out
 
     def model2emg3d(self, model):
@@ -154,34 +185,47 @@ class Kernel(pygimli.Modelling):
 
         This function deals with the regions defined in pyGIMLi.
         """
+        # pygimli.info('model2emg3d')
 
-        for n, v in self.regionProperties().items():
-            if v['fix']:
-                pygimli.info(f"Region {n} is fixed!")
-            if v['single']:
-                pygimli.info(f"Region {n} is single!")
-            if v['background']:
-                pygimli.info(f"Region {n} is background!")
+        # If the inversion model is smaller than the model, we have to
+        # take care of the regions.
+        if len(model) != self.simulation.model.size:
 
-        pygimli.info(np.asarray(model))
-        pygimli.info(np.asarray(model).shape, self.simulation.model.shape)
+            out = np.empty(self.simulation.model.shape)
+            i = 0
 
+            for n, v in self.regionProperties().items():
+                if v['fix']:
+                    # pygimli.info(f"{n} - fixed")
+                    out[self.markers == n] = v['startModel']
+                elif v['single']:
+                    # pygimli.info(f"{n} - single")
+                    out[self.markers == n] = model[i]
+                    i += 1
+                else:
+                    # pygimli.info(f"{n} - free")
+                    ii = np.sum(self.markers == n)
+                    out[self.markers == n] = model[i:ii+i]
+                    i += ii
+            # pygimli.info(out)
 
+        else:
+            out = np.asarray(model[self.mesh().cellMarkers()]).reshape(
+                    self.simulation.model.shape, order='F')
 
-        out = np.asarray(model[self.mesh().cellMarkers()])
-        return out.reshape(self.simulation.model.shape, order='F')
+        return out
 
     class Jacobian(pygimli.Matrix):
         """Return Jacobian operator for pyGIMLi(emg3d)."""
 
         def __init__(self, simulation,
-                     data2pygimli, data2emg3d, model2pygimli, model2emg3d):
+                     data2gimli, data2emg3d, model2gimli, model2emg3d):
             """Initiate a new Jacobian instance."""
             super().__init__()
             self.simulation = simulation
-            self.data2pygimli = data2pygimli
+            self.data2gimli = data2gimli
             self.data2emg3d = data2emg3d
-            self.model2pygimli = model2pygimli
+            self.model2gimli = model2gimli
             self.model2emg3d = model2emg3d
 
         def cols(self):
@@ -195,12 +239,12 @@ class Kernel(pygimli.Modelling):
         def mult(self, x):
             """Multiply the Jacobian with a vector, Jm."""
             jvec = self.simulation.jvec(vector=self.model2emg3d(x))
-            return self.data2pygimli(jvec)
+            return self.data2gimli(jvec)
 
         def transMult(self, x):
             """Multiply  Jacobian transposed with a vector, Jᵀd = (dJᵀ)ᵀ."""
             jtvec = self.simulation.jtvec(self.data2emg3d(x))
-            return self.model2pygimli(jtvec)
+            return self.model2gimli(jtvec)
 
         def save(self, *args):
             """There is no save for this pseudo-Jacobian."""
@@ -225,12 +269,12 @@ class Inversion(pygimli.Inversion):
 
         # Take data from the survey if not provided.
         if dataVals is None:
-            dataVals = self.fop.data2pygimli(
+            dataVals = self.fop.data2gimli(
                     self.fop.simulation.data.observed.data)
 
         # Take the error from the survey if not provided.
         if errorVals is None:
-            std_dev = self.fop.data2pygimli(
+            std_dev = self.fop.data2gimli(
                     self.fop.simulation.survey.standard_deviation.data)
             errorVals = std_dev / abs(dataVals)
 
