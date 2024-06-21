@@ -20,9 +20,9 @@ try:
 except ImportError:
     pygimli = None
 
-from emg3d import models, utils
+from emg3d import utils, _multiprocessing
 
-__all__ = ['Kernel', 'Inversion', 'Jacobian']
+__all__ = ['Kernel', 'Inversion']
 
 # Add pygimli and pgcore to the emg3d.Report().
 utils.OPTIONAL.extend(['pygimli', 'pgcore'])
@@ -31,22 +31,10 @@ utils.OPTIONAL.extend(['pygimli', 'pgcore'])
 def __dir__():
     return __all__
 
-# TODO: Create functions
-# - convert_model(from/to)
-# - convert_data(from/to)
-
 
 @utils._requires('pygimli')
-class Jacobian(pygimli.Matrix):
-    """Create a Jacobian operator for emg3d which is understood by pyGIMLi.
-
-    This never builds the actual Jacobian, but provides functions to compute
-    the
-
-    - Jacobian times a model vector ``Jm``
-      (``jvec`` in emg3d, ``mult`` in pyGIMLi), and the
-    - Jacobian transposed times a data vector ``Jᵀd``
-      (``jtvec`` in emg3d, ``transMult`` in pyGIMLi).
+class Kernel(pygimli.Modelling):
+    """Create a forward operator of emg3d to use within a pyGIMLi inversion.
 
 
     Parameters
@@ -54,114 +42,37 @@ class Jacobian(pygimli.Matrix):
     simulation : Simulation
         The simulation; a :class:`emg3d.simulations.Simulation` instance.
 
-    mesh : Mesh
-        The mesh; :func:`pygimli.meshtools.grid.createGrid` instance.
+    markers : ndarray of ints, default: None
+        An ndarray of ints of the same shapes as the model. All cells with the
+        same number belong to the same region with this number, which can
+        subsequently be defined through
+        :func:`pygimli.frameworks.modelling.Modelling.setRegionProperties`.
 
-    """
-
-    def __init__(self, simulation, mesh):
-        """Initiate a new Jacobian instance."""
-        super().__init__()
-
-        # Store pointers to the emg3d-simulation and the pyGIMLi-mesh.
-        self.simulation = simulation
-        self.mesh = mesh
-
-        # Store n-cols and n-rows.
-        self._cols = simulation.model.size
-        self._rows = simulation.survey.count * 2
-
-    def cols(self):
-        """The number of columns corresponds to the model size."""
-        return self._cols
-
-    def rows(self):
-        """The number of rows corresponds to 2x(data size), for [Re; Im]."""
-        return self._rows
-
-    def mult(self, x):
-        """Multiply the Jacobian with a vector, Jm."""
-
-        self.simulation._count_jvec += 1
-
-        # Resort x to represent the model.
-        model = x[self.mesh().cellMarkers()]
-
-        # Compute jvec.
-        jvec = self.simulation.jvec(
-            vector=np.reshape(model, self.simulation.model.shape, order='F')
-        )
-
-        # Get non-NaN data.
-        data = jvec[self.simulation.survey.isfinite]
-
-        # Return real and imaginary parts stacked.
-        return np.hstack((data.real, data.imag))
-
-    def transMult(self, x):
-        """Multiply  Jacobian transposed with a vector, Jᵀd = (dJᵀ)ᵀ."""
-        self.simulation._count_jtvec += 1
-
-        # Cast finite [Re, Im] data from pyGIMLi into the emg3d format.
-        data = np.ones(
-                self.simulation.survey.shape,
-                dtype=self.simulation.data.observed.dtype
-        )*np.nan
-        x = np.asarray(x)
-        xl = x.size//2
-        data[self.simulation.survey.isfinite] = x[:xl] + 1j*x[xl:]
-
-        # Compute jtvec.
-        jtvec = self.simulation.jtvec(data).ravel('F')
-
-        # Resort jtvec according to regions.
-        out = np.empty(jtvec.size)
-        out[self.mesh().cellMarkers()] = jtvec
-        return out
-
-    def save(self, *args):
-        """There is no save for this pseudo-Jacobian."""
-        pass
-
-
-@utils._requires('pygimli')
-class Kernel(pygimli.Modelling):
-    """Create a forward operator to use emg3d within a pyGIMLi inversion.
-
-
-    Parameters
-    ----------
-    simulation : Simulation
-        The emg3d simulation a :class:`emg3d.simulations.Simulation` instance.
+    pgthreads : int, default: 2
+        Number of threads for pyGIMLi (sets ``OPENBLAS_NUM_THREADS``). This is
+        by default a small number, as the important parallelization in
+        pyGIMLi(emg3d) happens over sources and frequencies in emg3d. This is
+        controlled in the parameter ``max_workers`` when creating the
+        simulation.
 
     """
 
     def __init__(self, simulation, markers=None, pgthreads=2):
-        """Initialize the pyGIMLi(emg3d)-wrapper."""
+        """Initialize a pyGIMLi(emg3d)-wrapper."""
+        super().__init__()
 
+        # Set pyGIMLi threads.
         pygimli.setThreadCount(pgthreads)
 
-        # TODO move this to the Simulation class!
-        simulation._count_forward = 0
-        simulation._count_jvec = 0
-        simulation._count_jtvec = 0
-
-        # Check current limitation 1: isotropic.
-        mcase = simulation.model.case
-        if mcase != 'isotropic':
-            raise NotImplementedError(
-                f"pyGIMLi(emg3d) not implemented for {mcase} case."
-            )
-
-        # Check current limitation 2: conductivity.
-        mname = simulation.model.map.name
-        if mname != 'Conductivity':
-            raise NotImplementedError(
-                f"pyGIMLi(emg3d) not implemented for {mname} mapping."
-            )
-
-        # Initiate first pygimli.Modelling, which will do its magic.
-        super().__init__()
+        # Check current limitations.
+        checks = {
+            'case': (simulation.model.case, 'isotropic'),
+            'mapping': (simulation.model.map.name, 'Conductivity'),
+        }
+        for k, v in checks.items():
+            if v[0] != v[1]:
+                msg = f"pyGIMLi(emg3d) is not implemented for {v[0]} {k}."
+                raise NotImplementedError(msg)
 
         # Store the simulation.
         self.simulation = simulation
@@ -173,13 +84,19 @@ class Kernel(pygimli.Modelling):
             z=simulation.model.grid.nodes_z,
         )
 
+        # Set mesh and, if provided, markers.
         if markers is not None:
-            mesh.setCellMarkers(markers)
-
+            mesh.setCellMarkers(markers.ravel('F'))
         self.setMesh(mesh)
 
-        # Store J and set it
-        self.J = Jacobian(self.simulation, self.mesh)
+        # Create J, store and set it.
+        self.J = self.Jacobian(
+            simulation=self.simulation,
+            data2pygimli=self.data2pygimli,
+            data2emg3d=self.data2emg3d,
+            model2pygimli=self.model2pygimli,
+            model2emg3d=self.model2emg3d,
+        )
         self.setJacobian(self.J)
 
     def response(self, model):
@@ -189,45 +106,137 @@ class Kernel(pygimli.Modelling):
         self.simulation.clean('computed')
 
         # Replace model
-        self.simulation.model = models.Model(
-            grid=self.simulation.model.grid,
-            # Resort inversion model array to represent the actual model.
-            property_x=model[self.mesh().cellMarkers()],
-            mapping='Conductivity'
-        )
+        self.simulation.model.property_x = self.model2emg3d(model)
 
         # Compute forward model and set initial residuals.
-        self.simulation._count_forward += 1
         _ = self.simulation.misfit
 
-        # Return the responses
-        data = self.simulation.data.synthetic.data[
-                self.simulation.survey.isfinite
-        ]
-        return np.hstack((data.real, data.imag))
+        # Return the responses as pyGIMLi array
+        return self.data2pygimli(self.simulation.data.synthetic.data)
 
     def createStartModel(self, dataVals=None):
         """Returns the model from the provided simulation."""
-        return self.simulation.model.property_x.ravel('F')
+        return self.model2pygimli(self.simulation.model.property_x)
 
     def createJacobian(self, model):
-        """Dummy to prevent pygimli.Modelling from doing it the hard way."""
+        """Dummy to prevent pyGIMLi from doing it the hard way."""
         pass  # do nothing
+
+    def data2pygimli(self, data):
+        """Convert an emg3d data-xarray to a pyGIMLi data array."""
+        out = data[self.simulation.survey.isfinite]
+        if np.iscomplexobj(out):
+            return np.hstack((out.real, out.imag))
+        else:  # For standard deviation
+            return np.hstack((out, out))
+
+    def data2emg3d(self, data):
+        """Convert a pyGIMLi data array to an emg3d data-xarray."""
+        out = np.ones(
+                self.simulation.survey.shape,
+                dtype=self.simulation.data.observed.dtype
+        )*np.nan
+        data = np.asarray(data)
+        ind = data.size//2
+        out[self.simulation.survey.isfinite] = data[:ind] + 1j*data[ind:]
+        return out
+
+    def model2pygimli(self, model):
+        """Convert an emg3d Model property to a pyGIMLi model array.
+
+        This function deals with the regions defined in pyGIMLi.
+        """
+        out = np.empty(model.size)
+        out[self.mesh().cellMarkers()] = model.ravel('F')
+        return out
+
+    def model2emg3d(self, model):
+        """Convert a pyGIMLi model array to an emg3d Model property.
+
+        This function deals with the regions defined in pyGIMLi.
+        """
+        out = np.asarray(model[self.mesh().cellMarkers()])
+        return out.reshape(self.simulation.model.shape, order='F')
+
+    class Jacobian(pygimli.Matrix):
+        """Return Jacobian operator for pyGIMLi(emg3d)."""
+
+        def __init__(self, simulation,
+                     data2pygimli, data2emg3d, model2pygimli, model2emg3d):
+            """Initiate a new Jacobian instance."""
+            super().__init__()
+            self.simulation = simulation
+            self.data2pygimli = data2pygimli
+            self.data2emg3d = data2emg3d
+            self.model2pygimli = model2pygimli
+            self.model2emg3d = model2emg3d
+
+        def cols(self):
+            """The number of columns corresponds to the model size."""
+            return self.simulation.model.size
+
+        def rows(self):
+            """The number of rows corresponds to 2x data-size (Re; Im)."""
+            return self.simulation.survey.count * 2
+
+        def mult(self, x):
+            """Multiply the Jacobian with a vector, Jm."""
+            jvec = self.simulation.jvec(vector=self.model2emg3d(x))
+            return self.data2pygimli(jvec)
+
+        def transMult(self, x):
+            """Multiply  Jacobian transposed with a vector, Jᵀd = (dJᵀ)ᵀ."""
+            jtvec = self.simulation.jtvec(self.data2emg3d(x))
+            return self.model2pygimli(jtvec)
+
+        def save(self, *args):
+            """There is no save for this pseudo-Jacobian."""
+            pass
+
+
+@utils._requires('pygimli')
+class Inversion(pygimli.Inversion):
+    """Thin wrapper, adding verbosity and taking care of data format."""
+
+    def __init__(self, fop=None, inv=None, **kwargs):
+        """Initialize an Inversion instance."""
+        super().__init__(fop=fop, inv=inv, **kwargs)
+        self._postStep = _post_step
+
+    def run(self, dataVals=None, errorVals=None, **kwargs):
+        """Run the inversion."""
+
+        # Reset counter, start timer, print message.
+        _multiprocessing.process_map.count = 0
+        timer = utils.Timer()
+        pygimli.info(":: pyGIMLi(emg3d) START ::")
+
+        # Take data from the survey if not provided.
+        if dataVals is None:
+            dataVals = self.fop.data2pygimli(
+                    self.fop.simulation.data.observed.data)
+
+        # Take the error from the survey if not provided.
+        if errorVals is None:
+            std_dev = self.fop.data2pygimli(
+                    self.fop.simulation.survey.standard_deviation.data)
+            errorVals = std_dev / abs(dataVals)
+
+        # Run the inversion
+        out = super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
+
+        # Print passed time and exit
+        pygimli.info(f":: pyGIMLi(emg3d) END   :: runtime = {timer.runtime}")
+
+        return out
 
 
 def _post_step(n, inv):
-    """TODO"""
+    """Print some values for each iteration."""
 
-    # TODO: save data, model, and everything to re-start inversion.
-
-    # inv.chi2History
-    # inv.modelHistory
-
+    # Print info
     sim = inv.fop.simulation
-
-    kc = sim._count_forward + sim._count_jvec + sim._count_jtvec
     sim.survey.data[f"it{n}"] = sim.survey.data.synthetic
-    cglsit = max(0, sim._count_jvec-1)
     phi = inv.inv.getPhi()
     if not hasattr(inv, 'lastphi'):
         lastphi = ""
@@ -238,49 +247,10 @@ def _post_step(n, inv):
         f"{n}: "
         f"χ² = {inv.inv.chi2():7.2f}; "
         f"λ = {inv.inv.getLambda()}; "
-        f"#CGLS {cglsit:2d} ({kc:2d} solves); "
+        f"{_multiprocessing.process_map.count:2d} kernel calls; "
         f"ϕ = {inv.inv.getPhiD():.2f} + {inv.inv.getPhiM():.2f}·λ = "
         f"{phi:.2f}{lastphi}"
     )
 
-    # Reset counters
-    sim._count_forward = 0
-    sim._count_jvec = 0
-    sim._count_jtvec = 0
-
-
-@utils._requires('pygimli')
-class Inversion(pygimli.Inversion):
-    """TODO"""
-    def __init__(self, fop=None, inv=None, **kwargs):
-        super().__init__(fop=fop, inv=inv, **kwargs)
-        self._postStep = _post_step
-
-    def run(self, dataVals=None, errorVals=None, **kwargs):
-        timer = utils.Timer()
-        pygimli.info(":: pyGIMLi(emg3d) START ::")
-
-        # Take data from the survey if not provided.
-        if dataVals is None:
-            finite_data = self.fop.simulation.survey.finite_data()
-            dataVals = np.hstack([finite_data.real, finite_data.imag])
-
-        # Take the error from the survey if not provided.
-        if errorVals is None:
-            # TODO - IS THIS CORRECT?
-            std_dev_full = self.fop.simulation.survey.standard_deviation
-            std_dev = std_dev_full.data[self.fop.simulation.survey.isfinite]
-            errorVals = np.hstack([std_dev, std_dev]) / abs(dataVals)
-
-            # TODO does it make any difference, is it needed?
-            # To completely ignore big errors
-            # => Test if it is actually necessary or not
-            errorVals[errorVals > 0.5] = 1e8
-
-        # Run the inversion
-        out = super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
-
-        # Print passed time and exit
-        pygimli.info(f":: pyGIMLi(emg3d) END   :: runtime = {timer.runtime}")
-
-        return out
+    # Reset counter
+    _multiprocessing.process_map.count = 0
