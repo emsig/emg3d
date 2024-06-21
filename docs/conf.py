@@ -81,6 +81,7 @@ html_theme_options = {
         {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery/gallery"},
         {"name": "emsig", "url": "https://emsig.xyz"},
     ],
+    'navigation_with_keys': True,
     # "use_edit_page_button": True,
 }
 
