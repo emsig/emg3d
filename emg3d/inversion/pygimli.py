@@ -120,7 +120,6 @@ class Kernel(pygimli.Modelling):
 
     def createJacobian(self, model):
         """Dummy to prevent pyGIMLi from doing it the hard way."""
-        pass  # do nothing
 
     def data2pygimli(self, data):
         """Convert an emg3d data-xarray to a pyGIMLi data array."""
@@ -155,6 +154,20 @@ class Kernel(pygimli.Modelling):
 
         This function deals with the regions defined in pyGIMLi.
         """
+
+        for n, v in self.regionProperties().items():
+            if v['fix']:
+                pygimli.info(f"Region {n} is fixed!")
+            if v['single']:
+                pygimli.info(f"Region {n} is single!")
+            if v['background']:
+                pygimli.info(f"Region {n} is background!")
+
+        pygimli.info(np.asarray(model))
+        pygimli.info(np.asarray(model).shape, self.simulation.model.shape)
+
+
+
         out = np.asarray(model[self.mesh().cellMarkers()])
         return out.reshape(self.simulation.model.shape, order='F')
 
@@ -191,7 +204,6 @@ class Kernel(pygimli.Modelling):
 
         def save(self, *args):
             """There is no save for this pseudo-Jacobian."""
-            pass
 
 
 @utils._requires('pygimli')
