@@ -84,12 +84,18 @@ class Kernel(pygimli.Modelling):
             z=simulation.model.grid.nodes_z,
         )
 
-        # Set mesh and, if provided, markers.
+        # Set markers.
         if markers is not None:
             mesh.setCellMarkers(markers.ravel('F'))
             self.markers = markers
         else:
             self.markes = np.zeros(simulation.model.size, dtype=int)
+        # Store original properties; required if a region is set to ``background``.
+        self._model = simulation.model.property_x.copy()
+        # Store volumes; required if a region is set to ``single``.
+        self._volumes = simulation.model.grid.cell_volumes.reshape(
+                self._model.shape, order='F')
+        # Set mesh.
         self.setMesh(mesh)
 
         # Create J, store and set it.
@@ -148,29 +154,25 @@ class Kernel(pygimli.Modelling):
 
         This function deals with the regions defined in pyGIMLi.
         """
-        # pygimli.info('model2gimli')
 
         # If the inversion model is smaller than the model, we have to
         # take care of the regions.
         if len(model) != self.simulation.model.size:
 
-            out = np.zeros(self.simulation.model.size)
+            out = np.empty(self.simulation.model.size)
             i = 0
 
             for n, v in self.regionProperties().items():
-                if v['fix']:
-                    # pygimli.info(f"{n} - fixed")
-                    pass
+                ni = self.markers == n
+                if v['background'] or v['fix']:
+                    ii = 0
                 elif v['single']:
-                    # TODO Should this be an average, or what?
-                    # pygimli.info(f"{n} - single")
-                    out[i] = np.average(model[self.markers == n])
-                    i += 1
+                    ii = 1
+                    out[i] = np.average(model[ni], weights=self._volumes[ni])
                 else:
-                    # pygimli.info(f"{n} - free")
-                    ii = np.sum(self.markers == n)
-                    out[i:i+ii] = model[self.markers == n].ravel('F')
-                    i += ii
+                    ii = np.sum(ni)
+                    out[i:i+ii] = model[ni]
+                i += ii
 
             out = out[:i]
 
@@ -185,7 +187,6 @@ class Kernel(pygimli.Modelling):
 
         This function deals with the regions defined in pyGIMLi.
         """
-        # pygimli.info('model2emg3d')
 
         # If the inversion model is smaller than the model, we have to
         # take care of the regions.
@@ -195,19 +196,20 @@ class Kernel(pygimli.Modelling):
             i = 0
 
             for n, v in self.regionProperties().items():
-                if v['fix']:
-                    # pygimli.info(f"{n} - fixed")
-                    out[self.markers == n] = v['startModel']
+                ni = self.markers == n
+                if v['background']:
+                    ii = 0
+                    out[ni] = self._model[ni]
+                elif v['fix']:
+                    ii = 0
+                    out[ni] = v['startModel']
                 elif v['single']:
-                    # pygimli.info(f"{n} - single")
-                    out[self.markers == n] = model[i]
-                    i += 1
+                    ii = 1
+                    out[ni] = model[i]
                 else:
-                    # pygimli.info(f"{n} - free")
-                    ii = np.sum(self.markers == n)
-                    out[self.markers == n] = model[i:ii+i]
-                    i += ii
-            # pygimli.info(out)
+                    ii = np.sum(ni)
+                    out[ni] = model[i:ii+i]
+                i += ii
 
         else:
             out = np.asarray(model[self.mesh().cellMarkers()]).reshape(
