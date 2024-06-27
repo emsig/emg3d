@@ -284,6 +284,8 @@ class TestSurvey():
         assert np.all(np.isnan(survey.data.test1.data[:, -1:, :]))
         # Ensure no others are none
         assert np.sum(np.isnan(survey.data.test1.data)) == 3
+        assert survey.isfinite.sum() == 21
+        assert survey.finite_data().shape == (21,)
 
         # No cutting
         survey.add_noise(min_offset=0, min_amplitude=10e-50, add_to='test2')
