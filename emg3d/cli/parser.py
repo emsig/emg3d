@@ -329,7 +329,7 @@ def parse_config_file(args_dict):
                 solver[key] = cfg.get('solver_opts', key)
 
         # Check for floats.
-        for key in ['tol', ]:
+        for key in ['tol', 'tol_gradient']:
             if cfg.has_option('solver_opts', key):
                 _ = all_solver.pop(key)
                 solver[key] = float(cfg.get('solver_opts', key))
