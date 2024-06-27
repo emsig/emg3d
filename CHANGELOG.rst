@@ -21,6 +21,11 @@ latest
     set the tolerance for the gradient often to a lower value, which saves
     computation time.
 
+- Survey
+
+  - New attributes ``isfinite`` and ``finite_data``. Former returns the indices
+    of the finite data, latter returns directly the finite data.
+
 - Electrodes
 
   - Fixed ``TxMagneticDipole``-representation and improved documentation of the
