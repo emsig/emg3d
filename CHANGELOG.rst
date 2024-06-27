@@ -9,7 +9,22 @@ Changelog
 latest
 ------
 
-TODO: some text about empymod, scooby.
+- New hard dependency: ``empymod`` changed from being a soft dependency to
+  being a hard dependency.
+
+- Simulation
+
+  - A new parameter ``tol_gradient`` can be provided in the dict
+    ``solver_opts``; by default it is set to the value of ``tol``. ``tol`` is
+    the value used for ``compute`` (the forward), ``tol_gradient`` is used for
+    ``gradient``/``jtvec`` and ``jvec`` (the gradient). In inversions, one can
+    set the tolerance for the gradient often to a lower value, which saves
+    computation time.
+
+- Electrodes
+
+  - Fixed ``TxMagneticDipole``-representation and improved documentation of the
+    magnetic sources.
 
 - Maintenance:
 

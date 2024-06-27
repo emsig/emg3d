@@ -78,6 +78,7 @@ remove the comment signs to use them.
   # linerelaxation =       # bool
   # cycle =                # string
   # tol =                  # float
+  # tol_gradient =         # float
   # verb =                 # int
   # maxit =                # int
   # nu_init =              # int

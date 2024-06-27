@@ -149,6 +149,13 @@ class Simulation:
         parameter that is accepted by the :func:`emg3d.solver.solve` except for
         ``model``, ``sfield``, ``efield``, ``return_info``, and ``log``.
 
+        In addition to the regular parameter ``tol``, one can provide a
+        parameter ``tol_gradient``. This tolerance will be used when calling
+        ``gradient``/``jtvec`` and ``jvec``. By default, it is set to the same
+        value as ``tol``, which is used for ``compute``. However, for
+        inversions it is usually possible to relax this tolerance (e.g.,
+        ``tol=1e-6``, ``tol_gradient=1e-3``).
+
     verb : int, default: 0
         Level of verbosity. Possible options:
 
@@ -260,13 +267,16 @@ class Simulation:
         self.receiver_interpolation = kwargs.pop(
                 'receiver_interpolation', 'cubic')
 
-        # Assemble solver_opts.
+        # Assemble solver_opts and store the tolerances separately.
         self.solver_opts = {
                 'verb': 1,  # Default verbosity, can be overwritten.
                 'log': -1,  # Default only log, can be overwritten.
                 **kwargs.pop('solver_opts', {}),  # User setting.
                 'return_info': True,  # return_info=True is forced.
         }
+        self.tol_forward = self.solver_opts.get('tol', 1e-6)
+        self.tol_gradient = self.solver_opts.pop(
+                'tol_gradient', self.tol_forward)
 
         # Initiate dictionaries and other values with None's.
         self._dict_grid = self._dict_initiate
@@ -425,6 +435,7 @@ class Simulation:
             raise TypeError(f"Unrecognized `what`: {what}.")
 
         # Initiate dict with input parameters.
+        self.solver_opts['tol'] = self.tol_forward
         out = {
             '__class__': self.__class__.__name__,
             'survey': self.survey.to_dict(),
@@ -440,6 +451,7 @@ class Simulation:
             'layered': self.layered,
             'layered_opts': self.layered_opts,
             'receiver_interpolation': self.receiver_interpolation,
+            'tol_gradient': self.tol_gradient,
             'file_dir': self.file_dir,
             '_input_sc2': self._input_sc2,
         }
@@ -504,6 +516,9 @@ class Simulation:
         cls_inp['tqdm_opts'] = inp.pop('tqdm_opts', {})
         cls_inp['layered'] = inp.pop('layered', False)
         cls_inp['layered_opts'] = inp.pop('layered_opts', {})
+        cls_inp['solver_opts'] = cls_inp['solver_opts'].copy()
+        cls_inp['solver_opts']['tol_gradient'] = inp.pop(
+                'tol_gradient', cls_inp['solver_opts'].get('tol', 1e-6))
 
         # Instantiate the class.
         out = cls(**cls_inp)
@@ -839,6 +854,7 @@ class Simulation:
                 'efield': self._dict_get('efield', source, freq),
                 'solver_opts': self.solver_opts,
             }
+            data['solver_opts']['tol'] = self.tol_forward
             return self._data_or_file('efield', source, freq, data)
 
         # Compute fields in parallel.
@@ -1195,6 +1211,7 @@ class Simulation:
                 'efield': self._dict_get('bfield', source, freq),
                 'solver_opts': self.solver_opts
             }
+            data['solver_opts']['tol'] = self.tol_gradient
             return self._data_or_file('bfield', source, freq, data)
 
         # Compute fields in parallel.
@@ -1355,6 +1372,7 @@ class Simulation:
                 'efield': None,
                 'solver_opts': self.solver_opts,
             }
+            data['solver_opts']['tol'] = self.tol_gradient
             return self._data_or_file('gfield', source, freq, data)
 
         # Compute fields (A^-1 * G * vector) in parallel.

@@ -996,6 +996,35 @@ class TestGradient:
         j = sim.jtvec(vector=sim.survey.data.residual*sim.survey.data.weights)
         assert_allclose(g, j)
 
+    @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+    @pytest.mark.skipif(h5py is None, reason="h5py not installed.")
+    def test_tol_gradient(self, capsys):
+        sim = simulations.Simulation(model=self.model_init, **self.sim_inp)
+        assert sim.tol_forward == 1e-6
+        assert sim.tol_gradient == 1e-6
+        sim_inp = self.sim_inp.copy()
+        sim_inp['solver_opts']['tol'] = 1e-2
+        sim_inp['solver_opts']['tol_gradient'] = 1e-1
+        sim = simulations.Simulation(model=self.model_init, **sim_inp)
+        assert sim.tol_forward == 1e-2
+        assert sim.tol_gradient == 1e-1
+        simdict = sim.to_dict()
+        sim2 = simulations.Simulation.from_dict(simdict)
+        assert sim.tol_forward == 1e-2
+        assert sim.tol_gradient == 1e-1
+        sim2.solver_opts['verb'] = 3
+        sim2.solver_opts['log'] = 1
+        _, _ = capsys.readouterr()  # empty
+        sim2.compute()
+        out, _ = capsys.readouterr()
+        assert "tol       : 0.01" in out
+        sim2.gradient
+        out, _ = capsys.readouterr()
+        assert "tol       : 0.1" in out
+        sim2.jvec(sim.model.property_x)
+        out, _ = capsys.readouterr()
+        assert "tol       : 0.1" in out
+
 
 def test_all_dir():
     assert set(simulations.__all__) == set(dir(simulations))
