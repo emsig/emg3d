@@ -6,8 +6,11 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.8.3 : tol_gradient isfinite
+------------------------------
+
+**2024-06-27**
+
 
 - New hard dependency: ``empymod`` changed from being a soft dependency to
   being a hard dependency.
