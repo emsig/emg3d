@@ -9,8 +9,6 @@ Changelog
 latest
 ------
 
-TODO: some text about empymod, scooby.
-
 - New hard dependency: ``empymod`` changed from being a soft dependency to
   being a hard dependency.
 
@@ -25,7 +23,8 @@ TODO: some text about empymod, scooby.
 
 - Electrodes
 
-  - Fixed ``TxMagneticDipole``-repr.
+  - Fixed ``TxMagneticDipole``-representation and improved documentation of the
+    magnetic sources.
 
 - Maintenance:
 
