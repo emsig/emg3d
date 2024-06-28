@@ -25,20 +25,22 @@ namely:
 - ``matplotlib``: To use the plotting utilities within ``discretize``.
 - ``h5py``: Save and load data in the HDF5 format.
 - ``tqdm``: For nice progress bars when computing many sources and frequencies.
-- ``pygimli``: To run inversions using ``pygimli``, pyGIMLi(emg3d).
 
 All soft dependencies are also available both on ``conda-forge`` and ``pip``.
 To get therefore the complete experience use one of the following options:
 
 .. code-block:: console
 
-   conda install -c conda-forge emg3d discretize xarray matplotlib h5py tqdm pygimli
+   conda install -c conda-forge emg3d discretize xarray matplotlib h5py tqdm
 
 or via ``pip``:
 
 .. code-block:: console
 
    pip install emg3d[full]
+
+The wrappers provided in :mod:`emg3d.inversion` may require additional
+packages, please consult the :ref:`inversionapi`-API for more information.
 
 If you are new to Python we recommend using a Python distribution, which will
 ensure that all dependencies are met, specifically properly compiled versions

@@ -1,3 +1,11 @@
+"""
+Thin wrappers to use emg3d as a forward modelling kernel within the
+*Geophysical Inversion & Modelling Library* `pyGIMLi <https://pygimli.org>`_.
+
+It deals mainly with converting the data and model from the emg3d format to the
+pyGIMLi format and back, and creating the correct classes and functions as
+expected by a pyGIMLi inversion.
+"""
 # Copyright 2024 The emsig community.
 #
 # This file is part of emg3d.
@@ -41,7 +49,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
     simulation : Simulation
         The simulation; a :class:`emg3d.simulations.Simulation` instance.
 
-    markers : ndarray of ints, default: None
+    markers : ndarray of dtype int, default: None
         An ndarray of ints of the same shapes as the model. All cells with the
         same number belong to the same region with this number, which can
         subsequently be defined through

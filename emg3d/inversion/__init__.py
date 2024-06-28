@@ -1,3 +1,14 @@
+"""
+The inversion submodule of emg3d provides wrapper functionalities to use emg3d
+as a forward modelling kernel within third-party inversion frameworks. These
+third-party libraries are not included in emg3d, you have to install them
+Separately.
+
+Currently implemented wrappers and their corresponding requirements:
+
+- pyGIMLi(emg3d): Requires the *Geophysical Inversion & Modelling
+  Library* `pyGIMLi <https://pygimli.org>`_.
+"""
 # Copyright 2024 The emsig community.
 #
 # This file is part of emg3d.

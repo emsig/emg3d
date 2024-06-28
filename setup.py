@@ -40,7 +40,6 @@ setup(
             "xarray",
             "discretize",
             "matplotlib",
-            "pygimli",
         ],
     },
     use_scm_version={
