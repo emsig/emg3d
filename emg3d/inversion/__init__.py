@@ -13,3 +13,20 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
+import importlib as _importlib
+
+
+submodules = [
+    'pygimli',
+]
+
+__all__ = submodules
+
+
+def __dir__():
+    return __all__
+
+
+def __getattr__(name):
+    if name in submodules:
+        return _importlib.import_module(f"emg3d.inversion.{name}")
