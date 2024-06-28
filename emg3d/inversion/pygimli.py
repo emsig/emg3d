@@ -23,17 +23,16 @@ expected by a pyGIMLi inversion.
 # the License.
 import numpy as np
 
+from emg3d import utils, _multiprocessing
+
 try:
     import pygimli
+    # Add pygimli and pgcore to the emg3d.Report().
+    utils.OPTIONAL.extend(['pygimli', 'pgcore'])
 except ImportError:
     pygimli = None
 
-from emg3d import utils, _multiprocessing
-
 __all__ = ['Kernel', 'Inversion']
-
-# Add pygimli and pgcore to the emg3d.Report().
-utils.OPTIONAL.extend(['pygimli', 'pgcore'])
 
 
 def __dir__():
@@ -94,10 +93,10 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         # Set markers.
         if markers is not None:
-            mesh.setCellMarkers(markers.ravel('F'))
             self.markers = markers
         else:
-            self.markers = np.zeros(simulation.model.size, dtype=int)
+            self.markers = np.arange(simulation.model.size, dtype=int)
+        mesh.setCellMarkers(self.markers.ravel('F'))
         # Store original props; required if a region is set to ``background``.
         self._model = simulation.model.property_x.copy()
         # Store volumes; required if a region is set to ``single``.
@@ -118,7 +117,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
         self.setJacobian(self.J)
 
     def response(self, model):
-        """Create synthetic data for provided model."""
+        """Create synthetic data for provided pyGIMLi model."""
 
         # Clean emg3d-simulation, so things are recomputed
         self.simulation.clean('computed')
@@ -235,7 +234,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
             self._fullmodel = True
             if self.regionProperties():
                 keys = ['background', 'fix', 'single']
-                for n, v in self.regionProperties().items():
+                for v in self.regionProperties().values():
                     if np.any([v[k] is True for k in keys]):
                         self._fullmodel = False
                         break
