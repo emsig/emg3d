@@ -50,8 +50,8 @@ class Kernel(pygimli.Modelling if pygimli else object):
         The simulation; a :class:`emg3d.simulations.Simulation` instance.
 
     markers : ndarray of dtype int, default: None
-        An ndarray of ints of the same shapes as the model. All cells with the
-        same number belong to the same region with this number, which can
+        An ndarray of integers of the same shape as the model. All cells with
+        the same number belong to the same region with this number, which can
         subsequently be defined through
         :func:`pygimli.frameworks.modelling.Modelling.setRegionProperties`.
 
@@ -97,7 +97,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
             mesh.setCellMarkers(markers.ravel('F'))
             self.markers = markers
         else:
-            self.markes = np.zeros(simulation.model.size, dtype=int)
+            self.markers = np.zeros(simulation.model.size, dtype=int)
         # Store original props; required if a region is set to ``background``.
         self._model = simulation.model.property_x.copy()
         # Store volumes; required if a region is set to ``single``.
@@ -105,6 +105,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
                 self._model.shape, order='F')
         # Set mesh.
         self.setMesh(mesh)
+        self._fullmodel = None
 
         # Create J, store and set it.
         self.J = self.Jacobian(
@@ -165,7 +166,12 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         # If the inversion model is smaller than the model, we have to
         # take care of the regions.
-        if len(model) != self.simulation.model.size:
+        if self.fullmodel:
+
+            out = np.empty(model.size)
+            out[self.mesh().cellMarkers()] = model.ravel('F')
+
+        else:
 
             out = np.empty(self.simulation.model.size)
             i = 0
@@ -184,10 +190,6 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
             out = out[:i]
 
-        else:
-            out = np.empty(model.size)
-            out[self.mesh().cellMarkers()] = model.ravel('F')
-
         return out
 
     def model2emg3d(self, model):
@@ -198,7 +200,12 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         # If the inversion model is smaller than the model, we have to
         # take care of the regions.
-        if len(model) != self.simulation.model.size:
+        if self.fullmodel:
+
+            out = np.asarray(model[self.mesh().cellMarkers()]).reshape(
+                    self.simulation.model.shape, order='F')
+
+        else:
 
             out = np.empty(self.simulation.model.shape)
             i = 0
@@ -219,11 +226,21 @@ class Kernel(pygimli.Modelling if pygimli else object):
                     out[ni] = model[i:ii+i]
                 i += ii
 
-        else:
-            out = np.asarray(model[self.mesh().cellMarkers()]).reshape(
-                    self.simulation.model.shape, order='F')
-
         return out
+
+    @property
+    def fullmodel(self):
+        """Flag if the full model is used for the inversion or not."""
+        if self._fullmodel is None:
+            self._fullmodel = True
+            if self.regionProperties():
+                keys = ['background', 'fix', 'single']
+                for n, v in self.regionProperties().items():
+                    if np.any([v[k] is True for k in keys]):
+                        self._fullmodel = False
+                        break
+
+        return self._fullmodel
 
     class Jacobian(pygimli.Matrix if pygimli else object):
         """Return Jacobian operator for pyGIMLi(emg3d)."""
@@ -288,6 +305,9 @@ class Inversion(pygimli.Inversion if pygimli else object):
             std_dev = self.fop.data2gimli(
                     self.fop.simulation.survey.standard_deviation.data)
             errorVals = std_dev / abs(dataVals)
+
+        # Reset full-model flag.
+        self.fop._fullmodel = None
 
         # Run the inversion
         out = super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
