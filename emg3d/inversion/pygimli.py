@@ -23,17 +23,16 @@ expected by a pyGIMLi inversion.
 # the License.
 import numpy as np
 
+from emg3d import utils, _multiprocessing
+
 try:
     import pygimli
+    # Add pygimli and pgcore to the emg3d.Report().
+    utils.OPTIONAL.extend(['pygimli', 'pgcore'])
 except ImportError:
     pygimli = None
 
-from emg3d import utils, _multiprocessing
-
 __all__ = ['Kernel', 'Inversion']
-
-# Add pygimli and pgcore to the emg3d.Report().
-utils.OPTIONAL.extend(['pygimli', 'pgcore'])
 
 
 def __dir__():
@@ -235,7 +234,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
             self._fullmodel = True
             if self.regionProperties():
                 keys = ['background', 'fix', 'single']
-                for n, v in self.regionProperties().items():
+                for v in self.regionProperties().values():
                     if np.any([v[k] is True for k in keys]):
                         self._fullmodel = False
                         break

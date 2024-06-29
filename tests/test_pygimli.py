@@ -4,6 +4,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 import emg3d
+from emg3d import inversion
 from emg3d.inversion import pygimli as ipygimli
 
 
@@ -190,4 +191,5 @@ class TestPygimli():
 
 
 def test_all_dir():
+    assert set(inversion.__all__) == set(dir(inversion))
     assert set(ipygimli.__all__) == set(dir(ipygimli))

@@ -6,6 +6,14 @@ from numpy.testing import assert_allclose
 import scooby
 from emg3d import utils
 
+try:
+    import pygimli
+    from emg3d.inversion import pygimli
+    add = ['pygimli', 'pgcore']
+except ImportError:
+    pygimli = None
+    add = []
+
 
 def test_known_class():
     @utils._known_class
@@ -36,7 +44,7 @@ def test_Report(capsys):
     out2 = scooby.Report(
             core=['numpy', 'scipy', 'numba', 'emg3d', 'empymod'],
             optional=['empymod', 'xarray', 'discretize', 'h5py',
-                      'matplotlib', 'tqdm', 'IPython'],
+                      'matplotlib', 'tqdm', 'IPython'] + add,
             ncol=4)
 
     # Ensure they're the same; exclude time to avoid errors.
