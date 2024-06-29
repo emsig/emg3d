@@ -94,10 +94,10 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         # Set markers.
         if markers is not None:
-            mesh.setCellMarkers(markers.ravel('F'))
             self.markers = markers
         else:
-            self.markers = np.zeros(simulation.model.size, dtype=int)
+            self.markers = np.arange(simulation.model.size, dtype=int)
+        mesh.setCellMarkers(self.markers.ravel('F'))
         # Store original props; required if a region is set to ``background``.
         self._model = simulation.model.property_x.copy()
         # Store volumes; required if a region is set to ``single``.
@@ -118,7 +118,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
         self.setJacobian(self.J)
 
     def response(self, model):
-        """Create synthetic data for provided model."""
+        """Create synthetic data for provided pyGIMLi model."""
 
         # Clean emg3d-simulation, so things are recomputed
         self.simulation.clean('computed')

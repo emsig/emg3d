@@ -34,7 +34,7 @@ def test_Report(capsys):
     # We just ensure the shown packages do not change (core and optional).
     out1 = utils.Report()
     out2 = scooby.Report(
-            core=['numpy', 'scipy', 'numba', 'emg3d'],
+            core=['numpy', 'scipy', 'numba', 'emg3d', 'empymod'],
             optional=['empymod', 'xarray', 'discretize', 'h5py',
                       'matplotlib', 'tqdm', 'IPython'],
             ncol=4)
