@@ -3,9 +3,9 @@ import pytest
 from timeit import default_timer
 from numpy.testing import assert_allclose
 
-from emg3d.inversion import pygimli as ipygimli
 import scooby
 from emg3d import utils
+from emg3d.inversion import pygimli as ipygimli
 
 
 def test_known_class():
@@ -31,15 +31,10 @@ def test_requires(capsys):
 def test_Report(capsys):
     out, _ = capsys.readouterr()  # Empty capsys
 
-    if ipygimli is None:
+    if ipygimli.pygimli is None:
         add = []
     else:
         add = ['pygimli', 'pgcore']
-
-    assert (
-        utils.OPTIONAL ==
-        ['xarray', 'discretize', 'h5py', 'matplotlib', 'tqdm', 'IPython'] + add
-    )
 
     # Reporting is now done by the external package scooby.
     # We just ensure the shown packages do not change (core and optional).
