@@ -56,7 +56,8 @@ jobs:
           - python-version: "3.11"
             name: full
             os: ubuntu
-            conda: "numba scipy xarray tqdm h5py discretize matplotlib pygimli 'numpy<2.0' 'empymod>=2.3'"
+            conda: "numba scipy pygimli 'numpy<2.0' 'empymod>=2.3'"
+          #   conda: "numba scipy xarray tqdm h5py discretize matplotlib pygimli 'numpy<2.0' 'empymod>=2.3'"
           # - python-version: "3.12"
           #   name: plain
           #   os: ubuntu
