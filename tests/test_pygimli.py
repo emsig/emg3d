@@ -23,6 +23,13 @@ except ImportError:
     pygimli = None
 
 
+print()
+print()
+print(80*'€')
+print(f"xarray: {xarray}; discretize: {discretize}; pygimli: {pygimli}")
+print(80*'£')
+print()
+
 LOGGER = logging.getLogger(__name__)
 
 
