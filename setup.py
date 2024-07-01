@@ -40,6 +40,7 @@ setup(
             "xarray",
             "discretize",
             "matplotlib",
+            "ipympl",
         ],
     },
     use_scm_version={
