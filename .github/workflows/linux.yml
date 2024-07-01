@@ -42,7 +42,7 @@ jobs:
         run: which python
 
       - name: Scooby pyGIMLi
-        run: scooby pygimli
+        run: scooby pygimli pgcore
 
       - name: Import pyGIMLi
         run: python -c 'import pygimli; print(pygimli.Report())'
