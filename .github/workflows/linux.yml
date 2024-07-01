@@ -7,12 +7,11 @@ on:
 
 defaults:
   run:
-    shell: bash
+    shell: bash -l {0}
 
 jobs:
   test:
-
-    name: testing
+    name: test-pyGIMLi-import
     runs-on: ubuntu-latest
 
     steps:
@@ -27,7 +26,6 @@ jobs:
           use-mamba: true
 
       - name: Conda settings
-        shell: bash -l {0}
         run: |
           conda config --set always_yes yes --set changeps1 no
           conda config --show-sources
@@ -35,17 +33,13 @@ jobs:
           conda info -a
 
       - name: Install pyGIMLi
-        shell: bash -l {0}
         run: conda install -c gimli -c conda-forge pygimli
 
       - name: Conda list
-        shell: bash -l {0}
         run: conda list
 
       - name: Which Python
-        shell: bash -l {0}
         run: which python
 
       - name: Import pyGIMLi
-        shell: bash -l {0}
         run: python -c 'import pygimli; print(pygimli.Report())'
