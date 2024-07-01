@@ -33,13 +33,16 @@ jobs:
           conda info -a
 
       - name: Install pyGIMLi
-        run: conda install -c gimli -c conda-forge pygimli
+        run: conda install -c gimli -c conda-forge pygimli scooby
 
       - name: Conda list
         run: conda list
 
       - name: Which Python
         run: which python
+
+      - name: Scooby pyGIMLi
+        run: scooby pygimli
 
       - name: Import pyGIMLi
         run: python -c 'import pygimli; print(pygimli.Report())'
