@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- New module ``inversion``:
+
+  - pyGIMLi(emg3d)
+
+
 v1.8.3 : tol_gradient isfinite
 ------------------------------
 
