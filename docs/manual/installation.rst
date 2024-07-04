@@ -23,6 +23,7 @@ namely:
 - ``discretize``: For advanced meshing tools (fancy mesh-representations and
   plotting utilities).
 - ``matplotlib``: To use the plotting utilities within ``discretize``.
+- ``ipympl``: To use the interactive plotting utilities in Jupyter.
 - ``h5py``: Save and load data in the HDF5 format.
 - ``tqdm``: For nice progress bars when computing many sources and frequencies.
 
@@ -31,7 +32,7 @@ To get therefore the complete experience use one of the following options:
 
 .. code-block:: console
 
-   conda install -c conda-forge emg3d discretize xarray matplotlib h5py tqdm
+   conda install -c conda-forge emg3d discretize xarray matplotlib ipympl h5py tqdm
 
 or via ``pip``:
 
