@@ -6,6 +6,12 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Add notes for ``ipympl`` (interactive plots in modern Jupyter).
+
+
 v1.8.3 : tol_gradient isfinite
 ------------------------------
 
