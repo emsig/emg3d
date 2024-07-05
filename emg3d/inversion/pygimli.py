@@ -98,10 +98,10 @@ class Kernel(pygimli.Modelling if pygimli else object):
             self.markers = np.arange(simulation.model.size, dtype=int)
         mesh.setCellMarkers(self.markers.ravel('F'))
         # Store original props; required if a region is set to ``background``.
-        self._model = simulation.model.property_x.copy()
+        self._model = simulation.model.copy()
         # Store volumes; required if a region is set to ``single``.
         self._volumes = simulation.model.grid.cell_volumes.reshape(
-                self._model.shape, order='F')
+                simulation.model.shape, order='F')
         # Set mesh.
         self.setMesh(mesh)
         self._fullmodel = None
@@ -213,7 +213,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
                 ni = self.markers == n
                 if v['background']:
                     ii = 0
-                    out[ni] = self._model[ni]
+                    out[ni] = self._model.property_x[ni]
                 elif v['fix']:
                     ii = 0
                     out[ni] = v['startModel']
@@ -310,11 +310,12 @@ class Inversion(pygimli.Inversion if pygimli else object):
 
         # Run the inversion
         out = super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
+        self.fop.simulation.model.property_x = self.fop.model2emg3d(out)
 
         # Print passed time and exit
         pygimli.info(f":: pyGIMLi(emg3d) END   :: runtime = {timer.runtime}")
 
-        return out
+        return self.fop.simulation.model
 
 
 def _post_step(n, inv):
@@ -333,7 +334,7 @@ def _post_step(n, inv):
         f"{n}: "
         f"χ² = {inv.inv.chi2():7.2f}; "
         f"λ = {inv.inv.getLambda()}; "
-        f"{_multiprocessing.process_map.count:2d} kernel calls; "
+        f"{_multiprocessing.process_map.count:2d} kernel call(s); "
         f"ϕ = {inv.inv.getPhiD():.2f} + {inv.inv.getPhiM():.2f}·λ = "
         f"{phi:.2f}{lastphi}"
     )
