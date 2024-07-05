@@ -40,30 +40,37 @@ jobs:
             name: minimal
             os: ubuntu
             conda: "'scipy=1.9' 'numba=0.53' 'numpy<2.0' 'empymod>=2.3'"
+            pip : "scooby"  # to not be empty
           - python-version: "3.10"
             name: full
             os: ubuntu
             conda: "numba scipy xarray h5py discretize matplotlib 'numpy<2.0' 'empymod>=2.3'"  # tqdm
+            pip : "scooby"  # to not be empty
           - python-version: "3.10"
             name: plain
             os: ubuntu
             conda: "numba scipy 'numpy<2.0' 'empymod>=2.3'"
+            pip : "scooby"  # to not be empty
           - python-version: "3.11"
             name: plain
             os: ubuntu
             conda: "numba scipy 'numpy<2.0' 'empymod>=2.3'"
+            pip : "scooby"  # to not be empty
           - python-version: "3.11"
             name: full
             os: ubuntu
             conda: "numba scipy xarray tqdm h5py discretize matplotlib 'numpy<2.0' 'empymod>=2.3'"
+            pip : "scooby pygimli"  # to not be empty
           - python-version: "3.12"
             name: plain
             os: ubuntu
             conda: "numba scipy 'numpy<2.0' 'empymod>=2.3'"
+            pip : "scooby"  # to not be empty
           - python-version: "3.12"
             name: full
             os: ubuntu
             conda: "numba scipy xarray tqdm h5py discretize matplotlib 'numpy<2.0' 'empymod>=2.3'"
+            pip : "scooby"  # to not be empty
 
     env:
       # Used for coveralls flag
@@ -106,6 +113,7 @@ jobs:
           conda config --show
           conda info -a
           conda install ${{ matrix.case.conda }} pytest pytest-cov pytest-console-scripts coveralls flake8 setuptools-scm
+          python -m pip install ${{ matrix.case.pip }}
 
       - name: Conda list
         shell: bash -l {0}
