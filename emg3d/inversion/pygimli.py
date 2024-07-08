@@ -93,15 +93,14 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         # Set markers.
         if markers is not None:
-            self.markers = markers
+            self.markers = markers.ravel('F')
         else:
             self.markers = np.arange(simulation.model.size, dtype=int)
-        mesh.setCellMarkers(self.markers.ravel('F'))
+        mesh.setCellMarkers(self.markers)
         # Store original props; required if a region is set to ``background``.
         self._model = simulation.model.copy()
         # Store volumes; required if a region is set to ``single``.
-        self._volumes = simulation.model.grid.cell_volumes.reshape(
-                simulation.model.shape, order='F')
+        self._volumes = simulation.model.grid.cell_volumes
         # Set mesh.
         self.setMesh(mesh)
         self._fullmodel = None
@@ -162,17 +161,15 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         This function deals with the regions defined in pyGIMLi.
         """
+        model = model.ravel('F')
+        out = np.empty(self.simulation.model.size)
 
         # If the inversion model is smaller than the model, we have to
         # take care of the regions.
         if self.fullmodel:
-
-            out = np.empty(model.size)
-            out[self.mesh().cellMarkers()] = model.ravel('F')
+            out[self.mesh().cellMarkers()] = model
 
         else:
-
-            out = np.empty(self.simulation.model.size)
             i = 0
 
             for n, v in self.regionProperties().items():
@@ -201,19 +198,18 @@ class Kernel(pygimli.Modelling if pygimli else object):
         # take care of the regions.
         if self.fullmodel:
 
-            out = np.asarray(model[self.mesh().cellMarkers()]).reshape(
-                    self.simulation.model.shape, order='F')
+            out = np.asarray(model[self.mesh().cellMarkers()])
 
         else:
 
-            out = np.empty(self.simulation.model.shape)
+            out = np.empty(self.simulation.model.size)
             i = 0
 
             for n, v in self.regionProperties().items():
                 ni = self.markers == n
                 if v['background']:
                     ii = 0
-                    out[ni] = self._model.property_x[ni]
+                    out[ni] = self._model.property_x.ravel('F')[ni]
                 elif v['fix']:
                     ii = 0
                     out[ni] = v['startModel']
@@ -225,7 +221,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
                     out[ni] = model[i:ii+i]
                 i += ii
 
-        return out
+        return out.reshape(self.simulation.model.shape, order='F')
 
     @property
     def fullmodel(self):
