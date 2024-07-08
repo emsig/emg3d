@@ -9,7 +9,11 @@ Changelog
 latest
 ------
 
-- Add notes for ``ipympl`` (interactive plots in modern Jupyter).
+Maintenance
+
+  - Add notes for ``ipympl`` (interactive plots in modern Jupyter).
+  - Reduce code by making use of new SciPy new features (complex-valued
+    map_coordinate; lazy loading).
 
 
 v1.8.3 : tol_gradient isfinite
