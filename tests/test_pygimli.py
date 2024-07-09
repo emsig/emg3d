@@ -103,7 +103,7 @@ class TestPygimli():
         # Regions
         fop = ipygimli.Kernel(simulation=sim, markers=self.markers)
         self.set_regions(fop)
-        assert_allclose(fop.markers, self.markers)
+        assert_allclose(fop.markers, self.markers.ravel('F'))
         assert fop.fullmodel is False
 
     @pytest.mark.skipif(pygimli is None, reason="pygimli not installed.")

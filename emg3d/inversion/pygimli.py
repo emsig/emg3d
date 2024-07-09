@@ -172,9 +172,8 @@ class Kernel(pygimli.Modelling if pygimli else object):
         else:
             i = 0
 
-            for n, v in self.regionProperties().items():
-                nn = self.markers == n
-                ni = nn[np.asarray(self.mesh().cellMarkers())]
+            for n, v in sorted(self.regionProperties().items()):
+                ni = self.markers == n
                 if v['background'] or v['fix']:
                     ii = 0
                 elif v['single']:
@@ -206,9 +205,8 @@ class Kernel(pygimli.Modelling if pygimli else object):
             out = np.empty(self.simulation.model.size)
             i = 0
 
-            for n, v in self.regionProperties().items():
-                nn = self.markers == n
-                ni = nn[np.asarray(self.mesh().cellMarkers())]
+            for n, v in sorted(self.regionProperties().items()):
+                ni = self.markers == n
                 if v['background']:
                     ii = 0
                     out[ni] = self._model.property_x.ravel('F')[ni]
