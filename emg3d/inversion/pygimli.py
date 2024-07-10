@@ -71,15 +71,10 @@ class Kernel(pygimli.Modelling if pygimli else object):
         # Set pyGIMLi threads.
         pygimli.setThreadCount(pgthreads)
 
-        # Check current limitations.
-        checks = {
-            'case': (simulation.model.case, 'isotropic'),
-            'mapping': (simulation.model.map.name, 'Conductivity'),
-        }
-        for k, v in checks.items():
-            if v[0] != v[1]:
-                msg = f"pyGIMLi(emg3d) is not implemented for {v[0]} {k}."
-                raise NotImplementedError(msg)
+        # Check isotropic limitation.
+        if iso := simulation.model.case != 'isotropic':
+            msg = f"pyGIMLi(emg3d) is not implemented for {iso} case."
+            raise NotImplementedError(msg)
 
         # Store the simulation.
         self.simulation = simulation
