@@ -72,7 +72,8 @@ class Kernel(pygimli.Modelling if pygimli else object):
         pygimli.setThreadCount(pgthreads)
 
         # Check isotropic limitation.
-        if iso := simulation.model.case != 'isotropic':
+        iso = simulation.model.case
+        if iso != 'isotropic':
             msg = f"pyGIMLi(emg3d) is not implemented for {iso} case."
             raise NotImplementedError(msg)
 
