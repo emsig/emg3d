@@ -184,7 +184,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         return out
 
-    def model2emg3d(self, model):
+    def model2emg3d(self, model, jvec=False):
         """Convert a pyGIMLi model array to an emg3d Model property.
 
         This function deals with the regions defined in pyGIMLi.
@@ -198,20 +198,27 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         else:
 
-            out = np.empty(self.simulation.model.size)
+            out = np.zeros(self.simulation.model.size)
             i = 0
+
+            # TODO:: If `jvec` and `mapping != 'Conductivity'`: chain rule?
 
             for n, v in sorted(self.regionProperties().items()):
                 ni = self.markers == n
+                # TODO:: Zeros for background/fixed?
                 if v['background']:
                     ii = 0
-                    out[ni] = self._model.property_x.ravel('F')[ni]
+                    if not jvec:
+                        out[ni] = self._model.property_x.ravel('F')[ni]
                 elif v['fix']:
                     ii = 0
-                    out[ni] = v['startModel']
+                    if not jvec:
+                        out[ni] = v['startModel']
                 elif v['single']:
                     ii = 1
                     out[ni] = model[i]
+                    if jvec:  # TODO:: Necessary to normalize?
+                        out[ni] *= self._volumes[ni]/self._volumes[ni].sum()
                 else:
                     ii = np.sum(ni)
                     out[ni] = model[i:ii+i]
@@ -256,7 +263,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         def mult(self, x):
             """Multiply the Jacobian with a vector, Jm."""
-            jvec = self.simulation.jvec(vector=self.model2emg3d(x))
+            jvec = self.simulation.jvec(vector=self.model2emg3d(x, jvec=True))
             return self.data2gimli(jvec)
 
         def transMult(self, x):
