@@ -83,6 +83,10 @@ class TestPygimli():
     def test_Kernel_errors(self):
 
         sim = self.sim.copy()
+        sim.model = emg3d.Model(sim.model.grid, mapping='Resistivity')
+        with pytest.raises(NotImplementedError, match='for Resistivity'):
+            _ = ipygimli.Kernel(simulation=sim)
+
         sim.model = emg3d.Model(sim.model.grid, 1, 2)
         with pytest.raises(NotImplementedError, match='for HTI'):
             _ = ipygimli.Kernel(simulation=sim)

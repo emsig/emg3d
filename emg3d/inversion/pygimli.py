@@ -71,11 +71,15 @@ class Kernel(pygimli.Modelling if pygimli else object):
         # Set pyGIMLi threads.
         pygimli.setThreadCount(pgthreads)
 
-        # Check isotropic limitation.
-        iso = simulation.model.case
-        if iso != 'isotropic':
-            msg = f"pyGIMLi(emg3d) is not implemented for {iso} case."
-            raise NotImplementedError(msg)
+        # Check current limitations.
+        checks = {
+            'case': (simulation.model.case, 'isotropic'),
+            'mapping': (simulation.model.map.name, 'Conductivity'),
+        }
+        for k, v in checks.items():
+            if v[0] != v[1]:
+                msg = f"pyGIMLi(emg3d) is not implemented for {v[0]} {k}."
+                raise NotImplementedError(msg)
 
         # Store the simulation.
         self.simulation = simulation
@@ -174,6 +178,7 @@ class Kernel(pygimli.Modelling if pygimli else object):
                     ii = 0
                 elif v['single']:
                     ii = 1
+                    # TODO: Should av. happen on log-scale (not for jtvec)
                     out[i] = np.average(model[ni], weights=self._volumes[ni])
                 else:
                     ii = np.sum(ni)
@@ -217,8 +222,9 @@ class Kernel(pygimli.Modelling if pygimli else object):
                 elif v['single']:
                     ii = 1
                     out[ni] = model[i]
-                    if jvec:  # TODO:: Necessary to normalize?
-                        out[ni] *= self._volumes[ni]/self._volumes[ni].sum()
+                    # TODO:: Necessary to normalize?
+                    # if jvec:
+                    #     out[ni] *= self._volumes[ni]/self._volumes[ni].sum()
                 else:
                     ii = np.sum(ni)
                     out[ni] = model[i:ii+i]
