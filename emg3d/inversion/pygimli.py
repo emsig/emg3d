@@ -261,11 +261,16 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         def cols(self):
             """The number of columns corresponds to the model size."""
-            return self.simulation.model.size
+            if not hasattr(self, '_cols'):
+                gmodel = self.model2gimli(self.simulation.model.property_x)
+                self._cols = len(gmodel)
+            return self._cols
 
         def rows(self):
             """The number of rows corresponds to 2x data-size (Re; Im)."""
-            return self.simulation.survey.count * 2
+            if not hasattr(self, '_rows'):
+                self._rows = self.simulation.survey.count * 2
+            return self._rows
 
         def mult(self, x):
             """Multiply the Jacobian with a vector, Jm."""
@@ -281,7 +286,6 @@ class Kernel(pygimli.Modelling if pygimli else object):
             """There is no save for this pseudo-Jacobian."""
 
 
-@utils._requires('pygimli')
 class Inversion(pygimli.Inversion if pygimli else object):
     """Thin wrapper, adding verbosity and taking care of data format."""
 
