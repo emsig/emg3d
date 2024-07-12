@@ -154,7 +154,7 @@ class TestPygimli():
         INV.inv.setCGLSTolerance(10)
         INV.inv.setMaxCGLSIter(30)
 
-        _ = INV.run(maxIter=2, lam=0.1)
+        INV.run(maxIter=2, lam=0.1)
 
         assert 'pyGIMLi(emg3d)' in caplog.text
         assert 'Created startmodel from forward operator: 27' in caplog.text
@@ -181,7 +181,7 @@ class TestPygimli():
         INV.fop.setRegionProperties(
                 3, single=True, limits=(0.99999, 1.00001), startModel=1.0)
 
-        _ = INV.run(maxIter=2, lam=1)
+        INV.run(maxIter=2, lam=1)
 
         assert 'pyGIMLi(emg3d)' in caplog.text
         assert 'Created startmodel from region infos: 2' in caplog.text

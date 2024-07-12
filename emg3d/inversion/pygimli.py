@@ -203,10 +203,11 @@ class Kernel(pygimli.Modelling if pygimli else object):
 
         else:
 
+            # TODO: default for jvec: zeros, ones, something else?
             out = np.zeros(self.simulation.model.size)
             i = 0
 
-            # TODO:: If `jvec` and `mapping != 'Conductivity'`: chain rule?
+            # TODO:: What about dsigma dm?
 
             for n, v in sorted(self.regionProperties().items()):
                 ni = self.markers == n
@@ -319,12 +320,18 @@ class Inversion(pygimli.Inversion if pygimli else object):
 
         # Run the inversion
         out = super().run(dataVals=dataVals, errorVals=errorVals, **kwargs)
+
+        # Store last model in the simulation
         self.fop.simulation.model.property_x = self.fop.model2emg3d(out)
+
+        # Store last iteration as inversion result
+        survey = self.fop.simulation.survey
+        n = self.inv.iter()
+        survey.data["inv"] = self.fop.simulation.data[f"it{n}"].copy()
+        survey.data["inv"].data[np.invert(survey.isfinite)] *= np.nan
 
         # Print passed time and exit
         pygimli.info(f":: pyGIMLi(emg3d) END   :: runtime = {timer.runtime}")
-
-        return self.fop.simulation.model
 
 
 def _post_step(n, inv):
