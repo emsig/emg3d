@@ -23,7 +23,7 @@ expected by a pyGIMLi inversion.
 # the License.
 import numpy as np
 
-from emg3d import utils, _multiprocessing
+from emg3d import io, utils, _multiprocessing
 
 try:
     import pygimli
@@ -302,6 +302,7 @@ class Inversion(pygimli.Inversion if pygimli else object):
         # Reset counter, start timer, print message.
         _multiprocessing.process_map.count = 0
         timer = utils.Timer()
+        self.fop.simulation.timer = timer
         pygimli.info(":: pyGIMLi(emg3d) START ::")
 
         # Take data from the survey if not provided.
@@ -336,24 +337,53 @@ class Inversion(pygimli.Inversion if pygimli else object):
 
 def _post_step(n, inv):
     """Print some values for each iteration."""
+    sim = inv.fop.simulation
 
     # Print info
-    sim = inv.fop.simulation
-    sim.survey.data[f"it{n}"] = sim.survey.data.synthetic
     phi = inv.inv.getPhi()
-    if not hasattr(inv, 'lastphi'):
-        lastphi = ""
+    if n == 0:
+        pygimli.info(
+            f"{70*'='}\n{39*' '}"
+            " it        χ²   F(m)       λ        ϕᵈ        ϕᵐ"
+            f"    ϕ=ϕᵈ+λϕᵐ   Δϕ (%)\n{39*' '}{70*'-'}"
+        )
+        deltaphi = 0
+        sim.invinfo = {}
+
     else:
-        lastphi = f"; Δϕ = {(1-phi/inv.lastphi)*100:.2f}%"
+        deltaphi = (1-phi/inv.lastphi)*100
     inv.lastphi = phi
     pygimli.info(
-        f"{n}: "
-        f"χ² = {inv.inv.chi2():7.2f}; "
-        f"λ = {inv.inv.getLambda()}; "
-        f"{_multiprocessing.process_map.count:2d} kernel call(s); "
-        f"ϕ = {inv.inv.getPhiD():.2f} + {inv.inv.getPhiM():.2f}·λ = "
-        f"{phi:.2f}{lastphi}"
+        f"{n:3d}{np.round(inv.inv.chi2(), 1):10.6g}"
+        f"{_multiprocessing.process_map.count:7d}{inv.inv.getLambda():8.3g}"
+        f"{np.round(inv.inv.getPhiD(), 1):10.6g}"
+        f"{np.round(inv.inv.getPhiM(), 1):10.6g}{np.round(phi, 1):12.6g}"
+        f"{deltaphi:9.2f}"
     )
+
+    # Store data TODO store everything required to reproduce or restart inv
+    sim.survey.data[f"it{n}"] = sim.survey.data.synthetic
+    # TODO store data and model as gimli vectors; requires region info
+    model = inv.fop.simulation.model.copy()
+    model.property_x = inv.fop.model2emg3d(inv.model)
+    sim.invinfo[n] = {
+        'model': model,
+        'chi2': inv.inv.chi2(),
+        'phi': phi,
+        'phi_d': inv.inv.getPhiD(),
+        'phi_m': inv.inv.getPhiM(),
+        'phi_delta': deltaphi,
+        'count': _multiprocessing.process_map.count,
+        'lambda': inv.inv.getLambda(),
+        'time': sim.timer.elapsed,
+    }
+    if sim.name:
+        io.save(
+            f"{sim.name}.h5",
+            simulation=sim.to_dict(what='plain'),
+            invinfo=sim.invinfo,
+            verb=0,
+        )
 
     # Reset counter
     _multiprocessing.process_map.count = 0

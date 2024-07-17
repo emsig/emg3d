@@ -158,7 +158,7 @@ class TestPygimli():
 
         assert 'pyGIMLi(emg3d)' in caplog.text
         assert 'Created startmodel from forward operator: 27' in caplog.text
-        assert 'λ = 0.1' in caplog.text
+        assert '1     0.1' in caplog.text
 
         assert INV.inv.chi2() < 1
 
@@ -185,8 +185,7 @@ class TestPygimli():
 
         assert 'pyGIMLi(emg3d)' in caplog.text
         assert 'Created startmodel from region infos: 2' in caplog.text
-        assert 'λ = 1.0' in caplog.text
-
+        assert '1       1' in caplog.text
         assert INV.inv.chi2() < 1
 
 
