@@ -354,10 +354,10 @@ def _post_step(n, inv):
         deltaphi = (1-phi/inv.lastphi)*100
     inv.lastphi = phi
     pygimli.info(
-        f"{n:3d}{np.round(inv.inv.chi2(), 1):10.6g}"
-        f"{_multiprocessing.process_map.count:7d}{inv.inv.getLambda():8.3g}"
-        f"{np.round(inv.inv.getPhiD(), 1):10.6g}"
-        f"{np.round(inv.inv.getPhiM(), 1):10.6g}{np.round(phi, 1):12.6g}"
+        f"{n:3d}{np.round(inv.inv.chi2(), 1):10.6}"
+        f"{_multiprocessing.process_map.count:7d}{inv.inv.getLambda():8.3}"
+        f"{np.round(inv.inv.getPhiD(), 1):10.6}"
+        f"{np.round(inv.inv.getPhiM(), 1):10.6}{np.round(phi, 1):12.6}"
         f"{deltaphi:9.2f}"
     )
 
