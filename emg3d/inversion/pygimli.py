@@ -343,9 +343,9 @@ def _post_step(n, inv):
     phi = inv.inv.getPhi()
     if n == 0:
         pygimli.info(
-            f"{70*'='}\n{39*' '}"
-            " it        χ²   F(m)       λ        ϕᵈ        ϕᵐ"
-            f"    ϕ=ϕᵈ+λϕᵐ   Δϕ (%)\n{39*' '}{70*'-'}"
+            f"{71*'='}\n{39*' '}"
+            " it        χ²   F(m)       λ         ϕᵈ         ϕᵐ"
+            f"   ϕ=ϕᵈ+λϕᵐ   Δϕ (%)\n{39*' '}{71*'-'}"
         )
         deltaphi = 0
         sim.invinfo = {}
@@ -354,10 +354,10 @@ def _post_step(n, inv):
         deltaphi = (1-phi/inv.lastphi)*100
     inv.lastphi = phi
     pygimli.info(
-        f"{n:3d}{np.round(inv.inv.chi2(), 1):10.6}"
+        f"{n:3d}{_round_format(inv.inv.chi2())}"
         f"{_multiprocessing.process_map.count:7d}{inv.inv.getLambda():8.3}"
-        f"{np.round(inv.inv.getPhiD(), 1):10.6}"
-        f"{np.round(inv.inv.getPhiM(), 1):10.6}{np.round(phi, 1):12.6}"
+        f" {_round_format(inv.inv.getPhiD())}"
+        f" {_round_format(inv.inv.getPhiM())} {_round_format(phi)}"
         f"{deltaphi:9.2f}"
     )
 
@@ -387,3 +387,8 @@ def _post_step(n, inv):
 
     # Reset counter
     _multiprocessing.process_map.count = 0
+
+
+def _round_format(x, ndigit=1, threshold=1e6, lower='10.1f', upper='10.3'):
+    """Rounding numbers for info display."""
+    return f"{np.round(x, ndigit):{lower if x < threshold else upper}}"
