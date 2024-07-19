@@ -9,6 +9,10 @@ Changelog
 latest
 ------
 
+- New module ``inversion``:
+
+  - pyGIMLi(emg3d)
+
 Maintenance
 
   - Add notes for ``ipympl`` (interactive plots in modern Jupyter).

@@ -40,6 +40,7 @@ intersphinx_mapping = {
     "empymod": ("https://empymod.emsig.xyz/en/stable", None),
     "xarray": ("https://docs.xarray.dev/en/stable", None),
     "numba": ("https://numba.readthedocs.io/en/stable", None),
+    "pygimli": ("https://www.pygimli.org", None),
 }
 
 # ==== 2. General Settings ====
