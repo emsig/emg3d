@@ -1,3 +1,4 @@
+import time
 from emg3d import __version__
 
 # ==== 1. Extensions  ====
@@ -56,7 +57,7 @@ master_doc = 'index'
 # General information about the project.
 project = 'emg3d'
 author = 'The emsig community'
-copyright = f'2018, {author}'
+copyright = f'2018-{time.strftime("%Y")}, {author}'
 
 # |version| and |today| tags (|release|-tag is not used).
 version = __version__

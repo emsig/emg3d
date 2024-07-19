@@ -32,8 +32,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import scipy as sp
-import scipy.linalg as sl
-import scipy.sparse.linalg as ssl
 
 from emg3d import core, meshes, models, fields, utils
 
@@ -311,7 +309,7 @@ def solve(model, sfield, sslsolver=True, semicoarsening=True,
     var.cprint(var, 2)
 
     # Compute reference error for tolerance.
-    var.l2_refe = sl.norm(sfield.field, check_finite=False)
+    var.l2_refe = sp.linalg.norm(sfield.field, check_finite=False)
     var.error_at_cycle[0] = var.l2_refe
 
     # Check sfield.
@@ -704,7 +702,7 @@ def krylov(model, sfield, efield, var):
         return -rfield.field
 
     # Initiate LinearOperator A x.
-    A = ssl.LinearOperator(
+    A = sp.sparse.linalg.LinearOperator(
             shape=(sfield.field.size, sfield.field.size),
             dtype=sfield.field.dtype, matvec=amatvec)
 
@@ -725,7 +723,7 @@ def krylov(model, sfield, efield, var):
     # Initiate LinearOperator M.
     M = None
     if var.cycle:
-        M = ssl.LinearOperator(
+        M = sp.sparse.linalg.LinearOperator(
                 shape=(sfield.field.size, sfield.field.size),
                 dtype=sfield.field.dtype, matvec=mg_matvec)
 
@@ -762,7 +760,7 @@ def krylov(model, sfield, efield, var):
     # The ssl solvers do not abort if the norm diverges or is not finite. We
     # therefore throw an exception in `_terminate`, and catch it here.
     try:
-        efield.field, i = getattr(ssl, var.sslsolver)(
+        efield.field, i = getattr(sp.sparse.linalg, var.sslsolver)(
                 A=A, b=sfield.field, x0=efield.field, **{TOL: var.tol},
                 maxiter=var.ssl_maxit, atol=1e-30, M=M, callback=callback)
     except _ConvergenceError:
@@ -1065,7 +1063,7 @@ def residual(model, sfield, efield, norm=False):
 
     # Return error if norm.
     if norm:
-        return sl.norm(rfield.field, check_finite=False)
+        return sp.linalg.norm(rfield.field, check_finite=False)
 
     # Return residual if not norm.
     else:

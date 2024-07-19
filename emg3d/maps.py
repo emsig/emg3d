@@ -545,15 +545,7 @@ def interp_spline_3d(points, values, xi, **kwargs):
             bounds_error=False, fill_value='extrapolate'
         )(xi[:, i])
 
-    # `map_coordinates` only works for real data; split it up if complex.
-    # Note: SciPy 1.6 (12/2020) introduced complex-valued
-    #       ndimage.map_coordinates; replace eventually.
-    values_x = sp.ndimage.map_coordinates(values.real, coords, **kwargs)
-    if 'complex' in values.dtype.name:
-        imag = sp.ndimage.map_coordinates(values.imag, coords, **kwargs)
-        values_x = values_x + 1j*imag
-
-    return values_x
+    return sp.ndimage.map_coordinates(values, coords, **kwargs)
 
 
 @nb.njit(**_numba_setting)
