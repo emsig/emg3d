@@ -28,23 +28,15 @@ from emg3d import electrodes, meshes, models, simulations, surveys, utils
 
 try:
     import simpeg
-    from simpeg.electromagnetics.frequency_domain import (
-            simulation, receivers, survey
-    )
+    import discretize
+    from simpeg.electromagnetics import frequency_domain as simpeg_fd
     # Add simpeg to the emg3d.Report().
     utils.OPTIONAL.extend(['simpeg',])
 except ImportError:
     simpeg = None
-    simulation = None
-    receivers = None
-    survey = None
 
-try:
-    import discretize
-except ImportError:
-    discretize = None
 
-__all__ = []
+__all__ = ['FDEMSimulation', ]
 
 
 def __dir__():
@@ -52,7 +44,8 @@ def __dir__():
 
 
 # class Kernel():
-class FDEMSimulation(simulation.BaseFDEMSimulation if simpeg else object):
+class FDEMSimulation(
+        simpeg_fd.simulation.BaseFDEMSimulation if simpeg else object):
     """3D simulation of electromagnetic fields using emg3d as a solver.
 
     .. note::
@@ -73,11 +66,6 @@ class FDEMSimulation(simulation.BaseFDEMSimulation if simpeg else object):
         reference model for the automatic gridding routine.
 
     """
-
-    _solutionType = "eSolution"
-    _formulation = "EB"
-    storeJ = False
-    _Jmatrix = None
 
     @utils._requires("simpeg")
     def __init__(self, mesh, **kwargs):
@@ -426,14 +414,14 @@ def survey_to_emg3d(survey):
     for src in survey.source_list:
 
         # Create emg3d source.
-        if isinstance(src, receivers.ElectricWire):
+        if isinstance(src, simpeg_fd.sources.ElectricWire):
             source = electrodes.TxElectricWire(
                 src.locations,
                 strength=src.strength
             )
-        elif isinstance(src, receivers.ElectricDipole):
+        elif isinstance(src, simpeg_fd.sources.ElectricDipole):
             source = electrodes.TxElectricDipole(
-                (*src.location, src.azimuth, src.elevation),
+                (*np.squeeze(src.location), src.azimuth, src.elevation),
                 strength=src.strength, length=src.length
             )
         else:
@@ -483,12 +471,16 @@ def survey_to_emg3d(survey):
                 )
 
             # Get azimuth, elevation.
-            if rec.orientation == "rotated":
+            if isinstance(rec.orientation, str) and rec.orientation == "rotated":
                 azimuth = rec.azimuth
                 elevation = rec.elevation
             else:
-                azimuth = [0, 90][rec.orientation == 'y']
-                elevation = [0, 90][rec.orientation == 'z']
+                azimuth = 0
+                elevation = 0
+                if rec.orientation[1] == 1:
+                    azimuth = 90
+                if rec.orientation[2] == 1:
+                    elevation = 90
 
             # Get type, component.
             rec_type = rec_types[rec.projField == 'h']
@@ -534,8 +526,8 @@ def survey_to_emg3d(survey):
     # Create and store survey.
     emg3d_survey = surveys.Survey(
         name='Survey created by SimPEG',
-        sources=surveys.surveys.txrx_lists_to_dict(src_list),
-        receivers=surveys.surveys.txrx_lists_to_dict(rec_list),
+        sources=surveys.txrx_lists_to_dict(src_list),
+        receivers=surveys.txrx_lists_to_dict(rec_list),
         frequencies=freq_list,
         noise_floor=1.,       # We deal with std in SimPEG.
         relative_error=None,  # "    "   "
@@ -641,9 +633,9 @@ def survey_to_simpeg(survey):
 
                 # Add this receiver to receiver list
                 if isinstance(rec, electrodes.RxElectricPoint):
-                    rfunc = receivers.PointElectricField
+                    rfunc = simpeg_fd.receivers.PointElectricField
                 elif isinstance(rec, electrodes.RxMagneticPoint):
-                    rfunc = receivers.PointMagneticField
+                    rfunc = simpeg_fd.receivers.PointMagneticField
                 else:
                     raise NotImplementedError(
                         f"Receiver type {rec} not implemented."
@@ -660,12 +652,12 @@ def survey_to_simpeg(survey):
 
             # Add this source-frequency to source list
             if isinstance(src, electrodes.TxElectricWire):
-                tsrc = receivers.ElectricWire(
+                tsrc = simpeg_fd.sources.ElectricWire(
                     locations=src.points, receiver_list=rec_list,
                     frequency=freq, strength=src.strength,
                 )
             elif isinstance(src, electrodes.TxElectricDipole):
-                tsrc = receivers.ElectricDipole(
+                tsrc = simpeg_fd.receivers.ElectricDipole(
                     location=src.center, azimuth=src.azimuth,
                     elevation=src.elevation, receiver_list=rec_list,
                     frequency=freq, strength=src.strength,
@@ -677,4 +669,4 @@ def survey_to_simpeg(survey):
 
             src_list.append(tsrc)
 
-    return survey.Survey(src_list), np.array(data_list)
+    return simpeg_fd.survey.Survey(src_list), np.array(data_list)
