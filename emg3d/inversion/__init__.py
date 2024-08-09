@@ -29,6 +29,7 @@ import importlib as _importlib
 
 submodules = [
     'pygimli',
+    'simpeg',
 ]
 
 __all__ = submodules

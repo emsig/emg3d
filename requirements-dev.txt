@@ -9,6 +9,7 @@ discretize
 matplotlib
 ipympl
 pygimli
+simpeg>=0.22
 
 # SETUP RELATED
 setuptools_scm
