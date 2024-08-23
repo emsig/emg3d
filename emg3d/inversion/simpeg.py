@@ -70,50 +70,28 @@ class FDEMSimulationNew(
     def __init__(self, simulation, **kwargs):
         """Initialize Simulation using emg3d as solver."""
 
-#############################################################################
+        # Store simulation
+        self.simulation = simulation
 
+        # Create SimPEG survey.
         survey = survey2simpeg(simulation.survey)[0]
 
+        # Get the data map
+        # TODO - can we simplify survey2emg3d?
+        _, dmap = survey2emg3d(survey)
 
-        # emg3d_survey and simulation.survey should be identical.
-        # TODO: Can we simplify this step?
-        emg3d_survey, dmap = survey2emg3d(survey)
-        print(f"Surveys are identical: {emg3d_survey == simulation.survey}")
-        print(simulation.survey)
-        print(emg3d_survey)
+        # Add reverse map to emg3d-data (is saved with survey).
+        ind = np.full(simulation.survey.shape, -1)
+        ind[dmap] = np.arange(survey.nD)
+        esurvey = simulation.survey
+        esurvey.data['indices'] = esurvey.data.observed.copy(data=ind)
 
-        # Get and store emg3d-survey and data map.
-        survey, dmap = survey_to_emg3d(self.survey)
-        self._emg3d_survey = survey
+        # Store emg3d-survey and data map.
+        self._emg3d_survey = esurvey
         self._dmap_simpeg_emg3d = dmap
 
         # Create emg3d data dummy; can be re-used.
-        self._emg3d_array = np.full(simulation.survey.shape, np.nan+1j*np.nan)
-
-
-        # Store emg3d-to-SimPEG mapping.
-
-        # Get dmap from the stored indices.
-        indices = np.zeros((self.survey.nD, 3), dtype=int)
-        for i in range(self.survey.nD):
-            indices[i, :] = np.r_[
-                    np.where(emg3d_survey.data.indices.data == i)]
-
-        # Store dmap.
-        self._dmap_simpeg_emg3d = tuple(indices.T)
-
-
-    #############################################################################
-
-
-
-
-
-
-
-
-        # Store simulation options.
-        self.simulation_opts = kwargs.pop('simulation_opts', {})
+        self._emg3d_array = np.full(esurvey.shape, np.nan+1j*np.nan)
 
         super().__init__(mesh=simulation.model.grid, survey=survey, **kwargs)
 
