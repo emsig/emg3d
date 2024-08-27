@@ -288,9 +288,11 @@ class FDEMSimulationNew(
             f = self.fields(m=m)
 
         # Map emg3d-data-array to SimPEG-data-vector
-        data_complex = simpeg.data.ComplexData(
+        # NOTE: Once https://github.com/simpeg/simpeg/pull/1523 is in, the
+        # `tolist()` can be removed
+        data_complex = simpeg.data.Data(
             survey=self.survey,
-            dobs=f.data.synthetic.data[self._dmap_simpeg_emg3d]
+            dobs=f.data.synthetic.data[self._dmap_simpeg_emg3d].tolist()
         )
         data = []
         for src in self.survey.source_list:
@@ -919,15 +921,18 @@ class FDEMSimulation(
             f = self.fields(m=m)
 
         # Map emg3d-data-array to SimPEG-data-vector
-        data_complex = simpeg.data.ComplexData(
+        data_complex = simpeg.data.Data(
             survey=self.survey,
-            dobs=f.data.synthetic.data[self._dmap_simpeg_emg3d]
+            # NOTE: Once https://github.com/simpeg/simpeg/pull/1523 is in, the
+            # `tolist()` can be removed
+            dobs=f.data.synthetic.data[self._dmap_simpeg_emg3d].tolist()
         )
         data = []
         for src in self.survey.source_list:
             for rx in src.receiver_list:
-                data_complex_rx = rx.evalDataComplex(data_complex[src, rx])
-                data.append(data_complex_rx)
+                # Hear would come Re/Im [used now] or Amp/Pha or
+                # log(Re)/Log(im) etc
+                data.append(data_complex[src, rx])
         return np.hstack(data)
 
     def fields(self, m=None):
