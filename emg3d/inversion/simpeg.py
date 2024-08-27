@@ -400,7 +400,7 @@ def survey2emg3d(survey):
                 strength=src.current
             )
         elif isinstance(src, simpeg_fd.sources.ElectricDipole):
-            azimuth, elevation = _get_azimuth_elevation(src)
+            azimuth, elevation = _vector2angles(src.orientation)
             source = electrodes.TxElectricDipole(
                 (*np.squeeze(src.location), azimuth, elevation),
                 strength=src.strength, length=1.0
@@ -451,18 +451,6 @@ def survey2emg3d(survey):
                     "Only projField = {'e'; 'h'} implemented."
                 )
 
-            # Get azimuth, elevation.
-            if isinstance(rec.orientation, str) and rec.orientation == "rotated":
-                azimuth = rec.azimuth
-                elevation = rec.elevation
-            else:
-                azimuth = 0
-                elevation = 0
-                if rec.orientation[1] == 1:
-                    azimuth = 90
-                if rec.orientation[2] == 1:
-                    elevation = 90
-
             # Get type, component.
             rec_type = rec_types[rec.projField == 'h']
             component = rec.component
@@ -471,6 +459,7 @@ def survey2emg3d(survey):
             for i in range(rec.locations[:, 0].size):
 
                 # Create emg3d receiver.
+                azimuth, elevation = _vector2angles(rec.orientation):
                 receiver = rec_type(
                     (*rec.locations[i, :], azimuth, elevation),
                     data_type=component,
@@ -624,7 +613,7 @@ def survey2simpeg(survey):
 
                 trec = rfunc(
                     locations=rec.center, component='complex',
-                    orientation=_get_orientation(rec),
+                    orientation=_angles2vector(rec.azimuth, rec.elevation),
                 )
 
                 rec_list.append(trec)
@@ -640,7 +629,7 @@ def survey2simpeg(survey):
                 tsrc = simpeg_fd.sources.ElectricDipole(
                     receiver_list=rec_list, frequency=freq,
                     location=src.center, strength=src.strength,
-                    orientation=_get_orientation(src),
+                    orientation=_angles2vector(src.azimuth, src.elevation),
                 )
             else:
                 raise NotImplementedError(
@@ -1034,7 +1023,7 @@ def survey_to_emg3d(survey):
                 strength=src.current
             )
         elif isinstance(src, simpeg_fd.sources.ElectricDipole):
-            azimuth, elevation = _get_azimuth_elevation(src)
+            azimuth, elevation = _vector2angles(src.orientation)
             source = electrodes.TxElectricDipole(
                 (*np.squeeze(src.location), azimuth, elevation),
                 strength=src.strength, length=1.0
@@ -1085,18 +1074,6 @@ def survey_to_emg3d(survey):
                     "Only projField = {'e'; 'h'} implemented."
                 )
 
-            # Get azimuth, elevation.
-            if isinstance(rec.orientation, str) and rec.orientation == "rotated":
-                azimuth = rec.azimuth
-                elevation = rec.elevation
-            else:
-                azimuth = 0
-                elevation = 0
-                if rec.orientation[1] == 1:
-                    azimuth = 90
-                if rec.orientation[2] == 1:
-                    elevation = 90
-
             # Get type, component.
             rec_type = rec_types[rec.projField == 'h']
             component = rec.component
@@ -1105,6 +1082,7 @@ def survey_to_emg3d(survey):
             for i in range(rec.locations[:, 0].size):
 
                 # Create emg3d receiver.
+                azimuth, elevation = _vector2angles(rec.orientation):
                 receiver = rec_type(
                     (*rec.locations[i, :], azimuth, elevation),
                     data_type=component,
@@ -1258,7 +1236,7 @@ def survey_to_simpeg(survey):
 
                 trec = rfunc(
                     locations=rec.center, component='complex',
-                    orientation=_get_orientation(rec),
+                    orientation=_angles2vector(rec.azimuth, rec.elevation),
                 )
 
                 rec_list.append(trec)
@@ -1274,7 +1252,7 @@ def survey_to_simpeg(survey):
                 tsrc = simpeg_fd.sources.ElectricDipole(
                     receiver_list=rec_list, frequency=freq,
                     location=src.center, strength=src.strength,
-                    orientation=_get_orientation(src),
+                    orientation=_angles2vector(src.azimuth, src.elevation),
                 )
             else:
                 raise NotImplementedError(
@@ -1286,43 +1264,23 @@ def survey_to_simpeg(survey):
     return simpeg_fd.survey.Survey(src_list), np.array(data_list)
 
 
-def _get_orientation(inp):
-    if inp.azimuth not in [0., 90.]:
-        raise NotImplementedError(
-            f"Only azimuth θ ∈ [0, 90] impl.; provided {inp.azimuth}."
-        )
-    if inp.elevation not in [0., 90.]:
-        raise NotImplementedError(
-            f"Only elevation φ ∈ [0, 90] impl.; provided {inp.elevation}."
-        )
-    if inp.elevation == 90:
-        return "z"
-    elif inp.azimuth == 90:
-        return "y"
-    else:
-        return "x"
+def _angles2vector(azimuth, elevation):
+    """Convert azimuth and elevation to a SimPEG-orientation vector."""
+    return electrodes.rotation(azimuth, elevation, deg=True)
 
 
-def _get_azimuth_elevation(inp):
-    out = None
-    if isinstance(inp.orientation, str):
-        if inp.orientation == "x":
-            out = 0.0, 0.0
-        elif inp.orientation == "y":
-            out = 90.0, 0.0
-        elif inp.orientation == "z":
-            out = 0.0, 90.0
+def _vector2angles(orientation):
+    """Convert a SimPEG-orientation vector to azimuth and elevation."""
+    if isinstance(orientation, str):
+        azimuth = 0.0
+        elevation = 0.0
+        if orientation == "y":
+            azimuth = 90.0
+        elif orientation == "z":
+            elevation = 90.0
     else:
-        if inp.orientation[0] == 1.0:
-            out = 0.0, 0.0
-        elif inp.orientation[1] == 1.0:
-            out = 90.0, 0.0
-        elif inp.orientation[2] == 1.0:
-            out = 0.0, 90.0
+        x, y, z = orientation
+        azimuth = np.angle(complex(x, y), deg=True)
+        elevation = np.angle(complex(np.linalg.norm([x, y]), z), deg=True)
 
-    if out is None:
-        raise NotImplementedError(
-            f"Only 'x/y/z' implemented; provided {inp.orientation}."
-        )
-    else:
-        return out
+    return azimuth, elevation
