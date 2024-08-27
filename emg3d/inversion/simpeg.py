@@ -394,15 +394,16 @@ def survey2emg3d(survey):
     for src in survey.source_list:
 
         # Create emg3d source.
-        if isinstance(src, simpeg_fd.sources.ElectricWire):
+        if isinstance(src, simpeg_fd.sources.LineCurrent):
             source = electrodes.TxElectricWire(
                 src.locations,
-                strength=src.strength
+                strength=src.current
             )
         elif isinstance(src, simpeg_fd.sources.ElectricDipole):
+            azimuth, elevation = _get_azimuth_elevation(src)
             source = electrodes.TxElectricDipole(
-                (*np.squeeze(src.location), src.azimuth, src.elevation),
-                strength=src.strength, length=src.length
+                (*np.squeeze(src.location), azimuth, elevation),
+                strength=src.strength, length=1.0
             )
         else:
             raise NotImplementedError(f"Source type {src} not implemented")
@@ -623,8 +624,7 @@ def survey2simpeg(survey):
 
                 trec = rfunc(
                     locations=rec.center, component='complex',
-                    orientation='rotated', azimuth=rec.azimuth,
-                    elevation=rec.elevation,
+                    orientation=_get_orientation(rec),
                 )
 
                 rec_list.append(trec)
@@ -632,15 +632,15 @@ def survey2simpeg(survey):
 
             # Add this source-frequency to source list
             if isinstance(src, electrodes.TxElectricWire):
-                tsrc = simpeg_fd.sources.ElectricWire(
+                tsrc = simpeg_fd.sources.LineCurrent(
                     locations=src.points, receiver_list=rec_list,
-                    frequency=freq, strength=src.strength,
+                    frequency=freq, current=src.strength,
                 )
             elif isinstance(src, electrodes.TxElectricDipole):
                 tsrc = simpeg_fd.sources.ElectricDipole(
-                    location=src.center, azimuth=src.azimuth,
-                    elevation=src.elevation, receiver_list=rec_list,
-                    frequency=freq, strength=src.strength,
+                    receiver_list=rec_list, frequency=freq,
+                    location=src.center, strength=src.strength,
+                    orientation=_get_orientation(src),
                 )
             else:
                 raise NotImplementedError(
@@ -1028,15 +1028,16 @@ def survey_to_emg3d(survey):
     for src in survey.source_list:
 
         # Create emg3d source.
-        if isinstance(src, simpeg_fd.sources.ElectricWire):
+        if isinstance(src, simpeg_fd.sources.LineCurrent):
             source = electrodes.TxElectricWire(
                 src.locations,
-                strength=src.strength
+                strength=src.current
             )
         elif isinstance(src, simpeg_fd.sources.ElectricDipole):
+            azimuth, elevation = _get_azimuth_elevation(src)
             source = electrodes.TxElectricDipole(
-                (*np.squeeze(src.location), src.azimuth, src.elevation),
-                strength=src.strength, length=src.length
+                (*np.squeeze(src.location), azimuth, elevation),
+                strength=src.strength, length=1.0
             )
         else:
             raise NotImplementedError(f"Source type {src} not implemented")
@@ -1257,8 +1258,7 @@ def survey_to_simpeg(survey):
 
                 trec = rfunc(
                     locations=rec.center, component='complex',
-                    orientation='rotated', azimuth=rec.azimuth,
-                    elevation=rec.elevation,
+                    orientation=_get_orientation(rec),
                 )
 
                 rec_list.append(trec)
@@ -1266,15 +1266,15 @@ def survey_to_simpeg(survey):
 
             # Add this source-frequency to source list
             if isinstance(src, electrodes.TxElectricWire):
-                tsrc = simpeg_fd.sources.ElectricWire(
+                tsrc = simpeg_fd.sources.LineCurrent(
                     locations=src.points, receiver_list=rec_list,
-                    frequency=freq, strength=src.strength,
+                    frequency=freq, current=src.strength,
                 )
             elif isinstance(src, electrodes.TxElectricDipole):
                 tsrc = simpeg_fd.sources.ElectricDipole(
-                    location=src.center, azimuth=src.azimuth,
-                    elevation=src.elevation, receiver_list=rec_list,
-                    frequency=freq, strength=src.strength,
+                    receiver_list=rec_list, frequency=freq,
+                    location=src.center, strength=src.strength,
+                    orientation=_get_orientation(src),
                 )
             else:
                 raise NotImplementedError(
@@ -1284,3 +1284,45 @@ def survey_to_simpeg(survey):
             src_list.append(tsrc)
 
     return simpeg_fd.survey.Survey(src_list), np.array(data_list)
+
+
+def _get_orientation(inp):
+    if inp.azimuth not in [0., 90.]:
+        raise NotImplementedError(
+            f"Only azimuth θ ∈ [0, 90] impl.; provided {inp.azimuth}."
+        )
+    if inp.elevation not in [0., 90.]:
+        raise NotImplementedError(
+            f"Only elevation φ ∈ [0, 90] impl.; provided {inp.elevation}."
+        )
+    if inp.elevation == 90:
+        return "z"
+    elif inp.azimuth == 90:
+        return "y"
+    else:
+        return "x"
+
+
+def _get_azimuth_elevation(inp):
+    out = None
+    if isinstance(inp.orientation, str):
+        if inp.orientation == "x":
+            out = 0.0, 0.0
+        elif inp.orientation == "y":
+            out = 90.0, 0.0
+        elif inp.orientation == "z":
+            out = 0.0, 90.0
+    else:
+        if inp.orientation[0] == 1.0:
+            out = 0.0, 0.0
+        elif inp.orientation[1] == 1.0:
+            out = 90.0, 0.0
+        elif inp.orientation[2] == 1.0:
+            out = 0.0, 90.0
+
+    if out is None:
+        raise NotImplementedError(
+            f"Only 'x/y/z' implemented; provided {inp.orientation}."
+        )
+    else:
+        return out
