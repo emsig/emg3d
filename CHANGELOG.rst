@@ -6,6 +6,12 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Initial version of SimPEG(emg3d)
+
+
 v1.8.4 : NumPy v2
 -----------------
 
