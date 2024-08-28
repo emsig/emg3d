@@ -301,7 +301,7 @@ class Simulation:
 
         # Initiate synthetic data with NaN's if they don't exist.
         if 'synthetic' not in self.survey.data.keys():
-            self.survey._data['synthetic'] = self.data.observed.copy(
+            self.survey.data['synthetic'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
 
         # `tqdm`-options.

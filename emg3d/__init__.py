@@ -22,6 +22,7 @@ from emg3d.electrodes import (
     RxElectricPoint, RxMagneticPoint,
 )
 from emg3d.fields import Field, get_source_field, get_magnetic_field
+from emg3d import inversion
 from emg3d.io import save, load, convert
 from emg3d.meshes import TensorMesh, construct_mesh
 from emg3d.models import Model

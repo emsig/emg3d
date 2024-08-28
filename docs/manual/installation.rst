@@ -40,6 +40,9 @@ or via ``pip``:
 
    pip install emg3d[full]
 
+The wrappers provided in :mod:`emg3d.inversion` may require additional
+packages, please consult the :ref:`inversionapi`-API for more information.
+
 If you are new to Python we recommend using a Python distribution, which will
 ensure that all dependencies are met, specifically properly compiled versions
 of ``NumPy`` and ``SciPy``; we recommend using `Anaconda

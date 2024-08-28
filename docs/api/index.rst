@@ -27,6 +27,7 @@ API reference
    surveys
    time
    utils
+   inversion/index
 
 
 .. grid:: 1
@@ -55,3 +56,7 @@ API reference
     .. grid-item-card::
 
         All sources and receivers are in :mod:`emg3d.electrodes`
+
+    .. grid-item-card::
+
+        Inversion: :mod:`emg3d.inversion`

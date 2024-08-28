@@ -9,6 +9,8 @@ Changelog
 latest
 ------
 
+- Created foundation for new module ``inversion``.
+
 Maintenance
 
   - Add notes for ``ipympl`` (interactive plots in modern Jupyter).
