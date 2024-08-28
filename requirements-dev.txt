@@ -8,6 +8,8 @@ xarray
 discretize
 matplotlib
 ipympl
+pygimli>=1.5.2
+simpeg>=0.22.1
 
 # SETUP RELATED
 setuptools_scm

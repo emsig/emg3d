@@ -5,6 +5,8 @@ from numpy.testing import assert_allclose
 
 import scooby
 from emg3d import utils
+from emg3d.inversion import pygimli as ipygimli
+from emg3d.inversion import simpeg as isimpeg
 
 
 def test_known_class():
@@ -30,13 +32,20 @@ def test_requires(capsys):
 def test_Report(capsys):
     out, _ = capsys.readouterr()  # Empty capsys
 
+    add = []
+
+    if ipygimli.pygimli:
+        add.extend(['pygimli', 'pgcore'])
+    if isimpeg.simpeg:
+        add.append('simpeg')
+
     # Reporting is now done by the external package scooby.
     # We just ensure the shown packages do not change (core and optional).
     out1 = utils.Report()
     out2 = scooby.Report(
-            core=['numpy', 'scipy', 'numba', 'emg3d'],
+            core=['numpy', 'scipy', 'numba', 'emg3d', 'empymod'],
             optional=['empymod', 'xarray', 'discretize', 'h5py',
-                      'matplotlib', 'tqdm', 'IPython'],
+                      'matplotlib', 'tqdm', 'IPython'] + add,
             ncol=4)
 
     # Ensure they're the same; exclude time to avoid errors.
