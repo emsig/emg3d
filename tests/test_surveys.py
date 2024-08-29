@@ -266,15 +266,22 @@ class TestSurvey():
         )
 
         data = np.logspace(0, -20, offs.size)+1j*np.logspace(0, -20, offs.size)
+        data = data[None, :, None]
 
         survey = surveys.Survey(
             sources=emg3d.electrodes.TxElectricDipole((0, 0, 0, 0, 0)),
             receivers=rec,
             frequencies=1.0,
-            data=data,
             relative_error=0.01,
             noise_floor=1e-15
         )
+
+        assert survey.isfinite.sum() == 0
+        assert not hasattr(survey, '_isfinite')
+        survey.data['observed'] = survey.data.observed.copy(data=data)
+        assert survey.isfinite.sum() == 21
+        assert hasattr(survey, '_isfinite')
+        assert survey.finite_data().shape == (21,)
 
         # Defined cutting
         survey.add_noise(min_offset=1000, min_amplitude=1e-19, add_to='test1')
@@ -284,8 +291,6 @@ class TestSurvey():
         assert np.all(np.isnan(survey.data.test1.data[:, -1:, :]))
         # Ensure no others are none
         assert np.sum(np.isnan(survey.data.test1.data)) == 3
-        assert survey.isfinite.sum() == 21
-        assert survey.finite_data().shape == (21,)
 
         # No cutting
         survey.add_noise(min_offset=0, min_amplitude=10e-50, add_to='test2')
