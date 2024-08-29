@@ -26,12 +26,13 @@ import numpy as np
 
 from emg3d import electrodes, meshes, models, surveys, utils
 
+
 try:
     import simpeg
     import discretize
     from simpeg.electromagnetics import frequency_domain as simpeg_fd
     # Add simpeg to the emg3d.Report().
-    utils.OPTIONAL.extend(['simpeg',])
+    utils.OPTIONAL.extend(['simpeg', 'pydiso'])
 except ImportError:
     simpeg = None
 
