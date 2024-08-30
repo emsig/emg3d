@@ -717,8 +717,14 @@ class Survey:
     def isfinite(self):
         """Return indices of the finite data."""
         if not hasattr(self, '_isfinite'):
-            self._isfinite = np.isfinite(self.data.observed.data)
-        return self._isfinite
+            finite = np.isfinite(self.data.observed.data)
+            # Only set the attribute if there is any data.
+            # Otherwise, this was called before observations were added.
+            if finite.sum() > 0:
+                self._isfinite = finite
+        else:
+            finite = self._isfinite
+        return finite
 
     def finite_data(self, data='observed'):
         """Return finite elements of selected `data`."""
