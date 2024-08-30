@@ -19,8 +19,12 @@ References
 .. [JoOM06] Jönsthövel, T. B., C. W. Oosterlee, and W. A. Mulder, 2006,
    Improving multigrid for 3-D electro-magnetic diffusion on stretched grids:
    European Conference on Computational Fluid Dynamics; UUID:
-   `df65da5c-e43f-47ab-b80d-2f8ee7f35464
-   <http://resolver.tudelft.nl/uuid:df65da5c-e43f-47ab-b80d-2f8ee7f35464>`_.
+   `632b503b-149a-47c1-a6b2-2f98f8703b48
+   <https://resolver.tudelft.nl/uuid:632b503b-149a-47c1-a6b2-2f98f8703b48>`_.
+
+   ..
+       df65da5c-e43f-47ab-b80d-2f8ee7f35464  # Old uuid
+
 .. [Hack85] Hackbusch, W., 1985, Multi-grid methods and applications: Springer,
    Berlin, Heidelberg, Volume 4 of Springer Series in Computational
    Mathematics; DOI: `10.1007/978- 3-662-02427-0 <https://doi.org/10.1007/978-
