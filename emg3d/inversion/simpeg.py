@@ -404,3 +404,121 @@ class Kernel(
                 src_list.append(tsrc)
 
         return simpeg_fd.survey.Survey(src_list)
+
+
+# ########################################################################### #
+# The following are Monkey-Patches for SimPEG PRs:                            #
+# - #1525: Add ElectricDipole                                                 #
+# - #1524: Ensure misfit is purely real valued                                #
+# - #1523: Fix validate_ndarray_with_shape                                    #
+# - #1517: Pass `rtol` to SciPy solvers for SciPy>=1.12                       #
+# Leave the patches until the connesponding PRs are merged AND released.      #
+# ########################################################################### #
+
+
+# Remove once https://github.com/simpeg/simpeg/pull/1525 is released
+class ElectricDipole(simpeg_fd.sources.BaseFDEMSrc):
+    """Point electric dipole source."""
+
+    def __init__(
+        self,
+        receiver_list,
+        frequency,
+        location=None,
+        strength=1.0,
+        orientation="x",
+        **kwargs,
+    ):
+        if location is None:
+            location = np.r_[0.0, 0.0, 0.0]
+
+        super().__init__(
+            receiver_list=receiver_list,
+            frequency=frequency,
+            location=location,
+            **kwargs,
+        )
+
+        self.strength = strength
+        self.orientation = orientation
+
+    @property
+    def location(self):
+        """Location of the dipole """
+        return self._location
+
+    @location.setter
+    def location(self, vec):
+        self._location = simpeg.utils.validate_location_property(
+                "location", vec, 3)
+
+    @property
+    def strength(self):
+        """Strength of the electric dipole (:math:`Am`) """
+        return self._strength
+
+    @strength.setter
+    def strength(self, value):
+        self._strength = simpeg.utils.validate_float(
+                "strength", value, min_val=0)
+
+    @property
+    def orientation(self):
+        """Orientation of the dipole as a normalized vector """
+        return self._orientation
+
+    @orientation.setter
+    def orientation(self, var):
+        self._orientation = simpeg.utils.validate_direction(
+                "orientation", var, dim=3)
+
+
+simpeg_fd.sources.ElectricDipole = ElectricDipole
+
+
+# Remove once https://github.com/simpeg/simpeg/pull/1524 is released
+class L2DataMisfit(simpeg.data_misfit.L2DataMisfit):
+    r"""Least-squares data misfit."""
+
+    @simpeg.utils.timeIt
+    def __call__(self, m, f=None):
+        R = self.W * self.residual(m, f=f)
+        return np.vdot(R, R).real
+
+
+simpeg.data_misfit.L2DataMisfit = L2DataMisfit
+
+
+# Remove once https://github.com/simpeg/simpeg/pull/1523 is released
+class Data(simpeg.data.Data):
+    """Data container."""
+
+    @property
+    def dobs(self):
+        return self._dobs
+
+    @dobs.setter
+    def dobs(self, value):
+        if isinstance(value, np.ndarray):
+            value = value.tolist()
+        self._dobs = simpeg.utils.validate_ndarray_with_shape(
+            "dobs", value, shape=(self.survey.nD,), dtype=(float, complex)
+        )
+
+
+simpeg.data.Data = Data
+
+
+# Remove once https://github.com/simpeg/simpeg/pull/1517 is released
+class InexactGaussNewton(simpeg.optimization.InexactGaussNewton):
+    """Minimizes using CG as the inexact solver of """
+
+    @simpeg.utils.timeIt
+    def findSearchDirection(self):
+        inp = {"rtol": self.tolCG, "maxiter": self.maxIterCG}
+        Hinv = simpeg.optimization.SolverICG(self.H, M=self.approxHinv, **inp)
+        p = Hinv * (-self.g)
+        return p
+
+
+simpeg.optimization.InexactGaussNewton = InexactGaussNewton
