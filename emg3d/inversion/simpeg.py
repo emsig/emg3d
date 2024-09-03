@@ -24,7 +24,7 @@ expected by a SimPEG inversion.
 # the License.
 import numpy as np
 
-from emg3d import electrodes, meshes, models, utils
+from emg3d import electrodes, io, meshes, models, utils, _multiprocessing
 
 
 try:
@@ -37,19 +37,18 @@ except ImportError:
     simpeg = None
 
 
-__all__ = ['Kernel', ]
+__all__ = ['FDEMSimulation', 'Inversion']
 
 
 def __dir__():
     return __all__
 
 
-class Kernel(
+class FDEMSimulation(
         simpeg_fd.simulation.BaseFDEMSimulation if simpeg else object):
     """Create a forward operator of emg3d to use within a SimPEG inversion.
 
-    This is a subclass of
-    :class:`simpeg.electromagnetic.frequency_domain.simulation.BaseFDEMSimulation`.
+    TODO - check limitation!
 
     .. note::
 
@@ -68,18 +67,45 @@ class Kernel(
     """
 
     @utils._requires("simpeg")
-    def __init__(self, simulation, **kwargs):
+    def __init__(
+        self, simulation, active_indices, imap=simpeg.maps.ExpMap, **kwargs
+    ):
         """Initialize Simulation using emg3d as solver."""
 
         # Store simulation
         self.simulation = simulation
+        self.grid = simulation.model.grid
+
+        # Create conductivity map
+        self.inds_active = active_indices.ravel('F')
+        conductivity_map = simpeg.maps.InjectActiveCells(
+            self.grid,
+            self.inds_active,
+            simulation.model.property_x.ravel('F')[~self.inds_active],
+        ) * imap(nP=int(self.inds_active.sum()))
 
         # Instantiate SimPEG Simulation
         super().__init__(
-            mesh=simulation.model.grid,
+            mesh=self.grid,
             survey=self.survey2simpeg(simulation.survey),
+            sigmaMap=conductivity_map,
             **kwargs
         )
+
+        # Replace once https://github.com/simpeg/simpeg/pull/1523 is released
+        data = Data(
+            self.survey,
+            dobs=self.data2simpeg(simulation.data.observed.data),
+            standard_deviation=self.data2simpeg(
+                simulation.survey.standard_deviation.data
+            ),
+        )
+
+        self.m0 = simulation.model.property_x.ravel('F')[self.inds_active]
+        self.m0 *= np.log(1.)
+
+        # Replace once https://github.com/simpeg/simpeg/pull/1524 is released
+        self.dmis = L2DataMisfit(data=data, simulation=self)
 
     @property
     def _di(self):
@@ -390,7 +416,9 @@ class Kernel(
                         frequency=freq, current=src.strength,
                     )
                 elif isinstance(src, electrodes.TxElectricDipole):
-                    tsrc = simpeg_fd.sources.ElectricDipole(
+                    # Replace once https://github.com/simpeg/simpeg/pull/1525
+                    # is released
+                    tsrc = ElectricDipole(
                         receiver_list=rec_list, frequency=freq,
                         location=src.center, strength=src.strength,
                         orientation=electrodes.rotation(
@@ -404,6 +432,108 @@ class Kernel(
                 src_list.append(tsrc)
 
         return simpeg_fd.survey.Survey(src_list)
+
+
+class Inversion(simpeg.inversion.BaseInversion if simpeg else object):
+    """Thin wrapper, adding verbosity and taking care of data format."""
+
+    @utils._requires('simpeg')
+    def __init__(
+        self, simulation, maxIter, regularization_opts, optimization_opts,
+        directiveList, **kwargs
+    ):
+        """Initialize an Inversion instance."""
+
+        # TODO # Add own directive
+        self.simulation = simulation
+
+        reg = simpeg.regularization.WeightedLeastSquares(
+            simulation.grid,
+            active_cells=simulation.inds_active,
+            reference_model=simulation.m0,  # TODO option from kwargs
+            **regularization_opts
+        )
+
+        # Replace once https://github.com/simpeg/simpeg/pull/1517 is released
+        opt = InexactGaussNewton(maxIter=maxIter, **optimization_opts)
+
+        inv_prob = simpeg.inverse_problem.BaseInvProblem(
+                simulation.dmis, reg, opt)
+
+        self.save = Directive(simulation)
+        directiveList.append(self.save)
+
+        super().__init__(
+                invProb=inv_prob, directiveList=directiveList, **kwargs)
+
+    def run(self, m0=None):
+        """Run the inversion."""
+
+        # Reset counter, start timer, print message.
+        _multiprocessing.process_map.count = 0
+        timer = utils.Timer()
+        self.simulation.simulation.timer = timer
+        print(":: SimPEG(emg3d) START ::")
+
+        # Take start model from Simulation if not provided.
+        if m0 is None:
+            m0 = self.simulation.m0
+
+        self.save._store(0)
+
+        # Run the inversion
+        _ = super().run(m0)
+
+        # Print passed time and exit
+        print(f":: SimPEG(emg3d) END   :: runtime = {timer.runtime}")
+
+
+class Directive(simpeg.directives.InversionDirective if simpeg else object):
+    """Print some values for each iteration."""
+
+    def __init__(self, simulation, **kwargs):
+        simulation.simulation.invinfo = {}
+        self.sim = simulation
+        super().__init__(**kwargs)
+
+    @utils._requires('simpeg')
+    def endIter(self):
+
+        self._store(self.opt.iter)
+
+        if self.sim.simulation.name:
+            io.save(
+                f"{self.sim.simulation.name}.h5",
+                simulation=self.sim.simulation.to_dict(what='plain'),
+                invinfo=self.sim.simulation.invinfo,
+                verb=0,
+            )
+
+        # Reset counter
+        _multiprocessing.process_map.count = 0
+
+    def _store(self, n):
+        sim = self.sim.simulation
+        sim.survey.data[f"it{n}"] = sim.survey.data.synthetic
+
+        if n > 0:
+            sim.invinfo[n] = {
+                'model': self.sim.model2emg3d,
+                'phi': self.opt.f,
+                'phi_d': self.invProb.phi_d,
+                'phi_m': self.invProb.phi_m,
+                'beta': self.invProb.beta,
+                'count': _multiprocessing.process_map.count,
+                'time': sim.timer.elapsed,
+                # 'chi2': ,
+                # 'phi_delta': ,
+            }
+        else:
+            sim.invinfo[n] = {
+                'model': sim.model,
+                'count': _multiprocessing.process_map.count,
+                'time': sim.timer.elapsed,
+            }
 
 
 # ########################################################################### #
@@ -473,9 +603,6 @@ class ElectricDipole(simpeg_fd.sources.BaseFDEMSrc):
                 "orientation", var, dim=3)
 
 
-simpeg_fd.sources.ElectricDipole = ElectricDipole
-
-
 # Remove once https://github.com/simpeg/simpeg/pull/1524 is released
 class L2DataMisfit(simpeg.data_misfit.L2DataMisfit):
     r"""Least-squares data misfit."""
@@ -484,9 +611,6 @@ class L2DataMisfit(simpeg.data_misfit.L2DataMisfit):
     def __call__(self, m, f=None):
         R = self.W * self.residual(m, f=f)
         return np.vdot(R, R).real
-
-
-simpeg.data_misfit.L2DataMisfit = L2DataMisfit
 
 
 # Remove once https://github.com/simpeg/simpeg/pull/1523 is released
@@ -506,9 +630,6 @@ class Data(simpeg.data.Data):
         )
 
 
-simpeg.data.Data = Data
-
-
 # Remove once https://github.com/simpeg/simpeg/pull/1517 is released
 class InexactGaussNewton(simpeg.optimization.InexactGaussNewton):
     """Minimizes using CG as the inexact solver of """
@@ -519,6 +640,3 @@ class InexactGaussNewton(simpeg.optimization.InexactGaussNewton):
         Hinv = simpeg.optimization.SolverICG(self.H, M=self.approxHinv, **inp)
         p = Hinv * (-self.g)
         return p
-
-
-simpeg.optimization.InexactGaussNewton = InexactGaussNewton
