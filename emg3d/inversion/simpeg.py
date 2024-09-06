@@ -24,13 +24,15 @@ expected by a SimPEG inversion.
 # the License.
 import numpy as np
 
-from emg3d import electrodes, io, meshes, models, utils, _multiprocessing
+from emg3d import (
+    electrodes, fields, io, meshes, models, utils, _multiprocessing,
+)
 
 
 try:
     import simpeg
     import discretize
-    from simpeg.electromagnetics import frequency_domain as simpeg_fd
+    from simpeg.electromagnetics import frequency_domain as fdem
     # Add simpeg to the emg3d.Report().
     utils.OPTIONAL.extend(['simpeg', 'pydiso'])
 except ImportError:
@@ -44,8 +46,7 @@ def __dir__():
     return __all__
 
 
-class FDEMSimulation(
-        simpeg_fd.simulation.BaseFDEMSimulation if simpeg else object):
+class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
     """Create a forward operator of emg3d to use within a SimPEG inversion.
 
     TODO - check limitation!
@@ -87,7 +88,7 @@ class FDEMSimulation(
         # Instantiate SimPEG Simulation
         super().__init__(
             mesh=self.grid,
-            survey=self.survey2simpeg(simulation.survey),
+            survey=self.survey2simpeg,
             sigmaMap=conductivity_map,
             **kwargs
         )
@@ -305,7 +306,8 @@ class FDEMSimulation(
 
     # TODO Should we re-define `residual` here, and maybe other stuff?
 
-    def survey2simpeg(self, survey):
+    @property
+    def survey2simpeg(self):
         """Return SimPEG survey from provided emg3d survey.
 
 
@@ -352,6 +354,8 @@ class FDEMSimulation(
             SimPEG survey instance.
 
         """
+        survey = self.simulation.survey
+        grid = self.grid
 
         # Check if survey contains any non-NaN data.
         data = survey.data.observed
@@ -359,7 +363,7 @@ class FDEMSimulation(
         if survey.count:
             check = True
         else:
-            raise ValueError
+            raise ValueError  # TODO make proper error!
 
         # Start source and data lists
         src_list = []
@@ -392,10 +396,13 @@ class FDEMSimulation(
                         continue
 
                     # Add this receiver to receiver list
+                    # TODO needs testing!
+                    #      => The actual receiver type, location, etc is completely
+                    #         irrelevant. It is only for data management.
                     if isinstance(rec, electrodes.RxElectricPoint):
-                        rfunc = simpeg_fd.receivers.PointElectricField
+                        rfunc = fdem.receivers.PointElectricField
                     elif isinstance(rec, electrodes.RxMagneticPoint):
-                        rfunc = simpeg_fd.receivers.PointMagneticField
+                        rfunc = fdem.receivers.PointMagneticField
                     else:
                         raise NotImplementedError(
                             f"Receiver type {rec} not implemented."
@@ -410,28 +417,16 @@ class FDEMSimulation(
                     rec_list.append(trec)
 
                 # Add this source-frequency to source list
-                if isinstance(src, electrodes.TxElectricWire):
-                    tsrc = simpeg_fd.sources.LineCurrent(
-                        location=src.points, receiver_list=rec_list,
-                        frequency=freq, current=src.strength,
-                    )
-                elif isinstance(src, electrodes.TxElectricDipole):
-                    # Replace once https://github.com/simpeg/simpeg/pull/1525
-                    # is released
-                    tsrc = ElectricDipole(
-                        receiver_list=rec_list, frequency=freq,
-                        location=src.center, strength=src.strength,
-                        orientation=electrodes.rotation(
-                            src.azimuth, src.elevation),
-                    )
-                else:
-                    raise NotImplementedError(
-                        f"Source type {src} not implemented."
-                    )
+                # TODO needs testing!
+                #      => The actual source type, location, etc is completely
+                #         irrelevant. It is only for data management.
+                sfield = fields.get_source_field(grid, src, freq)  # Source field
+                svector = sfield.field/-sfield.smu0
+                src_list.append(
+                    fdem.sources.RawVec_e(rec_list, freq, svector.real)
+                )
 
-                src_list.append(tsrc)
-
-        return simpeg_fd.survey.Survey(src_list)
+        return fdem.survey.Survey(src_list)
 
 
 class Inversion(simpeg.inversion.BaseInversion if simpeg else object):
@@ -538,69 +533,11 @@ class Directive(simpeg.directives.InversionDirective if simpeg else object):
 
 # ########################################################################### #
 # The following are Monkey-Patches for SimPEG PRs:                            #
-# - #1525: Add ElectricDipole                                                 #
 # - #1524: Ensure misfit is purely real valued                                #
 # - #1523: Fix validate_ndarray_with_shape                                    #
 # - #1517: Pass `rtol` to SciPy solvers for SciPy>=1.12                       #
 # Leave the patches until the connesponding PRs are merged AND released.      #
 # ########################################################################### #
-
-
-# Remove once https://github.com/simpeg/simpeg/pull/1525 is released
-class ElectricDipole(simpeg_fd.sources.BaseFDEMSrc):
-    """Point electric dipole source."""
-
-    def __init__(
-        self,
-        receiver_list,
-        frequency,
-        location=None,
-        strength=1.0,
-        orientation="x",
-        **kwargs,
-    ):
-        if location is None:
-            location = np.r_[0.0, 0.0, 0.0]
-
-        super().__init__(
-            receiver_list=receiver_list,
-            frequency=frequency,
-            location=location,
-            **kwargs,
-        )
-
-        self.strength = strength
-        self.orientation = orientation
-
-    @property
-    def location(self):
-        """Location of the dipole """
-        return self._location
-
-    @location.setter
-    def location(self, vec):
-        self._location = simpeg.utils.validate_location_property(
-                "location", vec, 3)
-
-    @property
-    def strength(self):
-        """Strength of the electric dipole (:math:`Am`) """
-        return self._strength
-
-    @strength.setter
-    def strength(self, value):
-        self._strength = simpeg.utils.validate_float(
-                "strength", value, min_val=0)
-
-    @property
-    def orientation(self):
-        """Orientation of the dipole as a normalized vector """
-        return self._orientation
-
-    @orientation.setter
-    def orientation(self, var):
-        self._orientation = simpeg.utils.validate_direction(
-                "orientation", var, dim=3)
 
 
 # Remove once https://github.com/simpeg/simpeg/pull/1524 is released
