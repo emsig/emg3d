@@ -24,14 +24,11 @@ expected by a SimPEG inversion.
 # the License.
 import numpy as np
 
-from emg3d import (
-    electrodes, fields, io, meshes, models, utils, _multiprocessing,
-)
+from emg3d import electrodes, io, models, utils, _multiprocessing
 
 
 try:
     import simpeg
-    import discretize
     from simpeg.electromagnetics import frequency_domain as fdem
     # Add simpeg to the emg3d.Report().
     utils.OPTIONAL.extend(['simpeg', 'pydiso'])
@@ -74,36 +71,34 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
         """Initialize Simulation using emg3d as solver."""
 
         # Store simulation
-        self.simulation = simulation
-        self.grid = simulation.model.grid
+        self.f = simulation
+        self.grid = self.f.model.grid
 
         # Create conductivity map
         self.inds_active = active_indices.ravel('F')
         conductivity_map = simpeg.maps.InjectActiveCells(
             self.grid,
             self.inds_active,
-            simulation.model.property_x.ravel('F')[~self.inds_active],
+            self.f.model.property_x.ravel('F')[~self.inds_active],
         ) * imap(nP=int(self.inds_active.sum()))
 
         # Instantiate SimPEG Simulation
         super().__init__(
             mesh=self.grid,
-            survey=self.survey2simpeg,
+            survey=self.survey2dummy,
             sigmaMap=conductivity_map,
             **kwargs
         )
 
-        # Replace once https://github.com/simpeg/simpeg/pull/1523 is released
-        data = Data(
+        data = simpeg.data.Data(
             self.survey,
-            dobs=self.data2simpeg(simulation.data.observed.data),
+            dobs=self.data2simpeg(self.f.data.observed.data),
             standard_deviation=self.data2simpeg(
-                simulation.survey.standard_deviation.data
+                self.f.survey.standard_deviation.data
             ),
         )
 
-        self.m0 = simulation.model.property_x.ravel('F')[self.inds_active]
-        self.m0 *= np.log(1.)
+        self.m0 = np.log(self.f.model.property_x.ravel('F')[self.inds_active])
 
         # Replace once https://github.com/simpeg/simpeg/pull/1524 is released
         self.dmis = L2DataMisfit(data=data, simulation=self)
@@ -113,11 +108,11 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
         """Return tuple of indices linking emg3d xarray to SimPEG array."""
 
         if not hasattr(self, '_data_indices'):
-            size = self.simulation.survey.size
-            shape = self.simulation.survey.shape
+            size = self.f.survey.size
+            shape = self.f.survey.shape
 
             # Get boolean in the right order for SimPEG
-            dmap = self.simulation.survey.isfinite.reshape(
+            dmap = self.f.survey.isfinite.reshape(
                 (shape[0], -1), order='F').ravel()
 
             # Create indices tuple for the booleans
@@ -131,7 +126,8 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
 
     def data2simpeg(self, data):
         """Convert an emg3d data-xarray to a SimPEG data array."""
-        return data[self._di[0], self._di[1], self._di[2]]
+        # Remove `.tolist()` when SimPEG PR#1523 is released
+        return data[self._di[0], self._di[1], self._di[2]].tolist()
 
     def data2emg3d(self, data):
         """Convert a SimPEG data array to an emg3d data-xarray."""
@@ -139,8 +135,8 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
         # Dummy array
         if not hasattr(self, '_data_array'):
             self._data_array = np.ones(
-                self.simulation.survey.shape,
-                self.simulation.survey.data.observed.dtype
+                self.f.survey.shape,
+                self.f.survey.data.observed.dtype
              )*np.nan
 
         # Put data on dummy.
@@ -151,8 +147,8 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
     def model2emg3d(self):
         """emg3d conductivity model; obtained from SimPEG conductivities."""
         return models.Model(
-            meshes.TensorMesh(self.mesh.h, self.mesh.origin),
-            property_x=self.sigma.reshape(self.mesh.shape_cells, order='F'),
+            self.grid,
+            property_x=self.sigma.reshape(self.grid.shape_cells, order='F'),
             # property_y=None,  Not yet implemented
             # property_z=None,   "
             # mu_r=None,         "
@@ -174,6 +170,7 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
         f : SimPEG.electromagnetics.frequency_domain.fields.FieldsFDEM
             Fields object
 
+
         Returns
         -------
         TODO
@@ -183,7 +180,7 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
 
         if self.storeJ:
             J = self.getJ(m, f=f)
-            Jv = discretize.utils.mkvc(np.dot(J, v))
+            Jv = simpeg.utils.mkvc(np.dot(J, v))
             return Jv
 
         self.model = m
@@ -191,12 +188,8 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
         if f is None:
             f = self.fields(m=m)
 
-        dsig_dm_v = (self.sigmaDeriv @ v).reshape(
-                self.simulation.model.shape, order='F')
-        j_vec = f.jvec(vector=dsig_dm_v)
-
-        # Map emg3d-data-array to SimPEG-data-vector
-        return self.data2simpeg(j_vec)
+        dsig_dm_v = (self.sigmaDeriv @ v).reshape(f.model.shape, order='F')
+        return self.data2simpeg(f.jvec(vector=dsig_dm_v))
 
     def Jtvec(self, m, v, f=None):
         """
@@ -221,7 +214,7 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
 
         if self.storeJ:
             J = self.getJ(m, f=f)
-            Jtv = discretize.utils.mkvc(np.dot(J.T, self.data2emg3d(v)))
+            Jtv = simpeg.utils.mkvc(np.dot(J.T, self.data2emg3d(v)))
 
             return Jtv
 
@@ -230,14 +223,7 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
         if f is None:
             f = self.fields(m=m)
 
-        return self._Jtvec(m, v=v, f=f)
-
-    def _Jtvec(self, m, v=None, f=None):
-        """Compute adjoint sensitivity matrix (J^T) and vector (v) product."""
-        if v is not None:
-            return self.sigmaDeriv.T @ f.jtvec(self.data2emg3d(v)).ravel('F')
-        else:
-            raise NotImplementedError
+        return self.sigmaDeriv.T @ f.jtvec(self.data2emg3d(v)).ravel('F')
 
     def getJ(self, m, f=None):
         """Generate full sensitivity matrix (not implemented)."""
@@ -269,24 +255,21 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
         -------
         TODO
         """
-
         if self.verbose:
             print("Compute predicted")
 
         if f is None:
             f = self.fields(m=m)
 
-        # Map emg3d-data-array to SimPEG-data-vector
         return self.data2simpeg(f.data.synthetic.data)
 
     def fields(self, m=None):
-        """Return the electric fields for a given model.
+        """Return the simulation with a given model.
 
         :param numpy.ndarray m: model
         :rtype: numpy.ndarray
         :return: f, the fields
         """
-
         if self.verbose:
             print("Compute fields")
 
@@ -294,21 +277,25 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
 
             # Store model and update emg3d equivalent.
             self.model = m
-            self.simulation.model = self.model2emg3d
+            self.f.model = self.model2emg3d
 
             # Clean emg3d-Simulation from old computed data.
-            self.simulation.clean('computed')
+            self.f.clean('computed')
 
         # Compute forward model and set initial residuals.
-        _ = self.simulation.misfit
+        _ = self.f.misfit
 
-        return self.simulation
-
-    # TODO Should we re-define `residual` here, and maybe other stuff?
+        return self.f
 
     @property
-    def survey2simpeg(self):
-        """Return SimPEG survey from provided emg3d survey.
+    def survey2dummy(self):
+        """Return a dummy SimPEG survey from provided emg3d survey.
+
+        .. note::
+
+            The actual source and receiver types, locations, and orientations
+            do not matter and are not correct. The only thing that matters is
+            the order how data is stored in SimPEG versus emg3d.
 
 
         - A SimPEG survey consists of a list of source-frequency pairs with
@@ -354,22 +341,21 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
             SimPEG survey instance.
 
         """
-        survey = self.simulation.survey
-        grid = self.grid
 
         # Check if survey contains any non-NaN data.
-        data = survey.data.observed
+        data = self.f.survey.data.observed
         check = False
-        if survey.count:
+        if self.f.survey.count:
             check = True
         else:
-            raise ValueError  # TODO make proper error!
+            # TODO make proper error!
+            raise ValueError("Survey contains no data!")
 
         # Start source and data lists
         src_list = []
 
         # 1. Loop over sources
-        for sname, src in survey.sources.items():
+        for sname, src in self.f.survey.sources.items():
 
             # If source has no data, skip it.
             sdata = data.loc[sname, :, :]
@@ -377,7 +363,7 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
                 continue
 
             # 2. Loop over frequencies
-            for sfreq, freq in survey.frequencies.items():
+            for sfreq, freq in self.f.survey.frequencies.items():
 
                 # If frequency has no data, skip it.
                 fdata = sdata.loc[:, sfreq]
@@ -388,42 +374,22 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
                 rec_list = []
 
                 # 3. Loop over non-NaN receivers
-                for srec, rec in survey.receivers.items():
+                for srec, rec in self.f.survey.receivers.items():
 
                     # If receiver has no data, skip it.
                     rdata = fdata.loc[srec].data
                     if check and not np.isfinite(rdata):
                         continue
 
-                    # Add this receiver to receiver list
-                    # TODO needs testing!
-                    #      => The actual receiver type, location, etc is completely
-                    #         irrelevant. It is only for data management.
-                    if isinstance(rec, electrodes.RxElectricPoint):
-                        rfunc = fdem.receivers.PointElectricField
-                    elif isinstance(rec, electrodes.RxMagneticPoint):
-                        rfunc = fdem.receivers.PointMagneticField
-                    else:
-                        raise NotImplementedError(
-                            f"Receiver type {rec} not implemented."
-                        )
-
-                    trec = rfunc(
-                        locations=rec.center, component='complex',
-                        orientation=electrodes.rotation(
-                            rec.azimuth, rec.elevation),
+                    # Add this dummy-receiver to receiver list
+                    angles = electrodes.rotation(rec.azimuth, rec.elevation)
+                    rec_list.append(
+                        fdem.receivers.BaseRx(rec.center, angles, 'complex')
                     )
 
-                    rec_list.append(trec)
-
-                # Add this source-frequency to source list
-                # TODO needs testing!
-                #      => The actual source type, location, etc is completely
-                #         irrelevant. It is only for data management.
-                sfield = fields.get_source_field(grid, src, freq)  # Source field
-                svector = sfield.field/-sfield.smu0
+                # Add this dummy-source-frequency to source list
                 src_list.append(
-                    fdem.sources.RawVec_e(rec_list, freq, svector.real)
+                    fdem.sources.BaseFDEMSrc(rec_list, freq, src.center)
                 )
 
         return fdem.survey.Survey(src_list)
@@ -450,7 +416,9 @@ class Inversion(simpeg.inversion.BaseInversion if simpeg else object):
         )
 
         # Replace once https://github.com/simpeg/simpeg/pull/1517 is released
-        opt = InexactGaussNewton(maxIter=maxIter, **optimization_opts)
+        opt = simpeg.optimization.InexactGaussNewton(
+            maxIter=maxIter, **optimization_opts
+        )
 
         inv_prob = simpeg.inverse_problem.BaseInvProblem(
                 simulation.dmis, reg, opt)
@@ -467,27 +435,29 @@ class Inversion(simpeg.inversion.BaseInversion if simpeg else object):
         # Reset counter, start timer, print message.
         _multiprocessing.process_map.count = 0
         timer = utils.Timer()
-        self.simulation.simulation.timer = timer
+        self.simulation.f.timer = timer
         print(":: SimPEG(emg3d) START ::")
 
         # Take start model from Simulation if not provided.
         if m0 is None:
             m0 = self.simulation.m0
 
-        self.save._store(0)
-
         # Run the inversion
         _ = super().run(m0)
 
         # Print passed time and exit
-        print(f":: SimPEG(emg3d) END   :: runtime = {timer.runtime}")
+        f = self.simulation.f
+        calls = [f.invinfo[k]['count'] for k in f.invinfo.keys()]
+        print(f"   Calls/Iteration: {calls}")
+        print(f":: SimPEG(emg3d) END   :: runtime = {timer.runtime}", end="")
+        print(f" :: {np.sum(calls)} kernel calls")
 
 
 class Directive(simpeg.directives.InversionDirective if simpeg else object):
     """Print some values for each iteration."""
 
     def __init__(self, simulation, **kwargs):
-        simulation.simulation.invinfo = {}
+        simulation.f.invinfo = {}
         self.sim = simulation
         super().__init__(**kwargs)
 
@@ -496,84 +466,51 @@ class Directive(simpeg.directives.InversionDirective if simpeg else object):
 
         self._store(self.opt.iter)
 
-        if self.sim.simulation.name:
+        if self.sim.f.name:
             io.save(
-                f"{self.sim.simulation.name}.h5",
-                simulation=self.sim.simulation.to_dict(what='plain'),
-                invinfo=self.sim.simulation.invinfo,
+                f"{self.sim.f.name}.h5",
+                simulation=self.sim.f.to_dict(what='plain'),
+                invinfo=self.sim.f.invinfo,
                 verb=0,
             )
 
-        # Reset counter
-        _multiprocessing.process_map.count = 0
+    def initialize(self):
+        self._store(0)
+        super().initialize()
+
+    def finish(self):
+        self._store(self.opt.iter+1)
+        super().finish()
 
     def _store(self, n):
-        sim = self.sim.simulation
-        sim.survey.data[f"it{n}"] = sim.survey.data.synthetic
+        self.sim.f.survey.data[f"it{n}"] = self.sim.f.survey.data.synthetic
 
         if n > 0:
-            sim.invinfo[n] = {
+            self.sim.f.invinfo[n] = {
                 'model': self.sim.model2emg3d,
                 'phi': self.opt.f,
                 'phi_d': self.invProb.phi_d,
                 'phi_m': self.invProb.phi_m,
                 'beta': self.invProb.beta,
                 'count': _multiprocessing.process_map.count,
-                'time': sim.timer.elapsed,
+                'time': self.sim.f.timer.elapsed,
                 # 'chi2': ,
                 # 'phi_delta': ,
             }
         else:
-            sim.invinfo[n] = {
-                'model': sim.model,
+            self.sim.f.invinfo[n] = {
+                'model': self.sim.f.model,
                 'count': _multiprocessing.process_map.count,
-                'time': sim.timer.elapsed,
+                'time': self.sim.f.timer.elapsed,
             }
 
-
-# ########################################################################### #
-# The following are Monkey-Patches for SimPEG PRs:                            #
-# - #1524: Ensure misfit is purely real valued                                #
-# - #1523: Fix validate_ndarray_with_shape                                    #
-# - #1517: Pass `rtol` to SciPy solvers for SciPy>=1.12                       #
-# Leave the patches until the connesponding PRs are merged AND released.      #
-# ########################################################################### #
+        # Reset counter
+        _multiprocessing.process_map.count = 0
 
 
 # Remove once https://github.com/simpeg/simpeg/pull/1524 is released
 class L2DataMisfit(simpeg.data_misfit.L2DataMisfit):
     r"""Least-squares data misfit."""
 
-    @simpeg.utils.timeIt
     def __call__(self, m, f=None):
-        R = self.W * self.residual(m, f=f)
-        return np.vdot(R, R).real
-
-
-# Remove once https://github.com/simpeg/simpeg/pull/1523 is released
-class Data(simpeg.data.Data):
-    """Data container."""
-
-    @property
-    def dobs(self):
-        return self._dobs
-
-    @dobs.setter
-    def dobs(self, value):
-        if isinstance(value, np.ndarray):
-            value = value.tolist()
-        self._dobs = simpeg.utils.validate_ndarray_with_shape(
-            "dobs", value, shape=(self.survey.nD,), dtype=(float, complex)
-        )
-
-
-# Remove once https://github.com/simpeg/simpeg/pull/1517 is released
-class InexactGaussNewton(simpeg.optimization.InexactGaussNewton):
-    """Minimizes using CG as the inexact solver of """
-
-    @simpeg.utils.timeIt
-    def findSearchDirection(self):
-        inp = {"rtol": self.tolCG, "maxiter": self.maxIterCG}
-        Hinv = simpeg.optimization.SolverICG(self.H, M=self.approxHinv, **inp)
-        p = Hinv * (-self.g)
-        return p
+        return super().__call__(m, f).real
