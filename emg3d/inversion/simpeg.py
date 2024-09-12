@@ -126,8 +126,7 @@ class FDEMSimulation(fdem.simulation.BaseFDEMSimulation if simpeg else object):
 
     def data2simpeg(self, data):
         """Convert an emg3d data-xarray to a SimPEG data array."""
-        # Remove `.tolist()` when SimPEG PR#1523 is released
-        return data[self._di[0], self._di[1], self._di[2]].tolist()
+        return data[self._di[0], self._di[1], self._di[2]]
 
     def data2emg3d(self, data):
         """Convert a SimPEG data array to an emg3d data-xarray."""
