@@ -1,6 +1,8 @@
 # GLOBAL REQUIREMENTS.
 -r requirements.txt
 
+numpy<=2
+
 # SOFT DEPENDENCIES
 tqdm
 h5py
