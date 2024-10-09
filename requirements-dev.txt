@@ -1,7 +1,8 @@
 # GLOBAL REQUIREMENTS.
 -r requirements.txt
 
-numpy<=2
+# Fix numpy<2 until discretize is ready for 2.0
+numpy<2
 
 # SOFT DEPENDENCIES
 tqdm
