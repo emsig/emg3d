@@ -1,17 +1,22 @@
 Credits
 #######
 
-This project was started by **Dieter Werthmüller** at
-`Delft University of Technology <https://www.tudelft.nl>`_ as part of the
-*Gitaro.JIM* project (till 05/2021, emg3d v1.0.0), funded through
-`MarTERA <https://www.martera.eu>`_ as part of Horizon 2020, a funding scheme
-of the European Research Area. Dieter would like to thank his current employers
-who allow him to maintain and further develop the code after the initial
-funding ended, namely:
+This project was started by **Dieter Werthmüller** at TUD as part of the
+*Gitaro.JIM* project (see below). Dieter would like to thank his current and
+former employers who allow him to maintain and further develop the code after
+the initial funding ended, namely:
 
-- 2021-today: `Delft University of Technology <https://www.tudelft.nl>`_,
-  funded through the `Delphi Consortium <https://www.delphi-consortium.com>`_
-- 2021-today: `TERRASYS Geophysics GmbH & Co. KG <https://www.terrasysgeo.com>`_
+- 2018-2024: `Delft University of Technology <https://www.tudelft.nl>`_
+
+  - 2018-2021: *Gitaro.JIM* project (till 05/2021, emg3d v1.0.0), funded
+    through `MarTERA <https://www.martera.eu>`_ as part of Horizon 2020, a
+    funding scheme of the European Research Area.
+  - 2021-2024: `Delphi Consortium <https://www.delphi-consortium.com>`_.
+
+- 2021-2022: `TERRASYS Geophysics GmbH & Co. KG <https://www.terrasysgeo.com>`_
+
+- 2024-today: `ETH Zurich <https://ethz.ch>`_ through the group `Geothermal
+  Energy and Geofluids <https://geg.ethz.ch>`_.
 
 For a list of code contributors see
 https://github.com/emsig/emg3d/graphs/contributors.

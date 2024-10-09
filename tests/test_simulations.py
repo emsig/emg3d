@@ -28,6 +28,7 @@ except ImportError:
 rng = np.random.default_rng()
 
 
+@pytest.mark.filterwarnings("ignore:.*lead to deadlocks*:DeprecationWarning")
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestSimulation():
     if xarray is not None:
@@ -695,6 +696,7 @@ class TestLayeredSimulation():
         assert grad.shape == self.model.shape
 
 
+@pytest.mark.filterwarnings("ignore:.*lead to deadlocks*:DeprecationWarning")
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 def test_misfit():
     data = 1
