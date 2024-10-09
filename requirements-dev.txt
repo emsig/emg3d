@@ -1,9 +1,6 @@
 # GLOBAL REQUIREMENTS.
 -r requirements.txt
 
-# Fix numpy<2 until discretize is ready for 2.0
-numpy<2
-
 # SOFT DEPENDENCIES
 tqdm
 h5py
