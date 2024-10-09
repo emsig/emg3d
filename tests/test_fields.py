@@ -78,7 +78,7 @@ class TestField:
         with pytest.raises(ValueError, match="must be f>0"):
             _ = fields.Field(self.grid, frequency=0.0)
 
-        with pytest.warns(np.ComplexWarning, match="Casting complex values"):
+        with pytest.warns(np.exceptions.ComplexWarning, match="Casting compl"):
             lp = fields.Field(self.grid, self.field, frequency=-1)
         assert lp.field.dtype == np.float64
 

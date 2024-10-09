@@ -468,7 +468,7 @@ class Model:
             # Find corresponding indices, limit to grid.
             def index(nodes, coo):
                 """Return index for interval btw nodes in which coo resides."""
-                x = np.asarray(coo < np.r_[nodes, np.infty]).nonzero()[0][0]-1
+                x = np.asarray(coo < np.r_[nodes, np.inf]).nonzero()[0][0]-1
                 return np.clip(x, 0, nodes.size-2)
 
             # Start and end indices.

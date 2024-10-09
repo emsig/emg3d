@@ -696,9 +696,9 @@ def _point_vector(grid, coordinates):
         nx, ny, nz = s.shape
 
         # Get indices of cells in which source resides.
-        ix = max(0, np.where(coo[0] < np.r_[xx, np.infty])[0][0]-1)
-        iy = max(0, np.where(coo[1] < np.r_[yy, np.infty])[0][0]-1)
-        iz = max(0, np.where(coo[2] < np.r_[zz, np.infty])[0][0]-1)
+        ix = max(0, np.where(coo[0] < np.r_[xx, np.inf])[0][0]-1)
+        iy = max(0, np.where(coo[1] < np.r_[yy, np.inf])[0][0]-1)
+        iz = max(0, np.where(coo[2] < np.r_[zz, np.inf])[0][0]-1)
 
         def get_index_and_strength(ic, nc, csrc, cc):
             """Return index and field strength in c-direction."""
@@ -864,8 +864,8 @@ def _dipole_vector(grid, points, decimals=9):
         """Return [min, max]-index of cells in which points resides."""
         vmin = min(points[:, i])
         vmax = max(points[:, i])
-        return [max(0, np.where(vmin < np.r_[vector, np.infty])[0][0]-1),
-                max(0, np.where(vmax < np.r_[vector, np.infty])[0][0]-1)]
+        return [max(0, np.where(vmin < np.r_[vector, np.inf])[0][0]-1),
+                max(0, np.where(vmax < np.r_[vector, np.inf])[0][0]-1)]
 
     rix = min_max_ind(nodes_x, 0)
     riy = min_max_ind(nodes_y, 1)

@@ -6,13 +6,27 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.8.4 : NumPy v2
+-----------------
+
+**2024-10-09**
+
+The code is now compatible with NumPy v2.
+
 
 - Created foundation for new module ``inversion``.
 
-Maintenance
+- Bumped the minimum requirements to:
 
+  - Python 3.9
+  - SciPy 1.10
+  - empymod 2.3.2
+  - Numba (without minimum version)
+
+- Maintenance
+
+  - Testing: dropped Python 3.9 (Python 3.13 not added yet).
+  - Update for NumPy v2: mainly ``np.infty -> np.inf``.
   - Add notes for ``ipympl`` (interactive plots in modern Jupyter).
   - Reduce code by making use of new SciPy new features (complex-valued
     map_coordinate; lazy loading).
