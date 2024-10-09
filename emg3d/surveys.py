@@ -619,7 +619,7 @@ class Survey:
             dataset it will create a dataset of zeroes. You can use that to
             obtain the pure noise.
 
-        max_offset : float, default: np.infty
+        max_offset : float, default: np.inf
             Data points in ``data.observed`` where the offset > max_offset are
             set to NaN.
 
@@ -639,8 +639,8 @@ class Survey:
             self.data[add_to].data[cut_amp] = np.nan + 1j*np.nan
 
         # Set offsets below min_offset and above max_offset to NaN.
-        max_offset = kwargs.pop('max_offset', np.infty)
-        if min_offset > 0.0 or max_offset < np.infty:
+        max_offset = kwargs.pop('max_offset', np.inf)
+        if min_offset > 0.0 or max_offset < np.inf:
             for ks, s in self.sources.items():
                 for kr, r in self.receivers.items():
                     off = np.linalg.norm(r.center_abs(s) - s.center)

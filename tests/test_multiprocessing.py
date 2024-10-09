@@ -27,6 +27,7 @@ def dummy(inp):
     return inp
 
 
+@pytest.mark.filterwarnings("ignore:.*lead to deadlocks*:DeprecationWarning")
 def test_process_map():
 
     # Parallel

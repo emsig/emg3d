@@ -241,7 +241,7 @@ def alt_volume_average(edges_x, edges_y, edges_z, values,
     """
 
     # Get cell indices.
-    # First and last edges ignored => first and last cells extend to +/- infty.
+    # First and last edges ignored => first and last cells extend to +/- inf.
     ix_l = np.searchsorted(edges_x[1:-1], new_edges_x, 'left')
     ix_r = np.searchsorted(edges_x[1:-1], new_edges_x, 'right')
     iy_l = np.searchsorted(edges_y[1:-1], new_edges_y, 'left')
@@ -353,9 +353,9 @@ def alt_get_source_field(grid, src, freq, strength=0):
         nx, ny, nz = s.shape
 
         # Get indices of cells in which source resides.
-        ix = max(0, np.where(src[0] < np.r_[xx, np.infty])[0][0]-1)
-        iy = max(0, np.where(src[1] < np.r_[yy, np.infty])[0][0]-1)
-        iz = max(0, np.where(src[2] < np.r_[zz, np.infty])[0][0]-1)
+        ix = max(0, np.where(src[0] < np.r_[xx, np.inf])[0][0]-1)
+        iy = max(0, np.where(src[1] < np.r_[yy, np.inf])[0][0]-1)
+        iz = max(0, np.where(src[2] < np.r_[zz, np.inf])[0][0]-1)
 
         def get_index_and_strength(ic, nc, csrc, cc):
             """Return index and field strength in c-direction."""

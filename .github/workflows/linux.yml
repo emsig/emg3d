@@ -36,34 +36,26 @@ jobs:
       matrix:
         os: [ubuntu, ]  # macos, windows]  # Only Linux currently.
         case:
-          - python-version: "3.9"
+          - python-version: "3.10"
             name: minimal
             os: ubuntu
-            conda: "'scipy=1.9' 'numba=0.53' 'numpy<2.0' 'empymod>=2.3'"
-          - python-version: "3.10"
-            name: full
-            os: ubuntu
-            conda: "numba scipy xarray h5py discretize matplotlib 'numpy<2.0' 'empymod>=2.3'"  # tqdm
-          - python-version: "3.10"
-            name: plain
-            os: ubuntu
-            conda: "numba scipy 'numpy<2.0' 'empymod>=2.3'"
+            conda: "'scipy=1.10' numba 'empymod>=2.3.2'"
           - python-version: "3.11"
             name: plain
             os: ubuntu
-            conda: "numba scipy 'numpy<2.0' 'empymod>=2.3'"
+            conda: "scipy numba 'empymod>=2.3.2'"
           - python-version: "3.11"
             name: full
             os: ubuntu
-            conda: "numba scipy xarray tqdm h5py discretize matplotlib 'numpy<2.0' 'empymod>=2.3'"
+            conda: "scipy numba 'empymod>=2.3.2' xarray tqdm h5py discretize matplotlib"
           - python-version: "3.12"
             name: plain
             os: ubuntu
-            conda: "numba scipy 'numpy<2.0' 'empymod>=2.3'"
+            conda: "scipy numba 'empymod>=2.3.2'"
           - python-version: "3.12"
             name: full
             os: ubuntu
-            conda: "numba scipy xarray tqdm h5py discretize matplotlib 'numpy<2.0' 'empymod>=2.3'"
+            conda: "scipy numba 'empymod>=2.3.2' xarray tqdm h5py discretize matplotlib"
 
     env:
       # Used for coveralls flag
@@ -95,8 +87,6 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.case.python-version }}
           miniforge-version: "latest"
-          miniforge-variant: Mambaforge
-          use-mamba: true
 
       - name: Install dependencies
         shell: bash -l {0}
@@ -118,7 +108,8 @@ jobs:
       - name: Test with pytest
         shell: bash -l {0}
         run: |
-          python -m pip install --no-build-isolation --no-deps .
+          python -m pip install --upgrade pip
+          make install
           pytest --cov=emg3d
 
       - name: Coveralls

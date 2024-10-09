@@ -26,12 +26,11 @@ setup(
             "emg3d=emg3d.cli.main:main",
         ],
     },
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     install_requires=[
-        "scipy>=1.9",
-        "numpy<2.0",
-        "numba>=0.53",
-        "empymod>=2.3.0",
+        "scipy>=1.10",
+        "numba",
+        "empymod>=2.3.2",
     ],
     extras_require={
         "full": [

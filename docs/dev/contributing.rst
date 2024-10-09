@@ -11,7 +11,7 @@ Good places to get started is to browse the existing issues, check out the
 roadmap, or have a look at any open PR:
 
 - `Issues <https://github.com/emsig/emg3d/issues>`_;
-- `Roadmap-project <https://github.com/emsig/emg3d/projects/1>`_;
+- `Roadmap <https://github.com/emsig/emg3d/issues/343>`_;
 - `PR's <https://github.com/emsig/emg3d/pulls>`_.
 
 There are various different ways to get in touch, see

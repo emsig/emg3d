@@ -13,10 +13,10 @@ help:
 	@echo ""
 
 install:
-	python -m pip install --no-build-isolation --no-deps -e .
+	python -m pip install --no-build-isolation --use-pep517 --no-deps -e .
 
 dev-install:
-	python -m pip install -r requirements-dev.txt && python -m pip install --no-build-isolation --no-deps -e .
+	python -m pip install -r requirements-dev.txt && python -m pip install --no-build-isolation --use-pep517 --no-deps -e .
 
 pytest:
 	rm -rf .coverage htmlcov/ .pytest_cache/ && pytest --cov=emg3d && coverage html

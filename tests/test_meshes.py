@@ -346,14 +346,14 @@ class TestOriginAndWidths:
 
         vector2 = np.array([-1, 0, 1])
         x02, hx2 = meshes.origin_and_widths(vector=vector2, **inp)
-        assert np.in1d(vector2, x02 + np.cumsum(hx2)).all()
+        assert np.isin(vector2, x02 + np.cumsum(hx2)).all()
 
         vector3 = np.array([-2, -1, 0, 1, 2])
         x03, hx3 = meshes.origin_and_widths(  # vector will be cut
                 domain=[-1, 1], vector=vector3, **inp)
-        assert np.in1d(vector3[1:-1], x03 + np.cumsum(hx3)).all()
-        assert not np.in1d(vector3[0], x03 + np.cumsum(hx3))
-        assert not np.in1d(vector3[-1], x03 + np.cumsum(hx3))
+        assert np.isin(vector3[1:-1], x03 + np.cumsum(hx3)).all()
+        assert not np.isin(vector3[0], x03 + np.cumsum(hx3))
+        assert not np.isin(vector3[-1], x03 + np.cumsum(hx3))
 
         x04, hx4 = meshes.origin_and_widths(  # vector will be cut
                 distance=[1.0, 1.0], vector=vector3, **inp)
@@ -362,7 +362,7 @@ class TestOriginAndWidths:
 
         x05, hx5 = meshes.origin_and_widths(  # vector will be expanded
                 distance=[2.0, 2.0], vector=vector2, **inp)
-        assert np.in1d(np.array([-2, -1, 0, 1, 2]), x05 + np.cumsum(hx5)).all()
+        assert np.isin(np.array([-2, -1, 0, 1, 2]), x05 + np.cumsum(hx5)).all()
 
     def test_seasurface(self):
         inp = {'frequency': 1/np.pi, 'properties': 9*mu_0, 'domain': [-1, 2],
