@@ -13,16 +13,16 @@ help:
 	@echo ""
 
 install:
-	python -m pip install --no-build-isolation --use-pep517 --no-deps -e .
+	python -m pip install -e .
 
 dev-install:
-	python -m pip install -r requirements-dev.txt && python -m pip install --no-build-isolation --use-pep517 --no-deps -e .
+	python -m pip install -e .[all]
 
 pytest:
 	rm -rf .coverage htmlcov/ .pytest_cache/ && pytest --cov=emg3d && coverage html
 
 flake8:
-	flake8 docs/ setup.py emg3d/ tests/
+	flake8 docs/ emg3d/ tests/
 
 html:
 	cd docs && make html

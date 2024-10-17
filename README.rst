@@ -2,23 +2,6 @@
    :target: https://emsig.xyz
    :alt: emg3d logo
 
-|
-
-.. image:: https://img.shields.io/pypi/v/emg3d.svg
-   :target: https://pypi.python.org/pypi/emg3d/
-   :alt: PyPI
-.. image:: https://img.shields.io/conda/v/conda-forge/emg3d.svg
-   :target: https://anaconda.org/conda-forge/emg3d/
-   :alt: conda-forge
-.. image:: https://img.shields.io/badge/python-3.10+-blue.svg
-   :target: https://www.python.org/downloads/
-   :alt: Supported Python Versions
-.. image:: https://img.shields.io/badge/platform-linux,win,osx-blue.svg
-   :target: https://anaconda.org/conda-forge/emg3d/
-   :alt: Linux, Windows, OSX
-
-|
-
 A multigrid solver for 3D electromagnetic diffusion in Python.
 
 - **Website:** https://emsig.xyz

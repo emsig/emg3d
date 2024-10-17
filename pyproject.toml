@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emg3d"
+description = "A multigrid solver for 3D electromagnetic diffusion"
+readme = "README.rst"
+requires-python = ">=3.10"
+authors = [
+  {name = "The emsig community", email = "info@emsig.xyz"},
+]
+dependencies = [
+    "numpy",
+    "scipy>=1.10",
+    "numba",
+    "empymod>=2.3.2",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python",
+]
+dynamic = ["version"]
+
+[project.license]
+file = "LICENSE"
+
+[project.urls]
+Homepage = "https://emsig.xyz"
+Documentation = "https://emg3d.emsig.xyz"
+Repository = "https://github.com/emsig/emg3d"
+
+[project.optional-dependencies]
+full = [
+    "tqdm",
+    "h5py",
+    "xarray",
+    "discretize",
+    "matplotlib",
+    "ipympl",
+    # "pygimli>=1.5.2",  # Only once implemented
+    # "simpeg>=0.22.1",  # Only once implemented
+]
+docs = [
+    "emg3d[full]",
+    "numpy<2",  # Until discretize is ready for NumPy v2
+    "sphinx",
+    "numpydoc",
+    "ipykernel",
+    "pickleshare",
+    "sphinx_design",
+    "sphinx_numfig",
+    "sphinx_automodapi",
+    "pydata_sphinx_theme",
+]
+tests = [
+    "flake8",
+    "pytest",
+    "coveralls",
+    "pytest_cov",
+    "flake8-pyproject",
+    "pytest-console-scripts",
+]
+all = [
+    "emg3d[docs]",
+    "emg3d[tests]",
+]
+build = [
+    "setuptools_scm>=8",
+    "setuptools>=64",
+]
+
+[project.scripts]
+emg3d = "emg3d.cli.main:main"
+
+[tool.setuptools.packages.find]
+include = ["emg3d*"]
+
+[tool.setuptools_scm]
+version_file = "emg3d/version.py"
+
+[tool.flake8]
+per-file-ignores = [
+    "__init__.py: F401, F403, F821",
+]
+
+[tool.coverage.run]
+relative_files = true
