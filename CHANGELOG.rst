@@ -9,6 +9,8 @@ Changelog
 latest
 ------
 
+- Initial version of SimPEG(emg3d)
+
 - Maintenance:
 
   - Changed from ``setup.py`` to ``pyproject.toml``.
