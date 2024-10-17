@@ -44,7 +44,6 @@ full = [
 ]
 docs = [
     "emg3d[full]",
-    "numpy<2",  # Until discretize is ready for NumPy v2
     "sphinx",
     "numpydoc",
     "ipykernel",
