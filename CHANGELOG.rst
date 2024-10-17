@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+- Maintenance:
+
+  - Changed from ``setup.py`` to ``pyproject.toml``.
+
+
 v1.8.4 : NumPy v2
 -----------------
 

@@ -13,9 +13,9 @@ or via ``pip``:
 
    pip install emg3d
 
-Requirements are the modules ``scipy``, ``numba``, and ``empymod``. Various
-other packages are recommended or required for some advanced functionalities,
-namely:
+Requirements are the modules ``numpy``, ``scipy``, ``numba``, and ``empymod``.
+Various other packages are recommended or required for some advanced
+functionalities, namely:
 
 - ``xarray``: For the :class:`emg3d.surveys.Survey` and
   :class:`emg3d.simulations.Simulation` classes (model many sources and
