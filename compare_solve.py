@@ -10,7 +10,7 @@ C_lib = npct.load_library("./emg3d/solve.so", ".")
 
 
 def solve(amat, bvec):
-    C_lib.solve(amat.ctypes.data_as(c_doublep), bvec.ctypes.data_as(c_doublep))
+    C_lib.solve(int(n), amat.ctypes.data_as(c_doublep), bvec.ctypes.data_as(c_doublep))
 
 
 # Create complex symmetric matrix A.

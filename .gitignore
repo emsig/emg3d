@@ -19,3 +19,7 @@ emg3d/version.py
 build/
 dist/
 emg3d.egg-info/
+
+#C-code object
+*.o
+*.so
