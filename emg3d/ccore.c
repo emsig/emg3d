@@ -1,5 +1,7 @@
+#include<stdio.h>
 #include<math.h>
 #include<assert.h>
+#include<complex.h>
 
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
@@ -71,10 +73,10 @@
         Right-hand-side vector b of length n.
 */
 
-void core( int n, double *amat, double *bvec)
+void core( int n, double complex* amat, double complex* bvec)
 {
     int i, j, k;
-    double d, h;
+    double complex d, h;
 
     // Number of unknowns
     //n = len(bvec)
@@ -91,6 +93,7 @@ void core( int n, double *amat, double *bvec)
     for ( i=1; i<MIN(n,6); i++ ) { 
         amat[i] *= d;
     }
+    //for ( i=0; i<n*6; i++ ) fprintf(stderr,"amat[%d]=%f %f\n", i, crealf(amat[i]), cimagf(amat[i]) );
 
     // Other columns (1 to n)
     for ( j=1; j<n; j++ ) { 
