@@ -6,11 +6,12 @@ import numpy.ctypeslib as npct
 
 
 c_doublep = ct.POINTER(ct.c_double)
-C_lib = npct.load_library("./emg3d/solve.so", ".")
+C_lib = npct.load_library("./emg3d/ccore.so", ".")
 
 
 def solve(amat, bvec):
-    C_lib.solve(int(n), amat.ctypes.data_as(c_doublep), bvec.ctypes.data_as(c_doublep))
+    n = bvec.size
+    C_lib.core(int(n), amat.ctypes.data_as(c_doublep), bvec.ctypes.data_as(c_doublep))
 
 
 # Create complex symmetric matrix A.

@@ -1,18 +1,9 @@
 #CC= /opt/local/bin/gcc-mp-13
 
-all: core.so 
+all: ccore.so 
 
-core.so: core.o
-	gcc -shared -o $@ core.o -lm
-
-reflections.so: reflections.o
-	gcc -shared -o $@ reflections.o -lm
-
-greenfct.so: greenfct.o reflections.o fields.o
-	gcc -shared -o $@ $^ -lm
-
-wavenumber.so: wavenumber.o greenfct.o reflections.o fields.o
-	gcc -shared -o $@ $^ -lm
+ccore.so: ccore.o
+	gcc -shared -o $@ ccore.o -lm
 
 #CFLAGS= -fPIC -Ofast -ftree-loop-vectorize -fopt-info-optimized  -fopt-info-vec-missed  -march=znver2
 #-fopt-info-optimized -fopenmp
@@ -25,8 +16,8 @@ CFLAGS= -fPIC -O3 -ftree-loop-vectorize -funroll-all-loops
 	$(CC) -c $(CFLAGS) $(OPTC) $<
 
 clean:
-	rm -f core *.o
+	rm -f ccore *.o
 
 deepclean:
-	rm -rf core *.o *.so *.h5 __pycache__
+	rm -rf ccore *.o *.so *.h5 __pycache__
 
