@@ -1,9 +1,12 @@
 #CC= /opt/local/bin/gcc-mp-13
 
-all: ccore.so 
+all: csolve.so cgaussseidel.so
 
-ccore.so: ccore.o
-	gcc -shared -o $@ ccore.o -lm
+csolve.so: csolve.o
+	gcc -shared -o $@ csolve.o -lm
+
+cgaussseidel.so: cgaussseidel.o csolve.o
+	gcc -shared -o $@ $^ -lm
 
 #CFLAGS= -fPIC -Ofast -ftree-loop-vectorize -fopt-info-optimized  -fopt-info-vec-missed  -march=znver2
 #-fopt-info-optimized -fopenmp
@@ -16,8 +19,8 @@ CFLAGS= -fPIC -O3 -ftree-loop-vectorize -funroll-all-loops
 	$(CC) -c $(CFLAGS) $(OPTC) $<
 
 clean:
-	rm -f ccore *.o
+	rm -f *.o
 
 deepclean:
-	rm -rf ccore *.o *.so *.h5 __pycache__
+	rm -rf *.o *.so *.h5 __pycache__
 

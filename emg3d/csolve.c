@@ -73,7 +73,7 @@
         Right-hand-side vector b of length n.
 */
 
-void core( int n, double complex* amat, double complex* bvec)
+void solve( int n, double complex* amat, double complex* bvec)
 {
     int i, j, k;
     double complex d, h;

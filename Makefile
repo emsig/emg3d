@@ -13,9 +13,11 @@ help:
 	@echo ""
 
 install:
+	cd emg3d && make && cd ..
 	python -m pip install -e .
 
 dev-install:
+	cd emg3d && make && cd ..
 	python -m pip install -e .[all]
 
 pytest:
@@ -37,6 +39,7 @@ linkcheck:
 	cd docs && make linkcheck
 
 clean:
+	cd emg3d && make deepclean && cd ..
 	python -m pip uninstall emg3d -y
 	rm -rf build/ dist/ .eggs/ emg3d.egg-info/ emg3d/version.py  # build
 	rm -rf */__pycache__/ */*/__pycache__/      # python cache

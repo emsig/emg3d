@@ -1,18 +1,7 @@
 import emg3d
 import numpy as np
-import ctypes as ct
-from numpy.testing import assert_allclose
-import numpy.ctypeslib as npct
 
-
-c_doublep = ct.POINTER(ct.c_double)
-C_lib = npct.load_library("./emg3d/ccore.so", ".")
-
-
-def solve(amat, bvec):
-    n = bvec.size
-    C_lib.core(int(n), amat.ctypes.data_as(c_doublep), bvec.ctypes.data_as(c_doublep))
-
+from emg3d import _ccore
 
 # Create complex symmetric matrix A.
 avec = np.zeros(36, dtype=np.complex128)
@@ -35,22 +24,40 @@ for i in range(6):
 # Compute b = A x
 b = amat@x
 
+atol = 0
+rtol = 1e-12
+
+def compare(a, b, atol, rtol, title):
+    same = np.allclose(a, b, rtol=rtol, atol=atol, equal_nan=True)
+    error = np.abs(a - b)
+    if not same:
+        print(f"  $$ {title} :: {['❌', '✅'][same]}")
+        print(f"     => True ***")
+        print(a)
+        print(f"     => Code ***")
+        print(b)
+        print()
+        print(f"    Data {['are NOT', 'ARE'][same]} the same "
+            f"(given rtol={rtol}, atol={atol})\n"
+            f"    max abs error: {np.max(error):.4g}; max rel "
+            f"error: {np.max(error/np.abs(a)):.4g}\n")
+
 # 1. Check with numpy
 # Ensure that our dummy-linear-equation system works fine.
 xnp = np.linalg.solve(amat, b)                 # Solve A x = b
-assert_allclose(x, xnp)                        # Check
+compare(x, xnp, atol, rtol, 'numpy')
 
 # 2. Check current
 xnb = b.copy()
 emg3d.core.solve(avec.copy(), xnb)             # Solve A x = b
-assert_allclose(x, xnb)                        # Check
+compare(x, xnb, atol, rtol, 'numba')
 
 # 2. Check new
 xc = b.copy()
-solve(avec.copy(), xc)                         # Solve A x = b
-assert_allclose(x, xc)                         # Check
+_ccore.solve(avec.copy(), xc)            # Solve A x = b
+compare(x, xc, atol, rtol, 'C')
 
 print(f"Solution : {x}")
-print(f"Numpy    : {xnp}")
-print(f"Numba    : {xnb}")
-print(f"C        : {xc}")
+print(f"Numpy    : {np.array2string(xnp, precision=2)}")
+print(f"Numba    : {np.array2string(xnb, precision=2)}")
+print(f"C        : {np.array2string(xc, precision=2)}")
