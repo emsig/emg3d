@@ -81,9 +81,6 @@ void solve( int n, double complex* amat, double complex* bvec)
     // Number of unknowns
     //n = len(bvec)
 
-    // Pre-allocate h
-    //h = np.zeros(1, dtype=amat.dtype)[0]
-
     // 1. Get L from non-standard Cholesky L D L^T factorisation
 
     // First element (i = j = 0). Warning: Diagonals of amat cannot be 0!
