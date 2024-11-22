@@ -84,8 +84,14 @@ html_theme_options = {
         {"name": "Gallery", "url": "https://emsig.xyz/emg3d-gallery/gallery"},
         {"name": "emsig", "url": "https://emsig.xyz"},
     ],
-    'navigation_with_keys': True,
+    "navigation_with_keys": True,
     # "use_edit_page_button": True,
+    "analytics": {
+        # The domain you'd like to use for this analytics instance
+        "plausible_analytics_domain": "emg3d.emsig.xyz",
+        # The analytics script that is served by Plausible
+        "plausible_analytics_url": "https://plausible.io/js/plausible.js",
+    },
 }
 
 html_context = {
