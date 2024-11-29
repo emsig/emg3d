@@ -301,9 +301,9 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
     print("kz=",kz)
     print ("nx,ny,nz=",nx, ny, nz)
     print ("ey,shape=",ey.shape[0], ey.shape[1], ey.shape[2])
-    for k in range(1, nz):
-        for j in range(1, ny):
-            for i in range(1, nx):
+    for k in range(0, nz):
+        for j in range(0, ny):
+            for i in range(0, nx):
                 print ("ey[",k, j, i, "]=",ey[i, j, k] )
 
     # Direction-switch for Gauss-Seidel
