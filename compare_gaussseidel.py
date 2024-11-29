@@ -59,20 +59,27 @@ sfield = emg3d.get_source_field(grid, src, freq)
 # Get volume-averaged model parameters.
 vmodel = emg3d.models.VolumeModel(model, sfield)
 
-# Run two iterations to get some e-field.
-efield = emg3d.solve(model, sfield, sslsolver=False,
-                     semicoarsening=False, linerelaxation=False,
-                     maxit=2, verb=1)
+# Use empty field or compute some initial values as starting field.
+efield = emg3d.Field(grid, frequency=freq)
+# efield = emg3d.solve(model, sfield, plain=True, maxit=2, verb=1)
 
-inp = (sfield.fx, sfield.fy, sfield.fz, vmodel.eta_x, vmodel.eta_y,
-        vmodel.eta_z, vmodel.zeta, grid.h[0], grid.h[1], grid.h[2], nu)
+# Collect input that remains the same.
+inp = (
+    sfield.fx.copy(), sfield.fy.copy(), sfield.fz.copy(),
+    vmodel.eta_x.copy(), vmodel.eta_y.copy(), vmodel.eta_z.copy(),
+    vmodel.zeta.copy(),
+    grid.h[0], grid.h[1], grid.h[2],
+    nu,
+)
+
+# Make two copies of the efield as input for numba/C.
+nfield = efield.copy()
+cfield = efield.copy()
 
 # Get result from `gauss_seidel`.
-nfield = emg3d.Field(grid, efield.field.copy(), frequency=efield._frequency)
 emg3d.core.gauss_seidel(nfield.fx, nfield.fy, nfield.fz, *inp)
 
 # Get result from `cgaussseidel`
-cfield = emg3d.Field(grid, efield.field.copy(), frequency=efield._frequency)
 _ccore.gaussseidel(cfield.fx, cfield.fy, cfield.fz, *inp)
 
 # Check the resulting field.
