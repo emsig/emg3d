@@ -1,11 +1,11 @@
 #CC= /opt/local/bin/gcc-mp-13
 
-all: csolve.so cgaussseidel.so
+all: csolve.so cgauss_seidel.so
 
 csolve.so: csolve.o
 	gcc -shared -o $@ csolve.o -lm
 
-cgaussseidel.so: cgaussseidel.o csolve.o
+cgauss_seidel.so: cgauss_seidel.o csolve.o
 	gcc -shared -o $@ $^ -lm
 
 #CFLAGS= -fPIC -Ofast -ftree-loop-vectorize -fopt-info-optimized  -fopt-info-vec-missed  -march=znver2

@@ -296,6 +296,15 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
     kx = 0.5/hx
     ky = 0.5/hy
     kz = 0.5/hz
+    print("kx=",kx)
+    print("ky=",ky)
+    print("kz=",kz)
+    print ("nx,ny,nz=",nx, ny, nz)
+    print ("ey,shape=",ey.shape[0], ey.shape[1], ey.shape[2])
+    for k in range(1, nz):
+        for j in range(1, ny):
+            for i in range(1, nx):
+                print ("ey[",k, j, i, "]=",ey[i, j, k] )
 
     # Direction-switch for Gauss-Seidel
     iback = 0
@@ -349,6 +358,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
 
                     # Averaging of 1/mu_r: mzyRxm etc.
                     mzyLxm = ky[iym]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    #print(iz, iy, ix, mzyLxm, zeta[ix, iy, iz] )
                     mzyRxm = ky[iy]*(zeta[ixm, iy, iz] + zeta[ixm, iy, izm])
                     myzLxm = kz[izm]*(zeta[ixm, iy, izm] + zeta[ixm, iym, izm])
                     myzRxm = kz[iz]*(zeta[ixm, iy, iz] + zeta[ixm, iym, iz])
@@ -389,6 +399,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
 
                     st = np.array([st0, st1, st2, st3, st4, st5])/4.
 
+                    # print("st=",st);
                     # Fill amat
                     amat[:] = 0.  # Reset
 
@@ -436,6 +447,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                     rhs = np.array([sx[ixm, iy, iz], sx[ix, iy, iz],
                                     sy[ix, iym, iz], sy[ix, iy, iz],
                                     sz[ix, iy, izm], sz[ix, iy, iz]])
+                    #print(iz, iy, ix, rhs);
 
                     rhs[0] += mzyRxm*(ey[ixm, iy, iz]/hx[ixm] +
                                       ex[ixm, iyp, iz]/hy[iy])
@@ -445,6 +457,8 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                                       ex[ixm, iy, izp]/hz[iz])
                     rhs[0] += myzLxm*(-ez[ixm, iy, izm]/hx[ixm] +
                                       ex[ixm, iy, izm]/hz[izm])
+
+                    #print("rhs[0]=",iz, iy, ix, rhs[0], "Ms=",  mzyRxm, mzyLxm, myzRxm, myzLxm, ey[ixm, iy, iz])
 
                     rhs[1] += mzyRxp*(-ey[ixp, iy, iz]/hx[ix] +
                                       ex[ix, iyp, iz]/hy[iy])
@@ -463,6 +477,7 @@ def gauss_seidel(ex, ey, ez, sx, sy, sz, eta_x, eta_y, eta_z, zeta, hx, hy, hz,
                                       ey[ix, iym, izp]/hz[iz])
                     rhs[2] += mxzLym*(-ez[ix, iym, izm]/hy[iym] +
                                       ey[ix, iym, izm]/hz[izm])
+
 
                     rhs[3] += mzxRyp*(ey[ixp, iy, iz]/hx[ix] -
                                       ex[ix, iyp, iz]/hy[iy])
