@@ -6,12 +6,15 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.8.5 : Bugfix and pyproject
+-----------------------------
 
-- Maintenance:
+- Bugfix and maintenance:
 
-  - Changed from ``setup.py`` to ``pyproject.toml``.
+  - Fix bug in Dipole/Wire sources when coordinates are mixed increasing and
+    decreasing over several cells
+    [#348](https://github.com/emsig/emg3d/issues/348).
+  - Changed build backend from ``setup.py`` to ``pyproject.toml``.
 
 
 v1.8.4 : NumPy v2

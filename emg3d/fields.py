@@ -898,7 +898,7 @@ def _dipole_vector(grid, points, decimals=9):
                 ez = 1 - rz
 
                 # Add to field (only if segment inside cell).
-                if min(rx, ry, rz) >= 0 and np.max(np.abs(ar-al)) > 0:
+                if min(rx, ex, ry, ey, rz, ez) >= 0 and np.max(abs(ar-al)) > 0:
 
                     vfield.fx[ix, iy, iz] += ey*ez*x_len
                     vfield.fx[ix, iy+1, iz] += ry*ez*x_len
@@ -918,7 +918,9 @@ def _dipole_vector(grid, points, decimals=9):
     # Ensure unity (should not be necessary).
     for field in [vfield.fx, vfield.fy, vfield.fz]:
         sum_s = abs(field.sum())
-        if abs(sum_s-1) > 1e-6:  # Normalize and warn.
+        # Normalize and warn; SHOULD NEVER HAPPEN
+        # (if it happens add it to the tests and remove the pragma-flag!
+        if abs(sum_s-1) > 1e-6:  # pragma: no cover
             msg = f"emg3d: Normalizing Source: {sum_s:.10f}."
             warnings.warn(msg, UserWarning)
             field /= sum_s
