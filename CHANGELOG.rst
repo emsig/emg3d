@@ -9,7 +9,7 @@ Changelog
 v1.8.5 : Bugfix and pyproject
 -----------------------------
 
-**2024-01-02**
+**2025-01-02**
 
 - Bugfix and maintenance:
 
