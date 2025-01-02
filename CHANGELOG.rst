@@ -9,6 +9,8 @@ Changelog
 v1.8.5 : Bugfix and pyproject
 -----------------------------
 
+**2024-01-02**
+
 - Bugfix and maintenance:
 
   - Fix bug in Dipole/Wire sources when coordinates are mixed increasing and
