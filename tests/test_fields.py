@@ -652,6 +652,7 @@ class TestDipoleVector:
         grid = emg3d.TensorMesh([h, h, h], (-3, -3, -3))
 
         # Large diagonal source in the middle
+        # x, y, z increasing
         source = np.array([[-2.5, -2.5, -2.5], [2.5, 2.5, 2.5]])
         vfield = fields._dipole_vector(grid, source)
 
@@ -671,6 +672,22 @@ class TestDipoleVector:
 
         assert_allclose(vfield.fx[1, 1:3, 1:3].ravel(),
                         vfield.fx[2, 2:4, 2:4].ravel()[::-1])
+
+        # Large diagonal source in the middle
+        # x, z increasing, y decreasing
+        source = np.array([[-2.5, 2.5, -2.5], [2.5, -2.5, 2.5]])
+        vfield2 = fields._dipole_vector(grid, source)
+        assert_allclose(vfield.fx, np.fliplr(vfield2.fx))
+        assert_allclose(vfield.fy, -np.fliplr(vfield2.fy))
+        assert_allclose(vfield.fz, np.fliplr(vfield2.fz))
+
+        # Large diagonal source in the middle
+        # x, z decreasing, y increasing
+        source = np.array([[2.5, -2.5, 2.5], [-2.5, 2.5, -2.5]])
+        vfield3 = fields._dipole_vector(grid, source)
+        assert_allclose(vfield.fx, -np.fliplr(vfield3.fx))
+        assert_allclose(vfield.fy, np.fliplr(vfield3.fy))
+        assert_allclose(vfield.fz, -np.fliplr(vfield3.fz))
 
     def test_decimals(self):
         h1 = [2, 1, 1, 2]
@@ -697,13 +714,6 @@ class TestDipoleVector:
         source = np.array([[2, 2, 2], [2, 2, 2]])
         with pytest.raises(ValueError, match='Provided finite dipole'):
             fields._dipole_vector(grid, source)
-
-        # This is a warning that should never be raised...
-        hx, x0 = np.ones(4), -2
-        grid = emg3d.TensorMesh([hx, hx, hx], (x0, x0, x0))
-        source = np.array([[-2, 2, 0], [0, -2, 0]])
-        with pytest.warns(UserWarning, match="Normalizing Source: 1.25000000"):
-            fields._dipole_vector(grid, source, 30)
 
 
 @pytest.mark.parametrize("njit", [True, False])
