@@ -789,7 +789,7 @@ def _point_vector_magnetic(grid, coordinates, frequency):
     return vfield
 
 
-def _dipole_vector(grid, points, decimals=9):
+def _dipole_vector(grid, points, decimals=9, nodes=None):
     """Get n-segment dipole source by distributing them to the relevant cells.
 
 
@@ -814,6 +814,26 @@ def _dipole_vector(grid, points, decimals=9):
 
     """
 
+    # Round nodes and source coordinates (to avoid floating point issues etc).
+    # Recursion: only necessary in first go.
+    if nodes:
+        nodes_x, nodes_y, nodes_z = nodes
+    else:
+        nodes_x = np.round(grid.nodes_x, decimals)
+        nodes_y = np.round(grid.nodes_y, decimals)
+        nodes_z = np.round(grid.nodes_z, decimals)
+        pts = np.round(np.asarray(points, dtype=float), decimals)
+
+        # Ensure source is within nodes.
+        outside = (
+            min(pts[:, 0]) < nodes_x[0] or max(pts[:, 0]) > nodes_x[-1] or
+            min(pts[:, 1]) < nodes_y[0] or max(pts[:, 1]) > nodes_y[-1] or
+            min(pts[:, 2]) < nodes_z[0] or max(pts[:, 2]) > nodes_z[-1]
+        )
+        if outside:
+            raise ValueError(f"Provided source outside grid: {pts}.")
+        points = pts
+
     vfield = Field(grid, dtype=float)
 
     # Recursively loop through segments.
@@ -822,25 +842,11 @@ def _dipole_vector(grid, points, decimals=9):
         # Add each segments' vector field to total vector field.
         for p0, p1 in zip(points[:-1, :], points[1:, :]):
             vfield.field += _dipole_vector(
-                          grid, points=np.r_[[p0, p1]], decimals=decimals
+                          grid, points=np.r_[[p0, p1]], decimals=decimals,
+                          nodes=(nodes_x, nodes_y, nodes_z)
                       ).field
 
         return vfield
-
-    # Round nodes and source coordinates (to avoid floating point issues etc).
-    nodes_x = np.round(grid.nodes_x, decimals)
-    nodes_y = np.round(grid.nodes_y, decimals)
-    nodes_z = np.round(grid.nodes_z, decimals)
-    points = np.round(np.asarray(points, dtype=float), decimals)
-
-    # Ensure source is within nodes.
-    outside = (
-        min(points[:, 0]) < nodes_x[0] or max(points[:, 0]) > nodes_x[-1] or
-        min(points[:, 1]) < nodes_y[0] or max(points[:, 1]) > nodes_y[-1] or
-        min(points[:, 2]) < nodes_z[0] or max(points[:, 2]) > nodes_z[-1]
-    )
-    if outside:
-        raise ValueError(f"Provided source outside grid: {points}.")
 
     # Dipole lengths in x-, y-, and z-directions, and overall.
     dxdydz = points[1, :] - points[0, :]
@@ -919,8 +925,7 @@ def _dipole_vector(grid, points, decimals=9):
     for field in [vfield.fx, vfield.fy, vfield.fz]:
         sum_s = abs(field.sum())
         # Normalize and warn; SHOULD NEVER HAPPEN
-        # (if it happens add it to the tests and remove the pragma-flag!
-        if abs(sum_s-1) > 1e-6:  # pragma: no cover
+        if abs(sum_s-1) > 1e-6:
             msg = f"emg3d: Normalizing Source: {sum_s:.10f}."
             warnings.warn(msg, UserWarning)
             field /= sum_s

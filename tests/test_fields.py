@@ -715,6 +715,15 @@ class TestDipoleVector:
         with pytest.raises(ValueError, match='Provided finite dipole'):
             fields._dipole_vector(grid, source)
 
+        # Create a BaseMesh and modify the widths, so _dipole_vector will
+        # have to normalize.
+        h = np.ones(4)
+        grid = emg3d.meshes.BaseMesh([h, h, h], (0, 0, 0))
+        grid.h = [grid.h[0], grid.h[1]*.3, grid.h[2]]
+        source = np.array([[0, 1, 2], [3, 3, 2]])
+        with pytest.warns(UserWarning, match='Normalizing Source'):
+            fields._dipole_vector(grid, source)
+
 
 @pytest.mark.parametrize("njit", [True, False])
 def test_edge_curl_factor(njit):
