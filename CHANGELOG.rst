@@ -6,6 +6,20 @@ Changelog
 """"""""""
 
 
+v1.8.6 : Tmp restrict SciPy
+---------------------------
+
+**2025-01-07**
+
+- Maintenance:
+
+  - Restricting to ``SciPy<1.15``. The function ``scipy.interpolate.interpnd``
+    is deprecated, and ``scipy.interpolate.interpnd._ndim_coords_from_array``
+    was removed. Needs fixing in ``emg3d.maps._points_from_grids``.
+  - Re-adding a test for normalizing source warning; avoid rounding over and
+    over again in recursion of creating a dipole/wire source.
+
+
 v1.8.5 : Bugfix and pyproject
 -----------------------------
 
