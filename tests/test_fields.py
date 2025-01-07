@@ -60,7 +60,7 @@ class TestField:
 
         # Try setting values
         ee3.field = ee.field
-        assert ee3.smu0/ee3.sval == constants.mu_0
+        assert_allclose(ee3.smu0/ee3.sval, constants.mu_0)
         assert ee != ee3  # First has no frequency
         ee3.fx = ee.fx
         ee3.fy = ee.fy

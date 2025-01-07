@@ -24,6 +24,10 @@ Interpolation routines mapping values between different grids.
 import numba as nb
 import numpy as np
 import scipy as sp
+if int(sp.__version__.split('.')[1]) < 15:
+    interpnd = sp.interpolate.interpnd
+else:
+    interpnd = sp.interpolate._interpnd
 
 from emg3d.utils import _requires
 from emg3d.core import _numba_setting
@@ -479,8 +483,7 @@ def _points_from_grids(grid, values, xi, method):
         else:
             # Replicate the same expansion of xi as used in
             # RegularGridInterpolator, so the input xi can be quite flexible.
-            new_points = sp.interpolate.interpnd._ndim_coords_from_arrays(
-                    xi, ndim=3)
+            new_points = interpnd._ndim_coords_from_arrays(xi, ndim=3)
             shape = new_points.shape[:-1]
             new_points = new_points.reshape(-1, 3, order='F')
 
