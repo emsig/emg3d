@@ -11,6 +11,8 @@ v1.8.6 : Tmp restrict SciPy
 
 **2025-01-07**
 
+- Initial version of SimPEG(emg3d)
+
 - Maintenance:
 
   - Restricting to ``SciPy<1.15``. The function ``scipy.interpolate.interpnd``
