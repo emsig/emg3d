@@ -24,6 +24,7 @@ Interpolation routines mapping values between different grids.
 import numba as nb
 import numpy as np
 import scipy as sp
+# Remove if-else once minimum SciPy = 1.15
 if int(sp.__version__.split('.')[1]) < 15:
     interpnd = sp.interpolate.interpnd
 else:
