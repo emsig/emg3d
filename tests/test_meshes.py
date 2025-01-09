@@ -2,6 +2,7 @@ from os.path import join, dirname
 
 import pytest
 import numpy as np
+import scipy as sp
 from scipy.constants import mu_0
 from numpy.testing import assert_allclose
 
@@ -313,7 +314,13 @@ class TestOriginAndWidths:
         assert "Comp. dom. DC  [m] : -19.8 - 19.8" in out
         assert "Final extent   [m] : -20.0 - 20.0" in out
         assert "Cell widths    [m] : 1.0 / 1.0 / 1.0  [min(DS) / m" in out
-        assert "Number of cells    : 40 (4 / 36 / 0)  [Total (DS/" in out
+        # For scipy<1.15, mu_0 was not precise to double precision. This
+        # funnily changed the output of this test.
+        # Remove if-else once minimum SciPy = 1.15
+        if int(sp.__version__.split('.')[1]) < 15:
+            assert "Number of cells    : 40 (4 / 36 / 0)  [Total (DS/" in out
+        else:
+            assert "Number of cells    : 40 (2 / 38 / 0)  [Total (DS/" in out
         assert "Max stretching     : 1.000 (1.000) / 1.000  [DS (" in out
 
         with pytest.warns(FutureWarning, match='`center` will change'):
