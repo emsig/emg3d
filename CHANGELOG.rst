@@ -6,6 +6,21 @@ Changelog
 """"""""""
 
 
+v1.8.7 : Release SciPy restriction
+----------------------------------
+
+**2025-01-09**
+
+- Maintenance:
+
+  - Replace ``scipy.interpolate.interpnd`` with ``scipy.interpolate._interpnd``
+    (should be a temporary solution, would be better to not use private
+    modules).
+  - Fix test failures; they were related to the change of SciPy v1.15 of
+    ``constants.mu_0`` value changed to the more precise double precision value
+    (https://github.com/scipy/scipy/pull/11345).
+
+
 v1.8.6 : Tmp restrict SciPy
 ---------------------------
 
