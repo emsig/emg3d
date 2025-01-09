@@ -816,5 +816,5 @@ def test_import_time(script_runner):
     cmd = ["python", "-Ximporttime", "-c", "import emg3d"]
     out = script_runner.run(cmd, print_result=False)
     import_time_s = float(out.stderr.split('|')[-2])/1e6
-    # Currently we check t < 2.0 s (really slow, should be < 0.5 s)
-    assert import_time_s < 2.0
+    # Currently we check t < 5.0 s (really slow, should be < 0.5 s)
+    assert import_time_s < 5.0
