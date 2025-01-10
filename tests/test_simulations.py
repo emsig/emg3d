@@ -887,6 +887,7 @@ class TestGradient:
             sim.jtvec,
             self.mesh.shape_cells,
             self.survey.shape,
+            random_seed=rng,
         )
 
         sim = simulations.Simulation(
@@ -900,6 +901,7 @@ class TestGradient:
             sim.jtvec,
             self.mesh.shape_cells,
             self.survey.shape,
+            random_seed=rng,
         )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
@@ -920,6 +922,7 @@ class TestGradient:
             sim.jtvec,
             (2, *self.mesh.shape_cells),
             self.survey.shape,
+            random_seed=rng,
         )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
@@ -940,6 +943,7 @@ class TestGradient:
             sim.jtvec,
             (2, *self.mesh.shape_cells),
             self.survey.shape,
+            random_seed=rng,
         )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
@@ -961,6 +965,7 @@ class TestGradient:
             sim.jtvec,
             (3, *self.mesh.shape_cells),
             self.survey.shape,
+            random_seed=rng,
         )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")
@@ -986,7 +991,7 @@ class TestGradient:
             return sim.data.synthetic.data, func2
 
         assert discretize.tests.check_derivative(
-            func1, m0, plotIt=False, num=3,
+            func1, m0, plotIt=False, num=3, random_seed=rng,
         )
 
     @pytest.mark.skipif(discretize is None, reason="discretize not installed.")

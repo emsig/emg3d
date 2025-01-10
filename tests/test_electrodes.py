@@ -606,6 +606,7 @@ def test_adjoint():
             shape_u=mesh.n_edges, shape_v=1,
             complex_u=rng.choice([True, False]),  # Random float or complex.
             complex_v=rng.choice([True, False]),  # Random float or complex.
+            random_seed=rng,
         )
 
 

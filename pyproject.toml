@@ -55,6 +55,7 @@ docs = [
 ]
 tests = [
     "flake8",
+    "discretize>=0.11",
     "pytest",
     "coveralls",
     "pytest_cov",
