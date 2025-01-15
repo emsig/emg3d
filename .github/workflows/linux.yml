@@ -56,6 +56,14 @@ jobs:
             name: full
             os: ubuntu
             conda: "scipy numba 'empymod>=2.3.2' xarray tqdm h5py 'discretize>=0.11' matplotlib"
+          - python-version: "3.13"
+            name: plain
+            os: ubuntu
+            conda: "scipy numba 'empymod>=2.3.2'"
+          - python-version: "3.13"
+            name: full
+            os: ubuntu
+            conda: "scipy numba 'empymod>=2.3.2' xarray tqdm h5py 'discretize>=0.11' matplotlib"
 
     env:
       # Used for coveralls flag

@@ -6,6 +6,15 @@ Changelog
 """"""""""
 
 
+latest
+------
+
+
+- Maintenance
+
+  - Testing: added Python 3.13.
+
+
 v1.8.7 : Release SciPy restriction
 ----------------------------------
 
