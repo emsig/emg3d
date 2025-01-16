@@ -16,7 +16,7 @@ void gauss_seidel(double complex *ex, double complex *ey, double complex *ez,
                   int nx, int ny, int nz, int nu) 
 {
     int ix, iy, iz, ixh, iyh, izh;
-    int nxy, ny1, nx1, nz1, nzy1;
+    int nxy, ny1, nx1, nz1, nyz;
     int ixm, iym, izm;
     int ixp, iyp, izp;
     double complex st[6];
@@ -28,11 +28,12 @@ void gauss_seidel(double complex *ex, double complex *ey, double complex *ez,
 
     fprintf(stderr,"nx=%d ny=%d nz=%d\n", nx, ny, nz);
 
+
     nxy = nx*ny;
+    nyz = ny*nz;
     nx1 = (nx+1);
     ny1 = (ny+1);
     nz1 = (nz+1);
-    nzy1 = nz*ny1;
     // Get half of the inverse widths
     double *kx = (double *)malloc(nx * sizeof(double));
     double *ky = (double *)malloc(ny * sizeof(double));
@@ -41,14 +42,34 @@ void gauss_seidel(double complex *ex, double complex *ey, double complex *ez,
     for (int i = 0; i < ny; i++) ky[i] = 0.5 / hy[i];
     for (int i = 0; i < nz; i++) kz[i] = 0.5 / hz[i];
 
+/*
+iz=5; iy=4; ix=4;
+                    fprintf(stderr," T %d %d %d ex=%.3e %.3ej\n",iz, iy, ix, creal(ex[ix*ny1*nz1+iy*nz1+iz]), cimag(ex[ix*ny1*nz1+iy*nz1+iz]) );
+                    fprintf(stderr," T %d %d %d ey=%.3e %.3ej\n",iz, iy, ix, creal(ey[ix*ny*nz1+iy*nz1+iz]), cimag(ey[ix*ny*nz1+iy*nz1+iz]) );
+                    fprintf(stderr," T %d %d %d ez=%.3e %.3ej\n",iz, iy, ix, creal(ez[ix*ny1*nz+iy*nz+iz]), cimag(ez[ix*ny1*nz+iy*nz+iz]) );
+
+    fprintf(stderr," %d %d %d ex=%.3e %.3ej\n",iz, iy, ix, creal(ex[ix+iy*nx+iz*nx*ny1]), cimag(ex[ix+iy*nx+iz*nx*ny1]) );
+    fprintf(stderr," %d %d %d ey=%.3e %.3ej\n",iz, iy, ix, creal(ey[ix+iy*nx1+iz*nx1*ny]), cimag(ey[ix+iy*nx1+iz*nx1*ny]) );
+    fprintf(stderr," %d %d %d ez=%.3e %.3ej\n",iz, iy, ix, creal(ez[ix+iy*nx1+iz*nx1*ny1]), cimag(ez[ix+iy*nx1+iz*nx1*ny1]) );
+    fprintf(stderr," T %d %d %d ex=%.3e %.3ej\n",iz, iy, ix, creal(ex[ix*ny1*nz1+iy*nz1+iz]), cimag(ex[ix*ny1*nz1+iy*nz1+iz]) );
+    fprintf(stderr," T %d %d %d ey=%.3e %.3ej\n",iz, iy, ix, creal(ey[ix*ny*nz1+iy*nz1+iz]), cimag(ey[ix*ny*nz1+iy*nz1+iz]) );
+    fprintf(stderr," T %d %d %d ez=%.3e %.3ej\n",iz, iy, ix, creal(ez[ix*ny1*nz+iy*nz+iz]), cimag(ez[ix*ny1*nz+iy*nz+iz]) );
+*/
+
+//    for (int i = 0; i < nx; i++) fprintf(stderr,"kx=%f ", kx[i]);
+//    for (int j = 0; j < ny; j++) fprintf(stderr,"ky=%f ", ky[j]);
+//    for (int k = 0; k < nz; k++) fprintf(stderr,"kz=%f ", kz[k]);
+
+/*
     for (int k = 0; k < nz; k++) {
     for (int j = 0; j < ny; j++) {
     for (int i = 0; i < nx; i++) {
-        //fprintf(stderr,"[kx=%f ky=%f kz=%f\n",kx[i], ky[i], kz[i]);
+//        fprintf(stderr,"[kx=%f ky=%f kz=%f\n",kx[i], ky[i], kz[i]);
         fprintf(stderr,"ey[%d %d %d]=%e %ej \n",k, j, i, crealf(ey[i+j*nx1+k*nx1*ny]), cimagf(ey[i+j*nx1+k*nx1*ny]) );
     }
     }
     }
+*/
 
     // Direction-switch for Gauss-Seidel
     int iback = 0;
@@ -88,84 +109,117 @@ void gauss_seidel(double complex *ex, double complex *ey, double complex *ez,
                     ixp = ix + 1;
 
                     // Averaging of 1/mu_r
-                    double mzyLxm = ky[iym] * (zeta[ixm + iym * nx + iz* nxy] +
-                                               zeta[ixm + iym * nx + izm* nxy]);
-        //fprintf(stderr,"%d %d %d %f  %f \n",iz, iy, ix, mzyLxm, zeta[ix + iy*nx + iz*nx*ny]);
+                    //mzyLxm = ky[iym]*(zeta[ixm, iym, iz] + zeta[ixm, iym, izm])
+                    double mzyLxm = ky[iym] * (zeta[ixm*nyz + iym * nz + iz] +
+                                               zeta[ixm*nyz + iym * nz + izm]);
+        //fprintf(stderr,"%d %d %d mzyLxm %f zeta %f \n",iz, iy, ix, mzyLxm, zeta[ix*nyz + iy*nz + iz]);
         //fprintf(stderr,"%d %d %d %f\n",izh, iyh, ixh, crealf(mzyLxm), cimagf(mzyLxm));
-                    double mzyRxm = ky[iy] *  (zeta[ixm + iy  * nx + iz * nxy] +
-                                               zeta[ixm + iy  * nx + izm* nxy]);
-                    double myzLxm = kz[izm] * (zeta[ixm + iy  * nx + izm* nxy] +
-                                               zeta[ixm + iym * nx + izm* nxy]);
-                    double myzRxm = kz[iz] *  (zeta[ixm + iy  * nx + iz * nxy] +
-                                               zeta[ixm + iym * nx + iz * nxy]);
-                    double mzyLxp = ky[iym] * (zeta[ix  + iym * nx + iz * nxy] +
-                                               zeta[ix  + iym * nx + izm* nxy]);
-                    double mzyRxp = ky[iy] *  (zeta[ix  + iy  * nx + iz * nxy] +
-                                               zeta[ix  + iy  * nx + izm* nxy]);
-                    double myzLxp = kz[izm] * (zeta[ix  + iy  * nx + izm* nxy] +
-                                               zeta[ix  + iym * nx + izm* nxy]);
-                    double myzRxp = kz[iz] *  (zeta[ix  + iy  * nx + iz * nxy] +
-                                               zeta[ix  + iym * nx + iz * nxy]);
+                    double mzyRxm = ky[iy] *  (zeta[ixm*nyz + iy  * nz + iz ] +
+                                               zeta[ixm*nyz + iy  * nz + izm]);
+                    double myzLxm = kz[izm] * (zeta[ixm*nyz + iy  * nz + izm] +
+                                               zeta[ixm*nyz + iym * nz + izm]);
+                    double myzRxm = kz[iz] *  (zeta[ixm*nyz + iy  * nz + iz ] +
+                                               zeta[ixm*nyz + iym * nz + iz ]);
+                    double mzyLxp = ky[iym] * (zeta[ix*nyz  + iym * nz + iz ] +
+                                               zeta[ix*nyz  + iym * nz + izm]);
+                    double mzyRxp = ky[iy] *  (zeta[ix*nyz  + iy  * nz + iz ] +
+                                               zeta[ix*nyz  + iy  * nz + izm]);
+                    double myzLxp = kz[izm] * (zeta[ix*nyz  + iy  * nz + izm] +
+                                               zeta[ix*nyz  + iym * nz + izm]);
+                    double myzRxp = kz[iz] *  (zeta[ix*nyz  + iy  * nz + iz ] +
+                                               zeta[ix*nyz  + iym * nz + iz ]);
  
-                    double mzxLym = kx[ixm] * (zeta[ixm + iym * nx + iz * nxy] +
-                                               zeta[ixm + iym * nx + izm* nxy]);
-                    double mzxRym = kx[ix] *  (zeta[ix  + iym * nx + iz * nxy] +
-                                               zeta[ix  + iym * nx + izm* nxy]);
-                    double mxzLym = kz[izm] * (zeta[ix  + iym * nx + izm* nxy] +
-                                               zeta[ixm + iym * nx + izm* nxy]);
-                    double mxzRym = kz[iz] *  (zeta[ix  + iym * nx + iz * nxy] +
-                                               zeta[ixm + iym * nx + iz * nxy]);
-                    double mzxLyp = kx[ixm] * (zeta[ixm + iy  * nx + iz * nxy] +
-                                               zeta[ixm + iy  * nx + izm* nxy]);
-                    double mzxRyp = kx[ix] *  (zeta[ix  + iy  * nx + iz * nxy] +
-                                               zeta[ix  + iy  * nx + izm* nxy]);
-                    double mxzLyp = kz[izm] * (zeta[ix  + iy  * nx + izm* nxy] +
-                                               zeta[ixm + iy  * nx + izm* nxy]);
-                    double mxzRyp = kz[iz] *  (zeta[ix  + iy  * nx + iz * nxy] +
-                                               zeta[ixm + iy  * nx + iz * nxy]);
+                    double mzxLym = kx[ixm] * (zeta[ixm*nyz + iym * nz + iz ] +
+                                               zeta[ixm*nyz + iym * nz + izm]);
+                    double mzxRym = kx[ix] *  (zeta[ix*nyz  + iym * nz + iz ] +
+                                               zeta[ix*nyz  + iym * nz + izm]);
+                    double mxzLym = kz[izm] * (zeta[ix*nyz  + iym * nz + izm] +
+                                               zeta[ixm*nyz + iym * nz + izm]);
+                    double mxzRym = kz[iz] *  (zeta[ix*nyz  + iym * nz + iz ] +
+                                               zeta[ixm*nyz + iym * nz + iz ]);
+                    double mzxLyp = kx[ixm] * (zeta[ixm*nyz + iy  * nz + iz ] +
+                                               zeta[ixm*nyz + iy  * nz + izm]);
+                    double mzxRyp = kx[ix] *  (zeta[ix*nyz  + iy  * nz + iz ] +
+                                               zeta[ix*nyz  + iy  * nz + izm]);
+                    double mxzLyp = kz[izm] * (zeta[ix*nyz  + iy  * nz + izm] +
+                                               zeta[ixm*nyz + iy  * nz + izm]);
+                    double mxzRyp = kz[iz] *  (zeta[ix*nyz  + iy  * nz + iz ] +
+                                               zeta[ixm*nyz + iy  * nz + iz ]);
 
-                    double myxLzm = kx[ixm] * (zeta[ixm + iy  * nx + izm* nxy] +
-                                               zeta[ixm + iym * nx + izm* nxy]);
-                    double myxRzm = kx[ix] *  (zeta[ix  + iy  * nx + izm* nxy] +
-                                               zeta[ix  + iym * nx + izm* nxy]);
-                    double mxyLzm = ky[iym] * (zeta[ix  + iym * nx + izm* nxy] +
-                                               zeta[ixm + iym * nx + izm* nxy]);
-                    double mxyRzm = ky[iy] *  (zeta[ix  + iy  * nx + izm* nxy] +
-                                               zeta[ixm + iy  * nx + izm* nxy]);
-                    double myxLzp = kx[ixm] * (zeta[ixm + iy  * nx + iz * nxy] +
-                                               zeta[ixm + iym * nx + iz * nxy]);
-                    double myxRzp = kx[ix] *  (zeta[ix  + iy  * nx + iz * nxy] +
-                                               zeta[ix  + iym * nx + iz * nxy]);
-                    double mxyLzp = ky[iym] * (zeta[ix  + iym * nx + iz * nxy] +
-                                               zeta[ixm + iym * nx + iz * nxy]);
-                    double mxyRzp = ky[iy] *  (zeta[ix  + iy  * nx + iz * nxy] +
-                                               zeta[ixm + iy  * nx + iz * nxy]);
+                    double myxLzm = kx[ixm] * (zeta[ixm*nyz + iy  * nz + izm] +
+                                               zeta[ixm*nyz + iym * nz + izm]);
+                    double myxRzm = kx[ix] *  (zeta[ix*nyz  + iy  * nz + izm] +
+                                               zeta[ix*nyz  + iym * nz + izm]);
+                    double mxyLzm = ky[iym] * (zeta[ix*nyz  + iym * nz + izm] +
+                                               zeta[ixm*nyz + iym * nz + izm]);
+                    double mxyRzm = ky[iy] *  (zeta[ix*nyz  + iy  * nz + izm] +
+                                               zeta[ixm*nyz + iy  * nz + izm]);
+                    double myxLzp = kx[ixm] * (zeta[ixm*nyz + iy  * nz + iz ] +
+                                               zeta[ixm*nyz + iym * nz + iz ]);
+                    double myxRzp = kx[ix] *  (zeta[ix*nyz  + iy  * nz + iz ] +
+                                               zeta[ix*nyz  + iym * nz + iz ]);
+                    double mxyLzp = ky[iym] * (zeta[ix*nyz  + iym * nz + iz ] +
+                                               zeta[ixm*nyz + iym * nz + iz ]);
+                    double mxyRzp = ky[iy] *  (zeta[ix*nyz  + iy  * nz + iz ] +
+                                               zeta[ixm*nyz + iy  * nz + iz ]);
+
+/*
+                     st[0] = (eta_x[ixm + iy * nx + iz * nxy] +
+                              eta_x[ixm + iy * nx + izm * nxy] +
+                              eta_x[ixm + iym * nx + iz * nxy] +
+                              eta_x[ixm + iym * nx + izm * nxy]);
+                     st[1] = (eta_x[ix + iy * nx + iz * nxy] +
+                              eta_x[ix + iy * nx + izm * nxy] +
+                              eta_x[ix + iym * nx + iz * nxy] +
+                              eta_x[ix + iym * nx + izm * nxy]);
+                     st[2] = (eta_y[ix + iym * nx + iz * ny] +
+                              eta_y[ix + iym * nx + izm * nz] +
+                              eta_y[ixm + iym * nx + iz * nz] +
+                              eta_y[ixm + iym * nx + izm * nz]);
+                     st[3] = (eta_y[ix + iy * nx + iz * nz] +
+                              eta_y[ix + iy * nx + izm * nz] +
+                              eta_y[ixm + iy * nx + iz * nz] +
+                              eta_y[ixm + iy * nx + izm * nz]);
+                     st[4] = (eta_z[ix + iy * nx + izm * nz] +
+                              eta_z[ix + iym * nx + izm * nz] +
+                              eta_z[ixm + iy * nx + izm * nz] +
+                              eta_z[ixm + iym * nx + izm * nz]);
+                     st[5] = (eta_z[ix + iy * nx + iz * nz] +
+                              eta_z[ix + iym * nx + iz * nz] +
+                              eta_z[ixm + iy * nx + iz * nz] +
+                              eta_z[ixm + iym * nx + iz * nz]);
+*/
 
                     // Diagonal elements
-                    st[0] = (eta_x[ixm + iy  * nx + iz * nxy] +
-                             eta_x[ixm + iy  * nx + izm* nxy] +
-                             eta_x[ixm + iym * nx + iz * nxy] +
-                             eta_x[ixm + iym * nx + izm* nxy]);
-                    st[1] = (eta_x[ix  + iy  * nx + iz * nxy] +
-                             eta_x[ix  + iy  * nx + izm* nxy] +
-                             eta_x[ix  + iym * nx + iz * nxy] +
-                             eta_x[ix  + iym * nx + izm* nxy]);
-                    st[2] = (eta_y[ix  + iym * nx + iz * nxy] +
-                             eta_y[ix  + iym * nx + izm* nxy] +
-                             eta_y[ixm + iym * nx + iz * nxy] +
-                             eta_y[ixm + iym * nx + izm* nxy]);
-                    st[3] = (eta_y[ix  + iy  * nx + iz * nxy] +
-                             eta_y[ix  + iy  * nx + izm * nxy] +
-                             eta_y[ixm + iy  * nx + iz * nxy] +
-                             eta_y[ixm + iy  * nx + izm* nxy]);
-                    st[4] = (eta_z[ix  + iy  * nx + izm* nxy] +
-                             eta_z[ix  + iym * nx + izm* nxy] +
-                             eta_z[ixm + iy  * nx + izm* nxy] +
-                             eta_z[ixm + iym * nx + izm* nxy]);
-                    st[5] = (eta_z[ix  + iy  * nx + iz * nxy] +
-                             eta_z[ix  + iym * nx + iz * nxy] +
-                             eta_z[ixm + iy  * nx + iz * nxy] +
-                             eta_z[ixm + iym * nx + iz * nxy]);
+                    st[0] = (eta_x[ixm*nyz + iy  * nz + iz ] +
+                             eta_x[ixm*nyz + iy  * nz + izm] +
+                             eta_x[ixm*nyz + iym * nz + iz ] +
+                             eta_x[ixm*nyz + iym * nz + izm]);
+                    st[1] = (eta_x[ix*nyz  + iy  * nz + iz ] +
+                             eta_x[ix*nyz  + iy  * nz + izm] +
+                             eta_x[ix*nyz  + iym * nz + iz ] +
+                             eta_x[ix*nyz  + iym * nz + izm]);
+                    st[2] = (eta_y[ix*nyz  + iym * nz + iz ] +
+                             eta_y[ix*nyz  + iym * nz + izm] +
+                             eta_y[ixm*nyz + iym * nz + iz ] +
+                             eta_y[ixm*nyz + iym * nz + izm]);
+                    st[3] = (eta_y[ix*nyz  + iy  * nz + iz ] +
+                             eta_y[ix*nyz  + iy  * nz + izm] +
+                             eta_y[ixm*nyz + iy  * nz + iz ] +
+                             eta_y[ixm*nyz + iy  * nz + izm]);
+                    st[4] = (eta_z[ix*nyz  + iy  * nz + izm] +
+                             eta_z[ix*nyz  + iym * nz + izm] +
+                             eta_z[ixm*nyz + iy  * nz + izm] +
+                             eta_z[ixm*nyz + iym * nz + izm]);
+                    st[5] = (eta_z[ix*nyz  + iy  * nz + iz ] +
+                             eta_z[ix*nyz  + iym * nz + iz ] +
+                             eta_z[ixm*nyz + iy  * nz + iz ] +
+                             eta_z[ixm*nyz + iym * nz + iz ]);
+/*
+
+fprintf(stderr,"[eta_x-1 %f %fj \n",eta_x[ix*nyz  + iy*nz + iz ]);
+fprintf(stderr,"[eta_x-2 %f %fj \n",eta_x[ix  + iy*nx + iz*nxy ]);
+*/
 
 /*
                     fprintf(stderr,"[st %f %fj %f %fj %f %fj\n",crealf(st[0]), cimagf(st[0]), 
@@ -179,6 +233,7 @@ void gauss_seidel(double complex *ex, double complex *ey, double complex *ez,
                     memset(&amat[0],0,sizeof(double complex)*36);
                     for (int k = 0; k < 6; k++) {
                         amat[6 * k] = -st[k] * 0.25;  // Fill diagonal elements
+                    //fprintf(stderr,"[amat %d %f %fj \n",k,crealf(amat[6*k]), cimagf(amat[6*k]));
                     }
 
                     // Complete diagonals
@@ -195,6 +250,7 @@ void gauss_seidel(double complex *ex, double complex *ey, double complex *ez,
                     amat[24] += mxyRzm / hy[iy] + mxyLzm / hy[iym];
                     amat[30] += myxRzp / hx[ix] + myxLzp / hx[ixm];
                     amat[30] += mxyRzp / hy[iy] + mxyLzp / hy[iym];
+                    //fprintf(stderr,"[amat [0]%f %fj \n",crealf(amat[6*0]), cimagf(amat[6*0]));
 
                     // Off-diagonal elements
                     // Upper triangle not needed and not set.
@@ -214,96 +270,150 @@ void gauss_seidel(double complex *ex, double complex *ey, double complex *ez,
                     amat[19] = mxzLyp / hy[iy];
                     amat[20] = -mxzRyp / hy[iy];
 
+//                    for (int k = 0; k < 36; k++) {
+//                    fprintf(stderr,"[amat %d %f %fj \n",k,crealf(amat[k]), cimagf(amat[k]));
+//                    }
                     // Fill residual (b - Ux^{(k)})
                     // Note: rhs is NOT the full residual at this point
 
                     // Get the 6 edges for ix, iy, and iz
-                    rhs[0] = sx[ixm + iy*nx   + iz*nx*ny1];
-                    rhs[1] = sx[ix  + iy*nx   + iz*nx*ny1];
-                    rhs[2] = sy[ix  + iym*nx1 + iz*nx1*ny];
-                    rhs[3] = sy[ix  + iy*nx1  + iz*nx1*ny];
-                    rhs[4] = sz[ix  + iy*nx1  + izm*nx1*ny1];
-                    rhs[5] = sz[ix  + iy*nx1  + iz*nx1*ny1];
+                    rhs[0] = sx[ixm*nz1*ny1 + iy*nz1  + iz];
+                    rhs[1] = sx[ix*nz1*ny1  + iy*nz1  + iz];
+                    rhs[2] = sy[ix*nz1*ny   + iym*nz1 + iz];
+                    rhs[3] = sy[ix*nz1*ny   + iy*nz1  + iz];
+                    rhs[4] = sz[ix*nz*ny1   + iy*nz   + izm];
+                    rhs[5] = sz[ix*nz*ny1   + iy*nz   + iz];
+
 /*
+                    fprintf(stderr," %d %d %d sx=%.3e %.3ej\n",iz, iy, ix, creal(sx[ix+iy*nx+iz*nx*ny1]), cimag(sx[ix+iy*nx+iz*nx*ny1]) );
+                    fprintf(stderr," T %d %d %d sx=%.3e %.3ej\n",iz, iy, ix, creal(sx[ix*ny1*nz1+iy*nz1+iz]), cimag(sx[ix*ny1*nz1+iy*nz1+iz]) );
                     fprintf(stderr," %d %d %d rhs=[%.3e %.3ej %.3e %.3ej %.3e %.3ej ",iz, iy, ix, crealf(rhs[0]), cimagf(rhs[0]), 
                                                             crealf(rhs[1]), cimagf(rhs[1]), 
                                                             crealf(rhs[2]), cimagf(rhs[2])); 
                     fprintf(stderr,"%.3e %.3ej %.3e %.3ej %.3e %.3ej]\n",crealf(rhs[3]), cimagf(rhs[3]), 
                                                             crealf(rhs[4]), cimagf(rhs[4]), 
                                                             crealf(rhs[5]), cimagf(rhs[5])); 
+
+                    fprintf(stderr," %d %d %d ex=%.3e %.3ej\n",iz, iy, ix, creal(ex[ix+iy*nx+iz*nx*ny1]), cimag(ex[ix+iy*nx+iz*nx*ny1]) );
+                    fprintf(stderr," %d %d %d ey=%.3e %.3ej\n",iz, iy, ix, creal(ey[ix+iy*nx1+iz*nx1*ny]), cimag(ey[ix+iy*nx1+iz*nx1*ny]) );
+                    fprintf(stderr," %d %d %d ez=%.3e %.3ej\n",iz, iy, ix, creal(ez[ix+iy*nx1+iz*nx1*ny1]), cimag(ez[ix+iy*nx1+iz*nx1*ny1]) );
 */
-
+/*
+                    fprintf(stderr," T %d %d %d ex=%.3e %.3ej\n",iz, iy, ix, creal(ex[ix*ny1*nz1+iy*nz1+iz]), cimag(ex[ix*ny1*nz1+iy*nz1+iz]) );
+                    fprintf(stderr," T %d %d %d ey=%.3e %.3ej\n",iz, iy, ix, creal(ey[ix*ny*nz1+iy*nz1+iz]), cimag(ey[ix*ny*nz1+iy*nz1+iz]) );
+                    fprintf(stderr," T %d %d %d ez=%.3e %.3ej\n",iz, iy, ix, creal(ez[ix*ny1*nz+iy*nz+iz]), cimag(ez[ix*ny1*nz+iy*nz+iz]) );
+*/
                     // Residual updates
-                    rhs[0] += mzyRxm * (ey[ixm + iy*nx1  + iz * nx1*ny] / hx[ixm] +
-                                        ex[ixm + iyp*nx  + iz * nx*ny1] / hy[iy]);
-                    rhs[0] += mzyLxm *(-ey[ixm + iym*nx1 + iz * nx1*ny] / hx[ixm] +
-                                        ex[ixm + iym*nx  + iz * nx*ny1] / hy[iym]);
-                    rhs[0] += myzRxm * (ez[ixm + iy*nx1  + iz * nx1*ny1] / hx[ixm] +
-                                        ex[ixm + iy*nx   + izp* nx*ny1] / hz[iz]);
-                    rhs[0] += myzLxm *(-ez[ixm + iy*nx1  + izm* nx1*ny1] / hx[ixm] +
-                                        ex[ixm + iy*nx   + izm* nx*ny1] / hz[izm]);
+                    rhs[0] += mzyRxm * (ey[ixm*ny *nz1 + iy *nz1 + iz ] / hx[ixm] +
+                                        ex[ixm*ny1*nz1 + iyp*nz1 + iz ] / hy[iy]);
+                    rhs[0] += mzyLxm *(-ey[ixm*ny *nz1 + iym*nz1 + iz ] / hx[ixm] +
+                                        ex[ixm*ny1*nz1 + iym*nz1 + iz ] / hy[iym]);
+                    rhs[0] += myzRxm * (ez[ixm*ny1*nz  + iy *nz  + iz ] / hx[ixm] +
+                                        ex[ixm*ny1*nz1 + iy *nz1 + izp] / hz[iz]);
+                    rhs[0] += myzLxm *(-ez[ixm*ny1*nz  + iy *nz  + izm] / hx[ixm] +
+                                        ex[ixm*ny1*nz1 + iy *nz1 + izm] / hz[izm]);
+
                     //fprintf(stderr,"Crhs[%d %d %d][0]=%e %ej m=%e %e %e %e\n",iz, iy, ix, crealf(rhs[0]), cimagf(rhs[0]), mzyRxm, mzyLxm, myzRxm, myzLxm, crealf(ey[ixm + iy*nx1  + iz * nx1*ny]) );
+                    //fprintf(stderr,"Crhs[%d %d %d][0]=%e %ej m=%e %e %e %e\n",iz, iy, ix, crealf(rhs[0]), cimagf(rhs[0]), mzyRxm, mzyLxm, myzRxm, myzLxm );
 
-                    rhs[1] += mzyRxp *(-ey[ixp + iy*nx1  + iz * nx1*ny] / hx[ix] +
-                                        ex[ix  + iyp*nx  + iz * nx*ny1] / hy[iy]);
-                    rhs[1] += mzyLxp * (ey[ixp + iym*nx1 + iz * nx1*ny] / hx[ix] +
-                                        ex[ix  + iym*nx  + iz * nx*ny1] / hy[iym]);
-                    rhs[1] += myzRxp *(-ez[ixp + iy*nx1  + iz * nx1*ny1] / hx[ix] +
-                                        ex[ix  + iy*nx   + izp* nx*ny1] / hz[iz]);
-                    rhs[1] += myzLxp * (ez[ixp + iy*nx1  + izm* nx1*ny1] / hx[ix] +
-                                        ex[ix  + iy*nx   + izm* nx*ny1] / hz[izm]);
+                    rhs[1] += mzyRxp *(-ey[ixp*ny *nz1 + iy *nz1 + iz ] / hx[ix] +
+                                        ex[ix *ny1*nz1 + iyp*nz1 + iz ] / hy[iy]);
+                    //fprintf(stderr,"Crhs[%d %d %d][1].1=%e %ej \n",iz, iy, ix, crealf(rhs[1]), cimagf(rhs[1]), mzyRxp);
+                    rhs[1] += mzyLxp * (ey[ixp*ny *nz1 + iym*nz1 + iz ] / hx[ix] +
+                                        ex[ix *ny1*nz1 + iym*nz1 + iz ] / hy[iym]);
+                    //fprintf(stderr,"Crhs[%d %d %d][1].2=%e %ej \n",iz, iy, ix, crealf(rhs[1]), cimagf(rhs[1]), mzyLxp);
+                    rhs[1] += myzRxp *(-ez[ixp*ny1*nz  + iy *nz  + iz ] / hx[ix] +
+                                        ex[ix *ny1*nz1 + iy *nz1 + izp] / hz[iz]);
+                    //fprintf(stderr,"Crhs[%d %d %d][1].3=%e %ej \n",iz, iy, ix, crealf(rhs[1]), cimagf(rhs[1]), myzRxp);
+                    rhs[1] += myzLxp * (ez[ixp*ny1*nz  + iy *nz  + izm] / hx[ix] +
+                                        ex[ix *ny1*nz1 + iy *nz1 + izm] / hz[izm]);
+                    //fprintf(stderr,"Crhs[%d %d %d][1].4=%e %ej \n",iz, iy, ix, crealf(rhs[1]), cimagf(rhs[1]), myzLxp);
 
-                    rhs[2] += mzxRym * (ey[ixp + iym*nx1 + iz * nx1*ny] / hx[ix] +
-                                        ex[ix  + iym*nx  + iz * nx*ny1] / hy[iym]);
-                    rhs[2] += mzxLym * (ey[ixm + iym*nx1 + iz * nx1*ny] / hx[ixm] -
-                                        ex[ixm + iym*nx  + iz * nx*ny1] / hy[iym]);
-                    rhs[2] += mxzRym * (ez[ix  + iym*nx1 + iz * nx1*ny1] / hy[iym] +
-                                        ey[ix  + iym*nx1 + izp* nx1*ny] / hz[iz]);
-                    rhs[2] += mxzLym *(-ez[ix  + iym*nx1 + izm* nx1*ny1] / hy[iym] +
-                                        ey[ix  + iym*nx1 + izm* nx1*ny] / hz[izm]);
-
-
-                    rhs[3] += mzxRyp * (ey[ixp + iy*nx1  + iz * nx1*ny] / hx[ix] -
-                                        ex[ix  + iyp*nx  + iz * nx*ny1] / hy[iy]);
-                    rhs[3] += mzxLyp * (ey[ixm + iy*nx1  + iz * nx1*ny] / hx[ixm] +
-                                        ex[ixm + iyp*nx  + iz * nx*ny1] / hy[iy]);
-                    rhs[3] += mxzRyp *(-ez[ix  + iyp*nx1 + iz * nx1*ny1] / hy[iy] +
-                                        ey[ix  + iy*nx1  + izp* nx1*ny] / hz[iz]);
-                    rhs[3] += mxzLyp * (ez[ix  + iyp*nx1 + izm* nx1*ny1] / hy[iy] +
-                                        ey[ix  + iy*nx1  + izm* nx1*ny] / hz[izm]);
-
-                    rhs[4] += myxRzm * (ez[ixp + iy*nx1  + izm* nx1*ny1] / hx[ix] +
-                                        ex[ix  + iy*nx   + izm* nx*ny1] / hz[izm]);
-                    rhs[4] += myxLzm * (ez[ixm + iy*nx1  + izm* nx1*ny1] / hx[ixm] -
-                                        ex[ixm + iy*nx   + izm* nx*ny1] / hz[izm]);
-                    rhs[4] += mxyRzm * (ez[ix  + iyp*nx1 + izm* nx1*ny1] / hy[iy] +
-                                        ey[ix  + iy*nx1  + izm* nx1*ny] / hz[izm]);
-                    rhs[4] += mxyLzm * (ez[ix  + iym*nx1 + izm* nx1*ny1] / hy[iym] -
-                                        ey[ix  + iym*nx1 + izm* nx1*ny] / hz[izm]);
+/*
+                    fprintf(stderr,"Crhs[%d %d %d][1]=%e %ej m=%e %e %e %e\n",iz, iy, ix, crealf(rhs[1]), cimagf(rhs[1]), mzyRxp, mzyLxp, myzRxp, myzLxp );
+                    fprintf(stderr," T %d %d %d ex=%.3e %.3ej\n",iz, iy, ix, creal(ex[ix*ny1*nz1+iy*nz1+iz]), cimag(ex[ix*ny1*nz1+iy*nz1+iz]) );
+                    fprintf(stderr," T %d %d %d ey=%.3e %.3ej\n",iz, iy, ix, creal(ey[ix*ny*nz1+iy*nz1+iz]), cimag(ey[ix*ny*nz1+iy*nz1+iz]) );
+                    fprintf(stderr," T %d %d %d ez=%.3e %.3ej\n",iz, iy, ix, creal(ez[ix*ny1*nz+iy*nz+iz]), cimag(ez[ix*ny1*nz+iy*nz+iz]) );
+*/
  
-                    rhs[5] += myxRzp * (ez[ixp + iy*nx1  + iz * nx1*ny1] / hx[ix] +
-                                        ex[ix  + iy*nx   + iz * nx*ny1] / hz[iz]);
-                    rhs[5] += myxLzp * (ez[ixm + iy*nx1  + iz * nx1*ny1] / hx[ixm] -
-                                        ex[ixm + iy*nx   + iz * nx*ny1] / hz[iz]);
-                    rhs[5] += mxyRzp *(-ez[ix  + iy*nx1  + izp* nx1*ny1] / hy[iy] +
-                                        ey[ix  + iy*nx1  + iz * nx1*ny] / hz[iz]);
-                    rhs[5] += mxyLzp * (ez[ix  + iy*nx1  + izm* nx1*ny1] / hy[iy] +
-                                        ey[ix  + iy*nx1  + iz * nx1*ny] / hz[iz]);
+                    rhs[2] += mzxRym * (ey[ixp*ny *nz1 + iym*nz1 + iz ] / hx[ix] +
+                                        ex[ix *ny1*nz1 + iym*nz1 + iz ] / hy[iym]);
+                    rhs[2] += mzxLym * (ey[ixm*ny *nz1 + iym*nz1 + iz ] / hx[ixm] -
+                                        ex[ixm*ny1*nz1 + iym*nz1 + iz ] / hy[iym]);
+                    rhs[2] += mxzRym * (ez[ix *ny1*nz  + iym*nz  + iz ] / hy[iym] +
+                                        ey[ix *ny *nz1 + iym*nz1 + izp] / hz[iz]);
+                    rhs[2] += mxzLym *(-ez[ix *ny1*nz  + iym*nz  + izm] / hy[iym] +
+                                        ey[ix *ny *nz1 + iym*nz1 + izm] / hz[izm]);
 
+
+                    rhs[3] += mzxRyp * (ey[ixp*ny *nz1 + iy*nz1  + iz ] / hx[ix] -
+                                        ex[ix *ny1*nz1 + iyp*nz1 + iz ] / hy[iy]);
+                    rhs[3] += mzxLyp * (ey[ixm*ny *nz1 + iy*nz1  + iz ] / hx[ixm] +
+                                        ex[ixm*ny1*nz1 + iyp*nz1 + iz ] / hy[iy]);
+                    rhs[3] += mxzRyp *(-ez[ix *ny1*nz  + iyp*nz  + iz ] / hy[iy] +
+                                        ey[ix *ny *nz1 + iy*nz1  + izp] / hz[iz]);
+                    rhs[3] += mxzLyp * (ez[ix *ny1*nz  + iyp*nz  + izm] / hy[iy] +
+                                        ey[ix *ny *nz1 + iy*nz1  + izm] / hz[izm]);
+
+                    rhs[4] += myxRzm * (ez[ixp*ny1*nz  + iy*nz   + izm] / hx[ix] +
+                                        ex[ix *ny1*nz1 + iy*nz1  + izm] / hz[izm]);
+                    rhs[4] += myxLzm * (ez[ixm*ny1*nz  + iy*nz   + izm] / hx[ixm] -
+                                        ex[ixm*ny1*nz1 + iy*nz1  + izm] / hz[izm]);
+                    rhs[4] += mxyRzm * (ez[ix *ny1*nz  + iyp*nz  + izm] / hy[iy] +
+                                        ey[ix *ny *nz1 + iy*nz1  + izm] / hz[izm]);
+                    rhs[4] += mxyLzm * (ez[ix *ny1*nz  + iym*nz  + izm] / hy[iym] -
+                                        ey[ix *ny *nz1 + iym*nz1 + izm] / hz[izm]);
+ 
+                    rhs[5] += myxRzp * (ez[ixp*ny1*nz  + iy*nz   + iz ] / hx[ix] -
+                                        ex[ix *ny1*nz1 + iy*nz1  + izp] / hz[iz]);
+                    rhs[5] += myxLzp * (ez[ixm*ny1*nz  + iy*nz   + iz ] / hx[ixm] +
+                                        ex[ixm*ny1*nz1 + iy*nz1  + izp] / hz[iz]);
+                    rhs[5] += mxyRzp * (ez[ix *ny1*nz  + iyp*nz  + iz ] / hy[iy] -
+                                        ey[ix *ny *nz1 + iy*nz1  + izp] / hz[iz]);
+                    rhs[5] += mxyLzp * (ez[ix *ny1*nz  + iym*nz  + iz ] / hy[iym] +
+                                        ey[ix *ny *nz1 + iym*nz1 + izp] / hz[iz]);
+
+/*
+                    fprintf(stderr," %d %d %d rhs2=[%.3e %.3ej %.3e %.3ej %.3e %.3ej ",iz, iy, ix, crealf(rhs[0]), cimagf(rhs[0]), 
+                                                            crealf(rhs[1]), cimagf(rhs[1]), 
+                                                            crealf(rhs[2]), cimagf(rhs[2])); 
+                    fprintf(stderr,"%.3e %.3ej %.3e %.3ej %.3e %.3ej]\n",crealf(rhs[3]), cimagf(rhs[3]), 
+                                                            crealf(rhs[4]), cimagf(rhs[4]), 
+                                                            crealf(rhs[5]), cimagf(rhs[5])); 
+*/
                     // Solve the linear system A x = b
                     solve(6, amat, rhs);
+		    
+		    /*
+                    fprintf(stderr," %d %d %d rhs3=[%.3e %.3ej %.3e %.3ej %.3e %.3ej ",iz, iy, ix, crealf(rhs[0]), cimagf(rhs[0]), 
+                                                            crealf(rhs[1]), cimagf(rhs[1]), 
+                                                            crealf(rhs[2]), cimagf(rhs[2])); 
+                    fprintf(stderr,"%.3e %.3ej %.3e %.3ej %.3e %.3ej]\n",crealf(rhs[3]), cimagf(rhs[3]), 
+                                                            crealf(rhs[4]), cimagf(rhs[4]), 
+                                                            crealf(rhs[5]), cimagf(rhs[5])); 
+		    */
 
                     // Update e-field (here we could apply damping weights)
-                    ex[ixm + iy*nx   + iz *nx*ny1] = rhs[0];
-                    ex[ix  + iy*nx   + iz *nx*ny1] = rhs[1];
-                    ey[ix  + iym*nx1 + iz *nx1*ny] = rhs[2];
-                    ey[ix  + iy*nx1  + iz *nx1*ny] = rhs[3];
-                    ez[ix  + iy*nx1  + izm* nx1*ny1] = rhs[4];
-                    ez[ix  + iy*nx1  + iz * nx1*ny1] = rhs[5];
+                    ex[ixm*ny1*nz1 + iy*nz1  + iz ] = rhs[0];
+                    ex[ix*ny1*nz1  + iy*nz1  + iz ] = rhs[1];
+                    ey[ix*ny*nz1   + iym*nz1 + iz ] = rhs[2];
+                    ey[ix*ny*nz1   + iy*nz1  + iz ] = rhs[3];
+                    ez[ix*ny1*nz   + iy*nz   + izm] = rhs[4];
+                    ez[ix*ny1*nz   + iy*nz   + iz ] = rhs[5];
                 }
             }
         }
     }
+    FILE *fp;
+    fp = fopen("Cex.bin", "w+");
+    fwrite(ex, sizeof(double complex), nx*ny1*nz1, fp);
+    fclose(fp);
+    fp = fopen("Cey.bin", "w+");
+    fwrite(ey, sizeof(double complex), nx1*ny*nz1, fp);
+    fclose(fp);
+    fp = fopen("Cez.bin", "w+");
+    fwrite(ez, sizeof(double complex), nx1*ny1*nz, fp);
+    fclose(fp);
 
     // Free allocated memory
     free(kx);
