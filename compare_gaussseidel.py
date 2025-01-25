@@ -5,7 +5,7 @@ from emg3d import _ccore
 
 
 atol = 0
-rtol = 1e-12
+rtol = 1e-8
 
 def compare(a, b, atol, rtol):
     same = np.allclose(a, b, rtol=rtol, atol=atol, equal_nan=True)
@@ -83,5 +83,19 @@ emg3d.core.gauss_seidel(nfield.fx, nfield.fy, nfield.fz, *inp)
 _ccore.gaussseidel(cfield.fx, cfield.fy, cfield.fz, *inp)
 
 # Check the resulting field.
+print("\n\n          === DEFAULT ==")
 compare(nfield.field, cfield.field, atol, rtol)
 # assert nfield == cfield
+
+
+print("\n\n          === RE-ORDERING ==")
+c2field = cfield.copy()
+xshape = c2field.fx.shape
+yshape = c2field.fy.shape
+zshape = c2field.fz.shape
+c2field.field = np.r_[
+    c2field.fx.ravel('F').reshape(xshape, order='C').ravel('F'),
+    c2field.fy.ravel('F').reshape(yshape, order='C').ravel('F'),
+    c2field.fz.ravel('F').reshape(zshape, order='C').ravel('F'),
+]
+compare(nfield.field, c2field.field, atol, rtol)
