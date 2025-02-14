@@ -11,6 +11,8 @@ v1.8.7 : Release SciPy restriction
 
 **2025-01-09**
 
+- Initial version of SimPEG(emg3d)
+
 - Maintenance:
 
   - Replace ``scipy.interpolate.interpnd`` with ``scipy.interpolate._interpnd``
