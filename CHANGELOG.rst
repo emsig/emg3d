@@ -5,6 +5,11 @@ Changelog
 1.x-Series
 """"""""""
 
+latest
+------
+
+- Initial version of pyGIMLI(emg3d)
+
 
 v1.8.7 : Release SciPy restriction
 ----------------------------------
