@@ -12,7 +12,7 @@ latest
 
 - Maintenance
 
-  - Testing: added Python 3.13.
+  - Testing: added Python 3.13, 3.14; removed Python 3.10.
 
 
 v1.8.7 : Release SciPy restriction
