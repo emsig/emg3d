@@ -6,11 +6,15 @@ Changelog
 """"""""""
 
 
-latest
-------
+v1.9.0 : Simulation Selection
+-----------------------------
+
+**2026-03-27**
 
 - Simulation
 
+  - New attribute ``select``, which returns a reduced simulation containing the
+    selected sources, receivers, and frequencies.
   - New cleaning option ``'gradient'`` (``Simulation.clean('gradient')``),
     cleaning only gradient-related values.
 

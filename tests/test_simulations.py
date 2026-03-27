@@ -550,6 +550,13 @@ class TestSimulation():
         sim = simulations.Simulation(tqdm_opts={'bar_format': '{bar}'}, **inp)
         assert sim._tqdm_opts == tqdm_opts
 
+    def test_select(self):
+        sim = self.simulation.select(sources='TxED-1', frequencies='f-2')
+        assert sim._gradient is None
+        assert sim._misfit is None
+        assert list(sim._dict_efield.keys()) == ['TxED-1']
+        assert list(sim._dict_efield['TxED-1'].keys()) == ['f-2']
+
 
 @pytest.mark.skipif(xarray is None, reason="xarray not installed.")
 class TestLayeredSimulation():
