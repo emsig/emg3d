@@ -393,7 +393,7 @@ class Fourier:
         """Get required frequencies for given times and ft/ftarg."""
 
         # Get freq via empymod.
-        inp = (self.verb, True) if empymod260 else (self.verb)
+        inp = (self.verb, True) if empymod260 else (self.verb, )
         freq, ft, ftarg = empymod.utils.check_time(
                 self.time, self.signal, self.ft, self.ftarg, *inp)[1:4]
 
