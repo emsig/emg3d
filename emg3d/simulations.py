@@ -626,6 +626,58 @@ class Simulation:
         else:
             return out[name]
 
+    def select(self, sources=None, receivers=None, frequencies=None,
+               remove_empty=True):
+        """Return a Simulation with selected sources, receivers, & frequencies.
+
+
+        Parameters
+        ----------
+        sources, receivers, frequencies : list, default: None
+            Lists containing the wanted sources, receivers, and frequencies.
+            If None, all are selected.
+
+        remove_empty : bool, default: True
+            If True, and self.data.observed has finite entries, it removes
+            empty source-receiver-frequency entries and according sources,
+            receivers, and frequencies.
+
+
+        Returns
+        -------
+        simulation : Simulation
+            A :class:`emg3d.simulations.Simulation` instance.
+
+        """
+
+        # Get a dict of the simulation
+        sim = self.to_dict()
+
+        # Reduce survey
+        surv = self.survey.select(
+                sources, receivers, frequencies, remove_empty)
+        sim['survey'] = surv.to_dict()
+
+        # Reset misfit and gradient
+        sim['gradient'] = None
+        sim['misfit'] = None
+
+        # Reduce field dicts
+        names = ['_dict_grid', '_dict_efield', '_dict_efield_info',
+                 '_dict_bfield', '_dict_bfield_info']
+
+        for name in names:
+            if name in sim.keys():
+                sim[name] = {
+                    src: {
+                        freq: sim[name][src][freq] for freq in surv.frequencies
+                    }
+                    for src in surv.sources.keys()
+                }
+
+        # Return new, reduced simulation.
+        return Simulation.from_dict(sim)
+
     # GET FUNCTIONS
     @property
     def data(self):
