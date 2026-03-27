@@ -362,6 +362,8 @@ class Simulation:
             - ``'computed'``:
               Removes all computed properties: electric and magnetic fields and
               responses at receiver locations.
+            - ``'gradient'``:
+              Removes everything related to the gradient.
             - ``'keepresults'``:
               Removes everything  except for the responses at receiver
               locations.
@@ -370,7 +372,7 @@ class Simulation:
 
         """
 
-        if what not in ['computed', 'keepresults', 'all']:
+        if what not in ['computed', 'gradient', 'keepresults', 'all']:
             raise TypeError(f"Unrecognized `what`: {what}.")
 
         # Clean grid/model-dicts.
@@ -389,6 +391,13 @@ class Simulation:
                 delattr(self, name)
                 setattr(self, name, self._dict_initiate)
 
+            # Remove files if they exist.
+            if self.file_dir:
+                for p in Path(self.file_dir).glob('efield_*.h5'):
+                    p.unlink()
+
+        if what in ['computed', 'gradient', 'keepresults', 'all']:
+
             # These only exist with gradient; don't initiate them.
             for name in ['_dict_bfield', '_dict_bfield_info']:
                 if hasattr(self, name):
@@ -396,7 +405,7 @@ class Simulation:
 
             # Remove files if they exist.
             if self.file_dir:
-                for p in Path(self.file_dir).glob('[ebg]field_*.h5'):
+                for p in Path(self.file_dir).glob('[bg]field_*.h5'):
                     p.unlink()
 
         # Clean data.
@@ -407,6 +416,8 @@ class Simulation:
                     del self.data[key]
             self.data['synthetic'] = self.data.observed.copy(
                     data=np.full(self.survey.shape, np.nan+1j*np.nan))
+
+        if what in ['computed', 'gradient', 'all']:
             for name in ['_gradient', '_misfit']:
                 delattr(self, name)
                 setattr(self, name, None)

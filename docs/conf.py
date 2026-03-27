@@ -117,4 +117,5 @@ html_css_files = [
 # is responsible for resolving them.
 linkcheck_ignore = [
     "https://doi.org/*",  # DOIs should be permanent (their entire purpose)
+    "https://zenodo.org/*",  # Zenodos should be permanent " " "
 ]

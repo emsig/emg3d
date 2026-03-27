@@ -297,10 +297,19 @@ class TestSimulation():
         assert 'residual' in sim2['survey']['data'].keys()
         assert 'residual' not in sim3['survey']['data'].keys()
 
+        # Test clean('gradient')
+        simulation.clean('gradient')  # Should remove 'residual'/'bfield-dicts'
+        sim5a = simulation.to_dict('all', copy=True)
+        assert 'residual' in sim5a['survey']['data'].keys()
+        assert 'weights' in sim5a['survey']['data'].keys()
+        assert sim5a['gradient'] is None
+        assert sim5a['misfit'] is None
+        assert '_dict_bfield' not in sim5a.keys()
+
         simulation.clean('all')  # Should remove 'residual', 'bfield-dicts'
         sim5 = simulation.to_dict('all')
         assert 'residual' not in sim5['survey']['data'].keys()
-        assert '_dict_bfield' not in sim5.keys()
+        assert sim5['_dict_efield'] == sim5['_dict_efield_info']  # Empty
 
     def test_simulation_automatic(self, capsys):
         # Create a simple survey

@@ -9,6 +9,10 @@ Changelog
 latest
 ------
 
+- Simulation
+
+  - New cleaning option ``'gradient'`` (``Simulation.clean('gradient')``),
+    cleaning only gradient-related values.
 
 - Maintenance
 
