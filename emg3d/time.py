@@ -18,12 +18,15 @@ Functionalities related to time-domain modelling using a frequency-domain code.
 # the License.
 
 import warnings
+from packaging.version import Version
 
 import empymod
 import numpy as np
 import scipy as sp
 
 __all__ = ['Fourier', ]
+
+empymod260 = Version(empymod.__version__) >= Version("2.6.0")
 
 
 def __dir__():
@@ -390,8 +393,9 @@ class Fourier:
         """Get required frequencies for given times and ft/ftarg."""
 
         # Get freq via empymod.
-        _, freq, ft, ftarg = empymod.utils.check_time(
-                self.time, self.signal, self.ft, self.ftarg, self.verb)
+        inp = (self.verb, True) if empymod260 else (self.verb)
+        freq, ft, ftarg = empymod.utils.check_time(
+                self.time, self.signal, self.ft, self.ftarg, *inp)[1:4]
 
         # Store required frequencies and check ft, ftarg.
         self._freq_req = freq
