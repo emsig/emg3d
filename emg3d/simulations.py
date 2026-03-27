@@ -646,7 +646,7 @@ class Simulation:
         Returns
         -------
         simulation : Simulation
-            A :class:`emg3d.surveys.Simulation` instance.
+            A :class:`emg3d.simulations.Simulation` instance.
 
         """
 
