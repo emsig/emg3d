@@ -6,6 +6,14 @@ Changelog
 """"""""""
 
 
+v1.9.1 : Simulation Selection II
+--------------------------------
+
+**2026-03-28**
+
+Tiny bug fix for v1.9.0 (dependencies, nothing to do with the actual code).
+
+
 v1.9.0 : Simulation Selection
 -----------------------------
 
