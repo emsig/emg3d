@@ -36,34 +36,34 @@ jobs:
       matrix:
         os: [ubuntu, ]  # macos, windows]  # Only Linux currently.
         case:
-          - python-version: "3.11"
+          - python-version: "3.12"
             name: minimal
             os: ubuntu
-            conda: "'scipy=1.10' numba 'empymod>=2.3.2'"
-          - python-version: "3.12"
-            name: plain
-            os: ubuntu
-            conda: "scipy numba 'empymod>=2.3.2'"
-          - python-version: "3.12"
-            name: full
-            os: ubuntu
-            conda: "scipy numba 'empymod>=2.3.2' xarray tqdm h5py 'discretize>=0.11' matplotlib"
+            conda: "'scipy=1.11' 'numba<0.68' 'empymod>=2.3.2,<2.6.1'"
           - python-version: "3.13"
             name: plain
             os: ubuntu
-            conda: "scipy numba 'empymod>=2.3.2'"
+            conda: "scipy numba 'empymod>=2.6.1'"
           - python-version: "3.13"
             name: full
             os: ubuntu
-            conda: "scipy numba 'empymod>=2.3.2' xarray tqdm h5py 'discretize>=0.11' matplotlib"
+            conda: "scipy numba 'empymod>=2.6.1' xarray tqdm h5py 'discretize>=0.11' matplotlib"
           - python-version: "3.14"
             name: plain
             os: ubuntu
-            conda: "scipy numba 'empymod>=2.3.2'"
+            conda: "scipy numba 'empymod>=2.6.1'"
           - python-version: "3.14"
             name: full
             os: ubuntu
-            conda: "scipy numba 'empymod>=2.3.2' xarray tqdm h5py 'discretize>=0.11' matplotlib"
+            conda: "scipy numba 'empymod>=2.6.1' xarray tqdm h5py 'discretize>=0.11' matplotlib"
+          - python-version: "3.15"
+            name: plain
+            os: ubuntu
+            conda: "scipy numba 'empymod>=2.6.1'"
+          - python-version: "3.15"
+            name: full
+            os: ubuntu
+            conda: "scipy numba 'empymod>=2.6.1' xarray tqdm h5py 'discretize>=0.11' matplotlib"
 
     env:
       # Used for coveralls flag
@@ -74,7 +74,7 @@ jobs:
 
       # Checks-out your repository under $GITHUB_WORKSPACE
       - name: Checkout
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v7.0.1
         with:
           # Need to fetch more than the last commit so that setuptools-scm can
           # create the correct version string. If the number of commits since
@@ -90,7 +90,7 @@ jobs:
         run: git fetch origin 'refs/tags/*:refs/tags/*'
 
       - name: Setup miniconda
-        uses: conda-incubator/setup-miniconda@v3.2.0
+        uses: conda-incubator/setup-miniconda@v4.1.0
         with:
           auto-update-conda: true
           python-version: ${{ matrix.case.python-version }}
@@ -148,7 +148,7 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE
       - name: Checkout
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v7.0.1
         with:
           # Need to fetch more than the last commit so that setuptools-scm can
           # create the correct version string. If the number of commits since
@@ -164,7 +164,7 @@ jobs:
         run: git fetch origin 'refs/tags/*:refs/tags/*'
 
       - name: Setup Python
-        uses: actions/setup-python@v6.1.0
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.9"
 
@@ -191,7 +191,7 @@ jobs:
 
       - name: Publish to Test PyPI
         if: success()
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@v1.14.3
         with:
           user: __token__
           password: ${{ secrets.TEST_PYPI_PASSWORD }}
@@ -203,7 +203,7 @@ jobs:
       - name: Publish to PyPI
         # Only for releases
         if: success() && github.event_name == 'release'
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@v1.14.3
         with:
           user: __token__
           password: ${{ secrets.PYPI_PASSWORD }}
