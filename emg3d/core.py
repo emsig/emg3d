@@ -40,8 +40,7 @@ import numba as nb
 import numpy as np
 
 # Numba-settings
-# _numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
-_numba_setting = {'nogil': True, 'cache': True}
+_numba_setting = {'nogil': True, 'fastmath': True, 'cache': True}
 
 __all__ = [
     'amat_x', 'gauss_seidel', 'gauss_seidel_x', 'gauss_seidel_y',
