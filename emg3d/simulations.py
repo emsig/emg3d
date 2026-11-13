@@ -1094,8 +1094,11 @@ class Simulation:
                 # Compute back-propagating electric fields.
                 self._bcompute()
 
-                # Pre-allocate the gradient on the mesh.
+                # Pre-allocate the gradient on the mesh; contributions from
+                # computational grids different from the model grid are
+                # collected separately (see below).
                 gradient = np.zeros((3, *self.model.shape), order='F')
+                gradient_interp = np.zeros_like(gradient)
 
                 # Loop over source-frequency pairs.
                 for src, freq in self._srcfreq:
@@ -1123,13 +1126,32 @@ class Simulation:
                     # Bring gradient back from computation grid to inversion
                     # grid and add it to the total gradient.
                     if self.model.grid != gfield.grid:
+
+                        # The model is interpolated to the computational grid
+                        # by volume-averaging in log-space of conductivity
+                        # (`Model.interpolate_to_grid`), hence
+                        #   σ_c = exp(Σ_i w_ci log σ_i),
+                        #   dσ_c/dσ_i = w_ci σ_c / σ_i.
+                        # The exact adjoint is therefore
+                        #   diag(1/σ_model) P^T diag(σ_comp),
+                        # where P^T is the adjoint of linear volume averaging.
+                        # Here we multiply by σ_comp; the division by
+                        # σ_model is done after the loop.
+                        cmodel = self.get_model(src, freq)
+                        grad *= self._get_conductivities(cmodel)
+
                         # Wrapped in own function as it requires discretize.
                         maps._interp_volume_average_adj(
-                            oval=gradient, ogrid=self.model.grid,
+                            oval=gradient_interp, ogrid=self.model.grid,
                             nval=grad, ngrid=gfield.grid,
                         )
                     else:
                         gradient += grad
+
+                # Divide interpolated contributions by σ_model (see above).
+                if np.any(gradient_interp):
+                    sigma = self._get_conductivities(self.model)
+                    gradient += gradient_interp/sigma
 
             # Apply derivative-chain of property-map (only relevant if
             # `mapping` is something else than conductivity) and collect.
@@ -1391,6 +1413,18 @@ class Simulation:
         iopts = {'method': 'volume', 'extrapolate': True,
                  'log': False, 'grid': self.model.grid}
 
+        # Directions (x=0, y=1, z=2) corresponding to the rows of `vector`.
+        directions = {'isotropic': [0], 'HTI': [0, 1], 'VTI': [0, 2],
+                      'triaxial': [0, 1, 2]}[self.model.case]
+
+        # The model is interpolated to the computational grid by
+        # volume-averaging in log-space of conductivity
+        # (`Model.interpolate_to_grid`), hence σ_c = exp(Σ_i w_ci log σ_i),
+        # and the linearized perturbation is
+        #   δσ_c = σ_c Σ_i w_ci δσ_i/σ_i = σ_c P(δσ/σ_model),
+        # where P is linear volume averaging.
+        sigma = self._get_conductivities(self.model)[directions]
+
         # Create iterable from src/freq-list for parallel computation.
         def collect_gfield_inputs(inp, vector=vector):
             """Collect inputs."""
@@ -1400,10 +1434,16 @@ class Simulation:
             efield = self._dict_get('efield', source, freq)
 
             # Interpolate to computational grid.
-            cvector = [
-                maps.interpolate(values=v, xi=efield.grid, **iopts).ravel('F')
-                for v in vector[:, ...]
-            ]
+            if efield.grid != self.model.grid:
+                csigma = self._get_conductivities(
+                        self.get_model(source, freq))[directions]
+                cvector = [
+                    (cs*maps.interpolate(
+                        values=v/s, xi=efield.grid, **iopts)).ravel('F')
+                    for v, s, cs in zip(vector, sigma, csigma)
+                ]
+            else:
+                cvector = [v.ravel('F') for v in vector]
 
             if self.model.case == 'isotropic':
                 ncase = 1
@@ -1525,6 +1565,17 @@ class Simulation:
             )
 
         return self.__srcfreq
+
+    @staticmethod
+    def _get_conductivities(model):
+        """Return conductivities in x, y, z of shape (3, *model.shape).
+
+        Missing ``property_y`` or ``property_z`` (isotropic, HTI, VTI) are
+        filled with ``property_x``.
+        """
+        props = [model.property_x, model.property_y, model.property_z]
+        return np.array([model.map.backward(props[0] if p is None else p)
+                         for p in props])
 
     def _freq_inp2key(self, frequency):
         """Return key of frequency entry given its key or its value. """

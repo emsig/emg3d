@@ -6,6 +6,23 @@ Changelog
 """"""""""
 
 
+Unreleased
+----------
+
+- Simulation
+
+  - Bug fix: ``gradient``, ``jtvec``, and ``jvec`` were not consistent with
+    the forward modelling if the computational grids differ from the model
+    grid (any ``gridding`` other than ``'same'``). The model is interpolated
+    to the computational grid with volume averaging in log-space of
+    conductivity (geometric mean), but the gradient was mapped back with the
+    adjoint of linear volume averaging (and ``jvec`` interpolated linearly).
+    This caused errors of the order of 1 % in heterogeneous models, larger
+    around strong contrasts such as the air-earth interface. They are now the
+    exact (linearized) adjoint of the log-volume averaging, for all mappings
+    and anisotropy cases. Reported by Gonzalo Pérez.
+
+
 v1.9.1 : Simulation Selection II
 --------------------------------
 

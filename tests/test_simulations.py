@@ -1049,5 +1049,77 @@ class TestGradient:
         assert "tol       : 0.1" in out
 
 
+@pytest.mark.skipif(discretize is None, reason="discretize not installed.")
+@pytest.mark.parametrize('mapping', ['Conductivity', 'LgResistivity'])
+def test_jvec_jtvec_vs_fd_interpolated_model(mapping):
+    # If the computational grid differs from the model grid, the model is
+    # interpolated with log-volume averaging (geometric mean). jvec and jtvec
+    # must be consistent with that (not with a linear average). A homogeneous
+    # model cannot detect this, so we use a heterogeneous model with an air
+    # layer, and compare against central finite differences.
+    hx = np.ones(16)*500.0
+    hz = np.r_[np.ones(2)*800.0, np.ones(12)*200.0, np.ones(2)*800.0]
+    grid = emg3d.TensorMesh([hx, hx, hz], origin=(-4000, -4000, -2800))
+
+    rng = np.random.default_rng(1)
+    cz = grid.cell_centers_z[None, None, :]
+    earth = np.broadcast_to(cz < 0, grid.shape_cells)
+    con = np.where(cz > 0, 1e-8, np.where(cz > -600, 1/30, 1/5))
+    con = np.where(earth, con*np.exp(0.5*rng.normal(size=grid.shape_cells)),
+                   con)
+    mapobj = getattr(emg3d.maps, 'Map'+mapping)()
+    m0 = mapobj.forward(con)
+
+    # Perturbation (only in the earth), relative for linear mappings.
+    dm = np.where(earth, rng.normal(size=grid.shape_cells), 0.0)
+    if mapping == 'Conductivity':
+        dm *= m0
+
+    survey = emg3d.Survey(
+        sources=emg3d.TxElectricDipole((0, 0, -50, 0, 0), length=100.0),
+        receivers=[emg3d.RxElectricPoint((x, 0, -10, 0, 0))
+                   for x in (1000, 2000)] +
+                  [emg3d.RxMagneticPoint((x, 0, -10, 90, 0))
+                   for x in (1000, 2000)],
+        frequencies=1.0,
+        noise_floor=1.0,
+    )
+
+    def sim(m):
+        return simulations.Simulation(
+            survey=survey.copy(),
+            model=emg3d.Model(grid, m, mapping=mapping),
+            gridding='single',
+            gridding_opts={'center': (0, 0, 0), 'center_on_edge': True,
+                           'domain': ([-2000, 3000], [-1500, 1500],
+                                      [-1500, 100])},
+            receiver_interpolation='linear',
+            solver_opts={'tol': 1e-10, 'plain': True},
+            max_workers=1, verb=0, tqdm_opts=False,
+        )
+
+    simulation = sim(m0)
+    simulation.survey.data['observed'] = 0*simulation.data.synthetic
+    simulation.compute()
+    assert simulation.model.grid != simulation.get_grid(
+            *simulation._srcfreq[0])
+
+    # Central finite differences of J dm.
+    h = 1e-3
+    sp, sm = sim(m0 + h*dm), sim(m0 - h*dm)
+    sp.compute()
+    sm.compute()
+    fd = (sp.data.synthetic.data - sm.data.synthetic.data)/(2*h)
+
+    # jvec (linear mapping gave errors of O(1e-2)).
+    jv = simulation.jvec(dm)
+    assert np.linalg.norm(jv - fd)/np.linalg.norm(fd) < 1e-4
+
+    # jtvec: dot-product test against finite differences.
+    v = rng.normal(size=fd.shape) + 1j*rng.normal(size=fd.shape)
+    jt = simulation.jtvec(v)
+    assert_allclose(np.sum(jt*dm), np.real(np.vdot(v, fd)), rtol=1e-4)
+
+
 def test_all_dir():
     assert set(simulations.__all__) == set(dir(simulations))
