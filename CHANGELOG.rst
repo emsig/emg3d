@@ -6,6 +6,18 @@ Changelog
 """"""""""
 
 
+*latest*
+--------
+
+
+- Maintenance
+
+  - Testing: added Python 3.15; removed Python 3.11.
+  - Added a temporary workaround for the linux test to ensure empymod is
+    compiled before emg3d, see [#362](https://github.com/emsig/emg3d/issues/362).
+  - Changed license declaration in accordance with PEP 639.
+
+
 v1.9.1 : Simulation Selection II
 --------------------------------
 
