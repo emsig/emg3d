@@ -118,4 +118,5 @@ html_css_files = [
 linkcheck_ignore = [
     "https://doi.org/*",  # DOIs should be permanent (their entire purpose)
     "https://zenodo.org/*",  # Zenodos should be permanent " " "
+    "https://coveralls.io/*",  # Stopped bots from accessing, always fails
 ]
