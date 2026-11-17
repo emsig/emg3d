@@ -7,6 +7,8 @@ name = "emg3d"
 description = "A multigrid solver for 3D electromagnetic diffusion"
 readme = "README.rst"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "CREDITS.rst"]
 authors = [
   {name = "The emsig community", email = "info@emsig.xyz"},
 ]
@@ -18,13 +20,9 @@ dependencies = [
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python",
 ]
 dynamic = ["version"]
-
-[project.license]
-file = "LICENSE"
 
 [project.urls]
 Homepage = "https://emsig.xyz"
